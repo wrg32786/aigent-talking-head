@@ -24,9 +24,35 @@ Every version gets checked by re-transcribing it and by reading frames. All scri
 4. Read `jobs/<name>/clips/clips.md`. `npm run reel` already dropped every `retake` row. Remove slates and asides ("Okay, take two...") from `build/cut.json`, and trim the `out` of clips that end mid-move.
 5. Edit `build/captions.js`. It's a draft of plain captions with the last phrase before each seam made a spray hero word. Turn key words into stickers (mode 2), add a count-up, card or CTA (see step 4 below), and fix any misheard words against what the teammate said.
 6. Build it: `npm run reel -- --rebuild --name <name>` writes `jobs/<name>/reel-vN.mp4`, a new number each time.
-7. Verify (step 6 below), then hand over the reel path.
+7. Verify (step 6 below), then hand over the reel path. Offer the effects pass (next section) if they want more motion.
 
 Leave out `--draft` to go straight to `reel-v1.mp4` in one command. The draft step is better when someone will watch it.
+
+## Pick effects (optional second pass)
+
+After the reel is cut and captioned, you can add effects from [`effects/CATALOG.md`](../../effects/CATALOG.md) (51 starter effects by Vibha Ramprakash; machine-readable in `effects/catalog.json`). Set up once with `npm run effects:setup`.
+
+1. **Read the transcript** (`jobs/<name>/build/captions.js` or `clips/clips.md`) and mark the moments with output-clock times: hook (first 2 s), key claims, numbers or proof, lists or steps, reveals, objections ("but", "no", "stop"), and the CTA. Note the energy of each part (calm, medium, high) from the delivery and the words.
+2. **Tell the user what's available**, briefly: the moments you found, and for each one 2 or 3 effect options from the catalog that fit the moment and its energy, with a one-line "what it does". Offer a menu preset if one fits (below). Ask them to pick, or to say "you choose".
+3. **Build the plan**: 3 to 6 effects. A hook effect in the first 2 s, a CTA effect at the end, and no more than one `high` effect every 5 s. Use each effect's typical duration. Put real copy and numbers in every required option (ask for numbers; never invent them). Put the teammate's name and handle in `"profile"`. The "Edited by Claude" pill on `glass-widgets` stays off unless the user asks for it: then add `"pill": true` (or their own text, `"pill": "Made by |Sam"`) to that entry, or pass `--pill`. Save it as `jobs/<name>/fx.json`:
+   ```json
+   {"profile": {"name": "Sam", "handle": "@sam.makes"},
+    "effects": [{"fx": "lean-in", "start": 0.3, "end": 1.2},
+                {"fx": "checklist", "start": 6.0, "end": 10.0, "text": "Record::on your phone|Drop::in inbox|Ask::for the reel", "title": "Your workflow"},
+                {"fx": "countdown-flip", "start": 18.5, "end": 21.5}]}
+   ```
+4. **Captions.** Effects rated `off` hide captions for their window automatically, `check` ones need a look, and `safe` ones keep captions on. Only one effect in the caption band at a time, and none while a sticker, hero word or CTA caption is up.
+5. **Check, then render.** `npm run fx -- --name <name> --plan jobs/<name>/fx.json --still <middle of each effect>`; read every PNG in `build/fx/` (face covered? text cut off? captions crowded?). Fix the plan, then run without `--still` to get `jobs/<name>/reel-fx-vN.mp4`. The audio is exactly the reel's.
+6. Fix the notes the command prints (pacing, durations, demo copy) before you hand it over.
+
+**Effects menu presets** (offer one when the user doesn't know what they want):
+- **Calm explainer**: `dot-reveal` or `backdrop-word` on the hook, `todo` or `apple-toggles` on the list, `slow-push` on the key claim, `led-sign` on the CTA.
+- **Punchy hook**: `lean-in` or `backdrop-word` on the hook, `reject-stamp` or `huge-strike` on the objection, `match-cut` on the reveal, `countdown-flip` or `comment-box` on the CTA.
+- **Product demo**: `locked-on` on the hook, `checklist` or `the-bill` on the steps, `liquid-glass-graph` or `over-the-shoulder-zoom` on the numbers, `tap` on the CTA.
+- **Social proof**: `cover-star` or `orbit` on the hook, `headline-wall`, `profile-wall` or `messages` on the proof, `pastel-word` or `tap` on the CTA.
+- **Cinematic minimal**: `spotlight` on the hook, `slow-push` on the claim, `moody` or `timeline` between sections.
+
+Effects need a face in frame for anything marked `face`. A grade (`moody`, `swipe`) or `dot-reveal` works without one. These are starter versions of the author's effects; say so if the user compares them to a reel they saw.
 
 ## Manual pipeline
 

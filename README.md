@@ -30,6 +30,19 @@ HeyGen cinematic takes are an optional second source; they cut in the same way a
 
 The first run downloads the Whisper model (large-v3, about 3 GB). Pass `--model medium.en` for a faster, smaller first pass. Your footage, `jobs/` and `.env*` files are gitignored.
 
+## Effects (optional)
+
+After the reel is made, ask your agent to "add effects". It reads the transcript, finds the hook, claims, numbers, lists and CTA, and offers 2 or 3 effects for each from a menu of 51 (spotlight, backdrop word, checklist, glass graph, stamps, countdowns and more). Then it renders `jobs/<clip-name>/reel-fx-v1.mp4`, with your captions kept on top and the same audio.
+
+```
+npm run effects:setup                                     # once: Python venv with OpenCV + MediaPipe (~150 MB)
+npm run fx -- --list                                      # the menu, by moment
+npm run fx -- --name <clip-name> --plan fx.json --still 1.2,6.5   # check frames
+npm run fx -- --name <clip-name> --plan fx.json           # render
+```
+
+The effects come from [claude-video-effects](https://github.com/Vibha-Ramprakash/claude-video-effects) by Vibha Ramprakash (MIT), vendored at a pinned commit. See [effects/README.md](effects/README.md) for the catalog, the caption-safety rule and `npm run effects:update`.
+
 ## Install
 
 | Need | Mac | Linux | Windows |
@@ -96,7 +109,9 @@ Agents: start at [AGENTS.md](AGENTS.md).
 | `kit/autocaption.mjs` | Drafts `captions.js` from Whisper word times (`words.json` or `clips.json`). Never overwrites without `--force`. |
 | `kit/themes/` | Theme presets: `neutral.js` (default) and `aigent.js`. |
 | `kit/chrome.mjs` | Finds Chrome on Mac, Linux or Windows; `CHROME_PATH` overrides. |
-| `kit/smoke.mjs` | `npm run smoke`: synthetic end-to-end test. |
+| `kit/smoke.mjs` | `npm run smoke`: synthetic end-to-end test (includes the effects pass once `npm run effects:setup` has run). |
+| `kit/fx.cjs` | `npm run fx`: the effects pass over a job's reel (check frames, render, captions kept on top). |
+| `effects/` | Effect catalog, vendored claude-video-effects, setup, update and check scripts. |
 | `kit/clip.py` | Raw footage to sentence clips. Retakes flagged, ends set from the audio, voice at -16 LUFS, optional vertical crop, contact sheet. |
 | `kit/tx.py` | Word timings for each take; flags repeated words. |
 | `kit/timeline.mjs` | Maps segment word times onto the output clock and prints the seams. |
@@ -123,4 +138,5 @@ Code and docs: Apache-2.0, Copyright 2026 Will Gwyn (wrg32786). See [LICENSE](LI
 - `kit/sfx/F-cinematic-woosh-648729.mp3`: "Cinematic Woosh SFX-010" by AudioPapkin, Freesound 648729, CC0.
 - `kit/sfx/D-quick-woosh-683101.mp3`: "quick woosh" by florianreichelt, Freesound 683101, CC0.
 - `kit/example/skool-logo.svg`: the Skool wordmark, a trademark of Skool. It's included only to mark The AIgent's own Skool group in the Awakening example; it isn't in any theme. Don't use it for other brands.
+- `effects/vendor/claude-video-effects/`: [claude-video-effects](https://github.com/Vibha-Ramprakash/claude-video-effects) by Vibha Ramprakash, MIT. Its models (YuNet, MIT; MediaPipe Selfie Segmenter, Apache-2.0) and fonts (SIL OFL 1.1, Permanent Marker Apache-2.0) keep their own licences; see `NOTICE` and `effects/README.md`.
 - Music beds are not included. Bring your own licensed track.

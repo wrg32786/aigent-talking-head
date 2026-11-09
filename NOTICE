@@ -6,3 +6,11 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 Third-party files keep their own terms:
 - kit/sfx/*.mp3: Freesound CC0 (credits in README.md).
 - kit/example/skool-logo.svg: the Skool wordmark, a trademark of Skool, not covered by the Apache license.
+- effects/vendor/claude-video-effects/: claude-video-effects by Vibha Ramprakash
+  (https://github.com/Vibha-Ramprakash/claude-video-effects), MIT, Copyright (c) 2026 Vibha Ramprakash.
+  Pinned commit in effects/vendor/claude-video-effects/UPSTREAM.json. Its LICENSE is kept alongside.
+  - models/yunet.onnx: OpenCV Zoo YuNet face detector, MIT. models/selfie_segmenter.tflite: MediaPipe Selfie
+    Segmenter, Apache-2.0 (see models/NOTICE.md).
+  - fonts/: Archivo Black, Instrument Serif, Space Mono, Inter, Anton, Montserrat, Playfair Display under the
+    SIL Open Font License 1.1 (effects/licenses/OFL-1.1.txt and fonts/OFL-*.txt); Permanent Marker under
+    Apache-2.0 (fonts/LICENSE-PermanentMarker.txt).

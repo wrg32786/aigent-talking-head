@@ -1,0 +1,40 @@
+{
+ "repo": "https://github.com/Vibha-Ramprakash/claude-video-effects",
+ "commit": "a6c05c5acfadbc6730b3a6dae0fde7b886eb2207",
+ "committed_at": "2026-11-09T23:18:38+01:00",
+ "fetched_at": "2026-11-09T22:52:37.847Z",
+ "license": "MIT (code), SIL OFL 1.1 / Apache-2.0 (fonts, see fonts/), MIT (YuNet) and Apache-2.0 (MediaPipe selfie segmenter), see models/NOTICE.md",
+ "files": [
+  "LICENSE",
+  "SKILL.md",
+  "requirements.txt",
+  "scripts/fx.py",
+  "scripts/words.py",
+  "models/NOTICE.md",
+  "models/yunet.onnx",
+  "models/selfie_segmenter.tflite",
+  "fonts/Anton-Regular.ttf",
+  "fonts/ArchivoBlack-Regular.ttf",
+  "fonts/InstrumentSerif-Italic.ttf",
+  "fonts/Inter.ttf",
+  "fonts/LICENSE-PermanentMarker.txt",
+  "fonts/Montserrat.ttf",
+  "fonts/OFL-Anton.txt",
+  "fonts/OFL-ArchivoBlack.txt",
+  "fonts/OFL-InstrumentSerif.txt",
+  "fonts/OFL-Inter.txt",
+  "fonts/OFL-Montserrat.txt",
+  "fonts/OFL-PlayfairDisplay.txt",
+  "fonts/OFL-SpaceMono.txt",
+  "fonts/PermanentMarker-Regular.ttf",
+  "fonts/PlayfairDisplay-Italic.ttf",
+  "fonts/PlayfairDisplay.ttf",
+  "fonts/SpaceMono-Bold.ttf"
+ ],
+ "excluded": [
+  "README.md (promo links)",
+  "assets/ (promo image)",
+  "scripts/setup.sh (replaced by npm run effects:setup)"
+ ],
+ "bytes": 3381923
+}
