@@ -1,8 +1,19 @@
 {
   "name": "aigent-talking-head",
   "private": true,
-  "version": "1.0.0",
-  "description": "AIgent talking-head video ad pipeline: HeyGen cinematic takes to a brand-guide captioned vertical ad.",
+  "version": "1.1.0",
+  "description": "Talking-head video pipeline: raw footage or HeyGen takes to a captioned, themed 9:16 reel.",
   "type": "commonjs",
-  "dependencies": { "playwright-core": "^1.47.0" }
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "reel": "node kit/reel.cjs",
+    "smoke": "node kit/smoke.mjs",
+    "smoke:whisper": "node kit/smoke.mjs --whisper",
+    "chrome": "node kit/chrome.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "^1.47.0"
+  }
 }

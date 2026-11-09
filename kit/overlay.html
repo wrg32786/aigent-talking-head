@@ -1,18 +1,20 @@
 <!doctype html><html><head><meta charset="utf-8">
-<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=Sofia+Sans+Extra+Condensed:wght@760;820;860&display=swap" rel="stylesheet">
-<style>html,body{margin:0;background:transparent}canvas{display:block}</style></head><body><script src="captions.js"></script><canvas id="c" width="1080" height="1920"></canvas><script>
-// AIgent talking-head ad overlay. All timing and copy come from captions.js (window.CAPTIONS); see example/captions.awakening-hero.js.
-// Output-timeline seconds. render.mjs calls window.seek(t) per frame.
-// AIgent brand guide (vault/brand/aigent-brand-guide, Plinth dark): accent #5cf9e2 is the only cyan; text #f1e8dc; ground #0b0907; text-muted #a39585.
-// Video surface: captions in `sans` (Hanken Grotesk) at body weight; headlines/kicker/stickers in `display` (Sofia Sans Extra Condensed) caps 760-880, tracking -0.01em; cards square.
-const CY='#5cf9e2',IV='#f1e8dc',DK='#0b0907',MU='#a39585',
- F='820 SZpx "Sofia Sans Extra Condensed", "Arial Narrow", sans-serif',
- G='860 SZpx "Sofia Sans Extra Condensed", "Arial Narrow", sans-serif',
- K='760 SZpx "Sofia Sans Extra Condensed", "Arial Narrow", sans-serif',
- S='400 SZpx "Hanken Grotesk", Arial, sans-serif',fnt=(f,s)=>f.replace('SZ',s);
+<style>html,body{margin:0;background:transparent}canvas{display:block}</style></head><body><script src="theme.js"></script><script src="captions.js"></script><canvas id="c" width="1080" height="1920"></canvas><script>
+// Talking-head ad overlay. All timing and copy come from captions.js (window.CAPTIONS); see example/captions.awakening-hero.js.
+// Colours, fonts and logo come from theme.js (window.THEME; presets in kit/themes/), then any "theme" block in captions.js.
+// No theme.js at all falls back to the neutral defaults below. Output-timeline seconds. render.mjs calls window.seek(t) per frame.
+const DEF={fontCss:null,colors:{accent:'#ffd400',text:'#ffffff',ink:'#111111',muted:'#bdbdbd',cardBg:'rgba(17,17,17,.93)',cardStroke:'rgba(255,255,255,.14)',plate:'#ffffff'},
+ fonts:{caption:{family:'"Helvetica Neue", Arial, "Liberation Sans", sans-serif',weight:700,size:76},display:{family:'"Arial Narrow", "Liberation Sans Narrow", "Helvetica Neue", Arial, sans-serif',hero:900,sticker:800,kicker:700,tracking:-0.01}},logo:null};
+const merge=(a,b)=>{if(!b||typeof b!=='object')return a;const o=Array.isArray(a)?[...a]:{...a};for(const k in b)o[k]=(b[k]&&typeof b[k]==='object'&&!Array.isArray(b[k])&&a&&typeof a[k]==='object'&&a[k])?merge(a[k],b[k]):b[k];return o};
+const CAP=window.CAPTIONS||{flips:[]};
+const TH=merge(merge(DEF,window.THEME),CAP.theme);
+const CY=TH.colors.accent,IV=TH.colors.text,DK=TH.colors.ink,MU=TH.colors.muted,DF=TH.fonts.display,CF=TH.fonts.caption,TRK=DF.tracking??-0.01,CSZ=CF.size||76,
+ F=`${DF.sticker} SZpx ${DF.family}`,
+ G=`${DF.hero} SZpx ${DF.family}`,
+ K=`${DF.kicker} SZpx ${DF.family}`,
+ S=`${CF.weight} SZpx ${CF.family}`,fnt=(f,s)=>f.replace('SZ',s);
 const ctx=document.getElementById('c').getContext('2d');
 const mk=()=>{const c=document.createElement('canvas');c.width=1080;c.height=1920;return c};const TC=mk(),MC=mk(),T=TC.getContext('2d'),M=MC.getContext('2d');
-const CAP=window.CAPTIONS||{flips:[]};
 const Y=CAP.captionY||1300; // caption band: chest, below the face box. Measure the face per take; text never covers the face.
 // mode 0 caption, 1 spray hero word, 2 sticker, 3 count-up, 4 takeover card, 5 logo plate, 6 CTA sticker (+ optional sub line)
 const flips=CAP.flips.map(f=>[f.start,f.end,f.text,f.mode]);
@@ -20,7 +22,7 @@ const glitchAt=CAP.glitchAt||[];
 const rng=s=>()=>(s=(s*16807)%2147483647)/2147483647;
 const backOut=x=>{const c=2.4;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2)};const expo=x=>x>=1?1:1-Math.pow(2,-10*x);const cl=x=>Math.max(0,Math.min(1,x));
 function shadow(c,fs){c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=fs*.16;c.shadowOffsetX=fs*.03;c.shadowOffsetY=fs*.05}
-function glyphs(txt,fs,cx,cy,p,fill,sh,fam=S){ctx.font=fnt(fam,fs);ctx.letterSpacing=fam===S?'0px':(-0.01*fs)+'px';ctx.textAlign='left';ctx.textBaseline='middle';const tot=ctx.measureText(txt).width;let x=cx-tot/2;for(let i=0;i<txt.length;i++){const w=ctx.measureText(txt.slice(0,i+1)).width-ctx.measureText(txt.slice(0,i)).width,e=expo(cl((p-i*.035)/.3));ctx.save();ctx.globalAlpha*=e;ctx.translate(x,cy+(1-e)*fs*.42);if(sh)shadow(ctx,fs);ctx.fillStyle=fill;ctx.fillText(txt[i],0,0);ctx.restore();x+=w}}
+function glyphs(txt,fs,cx,cy,p,fill,sh,fam=S){ctx.font=fnt(fam,fs);ctx.letterSpacing=fam===S?'0px':(TRK*fs)+'px';ctx.textAlign='left';ctx.textBaseline='middle';const tot=ctx.measureText(txt).width;let x=cx-tot/2;for(let i=0;i<txt.length;i++){const w=ctx.measureText(txt.slice(0,i+1)).width-ctx.measureText(txt.slice(0,i)).width,e=expo(cl((p-i*.035)/.3));ctx.save();ctx.globalAlpha*=e;ctx.translate(x,cy+(1-e)*fs*.42);if(sh)shadow(ctx,fs);ctx.fillStyle=fill;ctx.fillText(txt[i],0,0);ctx.restore();x+=w}}
 function fit(lines,fam,fs,max){const long=lines.reduce((a,b)=>a.length>b.length?a:b);ctx.font=fnt(fam,fs);while(ctx.measureText(long).width>max){fs-=4;ctx.font=fnt(fam,fs)}return fs}
 // Drips start at measured letter bottoms (Will 11-08: paint must line up with the letters). Scanned once per word from the
 // unmasked text canvas: per line, find each column's lowest inked pixel, keep runs sitting on that line's baseline, drip from their centres.
@@ -33,7 +35,7 @@ function dripsFor(key,lines,fs,cx,y0,lh,w,seed){if(dripCache[key])return dripCac
   const pick=runs.map(v=>[v,r()]).sort((a,b)=>a[1]-b[1]).slice(0,Math.min(runs.length,lines.length>1?4:6)).map(v=>v[0]);
   pick.forEach(([a,b])=>{const wd=Math.max(4,Math.min((b-a)*.55,fs*.075));out.push({x:(a+b)/2,y:top+base-2,wd,len:fs*(.18+r()*.55),t0:((a+b)/2-(cx-w/2))/w})})});
  return dripCache[key]=out}
-function spray(txt,fs,cx,cy,dt,seed,dur=.36){const lines=txt.split('|');T.clearRect(0,0,1080,1920);T.font=fnt(G,fs);T.letterSpacing=(-0.01*fs)+'px';T.textAlign='center';T.textBaseline='middle';T.fillStyle=CY;const lh=fs*.92,y0=cy-(lines.length-1)/2*lh;let w=0;lines.forEach((l,i)=>{T.fillText(l,cx,y0+i*lh);w=Math.max(w,T.measureText(l).width)});const h=lines.length*lh,p=cl(dt/dur),r=rng(seed);
+function spray(txt,fs,cx,cy,dt,seed,dur=.36){const lines=txt.split('|');T.clearRect(0,0,1080,1920);T.font=fnt(G,fs);T.letterSpacing=(TRK*fs)+'px';T.textAlign='center';T.textBaseline='middle';T.fillStyle=CY;const lh=fs*.92,y0=cy-(lines.length-1)/2*lh;let w=0;lines.forEach((l,i)=>{T.fillText(l,cx,y0+i*lh);w=Math.max(w,T.measureText(l).width)});const h=lines.length*lh,p=cl(dt/dur),r=rng(seed);
 const DR=dripsFor(txt+'@'+fs+'@'+cx+'@'+cy,lines,fs,cx,y0,lh,w,seed);
 if(p<1){M.clearRect(0,0,1080,1920);M.fillStyle='#fff';const N=Math.floor(1300*p);for(let i=0;i<1300;i++){const a=r(),b=r(),c=r();if(i>=N)continue;M.beginPath();M.arc(cx-w/2-30+(i/1300)*(w+60)+(a-.5)*70,y0-fs*.6+b*h,10+c*30,0,7);M.fill()}T.globalCompositeOperation='destination-in';T.drawImage(MC,0,0);T.globalCompositeOperation='source-over'}
 ctx.save();shadow(ctx,fs);ctx.drawImage(TC,0,0);ctx.restore();
@@ -41,25 +43,27 @@ if(p<1){const nx=cx-w/2+p*w,q=rng(Math.floor(dt*24)*53+seed);ctx.save();ctx.fill
 ctx.save();ctx.fillStyle=CY;ctx.shadowColor='rgba(0,0,0,.45)';ctx.shadowBlur=8;ctx.shadowOffsetY=3;
 for(const k of DR){const g=cl((dt-.08-k.t0*dur)/.75);if(g<=0)continue;const L=k.len*(1-Math.pow(1-g,3));ctx.fillRect(k.x-k.wd/2,k.y,k.wd,L);ctx.beginPath();ctx.arc(k.x,k.y+L,k.wd*.62,0,7);ctx.fill()}ctx.restore()}
 // Sticker = boxed word: accent fill, accent-ink display caps, square corners (radius-card 0).
-function sticker(txt,fs,cx,cy,dt,seed,fam){const lines=txt.split('|');ctx.save();ctx.font=fnt(fam,fs);ctx.letterSpacing=(-0.01*fs)+'px';const w=Math.max(...lines.map(l=>ctx.measureText(l).width)),lh=fs*.92,h=lines.length*lh,tilt=(seed%2?-1:1)*.04,wob=Math.exp(-7*dt)*Math.sin(dt*26)*.05,s=.4+.6*backOut(cl(dt/.2));ctx.translate(cx,cy);ctx.rotate(tilt+wob);ctx.scale(s,s);const px=fs*.32,py=fs*.16;shadow(ctx,fs);ctx.fillStyle=CY;ctx.fillRect(-w/2-px,-h/2-py,w+2*px,h+2*py);ctx.shadowColor='transparent';ctx.fillStyle=DK;ctx.textAlign='center';ctx.textBaseline='middle';lines.forEach((l,i)=>ctx.fillText(l,0,(i-(lines.length-1)/2)*lh+fs*.04));ctx.restore()}
+function sticker(txt,fs,cx,cy,dt,seed,fam){const lines=txt.split('|');ctx.save();ctx.font=fnt(fam,fs);ctx.letterSpacing=(TRK*fs)+'px';const w=Math.max(...lines.map(l=>ctx.measureText(l).width)),lh=fs*.92,h=lines.length*lh,tilt=(seed%2?-1:1)*.04,wob=Math.exp(-7*dt)*Math.sin(dt*26)*.05,s=.4+.6*backOut(cl(dt/.2));ctx.translate(cx,cy);ctx.rotate(tilt+wob);ctx.scale(s,s);const px=fs*.32,py=fs*.16;shadow(ctx,fs);ctx.fillStyle=CY;ctx.fillRect(-w/2-px,-h/2-py,w+2*px,h+2*py);ctx.shadowColor='transparent';ctx.fillStyle=DK;ctx.textAlign='center';ctx.textBaseline='middle';lines.forEach((l,i)=>ctx.fillText(l,0,(i-(lines.length-1)/2)*lh+fs*.04));ctx.restore()}
 // Awakening card = takeover card: ground plate, square; 40px-rule in accent; kicker in display caps text-muted; title in display accent, sprays on.
-function card(dt){const s=.55+.45*backOut(cl(dt/.22)),W=880,H=330,cx=540,cy=Y-10;ctx.save();ctx.translate(cx,cy);ctx.rotate(-.025+Math.exp(-7*dt)*Math.sin(dt*26)*.035);ctx.scale(s,s);shadow(ctx,60);ctx.fillStyle='rgba(11,9,7,.93)';ctx.fillRect(-W/2,-H/2,W,H);ctx.shadowColor='transparent';ctx.strokeStyle='rgba(241,232,220,.14)';ctx.lineWidth=2;ctx.strokeRect(-W/2+1,-H/2+1,W-2,H-2);
+function card(dt){const s=.55+.45*backOut(cl(dt/.22)),W=880,H=330,cx=540,cy=Y-10;ctx.save();ctx.translate(cx,cy);ctx.rotate(-.025+Math.exp(-7*dt)*Math.sin(dt*26)*.035);ctx.scale(s,s);shadow(ctx,60);ctx.fillStyle=TH.colors.cardBg;ctx.fillRect(-W/2,-H/2,W,H);ctx.shadowColor='transparent';ctx.strokeStyle=TH.colors.cardStroke;ctx.lineWidth=2;ctx.strokeRect(-W/2+1,-H/2+1,W-2,H-2);
 ctx.globalAlpha=cl(dt/.25);ctx.fillStyle=CY;ctx.fillRect(-40,-H/2+42,80,6);ctx.font=fnt(K,46);ctx.letterSpacing='0px';ctx.fillStyle=MU;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText((CAP.card&&CAP.card.kicker)||'',0,-H/2+92);ctx.restore();
 ctx.save();ctx.translate(cx,cy);ctx.scale(s,s);ctx.translate(-cx,-cy);spray((CAP.card&&CAP.card.title)||'',fit([(CAP.card&&CAP.card.title)||' '],G,170,800),cx,cy+48,dt-.08,4242,.4);ctx.restore()}
-// Skool plate: square cream plate (text token), real Skool wordmark (extracted from skool.com homepage SVG).
-const SK=new Image();if(CAP.logo)SK.src=CAP.logo;
-function skool(dt){const s=.4+.6*backOut(cl(dt/.2)),w=620,h=w*905/2783,pad=46;ctx.save();ctx.translate(540,Y);ctx.rotate(.035+Math.exp(-7*dt)*Math.sin(dt*26)*.05);ctx.scale(s,s);shadow(ctx,70);ctx.fillStyle=IV;ctx.fillRect(-w/2-pad,-h/2-pad,w+2*pad,h+2*pad);ctx.shadowColor='transparent';if(SK.complete)ctx.drawImage(SK,-w/2,-h/2,w,h);ctx.restore()}
+// Logo plate: square plate (theme plate colour) with the logo on it. Logo file comes from captions.js "logo" or theme.logo.src.
+const LOGO=CAP.logo||(TH.logo&&TH.logo.src)||null;const SK=new Image();if(LOGO)SK.src=LOGO;
+function skool(dt){if(!LOGO||!SK.naturalWidth)return;const s=.4+.6*backOut(cl(dt/.2)),w=620,h=w*(SK.naturalHeight/SK.naturalWidth||.325),pad=46;ctx.save();ctx.translate(540,Y);ctx.rotate(.035+Math.exp(-7*dt)*Math.sin(dt*26)*.05);ctx.scale(s,s);shadow(ctx,70);ctx.fillStyle=TH.colors.plate;ctx.fillRect(-w/2-pad,-h/2-pad,w+2*pad,h+2*pad);ctx.shadowColor='transparent';if(SK.complete)ctx.drawImage(SK,-w/2,-h/2,w,h);ctx.restore()}
 function flip(t){for(const c of flips){if(t<c[0]||t>=c[1])continue;const dt=t-c[0],m=c[3],out=c[1]>90?1:cl((c[1]-t)/.05);ctx.save();ctx.globalAlpha=out;
-if(m===0)glyphs(c[2],76,540,Y,dt,IV,true);
+if(m===0)glyphs(c[2],fit([c[2]],S,CSZ,980),540,Y,dt,IV,true);
 else if(m===1)spray(c[2],fit([c[2]],G,200,960),540,Y,dt,31*(Math.round(c[0]*10)+3));
 else if(m===2)sticker(c[2],fit([c[2]],F,150,860),540,Y,dt,Math.round(c[0]*10)+1,F);
 else if(m===3){const cu=CAP.countUp||{to:20,suffix:''},fs=fit([cu.to+cu.suffix],G,200,960),n=Math.min(cu.to,Math.round(cu.to*cl(dt/.3))),pop=.72+.28*backOut(cl(dt/.2));ctx.translate(540,Y);ctx.scale(pop,pop);ctx.translate(-540,-Y);glyphs(n+cu.suffix,fs,540,Y,dt+.2,CY,true,G)}
 else if(m===4)card(dt);
 else if(m===5)skool(dt);
-else if(m===6){sticker(c[2],fit(['COMMENT'],F,170,700),540,Y-20,dt,7,F);const cta=CAP.cta||{};if(cta.sub&&t>=cta.subAt)glyphs(cta.sub,62,540,Y+210,t-cta.subAt,IV,true)}
+else if(m===6){sticker(c[2],fit(c[2].split('|'),F,170,700),540,Y-20,dt,7,F);const cta=CAP.cta||{};if(cta.sub&&t>=cta.subAt)glyphs(cta.sub,62,540,Y+210,t-cta.subAt,IV,true)}
 ctx.restore()}}
 function burst(dt,seed){if(dt<-.1||dt>.42)return;const r=rng(seed),p=(dt+.1)/.52,a=Math.sin(Math.PI*cl(p));ctx.save();ctx.translate(540,Y);ctx.lineCap='round';for(let i=0;i<54;i++){const ang=r()*6.283,sp=.6+r()*.9,len=120+r()*520,st=120+p*sp*1150;ctx.strokeStyle=i%3?CY:IV;ctx.globalAlpha=a*(.35+r()*.6);ctx.lineWidth=2+r()*7;ctx.beginPath();ctx.moveTo(Math.cos(ang)*st,Math.sin(ang)*st);ctx.lineTo(Math.cos(ang)*(st+len),Math.sin(ang)*(st+len));ctx.stroke()}ctx.restore()}
 function glitch(t){glitchAt.forEach((h,i)=>{const dt=t-h;if(dt<-.05||dt>.2)return;const r=rng(Math.floor(t*24)*97+i*13+5),a=1-Math.max(0,dt)/.2;ctx.save();for(let k=0;k<16;k++){const y=r()*1920,hh=4+r()*r()*90;ctx.globalAlpha=a*(.12+r()*.5);ctx.fillStyle=k%3===0?CY:IV;ctx.fillRect(r()*200-100,y,r()>.4?1300:200+r()*700,hh)}ctx.fillStyle=IV;for(let k=0;k<2600;k++){ctx.globalAlpha=a*r()*.55;ctx.fillRect(r()*1080,r()*1920,2+r()*3,2)}ctx.restore()})}
 window.seek=t=>{ctx.clearRect(0,0,1080,1920);flip(t);(CAP.bursts||[]).forEach((h,i)=>burst(t-h,7919*(i+3)));glitch(t)};
-Promise.all([document.fonts.load('400 76px "Hanken Grotesk"'),document.fonts.load('860 160px "Sofia Sans Extra Condensed"'),document.fonts.load('820 150px "Sofia Sans Extra Condensed"'),document.fonts.load('760 46px "Sofia Sans Extra Condensed"'),document.fonts.ready,new Promise(r=>{if(!CAP.logo||SK.complete)return r();SK.onload=r;SK.onerror=r})]).finally(()=>{window.__skool=CAP.logo?SK.naturalWidth>0:null;window.seek(0);window.__ready=true});
+// Fonts: optional web-font stylesheet from the theme, then wait for every face we draw with, then the logo.
+const css=TH.fontCss?new Promise(r=>{const l=document.createElement('link');l.rel='stylesheet';l.href=TH.fontCss;l.onload=r;l.onerror=r;document.head.appendChild(l)}):Promise.resolve();
+css.then(()=>Promise.all([document.fonts.load(fnt(S,CSZ)),document.fonts.load(fnt(G,160)),document.fonts.load(fnt(F,150)),document.fonts.load(fnt(K,46)),document.fonts.ready,new Promise(r=>{if(!LOGO||SK.complete)return r();SK.onload=r;SK.onerror=r})])).finally(()=>{window.__logo=LOGO?SK.naturalWidth>0:null;window.__skool=window.__logo;window.__theme=TH.name||'custom';window.seek(0);window.__ready=true});
 </script></body></html>

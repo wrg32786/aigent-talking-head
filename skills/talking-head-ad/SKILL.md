@@ -1,47 +1,63 @@
 ---
 name: talking-head-ad
-description: "Build an AIgent vertical talking-head video ad from HeyGen cinematic takes, real camera footage, or both: cut, brand-guide captions with spray hero words and letter-aligned drips, woosh hits on every cut, a ducked music bed, verified by transcript and frame reads. Use when making or fixing a presenter ad."
+description: "Turn a teammate's phone recording (dropped in inbox/) into a vertical 9:16 talking-head reel: clean cuts with retakes skipped, themed captions drafted from the transcript, woosh hits on every cut, a ducked music bed, verified by transcript and frame reads. HeyGen cinematic takes are an optional extra source. Use when someone says 'make a reel from my clip' or is making or fixing a presenter ad."
 ---
 
 # Talking-head ad
 
-This is the pipeline behind the AIgent "Awakening" hero ad (Nov 2026). It runs in four stages:
+The main path: a teammate records on their phone, drops the file in `inbox/`, and you turn it into a reel. It runs in four stages:
 
-- **Takes.** Use HeyGen cinematic takes, real footage, or a mix of the two.
-- **Cut.** Join the takes, with a glitch hit on every seam.
-- **Overlay.** A canvas layer adds the captions and cards.
-- **Sound.** Two woosh hits sit on the cuts, and the music bed ducks under the voice.
+- **Clips.** Whisper transcribes the recording, splits it into sentences and flags flubbed retakes.
+- **Cut.** The keep clips are joined, with a glitch hit and a woosh on every seam.
+- **Overlay.** A canvas layer adds captions and cards, styled by a theme.
+- **Sound.** The music bed, if any, ducks under the voice.
 
-Every version gets checked by re-transcribing it and by reading frames.
+Every version gets checked by re-transcribing it and by reading frames. All scripts live in `../../kit`.
 
-All scripts live in `../../kit`. Work in a job folder like this:
+## Phone clip to reel (start here)
+
+1. Find the clip: the newest video in `inbox/`, or the file the teammate names. If the inbox is empty, ask them to drop it in.
+2. Ask which theme if they haven't said: `neutral` (default) or `aigent` (AIgent brand only), or their own `kit/themes/<name>.js`. Ask for a music file if they want one.
+3. Draft it: `npm run reel -- inbox/<file> --theme <name> [--bed music.wav] [--cropx 0.4] --draft`
+   - `--cropx` moves the 9:16 crop for a sideways clip (0 left, 0.5 centre, 1 right). Read `jobs/<name>/clips/clips-sheet.png` to check the face is in frame.
+   - `--model medium.en` is faster than the default large-v3 for a first pass.
+4. Read `jobs/<name>/clips/clips.md`. `npm run reel` already dropped every `retake` row. Remove slates and asides ("Okay, take two...") from `build/cut.json`, and trim the `out` of clips that end mid-move.
+5. Edit `build/captions.js`. It's a draft of plain captions with the last phrase before each seam made a spray hero word. Turn key words into stickers (mode 2), add a count-up, card or CTA (see step 4 below), and fix any misheard words against what the teammate said.
+6. Build it: `npm run reel -- --rebuild --name <name>` writes `jobs/<name>/reel-vN.mp4`, a new number each time.
+7. Verify (step 6 below), then hand over the reel path.
+
+Leave out `--draft` to go straight to `reel-v1.mp4` in one command. The draft step is better when someone will watch it.
+
+## Manual pipeline
+
+Use this when mixing sources or when you need finer control. Work in a job folder:
 
 ```
 <job>/
   seg1.mp4 seg2.mp4 ...   (or clips/ from the clip-raw-footage skill)
-  build/                  (copy kit/overlay.html, kit/render.mjs, your logo; write captions.js and cut.json here)
+  build/                  (write captions.js and cut.json here; render.mjs copies in overlay.html and theme.js)
 ```
 
 ## 1. Get the takes
 
-**HeyGen cinematic** (`create_video_from_cinematic_avatar`)
+**Phone or camera footage (main path)**
+- Run the `clip-raw-footage` skill on the raw file, then use its clips as segments.
+- A raw file can also go straight into `cut.json`. Add `cropX` to place the face, and `"norm": true` for camera audio.
+
+**Optional: HeyGen takes** (`create_video_from_cinematic_avatar`; needs a HeyGen account)
 - Settings: `seedance_2`, 9:16, 1080p, 12 to 13 s per take. A take costs about 177 credits.
 - Prompt for a seated presenter with a slow dolly push-in and a gentle arc, at eye level, with no cuts.
 - Write one gesture per line, for example: lean in on the question, open hands on the promise, count on the number, point at camera on the CTA and hold it.
 - Put the exact dialogue in quotes, followed by "said once each, no repeated words".
 - Save the prompt next to the take. Cinematic videos can't be listed back through the API, so a lost prompt is gone (see `kit/example/cinematic-retake-request.md`).
 
-**Real footage**
-- Run the `clip-raw-footage` skill on the raw file, then use its clips as segments.
-- A raw file can also go straight into `cut.json`. Add `cropX` to place the face, and `"norm": true` for camera audio.
-
 ## 2. Hear every take before you cut
 
-- `TX_MODEL=large-v3 py -3 -I kit/tx.py seg1.mp4 seg2.mp4 seg3.mp4` writes `words.json` and flags repeated words. A HeyGen take said "build, build", and only a large-model pass on the raw take caught it.
+- `TX_MODEL=large-v3 python3 kit/tx.py seg1.mp4 seg2.mp4 seg3.mp4` (Windows: `py -3 kit/tx.py ...`) writes `words.json` and flags repeated words. A HeyGen take said "build, build", and only a large-model pass on the raw take caught it.
 - Map speech blocks with `ffmpeg -i take.mp4 -af silencedetect=n=-35dB:d=0.25 -f null -`.
-- Whisper word times on cinematic takes run 0.3 to 0.6 s early, so time captions from the silence blocks.
+- Whisper word times on HeyGen cinematic takes run 0.3 to 0.6 s early, so time captions from the silence blocks (or pass `--shift 0.4` to `autocaption.mjs`).
 
-## 3. Cut (`build/cut.json`, then `node ../../kit/assemble.cjs ad-v1.mp4`)
+## 3. Cut (`build/cut.json`, then `node ../../kit/assemble.cjs ad-v1.mp4` from `build/`)
 
 - Start and end each segment inside its silences. Trim dead openings: one take opened on an empty room before the presenter walked in. Hide a whip-in under the seam glitch. Leave about 0.5 s of breath at each seam.
 - **Removing a word:** find its edges with high-band (>4 kHz) against low-band (<1 kHz) energy in 10 ms windows, so the next word's "s" or "k" survives.
@@ -51,9 +67,9 @@ All scripts live in `../../kit`. Work in a job folder like this:
 - `node ../../kit/timeline.mjs` prints every segment and word on the output clock. Use `--cuts` to print just the seams.
 - Schema and examples: `kit/assemble.cjs` header, `kit/example/cut.*.json`.
 
-## 4. Captions (`build/captions.js`, then `node render.mjs <seconds>`)
+## 4. Captions (`build/captions.js`, then `node ../../kit/render.mjs <seconds>` from `build/`)
 
-- Copy `kit/example/captions.awakening-hero.js` and edit the `flips`. Each flip is `{start, end, text, mode}`.
+- Draft them: `node ../../kit/autocaption.mjs --out captions.js [--hero] [--shift 0.4]` reads `words.json` (from `tx.py`) or the clips' `clips.json` and writes timed plain captions. Or copy `kit/example/captions.awakening-hero.js` and write them by hand. Either way, edit the `flips`. Each flip is `{start, end, text, mode}`.
 - Modes:
   - 0 caption
   - 1 spray hero word
@@ -63,8 +79,9 @@ All scripts live in `../../kit`. Work in a job folder like this:
   - 5 logo plate
   - 6 CTA sticker
 - `end: 99` holds a flip to the end of the video.
-- Check a few frames first: `node render.mjs 0 "2.7,13.6,25.9"` writes `stills/`.
-- Brand guide (AIgent Plinth):
+- Check a few frames first: `node ../../kit/render.mjs 0 "2.7,13.6,25.9"` writes `stills/`.
+- **Theme.** `build/theme.js` sets colours, fonts and logo. `render.mjs` copies `kit/themes/neutral.js` there if it's missing (`THEME=aigent` picks the AIgent preset). Edit it per job, or add `"theme": {...}` overrides in `captions.js`. A logo plate (mode 5) needs `"logo": "file.svg"` in `captions.js` (file in `build/`) or `theme.logo`; without one, mode 5 draws nothing.
+- AIgent theme rules (AIgent jobs only):
   - Captions are Hanken Grotesk 400 in `#f1e8dc`.
   - Hero words, stickers and cards are Sofia Sans Extra Condensed caps, weight 760 to 860, tracking -0.01em.
   - `#5cf9e2` is the only cyan. Never use orange, magenta or pure white.
@@ -72,6 +89,7 @@ All scripts live in `../../kit`. Work in a job folder like this:
 - Keep the caption band at about Y=1300, below the face. Measure the face per take; text never covers it.
 - A lone floating word with nothing behind it fails QA.
 - Never write copy the offer contradicts. The Skool group is paid, so the ad can't say "free school".
+- The Skool mark (`kit/skool-logo.svg`) is only for The AIgent's own Skool group. Never use it for another brand.
 
 ## 5. Sound (in `cut.json`)
 

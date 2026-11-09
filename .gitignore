@@ -5,3 +5,10 @@ node_modules/
 ovl/
 stills/
 .env*
+*.m4v
+*.mkv
+*.webm
+jobs/
+clips/
+inbox/*
+!inbox/README.md
