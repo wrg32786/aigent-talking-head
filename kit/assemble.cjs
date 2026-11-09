@@ -15,6 +15,9 @@
 // }
 // "norm": true runs loudnorm -16 LUFS on that segment (raw camera audio sits near -32 LUFS; HeyGen and clip.py output do not need it).
 // Env overrides: NOSFX=1, NOBED=1, BEDVOL=<n>, BEDNOFADE=1.
+// Effects pass (kit/fx.cjs drives these): BASEONLY=1 writes just the graded cut with the voice (no overlay, hits,
+// sfx or bed) for the effects to draw on. BASE=<file> then uses that file as the picture instead of the segments,
+// with the audio still built from the segments. OVL_OFF="a-b,c-d" hides the caption overlay in those output windows.
 const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -29,6 +32,7 @@ const segLen = s => (s.out - s.in) + (s.pad || 0);
 const LEN = +(segs.reduce((a, s) => a + segLen(s), 0) + tail).toFixed(3);
 const hasAudio = f => { try { return execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'a', '-show_entries', 'stream=index', '-of', 'csv=p=0', f]).toString().trim() !== ''; } catch { return false; } };
 
+const BASE = process.env.BASE, BASEONLY = !!process.env.BASEONLY;
 const args = ['-v', 'error', '-y'];
 const f = [];
 let idx = 0;
@@ -43,7 +47,7 @@ segs.forEach((s, i) => {
   if (s.pad) tp.push(`start_duration=${s.pad}:start_mode=clone`);
   if (last && tail) tp.push(`stop_duration=${tail}:stop_mode=clone`);
   const fadeIn = i === 0 ? (s.fadeIn ?? 0.25) : 0;
-  f.push(`[${n}:v]trim=${s.in}:${s.out},${V},${fit}${fadeIn ? `,fade=t=in:st=0:d=${fadeIn}` : ''}${tp.length ? `,tpad=${tp.join(':')}` : ''}[v${i}]`);
+  if (!BASE) f.push(`[${n}:v]trim=${s.in}:${s.out},${V},${fit}${fadeIn ? `,fade=t=in:st=0:d=${fadeIn}` : ''}${tp.length ? `,tpad=${tp.join(':')}` : ''}[v${i}]`);
   const d = s.out - s.in;
   const delay = s.pad ? `,adelay=${Math.round(s.pad * 1000)}|${Math.round(s.pad * 1000)}` : '';
   const apad = last && tail ? `,apad=pad_dur=${tail}` : '';
@@ -53,12 +57,27 @@ segs.forEach((s, i) => {
     f.push(`anullsrc=r=48000:cl=stereo,atrim=0:${(segLen(s) + (last ? tail : 0)).toFixed(3)},${A}[a${i}]`);
   }
 });
-f.push(`${segs.map((_, i) => `[v${i}][a${i}]`).join('')}concat=n=${segs.length}:v=1:a=1[cv][ca]`);
-f.push(`[cv]${G}[g]`);
+if (BASE) {
+  f.push(`${segs.map((_, i) => `[a${i}]`).join('')}concat=n=${segs.length}:v=0:a=1[ca]`);
+  const b = inp('-i', BASE);
+  f.push(`[${b}:v]${V},scale=1080:1920,setsar=1,tpad=stop_duration=1:stop_mode=clone[g]`);
+} else {
+  f.push(`${segs.map((_, i) => `[v${i}][a${i}]`).join('')}concat=n=${segs.length}:v=1:a=1[cv][ca]`);
+  f.push(`[cv]${G}[g]`);
+}
 let vcur = 'g';
+if (BASEONLY) {
+  f.push(`[g]trim=0:${LEN}[vo]`, `[ca]atrim=0:${LEN},aresample=48000[ao]`);
+  args.push('-filter_complex', f.join(';'), '-map', '[vo]', '-map', '[ao]', '-c:v', 'libx264', '-crf', '14', '-preset', 'fast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '256k', out);
+  execFileSync('ffmpeg', args, { stdio: 'inherit' });
+  console.log('wrote base', out, 'len', LEN);
+  process.exit(0);
+}
 if (C.overlay) {
   const o = inp('-framerate', '24', '-i', C.overlay);
-  f.push(`[g][${o}:v]overlay=format=auto:eof_action=pass[o]`); vcur = 'o';
+  const off = (process.env.OVL_OFF || '').split(',').filter(Boolean).map(w => w.split('-').map(Number)).filter(([a, b]) => b > a);
+  const en = off.length ? `:enable='not(${off.map(([a, b]) => `between(t,${a},${b})`).join('+')})'` : '';
+  f.push(`[g][${o}:v]overlay=format=auto:eof_action=pass${en}[o]`); vcur = 'o';
 }
 if (hits.length) {
   const env = hz => hits.map(([h, a]) => `${a}*gte(t,${h})*exp(-8*(t-${h}))*sin(2*PI*${hz}*(t-${h}))`).join('+');

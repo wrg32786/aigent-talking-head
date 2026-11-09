@@ -1,0 +1,2049 @@
+{
+ "source": {
+  "repo": "https://github.com/Vibha-Ramprakash/claude-video-effects",
+  "author": "Vibha Ramprakash",
+  "license": "MIT",
+  "note": "Starter effects. Every effect gets face tracking and a person cut-out; \"face\" in needs means it is placed relative to the face, \"segmentation\" means it hides behind you."
+ },
+ "captionZone": {
+  "captionY": 1300,
+  "band": [
+   0.6,
+   0.78
+  ],
+  "rule": "captions are composited after the effects, so camera moves never zoom them; \"off\" effects hide captions for their window automatically; \"check\" effects need a check frame"
+ },
+ "pacing": {
+  "maxHighEnergyEvery": 5,
+  "hookWithin": 2,
+  "ctaAtEnd": true,
+  "perReel": [
+   3,
+   6
+  ]
+ },
+ "moments": {
+  "hook": "First 2 s. Stop the scroll.",
+  "claim": "The key promise or bold statement.",
+  "list": "Steps, features, a numbered list.",
+  "reveal": "The turn: \"here is the thing\", the answer.",
+  "proof": "A number, a result, social proof.",
+  "objection": "\"But...\"/\"No...\", myth-busting, what not to do.",
+  "cta": "The ask at the end: comment, follow, link.",
+  "transition": "Between sections or at a seam."
+ },
+ "energy": {
+  "calm": "grades, slow moves, quiet panels",
+  "medium": "pops, cards, words",
+  "high": "punch-ins, stamps, glitches, busy card storms"
+ },
+ "effects": [
+  {
+   "n": 1,
+   "name": "noise",
+   "does": "Your reels (or frames from this clip) pile up behind your head, one every quarter second.",
+   "zone": "behind you, whole frame",
+   "moments": [
+    "hook",
+    "proof"
+   ],
+   "energy": "high",
+   "needs": [
+    "segmentation",
+    "images"
+   ],
+   "camera": false,
+   "options": {
+    "images": "folder of screenshots or clips (defaults to 10 frames from this video)",
+    "size": "card size, default 0.34"
+   },
+   "required": [],
+   "duration": [
+    2,
+    4
+   ],
+   "captions": "check",
+   "captionNote": "Cards land anywhere behind you, including behind the caption band; read a check frame for legibility.",
+   "pairsWith": [
+    "backdrop-word",
+    "lean-in"
+   ],
+   "avoidWith": [
+    "other card effects (orbit, carousel-spin, fan-build)"
+   ]
+  },
+  {
+   "n": 2,
+   "name": "lineup",
+   "does": "Numbered tiles fan out in an arc above your head.",
+   "zone": "above head",
+   "moments": [
+    "list"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation",
+    "text"
+   ],
+   "camera": false,
+   "options": {
+    "text": "tile names joined with |"
+   },
+   "required": [
+    "text"
+   ],
+   "duration": [
+    2.5,
+    4
+   ],
+   "captions": "safe",
+   "captionNote": "Sits above the head.",
+   "pairsWith": [
+    "todo",
+    "countdown-flip"
+   ],
+   "avoidWith": [
+    "the-bill (same zone)"
+   ]
+  },
+  {
+   "n": 3,
+   "name": "locked-on",
+   "does": "Corner brackets snap onto your face and the camera follows you, with a tag pill under the face.",
+   "zone": "camera + around face",
+   "moments": [
+    "hook",
+    "claim"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation"
+   ],
+   "camera": true,
+   "options": {
+    "text": "tag, default LOCKED ON",
+    "zoom": "default 1.35"
+   },
+   "required": [],
+   "duration": [
+    1.5,
+    3.5
+   ],
+   "captions": "safe",
+   "captionNote": "Camera move; captions are added after, so they never zoom.",
+   "pairsWith": [
+    "backdrop-word",
+    "scribble"
+   ],
+   "avoidWith": [
+    "other camera effects in the same window"
+   ]
+  },
+  {
+   "n": 4,
+   "name": "orbit",
+   "does": "Your reels circle your head: in front at the bottom, behind you at the top.",
+   "zone": "around head",
+   "moments": [
+    "proof",
+    "hook"
+   ],
+   "energy": "high",
+   "needs": [
+    "face",
+    "segmentation",
+    "images"
+   ],
+   "camera": false,
+   "options": {
+    "images": "folder of covers (defaults to frames from this clip)",
+    "count": "default 6",
+    "speed": "default 1.9",
+    "size": "default 0.2"
+   },
+   "required": [],
+   "duration": [
+    2.5,
+    4
+   ],
+   "captions": "check",
+   "captionNote": "The front of the ring passes around chest height; check frames against the caption band.",
+   "pairsWith": [
+    "spotlight",
+    "slow-push"
+   ],
+   "avoidWith": [
+    "carousel-spin",
+    "fan-build",
+    "noise"
+   ]
+  },
+  {
+   "n": 5,
+   "name": "lean-in",
+   "does": "A fast punch-in on one word.",
+   "zone": "camera",
+   "moments": [
+    "claim",
+    "reveal",
+    "objection"
+   ],
+   "energy": "high",
+   "needs": [
+    "face",
+    "word-cue"
+   ],
+   "camera": true,
+   "options": {
+    "zoom": "default 1.45, max 2",
+    "speed": "default 0.18 s"
+   },
+   "required": [],
+   "duration": [
+    0.6,
+    1.5
+   ],
+   "captions": "safe",
+   "captionNote": "Camera move only.",
+   "pairsWith": [
+    "reject-stamp",
+    "huge-strike",
+    "backdrop-word"
+   ],
+   "avoidWith": [
+    "slow-push or other camera effects in the same window"
+   ]
+  },
+  {
+   "n": 6,
+   "name": "backdrop-word",
+   "does": "A giant word drops in behind you.",
+   "zone": "behind head, top",
+   "moments": [
+    "hook",
+    "claim",
+    "reveal"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation",
+    "text"
+   ],
+   "camera": false,
+   "options": {
+    "text": "the word",
+    "color": "hex",
+    "font": "bold or serif"
+   },
+   "required": [
+    "text"
+   ],
+   "duration": [
+    1.5,
+    3
+   ],
+   "captions": "safe",
+   "captionNote": "Behind the head, above the caption band.",
+   "pairsWith": [
+    "lean-in",
+    "locked-on"
+   ],
+   "avoidWith": [
+    "other behind-head words (huge-strike, crayon-write, match-cut, led-sign)"
+   ]
+  },
+  {
+   "n": 7,
+   "name": "spotlight",
+   "does": "Kills the lights and keeps you lit, with an optional glowing word behind you. look=sparkle (alias glitter-spotlight) adds golden rays and sparkles.",
+   "zone": "camera + whole room",
+   "moments": [
+    "reveal",
+    "hook",
+    "cta"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation"
+   ],
+   "camera": true,
+   "options": {
+    "text": "glowing word behind you (optional)",
+    "color": "hex",
+    "push": "slow push, default 1.1",
+    "look": "sparkle for glitter-spotlight"
+   },
+   "required": [],
+   "duration": [
+    2,
+    4
+   ],
+   "captions": "safe",
+   "captionNote": "Darkens the room; captions stay bright on top.",
+   "pairsWith": [
+    "backdrop-word",
+    "orbit"
+   ],
+   "avoidWith": [
+    "moody, timeline or other grades in the same window"
+   ]
+  },
+  {
+   "n": 8,
+   "name": "the-bill",
+   "does": "Prints your instructions like a receipt into the wall above your head.",
+   "zone": "above head, top",
+   "moments": [
+    "list",
+    "proof"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation",
+    "text"
+   ],
+   "camera": false,
+   "options": {
+    "text": "lines joined with |"
+   },
+   "required": [
+    "text"
+   ],
+   "duration": [
+    2.5,
+    4.5
+   ],
+   "captions": "safe",
+   "captionNote": "Top of frame.",
+   "pairsWith": [
+    "checklist (later)",
+    "lean-in"
+   ],
+   "avoidWith": [
+    "lineup, todo (same zone)"
+   ]
+  },
+  {
+   "n": 9,
+   "name": "moody",
+   "does": "A colour grade: darker, softer, teal shadows. grade= moody, bw, warm, cool or pop.",
+   "zone": "whole frame",
+   "moments": [
+    "transition",
+    "objection"
+   ],
+   "energy": "calm",
+   "needs": [],
+   "camera": false,
+   "options": {
+    "grade": "moody, bw, warm, cool, pop"
+   },
+   "required": [],
+   "duration": [
+    2,
+    10
+   ],
+   "captions": "safe",
+   "captionNote": "Grade only. Works with no face in frame.",
+   "pairsWith": [
+    "slow-push",
+    "huge-strike"
+   ],
+   "avoidWith": [
+    "other grades (spotlight, timeline, red-collage)"
+   ]
+  },
+  {
+   "n": 10,
+   "name": "swipe",
+   "does": "A before-and-after slider sweeps across you, with a pill label near the bottom.",
+   "zone": "whole frame + bottom pill",
+   "moments": [
+    "reveal",
+    "proof"
+   ],
+   "energy": "medium",
+   "needs": [],
+   "camera": false,
+   "options": {
+    "grade": "the \"after\" look"
+   },
+   "required": [],
+   "duration": [
+    1.5,
+    3
+   ],
+   "captions": "check",
+   "captionNote": "Pill sits at 88% height, below captions; check it doesn't crowd a two-line caption.",
+   "pairsWith": [
+    "moody (before)"
+   ],
+   "avoidWith": [
+    "other grades"
+   ]
+  },
+  {
+   "n": 11,
+   "name": "todo",
+   "does": "A checklist card beside your head that ticks off as you talk.",
+   "zone": "beside head, behind you",
+   "moments": [
+    "list"
+   ],
+   "energy": "calm",
+   "needs": [
+    "face",
+    "segmentation",
+    "text",
+    "word-cue"
+   ],
+   "camera": false,
+   "options": {
+    "text": "items joined with |",
+    "ticks": "video seconds of each tick, joined with |",
+    "title": "default TO DO"
+   },
+   "required": [
+    "text"
+   ],
+   "duration": [
+    3,
+    6
+   ],
+   "captions": "safe",
+   "captionNote": "Sits beside and above the head.",
+   "pairsWith": [
+    "lineup",
+    "slow-push"
+   ],
+   "avoidWith": [
+    "checklist, apple-toggles (same job)"
+   ]
+  },
+  {
+   "n": 12,
+   "name": "comment-box",
+   "does": "An Instagram comments sheet above your head types your word, posts it, gets a heart and your reply. look=bar for the old bottom bar.",
+   "zone": "above head (look=bar: bottom)",
+   "moments": [
+    "cta"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation",
+    "text"
+   ],
+   "camera": false,
+   "options": {
+    "text": "the comment word",
+    "handle": "your handle (injected from the plan profile)",
+    "reply": "reply line",
+    "chip": "reply link chip",
+    "look": "bar for the bottom comment bar"
+   },
+   "required": [
+    "text",
+    "handle"
+   ],
+   "duration": [
+    2.5,
+    4
+   ],
+   "captions": "check",
+   "captionNote": "The default sheet is above the head and safe; look=bar sits at 80% height and needs captions off.",
+   "pairsWith": [
+    "tap"
+   ],
+   "avoidWith": [
+    "messages (same idea)"
+   ]
+  },
+  {
+   "n": 13,
+   "name": "tap",
+   "does": "A Follow button pops up and flips to Following.",
+   "zone": "below face (or x,y)",
+   "moments": [
+    "cta"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face"
+   ],
+   "camera": false,
+   "options": {
+    "at": "video second of the flip",
+    "x": "0-1",
+    "y": "0-1",
+    "color": "hex"
+   },
+   "required": [],
+   "duration": [
+    1.5,
+    2.5
+   ],
+   "captions": "check",
+   "captionNote": "Default spot is just under the face, near the top of the caption band; set y=0.45 or turn captions off.",
+   "pairsWith": [
+    "comment-box"
+   ],
+   "avoidWith": [
+    "another CTA sticker in the same window"
+   ]
+  },
+  {
+   "n": 14,
+   "name": "pause-point",
+   "does": "Freezes the frame and points at you with a hand-drawn arrow and label.",
+   "zone": "freeze + above head",
+   "moments": [
+    "reveal",
+    "objection"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation",
+    "text"
+   ],
+   "camera": true,
+   "options": {
+    "text": "label, default \"look here\"",
+    "color": "hex",
+    "label_x": "0-1"
+   },
+   "required": [],
+   "duration": [
+    1.5,
+    3
+   ],
+   "captions": "check",
+   "captionNote": "The picture freezes while captions keep moving; keep the window to one short phrase.",
+   "pairsWith": [
+    "scribble"
+   ],
+   "avoidWith": [
+    "camera effects in the same window"
+   ]
+  },
+  {
+   "n": 15,
+   "name": "uninstall",
+   "does": "A glitchy uninstall bar breaks the frame apart.",
+   "zone": "top bar + glitch over frame",
+   "moments": [
+    "objection",
+    "transition"
+   ],
+   "energy": "high",
+   "needs": [
+    "text"
+   ],
+   "camera": false,
+   "options": {
+    "text": "bar label, default Uninstalling..."
+   },
+   "required": [
+    "text"
+   ],
+   "duration": [
+    1.5,
+    3
+   ],
+   "captions": "safe",
+   "captionNote": "Bar at 16% height; works with no face.",
+   "pairsWith": [
+    "reject-stamp",
+    "huge-strike"
+   ],
+   "avoidWith": [
+    "other glitchy effects within 5 s"
+   ]
+  },
+  {
+   "n": 16,
+   "name": "reel-frame",
+   "does": "Your video shrinks into an Instagram reel card.",
+   "zone": "whole frame (shrinks you)",
+   "moments": [
+    "proof",
+    "transition"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation",
+    "text"
+   ],
+   "camera": false,
+   "options": {
+    "text": "handle shown on the card"
+   },
+   "required": [
+    "text"
+   ],
+   "duration": [
+    2,
+    3.5
+   ],
+   "captions": "off",
+   "captionNote": "Captions would float over the card edge; hide them for this window.",
+   "pairsWith": [
+    "place-in-grid (instead)"
+   ],
+   "avoidWith": [
+    "camera effects"
+   ]
+  },
+  {
+   "n": 17,
+   "name": "shortcut-rain",
+   "does": "Keyboard keys rain down behind you.",
+   "zone": "behind you, whole frame",
+   "moments": [
+    "list",
+    "proof"
+   ],
+   "energy": "medium",
+   "needs": [
+    "segmentation",
+    "text"
+   ],
+   "camera": false,
+   "options": {
+    "text": "keys joined with |",
+    "count": "default 26"
+   },
+   "required": [],
+   "duration": [
+    2,
+    4
+   ],
+   "captions": "safe",
+   "captionNote": "Behind you; captions stay on top.",
+   "pairsWith": [
+    "backdrop-word"
+   ],
+   "avoidWith": [
+    "noise (two busy backgrounds)"
+   ]
+  },
+  {
+   "n": 18,
+   "name": "reject-stamp",
+   "does": "A big red stamp slams onto the screen.",
+   "zone": "below face, up to 85% height",
+   "moments": [
+    "objection",
+    "reveal"
+   ],
+   "energy": "high",
+   "needs": [
+    "face",
+    "text",
+    "word-cue"
+   ],
+   "camera": false,
+   "options": {
+    "text": "stamp word, default REJECTED",
+    "color": "hex",
+    "angle": "default 12",
+    "y": "0-1"
+   },
+   "required": [
+    "text"
+   ],
+   "duration": [
+    1,
+    2
+   ],
+   "captions": "off",
+   "captionNote": "Lands over the chest by default, on top of the caption band; hide captions or set y=0.3.",
+   "pairsWith": [
+    "lean-in",
+    "uninstall"
+   ],
+   "avoidWith": [
+    "huge-strike in the same moment"
+   ]
+  },
+  {
+   "n": 19,
+   "name": "countdown-flip",
+   "does": "A 3, 2, 1 flip clock above your head.",
+   "zone": "above head",
+   "moments": [
+    "hook",
+    "cta",
+    "reveal"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation"
+   ],
+   "camera": false,
+   "options": {
+    "from": "default 3"
+   },
+   "required": [],
+   "duration": [
+    2.5,
+    3.5
+   ],
+   "captions": "safe",
+   "captionNote": "Above the head.",
+   "pairsWith": [
+    "lean-in (on 1)"
+   ],
+   "avoidWith": [
+    "lineup, the-bill (same zone)"
+   ]
+  },
+  {
+   "n": 20,
+   "name": "rabbit-hole",
+   "does": "The room tunnels into itself, spinning, while you stay in front.",
+   "zone": "whole frame behind you",
+   "moments": [
+    "transition",
+    "reveal"
+   ],
+   "energy": "high",
+   "needs": [
+    "face",
+    "segmentation"
+   ],
+   "camera": false,
+   "options": {
+    "ratio": "default 0.62",
+    "speed": "default 0.8",
+    "spin": "default 10"
+   },
+   "required": [],
+   "duration": [
+    1.5,
+    3
+   ],
+   "captions": "safe",
+   "captionNote": "Background only.",
+   "pairsWith": [
+    "slow-push"
+   ],
+   "avoidWith": [
+    "another high-energy effect within 5 s"
+   ]
+  },
+  {
+   "n": 21,
+   "name": "cover-star",
+   "does": "You become a magazine cover, with the title behind your head and cover lines down the side. look=editorial for a classic warm cover.",
+   "zone": "whole frame: masthead top, lines mid-left, barcode bottom",
+   "moments": [
+    "hook",
+    "proof"
+   ],
+   "energy": "medium",
+   "needs": [
+    "segmentation",
+    "text"
+   ],
+   "camera": false,
+   "options": {
+    "text": "masthead",
+    "lines": "cover lines joined with |",
+    "issue": "issue line",
+    "color": "hex",
+    "accent": "hex",
+    "look": "editorial"
+   },
+   "required": [
+    "text",
+    "lines"
+   ],
+   "duration": [
+    2.5,
+    4.5
+   ],
+   "captions": "off",
+   "captionNote": "Cover lines start at 50% height and run through the caption band.",
+   "pairsWith": [
+    "slow-push"
+   ],
+   "avoidWith": [
+    "red-collage, split-headline (other layouts)"
+   ]
+  },
+  {
+   "n": 22,
+   "name": "scribble",
+   "does": "Marker doodles draw themselves around you, with a label and arrow.",
+   "zone": "around face",
+   "moments": [
+    "hook",
+    "reveal"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "text"
+   ],
+   "camera": false,
+   "options": {
+    "text": "label, default \"me!\"",
+    "color": "hex"
+   },
+   "required": [],
+   "duration": [
+    2,
+    3.5
+   ],
+   "captions": "safe",
+   "captionNote": "Doodles stay near the head.",
+   "pairsWith": [
+    "locked-on",
+    "pause-point"
+   ],
+   "avoidWith": [
+    "crayon-write (same hand-drawn look)"
+   ]
+  },
+  {
+   "n": 23,
+   "name": "glass-widgets",
+   "does": "Frosted glass widgets and mini artifacts (stats, profile, calendar, render bar) float around your head, with an \"Edited by\" pill near the bottom. look=simple for 3 widgets.",
+   "zone": "around head + bottom pill",
+   "moments": [
+    "proof",
+    "hook"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation",
+    "text"
+   ],
+   "camera": false,
+   "options": {
+    "text": "big number",
+    "name": "profile name (injected from the plan profile)",
+    "handle": "handle (injected)",
+    "pill": "\"Edited by |Claude\" by default (text|bold part)",
+    "look": "simple",
+    "grade": "warm (default) or none"
+   },
+   "required": [
+    "name",
+    "handle"
+   ],
+   "duration": [
+    3,
+    5
+   ],
+   "captions": "check",
+   "captionNote": "The pill sits at 87% height below captions; widgets can reach chest height. Read a check frame.",
+   "pairsWith": [
+    "slow-push"
+   ],
+   "avoidWith": [
+    "liquid-glass-graph, apple-toggles (more glass)"
+   ]
+  },
+  {
+   "n": 24,
+   "name": "red-collage",
+   "does": "Black-and-white you, a giant red word behind, three lines slam in beside you.",
+   "zone": "whole frame: word top, lines from 50%",
+   "moments": [
+    "hook",
+    "claim"
+   ],
+   "energy": "high",
+   "needs": [
+    "face",
+    "segmentation",
+    "text"
+   ],
+   "camera": false,
+   "options": {
+    "text": "red word",
+    "lines": "three lines joined with |",
+    "tag": "small REC tag",
+    "color": "hex"
+   },
+   "required": [
+    "text",
+    "lines"
+   ],
+   "duration": [
+    2,
+    3.5
+   ],
+   "captions": "off",
+   "captionNote": "The kinetic lines run through the caption band.",
+   "pairsWith": [
+    "lean-in"
+   ],
+   "avoidWith": [
+    "other grades and layouts"
+   ]
+  },
+  {
+   "n": 25,
+   "name": "split-headline",
+   "does": "A headline card slides down and pushes you into the bottom of the frame.",
+   "zone": "top 36% card, you shifted down",
+   "moments": [
+    "hook",
+    "claim"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation",
+    "text"
+   ],
+   "camera": false,
+   "options": {
+    "text": "lines joined with |",
+    "hl": "highlighted word",
+    "pill": "pill text",
+    "height": "card height, default 0.36"
+   },
+   "required": [
+    "text"
+   ],
+   "duration": [
+    2.5,
+    4
+   ],
+   "captions": "check",
+   "captionNote": "You move down, so the caption band ends up over your face; set captionY lower or hide captions.",
+   "pairsWith": [
+    "lean-in (after)"
+   ],
+   "avoidWith": [
+    "broll-split, cover-star"
+   ]
+  },
+  {
+   "n": 26,
+   "name": "pastel-word",
+   "does": "A soft lavender room, a giant word behind you and a profile card that gets followed.",
+   "zone": "whole room + word top + card at 87%",
+   "moments": [
+    "cta",
+    "hook"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation",
+    "text"
+   ],
+   "camera": false,
+   "options": {
+    "text": "the word",
+    "name": "profile name (injected)",
+    "handle": "handle (injected)",
+    "role": "card subtitle"
+   },
+   "required": [
+    "text",
+    "name",
+    "handle"
+   ],
+   "duration": [
+    2.5,
+    4
+   ],
+   "captions": "check",
+   "captionNote": "The profile card sits below the caption band; check a two-line caption.",
+   "pairsWith": [
+    "tap"
+   ],
+   "avoidWith": [
+    "other room swaps"
+   ]
+  },
+  {
+   "n": 27,
+   "name": "check-pills",
+   "does": "Grid-paper room, reel boards pinned behind you and blue pills that a cursor clicks.",
+   "zone": "whole room + pills around you",
+   "moments": [
+    "list",
+    "proof"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation",
+    "text",
+    "images"
+   ],
+   "camera": false,
+   "options": {
+    "text": "pills joined with |",
+    "handle": "board handle (injected)",
+    "board": "board label",
+    "images": "folder of covers"
+   },
+   "required": [
+    "text",
+    "handle"
+   ],
+   "duration": [
+    3,
+    5
+   ],
+   "captions": "check",
+   "captionNote": "Pills land between 30% and 90% height; check frames.",
+   "pairsWith": [
+    "slow-push"
+   ],
+   "avoidWith": [
+    "other room swaps"
+   ]
+  },
+  {
+   "n": 28,
+   "name": "timeline",
+   "does": "A dark red cinematic grade with an editing timeline, a REC timecode and a glowing playhead.",
+   "zone": "grade + top-left REC + timeline panel",
+   "moments": [
+    "transition",
+    "proof"
+   ],
+   "energy": "calm",
+   "needs": [
+    "segmentation",
+    "text"
+   ],
+   "camera": false,
+   "options": {
+    "text": "title",
+    "sub": "subtitle (default \"timeline by Claude\")",
+    "tc": "timecode"
+   },
+   "required": [],
+   "duration": [
+    3,
+    6
+   ],
+   "captions": "check",
+   "captionNote": "Read a check frame: the timeline panel can sit near the caption band.",
+   "pairsWith": [
+    "slow-push"
+   ],
+   "avoidWith": [
+    "other grades"
+   ]
+  },
+  {
+   "n": 29,
+   "name": "headline-box",
+   "does": "A punch-in with a two-line headline above your head, the second line in a white box.",
+   "zone": "camera + above head",
+   "moments": [
+    "hook",
+    "claim"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation",
+    "text"
+   ],
+   "camera": true,
+   "options": {
+    "text": "two lines joined with |",
+    "zoom": "default 1.2"
+   },
+   "required": [
+    "text"
+   ],
+   "duration": [
+    2,
+    4
+   ],
+   "captions": "safe",
+   "captionNote": "Headline sits above the head; captions stay put.",
+   "pairsWith": [
+    "backdrop-word (later)"
+   ],
+   "avoidWith": [
+    "phone-fan (same headline style)"
+   ]
+  },
+  {
+   "n": 30,
+   "name": "profile-wall",
+   "does": "Your reels grid fills the wall behind you while a view counter ticks up below your face.",
+   "zone": "wall behind + counter card below face",
+   "moments": [
+    "proof"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation",
+    "images",
+    "numbers"
+   ],
+   "camera": false,
+   "options": {
+    "images": "folder of covers",
+    "count": "the number, e.g. 197000",
+    "label": "default views",
+    "name": "profile name (injected)",
+    "sub": "sub line"
+   },
+   "required": [
+    "name"
+   ],
+   "duration": [
+    2.5,
+    4
+   ],
+   "captions": "off",
+   "captionNote": "The counter card lands at chest height, in the caption band.",
+   "pairsWith": [
+    "slow-push"
+   ],
+   "avoidWith": [
+    "headline-wall (same proof job)"
+   ]
+  },
+  {
+   "n": 31,
+   "name": "tier-list",
+   "does": "A tier list drops in front of you and an item flies into S tier.",
+   "zone": "title above head, board from mid-frame",
+   "moments": [
+    "proof",
+    "claim"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation",
+    "text"
+   ],
+   "camera": false,
+   "options": {
+    "title": "question title",
+    "item": "item that lands in S tier (default Claude)",
+    "others": "other items joined with |"
+   },
+   "required": [
+    "title",
+    "item"
+   ],
+   "duration": [
+    3,
+    4.5
+   ],
+   "captions": "off",
+   "captionNote": "The board covers mid-frame and the caption band.",
+   "pairsWith": [
+    "lean-in (after)"
+   ],
+   "avoidWith": [
+    "other boards"
+   ]
+  },
+  {
+   "n": 32,
+   "name": "broll-split",
+   "does": "Split screen: b-roll on top with a price-tag sticker, you on the bottom.",
+   "zone": "top half b-roll, you shifted down",
+   "moments": [
+    "proof",
+    "transition"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation",
+    "images",
+    "text"
+   ],
+   "camera": false,
+   "options": {
+    "images": "folder with the b-roll image or clip",
+    "text": "price tag",
+    "pick": "which file, default 0"
+   },
+   "required": [
+    "images"
+   ],
+   "duration": [
+    2,
+    4
+   ],
+   "captions": "check",
+   "captionNote": "You move to the bottom, so the caption band may sit on your face; hide captions or check frames.",
+   "pairsWith": [
+    "tap"
+   ],
+   "avoidWith": [
+    "split-headline"
+   ]
+  },
+  {
+   "n": 33,
+   "name": "phone-fan",
+   "does": "Your reels fan out like a hand of phones under a two-line headline.",
+   "zone": "headline above head, phones from 62% down",
+   "moments": [
+    "proof",
+    "hook"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "text",
+    "images"
+   ],
+   "camera": false,
+   "options": {
+    "images": "folder of covers",
+    "text": "two lines joined with |"
+   },
+   "required": [
+    "text"
+   ],
+   "duration": [
+    2.5,
+    4
+   ],
+   "captions": "off",
+   "captionNote": "The phones fill the bottom of the frame, over the caption band.",
+   "pairsWith": [
+    "slow-push"
+   ],
+   "avoidWith": [
+    "headline-box (same headline)"
+   ]
+  },
+  {
+   "n": 34,
+   "name": "dot-reveal",
+   "does": "Your shot builds itself out of glowing dots, then snaps into the full picture.",
+   "zone": "whole frame",
+   "moments": [
+    "hook",
+    "transition",
+    "reveal"
+   ],
+   "energy": "medium",
+   "needs": [],
+   "camera": false,
+   "options": {
+    "color": "hex",
+    "cell": "dot size, default 0.017",
+    "bg": "hex"
+   },
+   "required": [],
+   "duration": [
+    1,
+    2.5
+   ],
+   "captions": "safe",
+   "captionNote": "Works with no face. Best as the very first effect.",
+   "pairsWith": [
+    "locked-on (after)"
+   ],
+   "avoidWith": [
+    "camera effects in the same window"
+   ]
+  },
+  {
+   "n": 35,
+   "name": "headline-wall",
+   "does": "Your own headlines pile up behind your head, then a total pops in front.",
+   "zone": "wall behind + total pill from 60%",
+   "moments": [
+    "proof"
+   ],
+   "energy": "high",
+   "needs": [
+    "face",
+    "segmentation",
+    "text",
+    "numbers"
+   ],
+   "camera": false,
+   "options": {
+    "text": "headline::meta joined with |",
+    "total": "the total, e.g. 672K",
+    "label": "label under the total",
+    "handle": "handle on each card (injected)"
+   },
+   "required": [
+    "text",
+    "total",
+    "handle"
+   ],
+   "duration": [
+    3,
+    5
+   ],
+   "captions": "check",
+   "captionNote": "The total pill lands at 60% or lower; read a check frame.",
+   "pairsWith": [
+    "lean-in (on the total)"
+   ],
+   "avoidWith": [
+    "profile-wall"
+   ]
+  },
+  {
+   "n": 36,
+   "name": "checklist",
+   "does": "A task list builds under your chin: each step spins, then ticks green.",
+   "zone": "under chin, from 42% down",
+   "moments": [
+    "list",
+    "proof"
+   ],
+   "energy": "calm",
+   "needs": [
+    "face",
+    "text"
+   ],
+   "camera": false,
+   "options": {
+    "text": "step::meta joined with |",
+    "title": "card title (default \"Claude is editing your clip\")"
+   },
+   "required": [
+    "text",
+    "title"
+   ],
+   "duration": [
+    3,
+    6
+   ],
+   "captions": "off",
+   "captionNote": "The card sits under the chin, on the caption band.",
+   "pairsWith": [
+    "slow-push"
+   ],
+   "avoidWith": [
+    "todo, apple-toggles"
+   ]
+  },
+  {
+   "n": 37,
+   "name": "liquid-glass-graph",
+   "does": "A liquid glass card floats under your chin while a graph climbs and the number counts up. look=bento moves it to a smoked glass screen behind your head with tiles in front.",
+   "zone": "under chin (bento: behind head + tiles from 50%)",
+   "moments": [
+    "proof"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation",
+    "text",
+    "numbers"
+   ],
+   "camera": false,
+   "options": {
+    "text": "label",
+    "from": "start number",
+    "to": "end number, e.g. 197K or 59%",
+    "color": "hex",
+    "look": "bento",
+    "donut": "29%::label",
+    "kpi": "672K::label",
+    "bars": "197|140|124::label"
+   },
+   "required": [
+    "text",
+    "to"
+   ],
+   "duration": [
+    2.5,
+    4
+   ],
+   "captions": "off",
+   "captionNote": "The card sits under the chin, on the caption band.",
+   "pairsWith": [
+    "lean-in (on the number)"
+   ],
+   "avoidWith": [
+    "over-the-shoulder-zoom (same graph)"
+   ]
+  },
+  {
+   "n": 38,
+   "name": "carousel-spin",
+   "does": "Your reels spin around you in a 3D carousel, then slow to a stop.",
+   "zone": "around you, whole frame",
+   "moments": [
+    "proof",
+    "hook"
+   ],
+   "energy": "high",
+   "needs": [
+    "face",
+    "segmentation",
+    "images"
+   ],
+   "camera": false,
+   "options": {
+    "images": "folder of covers",
+    "count": "6-12",
+    "size": "default 0.3",
+    "turns": "default 1.1"
+   },
+   "required": [],
+   "duration": [
+    3,
+    5
+   ],
+   "captions": "check",
+   "captionNote": "Front cards pass through chest height; check frames.",
+   "pairsWith": [
+    "spotlight"
+   ],
+   "avoidWith": [
+    "orbit, fan-build, noise"
+   ]
+  },
+  {
+   "n": 39,
+   "name": "match-cut",
+   "does": "News pages cut on one word, locked in a red box behind your head.",
+   "zone": "behind head",
+   "moments": [
+    "claim",
+    "proof",
+    "reveal"
+   ],
+   "energy": "high",
+   "needs": [
+    "face",
+    "segmentation",
+    "text",
+    "word-cue"
+   ],
+   "camera": true,
+   "options": {
+    "text": "the word (default Claude)",
+    "color": "hex"
+   },
+   "required": [
+    "text"
+   ],
+   "duration": [
+    2,
+    3.5
+   ],
+   "captions": "safe",
+   "captionNote": "Behind the head.",
+   "pairsWith": [
+    "lean-in"
+   ],
+   "avoidWith": [
+    "other behind-head words"
+   ]
+  },
+  {
+   "n": 40,
+   "name": "apple-toggles",
+   "does": "An iPhone settings card flips its switches on, one line at a time. Default sits above you tucked behind your head with a gentle zoom; pos=below puts it under the chin.",
+   "zone": "above head (pos=below: under chin)",
+   "moments": [
+    "list",
+    "cta"
+   ],
+   "energy": "calm",
+   "needs": [
+    "face",
+    "segmentation",
+    "text",
+    "word-cue"
+   ],
+   "camera": true,
+   "options": {
+    "text": "rows joined with |",
+    "ticks": "seconds of each flip, joined with |",
+    "color": "hex",
+    "pos": "above (default) or below",
+    "zoom": "default 1.12"
+   },
+   "required": [
+    "text"
+   ],
+   "duration": [
+    3,
+    5
+   ],
+   "captions": "safe",
+   "captionNote": "Default above-head card is safe. With pos=below, hide captions.",
+   "pairsWith": [
+    "slow-push"
+   ],
+   "avoidWith": [
+    "todo, checklist"
+   ]
+  },
+  {
+   "n": 41,
+   "name": "led-sign",
+   "does": "The lights drop and a glowing LED sign types itself out behind you.",
+   "zone": "camera + behind head",
+   "moments": [
+    "hook",
+    "cta",
+    "reveal"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation",
+    "text"
+   ],
+   "camera": true,
+   "options": {
+    "text": "lines joined with |",
+    "color": "hex",
+    "push": "default 1.08"
+   },
+   "required": [
+    "text"
+   ],
+   "duration": [
+    2.5,
+    4
+   ],
+   "captions": "safe",
+   "captionNote": "Behind the head; darkens the room.",
+   "pairsWith": [
+    "spotlight (instead, not with)"
+   ],
+   "avoidWith": [
+    "other behind-head words, grades"
+   ]
+  },
+  {
+   "n": 42,
+   "name": "slow-push",
+   "does": "A slow cinematic push-in to your face while the room melts out of focus.",
+   "zone": "camera",
+   "moments": [
+    "claim",
+    "objection",
+    "cta",
+    "transition"
+   ],
+   "energy": "calm",
+   "needs": [
+    "face",
+    "segmentation"
+   ],
+   "camera": true,
+   "options": {
+    "zoom": "default 1.6",
+    "blur": "default 0.006"
+   },
+   "required": [],
+   "duration": [
+    3,
+    8
+   ],
+   "captions": "safe",
+   "captionNote": "Camera move; captions stay sharp on top.",
+   "pairsWith": [
+    "todo",
+    "checklist",
+    "moody"
+   ],
+   "avoidWith": [
+    "other camera effects in the same window"
+   ]
+  },
+  {
+   "n": 43,
+   "name": "over-the-shoulder-zoom",
+   "does": "The camera pushes into one top corner and a liquid glass graph pops beside your head, pulls back, then the other corner with a second graph.",
+   "zone": "camera + top corners",
+   "moments": [
+    "proof"
+   ],
+   "energy": "high",
+   "needs": [
+    "face",
+    "segmentation",
+    "text",
+    "numbers"
+   ],
+   "camera": true,
+   "options": {
+    "text": "two labels joined with |",
+    "to": "two numbers joined with |, e.g. 197K|672K",
+    "zoom": "default 2.0"
+   },
+   "required": [
+    "text",
+    "to"
+   ],
+   "duration": [
+    4,
+    6
+   ],
+   "captions": "safe",
+   "captionNote": "Graphs sit at 25% height.",
+   "pairsWith": [
+    "slow-push (before)"
+   ],
+   "avoidWith": [
+    "liquid-glass-graph"
+   ]
+  },
+  {
+   "n": 44,
+   "name": "messages",
+   "does": "iMessage notifications pop in one after another, stacking up just above 61% height.",
+   "zone": "mid-frame stack",
+   "moments": [
+    "proof",
+    "objection",
+    "cta"
+   ],
+   "energy": "medium",
+   "needs": [
+    "text"
+   ],
+   "camera": false,
+   "options": {
+    "text": "messages joined with |",
+    "title": "default Messages",
+    "y": "bottom of the stack, default 0.61"
+   },
+   "required": [
+    "text"
+   ],
+   "duration": [
+    2.5,
+    4
+   ],
+   "captions": "check",
+   "captionNote": "The stack ends just above the caption band; with long captions set y=0.55 or hide captions.",
+   "pairsWith": [
+    "tap"
+   ],
+   "avoidWith": [
+    "comment-box"
+   ]
+  },
+  {
+   "n": 45,
+   "name": "place-in-grid",
+   "does": "You shrink into the centre tile of your 3x3 profile grid, then 8 reels pop in around you with view counts.",
+   "zone": "whole frame grid",
+   "moments": [
+    "proof",
+    "cta"
+   ],
+   "energy": "high",
+   "needs": [
+    "images",
+    "numbers"
+   ],
+   "camera": false,
+   "options": {
+    "images": "folder of covers",
+    "views": "9 counts joined with |, the 9th is yours"
+   },
+   "required": [
+    "views"
+   ],
+   "duration": [
+    2,
+    3.5
+   ],
+   "captions": "off",
+   "captionNote": "Captions would float over the grid.",
+   "pairsWith": [
+    "tap (after)"
+   ],
+   "avoidWith": [
+    "reel-frame"
+   ]
+  },
+  {
+   "n": 46,
+   "name": "tape-label",
+   "does": "A level strip of yellow tape with your line lands on your chest.",
+   "zone": "chest, 45-68% height",
+   "moments": [
+    "claim",
+    "cta"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "text"
+   ],
+   "camera": false,
+   "options": {
+    "text": "the line"
+   },
+   "required": [
+    "text"
+   ],
+   "duration": [
+    1.5,
+    3
+   ],
+   "captions": "off",
+   "captionNote": "It is a caption-style label on the caption band; hide captions for this window.",
+   "pairsWith": [
+    "lean-in"
+   ],
+   "avoidWith": [
+    "stickers or hero captions at the same time"
+   ]
+  },
+  {
+   "n": 47,
+   "name": "select-resize",
+   "does": "A blue selection box grabs your number above your head and a cursor drags it bigger.",
+   "zone": "above head",
+   "moments": [
+    "proof",
+    "reveal"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation",
+    "text",
+    "numbers"
+   ],
+   "camera": false,
+   "options": {
+    "text": "the number, default 2X"
+   },
+   "required": [
+    "text"
+   ],
+   "duration": [
+    2,
+    3.5
+   ],
+   "captions": "safe",
+   "captionNote": "Above the head.",
+   "pairsWith": [
+    "lean-in"
+   ],
+   "avoidWith": [
+    "other above-head words"
+   ]
+  },
+  {
+   "n": 48,
+   "name": "wave-trim",
+   "does": "A dark panel above your head shows your voice; the silent ends collapse until only your words are left.",
+   "zone": "above head",
+   "moments": [
+    "proof",
+    "transition"
+   ],
+   "energy": "calm",
+   "needs": [
+    "face",
+    "segmentation"
+   ],
+   "camera": false,
+   "options": {},
+   "required": [],
+   "duration": [
+    2.5,
+    4
+   ],
+   "captions": "safe",
+   "captionNote": "Above the head. Works on any speech.",
+   "pairsWith": [
+    "slow-push"
+   ],
+   "avoidWith": [
+    "other above-head panels"
+   ]
+  },
+  {
+   "n": 49,
+   "name": "huge-strike",
+   "does": "One huge serif word wipes in behind your head, then a red line crosses it out.",
+   "zone": "behind head",
+   "moments": [
+    "objection",
+    "reveal"
+   ],
+   "energy": "high",
+   "needs": [
+    "face",
+    "segmentation",
+    "text",
+    "word-cue"
+   ],
+   "camera": false,
+   "options": {
+    "text": "the word",
+    "at": "seconds into the effect when the strike lands, default 0.6"
+   },
+   "required": [
+    "text"
+   ],
+   "duration": [
+    1.5,
+    3
+   ],
+   "captions": "safe",
+   "captionNote": "Behind the head.",
+   "pairsWith": [
+    "lean-in",
+    "moody"
+   ],
+   "avoidWith": [
+    "other behind-head words"
+   ]
+  },
+  {
+   "n": 50,
+   "name": "crayon-write",
+   "does": "A red crayon writes your word behind your head, then underlines it and flies off.",
+   "zone": "behind head",
+   "moments": [
+    "claim",
+    "hook"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation",
+    "text"
+   ],
+   "camera": false,
+   "options": {
+    "text": "the word"
+   },
+   "required": [
+    "text"
+   ],
+   "duration": [
+    1.5,
+    3
+   ],
+   "captions": "safe",
+   "captionNote": "Behind the head.",
+   "pairsWith": [
+    "slow-push"
+   ],
+   "avoidWith": [
+    "scribble, other behind-head words"
+   ]
+  },
+  {
+   "n": 51,
+   "name": "fan-build",
+   "does": "Your reel covers deal into a fan behind your head, one card at a time.",
+   "zone": "behind head",
+   "moments": [
+    "proof"
+   ],
+   "energy": "medium",
+   "needs": [
+    "face",
+    "segmentation",
+    "images"
+   ],
+   "camera": false,
+   "options": {
+    "images": "folder of covers",
+    "count": "default 13"
+   },
+   "required": [],
+   "duration": [
+    2.5,
+    4
+   ],
+   "captions": "safe",
+   "captionNote": "Behind and above the head.",
+   "pairsWith": [
+    "slow-push"
+   ],
+   "avoidWith": [
+    "orbit, carousel-spin, noise"
+   ]
+  }
+ ],
+ "presets": [
+  {
+   "name": "Calm explainer",
+   "for": "teaching, walkthroughs, measured tone",
+   "pace": "3-4 effects, all calm or medium",
+   "picks": [
+    {
+     "moment": "hook",
+     "fx": [
+      "dot-reveal",
+      "backdrop-word"
+     ]
+    },
+    {
+     "moment": "list",
+     "fx": [
+      "todo",
+      "apple-toggles"
+     ]
+    },
+    {
+     "moment": "claim",
+     "fx": [
+      "slow-push"
+     ]
+    },
+    {
+     "moment": "cta",
+     "fx": [
+      "led-sign"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Punchy hook",
+   "for": "hot takes, myth-busting, fast talkers",
+   "pace": "4-6 effects, high energy spaced 5 s apart",
+   "picks": [
+    {
+     "moment": "hook",
+     "fx": [
+      "lean-in",
+      "backdrop-word"
+     ]
+    },
+    {
+     "moment": "objection",
+     "fx": [
+      "reject-stamp",
+      "huge-strike"
+     ]
+    },
+    {
+     "moment": "reveal",
+     "fx": [
+      "match-cut"
+     ]
+    },
+    {
+     "moment": "cta",
+     "fx": [
+      "countdown-flip",
+      "comment-box"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Product demo",
+   "for": "showing a tool, a result or numbers",
+   "pace": "3-5 effects, proof-heavy",
+   "picks": [
+    {
+     "moment": "hook",
+     "fx": [
+      "locked-on"
+     ]
+    },
+    {
+     "moment": "list",
+     "fx": [
+      "checklist",
+      "the-bill"
+     ]
+    },
+    {
+     "moment": "proof",
+     "fx": [
+      "liquid-glass-graph",
+      "over-the-shoulder-zoom"
+     ]
+    },
+    {
+     "moment": "cta",
+     "fx": [
+      "tap"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Social proof",
+   "for": "results, testimonials, creator stats",
+   "pace": "3-4 effects",
+   "picks": [
+    {
+     "moment": "hook",
+     "fx": [
+      "cover-star",
+      "orbit"
+     ]
+    },
+    {
+     "moment": "proof",
+     "fx": [
+      "headline-wall",
+      "profile-wall",
+      "messages"
+     ]
+    },
+    {
+     "moment": "cta",
+     "fx": [
+      "pastel-word",
+      "tap"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Cinematic minimal",
+   "for": "serious or emotional pieces",
+   "pace": "3 effects, no high energy",
+   "picks": [
+    {
+     "moment": "hook",
+     "fx": [
+      "spotlight"
+     ]
+    },
+    {
+     "moment": "claim",
+     "fx": [
+      "slow-push"
+     ]
+    },
+    {
+     "moment": "transition",
+     "fx": [
+      "moody",
+      "timeline"
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,121 @@
+// Effects pass: add claude-video-effects on top of a reel, as a second pass after the cut and captions.
+//   npm run fx -- --name <job> --plan fx.json            -> jobs/<job>/reel-fx-vN.mp4 (captions stay on top)
+//   npm run fx -- --name <job> --plan fx.json --still 1.2,6.5   -> check frames in jobs/<job>/build/fx/ (with captions)
+//   npm run fx -- some-video.mp4 --plan fx.json [--out x.mp4]   -> any video; effects draw over whatever is baked in
+//   npm run fx -- --list                                  -> the catalog, grouped by moment
+// Other flags: --jobs <dir>, --allow-demo-copy (skip the required-option check), --captions on|off (force for all).
+// Job mode keeps audio exactly as the reel: the picture is rebuilt as  graded cut -> effects -> caption overlay
+// -> glitch hits, and the sound is mixed from the segments as usual (voice, wooshes, ducked bed).
+//
+// fx.json (times are on the reel's output clock, the same as captions.js):
+// { "profile": {"name": "Sam", "handle": "@sam.makes"},
+//   "effects": [ {"fx": "lean-in", "start": 0.4, "end": 1.4},
+//                {"fx": "checklist", "start": 6, "end": 10, "text": "Record::phone|Drop::inbox|Ask::Claude", "title": "Your workflow"},
+//                {"fx": "tap", "start": 14, "end": 16, "captions": "off"} ] }
+// Per-entry "captions": "off" hides captions for that window, "on" keeps them even for effects the catalog marks "off".
+const { execFileSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+
+const KIT = __dirname, ROOT = path.dirname(KIT), FX = path.join(ROOT, 'effects');
+const PY = path.join(FX, '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+const RUNNER = path.join(FX, 'fx_runner.py');
+const cat = JSON.parse(fs.readFileSync(path.join(FX, 'catalog.json'), 'utf8'));
+const byName = Object.fromEntries(cat.effects.map(e => [e.name, e]));
+const argv = process.argv.slice(2);
+const flag = k => argv.includes('--' + k);
+const opt = k => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : undefined; };
+const VALUED = new Set(['name', 'plan', 'still', 'out', 'jobs', 'captions']);
+const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
+const die = m => { console.error(m); process.exit(1); };
+const sh = (cmd, args, cwd, env) => execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } });
+
+if (flag('list')) {
+  for (const m of Object.keys(cat.moments)) {
+    console.log(`\n${m.toUpperCase()}: ${cat.moments[m]}`);
+    for (const e of cat.effects.filter(e => e.moments.includes(m))) console.log(`  ${e.name.padEnd(24)} ${e.energy.padEnd(6)} captions:${e.captions.padEnd(5)} ${e.does.slice(0, 80)}`);
+  }
+  console.log('\nFull details: effects/CATALOG.md');
+  process.exit(0);
+}
+if (!fs.existsSync(PY)) die('Effects are not set up yet. Run: npm run effects:setup');
+const planPath = opt('plan'); if (!planPath) die('Pass --plan fx.json (see the header of kit/fx.cjs or effects/CATALOG.md)');
+const raw = JSON.parse(fs.readFileSync(planPath, 'utf8'));
+const profile = raw.profile || {};
+const plan = (Array.isArray(raw) ? raw : raw.effects).map(d => ({ ...d }));
+
+// resolve aliases (same table as upstream), then validate against the catalog
+const src = fs.readFileSync(path.join(FX, 'vendor/claude-video-effects/scripts/fx.py'), 'utf8');
+const aliases = Object.fromEntries([...(src.match(/ALIASES = \{([\s\S]*?)\}/)[1]).matchAll(/'([^']+)':\s*'([^']+)'/g)].map(m => [m[1], m[2]]));
+const looks = { 'glitter-spotlight': ['spotlight', 'sparkle'], glitter: ['spotlight', 'sparkle'] };
+const problems = [], warnings = [];
+for (const d of plan) {
+  let n = String(d.fx || '').toLowerCase().replace(/^\//, '');
+  if (looks[n]) { d.look = d.look || looks[n][1]; n = looks[n][0]; }
+  n = aliases[n] || n; d.fx = n;
+  const e = byName[n];
+  if (!e) { problems.push(`unknown effect "${d.fx}" (npm run fx -- --list)`); continue; }
+  if (!(d.end > d.start)) problems.push(`${n}: needs start < end`);
+  for (const k of ['name', 'handle']) if (e.options[k] !== undefined && d[k] === undefined) d[k] = profile[k] ?? '';
+  for (const k of e.required) if (d[k] === undefined || d[k] === '') (k === 'name' || k === 'handle' ? warnings : problems).push(`${n}: set "${k}"${k === 'name' || k === 'handle' ? ' in "profile"' : ''} (the default is the upstream demo copy)`);
+  const len = d.end - d.start;
+  if (len < e.duration[0] * 0.7 || len > e.duration[1] * 1.5) warnings.push(`${n}: ${len.toFixed(1)} s is outside its usual ${e.duration[0]}-${e.duration[1]} s`);
+  if (e.captions === 'check' && d.captions === undefined) warnings.push(`${n} (${d.start}-${d.end}): read a check frame, it can crowd the caption band. ${e.captionNote}`);
+}
+const highs = plan.filter(d => byName[d.fx]?.energy === 'high').sort((a, b) => a.start - b.start);
+for (let i = 1; i < highs.length; i++) if (highs[i].start - highs[i - 1].start < cat.pacing.maxHighEnergyEvery) warnings.push(`pacing: ${highs[i - 1].fx} and ${highs[i].fx} are both high energy and start < ${cat.pacing.maxHighEnergyEvery} s apart`);
+const known = plan.filter(d => byName[d.fx]);
+if (known.length && !known.some(d => d.start <= cat.pacing.hookWithin)) warnings.push(`pacing: no effect starts in the first ${cat.pacing.hookWithin} s (hook)`);
+if (known.length > cat.pacing.perReel[1]) warnings.push(`pacing: ${known.length} effects; ${cat.pacing.perReel[0]}-${cat.pacing.perReel[1]} reads best`);
+const cams = plan.filter(d => byName[d.fx]?.camera);
+for (let i = 0; i < cams.length; i++) for (let j = i + 1; j < cams.length; j++) if (cams[i].start < cams[j].end && cams[j].start < cams[i].end) warnings.push(`camera effects ${cams[i].fx} and ${cams[j].fx} overlap; they will fight over the zoom`);
+plan.sort((a, b) => (byName[b.fx]?.camera ? 1 : 0) - (byName[a.fx]?.camera ? 1 : 0) || a.start - b.start); // camera effects first (upstream rule)
+warnings.forEach(w => console.warn('note:', w));
+if (problems.length && !flag('allow-demo-copy')) die('Fix the plan first:\n  ' + problems.join('\n  ') + '\n(--allow-demo-copy skips the required-option check)');
+const capsMode = opt('captions');
+const hide = plan.filter(d => capsMode === 'off' || (capsMode !== 'on' && (d.captions === 'off' || (d.captions !== 'on' && byName[d.fx]?.captions === 'off'))));
+const ovlOff = hide.map(d => `${(+d.start).toFixed(2)}-${(+d.end).toFixed(2)}`).join(',');
+const clean = plan.map(({ captions, ...d }) => d);
+
+const still = opt('still');
+const direct = positional[0];
+if (direct) {
+  const out = opt('out') || direct.replace(/(\.[^.]+)?$/, still ? '_check.png' : '_fx.mp4');
+  const pf = path.join(path.dirname(path.resolve(out)), path.basename(out).replace(/\.[^.]+$/, '') + '.plan.json');
+  fs.writeFileSync(pf, JSON.stringify({ effects: clean }, null, 1));
+  console.warn('note: direct mode draws effects over anything already in the video, captions included. Use --name <job> to keep captions on top.');
+  sh(PY, [RUNNER, '--plan', pf, path.resolve(direct), path.resolve(out), ...(still ? ['--still', still] : [])]);
+  process.exit(0);
+}
+
+const name = opt('name'); if (!name) die('Pass --name <job> (a folder in jobs/) or a video path.');
+const job = path.resolve(opt('jobs') || path.join(ROOT, 'jobs'), name), build = path.join(job, 'build'), dir = path.join(build, 'fx');
+if (!fs.existsSync(path.join(build, 'cut.json'))) die('No ' + path.join(build, 'cut.json') + '. Make the reel first (npm run reel).');
+fs.mkdirSync(dir, { recursive: true });
+const cut = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8'));
+const LEN = cut.segs.reduce((a, s) => a + (s.out - s.in) + (s.pad || 0), 0) + (cut.tail ?? 0.3);
+if (cut.overlay && !fs.existsSync(path.join(build, 'ovl'))) sh(process.execPath, [path.join(KIT, 'render.mjs'), LEN.toFixed(2)], build);
+const pf = path.join(dir, 'plan.resolved.json');
+fs.writeFileSync(pf, JSON.stringify({ effects: clean }, null, 1));
+const base = path.join(dir, 'base.mp4');
+console.log('> base cut (no captions) for the effects');
+sh(process.execPath, [path.join(KIT, 'assemble.cjs'), base], build, { BASEONLY: '1' });
+if (still) {
+  for (const f of fs.readdirSync(dir)) if (/^check.*\.png$/.test(f)) fs.rmSync(path.join(dir, f));
+  sh(PY, [RUNNER, '--plan', pf, base, path.join(dir, 'check.png'), '--still', still]);
+  const pngs = fs.readdirSync(dir).filter(f => /^check(_[0-9.]+)?\.png$/.test(f));
+  for (const f of pngs) {
+    const png = path.join(dir, f), m = f.match(/_([0-9.]+)\.png$/), t = m ? +m[1] : +still;
+    const ov = path.join(build, 'ovl', String(Math.round(t * 24)).padStart(4, '0') + '.png');
+    const hidden = hide.some(d => t >= d.start && t <= d.end);
+    if (fs.existsSync(ov) && !hidden) { execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', png, '-i', ov, '-filter_complex', 'overlay', png + '.tmp.png']); fs.renameSync(png + '.tmp.png', png); }
+    console.log('check frame', png, hidden ? '(captions hidden here)' : '(with captions)');
+  }
+  process.exit(0);
+}
+const fxv = path.join(dir, 'base-fx.mp4');
+sh(PY, [RUNNER, '--plan', pf, base, fxv]);
+let v = 1; while (fs.existsSync(path.join(job, `reel-fx-v${v}.mp4`))) v++;
+const out = path.join(job, `reel-fx-v${v}.mp4`);
+sh(process.execPath, [path.join(KIT, 'assemble.cjs'), out], build, { BASE: fxv, OVL_OFF: ovlOff });
+console.log(`\nReel with effects: ${out}${ovlOff ? `  (captions hidden: ${ovlOff})` : ''}`);

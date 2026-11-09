@@ -4,7 +4,8 @@ The usual job: a teammate recorded themselves on their phone, dropped the file i
 
 1. **Make the reel.** Read [skills/talking-head-ad/SKILL.md](skills/talking-head-ad/SKILL.md) and start at "Phone clip to reel". The one command is `npm run reel` (newest video in `inbox/`), or `npm run reel -- inbox/<file> --theme <name>`.
 2. **Only want clips** from a long recording? Read [skills/clip-raw-footage/SKILL.md](skills/clip-raw-footage/SKILL.md).
-3. **HeyGen takes** are optional. They're covered in the talking-head-ad skill under "Optional: HeyGen takes".
+3. **Effects** are an optional second pass: the "Pick effects" section of the talking-head-ad skill, with the menu in [effects/CATALOG.md](effects/CATALOG.md). Use `npm run fx`, not the vendored upstream `SKILL.md`, so captions stay on top and the teammate's own name and handle are used.
+4. **HeyGen takes** are optional. They're covered in the talking-head-ad skill under "Optional: HeyGen takes".
 
 Setup check: `npm install`, `pip install -r requirements.txt`, then `npm run smoke` must print `SMOKE PASS`. If Chrome isn't found, set `CHROME_PATH`; if Python isn't `python3`, set `PYTHON`.
 

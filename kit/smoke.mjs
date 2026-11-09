@@ -5,6 +5,9 @@
 // a 1080x1920 cut with seams, wooshes and a ducked bed, checks it with ffprobe, then runs the one-command
 // reel.cjs path on faked clip.py output (retake skipped) and its --rebuild loop.
 // --whisper also runs kit/tx.py with the tiny.en model (needs faster-whisper; downloads ~75 MB on first run).
+// Effects pass: runs when effects are set up (npm run effects:setup) or with --effects: a face-free grade (moody),
+// a face-tracking camera effect (locked-on) and a captions-off effect (checklist) on the one-command reel.
+// The synthetic clip has no face, so this proves the pipeline runs and falls back cleanly, not detection quality.
 // --keep leaves the work folder in place and prints its path.
 import { execFileSync } from 'child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, statSync, existsSync, rmSync, readdirSync } from 'fs';
@@ -15,6 +18,8 @@ import { findChrome } from './chrome.mjs';
 
 const KIT = dirname(fileURLToPath(import.meta.url));
 const keep = process.argv.includes('--keep'), whisper = process.argv.includes('--whisper');
+const fxPy = join(dirname(KIT), 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+const effects = process.argv.includes('--effects') || existsSync(fxPy);
 const run = (cmd, args, cwd, env) => execFileSync(cmd, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...env } }).toString();
 const step = (name, fn) => { process.stdout.write(`- ${name} ... `); const r = fn(); console.log('ok'); return r; };
 const fail = m => { throw new Error(m); };
@@ -91,6 +96,27 @@ try {
     run(node, [join(KIT, 'reel.cjs'), '--rebuild', '--jobs', join(work, 'jobs'), '--name', 'smoke-reel'], work);
     if (!existsSync(join(work, 'jobs', 'smoke-reel', 'reel-v2.mp4'))) fail('--rebuild did not write reel-v2.mp4');
   });
+  if (effects) step('effects pass: moody + locked-on + checklist (captions off), check frames + render', () => {
+    if (!existsSync(fxPy)) fail('effects not set up: npm run effects:setup');
+    run(node, [join(dirname(KIT), 'effects', 'check.mjs')], work);
+    const plan = join(work, 'fx.json');
+    writeFileSync(plan, JSON.stringify({ profile: { name: 'Smoke', handle: '@smoke' }, effects: [
+      { fx: 'moody', start: 0, end: 1.2, grade: 'cool' },
+      { fx: 'locked-on', start: 0.2, end: 1.4, text: 'SMOKE' },
+      { fx: 'checklist', start: 1.6, end: 3.1, text: 'Record::phone|Drop::inbox|Ask::Claude', title: 'Smoke test' }] }));
+    const jobs = join(work, 'jobs'), fxdir = join(jobs, 'smoke-reel', 'build', 'fx');
+    run(node, [join(KIT, 'fx.cjs'), '--name', 'smoke-reel', '--jobs', jobs, '--plan', plan, '--still', '0.8,2.4'], work);
+    if (readdirSync(fxdir).filter(f => /^check_.*\.png$/.test(f)).length !== 2) fail('expected 2 check frames: ' + readdirSync(fxdir));
+    run(node, [join(KIT, 'fx.cjs'), '--name', 'smoke-reel', '--jobs', jobs, '--plan', plan], work);
+    const out = join(jobs, 'smoke-reel', 'reel-fx-v1.mp4'); if (!existsSync(out)) fail('no reel-fx-v1.mp4');
+    const j = JSON.parse(run('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,width,height:format=duration', '-of', 'json', out]));
+    const v = j.streams.find(s => s.codec_type === 'video');
+    if (!v || v.width !== 1080 || v.height !== 1920 || !j.streams.some(s => s.codec_type === 'audio')) fail('bad fx output ' + JSON.stringify(j.streams));
+    if (Math.abs(+j.format.duration - 3.3) > 0.25) fail('fx reel duration ' + j.format.duration);
+    writeFileSync(plan.replace('fx.json', 'bad.json'), JSON.stringify({ effects: [{ fx: 'backdrop-word', start: 0, end: 1 }] }));
+    try { run(node, [join(KIT, 'fx.cjs'), '--name', 'smoke-reel', '--jobs', jobs, '--plan', plan.replace('fx.json', 'bad.json')], work); fail('demo-copy check did not fire'); } catch (e) { if (!/upstream demo copy/.test(String(e.stderr || ''))) throw e; }
+  });
+  else console.log('- effects pass ... skipped (npm run effects:setup to include it)');
   ok = true;
   console.log('\nSMOKE PASS' + (keep ? `  (work folder: ${work})` : ''));
 } catch (e) {

@@ -12,3 +12,6 @@ jobs/
 clips/
 inbox/*
 !inbox/README.md
+
+# effects pass
+effects/.venv/

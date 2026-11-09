@@ -11,7 +11,13 @@
     "reel": "node kit/reel.cjs",
     "smoke": "node kit/smoke.mjs",
     "smoke:whisper": "node kit/smoke.mjs --whisper",
-    "chrome": "node kit/chrome.mjs"
+    "chrome": "node kit/chrome.mjs",
+    "fx": "node kit/fx.cjs",
+    "effects:setup": "node effects/setup.mjs",
+    "effects:update": "node effects/update.mjs",
+    "effects:check": "node effects/check.mjs",
+    "effects:catalog": "node effects/catalog.mjs",
+    "smoke:effects": "node kit/smoke.mjs --effects"
   },
   "dependencies": {
     "playwright-core": "^1.47.0"
