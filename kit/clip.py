@@ -1,6 +1,6 @@
 # clip.py: turn raw talking-head footage into clean, transcribed clips that drop into cut.json.
 #
-#   py -3 -I kit/clip.py raw.mp4 [--out clips] [--model large-v3] [--vertical] [--cropx 0.5] [--min 3.0]
+#   python3 kit/clip.py raw.mp4 [--out clips] [--model large-v3] [--vertical] [--cropx 0.5] [--min 3.0]
 #
 # What it does
 #   1. Transcribes the raw file with word timestamps (faster-whisper).

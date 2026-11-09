@@ -1,5 +1,5 @@
 window.CAPTIONS={
- "note": "Awakening hero ad v10 (2026-11-08). Output-timeline seconds. mode: 0 caption, 1 spray hero word, 2 sticker, 3 count-up, 4 takeover card, 5 logo plate, 6 CTA sticker (end 99 = hold to the end).",
+ "note": "Awakening hero ad v10 (2026-11-08). Render with THEME=aigent (kit/themes/aigent.js) and kit/example/skool-logo.svg copied into build/. Output-timeline seconds. mode: 0 caption, 1 spray hero word, 2 sticker, 3 count-up, 4 takeover card, 5 logo plate, 6 CTA sticker (end 99 = hold to the end).",
  "flips": [
   {
    "start": 0.54,

@@ -5,7 +5,7 @@ description: "Cut raw talking-head footage (phone, camera, Zoom) into clean, tra
 
 # Clip raw footage
 
-`kit/clip.py` turns one raw recording into numbered clips you can pick from, in four steps:
+`kit/clip.py` turns one raw recording (usually a phone clip from `inbox/`) into numbered clips you can pick from, in four steps. On Windows run it as `py -3 kit/clip.py`. If the goal is a finished reel, `npm run reel` runs this for you; see the `talking-head-ad` skill.
 
 1. **Transcribe.** It runs faster-whisper with word timestamps over the whole file.
 2. **Split into sentences.** Short sentences merge with a neighbour until each clip is at least 3 s long, because shorter inserts read as jumpy.
@@ -15,9 +15,9 @@ description: "Cut raw talking-head footage (phone, camera, Zoom) into clean, tra
 ## Run
 
 ```
-py -3 -I kit/clip.py raw.mov --out clips --vertical            # center crop to 1080x1920
-py -3 -I kit/clip.py raw.mov --out clips --vertical --cropx 0.4 # face left of center
-py -3 -I kit/clip.py raw.mov --model medium.en                  # faster; large-v3 is the default
+python3 kit/clip.py inbox/raw.mov --out clips --vertical            # center crop to 1080x1920
+python3 kit/clip.py inbox/raw.mov --out clips --vertical --cropx 0.4 # face left of center
+python3 kit/clip.py inbox/raw.mov --model medium.en                  # faster; large-v3 is the default
 ```
 
 Outputs in `clips/`:
@@ -31,7 +31,8 @@ Outputs in `clips/`:
 1. Read `clips.md`. Skip `retake` rows, slates ("Okay, video two...") and asides ("Hate all of that...").
 2. Read `clips-sheet.png` for clips that end mid-move: a look-down, or walking out of frame. Trim the `out` of those segments.
 3. Add the keepers to the ad's `cut.json` as `{"file": "../clips/clip-009.mp4", "in": 0, "out": <dur>}`. They're already vertical and normalized, so don't add `norm`.
-4. Continue with the `talking-head-ad` skill from step 3.
+4. Continue with the `talking-head-ad` skill from step 3, or let `npm run reel -- --clips clips` build the cut and captions from every keep clip.
+5. Captions: the word times in `clips.json` feed `kit/autocaption.mjs`, so you don't need to run `tx.py` again on these clips.
 
 ## Notes
 

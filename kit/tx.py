@@ -1,5 +1,6 @@
 # Word timings for each take or clip. Writes words.json keyed by file name.
-#   py -3 -I kit/tx.py take1.mp4 take2.mp4 ...   (default: every seg*.mp4 / clip-*.mp4 in the current folder)
+#   python3 kit/tx.py take1.mp4 take2.mp4 ...   (default: every seg*.mp4 / clip-*.mp4 in the current folder)
+#   (Windows: py -3 kit/<script>.py ...)
 #   env TX_MODEL=large-v3 for the repeat-word check (catches "build, build"); default medium.en is faster.
 import sys, json, glob, os
 from faster_whisper import WhisperModel
