@@ -15,3 +15,5 @@ inbox/*
 
 # effects pass
 effects/.venv/
+__pycache__/
+*.pyc
