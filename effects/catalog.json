@@ -70,7 +70,8 @@
    ],
    "avoidWith": [
     "other card effects (orbit, carousel-spin, fan-build)"
-   ]
+   ],
+   "needsCustomText": false
   },
   {
    "n": 2,
@@ -105,7 +106,11 @@
    ],
    "avoidWith": [
     "the-bill (same zone)"
-   ]
+   ],
+   "upstreamDefaults": {
+    "text": "upstream effect names"
+   },
+   "needsCustomText": true
   },
   {
    "n": 3,
@@ -139,7 +144,8 @@
    ],
    "avoidWith": [
     "other camera effects in the same window"
-   ]
+   ],
+   "needsCustomText": false
   },
   {
    "n": 4,
@@ -178,7 +184,8 @@
     "carousel-spin",
     "fan-build",
     "noise"
-   ]
+   ],
+   "needsCustomText": false
   },
   {
    "n": 5,
@@ -214,7 +221,8 @@
    ],
    "avoidWith": [
     "slow-push or other camera effects in the same window"
-   ]
+   ],
+   "needsCustomText": false
   },
   {
    "n": 6,
@@ -253,7 +261,11 @@
    ],
    "avoidWith": [
     "other behind-head words (huge-strike, crayon-write, match-cut, led-sign)"
-   ]
+   ],
+   "upstreamDefaults": {
+    "text": "CLAUDE"
+   },
+   "needsCustomText": true
   },
   {
    "n": 7,
@@ -290,7 +302,18 @@
    ],
    "avoidWith": [
     "moody, timeline or other grades in the same window"
-   ]
+   ],
+   "requiredIf": {
+    "look": {
+     "sparkle": [
+      "text"
+     ]
+    }
+   },
+   "upstreamDefaults": {
+    "text (look=sparkle)": "CLAUDE"
+   },
+   "needsCustomText": true
   },
   {
    "n": 8,
@@ -326,7 +349,11 @@
    ],
    "avoidWith": [
     "lineup, todo (same zone)"
-   ]
+   ],
+   "upstreamDefaults": {
+    "text": "ORDER #1021|1x orbit|1x spotlight..."
+   },
+   "needsCustomText": true
   },
   {
    "n": 9,
@@ -356,7 +383,8 @@
    ],
    "avoidWith": [
     "other grades (spotlight, timeline, red-collage)"
-   ]
+   ],
+   "needsCustomText": false
   },
   {
    "n": 10,
@@ -385,7 +413,8 @@
    ],
    "avoidWith": [
     "other grades"
-   ]
+   ],
+   "needsCustomText": false
   },
   {
    "n": 11,
@@ -423,7 +452,11 @@
    ],
    "avoidWith": [
     "checklist, apple-toggles (same job)"
-   ]
+   ],
+   "upstreamDefaults": {
+    "text": "drop your video into Claude|install the skill|type /effects"
+   },
+   "needsCustomText": true
   },
   {
    "n": 12,
@@ -449,7 +482,8 @@
    },
    "required": [
     "text",
-    "handle"
+    "reply",
+    "chip"
    ],
    "duration": [
     2.5,
@@ -462,7 +496,20 @@
    ],
    "avoidWith": [
     "messages (same idea)"
-   ]
+   ],
+   "fromProfile": [
+    "handle"
+   ],
+   "neutral": {
+    "handle": "$profile.handle"
+   },
+   "upstreamDefaults": {
+    "text": "EFFECTS",
+    "handle": "vibha.in.progress",
+    "reply": "Sent you the pack",
+    "chip": "22 effects"
+   },
+   "needsCustomText": true
   },
   {
    "n": 13,
@@ -495,7 +542,8 @@
    ],
    "avoidWith": [
     "another CTA sticker in the same window"
-   ]
+   ],
+   "needsCustomText": false
   },
   {
    "n": 14,
@@ -530,7 +578,8 @@
    ],
    "avoidWith": [
     "camera effects in the same window"
-   ]
+   ],
+   "needsCustomText": false
   },
   {
    "n": 15,
@@ -564,7 +613,8 @@
    ],
    "avoidWith": [
     "other glitchy effects within 5 s"
-   ]
+   ],
+   "needsCustomText": true
   },
   {
    "n": 16,
@@ -585,9 +635,7 @@
    "options": {
     "text": "handle shown on the card"
    },
-   "required": [
-    "text"
-   ],
+   "required": [],
    "duration": [
     2,
     3.5
@@ -599,7 +647,17 @@
    ],
    "avoidWith": [
     "camera effects"
-   ]
+   ],
+   "fromProfile": [
+    "text"
+   ],
+   "neutral": {
+    "text": "$profile.handle"
+   },
+   "upstreamDefaults": {
+    "text": "@your.handle"
+   },
+   "needsCustomText": false
   },
   {
    "n": 17,
@@ -632,7 +690,8 @@
    ],
    "avoidWith": [
     "noise (two busy backgrounds)"
-   ]
+   ],
+   "needsCustomText": false
   },
   {
    "n": 18,
@@ -671,7 +730,8 @@
    ],
    "avoidWith": [
     "huge-strike in the same moment"
-   ]
+   ],
+   "needsCustomText": true
   },
   {
    "n": 19,
@@ -704,7 +764,8 @@
    ],
    "avoidWith": [
     "lineup, the-bill (same zone)"
-   ]
+   ],
+   "needsCustomText": false
   },
   {
    "n": 20,
@@ -738,7 +799,8 @@
    ],
    "avoidWith": [
     "another high-energy effect within 5 s"
-   ]
+   ],
+   "needsCustomText": false
   },
   {
    "n": 21,
@@ -778,7 +840,18 @@
    ],
    "avoidWith": [
     "red-collage, split-headline (other layouts)"
-   ]
+   ],
+   "neutral": {
+    "issue": "$issue",
+    "right": " "
+   },
+   "upstreamDefaults": {
+    "text": "VIBE / EFFECTS",
+    "issue": "THE AI ISSUE · 2026 / THE ONE-CLIP ISSUE · NO. 42",
+    "lines": "22 effects|you can steal...",
+    "right": "the art of the|effortless edit"
+   },
+   "needsCustomText": true
   },
   {
    "n": 22,
@@ -812,7 +885,8 @@
    ],
    "avoidWith": [
     "crayon-write (same hand-drawn look)"
-   ]
+   ],
+   "needsCustomText": false
   },
   {
    "n": 23,
@@ -832,15 +906,26 @@
    "camera": false,
    "options": {
     "text": "big number",
+    "title": "stat tile label",
+    "sub": "lines under the number, joined with |",
     "name": "profile name (injected from the plan profile)",
     "handle": "handle (injected)",
     "pill": "off by default. Opt in with \"pill\": true (upstream \"Edited by Claude\"), custom text like \"Made by |Sam\" (text|bold part), or --pill on npm run fx",
     "look": "simple",
-    "grade": "warm (default) or none"
+    "grade": "warm (default) or none",
+    "chart": "stats card: label::value::bar values, e.g. Signups::1.2K::3|5|8|13|21",
+    "song": "\"now editing\" line (defaults to the job name)",
+    "song_sub": "line under it",
+    "day": "calendar day (defaults to today)",
+    "date": "calendar date (defaults to today)",
+    "event": "calendar event",
+    "label": "look=simple card label"
    },
    "required": [
-    "name",
-    "handle"
+    "text",
+    "title",
+    "sub",
+    "chart"
    ],
    "duration": [
     3,
@@ -853,7 +938,40 @@
    ],
    "avoidWith": [
     "liquid-glass-graph, apple-toggles (more glass)"
-   ]
+   ],
+   "requiredIf": {
+    "look": {
+     "simple": [
+      "label"
+     ]
+    }
+   },
+   "fromProfile": [
+    "name",
+    "handle"
+   ],
+   "neutral": {
+    "song": "$job",
+    "song_sub": "edit",
+    "day": "$day",
+    "date": "$date",
+    "event": "Post · today",
+    "chart_tag": "artifact · stats.html"
+   },
+   "upstreamDefaults": {
+    "title": "Claude",
+    "text": "38 / 22",
+    "sub": "effects|one clip",
+    "name": "Vibha",
+    "handle": "@vibha.in.progress",
+    "chart": "Top reels · 197K · fixed bars (hard-coded)",
+    "song": "soft UI pops",
+    "song_sub": "sfx · 25.7s (hard-coded)",
+    "day/date/event": "WED 21 Post 2 reels · tonight",
+    "label (look=simple)": "glass UI",
+    "pill": "Edited by Claude (hard-coded)"
+   },
+   "needsCustomText": true
   },
   {
    "n": 24,
@@ -892,7 +1010,16 @@
    ],
    "avoidWith": [
     "other grades and layouts"
-   ]
+   ],
+   "neutral": {
+    "tag": "REC"
+   },
+   "upstreamDefaults": {
+    "text": "EDIT",
+    "lines": "ONE CLIP.|22 EFFECTS.|ZERO APPS.",
+    "tag": "REC · RED COLLAGE"
+   },
+   "needsCustomText": true
   },
   {
    "n": 25,
@@ -917,7 +1044,8 @@
     "height": "card height, default 0.36"
    },
    "required": [
-    "text"
+    "text",
+    "pill"
    ],
    "duration": [
     2.5,
@@ -930,7 +1058,16 @@
    ],
    "avoidWith": [
     "broll-split, cover-star"
-   ]
+   ],
+   "neutral": {
+    "hl": "-"
+   },
+   "upstreamDefaults": {
+    "text": "Claude|edits my|reels.",
+    "hl": "edits",
+    "pill": "in seconds ↗"
+   },
+   "needsCustomText": true
   },
   {
    "n": 26,
@@ -955,9 +1092,7 @@
     "role": "card subtitle"
    },
    "required": [
-    "text",
-    "name",
-    "handle"
+    "text"
    ],
    "duration": [
     2.5,
@@ -970,7 +1105,17 @@
    ],
    "avoidWith": [
     "other room swaps"
-   ]
+   ],
+   "fromProfile": [
+    "name",
+    "handle"
+   ],
+   "upstreamDefaults": {
+    "text": "REELS",
+    "name": "Vibha",
+    "handle": "@vibha.in.progress"
+   },
+   "needsCustomText": true
   },
   {
    "n": 27,
@@ -996,8 +1141,7 @@
     "images": "folder of covers"
    },
    "required": [
-    "text",
-    "handle"
+    "text"
    ],
    "duration": [
     3,
@@ -1010,7 +1154,19 @@
    ],
    "avoidWith": [
     "other room swaps"
-   ]
+   ],
+   "fromProfile": [
+    "handle"
+   ],
+   "neutral": {
+    "board": "$profile.name"
+   },
+   "upstreamDefaults": {
+    "text": "Hook|Captions|Cuts|B-roll",
+    "handle": "@vibha.in.progress",
+    "board": "Reels · 22 effects"
+   },
+   "needsCustomText": true
   },
   {
    "n": 28,
@@ -1029,10 +1185,12 @@
    "camera": false,
    "options": {
     "text": "title",
-    "sub": "subtitle (default \"timeline by Claude\")",
+    "sub": "subtitle",
     "tc": "timecode"
    },
-   "required": [],
+   "required": [
+    "sub"
+   ],
    "duration": [
     3,
     6
@@ -1044,7 +1202,11 @@
    ],
    "avoidWith": [
     "other grades"
-   ]
+   ],
+   "upstreamDefaults": {
+    "sub": "timeline by Claude"
+   },
+   "needsCustomText": true
   },
   {
    "n": 29,
@@ -1080,7 +1242,11 @@
    ],
    "avoidWith": [
     "phone-fan (same headline style)"
-   ]
+   ],
+   "upstreamDefaults": {
+    "text": "How I got Claude|to edit my reels."
+   },
+   "needsCustomText": true
   },
   {
    "n": 30,
@@ -1106,7 +1272,7 @@
     "sub": "sub line"
    },
    "required": [
-    "name"
+    "count"
    ],
    "duration": [
     2.5,
@@ -1119,12 +1285,24 @@
    ],
    "avoidWith": [
     "headline-wall (same proof job)"
-   ]
+   ],
+   "fromProfile": [
+    "name"
+   ],
+   "neutral": {
+    "sub": "top post"
+   },
+   "upstreamDefaults": {
+    "name": "vibha.in.progress",
+    "count": "197000",
+    "sub": "top reel"
+   },
+   "needsCustomText": true
   },
   {
    "n": 31,
    "name": "tier-list",
-   "does": "A tier list drops in front of you and an item flies into S tier.",
+   "does": "A tier list drops in front of you and your item flies into S tier.",
    "zone": "title above head, board from mid-frame",
    "moments": [
     "proof",
@@ -1139,12 +1317,13 @@
    "camera": false,
    "options": {
     "title": "question title",
-    "item": "item that lands in S tier (default Claude)",
+    "item": "item that lands in S tier",
     "others": "other items joined with |"
    },
    "required": [
     "title",
-    "item"
+    "item",
+    "others"
    ],
    "duration": [
     3,
@@ -1157,7 +1336,13 @@
    ],
    "avoidWith": [
     "other boards"
-   ]
+   ],
+   "upstreamDefaults": {
+    "title": "best way to edit a reel?",
+    "item": "Claude",
+    "others": "templates|timelines|apps|doing it by hand"
+   },
+   "needsCustomText": true
   },
   {
    "n": 32,
@@ -1182,7 +1367,8 @@
     "pick": "which file, default 0"
    },
    "required": [
-    "images"
+    "images",
+    "text"
    ],
    "duration": [
     2,
@@ -1195,7 +1381,11 @@
    ],
    "avoidWith": [
     "split-headline"
-   ]
+   ],
+   "upstreamDefaults": {
+    "text": "4 hrs → 4 min"
+   },
+   "needsCustomText": true
   },
   {
    "n": 33,
@@ -1231,7 +1421,11 @@
    ],
    "avoidWith": [
     "headline-box (same headline)"
-   ]
+   ],
+   "upstreamDefaults": {
+    "text": "22 effects.|zero editing apps."
+   },
+   "needsCustomText": true
   },
   {
    "n": 34,
@@ -1263,7 +1457,8 @@
    ],
    "avoidWith": [
     "camera effects in the same window"
-   ]
+   ],
+   "needsCustomText": false
   },
   {
    "n": 35,
@@ -1290,7 +1485,7 @@
    "required": [
     "text",
     "total",
-    "handle"
+    "label"
    ],
    "duration": [
     3,
@@ -1303,7 +1498,17 @@
    ],
    "avoidWith": [
     "profile-wall"
-   ]
+   ],
+   "fromProfile": [
+    "handle"
+   ],
+   "upstreamDefaults": {
+    "text": "the author's reel headlines (Claude, ChatGPT...)",
+    "total": "672K",
+    "label": "views from 7 reels",
+    "handle": "@vibha.in.progress (hard-coded)"
+   },
+   "needsCustomText": true
   },
   {
    "n": 36,
@@ -1322,7 +1527,7 @@
    "camera": false,
    "options": {
     "text": "step::meta joined with |",
-    "title": "card title (default \"Claude is editing your clip\")"
+    "title": "card title"
    },
    "required": [
     "text",
@@ -1339,7 +1544,11 @@
    ],
    "avoidWith": [
     "todo, apple-toggles"
-   ]
+   ],
+   "upstreamDefaults": {
+    "title": "Claude is editing your clip"
+   },
+   "needsCustomText": true
   },
   {
    "n": 37,
@@ -1382,7 +1591,24 @@
    ],
    "avoidWith": [
     "over-the-shoulder-zoom (same graph)"
-   ]
+   ],
+   "requiredIf": {
+    "look": {
+     "bento": [
+      "donut",
+      "kpi",
+      "bars"
+     ]
+    }
+   },
+   "upstreamDefaults": {
+    "text": "RETENTION / VIEWS",
+    "to": "59% / 197K",
+    "donut (bento)": "29%::ERASE share",
+    "kpi (bento)": "672K::views · top 7 reels",
+    "bars (bento)": "197|140|124|83|50::top reels"
+   },
+   "needsCustomText": true
   },
   {
    "n": 38,
@@ -1418,7 +1644,8 @@
    ],
    "avoidWith": [
     "orbit, fan-build, noise"
-   ]
+   ],
+   "needsCustomText": false
   },
   {
    "n": 39,
@@ -1439,7 +1666,7 @@
    ],
    "camera": true,
    "options": {
-    "text": "the word (default Claude)",
+    "text": "the word",
     "color": "hex"
    },
    "required": [
@@ -1456,7 +1683,11 @@
    ],
    "avoidWith": [
     "other behind-head words"
-   ]
+   ],
+   "upstreamDefaults": {
+    "text": "Claude"
+   },
+   "needsCustomText": true
   },
   {
    "n": 40,
@@ -1496,7 +1727,11 @@
    ],
    "avoidWith": [
     "todo, checklist"
-   ]
+   ],
+   "upstreamDefaults": {
+    "text": "One clip|Type /effects|Zero editing apps"
+   },
+   "needsCustomText": true
   },
   {
    "n": 41,
@@ -1534,7 +1769,11 @@
    ],
    "avoidWith": [
     "other behind-head words, grades"
-   ]
+   ],
+   "upstreamDefaults": {
+    "text": "CLAUDE"
+   },
+   "needsCustomText": true
   },
   {
    "n": 42,
@@ -1571,7 +1810,8 @@
    ],
    "avoidWith": [
     "other camera effects in the same window"
-   ]
+   ],
+   "needsCustomText": false
   },
   {
    "n": 43,
@@ -1609,7 +1849,8 @@
    ],
    "avoidWith": [
     "liquid-glass-graph"
-   ]
+   ],
+   "needsCustomText": true
   },
   {
    "n": 44,
@@ -1645,7 +1886,11 @@
    ],
    "avoidWith": [
     "comment-box"
-   ]
+   ],
+   "upstreamDefaults": {
+    "text": "how did you edit this??|...|EFFECTS"
+   },
+   "needsCustomText": true
   },
   {
    "n": 45,
@@ -1680,7 +1925,11 @@
    ],
    "avoidWith": [
     "reel-frame"
-   ]
+   ],
+   "upstreamDefaults": {
+    "views": "2.4M|847K|... (demo counts)"
+   },
+   "needsCustomText": true
   },
   {
    "n": 46,
@@ -1714,7 +1963,11 @@
    ],
    "avoidWith": [
     "stickers or hero captions at the same time"
-   ]
+   ],
+   "upstreamDefaults": {
+    "text": "your own reels"
+   },
+   "needsCustomText": true
   },
   {
    "n": 47,
@@ -1750,7 +2003,11 @@
    ],
    "avoidWith": [
     "other above-head words"
-   ]
+   ],
+   "upstreamDefaults": {
+    "text": "2X"
+   },
+   "needsCustomText": true
   },
   {
    "n": 48,
@@ -1780,7 +2037,8 @@
    ],
    "avoidWith": [
     "other above-head panels"
-   ]
+   ],
+   "needsCustomText": false
   },
   {
    "n": 49,
@@ -1818,7 +2076,11 @@
    ],
    "avoidWith": [
     "other behind-head words"
-   ]
+   ],
+   "upstreamDefaults": {
+    "text": "8 HOURS"
+   },
+   "needsCustomText": true
   },
   {
    "n": 50,
@@ -1853,7 +2115,11 @@
    ],
    "avoidWith": [
     "scribble, other behind-head words"
-   ]
+   ],
+   "upstreamDefaults": {
+    "text": "NOBODY"
+   },
+   "needsCustomText": true
   },
   {
    "n": 51,
@@ -1886,7 +2152,8 @@
    ],
    "avoidWith": [
     "orbit, carousel-spin, noise"
-   ]
+   ],
+   "needsCustomText": false
   }
  ],
  "presets": [

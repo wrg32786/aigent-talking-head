@@ -12,7 +12,7 @@
 
 - **Update:** `npm run effects:update` (latest) or `npm run effects:update -- --ref <sha>`. It re-copies the files, records the new commit, flags any promotional links, then runs `npm run effects:check`.
 - **Check:** `npm run effects:check` fails if the catalog doesn't cover exactly the effects in `fx.py`, if a runner patch no longer matches, or if `CATALOG.md` is stale (`npm run effects:catalog` regenerates it from the JSON).
-- **Runner patches:** `fx_runner.py` runs the vendored `fx.py` unchanged on disk, with small in-memory patches so the upstream author's handle comes from the plan, and the upstream "Edited by Claude" pill on `glass-widgets` is off by default. Opt in per entry with `"pill": true` (upstream text) or your own `"pill": "Made by |Sam"`, or for the whole plan with `npm run fx -- ... --pill`. `kit/fx.cjs` also fills `name`/`handle` from the plan's `profile` and refuses plans that leave required text on the upstream demo copy.
+- **Runner patches:** `fx_runner.py` runs the vendored `fx.py` unchanged on disk, with small in-memory patches so the upstream author's handle comes from the plan, and the upstream "Edited by Claude" pill on `glass-widgets` is off by default. Opt in per entry with `"pill": true` (upstream text) or your own `"pill": "Made by |Sam"`, or for the whole plan with `npm run fx -- ... --pill`. `kit/fx.cjs` fills `name`/`handle` from the plan's `profile` and refuses plans that leave required copy unset. Optional fields that would show the author's content get neutral values (today's date, the job name). The runner also makes the `glass-widgets` stats card (`chart`) and its other fixed lines configurable. See "Needs your copy" in CATALOG.md for all 31 effects affected.
 
 ## Captions and effects
 

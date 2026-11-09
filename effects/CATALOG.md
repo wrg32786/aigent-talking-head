@@ -8,7 +8,7 @@
 - **Energy**: `calm` (grades, slow moves, quiet panels), `medium` (pops, cards, words), `high` (punch-ins, stamps, glitches, busy card storms).
 - **Needs**: `face` = placed relative to the face (needs a face in frame), `segmentation` = hides behind you, `word-cue` = should land on a spoken word, `text` / `numbers` / `images` = you supply copy, real numbers or a folder of pictures.
 - **Captions**: `safe` = keep captions on; `check` = read a check frame (`--still`); `off` = captions are hidden for that window automatically (add `"captions": "on"` to the plan entry to keep them).
-- **Required** options must be in the plan; the defaults are the upstream author's demo copy. `name`/`handle` come from the plan's `profile`.
+- **Required** options must be in the plan (see "Needs your copy"); upstream defaults never show. `name`/`handle` come from the plan's `profile`.
 
 **Pacing rules**: 3 to 6 effects per reel, a hook effect in the first 2 s, a CTA effect at the end, and no more than one `high` effect every 5 s. Camera effects (marked 🎥) go first in the plan when windows overlap.
 
@@ -22,6 +22,47 @@
 - **objection** ("But..."/"No...", myth-busting, what not to do.) calm: `moody`, `slow-push` · medium: `pause-point`, `messages` · high: `lean-in`, `uninstall`, `reject-stamp`, `huge-strike`
 - **cta** (The ask at the end: comment, follow, link.) calm: `apple-toggles`, `slow-push` · medium: `spotlight`, `comment-box`, `tap`, `countdown-flip`, `pastel-word`, `led-sign`, `messages`, `tape-label` · high: `place-in-grid`
 - **transition** (Between sections or at a seam.) calm: `moody`, `timeline`, `slow-push`, `wave-trim` · medium: `reel-frame`, `broll-split`, `dot-reveal` · high: `uninstall`, `rabbit-hole`
+
+## Needs your copy
+
+These effects ship with the upstream author's brand names, handle or demo stats as defaults. `npm run fx` refuses a plan that leaves the copy below unset (`--allow-demo-copy` fills neutral `[placeholders]` for a quick look, never the upstream text). Profile fields come from the plan's `"profile": {"name", "handle"}`. Optional fields marked *auto* get neutral values (today's date, the job name, your profile) when you leave them out.
+
+| Effect | You must set | From profile | Auto (neutral) | Upstream default it replaces |
+|---|---|---|---|---|
+| `lineup` | text | - | - | text: upstream effect names |
+| `backdrop-word` | text | - | - | text: CLAUDE |
+| `spotlight` | text (when look=sparkle) | - | - | text (look=sparkle): CLAUDE |
+| `the-bill` | text | - | - | text: ORDER #1021\|1x orbit\|1x spotlight... |
+| `todo` | text | - | - | text: drop your video into Claude\|install the skill\|type /effects |
+| `comment-box` | text, reply, chip | handle | handle | text: EFFECTS; handle: vibha.in.progress; reply: Sent you the pack; chip: 22 effects |
+| `uninstall` | text | - | - | - |
+| `reel-frame` | - | handle (as text) | text | text: @your.handle |
+| `reject-stamp` | text | - | - | - |
+| `cover-star` | text, lines | - | issue, right | text: VIBE / EFFECTS; issue: THE AI ISSUE · 2026 / THE ONE-CLIP ISSUE · NO. 42; lines: 22 effects\|you can steal...; right: the art of the\|effortless edit |
+| `glass-widgets` | text, title, sub, chart, label (when look=simple) | name, handle | song, song_sub, day, date, event, chart_tag | title: Claude; text: 38 / 22; sub: effects\|one clip; name: Vibha; handle: @vibha.in.progress; chart: Top reels · 197K · fixed bars (hard-coded); song: soft UI pops; song_sub: sfx · 25.7s (hard-coded); day/date/event: WED 21 Post 2 reels · tonight; label (look=simple): glass UI; pill: Edited by Claude (hard-coded) |
+| `red-collage` | text, lines | - | tag | text: EDIT; lines: ONE CLIP.\|22 EFFECTS.\|ZERO APPS.; tag: REC · RED COLLAGE |
+| `split-headline` | text, pill | - | hl | text: Claude\|edits my\|reels.; hl: edits; pill: in seconds ↗ |
+| `pastel-word` | text | name, handle | - | text: REELS; name: Vibha; handle: @vibha.in.progress |
+| `check-pills` | text | handle | board | text: Hook\|Captions\|Cuts\|B-roll; handle: @vibha.in.progress; board: Reels · 22 effects |
+| `timeline` | sub | - | - | sub: timeline by Claude |
+| `headline-box` | text | - | - | text: How I got Claude\|to edit my reels. |
+| `profile-wall` | count | name | sub | name: vibha.in.progress; count: 197000; sub: top reel |
+| `tier-list` | title, item, others | - | - | title: best way to edit a reel?; item: Claude; others: templates\|timelines\|apps\|doing it by hand |
+| `broll-split` | images, text | - | - | text: 4 hrs → 4 min |
+| `phone-fan` | text | - | - | text: 22 effects.\|zero editing apps. |
+| `headline-wall` | text, total, label | handle | - | text: the author's reel headlines (Claude, ChatGPT...); total: 672K; label: views from 7 reels; handle: @vibha.in.progress (hard-coded) |
+| `checklist` | text, title | - | - | title: Claude is editing your clip |
+| `liquid-glass-graph` | text, to, donut, kpi, bars (when look=bento) | - | - | text: RETENTION / VIEWS; to: 59% / 197K; donut (bento): 29%::ERASE share; kpi (bento): 672K::views · top 7 reels; bars (bento): 197\|140\|124\|83\|50::top reels |
+| `match-cut` | text | - | - | text: Claude |
+| `apple-toggles` | text | - | - | text: One clip\|Type /effects\|Zero editing apps |
+| `led-sign` | text | - | - | text: CLAUDE |
+| `over-the-shoulder-zoom` | text, to | - | - | - |
+| `messages` | text | - | - | text: how did you edit this??\|...\|EFFECTS |
+| `place-in-grid` | views | - | - | views: 2.4M\|847K\|... (demo counts) |
+| `tape-label` | text | - | - | text: your own reels |
+| `select-resize` | text | - | - | text: 2X |
+| `huge-strike` | text | - | - | text: 8 HOURS |
+| `crayon-write` | text | - | - | text: NOBODY |
 
 ## Effects menu presets
 
@@ -65,7 +106,7 @@
 | 28 | `timeline` | A dark red cinematic grade with an editing timeline, a REC timecode and a glowing playhead. | transition, proof | calm | segmentation, text | 3-6 s | **check**: Read a check frame: the timeline panel can sit near the caption band. | slow-push | other grades |
 | 29 | `headline-box` 🎥 | A punch-in with a two-line headline above your head, the second line in a white box. | hook, claim | medium | face, segmentation, text | 2-4 s | **safe**: Headline sits above the head; captions stay put. | backdrop-word (later) | phone-fan (same headline style) |
 | 30 | `profile-wall` | Your reels grid fills the wall behind you while a view counter ticks up below your face. | proof | medium | face, segmentation, images, numbers | 2.5-4 s | **off**: The counter card lands at chest height, in the caption band. | slow-push | headline-wall (same proof job) |
-| 31 | `tier-list` | A tier list drops in front of you and an item flies into S tier. | proof, claim | medium | face, segmentation, text | 3-4.5 s | **off**: The board covers mid-frame and the caption band. | lean-in (after) | other boards |
+| 31 | `tier-list` | A tier list drops in front of you and your item flies into S tier. | proof, claim | medium | face, segmentation, text | 3-4.5 s | **off**: The board covers mid-frame and the caption band. | lean-in (after) | other boards |
 | 32 | `broll-split` | Split screen: b-roll on top with a price-tag sticker, you on the bottom. | proof, transition | medium | face, segmentation, images, text | 2-4 s | **check**: You move to the bottom, so the caption band may sit on your face; hide captions or check frames. | tap | split-headline |
 | 33 | `phone-fan` | Your reels fan out like a hand of phones under a two-line headline. | proof, hook | medium | face, text, images | 2.5-4 s | **off**: The phones fill the bottom of the frame, over the caption band. | slow-push | headline-box (same headline) |
 | 34 | `dot-reveal` | Your shot builds itself out of glowing dots, then snaps into the full picture. | hook, transition, reveal | medium | nothing (no face needed) | 1-2.5 s | **safe**: Works with no face. Best as the very first effect. | locked-on (after) | camera effects in the same window |
@@ -102,34 +143,34 @@ Pass options as keys on the plan entry (`{"fx": "backdrop-word", "start": 3.2, "
 - `moody`: grade (moody, bw, warm, cool, pop)
 - `swipe`: grade (the "after" look)
 - `todo`: **text** (items joined with |), ticks (video seconds of each tick, joined with |), title (default TO DO)
-- `comment-box`: **text** (the comment word), **handle** (your handle (injected from the plan profile)), reply (reply line), chip (reply link chip), look (bar for the bottom comment bar)
+- `comment-box`: **text** (the comment word), handle (your handle (injected from the plan profile)), **reply** (reply line), **chip** (reply link chip), look (bar for the bottom comment bar)
 - `tap`: at (video second of the flip), x (0-1), y (0-1), color (hex)
 - `pause-point`: text (label, default "look here"), color (hex), label_x (0-1)
 - `uninstall`: **text** (bar label, default Uninstalling...)
-- `reel-frame`: **text** (handle shown on the card)
+- `reel-frame`: text (handle shown on the card)
 - `shortcut-rain`: text (keys joined with |), count (default 26)
 - `reject-stamp`: **text** (stamp word, default REJECTED), color (hex), angle (default 12), y (0-1)
 - `countdown-flip`: from (default 3)
 - `rabbit-hole`: ratio (default 0.62), speed (default 0.8), spin (default 10)
 - `cover-star`: **text** (masthead), **lines** (cover lines joined with |), issue (issue line), color (hex), accent (hex), look (editorial)
 - `scribble`: text (label, default "me!"), color (hex)
-- `glass-widgets`: text (big number), **name** (profile name (injected from the plan profile)), **handle** (handle (injected)), pill (off by default. Opt in with "pill": true (upstream "Edited by Claude"), custom text like "Made by |Sam" (text|bold part), or --pill on npm run fx), look (simple), grade (warm (default) or none)
+- `glass-widgets`: **text** (big number), **title** (stat tile label), **sub** (lines under the number, joined with |), name (profile name (injected from the plan profile)), handle (handle (injected)), pill (off by default. Opt in with "pill": true (upstream "Edited by Claude"), custom text like "Made by |Sam" (text|bold part), or --pill on npm run fx), look (simple), grade (warm (default) or none), **chart** (stats card: label::value::bar values, e.g. Signups::1.2K::3|5|8|13|21), song ("now editing" line (defaults to the job name)), song_sub (line under it), day (calendar day (defaults to today)), date (calendar date (defaults to today)), event (calendar event), label (look=simple card label)
 - `red-collage`: **text** (red word), **lines** (three lines joined with |), tag (small REC tag), color (hex)
-- `split-headline`: **text** (lines joined with |), hl (highlighted word), pill (pill text), height (card height, default 0.36)
-- `pastel-word`: **text** (the word), **name** (profile name (injected)), **handle** (handle (injected)), role (card subtitle)
-- `check-pills`: **text** (pills joined with |), **handle** (board handle (injected)), board (board label), images (folder of covers)
-- `timeline`: text (title), sub (subtitle (default "timeline by Claude")), tc (timecode)
+- `split-headline`: **text** (lines joined with |), hl (highlighted word), **pill** (pill text), height (card height, default 0.36)
+- `pastel-word`: **text** (the word), name (profile name (injected)), handle (handle (injected)), role (card subtitle)
+- `check-pills`: **text** (pills joined with |), handle (board handle (injected)), board (board label), images (folder of covers)
+- `timeline`: text (title), **sub** (subtitle), tc (timecode)
 - `headline-box`: **text** (two lines joined with |), zoom (default 1.2)
-- `profile-wall`: images (folder of covers), count (the number, e.g. 197000), label (default views), **name** (profile name (injected)), sub (sub line)
-- `tier-list`: **title** (question title), **item** (item that lands in S tier (default Claude)), others (other items joined with |)
-- `broll-split`: **images** (folder with the b-roll image or clip), text (price tag), pick (which file, default 0)
+- `profile-wall`: images (folder of covers), **count** (the number, e.g. 197000), label (default views), name (profile name (injected)), sub (sub line)
+- `tier-list`: **title** (question title), **item** (item that lands in S tier), **others** (other items joined with |)
+- `broll-split`: **images** (folder with the b-roll image or clip), **text** (price tag), pick (which file, default 0)
 - `phone-fan`: images (folder of covers), **text** (two lines joined with |)
 - `dot-reveal`: color (hex), cell (dot size, default 0.017), bg (hex)
-- `headline-wall`: **text** (headline::meta joined with |), **total** (the total, e.g. 672K), label (label under the total), **handle** (handle on each card (injected))
-- `checklist`: **text** (step::meta joined with |), **title** (card title (default "Claude is editing your clip"))
+- `headline-wall`: **text** (headline::meta joined with |), **total** (the total, e.g. 672K), **label** (label under the total), handle (handle on each card (injected))
+- `checklist`: **text** (step::meta joined with |), **title** (card title)
 - `liquid-glass-graph`: **text** (label), from (start number), **to** (end number, e.g. 197K or 59%), color (hex), look (bento), donut (29%::label), kpi (672K::label), bars (197|140|124::label)
 - `carousel-spin`: images (folder of covers), count (6-12), size (default 0.3), turns (default 1.1)
-- `match-cut`: **text** (the word (default Claude)), color (hex)
+- `match-cut`: **text** (the word), color (hex)
 - `apple-toggles`: **text** (rows joined with |), ticks (seconds of each flip, joined with |), color (hex), pos (above (default) or below), zoom (default 1.12)
 - `led-sign`: **text** (lines joined with |), color (hex), push (default 1.08)
 - `slow-push`: zoom (default 1.6), blur (default 0.006)
