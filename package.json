@@ -1,0 +1,8 @@
+{
+  "name": "aigent-talking-head",
+  "private": true,
+  "version": "1.0.0",
+  "description": "AIgent talking-head video ad pipeline: HeyGen cinematic takes to a brand-guide captioned vertical ad.",
+  "type": "commonjs",
+  "dependencies": { "playwright-core": "^1.47.0" }
+}

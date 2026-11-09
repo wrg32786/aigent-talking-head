@@ -1,0 +1,13 @@
+{
+  "note": "Awakening hero ad v10 (2026-11-08), as built. Three HeyGen cinematic takes; take 3 had 'free' cut out (seg3c.mov = take 3 minus 1.945-2.285 s). Output-timeline seconds for hits/sfx.",
+  "segs": [
+    {"file": "../seg1.mp4", "in": 0.30, "out": 11.96, "fadeIn": 0.25},
+    {"file": "../seg2.mp4", "in": 0.30, "out": 11.97},
+    {"file": "../seg3c.mov", "in": 0, "out": 12.61, "pad": 0.2}
+  ],
+  "tail": 0.3,
+  "hits": [[0.02,14],[11.66,24],[12.66,14],[23.33,24],[25.475,24],[33.55,14]],
+  "sfx": {"F": [11.66, 23.33, 25.475], "D": [12.66, 14.20, 26.28, 33.55]},
+  "bed": "Awaken Freedom.wav", "bedStart": 0, "bedVol": 0.16, "bedNoFade": true,
+  "overlay": "ovl/%04d.png"
+}

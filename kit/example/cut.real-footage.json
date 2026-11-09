@@ -1,0 +1,12 @@
+{
+  "note": "Real camera footage in place of HeyGen: clips from clip.py (already vertical and at -16 LUFS), or a raw file directly with cropX and norm.",
+  "segs": [
+    {"file": "../clips/clip-009.mp4", "in": 0, "out": 6.0},
+    {"file": "../raw/take-2.mov", "in": 17.4, "out": 22.2, "cropX": 0.45, "norm": true},
+    {"file": "../seg3.mp4", "in": 0, "out": 11.9, "pad": 0.2}
+  ],
+  "tail": 0.3,
+  "hits": [[6.0,24],[10.8,24]],
+  "sfx": {"F": [6.0, 10.8]},
+  "overlay": "ovl/%04d.png"
+}
