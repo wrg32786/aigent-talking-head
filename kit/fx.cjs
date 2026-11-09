@@ -3,7 +3,7 @@
 //   npm run fx -- --name <job> --plan fx.json --still 1.2,6.5   -> check frames in jobs/<job>/build/fx/ (with captions)
 //   npm run fx -- some-video.mp4 --plan fx.json [--out x.mp4]   -> any video; effects draw over whatever is baked in
 //   npm run fx -- --list                                  -> the catalog, grouped by moment
-// Other flags: --jobs <dir>, --allow-demo-copy (skip the required-option check), --captions on|off (force for all),
+// Other flags: --jobs <dir>, --allow-demo-copy (fill neutral [placeholders] for missing copy; never upstream text), --captions on|off (force for all),
 //   --pill (turn on the upstream "Edited by Claude" pill on glass-widgets; off by default, or set "pill" per entry).
 // Job mode keeps audio exactly as the reel: the picture is rebuilt as  graded cut -> effects -> caption overlay
 // -> glitch hits, and the sound is mixed from the segments as usual (voice, wooshes, ducked bed).
@@ -50,6 +50,7 @@ const src = fs.readFileSync(path.join(FX, 'vendor/claude-video-effects/scripts/f
 const aliases = Object.fromEntries([...(src.match(/ALIASES = \{([\s\S]*?)\}/)[1]).matchAll(/'([^']+)':\s*'([^']+)'/g)].map(m => [m[1], m[2]]));
 const looks = { 'glitter-spotlight': ['spotlight', 'sparkle'], glitter: ['spotlight', 'sparkle'] };
 const problems = [], warnings = [];
+const JOBNAME = opt('name') || (positional[0] ? path.basename(positional[0]).replace(/\.[^.]+$/, '') : '');
 for (const d of plan) {
   let n = String(d.fx || '').toLowerCase().replace(/^\//, '');
   if (looks[n]) { d.look = d.look || looks[n][1]; n = looks[n][0]; }
@@ -61,8 +62,22 @@ for (const d of plan) {
     if (d.pill === true || (d.pill === undefined && flag('pill'))) d.pill = 'Edited by |Claude';
     else if (d.pill === undefined || d.pill === false) d.pill = '';
   }
-  for (const k of ['name', 'handle']) if (e.options[k] !== undefined && d[k] === undefined) d[k] = profile[k] ?? '';
-  for (const k of e.required) if (d[k] === undefined || d[k] === '') (k === 'name' || k === 'handle' ? warnings : problems).push(`${n}: set "${k}"${k === 'name' || k === 'handle' ? ' in "profile"' : ''} (the default is the upstream demo copy)`);
+  // Profile fields (name, handle, reel-frame's handle): from the plan's "profile"; refused if missing.
+  for (const k of e.fromProfile || []) if (d[k] === undefined) {
+    const pk = k === 'text' ? 'handle' : k;
+    if (profile[pk]) d[k] = profile[pk]; else { problems.push(`${n}: set "${pk}" in "profile" (otherwise the upstream author's would show)`); if (flag('allow-demo-copy')) d[k] = `[${pk}]`; }
+  }
+  // Required copy: refused if missing (the upstream defaults are the author's brand, handle or demo stats).
+  const req = [...e.required, ...Object.entries(e.requiredIf || {}).flatMap(([k, m]) => m[d[k]] || [])];
+  const missing = req.filter(k => d[k] === undefined || d[k] === '');
+  for (const k of missing) problems.push(`${n}: set "${k}" (${e.options[k] || 'your copy'})`);
+  if (missing.length && flag('allow-demo-copy')) for (const k of missing.filter(k => k !== 'images')) d[k] = /^(to|count|total|views|from)$/.test(k) ? '0' : `[${k}]`;
+  // Neutral fills for optional upstream-specific fields, so nothing of the author's shows by default.
+  const now = new Date();
+  const tok = { '$profile.name': profile.name || ' ', '$profile.handle': profile.handle || ' ', '$job': JOBNAME || 'this reel',
+    '$day': now.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(), '$date': String(now.getDate()),
+    '$issue': 'ISSUE  ·  ' + now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase() };
+  for (const [k, v] of Object.entries(e.neutral || {})) if (d[k] === undefined) d[k] = tok[v] ?? v;
   const len = d.end - d.start;
   if (len < e.duration[0] * 0.7 || len > e.duration[1] * 1.5) warnings.push(`${n}: ${len.toFixed(1)} s is outside its usual ${e.duration[0]}-${e.duration[1]} s`);
   if (e.captions === 'check' && d.captions === undefined) warnings.push(`${n} (${d.start}-${d.end}): read a check frame, it can crowd the caption band. ${e.captionNote}`);
@@ -76,7 +91,7 @@ const cams = plan.filter(d => byName[d.fx]?.camera);
 for (let i = 0; i < cams.length; i++) for (let j = i + 1; j < cams.length; j++) if (cams[i].start < cams[j].end && cams[j].start < cams[i].end) warnings.push(`camera effects ${cams[i].fx} and ${cams[j].fx} overlap; they will fight over the zoom`);
 plan.sort((a, b) => (byName[b.fx]?.camera ? 1 : 0) - (byName[a.fx]?.camera ? 1 : 0) || a.start - b.start); // camera effects first (upstream rule)
 warnings.forEach(w => console.warn('note:', w));
-if (problems.length && !flag('allow-demo-copy')) die('Fix the plan first:\n  ' + problems.join('\n  ') + '\n(--allow-demo-copy skips the required-option check)');
+if (problems.length && !flag('allow-demo-copy')) die('Fix the plan first (these effects need your own copy; see "Needs your copy" in effects/CATALOG.md):\n  ' + problems.join('\n  ') + '\n(--allow-demo-copy fills neutral [placeholders] instead, for a quick look only)');
 const capsMode = opt('captions');
 const hide = plan.filter(d => capsMode === 'off' || (capsMode !== 'on' && (d.captions === 'off' || (d.captions !== 'on' && byName[d.fx]?.captions === 'off'))));
 const ovlOff = hide.map(d => `${(+d.start).toFixed(2)}-${(+d.end).toFixed(2)}`).join(',');

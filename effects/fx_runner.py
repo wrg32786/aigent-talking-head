@@ -22,6 +22,23 @@ PATCHES = [
      """    if pre or hi: show(shadowed(q, 14, 6, 70), W / 2, py, 7, front=True)"""),
     ("""    place(c, shadowed(q, 14, 6, 70), W / 2, py, 0.7 + 0.3 * pop(c, 0.4), 0, al * clamp((c.lt - 0.4) / 0.1), guard=True)""",
      """    if pre or hi: place(c, shadowed(q, 14, 6, 70), W / 2, py, 0.7 + 0.3 * pop(c, 0.4), 0, al * clamp((c.lt - 0.4) / 0.1), guard=True)"""),
+    # glass-widgets: the views artifact ("Top reels", "197K" and fixed bars) comes from "chart": "label::value::v1|v2|..."
+    ("""def glass_widgets_v2(c, e):""",
+     """def _chart(e):
+    parts = (str(e.o.get('chart') or 'Stats::::7|6|5|4|3|2|1').split('::') + ['', '', ''])[:3]
+    try: vals = [float(x) for x in parts[2].split('|') if x.strip()][:7]
+    except ValueError: vals = []
+    vals = (vals or [7, 6, 5, 4, 3, 2, 1]) + [0] * (7 - len(vals or [1] * 7))
+    return parts[0], parts[1], vals
+
+
+def glass_widgets_v2(c, e):"""),
+    ("""di.text((16 * u, 40 * u), 'Top reels', """, """di.text((16 * u, 40 * u), _chart(e)[0], """),
+    ("""di.text((16 * u, 72 * u), '197K', """, """di.text((16 * u, 72 * u), _chart(e)[1], """),
+    ("""vals = [197, 140, 124, 83, 50, 40, 38]; """, """vals = _chart(e)[2]; """),
+    ("""hh = (ih * 0.42) * v / 197 * q""", """hh = (ih * 0.42) * v / (max(vals) or 1) * q"""),
+    ("""'artifact · views.html'""", """e.o.get('chart_tag', 'artifact · stats.html')"""),
+    ("""'sfx · 25.7s'""", """e.o.get('song_sub', 'edit')"""),
 ]
 
 
