@@ -105,7 +105,7 @@ Agents: start at [AGENTS.md](AGENTS.md).
 | `kit/assemble.cjs` | The cut. Any number of segments from any source, cover-cropped to 1080x1920, glitch seams, overlay, woosh hits, ducked bed, -14 LUFS. |
 | `kit/fs.mjs` | Freesound search, CC0 only. |
 | `kit/sfx/` | The two picked sounds. |
-| `kit/example/` | The Awakening ad's real `cut.json` and `captions.js`, a real-footage cut, and the HeyGen retake prompt. |
+| `kit/example/` | The Awakening ad's real `cut.json` and `captions.js`, a real-footage cut, the HeyGen retake prompt, and the Skool mark used only by that ad. |
 
 ## Rules the pipeline carries
 
@@ -118,7 +118,9 @@ Agents: start at [AGENTS.md](AGENTS.md).
 
 ## Credits and licences
 
+Code and docs: Apache-2.0, Copyright 2026 Will Gwyn (wrg32786). See [LICENSE](LICENSE). The files below keep their own licences and marks.
+
 - `kit/sfx/F-cinematic-woosh-648729.mp3`: "Cinematic Woosh SFX-010" by AudioPapkin, Freesound 648729, CC0.
 - `kit/sfx/D-quick-woosh-683101.mp3`: "quick woosh" by florianreichelt, Freesound 683101, CC0.
-- `kit/skool-logo.svg`: the Skool wordmark, a trademark of Skool. It's included only to mark The AIgent's own Skool group in the Awakening example; it isn't in any theme. Don't use it for other brands.
+- `kit/example/skool-logo.svg`: the Skool wordmark, a trademark of Skool. It's included only to mark The AIgent's own Skool group in the Awakening example; it isn't in any theme. Don't use it for other brands.
 - Music beds are not included. Bring your own licensed track.

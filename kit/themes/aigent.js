@@ -16,5 +16,5 @@ window.THEME = {
     caption: { family: '"Hanken Grotesk", Arial, sans-serif', weight: 400, size: 76 },
     display: { family: '"Sofia Sans Extra Condensed", "Arial Narrow", sans-serif', hero: 860, sticker: 820, kicker: 760, tracking: -0.01 }
   },
-  logo: null  // job-specific: set "logo" in captions.js (the Awakening example uses skool-logo.svg)
+  logo: null  // job-specific: set "logo" in captions.js (only the Awakening example uses one, kit/example/skool-logo.svg)
 };

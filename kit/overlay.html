@@ -50,14 +50,14 @@ ctx.globalAlpha=cl(dt/.25);ctx.fillStyle=CY;ctx.fillRect(-40,-H/2+42,80,6);ctx.f
 ctx.save();ctx.translate(cx,cy);ctx.scale(s,s);ctx.translate(-cx,-cy);spray((CAP.card&&CAP.card.title)||'',fit([(CAP.card&&CAP.card.title)||' '],G,170,800),cx,cy+48,dt-.08,4242,.4);ctx.restore()}
 // Logo plate: square plate (theme plate colour) with the logo on it. Logo file comes from captions.js "logo" or theme.logo.src.
 const LOGO=CAP.logo||(TH.logo&&TH.logo.src)||null;const SK=new Image();if(LOGO)SK.src=LOGO;
-function skool(dt){if(!LOGO||!SK.naturalWidth)return;const s=.4+.6*backOut(cl(dt/.2)),w=620,h=w*(SK.naturalHeight/SK.naturalWidth||.325),pad=46;ctx.save();ctx.translate(540,Y);ctx.rotate(.035+Math.exp(-7*dt)*Math.sin(dt*26)*.05);ctx.scale(s,s);shadow(ctx,70);ctx.fillStyle=TH.colors.plate;ctx.fillRect(-w/2-pad,-h/2-pad,w+2*pad,h+2*pad);ctx.shadowColor='transparent';if(SK.complete)ctx.drawImage(SK,-w/2,-h/2,w,h);ctx.restore()}
+function logoPlate(dt){if(!LOGO||!SK.naturalWidth)return;const s=.4+.6*backOut(cl(dt/.2)),w=620,h=w*(SK.naturalHeight/SK.naturalWidth||.325),pad=46;ctx.save();ctx.translate(540,Y);ctx.rotate(.035+Math.exp(-7*dt)*Math.sin(dt*26)*.05);ctx.scale(s,s);shadow(ctx,70);ctx.fillStyle=TH.colors.plate;ctx.fillRect(-w/2-pad,-h/2-pad,w+2*pad,h+2*pad);ctx.shadowColor='transparent';if(SK.complete)ctx.drawImage(SK,-w/2,-h/2,w,h);ctx.restore()}
 function flip(t){for(const c of flips){if(t<c[0]||t>=c[1])continue;const dt=t-c[0],m=c[3],out=c[1]>90?1:cl((c[1]-t)/.05);ctx.save();ctx.globalAlpha=out;
 if(m===0)glyphs(c[2],fit([c[2]],S,CSZ,980),540,Y,dt,IV,true);
 else if(m===1)spray(c[2],fit([c[2]],G,200,960),540,Y,dt,31*(Math.round(c[0]*10)+3));
 else if(m===2)sticker(c[2],fit([c[2]],F,150,860),540,Y,dt,Math.round(c[0]*10)+1,F);
 else if(m===3){const cu=CAP.countUp||{to:20,suffix:''},fs=fit([cu.to+cu.suffix],G,200,960),n=Math.min(cu.to,Math.round(cu.to*cl(dt/.3))),pop=.72+.28*backOut(cl(dt/.2));ctx.translate(540,Y);ctx.scale(pop,pop);ctx.translate(-540,-Y);glyphs(n+cu.suffix,fs,540,Y,dt+.2,CY,true,G)}
 else if(m===4)card(dt);
-else if(m===5)skool(dt);
+else if(m===5)logoPlate(dt);
 else if(m===6){sticker(c[2],fit(c[2].split('|'),F,170,700),540,Y-20,dt,7,F);const cta=CAP.cta||{};if(cta.sub&&t>=cta.subAt)glyphs(cta.sub,62,540,Y+210,t-cta.subAt,IV,true)}
 ctx.restore()}}
 function burst(dt,seed){if(dt<-.1||dt>.42)return;const r=rng(seed),p=(dt+.1)/.52,a=Math.sin(Math.PI*cl(p));ctx.save();ctx.translate(540,Y);ctx.lineCap='round';for(let i=0;i<54;i++){const ang=r()*6.283,sp=.6+r()*.9,len=120+r()*520,st=120+p*sp*1150;ctx.strokeStyle=i%3?CY:IV;ctx.globalAlpha=a*(.35+r()*.6);ctx.lineWidth=2+r()*7;ctx.beginPath();ctx.moveTo(Math.cos(ang)*st,Math.sin(ang)*st);ctx.lineTo(Math.cos(ang)*(st+len),Math.sin(ang)*(st+len));ctx.stroke()}ctx.restore()}

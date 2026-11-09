@@ -1,0 +1,8 @@
+aigent-talking-head
+Copyright 2026 Will Gwyn (wrg32786)
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Third-party files keep their own terms:
+- kit/sfx/*.mp3: Freesound CC0 (credits in README.md).
+- kit/example/skool-logo.svg: the Skool wordmark, a trademark of Skool, not covered by the Apache license.

@@ -89,7 +89,7 @@ Use this when mixing sources or when you need finer control. Work in a job folde
 - Keep the caption band at about Y=1300, below the face. Measure the face per take; text never covers it.
 - A lone floating word with nothing behind it fails QA.
 - Never write copy the offer contradicts. The Skool group is paid, so the ad can't say "free school".
-- The Skool mark (`kit/skool-logo.svg`) is only for The AIgent's own Skool group. Never use it for another brand.
+- The Skool mark (`kit/example/skool-logo.svg`) is only for The AIgent's own Skool group. Never use it for another brand.
 
 ## 5. Sound (in `cut.json`)
 
