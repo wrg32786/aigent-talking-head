@@ -96,17 +96,21 @@ try {
     run(node, [join(KIT, 'reel.cjs'), '--rebuild', '--jobs', join(work, 'jobs'), '--name', 'smoke-reel'], work);
     if (!existsSync(join(work, 'jobs', 'smoke-reel', 'reel-v2.mp4'))) fail('--rebuild did not write reel-v2.mp4');
   });
-  if (effects) step('effects pass: moody + locked-on + checklist (captions off), check frames + render', () => {
+  if (effects) step('effects pass: moody + locked-on + checklist (captions off) + glass-widgets (no pill), check frames + render', () => {
     if (!existsSync(fxPy)) fail('effects not set up: npm run effects:setup');
     run(node, [join(dirname(KIT), 'effects', 'check.mjs')], work);
     const plan = join(work, 'fx.json');
     writeFileSync(plan, JSON.stringify({ profile: { name: 'Smoke', handle: '@smoke' }, effects: [
       { fx: 'moody', start: 0, end: 1.2, grade: 'cool' },
       { fx: 'locked-on', start: 0.2, end: 1.4, text: 'SMOKE' },
-      { fx: 'checklist', start: 1.6, end: 3.1, text: 'Record::phone|Drop::inbox|Ask::Claude', title: 'Smoke test' }] }));
+      { fx: 'checklist', start: 1.6, end: 3.1, text: 'Record::phone|Drop::inbox|Ask::Claude', title: 'Smoke test' },
+      { fx: 'glass-widgets', start: 2.2, end: 3.2, text: '3X' }] }));
+    // glass-widgets has no pill unless the plan opts in
     const jobs = join(work, 'jobs'), fxdir = join(jobs, 'smoke-reel', 'build', 'fx');
+    const pillOf = () => JSON.parse(readFileSync(join(fxdir, 'plan.resolved.json'), 'utf8')).effects.find(e => e.fx === 'glass-widgets').pill;
     run(node, [join(KIT, 'fx.cjs'), '--name', 'smoke-reel', '--jobs', jobs, '--plan', plan, '--still', '0.8,2.4'], work);
     if (readdirSync(fxdir).filter(f => /^check_.*\.png$/.test(f)).length !== 2) fail('expected 2 check frames: ' + readdirSync(fxdir));
+    if (pillOf() !== '') fail('Edited-by pill should be off by default, got ' + JSON.stringify(pillOf()));
     run(node, [join(KIT, 'fx.cjs'), '--name', 'smoke-reel', '--jobs', jobs, '--plan', plan], work);
     const out = join(jobs, 'smoke-reel', 'reel-fx-v1.mp4'); if (!existsSync(out)) fail('no reel-fx-v1.mp4');
     const j = JSON.parse(run('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,width,height:format=duration', '-of', 'json', out]));

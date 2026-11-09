@@ -34,7 +34,7 @@ After the reel is cut and captioned, you can add effects from [`effects/CATALOG.
 
 1. **Read the transcript** (`jobs/<name>/build/captions.js` or `clips/clips.md`) and mark the moments with output-clock times: hook (first 2 s), key claims, numbers or proof, lists or steps, reveals, objections ("but", "no", "stop"), and the CTA. Note the energy of each part (calm, medium, high) from the delivery and the words.
 2. **Tell the user what's available**, briefly: the moments you found, and for each one 2 or 3 effect options from the catalog that fit the moment and its energy, with a one-line "what it does". Offer a menu preset if one fits (below). Ask them to pick, or to say "you choose".
-3. **Build the plan**: 3 to 6 effects. A hook effect in the first 2 s, a CTA effect at the end, and no more than one `high` effect every 5 s. Use each effect's typical duration. Put real copy and numbers in every required option (ask for numbers; never invent them). Put the teammate's name and handle in `"profile"`. Save it as `jobs/<name>/fx.json`:
+3. **Build the plan**: 3 to 6 effects. A hook effect in the first 2 s, a CTA effect at the end, and no more than one `high` effect every 5 s. Use each effect's typical duration. Put real copy and numbers in every required option (ask for numbers; never invent them). Put the teammate's name and handle in `"profile"`. The "Edited by Claude" pill on `glass-widgets` stays off unless the user asks for it: then add `"pill": true` (or their own text, `"pill": "Made by |Sam"`) to that entry, or pass `--pill`. Save it as `jobs/<name>/fx.json`:
    ```json
    {"profile": {"name": "Sam", "handle": "@sam.makes"},
     "effects": [{"fx": "lean-in", "start": 0.3, "end": 1.2},

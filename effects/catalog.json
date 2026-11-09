@@ -817,7 +817,7 @@
   {
    "n": 23,
    "name": "glass-widgets",
-   "does": "Frosted glass widgets and mini artifacts (stats, profile, calendar, render bar) float around your head, with an \"Edited by\" pill near the bottom. look=simple for 3 widgets.",
+   "does": "Frosted glass widgets and mini artifacts (stats, profile, calendar, render bar) float around your head, with an optional \"Edited by\" pill near the bottom (off unless you opt in). look=simple for 3 widgets.",
    "zone": "around head + bottom pill",
    "moments": [
     "proof",
@@ -834,7 +834,7 @@
     "text": "big number",
     "name": "profile name (injected from the plan profile)",
     "handle": "handle (injected)",
-    "pill": "\"Edited by |Claude\" by default (text|bold part)",
+    "pill": "off by default. Opt in with \"pill\": true (upstream \"Edited by Claude\"), custom text like \"Made by |Sam\" (text|bold part), or --pill on npm run fx",
     "look": "simple",
     "grade": "warm (default) or none"
    },
@@ -847,7 +847,7 @@
     5
    ],
    "captions": "check",
-   "captionNote": "The pill sits at 87% height below captions; widgets can reach chest height. Read a check frame.",
+   "captionNote": "Widgets can reach chest height; read a check frame. If you opt in to the pill, it sits at 87% height below the captions.",
    "pairsWith": [
     "slow-push"
    ],

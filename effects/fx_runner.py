@@ -14,9 +14,14 @@ PATCHES = [
     # headline-wall: the per-card handle was hard-coded to the upstream author's; use the plan's "handle" (blank if none)
     ("""('@vibha.in.progress  ·  ' + meta) if meta else '@vibha.in.progress'""",
      """('  ·  '.join(x for x in (e.o.get('handle', ''), meta) if x))"""),
-    # glass-widgets: the "Edited by Claude" pill text was fixed; read "pill" ("Edited by |Claude" stays the default)
+    # glass-widgets: the "Edited by Claude" pill text was fixed; read "pill" (text|bold part)
     ("""pre, hi = 'Edited by ', 'Claude'""",
      """pre, hi = (e.o.get('pill', 'Edited by |Claude').split('|') + [''])[:2]"""),
+    # glass-widgets: skip the pill entirely when "pill" is empty (kit/fx.cjs sends "" unless the plan opts in)
+    ("""    show(shadowed(q, 14, 6, 70), W / 2, py, 7, front=True)""",
+     """    if pre or hi: show(shadowed(q, 14, 6, 70), W / 2, py, 7, front=True)"""),
+    ("""    place(c, shadowed(q, 14, 6, 70), W / 2, py, 0.7 + 0.3 * pop(c, 0.4), 0, al * clamp((c.lt - 0.4) / 0.1), guard=True)""",
+     """    if pre or hi: place(c, shadowed(q, 14, 6, 70), W / 2, py, 0.7 + 0.3 * pop(c, 0.4), 0, al * clamp((c.lt - 0.4) / 0.1), guard=True)"""),
 ]
 
 

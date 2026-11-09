@@ -12,7 +12,7 @@
 
 - **Update:** `npm run effects:update` (latest) or `npm run effects:update -- --ref <sha>`. It re-copies the files, records the new commit, flags any promotional links, then runs `npm run effects:check`.
 - **Check:** `npm run effects:check` fails if the catalog doesn't cover exactly the effects in `fx.py`, if a runner patch no longer matches, or if `CATALOG.md` is stale (`npm run effects:catalog` regenerates it from the JSON).
-- **Runner patches:** `fx_runner.py` runs the vendored `fx.py` unchanged on disk, with two small in-memory patches so the upstream author's handle and an "Edited by Claude" pill can be set from the plan instead of being hard-coded. `kit/fx.cjs` also fills `name`/`handle` from the plan's `profile` and refuses plans that leave required text on the upstream demo copy.
+- **Runner patches:** `fx_runner.py` runs the vendored `fx.py` unchanged on disk, with small in-memory patches so the upstream author's handle comes from the plan, and the upstream "Edited by Claude" pill on `glass-widgets` is off by default. Opt in per entry with `"pill": true` (upstream text) or your own `"pill": "Made by |Sam"`, or for the whole plan with `npm run fx -- ... --pill`. `kit/fx.cjs` also fills `name`/`handle` from the plan's `profile` and refuses plans that leave required text on the upstream demo copy.
 
 ## Captions and effects
 

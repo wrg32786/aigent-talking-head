@@ -3,7 +3,8 @@
 //   npm run fx -- --name <job> --plan fx.json --still 1.2,6.5   -> check frames in jobs/<job>/build/fx/ (with captions)
 //   npm run fx -- some-video.mp4 --plan fx.json [--out x.mp4]   -> any video; effects draw over whatever is baked in
 //   npm run fx -- --list                                  -> the catalog, grouped by moment
-// Other flags: --jobs <dir>, --allow-demo-copy (skip the required-option check), --captions on|off (force for all).
+// Other flags: --jobs <dir>, --allow-demo-copy (skip the required-option check), --captions on|off (force for all),
+//   --pill (turn on the upstream "Edited by Claude" pill on glass-widgets; off by default, or set "pill" per entry).
 // Job mode keeps audio exactly as the reel: the picture is rebuilt as  graded cut -> effects -> caption overlay
 // -> glitch hits, and the sound is mixed from the segments as usual (voice, wooshes, ducked bed).
 //
@@ -56,6 +57,10 @@ for (const d of plan) {
   const e = byName[n];
   if (!e) { problems.push(`unknown effect "${d.fx}" (npm run fx -- --list)`); continue; }
   if (!(d.end > d.start)) problems.push(`${n}: needs start < end`);
+  if (n === 'glass-widgets') { // the upstream "Edited by Claude" pill is off unless the plan opts in ("pill": true or custom text, or --pill)
+    if (d.pill === true || (d.pill === undefined && flag('pill'))) d.pill = 'Edited by |Claude';
+    else if (d.pill === undefined || d.pill === false) d.pill = '';
+  }
   for (const k of ['name', 'handle']) if (e.options[k] !== undefined && d[k] === undefined) d[k] = profile[k] ?? '';
   for (const k of e.required) if (d[k] === undefined || d[k] === '') (k === 'name' || k === 'handle' ? warnings : problems).push(`${n}: set "${k}"${k === 'name' || k === 'handle' ? ' in "profile"' : ''} (the default is the upstream demo copy)`);
   const len = d.end - d.start;
