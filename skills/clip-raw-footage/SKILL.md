@@ -5,12 +5,13 @@ description: "Cut raw talking-head footage (phone, camera, Zoom) into clean, tra
 
 # Clip raw footage
 
-`kit/clip.py` turns one raw recording (usually a phone clip from `inbox/`) into numbered clips you can pick from, in four steps. On Windows run it as `py -3 kit/clip.py`. If the goal is a finished reel, `npm run reel` runs this for you; see the `talking-head-ad` skill.
+`kit/clip.py` turns one raw recording, or several takes of the same script (usually phone clips from `inbox/`), into numbered clips you can pick from, in four steps (five with several takes). On Windows run it as `py -3 kit/clip.py`. If the goal is a finished reel, `npm run reel` runs this for you; see the `talking-head-ad` skill.
 
 1. **Transcribe.** It runs faster-whisper with word timestamps over the whole file.
 2. **Split into sentences.** Short sentences merge with a neighbour until each clip is at least 3 s long, because shorter inserts read as jumpy.
 3. **Flag retakes.** If a later sentence within 150 s repeats any 4-word phrase, the earlier one is marked `retake (see clip-NNN)`. A short lead-in that runs straight into a flub ("All right, welcome back.") gets the same mark. Restarts often reword the opener but keep the body, which is why it compares phrases rather than first words. **Nothing is deleted.**
-4. **Set clip ends from the audio, not from word stamps.** Each clip starts in the silence just before its first word, with a few frames of lead and never mid-sentence. It ends when the voice stops plus 0.15 s, never running into the next line.
+4. **With several takes, pick the best take of each sentence.** Sentences are matched across files by a shared 4-word phrase or by wording that's at least 60% the same. Each match is scored on Whisper's word confidence, minus repeated words and fillers ("um", "like"), and the best one stays `keep`; the others are marked `retake (take2.mp4 is better)`. `--hook take3.mov` forces the first sentence from that take, for example the one shot from your most extreme angle (optional).
+5. **Set clip ends from the audio, not from word stamps.** Each clip starts in the silence just before its first word, with a few frames of lead and never mid-sentence. It ends when the voice stops plus 0.15 s, never running into the next line.
 
 ## Run
 
@@ -18,12 +19,14 @@ description: "Cut raw talking-head footage (phone, camera, Zoom) into clean, tra
 python3 kit/clip.py inbox/raw.mov --out clips --vertical            # center crop to 1080x1920
 python3 kit/clip.py inbox/raw.mov --out clips --vertical --cropx 0.4 # face left of center
 python3 kit/clip.py inbox/raw.mov --model medium.en                  # faster; large-v3 is the default
+python3 kit/clip.py inbox/take1.mov inbox/take2.mov --vertical --hook take2.mov   # several takes, best sentence of each
+python3 kit/clip.py take1.mov take2.mov --words words.json           # reuse tx.py word times, skips Whisper
 ```
 
 Outputs in `clips/`:
 - `clip-NNN.mp4`: H.264 at CRF 16, 24 fps, voice normalized to -16 LUFS. Pass `--vertical` for 1080x1920.
-- `clips.json`: id, source in and out, duration, status, text, and word times relative to the clip.
-- `clips.md`: the same as a table for a human to scan.
+- `clips.json`: id, source take, source in and out, duration, status, score, text, and word times relative to the clip, plus the list of takes.
+- `clips.md`: the same as a table for a human to scan, with a take column.
 - `clips-sheet.png`: the first and last frame of every clip, one row each.
 
 ## Pick and cut

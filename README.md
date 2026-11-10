@@ -2,9 +2,10 @@
 
 Turn a phone recording into a finished 9:16 reel. Record yourself on your phone, drop the file in `inbox/`, and ask Claude (or any coding agent) to make the reel. You get:
 
-- clean clips cut on sentence boundaries, with flubbed retakes flagged and skipped
-- tight cuts with a glitch hit and a woosh on every seam
-- timed captions drafted from the transcript, in a theme you pick (neutral by default, or the AIgent look)
+- clean clips cut on sentence boundaries, with flubbed retakes flagged and skipped, and the best take of each sentence picked when you record several takes
+- tight cuts with a glitch seam and a 10% zoom punch on every cut, a bigger punch after the hook and into the payoff, and a few sounds on the key cuts only
+- every spoken word animated (kinetic type, key words bigger in the accent colour), drafted from the transcript, in a theme and font pairing you pick
+- one kinetic title per beat, behind your head (the person is cut out with a segmentation mask)
 - your music bed, ducked under the voice, if you add one
 - a numbered version (`reel-v1.mp4`, `reel-v2.mp4`, ...) every time you rebuild
 
@@ -24,9 +25,13 @@ HeyGen cinematic takes are an optional second source; they cut in the same way a
    ```
    npm run reel                          # newest video in inbox/, neutral theme
    npm run reel -- inbox/my-take.mov --theme aigent --cropx 0.4 --bed music.wav
+   npm run reel -- inbox/take1.mov inbox/take2.mov --hook take2.mov --fonts druk
    ```
 
-5. **Review** `jobs/<clip-name>/reel-v1.mp4`. To change anything, edit `jobs/<clip-name>/build/captions.js` (words, timing, hero words, stickers) or `build/cut.json` (which clips, trims), then `npm run reel -- --rebuild --name <clip-name>`.
+   Several takes of the same script? Drop them all in. `npm run reel` with no path uses every video from the newest recording session (files within 2 hours of the newest; `--newest` for just one), lines up the sentences across takes and keeps the best take of each. `--hook <file>` forces the first sentence from one take, for example the one you shot from your most extreme angle.
+
+5. **Verify**: `npm run verify -- <clip-name>` checks size, frame rate, codecs, loudness, the person mask and the copy, and writes stills of every title plus a contact sheet to `jobs/<clip-name>/verify/`. Look at the contact sheet before you share the reel.
+6. **Review** `jobs/<clip-name>/reel-v1.mp4`. To change anything, edit `jobs/<clip-name>/build/captions.js` (words, timing, hero words, stickers) or `build/cut.json` (which clips, trims), then `npm run reel -- --rebuild --name <clip-name>`.
 
 The first run downloads the Whisper model (large-v3, about 3 GB). Pass `--model medium.en` for a faster, smaller first pass. Your footage, `jobs/` and `.env*` files are gitignored.
 
@@ -58,12 +63,41 @@ Then, in the repo folder:
 npm install
 python3 -m pip install -r requirements.txt      # Windows: py -3 -m pip install -r requirements.txt
 npm run chrome                                  # prints the Chrome it found
-npm run smoke                                   # synthetic clip end to end, about 30 s, no footage or keys needed
+npm run smoke                                   # synthetic clips end to end, several minutes, no footage or keys needed
+npm run check                                   # copy lint self-test over the examples
 ```
 
 Chrome is found automatically in the usual Mac, Linux and Windows install paths or on PATH. Set `CHROME_PATH` to use a different one. Set `PYTHON` if your Python isn't `python3` (or `py` on Windows). `npm run smoke:whisper` also runs a tiny Whisper model.
 
 Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FREESOUND_API_KEY` if you search for new sounds.
+
+## Looks, caption styles and fonts
+
+`--look` picks the whole edit; `--style`, `--fonts`, `--no-titles`, `--no-punch` and `--no-mask` override single parts.
+
+| Look | Captions | Titles | Notes |
+|---|---|---|---|
+| `kinetic` (default) | `kinetic`: every phrase is a two-font lockup, the hero word slamming in big in the display face and the other words writing or rising in, each on its own word time, in the partner face | one per beat, behind the head | |
+| `muse` | `pill`: 3 to 5 words in a lower-third pill | one per beat, behind the head | |
+| `classic` | the original phrase captions + spray-painted hero word | none | the pre-1.2 look |
+
+Caption styles: `kinetic` (font lockups), `pill`, `hormozi` (bold caps with a cyan active word), `karaoke` (colour wipe as each word is said), `classic`. Set `"captionStyle"` in `captions.js` to change one job.
+
+Titles use 7 entrances (stagger rise, slam, blur rise, slide left, elastic, flip, pop zoom), never the same one twice in a video, with a flicker only on the hook and the payoff. Set them by hand as mode 7 flips in `captions.js` (`"entrance"` to pick one, `"hero"` for the big word), or leave them to `autocaption.mjs --titles`.
+
+Font pairings (`--fonts`, or `"fonts"` in `captions.js`): `theme` (default), `modern`, `druk`, `elegant`, `editorial`. A pairing is two faces set together: every title and kinetic line is a lockup with the hero word big in the display face and the rest of the phrase in the partner face (script or sans/serif) beside, under or across it. `"hero"` on a phrase picks the hero word. All shipped fonts are SIL OFL Google Fonts; your own licensed fonts go in `kit/fonts/local/` (gitignored). See [kit/fonts/README.md](kit/fonts/README.md).
+
+Words and titles stay out of the way of effects: where an effect's catalog entry says `captions: off` they hide, and where it says `check` the caption track moves to the top of the frame.
+
+## Edit rules
+
+These are defaults in `cut.json`; `npm run check -- <job>` flags anything that breaks them.
+
+- **Zoom punch.** `"punch": 0.1` scales every other segment 10% so each cut lands as a jump; `false` turns it off. `"bigPunch": true` on a segment eases in another 12% over 0.3 s; `npm run reel` puts it on the cut after the hook and the cut into the payoff. `"zoom"` and `"punchY"` per segment override the amount and the vertical centre.
+- **Transitions.** The glitch seam stays the default. `"transition": "crossfade"` on a segment (or at the top level for all of them) uses an ffmpeg xfade instead; `"transitionDur"` sets the length. The 50 names (crossfade, dip, flash, whip, iris, zoom, pixelate, ...) are in `kit/transitions.json` and `effects/CATALOG.md`.
+- **Sounds.** Fewer and deeper. The locked set is `whoosh`, `swipe`, `boom`, `click`, `typing` (mono 48 kHz WAV, CC0), used as `"sfx": {"whoosh": [3.2], "boom": [[12.4, 0.55]]}`. Never a sound on every cut, and the key moment (the payoff) gets the loudest one. You still pick sounds by ear.
+- **Copy.** No em or en dashes, no "not X, but Y", no staged run-ups ("Here's the thing:"), no dramatic closers, no hype words. `npm run check` lints the captions, titles and card copy.
+- **Script shape.** A hook, one reveal per beat, a payoff: 40 to 55 words, 15 to 20 s. Over 25 s, cut a middle sentence.
 
 ## Themes
 
@@ -105,21 +139,27 @@ Agents: start at [AGENTS.md](AGENTS.md).
 
 | File | Does |
 |---|---|
-| `kit/reel.cjs` | `npm run reel`: inbox clip to draft reel in one command (clip, cut, captions, render, assemble), plus `--draft` and `--rebuild`. |
-| `kit/autocaption.mjs` | Drafts `captions.js` from Whisper word times (`words.json` or `clips.json`). Never overwrites without `--force`. |
+| `kit/reel.cjs` | `npm run reel`: inbox clip (or several takes) to draft reel in one command (clip, cut, captions, check, render, mask, assemble), plus `--draft` and `--rebuild`. |
+| `kit/autocaption.mjs` | Drafts `captions.js` from Whisper word times (`words.json` or `clips.json`), in any caption style, with `--titles`. Never overwrites without `--force`. |
+| `kit/check.mjs` | `npm run check [job]`: copy lint, titles, transitions, sounds, punches and script shape. |
+| `kit/verify.mjs` | `npm run verify -- <job>`: ffprobe, loudness, title and punch stills, contact sheet, mask alpha, copy lint. Run it before every delivery. |
+| `kit/rules.cjs` | The shared edit rules: sounds, entrances, punch amounts, transitions, copy lint, script shape. |
+| `kit/mask.py` | Person mask for titles-behind-the-head (MediaPipe selfie segmenter from the effects venv). |
+| `kit/fonts/`, `kit/fonts.mjs` | Font pairings and their OFL files. |
+| `kit/transitions.json` | Transition names mapped to ffmpeg xfade modes. |
 | `kit/themes/` | Theme presets: `neutral.js` (default) and `aigent.js`. |
 | `kit/chrome.mjs` | Finds Chrome on Mac, Linux or Windows; `CHROME_PATH` overrides. |
 | `kit/smoke.mjs` | `npm run smoke`: synthetic end-to-end test (includes the effects pass once `npm run effects:setup` has run). |
 | `kit/fx.cjs` | `npm run fx`: the effects pass over a job's reel (check frames, render, captions kept on top). |
 | `effects/` | Effect catalog, vendored claude-video-effects, setup, update and check scripts. |
-| `kit/clip.py` | Raw footage to sentence clips. Retakes flagged, ends set from the audio, voice at -16 LUFS, optional vertical crop, contact sheet. |
+| `kit/clip.py` | Raw footage (one file or several takes) to sentence clips. Best take per sentence, retakes flagged, ends set from the audio, voice at -16 LUFS, optional vertical crop, contact sheet. |
 | `kit/tx.py` | Word timings for each take; flags repeated words. |
 | `kit/timeline.mjs` | Maps segment word times onto the output clock and prints the seams. |
 | `kit/overlay.html` | Caption layer, driven by `captions.js` and styled by `theme.js`. |
 | `kit/render.mjs` | Renders the overlay to PNG frames (24 fps) or to stills. Run it from `build/`. |
-| `kit/assemble.cjs` | The cut. Any number of segments from any source, cover-cropped to 1080x1920, glitch seams, overlay, woosh hits, ducked bed, -14 LUFS. |
+| `kit/assemble.cjs` | The cut. Any number of segments from any source, cover-cropped to 1080x1920, zoom punch, glitch seams or named transitions, titles behind the person, overlay, sounds, ducked bed, -14 LUFS. |
 | `kit/fs.mjs` | Freesound search, CC0 only. |
-| `kit/sfx/` | The two picked sounds. |
+| `kit/sfx/` | The locked sound set (WAV) and the two original woosh MP3s. |
 | `kit/example/` | The Awakening ad's real `cut.json` and `captions.js`, a real-footage cut, the HeyGen retake prompt, and the Skool mark used only by that ad. |
 
 ## Rules the pipeline carries
@@ -130,6 +170,7 @@ Agents: start at [AGENTS.md](AGENTS.md).
 - Use only the theme's faces and colours. On the AIgent theme the one cyan is `#5cf9e2`. Cards are square.
 - Only real sounds, picked by a human ear. An agent can't judge audio, so give the human an audition.
 - Re-transcribe the full render with the music in. It must match the script.
+- `npm run verify` passes and someone has looked at the contact sheet before the reel goes out.
 
 ## Credits and licences
 
@@ -137,6 +178,10 @@ Code and docs: Apache-2.0, Copyright 2026 Will Gwyn (wrg32786). See [LICENSE](LI
 
 - `kit/sfx/F-cinematic-woosh-648729.mp3`: "Cinematic Woosh SFX-010" by AudioPapkin, Freesound 648729, CC0.
 - `kit/sfx/D-quick-woosh-683101.mp3`: "quick woosh" by florianreichelt, Freesound 683101, CC0.
+- `kit/sfx/whoosh.wav` and `kit/sfx/swipe.wav`: mono 48 kHz WAV conversions of the two Freesound files above, CC0.
+- `kit/sfx/boom.wav`, `click.wav`, `typing.wav`: from [motion-pack](https://github.com/ANVEAI/motion-pack) by ANVEAI (sounds `snd.hit.deep_impact`, `snd.ui.click`, `snd.ui.typing_burst`), CC0 1.0 under its LICENSE-MEDIA.
+- `kit/fonts/`: Google Fonts under the SIL Open Font License 1.1, each with its licence file. See [kit/fonts/README.md](kit/fonts/README.md).
+- Ideas adapted, no code copied: the transition name map from motion-pack (MIT), the Hormozi and karaoke caption looks from [Capite](https://github.com/muneebkhan08/Capite) (MIT), the title entrances from [motion-anything](https://github.com/nexu-io/motion-anything) (Apache-2.0, reference only). See [THIRD_PARTY.md](THIRD_PARTY.md).
 - `kit/example/skool-logo.svg`: the Skool wordmark, a trademark of Skool. It's included only to mark The AIgent's own Skool group in the Awakening example; it isn't in any theme. Don't use it for other brands.
 - `effects/vendor/claude-video-effects/`: [claude-video-effects](https://github.com/Vibha-Ramprakash/claude-video-effects) by Vibha Ramprakash, MIT. Its models (YuNet, MIT; MediaPipe Selfie Segmenter, Apache-2.0) and fonts (SIL OFL 1.1, Permanent Marker Apache-2.0) keep their own licences; see `NOTICE` and `effects/README.md`.
 - Music beds are not included. Bring your own licensed track.

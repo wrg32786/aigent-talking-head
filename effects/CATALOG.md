@@ -2,12 +2,25 @@
 
 51 starter effects from [claude-video-effects](https://github.com/Vibha-Ramprakash/claude-video-effects) by Vibha Ramprakash (MIT), applied as an optional second pass over a finished reel. Generated from `catalog.json` by `npm run effects:catalog`; edit the JSON, not this file.
 
+## Everything available
+
+130 things to offer, in one list. Tell the user what fits their moment, not the whole list.
+
+- **51 video effects** (this catalog, `npm run fx`): `noise`, `lineup`, `locked-on`, `orbit`, `lean-in`, `backdrop-word`, `spotlight`, `the-bill`, `moody`, `swipe`, `todo`, `comment-box`, `tap`, `pause-point`, `uninstall`, `reel-frame`, `shortcut-rain`, `reject-stamp`, `countdown-flip`, `rabbit-hole`, `cover-star`, `scribble`, `glass-widgets`, `red-collage`, `split-headline`, `pastel-word`, `check-pills`, `timeline`, `headline-box`, `profile-wall`, `tier-list`, `broll-split`, `phone-fan`, `dot-reveal`, `headline-wall`, `checklist`, `liquid-glass-graph`, `carousel-spin`, `match-cut`, `apple-toggles`, `led-sign`, `slow-push`, `over-the-shoulder-zoom`, `messages`, `place-in-grid`, `tape-label`, `select-resize`, `wave-trim`, `huge-strike`, `crayon-write`, `fan-build`.
+- **8 overlay modes** (`captions.js` flips, `mode`): 0 caption (styled by captionStyle); 1 spray hero word with drips; 2 sticker; 3 count-up; 4 takeover card; 5 logo plate; 6 CTA sticker; 7 kinetic title (behind the person when masked).
+- **5 caption styles** (`captionStyle`, or `style` per flip): kinetic (default: every word animates in, one emphasis word big in the display font, optional script accent); classic (the original rise-in caption); pill (3-5 words in a dark rounded pill, lower third); hormozi (heavy caps, thick outline, spoken word highlighted); karaoke (left-to-right colour wipe per word).
+- **7 kinetic title entrances** (mode 7 `entrance`, each once per video; flicker on the hook and payoff only): `stagger-rise`, `slam`, `blur-rise`, `slide-left`, `elastic`, `flip`, `pop-zoom`.
+- **50 named transitions** (`cut.json` per segment `transition`; default `glitch` seam; any of ffmpeg's 58 xfade modes also works): `glitch` (seam), `cut` (seam), `crossfade`, `dissolve`, `fade-fast`, `fade-slow`, `film`, `dip`, `dip-black`, `flash`, `dip-white`, `whip`, `whip-left`, `whip-right`, `push-left`, `push-right`, `swipe-up`, `swipe-down`, `cover-left`, `cover-right`, `cover-up`, `reveal-left`, `reveal-right`, `wipe`, `wipe-left`, `wipe-right`, `wipe-up`, `wipe-down`, `luma-wipe`, `soft-wipe`, `iris`, `iris-open`, `iris-close`, `circle-crop`, `doorway`, `barn-door`, `zoom`, `zoom-through`, `pixelate`, `blur`, `blur-cross`, `radial`, `clock`, `squeeze`, `slice`, `blinds`, `wind`, `warp`, `diagonal`, `distance`.
+- **5 sounds**, the locked set (`cut.json` `sfx`; fewer and deeper): `whoosh` entrances and the big cuts (the original cinematic woosh pick, Freesound 648729, CC0); `swipe` cards or titles sliding in or out (quick woosh, Freesound 683101, CC0); `boom` the one big moment: payoff or end card (motion-pack snd.hit.deep_impact, CC0); `click` on-screen UI clicks (motion-pack snd.ui.click, CC0); `typing` text typing on screen (motion-pack snd.ui.typing_burst, CC0).
+- **4 font pairings** (`--fonts`, plus `theme` and your own licensed fonts in kit/fonts/local/): `modern` (Archivo Black + Hanken Grotesk + Allura), `druk` (Unbounded + Hanken Grotesk), `elegant` (Marcellus + Crimson Pro + Pinyon Script), `editorial` (Instrument Serif + Libre Caslon Text).
+- **Camera**: zoom punch on every cut (`punch`), big punch (`bigPunch`, +12% over 0.3 s) on the cut after the hook and into the payoff.
+
 **How to read it**
 
 - **Moments**: where in the script it fits. `hook` First 2 s. Stop the scroll. `claim` The key promise or bold statement. `list` Steps, features, a numbered list. `reveal` The turn: "here is the thing", the answer. `proof` A number, a result, social proof. `objection` "But..."/"No...", myth-busting, what not to do. `cta` The ask at the end: comment, follow, link. `transition` Between sections or at a seam.
 - **Energy**: `calm` (grades, slow moves, quiet panels), `medium` (pops, cards, words), `high` (punch-ins, stamps, glitches, busy card storms).
 - **Needs**: `face` = placed relative to the face (needs a face in frame), `segmentation` = hides behind you, `word-cue` = should land on a spoken word, `text` / `numbers` / `images` = you supply copy, real numbers or a folder of pictures.
-- **Captions**: `safe` = keep captions on; `check` = read a check frame (`--still`); `off` = captions are hidden for that window automatically (add `"captions": "on"` to the plan entry to keep them).
+- **Captions**: `safe` = keep captions on; `check` = the caption track moves up to `altY` (default 330) for that window, read a check frame (`--still`); `off` = captions and kinetic titles are hidden for that window automatically (add `"captions": "on"` to the plan entry to keep them).
 - **Required** options must be in the plan (see "Needs your copy"); upstream defaults never show. `name`/`handle` come from the plan's `profile`.
 
 **Pacing rules**: 3 to 6 effects per reel, a hook effect in the first 2 s, a CTA effect at the end, and no more than one `high` effect every 5 s. Camera effects (marked 🎥) go first in the plan when windows overlap.

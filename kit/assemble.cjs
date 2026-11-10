@@ -11,8 +11,17 @@
 //   "hits": [[11.66,24],[12.66,14]],     output-time glitch/shake hits [time, strength]
 //   "sfx": {"F":[11.66],"D":[12.66]},    output times. F = cinematic woosh on cuts, D = quick woosh on card moves
 //   "bed": "music.wav", "bedStart": 0, "bedVol": 0.16, "bedNoFade": true,
-//   "overlay": "ovl/%04d.png"            optional; leave out for a clean cut
+//   "overlay": "ovl/%04d.png",           optional; leave out for a clean cut
+//   "titles": "ovlt/%04d.png",           optional kinetic-title layer (render.mjs writes it); drawn under the person when
+//   "mask": "mask.mkv",                  a person mask is given (kit/mask.py), else in front of the picture
+//   "punch": 0.10                        zoom punch: every cut toggles a 10% punch-in (true = 0.10, false/absent = off)
 // }
+// Per segment, also: "bigPunch": true (an extra 12% push over 0.3 s from this cut; use it on the cut after the hook
+// and the cut into the payoff), "zoom": 1.15 (fixed zoom for this segment, overrides the toggle), "punchY": 0.4
+// (zoom centre, 0 top .. 1 bottom), "transition": "crossfade" (named transition INTO this segment, see
+// kit/transitions.json; default is the hard cut with the glitch seam) and "transitionDur": 0.3.
+// sfx keys: whoosh, swipe, boom, click, typing (the locked set in kit/rules.cjs), plus the legacy F and D. Each entry is a
+// time or [time, gain]. Fewer and deeper: never a sound on every cut, the key moment gets the loudest one.
 // "norm": true runs loudnorm -16 LUFS on that segment (raw camera audio sits near -32 LUFS; HeyGen and clip.py output do not need it).
 // Env overrides: NOSFX=1, NOBED=1, BEDVOL=<n>, BEDNOFADE=1.
 // Effects pass (kit/fx.cjs drives these): BASEONLY=1 writes just the graded cut with the voice (no overlay, hits,
@@ -24,10 +33,16 @@ const path = require('path');
 const C = JSON.parse(fs.readFileSync('cut.json', 'utf8'));
 const out = process.argv[2] || 'out.mp4';
 const KIT = __dirname;
+const R = require('./rules.cjs');
 const A = 'aresample=48000,aformat=channel_layouts=stereo,asetpts=PTS-STARTPTS';
-const V = 'fps=24,format=yuv420p,setsar=1,settb=AVTB,setpts=PTS-STARTPTS';
+// the trailing fps=24 matters: after setpts the link loses its frame rate and tpad then silently adds nothing
+const V = 'fps=24,format=yuv420p,setsar=1,settb=AVTB,setpts=PTS-STARTPTS,fps=24';
 const G = "unsharp=5:5:0.3:3:3:0,eq=contrast=1.03:saturation=0.93:gamma=0.99,curves=all='0/0.02 0.5/0.495 1/0.975',noise=c0s=5:c0f=t+u,vignette=PI/6";
 const segs = C.segs, tail = C.tail ?? 0.3, hits = C.hits || [];
+const PZ = C.punch === true ? R.PUNCH.zoom : (+C.punch || 0);
+const zoomOf = (s, i) => s.zoom != null ? +s.zoom : 1 + (PZ && i % 2 === 1 ? PZ : 0);
+const TL = R.timeline(C);
+const trans = segs.map((s, i) => { if (!i || !s.transition) return null; const m = R.xfadeMode(s.transition); if (m === undefined) { console.error(`unknown transition "${s.transition}" on seg ${i} (see kit/transitions.json)`); process.exit(1); } return m ? { m, d: +(s.transitionDur || 0.3) } : null; });
 const segLen = s => (s.out - s.in) + (s.pad || 0);
 const LEN = +(segs.reduce((a, s) => a + segLen(s), 0) + tail).toFixed(3);
 const hasAudio = f => { try { return execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'a', '-show_entries', 'stream=index', '-of', 'csv=p=0', f]).toString().trim() !== ''; } catch { return false; } };
@@ -47,7 +62,20 @@ segs.forEach((s, i) => {
   if (s.pad) tp.push(`start_duration=${s.pad}:start_mode=clone`);
   if (last && tail) tp.push(`stop_duration=${tail}:stop_mode=clone`);
   const fadeIn = i === 0 ? (s.fadeIn ?? 0.25) : 0;
-  if (!BASE) f.push(`[${n}:v]trim=${s.in}:${s.out},${V},${fit}${fadeIn ? `,fade=t=in:st=0:d=${fadeIn}` : ''}${tp.length ? `,tpad=${tp.join(':')}` : ''}[v${i}]`);
+  // zoom punch: a fixed punch-in is a plain scale + crop; a big punch eases in 12% more over 0.3 s with zoompan
+  const z = zoomOf(s, i), py = s.punchY ?? R.PUNCH.y;
+  let zf = '';
+  if (s.bigPunch) {
+    const z1 = z * (1 + R.PUNCH.big), n = Math.round(R.PUNCH.bigDur * 24);
+    zf = `,scale=2160:3840,zoompan=z='${z}+${(z1 - z).toFixed(4)}*(1-pow(1-min(on/${n},1),3))':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*${py}':d=1:s=1080x1920:fps=24,setsar=1`;
+  } else if (z > 1.0001) {
+    const w = Math.round(1080 * z / 2) * 2, h = Math.round(1920 * z / 2) * 2;
+    zf = `,scale=${w}:${h},crop=1080:1920:(iw-ow)/2:(ih-oh)*${py},setsar=1`;
+  }
+  // hold the last frame so every segment's picture is exactly out-in long (phone clips often end a frame short of
+  // their audio, which left gaps and a variable frame rate after concat)
+  const exact = `,tpad=stop_mode=clone:stop_duration=0.25,trim=duration=${(s.out - s.in).toFixed(4)}`;
+  if (!BASE) f.push(`[${n}:v]trim=${s.in}:${s.out},${V}${exact},${fit}${zf}${fadeIn ? `,fade=t=in:st=0:d=${fadeIn}` : ''}${tp.length ? `,tpad=${tp.join(':')}` : ''}[v${i}]`);
   const d = s.out - s.in;
   const delay = s.pad ? `,adelay=${Math.round(s.pad * 1000)}|${Math.round(s.pad * 1000)}` : '';
   const apad = last && tail ? `,apad=pad_dur=${tail}` : '';
@@ -62,22 +90,52 @@ if (BASE) {
   const b = inp('-i', BASE);
   f.push(`[${b}:v]${V},scale=1080:1920,setsar=1,tpad=stop_duration=1:stop_mode=clone[g]`);
 } else {
-  f.push(`${segs.map((_, i) => `[v${i}][a${i}]`).join('')}concat=n=${segs.length}:v=1:a=1[cv][ca]`);
-  f.push(`[cv]${G}[g]`);
+  if (trans.some(Boolean)) {
+    // named transitions: the outgoing shot holds its last frame for the blend, so every segment still starts on the
+    // same output time (captions and sfx stay put) and picture stays in sync with the voice
+    f.push(`${segs.map((_, i) => `[a${i}]`).join('')}concat=n=${segs.length}:v=0:a=1[ca]`);
+    let cur = 'v0';
+    segs.forEach((s, i) => {
+      if (!i) return;
+      const tr = trans[i], o = `x${i}`;
+      if (tr) f.push(`[${cur}]tpad=stop_duration=${tr.d}:stop_mode=clone,fps=24,settb=AVTB[p${i}]`, `[v${i}]fps=24,settb=AVTB[q${i}]`, `[p${i}][q${i}]xfade=transition=${tr.m}:duration=${tr.d}:offset=${TL.segs[i].start.toFixed(3)}[${o}]`);
+      else f.push(`[${cur}][v${i}]concat=n=2:v=1:a=0,fps=24,settb=AVTB[${o}]`);
+      cur = o;
+    });
+    f.push(`[${cur}]${G}[g]`);
+  } else {
+    f.push(`${segs.map((_, i) => `[v${i}][a${i}]`).join('')}concat=n=${segs.length}:v=1:a=1[cv][ca]`);
+    f.push(`[cv]${G}[g]`);
+  }
 }
 let vcur = 'g';
 if (BASEONLY) {
-  f.push(`[g]trim=0:${LEN}[vo]`, `[ca]atrim=0:${LEN},aresample=48000[ao]`);
+  f.push(`[g]fps=24,trim=0:${LEN}[vo]`, `[ca]atrim=0:${LEN},aresample=48000[ao]`);
   args.push('-filter_complex', f.join(';'), '-map', '[vo]', '-map', '[ao]', '-c:v', 'libx264', '-crf', '14', '-preset', 'fast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '256k', out);
   execFileSync('ffmpeg', args, { stdio: 'inherit' });
   console.log('wrote base', out, 'len', LEN);
   process.exit(0);
 }
+// kinetic titles sit between the picture and the person: picture -> titles -> person cut out by the mask -> captions
+const ovlOff = (process.env.OVL_OFF || '').split(',').filter(Boolean).map(w => w.split('-').map(Number)).filter(([a, b]) => b > a);
+const offEn = ovlOff.length ? `:enable='not(${ovlOff.map(([a, b]) => `between(t,${a},${b})`).join('+')})'` : '';
+if (C.titles) {
+  const t = inp('-framerate', '24', '-i', C.titles);
+  if (C.mask && fs.existsSync(C.mask)) {
+    const m = inp('-i', C.mask);
+    f.push(`[g]split[gb][gp]`, `[gb][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gt]`, `[${m}:v]format=gray,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS[mk]`,
+      `[gp][mk]alphamerge[person]`, `[gt][person]overlay=format=auto:eof_action=pass[gm]`);
+    vcur = 'gm';
+  } else {
+    if (C.mask) console.warn(`note: mask ${C.mask} not found; titles go in front of the picture (run kit/mask.py)`);
+    f.push(`[g][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gm]`); vcur = 'gm';
+  }
+}
 if (C.overlay) {
   const o = inp('-framerate', '24', '-i', C.overlay);
   const off = (process.env.OVL_OFF || '').split(',').filter(Boolean).map(w => w.split('-').map(Number)).filter(([a, b]) => b > a);
   const en = off.length ? `:enable='not(${off.map(([a, b]) => `between(t,${a},${b})`).join('+')})'` : '';
-  f.push(`[g][${o}:v]overlay=format=auto:eof_action=pass${en}[o]`); vcur = 'o';
+  f.push(`[${vcur}][${o}:v]overlay=format=auto:eof_action=pass${en}[o]`); vcur = 'o';
 }
 if (hits.length) {
   const env = hz => hits.map(([h, a]) => `${a}*gte(t,${h})*exp(-8*(t-${h}))*sin(2*PI*${hz}*(t-${h}))`).join('+');
@@ -85,18 +143,20 @@ if (hits.length) {
   f.push(`[${vcur}]split[sa][sb]`, `[sa][sb]overlay=x='${env(17)}':y='${env(23)}':eval=frame[sh]`, `[sh]rgbashift=rh=-16:bh=16:rv=4:bv=-4:enable='${win}',noise=c0s=46:c0f=t+u:enable='${win}'[hv]`);
   vcur = 'hv';
 }
-f.push(`[${vcur}]trim=0:${LEN}[vo]`);
+f.push(`[${vcur}]fps=24,trim=0:${LEN}[vo]`);
 
-// Woosh hits (Will's picks, Freesound CC0): F 648729 "Cinematic Woosh SFX-010" by AudioPapkin on every cut,
-// D 683101 "quick woosh" by florianreichelt on cards moving in or out. The measured peak lands on the time given.
-const SFX = { F: { file: 'sfx/F-cinematic-woosh-648729.mp3', peak: 0.69, vol: 0.6 }, D: { file: 'sfx/D-quick-woosh-683101.mp3', peak: 0.24, vol: 0.5 } };
+// Sound: the locked set in kit/rules.cjs. The measured peak of each sound lands on the time given.
 const lbl = [];
-if (!process.env.NOSFX) for (const k of Object.keys(SFX)) {
-  const ts = (C.sfx && C.sfx[k]) || []; if (!ts.length) continue;
-  const n = inp('-i', path.join(KIT, SFX[k].file));
+if (!process.env.NOSFX) for (const k of Object.keys(C.sfx || {})) {
+  const S = R.SFX[k]; if (!S) { console.error(`unknown sfx "${k}"; use one of ${Object.keys(R.SFX).join(', ')}`); process.exit(1); }
+  const ts = R.sfxHits(C.sfx[k]); if (!ts.length) continue;
+  const n = inp('-i', path.join(KIT, S.file));
   f.push(`[${n}:a]${A},asplit=${ts.length}` + ts.map((_, j) => `[${k}s${j}]`).join(''));
-  ts.forEach((h, j) => { const ms = Math.max(0, Math.round((h - SFX[k].peak) * 1000)); f.push(`[${k}s${j}]volume=${SFX[k].vol},adelay=${ms}|${ms}[${k}d${j}]`); lbl.push(`[${k}d${j}]`); });
+  ts.forEach((h, j) => { const ms = Math.max(0, Math.round((h.t - S.peak) * 1000)); f.push(`[${k}s${j}]volume=${h.g ?? S.vol},adelay=${ms}|${ms}[${k}d${j}]`); lbl.push(`[${k}d${j}]`); });
 }
+// fewer and deeper: say so when a cut sound sits on every seam
+const seamSet = TL.seams.map(x => x.toFixed(2));
+if (seamSet.length >= 3) for (const k of R.CUT_SOUNDS) { const on = R.sfxHits((C.sfx || {})[k]).map(h => h.t.toFixed(2)); if (seamSet.every(x => on.includes(x))) console.warn(`note: sfx.${k} is on every cut. Rule: fewer and deeper; keep it for the big cuts.`); }
 const mix = ['[ca]'];
 if (lbl.length) { f.push(`${lbl.join('')}amix=inputs=${lbl.length}:normalize=0,volume=0.8[sfx]`); mix.push('[sfx]'); }
 const bed = !process.env.NOBED && C.bed;
