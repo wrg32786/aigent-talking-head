@@ -19,7 +19,9 @@
     "effects:update": "node effects/update.mjs",
     "effects:check": "node effects/check.mjs",
     "effects:catalog": "node effects/catalog.mjs",
-    "smoke:effects": "node kit/smoke.mjs --effects"
+    "smoke:effects": "node kit/smoke.mjs --effects",
+    "music": "node kit/music/add.mjs",
+    "music:add": "node kit/music/add.mjs"
   },
   "dependencies": {
     "playwright-core": "^1.47.0"

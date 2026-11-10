@@ -9,7 +9,7 @@
 //          --style kinetic|classic|pill|hormozi|karaoke (override the caption style)  --no-titles  --fonts modern|druk|elegant|editorial|<local>
 //          --no-punch (no zoom punch)  --no-mask (titles in front, skip the person mask)
 //          --draft (stop after captions.js so you can edit it)  --rebuild (re-render + re-assemble an edited job)
-//          --bed music.wav  --logo logo.svg  --jobs <dir> (default jobs/)  --force
+//          --bed <name from npm run music> or --bed music.wav  --logo logo.svg  --jobs <dir> (default jobs/)  --force
 // Writes jobs/<name>/: clips/ (clip.py output), build/ (cut.json, captions.js, theme.js, overlay frames), reel-vN.mp4.
 // Steps: clip.py (Whisper, best take per sentence, retakes flagged) -> cut.json from every "keep" clip (zoom punch on
 // every cut, big punch after the hook and into the payoff, a few sounds on the key cuts only) -> autocaption ->
@@ -86,7 +86,8 @@ if (!flag('rebuild')) {
   }
   const cut = { note: `Drafted by kit/reel.cjs from ${keep.length} keep clips (${clips.length - keep.length} retakes skipped). Edit, then: npm run reel -- --rebuild --name ${name}`, segs, tail: 0.3, punch: flag('no-punch') ? false : 0.1, hits: [[0.02, 14], ...seams.map(s => [s, 24])], sfx, overlay: 'ovl/%04d.png' };
   if (TITLES) Object.assign(cut, { titles: 'ovlt/%04d.png', ...(flag('no-mask') ? {} : { mask: 'mask.mkv' }) });
-  const bed = opt('bed'); if (bed) Object.assign(cut, { bed: path.resolve(bed), bedVol: 0.16 });
+  // a library name stays a name in cut.json (portable across machines); your own file becomes an absolute path
+  const bed = opt('bed'); if (bed) Object.assign(cut, { bed: require('./rules.cjs').BEDS[bed] ? bed : path.resolve(bed), bedVol: 0.16 });
   if (fs.existsSync(path.join(build, 'cut.json')) && !flag('force')) die('build/cut.json exists. Use --rebuild to render your edits, or --force to redraft.');
   fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
   console.log(`cut.json: ${segs.length} segments, seams ${JSON.stringify(seams)}`);

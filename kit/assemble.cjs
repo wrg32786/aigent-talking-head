@@ -10,7 +10,7 @@
 //   "tail": 0.3,                        seconds to hold the last frame at the end
 //   "hits": [[11.66,24],[12.66,14]],     output-time glitch/shake hits [time, strength]
 //   "sfx": {"F":[11.66],"D":[12.66]},    output times. F = cinematic woosh on cuts, D = quick woosh on card moves
-//   "bed": "music.wav", "bedStart": 0, "bedVol": 0.16, "bedNoFade": true,
+//   "bed": "vinyl-sunrise" (a kit/music library name) or "music.wav", "bedStart": 0, "bedVol": 0.16, "bedNoFade": true,
 //   "overlay": "ovl/%04d.png",           optional; leave out for a clean cut
 //   "titles": "ovlt/%04d.png",           optional kinetic-title layer (render.mjs writes it); drawn under the person when
 //   "mask": "mask.mkv",                  a person mask is given (kit/mask.py), else in front of the picture
@@ -161,7 +161,7 @@ const mix = ['[ca]'];
 if (lbl.length) { f.push(`${lbl.join('')}amix=inputs=${lbl.length}:normalize=0,volume=0.8[sfx]`); mix.push('[sfx]'); }
 const bed = !process.env.NOBED && C.bed;
 if (bed) {
-  const n = inp('-i', bed);
+  const n = inp('-i', R.bedFile(bed));
   const st = +(C.bedStart || 0), vol = +(process.env.BEDVOL || C.bedVol || 0.22), nofade = process.env.BEDNOFADE || C.bedNoFade;
   f.push(`[${n}:a]atrim=${st}:${(st + LEN + .2).toFixed(2)},${A},volume=${vol}${nofade ? '' : ',afade=t=in:d=0.3'},afade=t=out:st=${(LEN - 1.4).toFixed(2)}:d=1.4[bed]`);
   // Duck the bed under the voice. Without it, hi-hats masked "school" into "pool".

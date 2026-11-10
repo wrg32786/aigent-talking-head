@@ -6,7 +6,7 @@ Turn a phone recording into a finished 9:16 reel. Record yourself on your phone,
 - tight cuts with a glitch seam and a 10% zoom punch on every cut, a bigger punch after the hook and into the payoff, and a few sounds on the key cuts only
 - every spoken word animated (kinetic type, key words bigger in the accent colour), drafted from the transcript, in a theme and font pairing you pick
 - one kinetic title per beat, behind your head (the person is cut out with a segmentation mask)
-- your music bed, ducked under the voice, if you add one
+- a music bed from our own library (`kit/music/`, 11 tracks) or your own track, ducked under the voice
 - a numbered version (`reel-v1.mp4`, `reel-v2.mp4`, ...) every time you rebuild
 
 HeyGen cinematic takes are an optional second source; they cut in the same way as phone clips.
@@ -24,7 +24,8 @@ HeyGen cinematic takes are an optional second source; they cut in the same way a
 
    ```
    npm run reel                          # newest video in inbox/, neutral theme
-   npm run reel -- inbox/my-take.mov --theme aigent --cropx 0.4 --bed music.wav
+   npm run reel -- inbox/my-take.mov --theme aigent --cropx 0.4 --bed vinyl-sunrise
+   npm run music                         # list the music beds
    npm run reel -- inbox/take1.mov inbox/take2.mov --hook take2.mov --fonts druk
    ```
 
@@ -160,6 +161,7 @@ Agents: start at [AGENTS.md](AGENTS.md).
 | `kit/assemble.cjs` | The cut. Any number of segments from any source, cover-cropped to 1080x1920, zoom punch, glitch seams or named transitions, titles behind the person, overlay, sounds, ducked bed, -14 LUFS. |
 | `kit/fs.mjs` | Freesound search, CC0 only. |
 | `kit/sfx/` | The locked sound set (WAV) and the two original woosh MP3s. |
+| `kit/music/` | Our music beds (MP3, all at -13 LUFS) and `beds.json`. `npm run music` lists them, `npm run music:add -- <file>` adds one. See [kit/music/README.md](kit/music/README.md). |
 | `kit/example/` | The Awakening ad's real `cut.json` and `captions.js`, a real-footage cut, the HeyGen retake prompt, and the Skool mark used only by that ad. |
 
 ## Rules the pipeline carries
@@ -184,4 +186,4 @@ Code and docs: Apache-2.0, Copyright 2026 Will Gwyn (wrg32786). See [LICENSE](LI
 - Ideas adapted, no code copied: the transition name map from motion-pack (MIT), the Hormozi and karaoke caption looks from [Capite](https://github.com/muneebkhan08/Capite) (MIT), the title entrances from [motion-anything](https://github.com/nexu-io/motion-anything) (Apache-2.0, reference only). See [THIRD_PARTY.md](THIRD_PARTY.md).
 - `kit/example/skool-logo.svg`: the Skool wordmark, a trademark of Skool. It's included only to mark The AIgent's own Skool group in the Awakening example; it isn't in any theme. Don't use it for other brands.
 - `effects/vendor/claude-video-effects/`: [claude-video-effects](https://github.com/Vibha-Ramprakash/claude-video-effects) by Vibha Ramprakash, MIT. Its models (YuNet, MIT; MediaPipe Selfie Segmenter, Apache-2.0) and fonts (SIL OFL 1.1, Permanent Marker Apache-2.0) keep their own licences; see `NOTICE` and `effects/README.md`.
-- Music beds are not included. Bring your own licensed track.
+- `kit/music/*.mp3`: our own tracks, made by Will Gwyn with Suno (song ids in `kit/music/beds.json`). For The AIgent's videos only; not covered by the Apache-2.0 licence. See [kit/music/README.md](kit/music/README.md).
