@@ -77,15 +77,15 @@ Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FRE
 
 | Look | Captions | Titles | Notes |
 |---|---|---|---|
-| `kinetic` (default) | `kinetic`: every word rises in, key words slam in bigger in the display font and accent colour, an optional script accent | one per beat, behind the head | |
+| `kinetic` (default) | `kinetic`: every phrase is a two-font lockup, the hero word slamming in big in the display face and the other words writing or rising in, each on its own word time, in the partner face | one per beat, behind the head | |
 | `muse` | `pill`: 3 to 5 words in a lower-third pill | one per beat, behind the head | |
 | `classic` | the original phrase captions + spray-painted hero word | none | the pre-1.2 look |
 
-Caption styles: `kinetic`, `pill`, `hormozi` (bold caps with a cyan active word), `karaoke` (colour wipe as each word is said), `classic`. Set `"captionStyle"` in `captions.js` to change one job.
+Caption styles: `kinetic` (font lockups), `pill`, `hormozi` (bold caps with a cyan active word), `karaoke` (colour wipe as each word is said), `classic`. Set `"captionStyle"` in `captions.js` to change one job.
 
-Titles use 7 entrances (stagger rise, slam, blur rise, slide left, elastic, flip, pop zoom), never the same one twice in a video, with a flicker only on the hook and the payoff. Set them by hand with a `"titles"` list in `captions.js`, or leave them to `autocaption.mjs --titles`.
+Titles use 7 entrances (stagger rise, slam, blur rise, slide left, elastic, flip, pop zoom), never the same one twice in a video, with a flicker only on the hook and the payoff. Set them by hand as mode 7 flips in `captions.js` (`"entrance"` to pick one, `"hero"` for the big word), or leave them to `autocaption.mjs --titles`.
 
-Font pairings (`--fonts`, or `"fonts"` in `captions.js`): `theme` (default), `modern`, `druk`, `elegant`, `editorial`. Each pairing gives a display font (hero words, titles), a secondary font (body words, pills) and sometimes a script accent. All shipped fonts are SIL OFL Google Fonts; your own licensed fonts go in `kit/fonts/local/` (gitignored). See [kit/fonts/README.md](kit/fonts/README.md).
+Font pairings (`--fonts`, or `"fonts"` in `captions.js`): `theme` (default), `modern`, `druk`, `elegant`, `editorial`. A pairing is two faces set together: every title and kinetic line is a lockup with the hero word big in the display face and the rest of the phrase in the partner face (script or sans/serif) beside, under or across it. `"hero"` on a phrase picks the hero word. All shipped fonts are SIL OFL Google Fonts; your own licensed fonts go in `kit/fonts/local/` (gitignored). See [kit/fonts/README.md](kit/fonts/README.md).
 
 Words and titles stay out of the way of effects: where an effect's catalog entry says `captions: off` they hide, and where it says `check` the caption track moves to the top of the frame.
 

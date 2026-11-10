@@ -62,6 +62,7 @@ if (MINW > 1) for (let i = 0; i < phrases.length; i++) {
   else if (next && next[0].seg === p[0].seg && next.length + p.length <= MAXW) { next.unshift(...p); phrases.splice(i--, 1); }
 }
 const STOP = new Set('a an the and or but of to in on at for with is are was it this that you your i we my our be as by so if do just'.split(' '));
+const heroIdx = ws => { const lv = ws.map(w => { const x = String(w).toLowerCase().replace(/[^a-z0-9']/g, ''); return /\d/.test(x) ? 99 : STOP.has(x) ? x.length / 10 : x.length; }); return lv.indexOf(Math.max(...lv)); };
 const clean = s => s.replace(/\s+/g, ' ').replace(/^[,;:\s]+|[,;:]+$/g, '').trim();
 const flips = phrases.map((p, i) => {
   const next = phrases[i + 1];
@@ -70,14 +71,10 @@ const flips = phrases.map((p, i) => {
   const hero = opt('hero', false) && !opt('titles', false) && last;
   const text = clean(p.map(x => x.w).join(' '));
   const ws = p.map(x => [+x.s.toFixed(2), +x.e.toFixed(2), x.w.replace(/[,;:]+$/, '')]);
-  // kinetic: one emphasis word (the longest non-filler word, or a number) and, every other phrase of 3+ words, one
-  // script accent word (drawn in the pairing's script font when it has one)
+  // kinetic: the phrase is set as a font lockup; "hero" = the word(s) in the display face (the longest non-filler
+  // word, or a number), the rest in the pairing's partner face (script or secondary). Edit "hero" to change it.
   const kin = {};
-  if (STYLE === 'kinetic') {
-    const lv = ws.map(([, , w]) => { const x = w.toLowerCase().replace(/[^a-z0-9']/g, ''); return /\d/.test(x) ? 99 : STOP.has(x) ? 0 : x.length; });
-    const e = lv.indexOf(Math.max(...lv)); if (lv[e] >= 4) kin.emph = [e];
-    if (ws.length >= 3 && i % 2 === 1) { const c = lv.map((l, k) => (k === e ? -1 : l)), a = c.indexOf(Math.max(...c)); if (c[a] >= 3) kin.accent = a; }
-  }
+  if (STYLE === 'kinetic') kin.hero = [heroIdx(ws.map(w => w[2]))];
   return { start: +p[0].s.toFixed(2), end: +end.toFixed(2), text: hero ? text.replace(/[.?!]+$/, '').toUpperCase() : text, mode: hero ? 1 : 0, ...(last ? { _beatEnd: p[0].seg } : {}), ...(PILLISH ? { words: ws } : {}), ...kin };
 });
 // --titles: one kinetic title per beat (segment), from the beat's last phrase, held to the cut. Up to 7 (the first
@@ -87,16 +84,16 @@ if (opt('titles', false)) {
   const pick = beats.length > 7 ? [...beats.slice(0, 6), beats[beats.length - 1]] : beats;
   const segEnd = i => { let t = 0; for (let k = 0; k <= i; k++) t += (C.segs[k].out - C.segs[k].in) + (C.segs[k].pad || 0); return t; };
   for (const f of pick) {
-    const words = f.text.replace(/[.?!,]+$/, '').toUpperCase().split(/\s+/);
-    const txt = words.length > 3 ? words.slice(0, Math.ceil(words.length / 2)).join(' ') + '|' + words.slice(Math.ceil(words.length / 2)).join(' ') : words.join(' ');
-    flips.push({ start: f.start, end: +Math.min(total, f._beatEnd === C.segs.length - 1 ? 99 : segEnd(f._beatEnd)).toFixed(2), text: txt, mode: 7 });
+    // a title is a font lockup too: the hero word big in the display face, the rest of the phrase in the partner face
+    const words = f.text.replace(/[.?!,]+$/, '').split(/\s+/);
+    flips.push({ start: f.start, end: +Math.min(total, f._beatEnd === C.segs.length - 1 ? 99 : segEnd(f._beatEnd)).toFixed(2), text: words.join(' '), hero: [heroIdx(words)], mode: 7 });
     f._title = true; // the title says this phrase big behind the head, so the caption track skips it
   }
   for (let k = flips.length - 1; k >= 0; k--) if (flips[k]._title) flips.splice(k, 1);
   flips.sort((a, b) => a.start - b.start || a.mode - b.mode);
 }
 flips.forEach(f => delete f._beatEnd);
-const caps = { note: `Auto-drafted by kit/autocaption.mjs from Whisper word times. Hand-tweak before shipping: modes 0 caption, 1 spray hero word, 2 sticker, 3 count-up, 4 takeover card, 5 logo plate, 6 CTA sticker, 7 kinetic title (entrance: stagger-rise|slam|blur-rise|slide-left|elastic|flip|pop-zoom, each once; flicker only on the first and last title). end 99 = hold to the end. captionStyle: kinetic|classic|pill|hormozi|karaoke; emph = word indices drawn big in the display font, accent = one word in the script font.`, captionStyle: STYLE, ...(opt('fonts', null) && opt('fonts') !== true ? { fonts: opt('fonts') } : {}), flips, glitchAt: [0.02, ...seams], bursts: [], captionY: 1300 };
+const caps = { note: `Auto-drafted by kit/autocaption.mjs from Whisper word times. Hand-tweak before shipping: modes 0 caption, 1 spray hero word, 2 sticker, 3 count-up, 4 takeover card, 5 logo plate, 6 CTA sticker, 7 kinetic title (entrance: stagger-rise|slam|blur-rise|slide-left|elastic|flip|pop-zoom, each once; flicker only on the first and last title). end 99 = hold to the end. captionStyle: kinetic|classic|pill|hormozi|karaoke; hero = word indices set big in the display face (titles and kinetic captions are two-font lockups; \"lockup\": false for one font).`, captionStyle: STYLE, ...(opt('fonts', null) && opt('fonts') !== true ? { fonts: opt('fonts') } : {}), flips, glitchAt: [0.02, ...seams], bursts: [], captionY: 1300 };
 const logo = opt('logo', null); if (logo && logo !== true) caps.logo = logo;
 writeFileSync(OUT, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
 console.log(`${flips.length} captions from ${words.length} words -> ${OUT}  (seams ${JSON.stringify(seams)}, total ${total}s)`);

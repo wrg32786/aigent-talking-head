@@ -1,5 +1,5 @@
 // Resolve a font pairing name (kit/fonts/pairings.json, then kit/fonts/local/pairings.json) or a pairing .json path
-// into what overlay.html loads: { name, display, secondary, script } with absolute file:// URLs. 'theme' -> null.
+// into what overlay.html loads: { name, display, secondary, script, lockup } with absolute file:// URLs. 'theme' -> null.
 import { existsSync, readFileSync } from 'fs';
 import { dirname, join, isAbsolute, resolve } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
@@ -19,5 +19,5 @@ export function resolveFonts(want) {
     if (r.file) { const f = isAbsolute(r.file) ? r.file : join(dir, r.file); if (!existsSync(f)) throw new Error(`Font file missing: ${f}`); out.url = pathToFileURL(f).href; out.vf = /-VF\.|\[wght\]|Variable/i.test(r.file); }
     return out;
   };
-  return { name: /\.json$/i.test(want) ? want : want, display: role(p.display), secondary: role(p.secondary), script: role(p.script) };
+  return { name: want, display: role(p.display), secondary: role(p.secondary), script: role(p.script), lockup: p.lockup || null };
 }

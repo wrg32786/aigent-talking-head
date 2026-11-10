@@ -34,9 +34,22 @@ function checkJob(captionsFile, cutFile, label) {
   }
   const sorted = raw.slice().sort((a, b) => a.start - b.start);
   sorted.forEach((t, i) => { if (t.flicker && i > 0 && i < sorted.length - 1) warns.push(`title ${t.start}s: flicker is for the hook and payoff only; it is ignored on a middle title`); });
+  // font lockups: "hero" must name words that are in the phrase; "lockup" must use a known arrangement
+  const ARR = ['stack', 'overlap', 'inline'];
+  const words = t => String(t).replace(/\|/g, ' ').split(/\s+/).filter(Boolean).map(w => w.toLowerCase().replace(/[^a-z0-9']/g, ''));
+  const heroOk = (f, h) => { const ws = f.words && f.words.length && f.mode !== R.TITLE_MODE ? f.words.map(w => String(w[2]).toLowerCase().replace(/[^a-z0-9']/g, '')) : words(f.text);
+    if (typeof h === 'string') { const want = words(h); return want.length && ws.some((_, i) => want.every((w, k) => ws[i + k] === w)); }
+    return Array.isArray(h) && h.length && h.every(i => Number.isInteger(i) && i >= 0 && i < ws.length); };
+  for (const f of flips) {
+    if (f.hero !== undefined && !heroOk(f, f.hero)) errs.push(`flip ${f.start}s: hero ${JSON.stringify(f.hero)} is not in "${f.text}" (word indices from 0, or the words themselves)`);
+    if (f.lockup && typeof f.lockup === 'object' && f.lockup.arrange && !ARR.includes(f.lockup.arrange)) errs.push(`flip ${f.start}s: lockup arrange "${f.lockup.arrange}" (${ARR.join(', ')})`);
+  }
+  if (CAP.lockup && CAP.lockup.arrange && !ARR.includes(CAP.lockup.arrange)) errs.push(`lockup arrange "${CAP.lockup.arrange}" (${ARR.join(', ')})`);
   if (CAP.captionStyle && !['kinetic', 'classic', 'pill', 'hormozi', 'karaoke'].includes(CAP.captionStyle)) errs.push(`captionStyle "${CAP.captionStyle}" (kinetic, classic, pill, hormozi, karaoke)`);
   if (cutFile && existsSync(cutFile)) {
     const C = JSON.parse(readFileSync(cutFile, 'utf8')), TL = R.timeline(C);
+    if (C.lockup && C.lockup.arrange && !ARR.includes(C.lockup.arrange)) errs.push(`cut.json lockup arrange "${C.lockup.arrange}" (${ARR.join(', ')})`);
+    for (const [k, h] of Object.entries(C.hero || {})) { const f = flips.find(x => Math.abs(x.start - +k) < 0.006 && (x.mode === 0 || x.mode === R.TITLE_MODE)); if (!f) errs.push(`cut.json hero "${k}": no caption or title starts at ${k}s`); else if (!heroOk(f, h)) errs.push(`cut.json hero "${k}": ${JSON.stringify(h)} is not in "${f.text}"`); }
     (C.segs || []).forEach((s, i) => { if (s.transition && R.xfadeMode(s.transition) === undefined) errs.push(`seg ${i}: unknown transition "${s.transition}" (kit/transitions.json)`); });
     for (const k of Object.keys(C.sfx || {})) if (!R.SFX[k]) errs.push(`sfx "${k}": use ${Object.keys(R.SFX).join(', ')}`);
     const seams = TL.seams.map(x => x.toFixed(2));
