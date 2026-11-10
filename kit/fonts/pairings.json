@@ -1,0 +1,30 @@
+{
+ "note": "Font pairings: pick one with --fonts <name> (reel.cjs), FONTS=<name> (render.mjs) or \"fonts\": \"<name>\" in captions.js. Roles: display = hero words and titles, secondary = body words and pills, script = the one accent word per phrase (optional). Every file here is SIL OFL 1.1 from Google Fonts, committed unmodified with its OFL text. Your own licensed fonts (Druk, Helvetica...) go in kit/fonts/local/ with a kit/fonts/local/pairings.json in this same shape; that folder is gitignored and never committed. 'theme' keeps the theme's own fonts.",
+ "pairings": {
+  "theme": null,
+  "modern": {
+   "about": "heavy grotesk + script (stand-in for a modern heavy sans with a signature script)",
+   "display": { "family": "Archivo Black", "file": "ArchivoBlack-Regular.ttf", "weight": 400, "tracking": -0.02, "upper": true },
+   "secondary": { "family": "Hanken Grotesk", "file": "HankenGrotesk-VF.ttf", "weight": 700 },
+   "script": { "family": "Allura", "file": "Allura-Regular.ttf", "weight": 400, "scale": 1.5 }
+  },
+  "druk": {
+   "about": "wide heavy display + clean sans (free stand-in for Druk Wide + Helvetica; drop licensed files in kit/fonts/local/ for the real pair)",
+   "display": { "family": "Unbounded", "file": "Unbounded-VF.ttf", "weight": 900, "tracking": -0.03, "upper": true },
+   "secondary": { "family": "Hanken Grotesk", "file": "HankenGrotesk-VF.ttf", "weight": 600 },
+   "script": null
+  },
+  "elegant": {
+   "about": "classical serif caps + formal script (free stand-in for Optitimes + Sloop)",
+   "display": { "family": "Marcellus", "file": "Marcellus-Regular.ttf", "weight": 400, "tracking": 0.02, "upper": true },
+   "secondary": { "family": "Crimson Pro", "file": "CrimsonPro-VF.ttf", "weight": 500 },
+   "script": { "family": "Pinyon Script", "file": "PinyonScript-Regular.ttf", "weight": 400, "scale": 1.45 }
+  },
+  "editorial": {
+   "about": "condensed serif italic + text serif (free stand-in for Vanguard + Athelas)",
+   "display": { "family": "Instrument Serif", "file": "InstrumentSerif-Italic.ttf", "weight": 400, "style": "italic", "tracking": -0.01 },
+   "secondary": { "family": "Libre Caslon Text", "file": "LibreCaslonText-VF.ttf", "weight": 500 },
+   "script": null
+  }
+ }
+}

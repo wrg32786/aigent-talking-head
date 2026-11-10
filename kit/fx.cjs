@@ -115,6 +115,18 @@ fs.mkdirSync(dir, { recursive: true });
 const cut = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8'));
 const LEN = cut.segs.reduce((a, s) => a + (s.out - s.in) + (s.pad || 0), 0) + (cut.tail ?? 0.3);
 if (cut.overlay && !fs.existsSync(path.join(build, 'ovl'))) sh(process.execPath, [path.join(KIT, 'render.mjs'), LEN.toFixed(2)], build);
+// Caption zones: effects the catalog marks "off" hide the caption track and the kinetic titles for their window;
+// "check" effects (they can reach the caption band) move the caption track up to captions.js altY instead, unless
+// the entry says "captions": "on". fxzones.js tells overlay.html; the overlay is re-rendered when the zones change.
+const zones = plan.filter(d => byName[d.fx]).map(d => {
+  const c = capsMode || d.captions || byName[d.fx].captions;
+  return c === 'off' ? { start: +d.start, end: +d.end, act: 'hide', fx: d.fx } : (c === 'check' || c === 'move') ? { start: +d.start, end: +d.end, act: 'move', fx: d.fx } : null;
+}).filter(Boolean);
+const zf = path.join(build, 'fxzones.js'), zsrc = 'window.FXZONES=' + JSON.stringify(zones) + ';\n';
+if (!fs.existsSync(zf) || fs.readFileSync(zf, 'utf8') !== zsrc) {
+  fs.writeFileSync(zf, zsrc);
+  if (cut.overlay) { console.log('> caption zones changed, re-rendering the overlay', zones.map(z => `${z.fx} ${z.act}`).join(', ')); sh(process.execPath, [path.join(KIT, 'render.mjs'), LEN.toFixed(2)], build); }
+}
 const pf = path.join(dir, 'plan.resolved.json');
 fs.writeFileSync(pf, JSON.stringify({ effects: clean }, null, 1));
 const base = path.join(dir, 'base.mp4');
@@ -128,6 +140,8 @@ if (still) {
     const png = path.join(dir, f), m = f.match(/_([0-9.]+)\.png$/), t = m ? +m[1] : +still;
     const ov = path.join(build, 'ovl', String(Math.round(t * 24)).padStart(4, '0') + '.png');
     const hidden = hide.some(d => t >= d.start && t <= d.end);
+    const ovt = path.join(build, 'ovlt', path.basename(ov));
+    if (fs.existsSync(ovt) && !hidden) { execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', png, '-i', ovt, '-filter_complex', 'overlay', png + '.tmp.png']); fs.renameSync(png + '.tmp.png', png); }
     if (fs.existsSync(ov) && !hidden) { execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', png, '-i', ov, '-filter_complex', 'overlay', png + '.tmp.png']); fs.renameSync(png + '.tmp.png', png); }
     console.log('check frame', png, hidden ? '(captions hidden here)' : '(with captions)');
   }

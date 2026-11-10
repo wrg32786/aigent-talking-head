@@ -17,3 +17,10 @@ inbox/*
 effects/.venv/
 __pycache__/
 *.pyc
+
+# the locked sound set ships as WAV
+!kit/sfx/*.wav
+# per-job renders
+ovlt/
+*.mkv
+kit/fonts/local/

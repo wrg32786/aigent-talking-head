@@ -214,5 +214,6 @@ window.CAPTIONS={
   "subAt": 35.11
  },
  "logo": "skool-logo.svg",
- "captionY": 1300
+ "captionY": 1300,
+ "captionStyle": "classic"
 };

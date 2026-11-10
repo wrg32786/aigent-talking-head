@@ -7,15 +7,17 @@ The usual job: a teammate recorded themselves on their phone, dropped the file i
 3. **Effects** are an optional second pass: the "Pick effects" section of the talking-head-ad skill, with the menu in [effects/CATALOG.md](effects/CATALOG.md). Use `npm run fx`, not the vendored upstream `SKILL.md`, so captions stay on top and the teammate's own name and handle are used.
 4. **HeyGen takes** are optional. They're covered in the talking-head-ad skill under "Optional: HeyGen takes".
 
-Setup check: `npm install`, `pip install -r requirements.txt`, then `npm run smoke` must print `SMOKE PASS`. If Chrome isn't found, set `CHROME_PATH`; if Python isn't `python3`, set `PYTHON`.
+Setup check: `npm install`, `pip install -r requirements.txt`, then `npm run smoke` must print `SMOKE PASS` and `npm run check` must print `CHECK PASS`. If Chrome isn't found, set `CHROME_PATH`; if Python isn't `python3`, set `PYTHON`.
 
 Use the scripts in `kit/` as they are. Put job data in `jobs/<name>/build/cut.json` and `captions.js`, and the look in `theme.js`, never in the scripts. The worked example is in `kit/example/` (the shipped Awakening ad).
 
 Install Claude Code skills by copying the two folders under `skills/` into `.claude/skills/`. The SKILL.md files point back to `kit/` by relative path, so keep the repo next to them or fix the paths.
 
 Hard rules:
+- Run `npm run verify -- <job>` before you hand over any reel, and look at `jobs/<job>/verify/contact.png`. It must print `VERIFY PASS`. Fix what it flags, don't explain it away.
+- Copy follows the humanizer rules in the talking-head-ad skill: no em dashes, no "not X, but Y", no hype words. `npm run check -- <job>` lints it.
 - Verify every render: re-transcribe it with the music in, and read frame strips across every seam. A probe proves something exists; your eye on the frames proves it looks right.
-- You can't hear. Never call a sound good. Build an audition and let the human pick by ear.
+- You can't hear. Never call a sound good. Build an audition and let the human pick by ear. Fewer, deeper sounds: never one on every cut.
 - Never fabricate copy the offer contradicts, such as "free" on a paid product.
 - Number versions (`-v1`, `-v2`, ...) and keep the old ones for comparison. `npm run reel` does this for you.
 - Ask which theme to use if the teammate hasn't said. Don't use the AIgent theme or the Skool mark for another brand.

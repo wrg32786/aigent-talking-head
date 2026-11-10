@@ -16,11 +16,13 @@
 
 ## Captions and effects
 
-Our caption band sits at about 60 to 78% of the frame height (`captionY` 1300). Captions are composited after the effects, so camera moves never zoom or crop them. Each effect is rated in the catalog:
+Our caption band sits at about 60 to 78% of the frame height (`kineticY` / `captionY` 1320). Kinetic titles sit behind the presenter at about Y=560. Captions and titles are composited after the effects, so camera moves never zoom or crop them. Each effect is rated in the catalog:
 
 - `safe`: keep captions on.
-- `check`: read a check frame; move the effect (`y`, `pos`) or hide captions for that window if they crowd.
-- `off`: captions are hidden automatically for that window (put `"captions": "on"` on the plan entry to override, or `"captions": "off"` on any entry to hide them).
+- `check`: the caption track moves to the top of the frame (Y=330) for that window. Still read a check frame; move the effect (`y`, `pos`) or hide captions if they crowd.
+- `off`: captions and titles are hidden automatically for that window (put `"captions": "on"` on the plan entry to override, or `"captions": "off"` on any entry to hide them).
+
+`npm run fx` writes these windows to `build/fxzones.js` and re-renders the caption layer when they change.
 
 Pairing rule: one effect in the caption band at a time, and nothing in the band while a sticker, hero word or CTA caption is up.
 

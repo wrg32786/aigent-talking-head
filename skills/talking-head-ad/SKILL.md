@@ -1,30 +1,44 @@
 ---
 name: talking-head-ad
-description: "Turn a teammate's phone recording (dropped in inbox/) into a vertical 9:16 talking-head reel: clean cuts with retakes skipped, themed captions drafted from the transcript, woosh hits on every cut, a ducked music bed, verified by transcript and frame reads. HeyGen cinematic takes are an optional extra source. Use when someone says 'make a reel from my clip' or is making or fixing a presenter ad."
+description: "Turn a teammate's phone recording or takes (dropped in inbox/) into a vertical 9:16 talking-head reel: best take per sentence, zoom-punched cuts, every word animated, kinetic titles behind the head, a few deep sounds on the key cuts, a ducked music bed, checked with npm run verify. HeyGen cinematic takes are an optional extra source. Use when someone says 'make a reel from my clip' or is making or fixing a presenter ad."
 ---
 
 # Talking-head ad
 
 The main path: a teammate records on their phone, drops the file in `inbox/`, and you turn it into a reel. It runs in four stages:
 
-- **Clips.** Whisper transcribes the recording, splits it into sentences and flags flubbed retakes.
-- **Cut.** The keep clips are joined, with a glitch hit and a woosh on every seam.
-- **Overlay.** A canvas layer adds captions and cards, styled by a theme.
-- **Sound.** The music bed, if any, ducks under the voice.
+- **Clips.** Whisper transcribes the recording (or every take), splits it into sentences, flags flubbed retakes and keeps the best take of each sentence.
+- **Cut.** The keep clips are joined with a glitch seam and a 10% zoom punch at each cut, and a bigger eased punch after the hook and into the payoff.
+- **Overlay.** A canvas layer animates every spoken word, adds one kinetic title per beat behind the presenter's head, and any cards, styled by a theme and a font pairing.
+- **Sound.** A few deep sounds on the key cuts only; the music bed, if any, ducks under the voice.
 
-Every version gets checked by re-transcribing it and by reading frames. All scripts live in `../../kit`.
+Every version gets checked with `npm run verify` and by re-transcribing it. All scripts live in `../../kit`. The rules below come from a working reel workflow; follow them unless the teammate asks otherwise.
+
+## Optional: study a reference, then write the script
+
+Skip this when the teammate already has a script.
+
+1. **Teardown (optional, only if the tools are installed).** If the teammate points at a reel they want to match, you can download it with [instaloader](https://github.com/instaloader/instaloader) (MIT) and break it down with [rea-video](https://github.com/JuneYaooo/rea-video) (Apache-2.0): hook, beats, cut rhythm, title moments. Neither is bundled; install them yourself, and only for public posts the teammate may use. Never post anything.
+2. **Script shape.** A hook, one reveal per beat, a payoff. 40 to 55 words, 15 to 20 s spoken. If a draft runs over 25 s, cut a middle sentence, never the hook or the payoff. `npm run check -- <job>` reports the word count and length.
+3. **Copy standard (humanizer).** Write like a person talking:
+   - No em or en dashes. Use a full stop or a comma.
+   - No "not X, but Y" / "it's not X, it's Y" flips, no staged run-ups ("Here's the thing:", "The truth?"), no dramatic one-word closers, no rule-of-three lists for rhythm.
+   - No hype or AI words: "game-changer", "unlock", "supercharge", "revolutionize", "seamless", "delve", "elevate", "next-level" and similar.
+   - Plain verbs, short sentences, specific numbers the teammate gave you. Never invent a number.
+   `npm run check` lints captions, titles and cards for these and fails on them.
+4. **Takes.** Ask for 2 or 3 full takes. One take shot from an extreme angle (low, high, or very close) makes a strong hook: pass `--hook <that file>`.
 
 ## Phone clip to reel (start here)
 
-1. Find the clip: the newest video in `inbox/`, or the file the teammate names. If the inbox is empty, ask them to drop it in.
-2. Ask which theme if they haven't said: `neutral` (default) or `aigent` (AIgent brand only), or their own `kit/themes/<name>.js`. Ask for a music file if they want one.
-3. Draft it: `npm run reel -- inbox/<file> --theme <name> [--bed music.wav] [--cropx 0.4] --draft`
+1. Find the clip: `npm run reel` with no path uses every video from the newest recording session in `inbox/` (files within 2 hours of the newest; `--newest` for one), or pass the files the teammate names. If the inbox is empty, ask them to drop it in.
+2. Ask which theme if they haven't said: `neutral` (default) or `aigent` (AIgent brand only), or their own `kit/themes/<name>.js`. Ask for a music file if they want one. Offer a font pairing (`--fonts modern|druk|elegant|editorial`, default the theme's fonts) and a look (`--look kinetic` default, `muse` for pill captions, `classic` for the old captions).
+3. Draft it: `npm run reel -- inbox/<file> [inbox/<take2> ...] --theme <name> [--fonts druk] [--hook <take>] [--bed music.wav] [--cropx 0.4] --draft`
    - `--cropx` moves the 9:16 crop for a sideways clip (0 left, 0.5 centre, 1 right). Read `jobs/<name>/clips/clips-sheet.png` to check the face is in frame.
    - `--model medium.en` is faster than the default large-v3 for a first pass.
 4. Read `jobs/<name>/clips/clips.md`. `npm run reel` already dropped every `retake` row. Remove slates and asides ("Okay, take two...") from `build/cut.json`, and trim the `out` of clips that end mid-move.
-5. Edit `build/captions.js`. It's a draft of plain captions with the last phrase before each seam made a spray hero word. Turn key words into stickers (mode 2), add a count-up, card or CTA (see step 4 below), and fix any misheard words against what the teammate said.
+5. Edit `build/captions.js`. It's a draft with every phrase in the caption style (`kinetic` by default, key words in `emph`), and one title per beat in `titles`. Fix misheard words against what the teammate said, rewrite titles that don't read as a headline, and add a count-up, card or CTA if wanted (see step 4 below).
 6. Build it: `npm run reel -- --rebuild --name <name>` writes `jobs/<name>/reel-vN.mp4`, a new number each time.
-7. Verify (step 6 below), then hand over the reel path. Offer the effects pass (next section) if they want more motion.
+7. **Verify (mandatory):** `npm run verify -- <name>` must print `VERIFY PASS`. Read `jobs/<name>/verify/contact.png` and every still it lists (each title mid-entrance and settled, the big punches, the payoff) before you hand over the reel path. Then offer the effects pass (next section) if they want more motion.
 
 Leave out `--draft` to go straight to `reel-v1.mp4` in one command. The draft step is better when someone will watch it.
 
@@ -41,7 +55,7 @@ After the reel is cut and captioned, you can add effects from [`effects/CATALOG.
                 {"fx": "checklist", "start": 6.0, "end": 10.0, "text": "Record::on your phone|Drop::in inbox|Ask::for the reel", "title": "Your workflow"},
                 {"fx": "countdown-flip", "start": 18.5, "end": 21.5}]}
    ```
-4. **Captions.** Effects rated `off` hide captions for their window automatically, `check` ones need a look, and `safe` ones keep captions on. Only one effect in the caption band at a time, and none while a sticker, hero word or CTA caption is up.
+4. **Captions.** Effects rated `off` hide the captions and the titles for their window automatically, `check` ones move the caption track to the top of the frame (and still need a look), and `safe` ones keep captions on. Only one effect in the caption band at a time, and none while a sticker, hero word or CTA caption is up.
 5. **Check, then render.** `npm run fx -- --name <name> --plan jobs/<name>/fx.json --still <middle of each effect>`; read every PNG in `build/fx/` (face covered? text cut off? captions crowded?). Fix the plan, then run without `--still` to get `jobs/<name>/reel-fx-vN.mp4`. The audio is exactly the reel's.
 6. Fix the notes the command prints (pacing, durations, missing copy) before you hand it over. `--allow-demo-copy` only fills neutral `[placeholders]` for a quick look; never ship that.
 
@@ -92,10 +106,12 @@ Use this when mixing sources or when you need finer control. Work in a job folde
   - Join the two halves with a 20 ms acrossfade, and put a card pop and an F hit on the jump cut.
 - `node ../../kit/timeline.mjs` prints every segment and word on the output clock. Use `--cuts` to print just the seams.
 - Schema and examples: `kit/assemble.cjs` header, `kit/example/cut.*.json`.
+- **Zoom punch.** `"punch": 0.1` (the `npm run reel` default) scales every other segment 10% so each cut reads as a jump. `"bigPunch": true` on a segment eases in 12% more over 0.3 s: use it on the cut right after the hook and the cut into the payoff, no more than two. `"zoom"` and `"punchY"` per segment override it; `"punch": false` turns it off.
+- **Transitions.** The glitch seam is the default and the right choice most of the time. `"transition": "<name>"` on a segment (or top level) swaps in an ffmpeg xfade; names are in `kit/transitions.json` (crossfade, dip, flash, whip, iris, zoom, pixelate, ...). The outgoing shot holds its last frame for the blend, so caption times don't move.
 
 ## 4. Captions (`build/captions.js`, then `node ../../kit/render.mjs <seconds>` from `build/`)
 
-- Draft them: `node ../../kit/autocaption.mjs --out captions.js [--hero] [--shift 0.4]` reads `words.json` (from `tx.py`) or the clips' `clips.json` and writes timed plain captions. Or copy `kit/example/captions.awakening-hero.js` and write them by hand. Either way, edit the `flips`. Each flip is `{start, end, text, mode}`.
+- Draft them: `node ../../kit/autocaption.mjs --out captions.js [--style kinetic|pill|hormozi|karaoke|classic] [--titles] [--fonts druk] [--hero] [--shift 0.4]` reads `words.json` (from `tx.py`) or the clips' `clips.json` and writes timed plain captions. Or copy `kit/example/captions.awakening-hero.js` and write them by hand. Either way, edit the `flips`. Each flip is `{start, end, text, mode}`.
 - Modes:
   - 0 caption
   - 1 spray hero word
@@ -104,7 +120,11 @@ Use this when mixing sources or when you need finer control. Work in a job folde
   - 4 takeover card
   - 5 logo plate
   - 6 CTA sticker
+  - 7 kinetic title (also made from the top-level `"titles"` list)
 - `end: 99` holds a flip to the end of the video.
+- **Caption styles** (`"captionStyle"`): `kinetic` (default: every word rises in, words listed in a flip's `emph` slam in bigger in the display font and accent colour, `accent` adds a script word), `pill` (3 to 5 words in a lower-third pill), `hormozi` (bold caps, cyan active word), `karaoke` (colour wipe word by word), `classic` (the original). Every spoken word should be on screen in some style; don't ship plain captions unless asked.
+- **Titles.** One per beat, at most 7: `"titles": [{"start": 0.2, "end": 3.1, "text": "STOP EDITING|BY HAND"}]` (`|` breaks the line). Each gets a different entrance (`stagger-rise`, `slam`, `blur-rise`, `slide-left`, `elastic`, `flip`, `pop-zoom`), picked in order unless you set `"enter"`. Only the hook and the payoff flicker. Titles sit at about Y=560, behind the presenter: `build/mask.mkv` (made by `kit/mask.py` from the effects venv) cuts the person out on top of them. Without the effects venv, titles go in front; run `npm run effects:setup` to get the mask. If the mask leaks onto the background, add `"maskClear": [[start, end]]` in `cut.json`.
+- **Fonts.** `"fonts": "druk"` (or `--fonts`) picks a pairing from `kit/fonts/`: display font for titles and emphasised words, secondary for body words, optional script accent. Teammates' own licensed fonts go in `kit/fonts/local/`, never in git.
 - Check a few frames first: `node ../../kit/render.mjs 0 "2.7,13.6,25.9"` writes `stills/`.
 - **Theme.** `build/theme.js` sets colours, fonts and logo. `render.mjs` copies `kit/themes/neutral.js` there if it's missing (`THEME=aigent` picks the AIgent preset). Edit it per job, or add `"theme": {...}` overrides in `captions.js`. A logo plate (mode 5) needs `"logo": "file.svg"` in `captions.js` (file in `build/`) or `theme.logo`; without one, mode 5 draws nothing.
 - AIgent theme rules (AIgent jobs only):
@@ -112,22 +132,23 @@ Use this when mixing sources or when you need finer control. Work in a job folde
   - Hero words, stickers and cards are Sofia Sans Extra Condensed caps, weight 760 to 860, tracking -0.01em.
   - `#5cf9e2` is the only cyan. Never use orange, magenta or pure white.
   - Cards are square. Drips fall from the measured bottoms of the letters.
-- Keep the caption band at about Y=1300, below the face. Measure the face per take; text never covers it.
+- Keep the caption band at about Y=1320, below the face. Measure the face per take; text never covers it.
 - A lone floating word with nothing behind it fails QA.
 - Never write copy the offer contradicts. The Skool group is paid, so the ad can't say "free school".
 - The Skool mark (`kit/example/skool-logo.svg`) is only for The AIgent's own Skool group. Never use it for another brand.
 
 ## 5. Sound (in `cut.json`)
 
-- `sfx.F` is the cinematic woosh. Put it on every cut and hidden jump.
-- `sfx.D` is the quick woosh. Put it on cards moving in or out.
-- Both are Will's picks by ear, and both are CC0. Each sound's measured peak lands on the time you give.
+- The locked set: `whoosh` (the cinematic woosh), `swipe` (the quick woosh), `boom` (deep impact), `click`, `typing`. Mono 48 kHz WAV, all CC0. Use them as `"sfx": {"whoosh": [3.2], "boom": [[12.4, 0.55]]}` (a time, or `[time, gain]`). Each sound's measured peak lands on the time you give. The old keys `F` and `D` still work.
+- **Fewer and deeper.** Never a sound on every cut; the glitch seam already marks the cut. Put a whoosh on the big punches, a click or typing under a card or title that needs it, and the loudest sound (usually `boom`) on the payoff. `npm run check` flags a sound on every cut and more than about one sound every 3 s.
+- The whoosh and swipe are Will's picks by ear; boom, click and typing have not been auditioned yet.
 - Never use synthetic noise swooshes; they read as cheap static.
 - To choose new sounds, run `node kit/fs.mjs "<query>"` (CC0 only). Build an audition with one 3 s seam clip per candidate and let a human pick by ear. An agent can't hear.
 - `bed` is the music. A bed the human has timed starts at 0 with `bedNoFade`. It ducks under the voice automatically. Set `bedVol` about 0.16 for a bed near -13 LUFS, or 0.22 for one near -16.
 
 ## 6. Verify every version
 
+- `npm run verify -- <name>` (mandatory before delivery) checks 1080x1920, 24 fps, H.264 + AAC 48 kHz, the duration against `cut.json`, loudness (-14 LUFS, true peak under -0.5 dB), that the person mask is there under every title and empty outside them, and the copy lint. It writes stills of each title mid-entrance and settled, the big punches and the payoff, plus `verify/contact.png` and `verify/report.md`. Read the contact sheet: a still proves the frame exists, your eye proves it looks right.
 - Re-transcribe the whole render. It must match the script word for word with the bed in. Before ducking, hi-hats turned "school" into "pool".
 - Read frame strips across every seam and every hidden cut, plus a still of every caption mode.
 - Loudness should land at about -14.7 LUFS integrated (`-af ebur128`).

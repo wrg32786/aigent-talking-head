@@ -4,7 +4,13 @@ Copyright 2026 Will Gwyn (wrg32786)
 Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 Third-party files keep their own terms:
-- kit/sfx/*.mp3: Freesound CC0 (credits in README.md).
+- kit/sfx/*.mp3, kit/sfx/whoosh.wav, kit/sfx/swipe.wav: Freesound CC0 (credits in README.md).
+- kit/sfx/boom.wav, click.wav, typing.wav: from motion-pack by ANVEAI (https://github.com/ANVEAI/motion-pack),
+  CC0 1.0 under its LICENSE-MEDIA.
+- kit/fonts/*.ttf: Google Fonts under the SIL Open Font License 1.1 (kit/fonts/OFL-*.txt).
+- kit/transitions.json adapts motion-pack's xfade name map (MIT). The hormozi and karaoke caption looks follow
+  Capite (https://github.com/muneebkhan08/Capite), MIT, Copyright (c) 2026 Capite Contributors. Title entrances
+  use nexu-io/motion-anything (Apache-2.0) as a reference only. Details in THIRD_PARTY.md.
 - kit/example/skool-logo.svg: the Skool wordmark, a trademark of Skool, not covered by the Apache license.
 - effects/vendor/claude-video-effects/: claude-video-effects by Vibha Ramprakash
   (https://github.com/Vibha-Ramprakash/claude-video-effects), MIT, Copyright (c) 2026 Vibha Ramprakash.
