@@ -35,3 +35,5 @@ kit/fonts/local/
 # user-saved brand presets and dropped brand guides
 kit/presets/local/
 /brand-guide/
+# the example reel is the one video kept in git
+!kit/example/demo-reel/demo-reel.mp4

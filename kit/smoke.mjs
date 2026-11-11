@@ -209,6 +209,22 @@ try {
     if (!a) fail('no audio stream');
     if (Math.abs(d - 3.5) > 0.25) fail('duration ' + d);
   });
+  step('b-roll insert covers the picture for its span only, voice and length unchanged; check refuses a missing insert', () => {
+    run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=red:s=720x1280:r=24:d=2', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', 'insert.mp4'], work);
+    const cutF = join(build, 'cut.json'), keep = readFileSync(cutF, 'utf8');
+    writeFileSync(cutF, JSON.stringify({ ...JSON.parse(keep), inserts: [{ file: '../insert.mp4', at: 0.8, dur: 0.8, in: 0.2 }] }));
+    try {
+      run(node, [join(KIT, 'assemble.cjs'), 'ins.mp4'], build);
+      const px = t => [...execFileSync('ffmpeg', ['-v', 'error', '-ss', String(t), '-i', 'ins.mp4', '-frames:v', '1', '-vf', 'format=rgb24,crop=1:1:20:20', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'], { cwd: build })];
+      const red = px(1.2), after = px(2.0);
+      if (!(red[0] > 180 && red[1] < 70 && red[2] < 70)) fail('insert not on screen at 1.2 s: ' + red);
+      if (after[0] > 180 && after[1] < 70 && after[2] < 70) fail('insert still on screen at 2.0 s');
+      const d = +run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', 'ins.mp4'], build);
+      if (Math.abs(d - 3.5) > 0.25) fail('insert changed the length: ' + d);
+      writeFileSync(cutF, JSON.stringify({ ...JSON.parse(keep), inserts: [{ file: '../nope.mp4', at: 0.8, dur: 0.8 }] }));
+      try { run(node, [join(KIT, 'check.mjs'), build], work); fail('check passed a missing insert'); } catch (e) { if (!/inserts\[0\]: no file/.test(String(e.stdout || ''))) throw e; }
+    } finally { writeFileSync(cutF, keep); }
+  });
   step('neutral preset stills', () => {
     rmSync(join(build, 'theme.js'));
     run(node, [join(KIT, 'render.mjs'), '0', '0.6'], build, { THEME: 'neutral' });
@@ -293,7 +309,7 @@ try {
     writeFileSync(join(b, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(caps) + ';\n');
     try { run(node, [join(KIT, 'check.mjs'), b], work); fail('check passed 8 titles with a repeated entrance'); } catch (e) { if (!/entrance "slam" already used|8 titles/.test(String(e.stdout || ''))) throw e; }
   });
-  step('font pairings: druk, modern, elegant, editorial load and render as two-font lockups; unknown pairing refused', () => {
+  step('font pairings: all 15 load and render as two-font lockups; a list cycles them as whole pairs; unknown pairing refused', () => {
     const b = join(work, 'jobs', 'muse', 'build'), capF = join(b, 'captions.js'), keep = readFileSync(capF, 'utf8');
     const w = (t0, txt) => txt.split(' ').map((x, i) => [+(t0 + i * 0.2).toFixed(2), +(t0 + i * 0.2 + 0.2).toFixed(2), x]);
     writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'kinetic', flips: [
@@ -301,27 +317,67 @@ try {
       { start: 0, end: 2, text: 'Record one take on your phone', mode: 0, words: w(0, 'Record one take on your phone'), hero: 'record' },
       { start: 2, end: 4, text: 'Drop the file in the inbox', mode: 7 },
       { start: 2, end: 4, text: 'Ask for the reel', mode: 0, words: w(2, 'Ask for the reel') }] }) + ';\n');
-    for (const fp of ['druk', 'modern', 'elegant', 'editorial']) {
+    for (const fp of ['druk', 'modern', 'elegant', 'editorial', 'literata', 'bricolage', 'pirata', 'michroma', 'redhat', 'jakarta', 'grotesk-times', 'avantgarde', 'recoleta', 'haas', 'wabbit']) {
       const o = run(node, [join(KIT, 'render.mjs'), '0', '1.0'], b, { FONTS: fp });
       if (!new RegExp('fonts ' + fp).test(o)) fail('pairing not applied: ' + fp + '\n' + o);
       if (!/"url":"file:/.test(readFileSync(join(b, 'fonts.js'), 'utf8'))) fail('fonts.js has no font files for ' + fp);
       // two-font lockups: every multi-word title and kinetic line pairs a big hero with a smaller partner on one line
       const L = JSON.parse(readFileSync(join(b, 'lockups.json'), 'utf8'));
       if (!L.some(l => l.kind === 'title')) fail(fp + ': no title lockups');
-      const want = { druk: 'stack', modern: 'overlap', elegant: 'overlap' }[fp];
+      const want = { druk: 'stack', modern: 'overlap', elegant: 'overlap', jakarta: 'overlap', wabbit: 'overlap', redhat: 'stack', pirata: 'stack' }[fp];
       for (const l of L) {
         if (!l.partners.length) continue;
         for (const q of l.partners) { const r = q.size / l.heroSize; if (r < 0.25 || r > 0.9) fail(`${fp} ${l.kind} ${l.start}s: partner/hero size ${r.toFixed(2)}`); if (q.w > 960) fail(`${fp}: partner "${q.txt}" wider than the frame`); }
         if (l.kind === 'kinetic') for (const q of l.partners) if (q.size < (q.script ? 60 : 46) || q.size / l.heroSize < 0.5) fail(`${fp} kinetic ${l.start}s: partner "${q.txt}" ${q.size}px (hero ${l.heroSize}px) is too small to read`);
         if (want && l.arrange !== want) fail(`${fp}: ${l.kind} arranged ${l.arrange}, want ${want}`);
         if ((fp === 'modern' || fp === 'elegant') && !l.partners.every(q => q.script)) fail(fp + ': partner is not the script face');
-        if (l.kind === 'title' && l.hero.length <= 7 && l.heroW < 0.8 * 960 && l.heroSize < 360) fail(`${fp}: title hero "${l.hero}" only ${l.heroW}px wide`);
+        // an inline lockup shares its line with the partner, so the whole line has to fill the width, not the hero alone
+        const span = l.arrange === 'inline' ? l.box[2] - l.box[0] : l.heroW;
+        if (l.kind === 'title' && l.hero.length <= 7 && span < 0.8 * 960 && l.heroSize < 360) fail(`${fp}: title hero "${l.hero}" only ${span}px wide`);
       }
       if (!L.some(l => l.partners.length)) fail(fp + ': no lockup has a partner face');
     }
+    // a list cycles: titles take the pairings in turn, each caption line takes its title's pair, no phrase mixes two
+    { const o = run(node, [join(KIT, 'render.mjs'), '0', '1.0'], b, { FONTS: 'literata,bricolage,michroma' });
+      if (!/font cycle literata > bricolage > michroma/.test(o)) fail('font cycle not applied: ' + o);
+      const got = JSON.parse(readFileSync(join(b, 'lockups.json'), 'utf8')).map(l => `${l.kind} ${l.start} ${l.fonts} ${l.faces.join('+')}`).join('; ');
+      const want = 'title 0 literata Archivo Black+Literata; kinetic 0 literata Archivo Black+Literata; title 2 bricolage Bricolage Grotesque+Gloock; kinetic 2 bricolage Bricolage Grotesque+Gloock';
+      if (got !== want) fail('font cycle lockups: ' + got); }
     writeFileSync(capF, keep);
     try { run(node, [join(KIT, 'render.mjs'), '0', '1.0'], b, { FONTS: 'helvetica-please' }); fail('unknown pairing accepted'); } catch (e) { if (!/Unknown font pairing/.test(String(e.stderr || ''))) throw e; }
     run(node, [join(KIT, 'render.mjs'), '0', '1.0'], b, { FONTS: 'theme' });
+  });
+  step('oneword look: one word at a time, hero in the display face with the phrase building under it, type card in front', () => {
+    const b = join(work, 'jobs', 'muse', 'build'), capF = join(b, 'captions.js'), keep = readFileSync(capF, 'utf8');
+    const ws = (t0, s) => s.split(' ').map((x, i) => [+(t0 + i * 0.25).toFixed(2), +(t0 + i * 0.25 + 0.25).toFixed(2), x]);
+    writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'oneword', fonts: 'instrument', flips: [
+      { start: 0, end: 1.6, text: 'Record the whole take on your phone', mode: 0, words: ws(0, 'Record the whole take on your phone'), hero: 'take' },
+      { start: 1.8, end: 3.0, text: 'Step two: drop it in', mode: 0, words: ws(1.8, 'Step two: drop it in') },
+      { start: 1.8, end: 3.0, mode: 8, bg: 'navy', number: '2' }] }) + ';\n');
+    const o = run(node, [join(KIT, 'render.mjs'), '0', '0.3,1.2,2.4'], b);
+    if (!/fonts instrument/.test(o)) fail('instrument pairing not applied: ' + o);
+    const W = JSON.parse(readFileSync(join(b, 'oneword.json'), 'utf8')), at = s => W.find(w => Math.abs(w.t - s) < 0.01);
+    if (W.length !== 12) fail('expected one state per word (12), got ' + W.length);
+    if (at(0).txt !== 'Record' || at(0).face !== 'body' || at(0.25).face !== 'small') fail('words before the hero: ' + JSON.stringify(W.slice(0, 3)));
+    const h = at(0.75), last = at(1.5);
+    if (h.txt !== 'take' || h.face !== 'hero' || h.size < 1.6 * at(0).size) fail('hero: ' + JSON.stringify(h));
+    if (last.txt !== 'take' || last.tail !== 'on your phone') fail('the phrase should build under the hero: ' + JSON.stringify(last));
+    if (!W.filter(w => w.t >= 1.8).every(w => w.card && w.ink === '#efe6cf')) fail('words on the card should take its ink: ' + JSON.stringify(W.slice(7)));
+    if (!W.some(w => w.face === 'stack') && !W.some(w => w.face === 'big')) { /* too few phrases here for the stack or big words; the oneword demo shows them */ }
+    if (new Set(W.filter(w => w.card).map(w => w.x + ',' + w.y)).size < 3) fail('words on a card should move around it, not sit in one spot: ' + JSON.stringify(W.filter(w => w.card)));
+    const px = (f, x, y) => [...execFileSync('ffmpeg', ['-v', 'error', '-i', join(b, 'stills', f), '-vf', `crop=1:1:${x}:${y}`, '-f', 'rawvideo', '-pix_fmt', 'rgba', '-'], { cwd: b })];
+    const card = px('t2.40.png', 8, 8), face = px('t1.20.png', 8, 8);
+    if (card[0] !== 14 || card[1] !== 26 || card[2] !== 51 || card[3] !== 255) fail('card should fill the frame navy, got ' + card);
+    if (face[3] !== 0) fail('no card: the overlay corner should be clear, got ' + face);
+    // three pairings cycling: a card that spans a pairing change keeps one pairing on screen with the words under it
+    const ph = k => ({ start: k * 0.6, end: k * 0.6 + 0.5, text: 'one two', mode: 0, words: ws(k * 0.6, 'one two') });
+    writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'oneword', fonts: 'instrument,literata,bricolage', flips: [ph(0), ph(1), ph(2), ph(3), { start: 1.3, end: 2.1, mode: 8, bg: 'ink' }] }) + ';\n');
+    const o2 = run(node, [join(KIT, 'render.mjs'), '0', '2.0'], b);
+    if (/pairing mix/.test(o2)) fail('one frame shows two font pairings: ' + o2);
+    writeFileSync(capF, keep);
+  });
+  if (existsSync(fxPy)) step('legibility.py: contrast of the letters against the picture round them (self-test)', () => {
+    run(fxPy, ['-c', 'import sys; sys.path.insert(0, sys.argv[1]); import legibility, anchors; legibility.selftest(); anchors.selftest()', KIT], work, { PYTHONUTF8: '1' });
   });
   step('music beds: only real library names resolve; a missing bed fails the check; add refuses a taken or empty name', () => {
     const b = join(work, 'jobs', 'muse', 'build'), cutF = join(b, 'cut.json'), keep = readFileSync(cutF, 'utf8'), add = join(KIT, 'music', 'add.mjs');
@@ -442,7 +498,7 @@ try {
     });
     else console.log('- beats.py on a click bed + python tests ... skipped (pip install -r requirements.txt for librosa)');
   }
-  if (effects) step('effects pass: moody + locked-on + checklist (captions off) + glass-widgets (no pill, no upstream sample content), check frames + render', () => {
+  if (effects) step('effects pass: moody + locked-on + backdrop-word + checklist (captions off) + glass-widgets (no pill, no upstream sample content), check frames + render', () => {
     if (!existsSync(fxPy)) fail('effects not set up: npm run effects:setup');
     run(node, [join(dirname(KIT), 'effects', 'check.mjs')], work);
     const plan = join(work, 'fx.json');
@@ -450,6 +506,7 @@ try {
       { fx: 'moody', start: 0, end: 1.2, grade: 'cool' },
       { fx: 'locked-on', start: 0.2, end: 1.4, text: 'SMOKE' },
       { fx: 'checklist', start: 1.6, end: 3.1, text: 'Record::phone|Drop::inbox|Ask::your agent', title: 'Smoke test' },
+      { fx: 'backdrop-word', start: 0.4, end: 1.5, text: 'SMOKE' },
       { fx: 'glass-widgets', start: 2.2, end: 3.2, text: '3X', title: 'Smoke', sub: 'reels|this week', chart: 'Signups::1.2K::3|5|8|13|21' }] }));
     // glass-widgets has no pill unless the plan opts in
     const jobs = join(work, 'jobs'), fxdir = join(jobs, 'smoke-reel', 'build', 'fx');

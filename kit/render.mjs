@@ -24,18 +24,21 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
   else console.warn(`no theme.js and no ${t}; using the built-in neutral look`);
 }
 // Font pairing -> fonts.js: FONTS=<name|path.json> wins, then "fonts" in captions.js, else the fonts.js already here
-// (none = the theme's own fonts). fxzones.js (from fx.cjs) tells the caption track where effects need the band.
+// (none = the theme's own fonts). Several names ("literata,bricolage,michroma") cycle: the first is the base and
+// titles take them in turn (overlay.html). fxzones.js (from fx.cjs) tells the caption track where effects need the band.
 {
   const CAP = createRequire(import.meta.url)('./rules.cjs').readCaptions(join(ROOT, 'captions.js'));
   const want = process.env.FONTS || CAP.fonts;
   if (want || !existsSync(join(ROOT, 'fonts.js'))) {
-    const fp = resolveFonts(want || 'theme');
-    writeFileSync(join(ROOT, 'fonts.js'), 'window.FONTS=' + JSON.stringify(fp) + ';\n');
+    const names = (Array.isArray(want) ? want : String(want || 'theme').split(',')).map(s => String(s).trim()).filter(Boolean);
+    const sets = names.map(n => resolveFonts(n) || { name: 'theme' }), fp = resolveFonts(names[0]);
+    writeFileSync(join(ROOT, 'fonts.js'), 'window.FONTS=' + JSON.stringify(fp) + ';\n' + (sets.length > 1 ? 'window.FONTSETS=' + JSON.stringify(sets) + ';\n' : ''));
+    if (sets.length > 1) console.log('font cycle', sets.map(s => s.name).join(' > '));
     if (fp) console.log('fonts', fp.name, [fp.display, fp.secondary, fp.script].filter(Boolean).map(r => r.family).join(' + '));
   }
   // font lockup overrides from cut.json ("lockup" for the job, "hero" per flip start) -> lockover.js
   { let C = {}; try { C = JSON.parse(readFileSync(join(ROOT, 'cut.json'), 'utf8')); } catch {}
-    writeFileSync(join(ROOT, 'lockover.js'), 'window.LOCKOVER=' + JSON.stringify({ lockup: C.lockup || null, hero: C.hero || null }) + ';\n'); }
+    writeFileSync(join(ROOT, 'lockover.js'), 'window.LOCKOVER=' + JSON.stringify({ lockup: C.lockup || null, hero: C.hero || null, inserts: (C.inserts || []).map(s => ({ at: +s.at, dur: +s.dur, y: s.y, tint: s.tint, line: s.line, arc: s.arc })) }) + ';\n'); }
   if (!existsSync(join(ROOT, 'fxzones.js'))) writeFileSync(join(ROOT, 'fxzones.js'), 'window.FXZONES=[];\n');
 }
 const b = await chromium.launch({ executablePath: findChrome() });
@@ -51,6 +54,12 @@ if (titles.length) console.log('titles', titles.map(t => `${t.start}s ${t.entran
 // Font lockups (titles and kinetic lines, two faces per phrase): written out so they can be checked without pixels
 const lockups = await p.evaluate(() => (window.__lockups ? window.__lockups() : []));
 writeFileSync(join(ROOT, 'lockups.json'), JSON.stringify(lockups, null, 1) + '\n');
+// one-word captions: what each word shows as (face, size, the line building under a hero, on a card or not)
+const ow = await p.evaluate(() => (window.__oneword ? window.__oneword() : []));
+if (ow.length) { writeFileSync(join(ROOT, 'oneword.json'), JSON.stringify(ow, null, 1) + '\n'); console.log('oneword', ow.length, 'words,', ow.filter(w => w.face === 'hero').length, 'heroes,', ow.filter(w => w.card).length, 'on cards'); }
+// two pairings on screen at once (with "fonts": "a,b,c" cycling) is a defect; smoke checks for this line
+const mix = await p.evaluate(() => (window.__pairMix ? window.__pairMix() : []));
+if (mix.length) console.log('pairing mix at', mix.map(m => m.join('/')).join(', '));
 if (lockups.length) console.log('lockups', lockups.filter(l => l.kind === 'title').length, 'titles +', lockups.filter(l => l.kind === 'kinetic').length, 'lines,', [...new Set(lockups.map(l => l.arrange))].join('/'));
 const split = !!(only && process.env.STILLS_LAYERS);
 const passes = split

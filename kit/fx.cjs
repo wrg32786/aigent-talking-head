@@ -30,12 +30,34 @@ const byName = Object.fromEntries(cat.effects.map(e => [e.name, e]));
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = k => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : undefined; };
-const VALUED = new Set(['name', 'plan', 'still', 'out', 'jobs', 'captions', 'sfx']);
+const VALUED = new Set(['name', 'plan', 'still', 'out', 'jobs', 'captions', 'sfx', 'mask', 'matte']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const die = m => { console.error(m); process.exit(1); };
 const SFXPLAN = require('./sfx-plan.cjs');
 const B = require('./beats.cjs');
 const sh = (cmd, args, cwd, env) => execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } });
+// Windows only: when Application Control blocks MediaPipe's DLL, run the effects in WSL instead. Set FX_WSL to the
+// Python inside WSL that has the effects packages (e.g. /root/fxvenv/bin/python), FX_WSL_DISTRO to pick a distro.
+const WSL = process.platform === 'win32' && process.env.FX_WSL;
+const wp = s => (typeof s === 'string' && /^[A-Za-z]:[\\/]/.test(s) ? '/mnt/' + s[0].toLowerCase() + s.slice(2).split('\\').join('/') : s);
+// --mask birefnet | birefnet-portrait | mediapipe: the person cut-out the effects use. Default: the job's cut.json
+// "maskModel" (the same setting the titles-behind-the-head mask reads), else MASK_MODEL / FX_MATTE, else MediaPipe.
+// The BiRefNet mattes come from rembg through kit/mask_refine.py, need no MediaPipe (so no WSL on Windows), and the slow
+// raw matte is cached per frame in build/fx/matte-<model>/. birefnet-portrait has the best edge; birefnet is twice as fast.
+const R = require('./rules.cjs');
+let MATTE = opt('mask') || opt('matte') || process.env.FX_MATTE || process.env.MASK_MODEL;
+const matteModel = m => { if (!m) return undefined; const k = R.MASK_MODELS[String(m).toLowerCase()]; if (!k) die('unknown mask model ' + m + ' (use birefnet, birefnet-portrait or mediapipe)'); return k === 'mediapipe' ? undefined : k; };
+const runFx = args => {
+  // PYTHONUTF8: Windows Python reads the plan as cp1252 otherwise, and "·" in a plan comes out as "Â·" on screen
+  if (matteModel(MATTE)) return sh(PY, [RUNNER, ...args], undefined, { PYTHONUTF8: '1', FX_MATTE: matteModel(MATTE), FX_MATTE_CACHE: path.dirname(args[2]), FX_TRACK_W: process.env.FX_TRACK_W || '1080' });
+  // MediaPipe chosen (or nothing set): an FX_MATTE left in the environment must not switch the runner to a matte
+  if (!WSL) return sh(PY, [RUNNER, ...args], undefined, { PYTHONUTF8: '1', FX_MATTE: '' });
+  const i = args.indexOf('--plan'), pf = args[i + 1], plan = JSON.parse(fs.readFileSync(pf, 'utf8'));
+  const wpf = pf.replace(/\.json$/, '.wsl.json'); fs.writeFileSync(wpf, JSON.stringify(plan, (k, v) => wp(v), 1));   // image folders in the plan too
+  const a = args.slice(); a[i + 1] = wpf;
+  // --exec runs the Python straight, without the Linux shell, so a file name like take$(id).mp4 or O'Brien.mp4 stays a name
+  sh('wsl.exe', [...(process.env.FX_WSL_DISTRO ? ['-d', process.env.FX_WSL_DISTRO] : []), '--exec', WSL, wp(RUNNER), ...a.map(wp)], undefined, { FX_MATTE: '' });
+};
 
 if (flag('list')) {
   for (const m of Object.keys(cat.moments)) {
@@ -45,7 +67,7 @@ if (flag('list')) {
   console.log('\nFull details: effects/CATALOG.md');
   process.exit(0);
 }
-if (!fs.existsSync(PY)) die('Effects are not set up yet. Run: npm run effects:setup');
+if (!(WSL && !matteModel(MATTE)) && !fs.existsSync(PY)) die('Effects are not set up yet. Run: npm run effects:setup');
 const planPath = opt('plan'); if (!planPath) die('Pass --plan fx.json (see the header of kit/fx.cjs or effects/CATALOG.md)');
 const raw = JSON.parse(fs.readFileSync(planPath, 'utf8'));
 const profile = raw.profile || {};
@@ -110,7 +132,7 @@ if (direct) {
   const pf = path.join(path.dirname(path.resolve(out)), path.basename(out).replace(/\.[^.]+$/, '') + '.plan.json');
   fs.writeFileSync(pf, JSON.stringify({ effects: clean }, null, 1));
   console.warn('note: direct mode draws effects over anything already in the video, captions included. Use --name <job> to keep captions on top.');
-  sh(PY, [RUNNER, '--plan', pf, path.resolve(direct), path.resolve(out), ...(still ? ['--still', still] : [])]);
+  runFx(['--plan', pf, path.resolve(direct), path.resolve(out), ...(still ? ['--still', still] : [])]);
   process.exit(0);
 }
 
@@ -119,6 +141,8 @@ const job = path.resolve(opt('jobs') || path.join(ROOT, 'jobs'), name), build = 
 if (!fs.existsSync(path.join(build, 'cut.json'))) die('No ' + path.join(build, 'cut.json') + '. Make the reel first (npm run reel).');
 fs.mkdirSync(dir, { recursive: true });
 const cut = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8'));
+if (!MATTE) MATTE = R.maskSpec(cut).model;   // the job's own mask model, so titles and effects share one cut-out
+if (matteModel(MATTE)) console.log('> person cut-out for the effects:', matteModel(MATTE));
 const LEN = cut.segs.reduce((a, s) => a + (s.out - s.in) + (s.pad || 0), 0) + (cut.tail ?? 0.3);
 if (cut.overlay && !fs.existsSync(path.join(build, 'ovl'))) sh(process.execPath, [path.join(KIT, 'render.mjs'), LEN.toFixed(2)], build);
 // Caption zones: effects the catalog marks "off" hide the caption track and the kinetic titles for their window;
@@ -140,7 +164,7 @@ console.log('> base cut (no captions) for the effects');
 sh(process.execPath, [path.join(KIT, 'assemble.cjs'), base], build, { BASEONLY: '1' });
 if (still) {
   for (const f of fs.readdirSync(dir)) if (/^check.*\.png$/.test(f)) fs.rmSync(path.join(dir, f));
-  sh(PY, [RUNNER, '--plan', pf, base, path.join(dir, 'check.png'), '--still', still]);
+  runFx(['--plan', pf, base, path.join(dir, 'check.png'), '--still', still]);
   const pngs = fs.readdirSync(dir).filter(f => /^check(_[0-9.]+)?\.png$/.test(f));
   for (const f of pngs) {
     const png = path.join(dir, f), m = f.match(/_([0-9.]+)\.png$/), t = m ? +m[1] : +still;
@@ -154,7 +178,7 @@ if (still) {
   process.exit(0);
 }
 const fxv = path.join(dir, 'base-fx.mp4');
-sh(PY, [RUNNER, '--plan', pf, base, fxv]);
+runFx(['--plan', pf, base, fxv]);
 const sfxOff = opt('sfx') === 'off' || flag('no-sfx') || process.env.NOSFX;
 let sfxHits = [];
 if (!sfxOff) {

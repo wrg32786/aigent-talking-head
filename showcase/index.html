@@ -128,12 +128,19 @@
         <span>max snap distance in seconds; speech cuts never move</span>
       </figcaption>
     </figure></div></section>
-<section id="looks"><h2>Looks <small>4</small></h2><p class="hint">The overall edit. --look also picks a default caption style.</p><div class="grid">
+<section id="looks"><h2>Looks <small>5</small></h2><p class="hint">The overall edit. --look also picks a default caption style.</p><div class="grid">
     <figure class="tile" data-id="look:kinetic" id="look-kinetic">
       <img src="media/look/kinetic.jpg" alt="kinetic" width="270" height="480" loading="lazy">
       <figcaption>
         <code>--look kinetic</code>
         <span>every word animates, plus a kinetic title behind the head (default)</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="look:oneword" id="look-oneword">
+      <img src="media/look/oneword.jpg" alt="oneword" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>--look oneword</code>
+        <span>one word at a time, size and face changing per word, type cards, cycling pairings (kit/looks/oneword.md)</span>
       </figcaption>
     </figure>
     <figure class="tile" data-id="look:muse" id="look-muse">
@@ -157,12 +164,19 @@
         <span>one big word at a time on screen, kinetic and punchy, plus titles behind the head</span>
       </figcaption>
     </figure></div></section>
-<section id="caption-styles"><h2>Caption styles <small>6</small></h2><p class="hint">Override the look with --style, or &quot;captionStyle&quot; in captions.js.</p><div class="grid">
+<section id="caption-styles"><h2>Caption styles <small>7</small></h2><p class="hint">Override the look with --style, or &quot;captionStyle&quot; in captions.js.</p><div class="grid">
     <figure class="tile" data-id="captionStyle:kinetic" id="captionStyle-kinetic">
       <img src="media/caption/kinetic.jpg" alt="kinetic" width="270" height="480" loading="lazy">
       <figcaption>
         <code>--style kinetic  or  &quot;captionStyle&quot;: &quot;kinetic&quot;</code>
         <span>two-font lockup, hero word big in the display face</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="captionStyle:oneword" id="captionStyle-oneword">
+      <img src="media/caption/oneword.jpg" alt="oneword" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>--style oneword  or  &quot;captionStyle&quot;: &quot;oneword&quot;</code>
+        <span>one word at a time, key word big in the display face with the phrase building under it</span>
       </figcaption>
     </figure>
     <figure class="tile" data-id="captionStyle:pill" id="captionStyle-pill">
@@ -200,7 +214,7 @@
         <span>one big word at a time, punchy, in the display face</span>
       </figcaption>
     </figure></div></section>
-<section id="fonts"><h2>Font pairings <small>5</small></h2><p class="hint">Two faces as a lockup. Your own licensed fonts go in kit/fonts/local/.</p><div class="grid">
+<section id="fonts"><h2>Font pairings <small>17</small></h2><p class="hint">Two faces as a lockup. Your own licensed fonts go in kit/fonts/local/.</p><div class="grid">
     <figure class="tile" data-id="font:theme" id="font-theme">
       <img src="media/font/theme.jpg" alt="theme" width="270" height="480" loading="lazy">
       <figcaption>
@@ -234,6 +248,90 @@
       <figcaption>
         <code>--fonts editorial  or  &quot;fonts&quot;: &quot;editorial&quot;</code>
         <span>condensed serif italic hero + roman text serif support (free stand-in for Vanguard + Athelas)</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="font:literata" id="font-literata">
+      <img src="media/font/literata.jpg" alt="literata" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>--fonts literata  or  &quot;fonts&quot;: &quot;literata&quot;</code>
+        <span>Archivo Black + Literata: heavy caps grotesk over a quiet serif line. Clean; good for hooks and titles</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="font:bricolage" id="font-bricolage">
+      <img src="media/font/bricolage.jpg" alt="bricolage" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>--fonts bricolage  or  &quot;fonts&quot;: &quot;bricolage&quot;</code>
+        <span>Bricolage Grotesque + Gloock: a characterful bold grotesk with a high-contrast display serif. Clean; good for hooks and titles</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="font:pirata" id="font-pirata">
+      <img src="media/font/pirata.jpg" alt="pirata" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>--fonts pirata  or  &quot;fonts&quot;: &quot;pirata&quot;</code>
+        <span>Pirata One + Nunito Sans: blackletter hero over a quiet bold sans line</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="font:michroma" id="font-michroma">
+      <img src="media/font/michroma.jpg" alt="michroma" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>--fonts michroma  or  &quot;fonts&quot;: &quot;michroma&quot;</code>
+        <span>Michroma + Cardo: wide techno caps with a classical italic underneath</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="font:redhat" id="font-redhat">
+      <img src="media/font/redhat.jpg" alt="redhat" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>--fonts redhat  or  &quot;fonts&quot;: &quot;redhat&quot;</code>
+        <span>Red Hat Display + Red Hat Mono: heavy display sans over tracked mono caps</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="font:jakarta" id="font-jakarta">
+      <img src="media/font/jakarta.jpg" alt="jakarta" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>--fonts jakarta  or  &quot;fonts&quot;: &quot;jakarta&quot;</code>
+        <span>Plus Jakarta Sans + Ribeye: clean bold sans with a playful display script on top. For Instagram Edits style reels</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="font:grotesk-times" id="font-grotesk-times">
+      <img src="media/font/grotesk-times.jpg" alt="grotesk-times" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>--fonts grotesk-times  or  &quot;fonts&quot;: &quot;grotesk-times&quot;</code>
+        <span>tight bold grotesk + a book serif (free stand-in for ID Grotesk + Times)</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="font:avantgarde" id="font-avantgarde">
+      <img src="media/font/avantgarde.jpg" alt="avantgarde" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>--fonts avantgarde  or  &quot;fonts&quot;: &quot;avantgarde&quot;</code>
+        <span>geometric caps + a soft fat serif (free stand-in for Avant Garde + Cooper)</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="font:recoleta" id="font-recoleta">
+      <img src="media/font/recoleta.jpg" alt="recoleta" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>--fonts recoleta  or  &quot;fonts&quot;: &quot;recoleta&quot;</code>
+        <span>soft old-style serif + small tracked grotesk caps (free stand-in for Recoleta + Berthold)</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="font:haas" id="font-haas">
+      <img src="media/font/haas.jpg" alt="haas" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>--fonts haas  or  &quot;fonts&quot;: &quot;haas&quot;</code>
+        <span>one neo-grotesk, heavy over regular (free stand-in for Neue Haas Grotesk Display + Helvetica Neue)</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="font:wabbit" id="font-wabbit">
+      <img src="media/font/wabbit.jpg" alt="wabbit" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>--fonts wabbit  or  &quot;fonts&quot;: &quot;wabbit&quot;</code>
+        <span>heavy caps grotesk + a cartoon brush (free stand-in for Archivo Black + Wascally Wabbit). For Instagram Edits style reels</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="font:instrument" id="font-instrument">
+      <img src="media/font/instrument.jpg" alt="instrument" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>--fonts instrument  or  &quot;fonts&quot;: &quot;instrument&quot;</code>
+        <span>Instrument Serif Italic + Inter Tight: a condensed italic serif for the key word over a clean grotesk for the rest. The oneword look's pairing</span>
       </figcaption>
     </figure></div></section>
 <section id="themes"><h2>Themes <small>2</small></h2><p class="hint">Colours, default fonts, optional logo.</p><div class="grid">
@@ -681,7 +779,7 @@
       <img src="media/effect/backdrop-word.jpg" alt="backdrop-word" width="270" height="480" loading="lazy">
       <figcaption>
         <code>&quot;fx&quot;: &quot;backdrop-word&quot;</code>
-        <span>A giant word drops in behind you.</span>
+        <span>A giant word in tall type rises in behind you, letter by letter, with your head cutting into it.</span>
       </figcaption>
     </figure>
     <figure class="tile" data-id="effect:spotlight" id="effect-spotlight">
@@ -803,7 +901,7 @@
       <img src="media/effect/backdrop-word.jpg" alt="backdrop-word" width="270" height="480" loading="lazy">
       <figcaption>
         <code>&quot;fx&quot;: &quot;backdrop-word&quot;</code>
-        <span>A giant word drops in behind you.</span>
+        <span>A giant word in tall type rises in behind you, letter by letter, with your head cutting into it.</span>
       </figcaption>
     </figure>
     <figure class="tile" data-id="effect:red-collage" id="effect-red-collage">
@@ -928,7 +1026,7 @@
       <img src="media/effect/backdrop-word.jpg" alt="backdrop-word" width="270" height="480" loading="lazy">
       <figcaption>
         <code>&quot;fx&quot;: &quot;backdrop-word&quot;</code>
-        <span>A giant word drops in behind you.</span>
+        <span>A giant word in tall type rises in behind you, letter by letter, with your head cutting into it.</span>
       </figcaption>
     </figure>
     <figure class="tile" data-id="effect:spotlight" id="effect-spotlight">

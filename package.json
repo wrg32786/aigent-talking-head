@@ -25,7 +25,8 @@
     "effects:catalog": "node effects/catalog.mjs",
     "smoke:effects": "node kit/smoke.mjs --effects",
     "music": "node kit/music/add.mjs",
-    "music:add": "node kit/music/add.mjs"
+    "music:add": "node kit/music/add.mjs",
+    "fonts:examples": "node kit/fonts/examples.mjs"
   },
   "dependencies": {
     "playwright-core": "^1.47.0"

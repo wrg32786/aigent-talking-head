@@ -10,19 +10,26 @@ const CAP=window.CAPTIONS||{flips:[]};
 const TH=merge(merge(DEF,window.THEME),CAP.theme);
 // Font pairing (kit/fonts/pairings.json; render.mjs writes fonts.js): display -> hero words, titles, stickers;
 // secondary -> body words, captions, pills; script -> the accent word. Missing roles keep the theme's fonts.
-const FP=window.FONTS||null,FACES=[];
-if(FP){const face=(r,fam)=>{if(!r||!r.url)return;const ff=new FontFace(r.family,`url("${r.url}")`,{weight:r.vf?'100 900':String(r.weight||400),style:r.style||'normal'});document.fonts.add(ff);FACES.push(ff.load().catch(()=>console.warn('font failed',r.family)))};
- face(FP.display);face(FP.secondary);face(FP.script);
- const it=r=>r&&r.style==='italic'?'italic ':'';
- if(FP.display){const w=it(FP.display)+(FP.display.weight||400);TH.fonts.display={...TH.fonts.display,family:`"${FP.display.family}", ${TH.fonts.display.family}`,hero:w,sticker:w,kicker:w,tracking:FP.display.tracking??TH.fonts.display.tracking,upper:!!FP.display.upper}}
- if(FP.secondary)TH.fonts.caption={...TH.fonts.caption,family:`"${FP.secondary.family}", ${TH.fonts.caption.family}`,weight:it(FP.secondary)+(FP.secondary.weight||500)};
- if(FP.script)TH.fonts.script={family:`"${FP.script.family}", cursive`,weight:it(FP.script)+(FP.script.weight||400),scale:FP.script.scale||1.4}}
+const FP=window.FONTS||null,FACES=[],TF=TH.fonts,faceSeen=new Set();
+const face=r=>{if(!r||!r.url||faceSeen.has(r.url))return;faceSeen.add(r.url);const ff=new FontFace(r.family,`url("${r.url}")`,{weight:r.vf?'100 900':String(r.weight||400),style:r.style||'normal'});document.fonts.add(ff);FACES.push(ff.load().catch(()=>console.warn('font failed',r.family)))};
+const ital=r=>r&&r.style==='italic'?'italic ':'';
+// the theme's fonts with one pairing on top (null = the theme's own)
+function pairFonts(p){const f={...TF};if(!p)return f;face(p.display);face(p.secondary);face(p.script);
+ if(p.display){const w=ital(p.display)+(p.display.weight||400);f.display={...TF.display,family:`"${p.display.family}", ${TF.display.family}`,hero:w,sticker:w,kicker:w,tracking:p.display.tracking??TF.display.tracking,upper:!!p.display.upper}}
+ if(p.secondary)f.caption={...TF.caption,family:`"${p.secondary.family}", ${TF.caption.family}`,weight:ital(p.secondary)+(p.secondary.weight||500)};
+ if(p.script)f.script={family:`"${p.script.family}", cursive`,weight:ital(p.script)+(p.script.weight||400),scale:p.script.scale||1.4};return f}
 const ZONES=window.FXZONES||[];const zoneAt=t=>{const z=ZONES.find(z=>t>=z.start&&t<=z.end);return z?z.act:null};
-const CY=TH.colors.accent,IV=TH.colors.text,DK=TH.colors.ink,MU=TH.colors.muted,DF=TH.fonts.display,CF=TH.fonts.caption,TRK=DF.tracking??-0.01,CSZ=CF.size||76,
- F=`${DF.sticker} SZpx ${DF.family}`,
- G=`${DF.hero} SZpx ${DF.family}`,
- K=`${DF.kicker} SZpx ${DF.family}`,
- S=`${CF.weight} SZpx ${CF.family}`,fnt=(f,s)=>f.replace('SZ',s);
+const CY=TH.colors.accent,IV=TH.colors.text,DK=TH.colors.ink,MU=TH.colors.muted,CSZ=TF.caption.size||76,fnt=(f,s)=>f.replace('SZ',s);
+// The active pairing. A job has one pairing, or several to cycle ("fonts":"a,b,c" -> window.FONTSETS, the first is
+// the base). use() swaps the whole set at once (display face, partner face, script, tracking, lockup rule), so a
+// phrase is always set in one complete pair and two combos never mix.
+let DF,TRK,F,G,K,S,SCF,LK,PN;
+const LKDEF={arrange:'stack',partner:'secondary',scale:.38,partnerUpper:true,partnerTracking:.16,justify:true,heroUpper:true,heroColor:'accent',partnerColor:'text',drop:.34,rotate:0,anchor:'center'};
+function mkSet(p){const fonts=pairFonts(p),d=fonts.display,c=fonts.caption,sc=fonts.script;return{name:p?p.name||'pairing':'theme',fonts,DF:d,TRK:d.tracking??-0.01,F:`${d.sticker} SZpx ${d.family}`,G:`${d.hero} SZpx ${d.family}`,K:`${d.kicker} SZpx ${d.family}`,S:`${c.weight} SZpx ${c.family}`,SCF:sc?`${sc.weight} SZpx ${sc.family}`:null,
+ LK:Object.assign({},LKDEF,(p&&p.lockup)||{},(window.LOCKOVER||{}).lockup||{},CAP.lockup||{})}}
+function use(s){if(PN===s.name)return;PN=s.name;TH.fonts=s.fonts;({DF,TRK,F,G,K,S,SCF,LK}=s)}
+const SETS={},BASE=mkSet(FP);SETS[BASE.name]=BASE;use(BASE);
+const CYC=(window.FONTSETS||[]).map(p=>{const s=mkSet(p.display||p.secondary||p.script?p:null);return SETS[s.name]||(SETS[s.name]=s)});
 const ctx=document.getElementById('c').getContext('2d');
 const mk=()=>{const c=document.createElement('canvas');c.width=1080;c.height=1920;return c};const TC=mk(),MC=mk(),T=TC.getContext('2d'),M=MC.getContext('2d');
 const Y=CAP.captionY||1300; // caption band: chest, below the face box. Measure the face per take; text never covers the face.
@@ -38,11 +45,14 @@ const TITLES=flips.filter(c=>c[3]===7).sort((a,b)=>a[0]-b[0]);
 // behind the hair. The slam lands lower, behind the head (titleSlamY), holds, then rises to titleY ("titleRise": false
 // on a title, or for the whole job, lands it at titleY). Partner words of a title draw in front of the person.
 const TY=CAP.titleY||290,TSY=CAP.titleSlamY||600,PY=CAP.pillY||1480,KY=CAP.kineticY||CAP.captionY||1320,ALTY=CAP.altY||330,CSTYLE=CAP.captionStyle||'kinetic';
-const ONEW=CSTYLE==='one-word'||CSTYLE==='oneword';
+const ONEW=CSTYLE==='one-word'; // the simple one-word style; "oneword" is the full look further down
 // Slam rise: lands at titleSlamY, holds .15 s, then a smooth .35 s ease up to the resting titleY. Returns the y offset.
 const RISE={hold:.5,dur:.35};const riseOff=(c,dt)=>{if(c.entr!=='slam'||c[4].titleRise===false||CAP.titleRise===false)return 0;const d=TSY-TY;if(d<=0)return 0;const q=cl((dt-RISE.hold)/RISE.dur),e=q<.5?4*q*q*q:1-Math.pow(-2*q+2,3)/2;return d*(1-e)};
 const riseEnd=c=>riseOff(c,0)?RISE.hold+RISE.dur*.6-.24:0; // partners start as the rise settles
-const SCF=TH.fonts.script?`${TH.fonts.script.weight} SZpx ${TH.fonts.script.family}`:null;
+// Pairing per flip. With a cycle the titles take the pairings in turn, and every other flip takes the pairing of the
+// title beat it sits in, so one combo is on screen at a time. No cycle (or no titles) = the base pairing throughout.
+TITLES.forEach((c,i)=>{c.ps=CYC.length?CYC[i%CYC.length]:BASE});
+for(const c of flips)if(!c.ps){let b=null;for(const tt of TITLES)if(tt[0]<=c[0]+.2)b=tt;c.ps=b?b.ps:BASE}
 const glitchAt=CAP.glitchAt||[];
 const rng=s=>()=>(s=(s*16807)%2147483647)/2147483647;
 const backOut=x=>{const c=2.4;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2)};const expo=x=>x>=1?1:1-Math.pow(2,-10*x);const cl=x=>Math.max(0,Math.min(1,x));
@@ -61,7 +71,7 @@ function dripsFor(key,lines,fs,cx,y0,lh,w,seed){if(dripCache[key])return dripCac
   pick.forEach(([a,b])=>{const wd=Math.max(4,Math.min((b-a)*.55,fs*.075));out.push({x:(a+b)/2,y:top+base-2,wd,len:fs*(.18+r()*.55),t0:((a+b)/2-(cx-w/2))/w})})});
  return dripCache[key]=out}
 function spray(txt,fs,cx,cy,dt,seed,dur=.36){const lines=txt.split('|');T.clearRect(0,0,1080,1920);T.font=fnt(G,fs);T.letterSpacing=(TRK*fs)+'px';T.textAlign='center';T.textBaseline='middle';T.fillStyle=CY;const lh=fs*.92,y0=cy-(lines.length-1)/2*lh;let w=0;lines.forEach((l,i)=>{T.fillText(l,cx,y0+i*lh);w=Math.max(w,T.measureText(l).width)});const h=lines.length*lh,p=cl(dt/dur),r=rng(seed);
-const DR=dripsFor(txt+'@'+fs+'@'+cx+'@'+cy,lines,fs,cx,y0,lh,w,seed);
+const DR=dripsFor(PN+'@'+txt+'@'+fs+'@'+cx+'@'+cy,lines,fs,cx,y0,lh,w,seed);
 if(p<1){M.clearRect(0,0,1080,1920);M.fillStyle='#fff';const N=Math.floor(1300*p);for(let i=0;i<1300;i++){const a=r(),b=r(),c=r();if(i>=N)continue;M.beginPath();M.arc(cx-w/2-30+(i/1300)*(w+60)+(a-.5)*70,y0-fs*.6+b*h,10+c*30,0,7);M.fill()}T.globalCompositeOperation='destination-in';T.drawImage(MC,0,0);T.globalCompositeOperation='source-over'}
 ctx.save();shadow(ctx,fs);ctx.drawImage(TC,0,0);ctx.restore();
 if(p<1){const nx=cx-w/2+p*w,q=rng(Math.floor(dt*24)*53+seed);ctx.save();ctx.fillStyle=CY;for(let i=0;i<170;i++){ctx.globalAlpha=q()*.4;const ang=q()*6.3,d=q()*q()*fs*1.1;ctx.fillRect(nx+Math.cos(ang)*d,cy+Math.sin(ang)*d,2+q()*4,2+q()*4)}ctx.restore()}
@@ -143,7 +153,6 @@ function kineticSolo(c,t){const y=zoneAt(t)==='move'?ALTY:(c[4].y||KY),toks=kine
 // the pairing's rule for one flip, a top-level "lockup" in captions.js for the whole job; "lockup": false = one font.
 // cut.json can also set them (render.mjs -> lockover.js): "lockup": {...} for the job, "hero": {"<flip start s>": "words"|[i]}
 const LOV=window.LOCKOVER||{};for(const [k,v] of Object.entries(LOV.hero||{}))for(const f of flips)if(Math.abs(f[0]-(+k))<.006&&(f[3]===7||f[3]===0)&&f[4].hero===undefined)f[4].hero=v;
-const LK=Object.assign({arrange:'stack',partner:'secondary',scale:.38,partnerUpper:true,partnerTracking:.16,justify:true,heroUpper:true,heroColor:'accent',partnerColor:'text',drop:.34,rotate:0,anchor:'center'},(FP&&FP.lockup)||{},LOV.lockup||{},CAP.lockup||{});
 const colOf=k=>k==='accent'?CY:k==='text'?IV:(k||IV);
 const normW=w=>String(w).toLowerCase().replace(/[^a-z0-9']/g,'');
 const cleanW=w=>String(w).replace(/^[\s"“'(]+|[,;:.!?"”)]+$/g,'');
@@ -154,7 +163,7 @@ function heroOf(ws,o){const n=ws.length;let h=o.hero!==undefined?o.hero:o.emph;
  let b=0,bl=-1;ws.forEach(([, ,w],i)=>{const x=normW(w),l=/\d/.test(x)?99:STOP.has(x)?x.length/10:x.length;if(l>bl){bl=l;b=i}});return[b,b]}
 function meas(f,size,track,txt){ctx.font=fnt(f,size);ctx.letterSpacing=track+'px';const m=ctx.measureText(txt);return{w:m.width-(txt.length?track:0),asc:m.actualBoundingBoxAscent,desc:m.actualBoundingBoxDescent}}
 const lkCache={};
-function lockup(ws,o,Y0,P){const key=P.kind+'|'+ws.map(w=>w[0]+':'+w[2]).join(' ')+'|'+Y0+'|'+JSON.stringify([o.hero,o.emph,o.lockup,o.size]);if(lkCache[key])return lkCache[key];
+function lockup(ws,o,Y0,P){const key=PN+'|'+P.kind+'|'+ws.map(w=>w[0]+':'+w[2]).join(' ')+'|'+Y0+'|'+JSON.stringify([o.hero,o.emph,o.lockup,o.size]);if(lkCache[key])return lkCache[key];
  const L={...LK,...(o.lockup&&typeof o.lockup==='object'?o.lockup:{})},script=L.partner==='script'&&!!SCF,pf=script?SCF:S;
  if(!script&&L.partner==='script'){L.partnerUpper=false;L.partnerTracking=0;L.justify=false}
  const nz=a=>a.filter(w=>cleanW(w[2]));const caps=allCaps(ws.map(w=>w[2]).join(' '));const [h0,h1]=heroOf(ws,o);
@@ -222,20 +231,114 @@ function kinetic(c,t){const o=c[4];if(o.lockup===false)return kineticSolo(c,t);c
  R.parts.forEach(p=>partnerDraw(p,R.pc,k=>t-k.a+.04));ctx.restore()}
 const LKP={T:{kind:'T',maxW:960,target:880,max:360,min:150,pmin:56},K:{kind:'K',maxW:940,target:620,max:Math.round(CSZ*2.3),min:Math.round(CSZ*1.1),pmin:Math.round(CSZ*.66)}};
 // every lockup in the job, for render.mjs (build/lockups.json) and the smoke test
-window.__lockups=()=>flips.filter(c=>c[4].lockup!==false&&(c[3]===7||(c[3]===0&&(c[4].style||CSTYLE)==='kinetic'))).map(c=>{const T=c[3]===7,o=c[4],ws=T?c[2].replace(/\|/g,' ').split(/\s+/).filter(Boolean).map(w=>[0,0,w]):wordsOf(c),R=lockup(ws,o,T?(o.y||TY):(o.y||KY),T&&o.size?{...LKP.T,target:1e4,max:o.size}:LKP[T?'T':'K']);
- return{start:c[0],kind:T?'title':'kinetic',arrange:R.arr,hero:R.heroes.map(h=>h.txt).join(' / '),heroSize:R.heroes[0].size,heroW:Math.round(Math.max(...R.heroes.map(h=>h.w))),partners:R.parts.map(p=>({txt:p.toks.map(k=>k.txt).join(' '),size:p.size,w:Math.round(p.w),script:p.script})),box:R.box.map(Math.round)}});
-window.__lockup=(text,o={},kind='T')=>{const ws=String(text).replace(/\|/g,' ').split(/\s+/).filter(Boolean).map(w=>[0,0,w]);const R=lockup(ws,o,kind==='T'?TY:KY,LKP[kind]);return{heroes:R.heroes.map(h=>({txt:h.txt,size:h.size,w:Math.round(h.w)})),parts:R.parts.map(p=>({txt:p.toks.map(k=>k.txt).join(' '),size:p.size,w:Math.round(p.w),lines:1})),box:R.box.map(Math.round)}};
+window.__lockups=()=>flips.filter(c=>c[4].lockup!==false&&(c[3]===7||(c[3]===0&&(c[4].style||CSTYLE)==='kinetic'))).map(c=>{use(c.ps);const T=c[3]===7,o=c[4],ws=T?c[2].replace(/\|/g,' ').split(/\s+/).filter(Boolean).map(w=>[0,0,w]):wordsOf(c),R=lockup(ws,o,T?(o.y||TY):(o.y||KY),T&&o.size?{...LKP.T,target:1e4,max:o.size}:LKP[T?'T':'K']);
+ const fam=f=>(f.match(/px "?([^",]+)/)||[])[1];return{start:c[0],kind:T?'title':'kinetic',fonts:PN,faces:[fam(R.heroes[0].font),...R.parts.slice(0,1).map(p=>fam(p.font))],arrange:R.arr,hero:R.heroes.map(h=>h.txt).join(' / '),heroSize:R.heroes[0].size,heroW:Math.round(Math.max(...R.heroes.map(h=>h.w))),partners:R.parts.map(p=>({txt:p.toks.map(k=>k.txt).join(' '),size:p.size,w:Math.round(p.w),script:p.script})),box:R.box.map(Math.round)}});
+window.__lockup=(text,o={},kind='T')=>{use(BASE);const ws=String(text).replace(/\|/g,' ').split(/\s+/).filter(Boolean).map(w=>[0,0,w]);const R=lockup(ws,o,kind==='T'?TY:KY,LKP[kind]);return{heroes:R.heroes.map(h=>({txt:h.txt,size:h.size,w:Math.round(h.w)})),parts:R.parts.map(p=>({txt:p.toks.map(k=>k.txt).join(' '),size:p.size,w:Math.round(p.w),lines:1})),box:R.box.map(Math.round)}};
+// Type card (mode 8): the frame cuts to flat colour and the words carry it while the voice runs on.
+// {"start":4.2,"end":6.0,"mode":8,"bg":"navy"}; bg is navy|cream|paper|blue|ink, or {"bg":"#hex","ink":"#hex"}.
+// "number":"1" sets a giant faded numeral in the display face behind the words. While a card is up the caption
+// words sit mid-frame in the card's ink.
+const CARDS={navy:['#0e1a33','#efe6cf'],cream:['#ebe3c3','#17161a'],paper:['#f1f1ee','#16161a'],blue:['#2b2cf0','#ffffff'],ink:['#111214','#f1f1ee']};
+flips.forEach(c=>{if(c[3]!==8)return;const k=CARDS[c[4].bg]||[c[4].bg||CARDS.navy[0],CARDS.navy[1]];c.bg=k[0];c.ink=c[4].ink||k[1]});
+flips.sort((a,b)=>(b[3]===8)-(a[3]===8)); // cards draw first, so the words land on them
+const cardAt=t=>flips.find(c=>c[3]===8&&t>=c[0]&&t<c[1]);
+function typeCard(c){ctx.save();ctx.globalAlpha=1;ctx.fillStyle=c.bg;ctx.fillRect(0,0,1080,1920);
+ if(c[4].number!=null){ctx.font=fnt(G,1150);ctx.letterSpacing='0px';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=c.ink;ctx.globalAlpha=.2;ctx.fillText(String(c[4].number),540,990)}
+ ctx.restore()}
+// One word at a time (captionStyle "oneword", the look in kit/looks/oneword.md). Every spoken word replaces the last
+// at chest height. Until the phrase's hero word, filler words are small and the rest body size, in the pairing's
+// partner face. The hero comes in big in the display face (an italic serif reads best) with a short blur, holds, and
+// the rest of the phrase builds under it, small. Every fourth hero takes the accent colour.
+const OW={small:.62,body:1.25,hero:2.3,under:.62},INS=(window.LOCKOVER||{}).inserts||[],insertAt=t=>INS.find(s=>t>=s.at&&t<s.at+s.dur);
+{let n=0;flips.forEach(c=>{if(c[3]===0)c.owN=n++})}
+// with several pairings ("fonts": "a,b,c") the oneword track changes pairing every three phrases, whole pairs only.
+// Everything else on screen (cards, titles, stickers) takes the pairing of the phrase it comes up with, or of the card or
+// title already up, and a phrase under a card or title takes theirs, so one frame never shows two pairings.
+if(CYC.length>1){const ow=flips.filter(c=>c[3]===0&&(c[4].style||CSTYLE)==='oneword');
+ if(ow.length){ow.forEach(c=>{c.ps=CYC[Math.floor(c.owN/3)%CYC.length]});
+  const over=flips.filter(c=>c[3]!==0).sort((p,q)=>p[0]-q[0]),hit=(p,q)=>p[0]<q[1]&&q[0]<p[1];
+  over.forEach((c,k)=>{const up=over.slice(0,k).find(x=>hit(x,c));if(up){c.ps=up.ps;return}let b=null;for(const p of ow)if(p[0]<=c[0]+.2&&(!b||p[0]>=b[0]))b=p;if(b)c.ps=b.ps});
+  ow.forEach(c=>{const up=over.find(x=>hit(x,c));if(up)c.ps=up.ps})}}
+window.__pairMix=()=>{const m=[];for(const c of flips)for(const d of flips)if(c!==d&&c[0]<d[1]&&d[0]<c[1]&&c.ps!==d.ps)m.push([c[0],d[0]]);return m};
+function owAt0(c,t){const ws=wordsOf(c),n=ws.length;let i=-1;for(let k=0;k<n;k++)if(t>=ws[k][0]-.02)i=k;if(i<0)return null;
+ const h=heroOf(ws,c[4])[0],cd=cardAt(t),bi=!cd&&insertAt(t),y=cd?960:bi?(bi.y||640):zoneAt(t)==='move'?ALTY:(c[4].y||KY),base=bi&&bi.tint||IV;
+ // a behind-head title already says the key word: the chest track never says it again at the same time
+ const tt=flips.find(x=>x[3]===7&&t>=x[0]&&t<x[1]);
+ if(tt&&i>=h&&normW(String(tt[2]).replace(/[\s|]+/g,''))===normW(ws[h][2])){if(i===h)return null;const sm=STOP.has(normW(ws[i][2]));
+  return{y,cd,ink:cd?cd.ink:base,txt:cleanW(ws[i][2]),a:ws[i][0],size:Math.round(CSZ*(sm?OW.small:OW.body)),font:S,face:sm?'small':'body',tail:''}}
+ // a phrase that follows the speaker's outline ("arc" from kit/anchors.py) builds along it word by word
+ const arc=!cd&&(bi?bi.arc:c[4].arc);
+ if(arc){const full=ws.map(w=>cleanW(w[2])).join(' '),built=ws.slice(0,i+1).map(w=>cleanW(w[2])).join(' ');
+  return{arc,full,txt:built,a:ws[i][0],size:Math.round(CSZ*OW.body),font:S,face:'arc',ink:base,cd:null,tail:''}}
+ // on a b-roll insert: just the spoken word, set on the shot's hard line when it has one (its baseline on the edge)
+ if(bi){const w=cleanW(ws[i][2]),hr=i===h,sm=!hr&&STOP.has(normW(ws[i][2])),L=bi.line,f=hr?G:S;
+  return{y:L?L.y-8:y,x:L?(L.x0+L.x1)/2:540,base:!!L,cd:null,ink:hr&&c.owN%4===3?CY:base,txt:w,a:ws[i][0],size:fit([w],f,Math.round(CSZ*(hr?OW.hero:sm?.9:1.6)),L?Math.max(220,(L.x1-L.x0)*1.05):940),font:f,face:hr?'hero':sm?'small':'body',tail:''}}
+ if(i<h){const sm=STOP.has(normW(ws[i][2]));return{y,cd,ink:cd?cd.ink:base,txt:cleanW(ws[i][2]),a:ws[i][0],size:Math.round(CSZ*(sm?OW.small:OW.body)),font:S,face:sm?'small':'body',tail:''}}
+ const txt=(w=>DF.upper?w.toUpperCase():w)(cleanW(ws[h][2])),ink=cd?cd.ink:(c.owN%4===3?CY:base); // a caps display face sets the key word in caps
+ // a key word set on a shape of the speaker (head, shoulder: "anchor" from kit/anchors.py) holds there while the
+ // rest of the phrase runs on one word at a time at chest height
+ if(c[4].anchor&&!cd){const L=c[4].anchor,ss=i>h&&STOP.has(normW(ws[i][2]));
+  return{y:L.y,x:(L.x0+L.x1)/2,base:true,cd,ink,txt,a:ws[h][0],size:fit([txt],G,Math.round(CSZ*OW.hero),Math.max(320,(L.x1-L.x0)*1.1)),font:G,face:'hero',tail:'',sub:i>h?cleanW(ws[i][2]):'',subSize:Math.round(CSZ*(ss?OW.small:OW.body)),subY:y}}
+ // now and then the word before the key word stacks on top of it, overlapping, the key word cut away round it
+ if(h>0&&c.owN%4===1){const bs=fit([txt],`800 SZpx ${TH.fonts.caption.family}`,Math.round(CSZ*2.7),980);
+  return{y,cd,ink,txt,top:cleanW(ws[h-1][2]),a:ws[h][0],size:bs,font:G,face:'stack',tail:ws.slice(h+1,i+1).map(w=>cleanW(w[2])).join(' ')}}
+ // and now and then the key word goes big, near full width
+ const big=c.owN%5===2;
+ return{y,cd,ink,txt,a:ws[h][0],size:fit([txt],G,Math.round(CSZ*(big?4.2:OW.hero)),big?1000:940),font:G,face:big?'big':'hero',tail:ws.slice(h+1,i+1).map(w=>cleanW(w[2])).join(' ')}}
+// Legibility over footage (Will, 2026-11-11: curved text washed out on the painting): every word on the picture gets a
+// soft dark glow and a thin dark edge, so a light word holds on a busy or bright background. kit/legibility.py measures
+// the result in the finished reel. Cards don't need it: their ink is set against a flat colour.
+function halo(c,z){c.shadowColor='rgba(0,0,0,.8)';c.shadowBlur=z*.3;c.shadowOffsetX=0;c.shadowOffsetY=z*.03}
+function edged(c,txt,x,y,z){c.save();c.shadowColor='transparent';c.filter='none';c.lineJoin='round';c.strokeStyle='rgba(0,0,0,.6)';c.lineWidth=Math.max(2,z*.07);c.strokeText(txt,x,y);c.restore();c.fillText(txt,x,y)}
+// Text along a path: each letter sits on the path at the path's angle there. The whole phrase is measured first and
+// centred on the path's middle, so the words don't shift as they build; it shrinks to fit 92% of the path.
+function pathText(s,dt=1){const P=s.arc,seg=[];let L=0;for(let k=1;k<P.length;k++){const dx=P[k][0]-P[k-1][0],dy=P[k][1]-P[k-1][1],l=Math.hypot(dx,dy)||1;seg.push([L,l,P[k-1],dx/l,dy/l]);L+=l}
+ if(!seg.length)return;let sz=s.size;ctx.letterSpacing='0px';ctx.font=fnt(s.font,sz);const adv=(str,z)=>[...str].reduce((w,ch)=>w+ctx.measureText(ch).width+(ch===' '?z*.14:z*.012),0);while(sz>30&&adv(s.full,sz)>L*.92){sz-=4;ctx.font=fnt(s.font,sz)}
+ const at=d=>{const q=seg.find(z=>d<=z[0]+z[1])||seg[seg.length-1],u=Math.min(d-q[0],q[1]);return[q[2][0]+q[3]*u,q[2][1]+q[4]*u,Math.atan2(q[4],q[3])]};
+ let d=(L-adv(s.full,sz))/2;ctx.save();ctx.textAlign='center';ctx.textBaseline='alphabetic';ctx.fillStyle=s.ink;halo(ctx,sz);
+ const from=s.txt.lastIndexOf(' ')+1,q=expo(cl((dt+.02)/.14));let n=0;
+ for(const ch of s.txt){const cw=ctx.measureText(ch).width,[x,y,an]=at(d+cw/2);ctx.save();ctx.translate(x,y);ctx.rotate(an);if(n>=from){ctx.globalAlpha*=cl(q*1.6);ctx.translate(0,(1-q)*sz*.3)}edged(ctx,ch,0,0,sz);ctx.restore();d+=cw+(ch===' '?sz*.14:sz*.012);n++}
+ ctx.restore()}
+// On a type card the words don't sit dead centre: each lands on its own spot from a set around the middle (picked per
+// card, so two cards differ) and drifts about 22 px a second, so the card keeps moving (Will, 2026-11-11).
+const CP=[[540,960],[360,800],[720,1110],[400,1150],[690,780],[540,690],[540,1230],[330,960],[750,960]];
+function cardPos(cd,k,a,t){const s=Math.round(cd[0]*10)%CP.length,p=CP[(s+k)%CP.length],ang=((s+k)*2.39)%6.283,d=Math.max(0,t-a);return[p[0]+Math.cos(ang)*d*22,p[1]+Math.sin(ang)*d*22]}
+function owAt(c,t){const s=owAt0(c,t);if(s&&s.tail){const ws=wordsOf(c);let a=0;for(const w of ws)if(t>=w[0]-.02)a=w[0];s.tailDt=t-a}if(!s||!s.cd||s.arc)return s;const k=wordsOf(c).findIndex(w=>w[0]===s.a),p=cardPos(s.cd,Math.max(0,k),s.a,t);s.x=p[0];s.y=p[1];return s}
+// The stack: the top word in the display face sits over the key word in heavy sans, its descenders dipping into it.
+// The key word is cut away in a thin outline round the top word where they overlap, so the top word reads on top.
+const STK=mk(),SX=STK.getContext('2d');
+function drawStack(s,dt){const bf=`800 SZpx ${TH.fonts.caption.family}`,bs=s.size,x=Math.min(1040,Math.max(40,s.x||540));
+ let ts=Math.round(bs*.8);ctx.font=fnt(G,ts);ctx.letterSpacing=(TRK*ts)+'px';while(ts>40&&ctx.measureText(s.top).width>960){ts-=6;ctx.font=fnt(G,ts)}
+ const by=s.y+bs*.36,ty=by-bs*.8; // the top word's baseline just above the key word's caps, so only its descenders dip in
+ SX.clearRect(0,0,1080,1920);SX.textAlign='center';SX.textBaseline='alphabetic';SX.font=fnt(bf,bs);SX.letterSpacing=(-.035*bs)+'px';SX.fillStyle=s.ink;SX.fillText(s.txt,x,by);
+ SX.globalCompositeOperation='destination-out';SX.font=fnt(G,ts);SX.letterSpacing=(TRK*ts)+'px';SX.lineJoin='round';SX.lineWidth=ts*.1;SX.strokeText(s.top,x,ty);SX.fillText(s.top,x,ty);SX.globalCompositeOperation='source-over';
+ const q=cl((dt+.02)/.16);ctx.save();ctx.globalAlpha*=q;if(!s.cd)halo(ctx,bs);ctx.drawImage(STK,0,0);ctx.restore();
+ ctx.save();ctx.globalAlpha*=q;ctx.textAlign='center';ctx.textBaseline='alphabetic';ctx.font=fnt(G,ts);ctx.letterSpacing=(TRK*ts)+'px';ctx.fillStyle=s.ink;if(s.cd)ctx.fillText(s.top,x,ty);else{halo(ctx,ts);edged(ctx,s.top,x,ty,ts)}ctx.restore();
+ if(s.tail){ctx.save();const z=fit([s.tail],S,Math.round(CSZ*OW.under),900);ctx.font=fnt(S,z);ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=s.ink;if(s.cd)ctx.fillText(s.tail,x,by+z*1.1);else{halo(ctx,z);edged(ctx,s.tail,x,by+z*1.1,z)}ctx.restore()}}
+function oneword(c,t){const s=owAt(c,t);if(s&&s.face==='stack'&&s.txt)return drawStack(s,t-s.a);if(!s||!s.txt)return;if(s.arc)return pathText(s,t-s.a);const dt=t-s.a;ctx.save();ctx.textAlign='center';ctx.textBaseline=s.base?'alphabetic':'middle';ctx.fillStyle=s.ink;
+ if(!s.cd)halo(ctx,s.size);
+ // every word has an entrance: the key word blurs in, the rest rise in quickly (Will, 2026-11-11: no word just appears)
+ let rise=0;if(s.face==='hero'||s.face==='big'){const q=cl((dt+.02)/.16);ctx.globalAlpha*=q;if(q<1)ctx.filter=`blur(${((1-q)*14).toFixed(1)}px)`}else{const q=expo(cl((dt+.02)/.12));ctx.globalAlpha*=cl(q*1.6);rise=(1-q)*s.size*.3}
+ ctx.font=fnt(s.font,s.size);ctx.letterSpacing=(s.face==='hero'?TRK*s.size:-.015*s.size)+'px';const hw=ctx.measureText(s.txt).width/2,tx=Math.min(1040-hw,Math.max(40+hw,s.x||540));if(s.cd)ctx.fillText(s.txt,tx,s.y+rise);else edged(ctx,s.txt,tx,s.y+rise,s.size);ctx.filter='none';
+ if(s.sub){ctx.globalAlpha=1;ctx.filter='none';ctx.textBaseline='middle';ctx.font=fnt(S,s.subSize);ctx.letterSpacing=(-.015*s.subSize)+'px';ctx.fillStyle=IV;halo(ctx,s.subSize);edged(ctx,s.sub,540,s.subY,s.subSize)}
+ if(s.tail){const ts=fit([s.tail],S,Math.round(CSZ*OW.under),900),ty=s.y+s.size*.52+ts*.55;ctx.globalAlpha=1;ctx.filter='none';ctx.font=fnt(S,ts);ctx.letterSpacing='0px';ctx.textAlign='left';
+  const cut=s.tail.lastIndexOf(' ')+1,old=s.tail.slice(0,cut),nw=s.tail.slice(cut),x0=tx-ctx.measureText(s.tail).width/2,q=expo(cl((s.tailDt??1)/.12));if(!s.cd)halo(ctx,ts);
+  const put=(w,x,y)=>s.cd?ctx.fillText(w,x,y):edged(ctx,w,x,y,ts);if(old)put(old,x0,ty);ctx.globalAlpha=cl(q*1.6);put(nw,x0+ctx.measureText(old).width,ty+(1-q)*ts*.3)}
+ ctx.restore()}
+// every word state in the job, for render.mjs (build/oneword.json) and the smoke test
+window.__oneword=()=>flips.filter(c=>c[3]===0&&(c[4].style||CSTYLE)==='oneword').flatMap(c=>{use(c.ps);return wordsOf(c).map(w=>{const s=owAt(c,w[0]+.01);return s&&{t:w[0],txt:s.txt,face:s.face,size:s.size,tail:s.tail,card:!!s.cd,ink:s.ink,onLine:!!s.base,x:Math.round(s.x||540),y:Math.round(s.y)}}).filter(Boolean)});
 function oneWord(c,t,yo){const ws=wordsOf(c);let cur=null;for(const w of ws){if(t+0.02>=w[0]&&t<w[1]+0.08)cur=w}if(!cur){for(let i=ws.length-1;i>=0;i--)if(t>=ws[i][0]){cur=ws[i];break}}if(!cur)return;
  const [a,b,raw]=cur;let txt=String(raw).replace(/^[\s.,;:!?]+|[\s.,;:!?]+$/g,'');if(!txt)return;txt=txt.toUpperCase();const y=yo||c[4].y||KY,fs=fit([txt],G,Math.round(CSZ*2.4),1000),dt=t-a,pop=.86+.14*backOut(cl(dt/.12));
  ctx.save();ctx.font=fnt(G,fs);ctx.textAlign='center';ctx.textBaseline='middle';ctx.letterSpacing=(TRK*fs)+'px';ctx.globalAlpha*=cl(dt/.05);ctx.translate(540,y);ctx.scale(pop,pop);shadow(ctx,fs);
  ctx.lineJoin='round';ctx.lineWidth=Math.max(8,fs*.1);ctx.strokeStyle=c[4].outline||'#000';ctx.strokeText(txt,0,0);ctx.fillStyle=c[4].highlight||CY;ctx.fillText(txt,0,0);ctx.restore()}
-// one-word: while a title is up it is the one word on screen, so the caption waits
+// one-word (the simple style): while a title is up it is the one word on screen, so the caption waits
 const titleUp=t=>zoneAt(t)!=='hide'&&TITLES.some(c=>t>=c[0]&&t<c[1]);
-function caption(c,t){const st=c[4].style||CSTYLE;if((st==='one-word'||st==='oneword')&&titleUp(t))return;const yo=zoneAt(t)==='move'?ALTY:0;if(st==='kinetic')return kinetic(c,t);if(st==='pill')return pill(c,t,yo);if(st==='hormozi')return boldCap(c,t,false,yo);if(st==='karaoke')return boldCap(c,t,true,yo);if(st==='one-word'||st==='oneword')return oneWord(c,t,yo);glyphs(c[2],fit([c[2]],S,CSZ,980),540,yo||Y,t-c[0],IV,true)}
+function caption(c,t){const st=c[4].style||CSTYLE;if(st==='one-word'&&titleUp(t))return;const yo=zoneAt(t)==='move'?ALTY:0;if(st==='kinetic')return kinetic(c,t);if(st==='oneword')return oneword(c,t);if(st==='pill')return pill(c,t,yo);if(st==='hormozi')return boldCap(c,t,false,yo);if(st==='karaoke')return boldCap(c,t,true,yo);if(st==='one-word')return oneWord(c,t,yo);glyphs(c[2],fit([c[2]],S,CSZ,980),540,yo||Y,t-c[0],IV,true)}
 let LAYER='all';
-function flip(t){for(const c of flips){if(t<c[0]||t>=c[1])continue;const dt=t-c[0],m=c[3],out=c[1]>90?1:cl((c[1]-t)/.05);ctx.save();ctx.globalAlpha=out;
+function flip(t){for(const c of flips){if(t<c[0]||t>=c[1])continue;use(c.ps);const dt=t-c[0],m=c[3],out=c[1]>90?1:cl((c[1]-t)/.05);ctx.save();ctx.globalAlpha=out;
 if(m===7){if(zoneAt(t)!=='hide')title(c,t,LAYER==='titles'?'hero':LAYER==='front'?'partner':'all')}
 else if(LAYER==='titles'){}
+else if(m===8)typeCard(c);
 else if(m===0)caption(c,t);
 else if(m===1)spray(c[2],fit([c[2]],G,200,960),540,Y,dt,31*(Math.round(c[0]*10)+3));
 else if(m===2)sticker(c[2],fit([c[2]],F,150,860),540,Y,dt,Math.round(c[0]*10)+1,F);
@@ -251,5 +354,5 @@ window.seek=(t,layer)=>{LAYER=layer||'all';ctx.clearRect(0,0,1080,1920);flip(t);
 window.__titles=TITLES.map(c=>({start:c[0],end:c[1],text:c[2],entrance:c.entr,flicker:c.flick}));
 // Fonts: optional web-font stylesheet from the theme, then wait for every face we draw with, then the logo.
 const css=TH.fontCss?new Promise(r=>{const l=document.createElement('link');l.rel='stylesheet';l.href=TH.fontCss;l.onload=r;l.onerror=r;document.head.appendChild(l)}):Promise.resolve();
-css.then(()=>Promise.all(FACES)).then(()=>Promise.all([...(SCF?[document.fonts.load(fnt(SCF,90))]:[]),document.fonts.load(fnt(S,CSZ)),document.fonts.load(fnt(G,160)),document.fonts.load(fnt(F,150)),document.fonts.load(fnt(K,46)),document.fonts.ready,new Promise(r=>{if(!LOGO||SK.complete)return r();SK.onload=r;SK.onerror=r})])).finally(()=>{window.__logo=LOGO?SK.naturalWidth>0:null;window.__skool=window.__logo;window.__theme=TH.name||'custom';window.__fonts=FP?FP.name||'pairing':'theme';window.seek(0);window.__ready=true});
+css.then(()=>Promise.all(FACES)).then(()=>Promise.all([...Object.values(SETS).flatMap(s=>[...(s.SCF?[document.fonts.load(fnt(s.SCF,90))]:[]),document.fonts.load(fnt(s.S,CSZ)),document.fonts.load(fnt(s.G,160)),document.fonts.load(fnt(s.F,150)),document.fonts.load(fnt(s.K,46))]),document.fonts.ready,new Promise(r=>{if(!LOGO||SK.complete)return r();SK.onload=r;SK.onerror=r})])).finally(()=>{window.__logo=LOGO?SK.naturalWidth>0:null;window.__skool=window.__logo;window.__theme=TH.name||'custom';window.__fonts=CYC.length>1?CYC.map(s=>s.name).join(','):BASE.name;window.seek(0);window.__ready=true});
 </script></body></html>

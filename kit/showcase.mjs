@@ -262,7 +262,9 @@ function captionsDoc(style, fonts, titles) {
     titles.forEach((ent, i) => flips.push({ start: i * 1.2, end: i * 1.2 + 1.1, text: 'Record one take', mode: 7, hero: [0], entrance: ent }));
   } else {
     // one-word keeps one word on screen: the title is the word until it leaves, then the caption words take over
-    flips.push({ start: 0, end: style === 'one-word' ? 0.9 : 2.4, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam' });
+    // oneword shows its caption signature (the key word big, the phrase building under it); its behind-head words are
+    // single beats in a reel, and a title here would say the key word twice
+    if (style !== 'oneword') flips.push({ start: 0, end: style === 'one-word' ? 0.9 : 2.4, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam' });
   }
   flips.push({ start: 0, end: 2.4, text: 'Record one take on your phone', mode: 0, words, hero: 'record' });
   return { captionStyle: style, ...(fonts ? { fonts } : {}), flips };
@@ -413,7 +415,7 @@ async function main() {
       typeStill(build, mid, { THEME: th.id }, out);
     });
   }
-  const lookStyle = { kinetic: 'kinetic', muse: 'pill', classic: 'classic', 'one-word': 'one-word' };
+  const lookStyle = { kinetic: 'kinetic', oneword: 'oneword', muse: 'pill', classic: 'classic', 'one-word': 'one-word' };
   for (const lk of menu.sections.find(s => s.id === 'looks').items) {
     typeOrCard('look', lk, out => {
       const doc = captionsDoc(lookStyle[lk.id] || 'kinetic', 'theme');

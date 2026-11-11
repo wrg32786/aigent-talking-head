@@ -21,12 +21,14 @@ const ROOT = dirname(KIT);
 
 const LOOKS = [
   { id: 'kinetic', flag: '--look kinetic', label: 'every word animates, plus a kinetic title behind the head (default)' },
+  { id: 'oneword', flag: '--look oneword', label: 'one word at a time, size and face changing per word, type cards, cycling pairings (kit/looks/oneword.md)' },
   { id: 'muse', flag: '--look muse', label: 'pill captions and kinetic titles behind the head' },
   { id: 'classic', flag: '--look classic', label: 'the original phrase captions and a spray-painted hero word, no titles' },
   { id: 'one-word', flag: '--look one-word', label: 'one big word at a time on screen, kinetic and punchy, plus titles behind the head' },
 ];
 const CAPTION_STYLES = [
   { id: 'kinetic', flag: '--style kinetic  or  "captionStyle": "kinetic"', label: 'two-font lockup, hero word big in the display face' },
+  { id: 'oneword', flag: '--style oneword  or  "captionStyle": "oneword"', label: 'one word at a time, key word big in the display face with the phrase building under it' },
   { id: 'pill', flag: '--style pill  or  "captionStyle": "pill"', label: '3 to 5 words in a lower-third pill' },
   { id: 'hormozi', flag: '--style hormozi  or  "captionStyle": "hormozi"', label: 'bold caps with a cyan active word' },
   { id: 'karaoke', flag: '--style karaoke  or  "captionStyle": "karaoke"', label: 'colour wipe as each word is said' },

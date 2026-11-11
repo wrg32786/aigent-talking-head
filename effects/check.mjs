@@ -15,7 +15,8 @@ if (missing.length) { bad++; console.error('catalog.json is missing:', missing.j
 if (extra.length) { bad++; console.error('catalog.json lists effects upstream no longer has:', extra.join(', ')); }
 const runner = readFileSync(join(HERE, 'fx_runner.py'), 'utf8');
 for (const m of runner.matchAll(/^\s*\("""([\s\S]*?)""",/gm)) if (!fx.includes(m[1])) { bad++; console.error('runner patch no longer matches upstream:', m[1].slice(0, 80)); }
-const md = existsSync(join(HERE, 'CATALOG.md')) ? readFileSync(join(HERE, 'CATALOG.md'), 'utf8') : '';
+// a Windows checkout with core.autocrlf has CRLF here; the content is what has to match
+const md = existsSync(join(HERE, 'CATALOG.md')) ? readFileSync(join(HERE, 'CATALOG.md'), 'utf8').replace(/\r\n/g, '\n') : '';
 if (md !== renderCatalog(cat)) { bad++; console.error('CATALOG.md is stale: run npm run effects:catalog'); }
 if (bad) process.exit(1);
 console.log(`effects check ok: ${names.length} effects catalogued, runner patches match, CATALOG.md current`);

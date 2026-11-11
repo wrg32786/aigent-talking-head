@@ -22,8 +22,8 @@ const ROOT = path.dirname(KIT);
 const SHIPPED = path.join(KIT, 'presets');
 const LOCAL = path.join(KIT, 'presets', 'local');
 
-const LOOKS = ['kinetic', 'muse', 'classic', 'one-word'];
-const STYLES = ['kinetic', 'classic', 'pill', 'hormozi', 'karaoke', 'one-word'];
+const LOOKS = ['kinetic', 'oneword', 'muse', 'classic', 'one-word'];
+const STYLES = ['kinetic', 'oneword', 'classic', 'pill', 'hormozi', 'karaoke', 'one-word'];
 
 function themes() {
   return fs.readdirSync(path.join(KIT, 'themes')).filter(f => f.endsWith('.js')).map(f => f.replace(/\.js$/, ''));
