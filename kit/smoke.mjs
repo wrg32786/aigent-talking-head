@@ -2,7 +2,7 @@
 // The person mask uses MediaPipe (--mask mediapipe) so this does not download birefnet-general-lite (~214 MB).
 //   npm run smoke                 (or: node kit/smoke.mjs [--keep] [--whisper])
 // Makes a 3 s colour-bars + tone clip with ffmpeg, fakes word timings, drafts captions with autocaption.mjs,
-// renders stills and 2 s of overlay frames in headless Chrome (neutral theme, plus AIgent stills), assembles
+// renders stills and 2 s of overlay frames in headless Chrome (AIgent theme default, plus a neutral still), assembles
 // a 1080x1920 cut with seams, wooshes and a ducked bed, checks it with ffprobe, then runs the one-command
 // reel.cjs path on faked clip.py output (retake skipped) and its --rebuild loop.
 // --whisper also runs kit/tx.py with the tiny.en model (needs faster-whisper; downloads ~75 MB on first run).
@@ -60,10 +60,10 @@ try {
     caps.flips.push({ start: 2.4, end: 3.2, text: 'STICKER', mode: 2 });   // exercise a second mode
     writeFileSync(join(build, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(caps) + ';\n');
   });
-  step('render stills (neutral theme)', () => {
+  step('render stills (aigent theme default)', () => {
     run(node, [join(KIT, 'render.mjs'), '0', '0.6,1.9,2.6'], build);
     const s = readdirSync(join(build, 'stills')); if (s.length !== 3) fail('stills: ' + s);
-    if (!/neutral/.test(readFileSync(join(build, 'theme.js'), 'utf8'))) fail('neutral theme not used by default');
+    if (!/aigent/.test(readFileSync(join(build, 'theme.js'), 'utf8'))) fail('aigent theme not used by default');
     if (statSync(join(build, 'stills', 't0.60.png')).size < 8000) fail('caption still looks blank');
   });
   step('render overlay frames (2 s)', () => { run(node, [join(KIT, 'render.mjs'), '2'], build); const n = readdirSync(join(build, 'ovl')).length; if (n !== 48) fail('frames ' + n); });
@@ -105,10 +105,10 @@ try {
     if (!a) fail('no audio stream');
     if (Math.abs(d - 3.5) > 0.25) fail('duration ' + d);
   });
-  step('AIgent preset stills', () => {
+  step('neutral preset stills', () => {
     rmSync(join(build, 'theme.js'));
-    run(node, [join(KIT, 'render.mjs'), '0', '0.6'], build, { THEME: 'aigent' });
-    if (!/aigent/.test(readFileSync(join(build, 'theme.js'), 'utf8'))) fail('aigent theme not copied');
+    run(node, [join(KIT, 'render.mjs'), '0', '0.6'], build, { THEME: 'neutral' });
+    if (!/neutral/.test(readFileSync(join(build, 'theme.js'), 'utf8'))) fail('neutral theme not copied');
   });
   step('reel.cjs one-command path (faked clip.py output, 1 retake)', () => {
     const clips = join(work, 'clips'); mkdirSync(clips);
