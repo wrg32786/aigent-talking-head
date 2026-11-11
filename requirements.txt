@@ -1,3 +1,5 @@
 faster-whisper>=1.0
 # faster-whisper 1.2 breaks on PyAV 19 ("unexpected keyword argument metadata_errors"); 15.x is known good.
 av<16
+# Beat grid for music beds (kit/beats.py). librosa is ISC.
+librosa>=0.10.0

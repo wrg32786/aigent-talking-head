@@ -4,14 +4,15 @@
 //   node kit/check.mjs <build> --warn-only   (reel.cjs runs this; prints, never fails)
 // Errors (exit 1): copy that breaks the humanizer standard (em dashes, "not X but Y", staged run-ups, dramatic closers,
 // hype words) in captions, titles or the script; a repeated or unknown title entrance; more than 7 titles; an unknown
-// transition or sound. Warnings: flicker on a middle title, a sound on every cut, more than 2 big punches, a possible
-// forced triad, and the script shape (40-55 words, 15-20 s; over 25 s cut a middle sentence).
+// transition, sound or film-finish name. Warnings: flicker on a middle title, a sound on every cut, more than 2 big punches, a possible
+// forced triad, the script shape (40-55 words, 15-20 s; over 25 s cut a middle sentence), and beat-sync on with no bed.
 import { existsSync, readFileSync, statSync } from 'fs';
 import { join, resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 const R = createRequire(import.meta.url)('./rules.cjs');
 const SFXPLAN = createRequire(import.meta.url)('./sfx-plan.cjs');
+const B = createRequire(import.meta.url)('./beats.cjs');
 const KIT = dirname(fileURLToPath(import.meta.url)), ROOT = dirname(KIT);
 const argv = process.argv.slice(2), warnOnly = argv.includes('--warn-only');
 const target = argv.find(a => !a.startsWith('--'));
@@ -64,6 +65,23 @@ function checkJob(captionsFile, cutFile, label) {
     if (n > Math.max(3, TL.total / 3)) warns.push(`${n} sounds in ${TL.total.toFixed(1)} s; fewer and deeper reads better`);
     const bp = (C.segs || []).filter(s => s.bigPunch).length;
     if (bp > 2) warns.push(`${bp} big punches; use them on the cut after the hook and the cut into the payoff`);
+    const finishes = [{ where: 'cut.json', raw: C.finish }, ...(C.segs || []).map((s, i) => ({ where: `seg ${i}`, raw: s.finish }))];
+    for (const { where, raw } of finishes) {
+      if (raw == null || raw === false || raw === '') continue;
+      try { B.parseFinish(raw); } catch (e) { errs.push(`${where}: ${e.message}`); }
+    }
+    if (C.beatWindow != null && !(C.beatWindow >= 0 && C.beatWindow <= 0.5)) errs.push(`beatWindow ${C.beatWindow} should be between 0 and 0.5 seconds`);
+    if (C.beatSync && !C.bed) warns.push('beatSync is on but there is no bed to analyse; punches and SFX will not snap');
+    if (C.dropHits && C.dropHits.length) {
+      const TL = R.timeline(C), cap = {};
+      for (const h of C.dropHits) {
+        const t = Array.isArray(h) ? h[0] : h;
+        const seg = TL.segs.find(s => t >= s.start - 0.001 && t < s.end + 0.001);
+        const i = seg ? seg.i : -1;
+        cap[i] = (cap[i] || 0) + 1;
+      }
+      for (const [i, n] of Object.entries(cap)) if (n > B.MAX_SHAKES_PER_SEG) warns.push(`seg ${i}: ${n} drop shakes; cap is ${B.MAX_SHAKES_PER_SEG} per shot`);
+    }
     // script shape from the spoken captions (pills/captions only)
     const spoken = flips.filter(f => f.mode === 0 || f.mode === 1).map(f => f.text).join(' ').split(/\s+/).filter(Boolean).length;
     if (spoken) R.scriptShape(spoken, TL.total - (C.tail ?? 0.3)).forEach(x => warns.push(x));

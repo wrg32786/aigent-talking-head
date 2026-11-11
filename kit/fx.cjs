@@ -34,6 +34,7 @@ const VALUED = new Set(['name', 'plan', 'still', 'out', 'jobs', 'captions', 'sfx
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const die = m => { console.error(m); process.exit(1); };
 const SFXPLAN = require('./sfx-plan.cjs');
+const B = require('./beats.cjs');
 const sh = (cmd, args, cwd, env) => execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } });
 // Windows only: when Application Control blocks MediaPipe's DLL, run the effects in WSL instead. Set FX_WSL to the
 // Python inside WSL that has the effects packages (e.g. /root/fxvenv/bin/python), FX_WSL_DISTRO to pick a distro.
@@ -183,9 +184,15 @@ let sfxHits = [];
 if (!sfxOff) {
   sfxHits = SFXPLAN.planHits(plan);
   const cutNow = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8'));
+  const beatPy = process.env.PYTHON || (process.platform === 'win32' ? 'py' : 'python3');
+    const grid = B.loadGrid(build) || (B.wantBeatSync(cutNow) && cutNow.bed ? B.analyseBed(cutNow, build, { python: beatPy }) : null);
+  if (grid) {
+    const win = B.windowOf(cutNow), times = B.anchors(grid);
+    sfxHits = sfxHits.map(h => ({ ...h, t: B.snap(+h.t, times, win).t }));
+  }
   cutNow.sfxHits = sfxHits;
   fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cutNow, null, 1));
-  fs.writeFileSync(path.join(dir, 'sfx-hits.json'), JSON.stringify({ note: 'Auto-picked by kit/fx.cjs from kit/sfx/sfx.json. Override a line in fx.json with "sfx": "<id>" or "sfx": false, then re-run.', hits: sfxHits }, null, 1));
+  fs.writeFileSync(path.join(dir, 'sfx-hits.json'), JSON.stringify({ note: 'Auto-picked by kit/fx.cjs from kit/sfx/sfx.json. Override a line in fx.json with "sfx": "<id>" or "sfx": false, then re-run. Times snap to the bed beat grid when beat-sync is on.', hits: sfxHits }, null, 1));
   sfxHits.forEach(h => console.log(`  sfx  ${h.t.toFixed(2).padStart(6)}s  ${h.fx.padEnd(24)} ${h.id.padEnd(28)} ${h.role}`));
 }
 let v = 1; while (fs.existsSync(path.join(job, `reel-fx-v${v}.mp4`))) v++;

@@ -2,6 +2,9 @@
 
 ## 1.2.0 (unreleased)
 
+- **Beat-sync and film finish.** When a music bed is set, `kit/beats.py` (librosa) writes `build/beat-grid.json` from the bed at `bedStart` for the reel length: tempo, beats, onsets, energy, and intensity-filtered drops. `"beatSync": true` (the default when a bed is set; `--no-beat-sync` to turn it off) snaps zoom punches, pack and locked-set SFX, fx hit points, and title entrances to the nearest beat or onset within 120 ms, and adds a short camera shake on strong drops (at most two per shot). Speech cuts and lip sync do not move. Optional `"finish"` on the cut or a segment applies an ffmpeg film look on the picture, before titles: `grain`, `vignette`, `chroma`, `scan-lines`, `warm`, `cool`, `teal`, `crushed`, `mono`, `bleach`. No LUT files or light-leak assets. Adapted from the author's music-video project and relicensed Apache-2.0. `npm run check` validates finish names; `npm run smoke` covers the snap rules and a finish render.
+- **Public-ready sanitization.** AIgent is the default theme (`--theme neutral` for an unbranded offline look). The HeyGen retake example no longer includes account or asset ids.
+
 Edit rules from the Muse reel workflow, plus parts of a motion design pack, adapted to 1080x1920 at 24 fps.
 
 - **Cinematic SFX pack.** 31 Will-approved sounds in `kit/sfx/` (`sfx.json`), all CC0. `npm run fx` auto-picks one per effect hit (category map, no-repeat rotation, hit-point alignment, risers ending on the hit, releases after heavy hits, ducked under the voice). Override with `"sfx": "<id>"` or `"sfx": false` on an effect, or `--sfx off`. `--bed-start` sets where a music bed begins. The locked cut-seam set is unchanged.

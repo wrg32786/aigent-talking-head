@@ -1,6 +1,6 @@
 # aigent-talking-head
 
-Turn a phone recording into a finished 9:16 reel. Record yourself on your phone, drop the file in `inbox/`, and ask Claude (or any coding agent) to make the reel. You get:
+From [The AIgent](https://theaigent.xyz). Turn a phone recording into a finished 9:16 reel. Record yourself on your phone, drop the file in `inbox/`, and ask Claude (or any coding agent) to make the reel. You get:
 
 - clean clips cut on sentence boundaries, with flubbed retakes flagged and skipped, and the best take of each sentence picked when you record several takes
 - tight cuts with a glitch seam and a 10% zoom punch on every cut, a bigger punch after the hook and into the payoff, and a few sounds on the key cuts only
@@ -25,8 +25,9 @@ See what it makes: [the demo reel](kit/example/demo-reel/) (40 s, 20 effects, wi
    or run it yourself:
 
    ```
-   npm run reel                          # newest video in inbox/, neutral theme
-   npm run reel -- inbox/my-take.mov --theme aigent --cropx 0.4 --bed vinyl-sunrise --bed-start 0
+   npm run reel                          # newest video in inbox/, AIgent theme
+   npm run reel -- inbox/my-take.mov --theme neutral --cropx 0.4 --bed vinyl-sunrise --bed-start 0
+   npm run reel -- inbox/my-take.mov --bed vinyl-sunrise --finish grain,vignette
    npm run music                         # list the music beds
    npm run reel -- inbox/take1.mov inbox/take2.mov --hook take2.mov --fonts druk
    ```
@@ -58,7 +59,7 @@ The effects come from [claude-video-effects](https://github.com/Vibha-Ramprakash
 |---|---|---|---|
 | Node 18+ | `brew install node` | your package manager or nodejs.org | nodejs.org installer |
 | ffmpeg + ffprobe | `brew install ffmpeg` | `sudo apt install ffmpeg` | `winget install ffmpeg` |
-| Python 3.9+ | `brew install python` | usually installed | python.org installer (gives `py`) |
+| Python 3.9+ (3.11+ for the BiRefNet mask) | `brew install python` | usually installed | python.org installer (gives `py`) |
 | Chrome or Chromium | google.com/chrome | `google-chrome` or `chromium` package | google.com/chrome |
 
 Then, in the repo folder:
@@ -102,6 +103,8 @@ These are defaults in `cut.json`; `npm run check -- <job>` flags anything that b
 - **Zoom punch.** `"punch": 0.1` scales every other segment 10% so each cut lands as a jump; `false` turns it off. `"bigPunch": true` on a segment eases in another 12% over 0.3 s; `npm run reel` puts it on the cut after the hook and the cut into the payoff. `"zoom"` and `"punchY"` per segment override the amount and the vertical centre.
 - **Transitions.** The glitch seam stays the default. `"transition": "crossfade"` on a segment (or at the top level for all of them) uses an ffmpeg xfade instead; `"transitionDur"` sets the length. The 50 names (crossfade, dip, flash, whip, iris, zoom, pixelate, ...) are in `kit/transitions.json` and `effects/CATALOG.md`.
 - **Sounds.** Fewer and deeper. The locked cut-seam set is `whoosh`, `swipe`, `boom`, `click`, `typing` (mono 48 kHz WAV, CC0), used as `"sfx": {"whoosh": [3.2], "boom": [[12.4, 0.55]]}`. Never a sound on every cut, and the key moment (the payoff) gets the loudest one. A 31-sound cinematic pack in `kit/sfx/` (see `kit/sfx/sfx.json`) is auto-picked on `npm run fx` for each effect hit: category mapping, no-repeat rotation, the hit point aligned to the effect, risers ending on the hit, releases after heavy hits, ducked under the voice. Override per effect with `"sfx": "01-cinematic-hit-a"` or `"sfx": false`, or turn the pack off with `--sfx off`. You still pick sounds by ear.
+- **Beat-sync.** When a bed is set, `kit/beats.py` analyses it from `bedStart` for the reel length and writes `build/beat-grid.json` (tempo, beats, onsets, energy, strong drops). `"beatSync": true` (the default with a bed; `--no-beat-sync` or `"beatSync": false` to turn it off) snaps zoom punches, SFX, fx hit points and title entrances to the nearest beat or onset within 120 ms (`"beatWindow"`), and adds a short camera shake on strong drops, at most two per shot. Speech cuts and lip sync do not move. Needs `librosa` (`pip install -r requirements.txt`).
+- **Film finish.** `"finish": "grain"` (or a list, or `{ "grain": { "intensity": 0.4 } }`) applies an ffmpeg look to the picture, before titles and captions, so the type stays clean. Names: `grain`, `vignette`, `chroma`, `scan-lines`, `warm`, `cool`, `teal`, `crushed`, `mono`, `bleach`. Set it on the whole cut or on one segment. No LUT files or light-leak overlays. `--finish grain,vignette` on `npm run reel`.
 - **Copy.** No em or en dashes, no "not X, but Y", no staged run-ups ("Here's the thing:"), no dramatic closers, no hype words. `npm run check` lints the captions, titles and card copy.
 - **Script shape.** A hook, one reveal per beat, a payoff: 40 to 55 words, 15 to 20 s. Over 25 s, cut a middle sentence.
 
@@ -111,10 +114,10 @@ The look of the captions lives in a theme file: colours, fonts, an optional web-
 
 | Theme | Look |
 |---|---|
-| `kit/themes/neutral.js` | Default. White captions, yellow accent, system fonts, no logo, works offline. |
-| `kit/themes/aigent.js` | AIgent brand guide: cyan `#5cf9e2`, Hanken Grotesk and Sofia Sans Extra Condensed (Google Fonts). |
+| `kit/themes/aigent.js` | Default. AIgent brand guide: cyan `#5cf9e2`, Hanken Grotesk and Sofia Sans Extra Condensed (Google Fonts). |
+| `kit/themes/neutral.js` | Unbranded opt-out (`--theme neutral`). White captions, yellow accent, system fonts, no logo, works offline. |
 
-Pick one with `--theme` (or `THEME=aigent` for `render.mjs`). It's copied into the job as `build/theme.js`, so you can edit colours for one job, or copy a preset to `kit/themes/<yours>.js` for your own brand. A `"theme": {...}` block in `captions.js` overrides single fields, and `"logo": "file.svg"` there puts a logo on the logo-plate flips.
+The default is AIgent. Pass `--theme neutral` (or `THEME=neutral` for `render.mjs`) for an unbranded offline look, or add your own `kit/themes/<yours>.js`. The chosen file is copied into the job as `build/theme.js`, so you can edit colours for one job. A `"theme": {...}` block in `captions.js` overrides single fields, and `"logo": "file.svg"` there puts a logo on the logo-plate flips.
 
 ## Step by step (manual control)
 
@@ -153,7 +156,7 @@ Agents: start at [AGENTS.md](AGENTS.md).
 | `kit/mask.py` | Person mask for titles-behind-the-head. `--model birefnet` (rembg birefnet-general-lite, quality, weights downloaded on first use) or `--model mediapipe` (fast fallback). `kit/mask_refine.py` is the shared cleanup. |
 | `kit/fonts/`, `kit/fonts.mjs` | Font pairings, their licence files and example stills (`npm run fonts:examples`). |
 | `kit/transitions.json` | Transition names mapped to ffmpeg xfade modes. |
-| `kit/themes/` | Theme presets: `neutral.js` (default) and `aigent.js`. |
+| `kit/themes/` | Theme presets: `aigent.js` (default) and `neutral.js`. |
 | `kit/chrome.mjs` | Finds Chrome on Mac, Linux or Windows; `CHROME_PATH` overrides. |
 | `kit/smoke.mjs` | `npm run smoke`: synthetic end-to-end test (includes the effects pass once `npm run effects:setup` has run). |
 | `kit/fx.cjs` | `npm run fx`: the effects pass over a job's reel (check frames, render, captions kept on top). |
@@ -188,7 +191,7 @@ Code and docs: Apache-2.0, Copyright 2026 Will Gwyn (wrg32786). See [LICENSE](LI
 - `kit/sfx/D-quick-woosh-683101.mp3`: "quick woosh" by florianreichelt, Freesound 683101, CC0.
 - `kit/sfx/whoosh.wav` and `kit/sfx/swipe.wav`: mono 48 kHz WAV conversions of the two Freesound files above, CC0.
 - `kit/sfx/boom.wav`, `click.wav`, `typing.wav`: from [motion-pack](https://github.com/ANVEAI/motion-pack) by ANVEAI (sounds `snd.hit.deep_impact`, `snd.ui.click`, `snd.ui.typing_burst`), CC0 1.0 under its LICENSE-MEDIA.
-- `kit/sfx/{hit,riser,release,whoosh,swipe,pop,ui,glitch,camera,paper,counter,sub,shimmer}/` and `kit/sfx/sfx.json`: 31-sound cinematic pack (Will-approved). DAEDAL Transition / UI packs, Kenney Interface Sounds, OpenGameArt / Freesound CC0 items, and original synths dedicated CC0. Full credits in [THIRD_PARTY.md](THIRD_PARTY.md).
+- `kit/sfx/{hit,riser,release,whoosh,swipe,pop,ui,glitch,camera,paper,counter,sub,shimmer}/` and `kit/sfx/sfx.json`: 31-sound cinematic pack. DAEDAL Transition / UI packs, Kenney Interface Sounds, OpenGameArt / Freesound CC0 items, and original synths dedicated CC0. Full credits in [THIRD_PARTY.md](THIRD_PARTY.md).
 - `kit/fonts/`: Google Fonts under the SIL Open Font License 1.1, each with its licence file. See [kit/fonts/README.md](kit/fonts/README.md).
 - Ideas adapted, no code copied: the transition name map from motion-pack (MIT), the Hormozi and karaoke caption looks from [Capite](https://github.com/muneebkhan08/Capite) (MIT), the title entrances from [motion-anything](https://github.com/nexu-io/motion-anything) (Apache-2.0, reference only). See [THIRD_PARTY.md](THIRD_PARTY.md).
 - `kit/example/skool-logo.svg`: the Skool wordmark, a trademark of Skool. It's included only to mark The AIgent's own Skool group in the Awakening example; it isn't in any theme. Don't use it for other brands.

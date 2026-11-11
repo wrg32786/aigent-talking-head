@@ -21,4 +21,4 @@ Hard rules:
 - You can't hear. Never call a sound good. Build an audition and let the human pick by ear. Fewer, deeper sounds: never one on every cut. Prefer the shipped pack (`kit/sfx/sfx.json`, auto-picked on `npm run fx`) or a CC0 file the human has already chosen; don't invent new raw synthetic swooshes.
 - Never fabricate copy the offer contradicts, such as "free" on a paid product.
 - Number versions (`-v1`, `-v2`, ...) and keep the old ones for comparison. `npm run reel` does this for you.
-- Ask which theme to use if the teammate hasn't said. Don't use the AIgent theme or the Skool mark for another brand.
+- The default theme is AIgent; use it unless the teammate asks for another look. Don't use the Skool mark for another brand. For other brands, use `--theme neutral` or their own `kit/themes/<name>.js`.

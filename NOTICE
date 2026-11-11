@@ -35,3 +35,8 @@ Third-party files keep their own terms:
   own videos only. Not covered by the Apache license.
 - kit/example/demo-reel/demo-reel.mp4 and poster.jpg: footage of Will Gwyn with our own music, for The AIgent's
   own use only. Not covered by the Apache license.
+- kit/beats.py, kit/beats.cjs (beat grid, snap rules, and ffmpeg film-finish looks): adapted from
+  Will Gwyn's music-video project (private), relicensed Apache-2.0 by the author. No LUT or light-leak
+  assets were brought over.
+- librosa (pip): librosa by the librosa developers (https://github.com/librosa/librosa), ISC.
+  Installed by pip install -r requirements.txt, not vendored.
