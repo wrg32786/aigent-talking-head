@@ -2,7 +2,7 @@
 """Run the vendored claude-video-effects fx.py with a few small, named patches applied in memory.
 
 Same CLI as upstream fx.py (python fx_runner.py --plan plan.json in.mp4 out.mp4 [--still 1.2,3.4] / --list).
-The vendored file stays byte-for-byte upstream, so `npm run effects:update` stays a clean copy. Patches only
+The vendored file stays upstream's apart from the identity scrub in effects/update.mjs, so `npm run effects:update` stays a clean copy. Patches only
 stop upstream demo identity from leaking into a teammate's reel; each one has to match upstream exactly, and
 `npm run effects:check` fails loudly if an update breaks one. Fonts and models still load from the vendor folder.
 """
@@ -11,8 +11,8 @@ import os, sys
 VENDOR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'vendor', 'claude-video-effects', 'scripts', 'fx.py')
 
 PATCHES = [
-    # headline-wall: the per-card handle was hard-coded to the upstream author's; use the plan's "handle" (blank if none)
-    ("""('@vibha.in.progress  ·  ' + meta) if meta else '@vibha.in.progress'""",
+    # headline-wall: the per-card handle was hard-coded (upstream's author, scrubbed to @yourhandle); use the plan's "handle" (blank if none)
+    ("""('@yourhandle  ·  ' + meta) if meta else '@yourhandle'""",
      """('  ·  '.join(x for x in (e.o.get('handle', ''), meta) if x))"""),
     # glass-widgets: the "Edited by Claude" pill text was fixed; read "pill" (text|bold part)
     ("""pre, hi = 'Edited by ', 'Claude'""",
@@ -61,6 +61,13 @@ def glass_widgets_v2(c, e):"""),
     # the person is tracked and cut out at 540 px wide; FX_TRACK_W raises it so a sharper matte (FX_MATTE) keeps its edge
     ("""aw = 540 if sw <= sh else int(round(540 * sw / sh / 2)) * 2;""",
      """_tw = int(os.environ.get('FX_TRACK_W', 540)); aw = _tw if sw <= sh else int(round(_tw * sw / sh / 2)) * 2;"""),
+    # comment-box: the commenter's avatar letter was the upstream author's initial; take it from the plan's handle
+    ("""'V', font=font('uib', sz * 0.5)""",
+     """next((ch for ch in str(e.o.get('handle', '')) if ch.isalnum()), '').upper(), font=font('uib', sz * 0.5)"""),
+    # pastel-word: the handle line's default carried its own separator, so a
+    # filled handle ran into the role ("@showcasecreator"); add the separator when there is a role to follow
+    ("""h1 = e.o.get('handle', '@yourhandle  ·  ')""",
+     """h1 = e.o.get('handle', ''); h1 += '  ·  ' if h1 and e.o.get('role', 'creator') and not h1.rstrip().endswith('·') else ''"""),
 ]
 
 

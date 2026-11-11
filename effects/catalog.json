@@ -506,7 +506,7 @@
    },
    "upstreamDefaults": {
     "text": "EFFECTS",
-    "handle": "vibha.in.progress",
+    "handle": "the upstream author's handle",
     "reply": "Sent you the pack",
     "chip": "22 effects"
    },
@@ -963,8 +963,8 @@
     "title": "Claude",
     "text": "38 / 22",
     "sub": "effects|one clip",
-    "name": "Vibha",
-    "handle": "@vibha.in.progress",
+    "name": "the upstream author's name",
+    "handle": "the upstream author's handle",
     "chart": "Top reels · 197K · fixed bars (hard-coded)",
     "song": "soft UI pops",
     "song_sub": "sfx · 25.7s (hard-coded)",
@@ -1113,8 +1113,8 @@
    ],
    "upstreamDefaults": {
     "text": "REELS",
-    "name": "Vibha",
-    "handle": "@vibha.in.progress"
+    "name": "the upstream author's name",
+    "handle": "the upstream author's handle"
    },
    "needsCustomText": true
   },
@@ -1164,7 +1164,7 @@
    },
    "upstreamDefaults": {
     "text": "Hook|Captions|Cuts|B-roll",
-    "handle": "@vibha.in.progress",
+    "handle": "the upstream author's handle",
     "board": "Reels · 22 effects"
    },
    "needsCustomText": true
@@ -1294,7 +1294,7 @@
     "sub": "top post"
    },
    "upstreamDefaults": {
-    "name": "vibha.in.progress",
+    "name": "the upstream author's handle",
     "count": "197000",
     "sub": "top reel"
    },
@@ -1507,7 +1507,7 @@
     "text": "the author's reel headlines (Claude, ChatGPT...)",
     "total": "672K",
     "label": "views from 7 reels",
-    "handle": "@vibha.in.progress (hard-coded)"
+    "handle": "the upstream author's handle (hard-coded)"
    },
    "needsCustomText": true
   },

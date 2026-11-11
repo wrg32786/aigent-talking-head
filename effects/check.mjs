@@ -15,6 +15,8 @@ if (missing.length) { bad++; console.error('catalog.json is missing:', missing.j
 if (extra.length) { bad++; console.error('catalog.json lists effects upstream no longer has:', extra.join(', ')); }
 const runner = readFileSync(join(HERE, 'fx_runner.py'), 'utf8');
 for (const m of runner.matchAll(/^\s*\("""([\s\S]*?)""",/gm)) if (!fx.includes(m[1])) { bad++; console.error('runner patch no longer matches upstream:', m[1].slice(0, 80)); }
+// the vendored fx.py names its author only in the docstring attribution; update.mjs scrubs the sample fallbacks
+if (fx.split('\n').slice(2).some(l => /vibha/i.test(l))) { bad++; console.error('sample identity left in the vendored fx.py: add it to SCRUB in effects/update.mjs'); }
 // a Windows checkout with core.autocrlf has CRLF here; the content is what has to match
 const md = existsSync(join(HERE, 'CATALOG.md')) ? readFileSync(join(HERE, 'CATALOG.md'), 'utf8').replace(/\r\n/g, '\n') : '';
 if (md !== renderCatalog(cat)) { bad++; console.error('CATALOG.md is stale: run npm run effects:catalog'); }

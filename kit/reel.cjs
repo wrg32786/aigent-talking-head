@@ -77,7 +77,7 @@ const LOOK_STYLE = { kinetic: 'kinetic', oneword: 'oneword', muse: 'pill', class
 const STYLE = opt('style', (!lookFlag && preset && preset.captionStyle) || LOOK_STYLE[look]);
 if (STYLE && !P.STYLES.includes(STYLE)) die('--style must be ' + P.STYLES.join(', '));
 const TITLES = flag('no-titles') ? false : (flag('titles') ? true : (!lookFlag && preset && preset.titles !== undefined ? !!preset.titles : look !== 'classic'));
-const FONTS = opt('fonts') || (lookFlag && look === 'oneword' ? 'instrument,literata,bricolage' : (preset && preset.fonts) || (look === 'oneword' ? 'instrument,literata,bricolage' : undefined));
+const FONTS = opt('fonts') || (!lookFlag && preset && preset.fonts) || (look === 'oneword' ? 'instrument,literata,bricolage' : undefined);
 const name = opt('name') || (src ? path.basename(src).replace(/\.[^.]+$/, '') : path.basename(path.resolve(clipsArg || '.')))
   .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'reel';
 const job = path.resolve(opt('jobs', path.join(ROOT, 'jobs')), name), build = path.join(job, 'build');
