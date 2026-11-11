@@ -1,7 +1,9 @@
 // Build the labelled gallery at showcase/index.html so every option is visible.
 //   npm run showcase
-// Renders stills (and a few short loops) from a synthetic presenter frame. No private
-// footage, no brand portraits. Regenerates the committed gallery; keep the folder modest.
+// Renders stills (and a few short loops) from showcase/source/presenter.jpg, an
+// AI-generated fictional presenter made for this project. No private footage, no
+// brand portraits. Titles are composited behind the head with the person mask.
+// Regenerates the committed gallery; keep the folder modest.
 import { execFileSync } from 'child_process';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, readdirSync, statSync } from 'fs';
 import { tmpdir } from 'os';
@@ -39,40 +41,35 @@ function relPath(file) {
 
 function jpg(src, dest) {
   mkdirSync(dirname(dest), { recursive: true });
-  sh('ffmpeg', ['-v', 'error', '-y', '-i', src, '-vf', `scale=${W}:${H}`, '-q:v', '5', dest]);
+  sh('ffmpeg', ['-v', 'error', '-y', '-i', src, '-vf', `scale=${W}:${H}`, '-frames:v', '1', '-update', '1', '-q:v', '5', dest]);
 }
 
-const PERSON_PY = `
-from PIL import Image, ImageDraw, ImageFilter
-import sys
-W, H = 1080, 1920
-bg = Image.new('RGB', (W, H), (28, 24, 22))
-d = ImageDraw.Draw(bg)
-for i, c in enumerate([(54, 44, 38), (40, 48, 52), (36, 32, 46)]):
-    x, y = 200 + i * 280, 240 + i * 80
-    d.ellipse((x, y, x + 520, y + 520), fill=c)
-bg = bg.filter(ImageFilter.GaussianBlur(48))
-d = ImageDraw.Draw(bg)
-d.rounded_rectangle((220, 1180, 860, 1920), 180, fill=(42, 36, 34))
-d.polygon([(400, 1240), (680, 1240), (760, 1920), (320, 1920)], fill=(58, 46, 42))
-d.rectangle((490, 980, 590, 1180), fill=(210, 168, 140))
-d.ellipse((340, 520, 740, 1080), fill=(226, 184, 154))
-d.ellipse((320, 500, 760, 900), fill=(36, 28, 26))
-d.ellipse((370, 560, 710, 940), fill=(226, 184, 154))
-d.ellipse((430, 760, 500, 820), fill=(40, 28, 24))
-d.ellipse((580, 760, 650, 820), fill=(40, 28, 24))
-d.arc((470, 850, 610, 960), 20, 160, fill=(140, 80, 70), width=8)
-bg.save(sys.argv[1])
-mask = Image.new('L', (W, H), 0)
-m = ImageDraw.Draw(mask)
-m.rounded_rectangle((220, 1180, 860, 1920), 180, fill=255)
-m.polygon([(400, 1240), (680, 1240), (760, 1920), (320, 1920)], fill=255)
-m.rectangle((490, 980, 590, 1180), fill=255)
-m.ellipse((340, 520, 740, 1080), fill=255)
-m.ellipse((320, 500, 760, 900), fill=255)
-mask.filter(ImageFilter.GaussianBlur(2)).save(sys.argv[2])
-print('ok')
-`;
+const PRESENTER = join(OUT, 'source', 'presenter.jpg');
+const PRESENTER_MASK = join(OUT, 'source', 'presenter-mask.png');
+
+function presenterPath() {
+  if (!existsSync(PRESENTER)) throw new Error('missing ' + PRESENTER + ' (AI-generated fictional presenter, 1080x1920)');
+  return PRESENTER;
+}
+
+function ensureMask(py, work) {
+  if (existsSync(PRESENTER_MASK) && !process.argv.includes('--refresh-mask')) return PRESENTER_MASK;
+  const clip = join(work, 'masksrc.mp4');
+  videoFromStill(PRESENTER, clip, 0.25);
+  const mkv = join(work, 'mask.mkv');
+  const tryModel = (model) => {
+    sh(py, [join(KIT, 'mask.py'), clip, mkv, '--model', model, '--no-download', '--windows', '0-0.25'], work);
+  };
+  try {
+    console.log('person mask: birefnet');
+    tryModel('birefnet');
+  } catch (e) {
+    console.warn('birefnet mask failed, trying mediapipe: ' + e.message.split('\n')[0]);
+    tryModel('mediapipe');
+  }
+  sh('ffmpeg', ['-v', 'error', '-y', '-i', mkv, '-frames:v', '1', '-update', '1', PRESENTER_MASK]);
+  return PRESENTER_MASK;
+}
 
 const CARD_PY = `
 from PIL import Image, ImageDraw, ImageFont
@@ -84,17 +81,15 @@ palettes = {
     'bed': ((28, 18, 24), (241, 196, 120)),
     'beatSync': ((16, 24, 22), (168, 220, 160)),
     'effect': ((22, 18, 20), (243, 238, 230)),
+    'preset': ((18, 22, 28), (92, 249, 226)),
 }
 bg, accent = palettes.get(kind, ((20, 18, 22), (243, 238, 230)))
 im = Image.new('RGB', (W, H), bg)
 d = ImageDraw.Draw(im)
 d.rectangle((0, 0, 12, H), fill=accent)
-font_big = font_sm = ImageFont.load_default()
-# wrap title
 y = 80
 d.text((40, y), kind, fill=accent)
 y = 140
-# crude wrap
 line, lines = '', []
 for w in title.split():
     t = (line + ' ' + w).strip()
@@ -120,12 +115,6 @@ for ln in lines[:8]:
     y += 28
 im.save(dest, quality=80)
 `;
-
-function writePerson(dir, py) {
-  const script = join(dir, 'person.py');
-  writeFileSync(script, PERSON_PY);
-  sh(py, [script, join(dir, 'person.png'), join(dir, 'mask.png')], dir);
-}
 
 function cardStill(py, work, kind, id, label, dest) {
   mkdirSync(dirname(dest), { recursive: true });
@@ -200,7 +189,7 @@ function writeHtml(menu, stills) {
   <header>
     <h1>aigent-talking-head showcase</h1>
     <p>Every effect, film finish, look, caption style, font pairing, theme, title entrance and transition, labelled with the exact name or flag to use. Music beds and SFX are listed the same way (listen to the files in the kit; they are not embedded here). Vary finishes across scenes rather than one look on everything.</p>
-    <p>Generated by <code>npm run showcase</code> from the catalogs, so this page stays in sync. Open this file locally, or serve the <code>showcase/</code> folder.</p>
+    <p>Stills use an AI-generated fictional presenter made for this project (Apache-2.0 with the repo). Generated by <code>npm run showcase</code> from the catalogs, so this page stays in sync. Open this file locally, or serve the <code>showcase/</code> folder.</p>
   </header>
   <nav>${nav}</nav>
   <main>${blocks}</main>
@@ -209,13 +198,60 @@ function writeHtml(menu, stills) {
 `;
 }
 
-function typeStill(build, t, env, outFile) {
-  if (existsSync(join(build, 'stills'))) rmSync(join(build, 'stills'), { recursive: true, force: true });
-  sh(node, [join(KIT, 'render.mjs'), '0', String(t)], build, env);
-  const files = readdirSync(join(build, 'stills')).filter(f => f.endsWith('.png'));
+function pickLayerStill(dir, t) {
+  if (!existsSync(dir)) return null;
+  const files = readdirSync(dir).filter(f => f.endsWith('.png'));
   const want = files.find(f => Math.abs(parseFloat(f.slice(1)) - t) < 0.03) || files[0];
-  if (!want) throw new Error('render wrote no still at ' + t);
-  jpg(join(build, 'stills', want), outFile);
+  return want ? join(dir, want) : null;
+}
+
+// Titles go behind the person (mask), captions and other overlay sit in front.
+function composeOverPerson(person, mask, titles, front, dest) {
+  const tmp = dest.replace(/\.jpg$/i, '') + '.compose.png';
+  mkdirSync(dirname(dest), { recursive: true });
+  const inputs = ['-i', person];
+  const filters = [];
+  let n = 1;
+  if (titles && existsSync(titles) && mask && existsSync(mask)) {
+    inputs.push('-i', titles, '-i', mask);
+    filters.push(`[0:v]format=rgba[bg];[${n}:v]format=rgba[ti];[${n + 1}:v]format=gray[ma]`);
+    filters.push('[bg][ti]overlay=0:0:format=auto[bt]');
+    filters.push('[0:v]format=rgba[pr];[pr][ma]alphamerge[cut]');
+    filters.push('[bt][cut]overlay=0:0:format=auto[mid]');
+    n += 2;
+  } else {
+    filters.push('[0:v]format=rgba[mid]');
+  }
+  let last = 'mid';
+  if (front && existsSync(front)) {
+    inputs.push('-i', front);
+    filters.push(`[${n}:v]format=rgba[fr];[mid][fr]overlay=0:0:format=auto[outv]`);
+    last = 'outv';
+  }
+  sh('ffmpeg', ['-v', 'error', '-y', ...inputs, '-filter_complex', filters.join(';'), '-map', `[${last}]`,
+    '-frames:v', '1', '-update', '1', tmp]);
+  jpg(tmp, dest);
+  try { rmSync(tmp); } catch {}
+}
+
+let PERSON = null, MASK = null;
+
+function typeStill(build, t, env, outFile) {
+  for (const d of ['stills', 'stills-front', 'stills-titles']) {
+    if (existsSync(join(build, d))) rmSync(join(build, d), { recursive: true, force: true });
+  }
+  if (env && env.THEME) {
+    try { rmSync(join(build, 'theme.js')); } catch {}
+  }
+  sh(node, [join(KIT, 'render.mjs'), '0', String(t)], build, { ...env, STILLS_LAYERS: '1' });
+  const front = pickLayerStill(join(build, 'stills-front'), t);
+  const titles = pickLayerStill(join(build, 'stills-titles'), t);
+  if (PERSON && (front || titles)) composeOverPerson(PERSON, MASK, titles, front, outFile);
+  else {
+    const fallback = front || titles || pickLayerStill(join(build, 'stills'), t);
+    if (!fallback) throw new Error('render wrote no still at ' + t);
+    jpg(fallback, outFile);
+  }
 }
 
 function captionsDoc(style, fonts, titles) {
@@ -273,7 +309,7 @@ function runEffectBatch(fxPy, runner, person, imgs, batch, work, fps) {
   });
 }
 
-function main() {
+async function main() {
   const menu = loadMenu();
   const py = whichPy();
   const work = mkdtempSync(join(tmpdir(), 'ath-showcase-'));
@@ -283,9 +319,12 @@ function main() {
   mkdirSync(join(OUT, 'loops'), { recursive: true });
   console.log('work', work);
 
-  writePerson(work, py);
-  const person = join(work, 'person.png');
+  const person = presenterPath();
+  PERSON = person;
+  MASK = ensureMask(py, work);
   jpg(person, join(OUT, 'media', 'plate.jpg'));
+  console.log('presenter', person);
+  console.log('mask', MASK);
 
   console.log('finishes');
   for (const it of menu.sections.find(s => s.id === 'finishes').items) {
@@ -294,7 +333,7 @@ function main() {
     const out = join(OUT, 'media', 'finish', it.id + '.jpg');
     try {
       sh('ffmpeg', ['-v', 'error', '-y', '-loop', '1', '-i', person, '-t', '0.4',
-        '-vf', `format=yuv420p,${vf},format=yuv420p`, '-frames:v', '1', tmp]);
+        '-vf', `format=yuv444p,${vf},format=yuv420p`, '-frames:v', '1', '-update', '1', tmp]);
       jpg(tmp, out);
     } catch (e) {
       console.warn('finish ' + it.id + ' failed, using plate: ' + e.message.split('\n')[0]);
@@ -376,14 +415,18 @@ function main() {
   const ents = menu.sections.find(s => s.id === 'title-entrances').items;
   try {
     writeFileSync(join(build, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(captionsDoc('kinetic', 'theme', ents.map(i => i.id))) + ';\n');
-    const entTimes = ents.map((_, i) => (i * 1.2 + 0.15).toFixed(2)).join(',');
-    if (existsSync(join(build, 'stills'))) rmSync(join(build, 'stills'), { recursive: true, force: true });
-    sh(node, [join(KIT, 'render.mjs'), '0', entTimes], build, { THEME: 'aigent', FONTS: 'theme' });
-    const rendered = readdirSync(join(build, 'stills')).filter(f => f.endsWith('.png')).sort((a, b) => parseFloat(a.slice(1)) - parseFloat(b.slice(1)));
+    const entTimes = ents.map((_, i) => (i * 1.2 + 0.15).toFixed(2));
+    for (const d of ['stills', 'stills-front', 'stills-titles']) {
+      if (existsSync(join(build, d))) rmSync(join(build, d), { recursive: true, force: true });
+    }
+    try { rmSync(join(build, 'theme.js')); } catch {}
+    sh(node, [join(KIT, 'render.mjs'), '0', entTimes.join(',')], build, { THEME: 'aigent', FONTS: 'theme', STILLS_LAYERS: '1' });
     ents.forEach((it, i) => {
-      const src = rendered[i] || rendered[0];
+      const t = +entTimes[i];
       const out = join(OUT, 'media', 'entrance', it.id + '.jpg');
-      jpg(join(build, 'stills', src), out);
+      const front = pickLayerStill(join(build, 'stills-front'), t);
+      const titles = pickLayerStill(join(build, 'stills-titles'), t);
+      composeOverPerson(PERSON, MASK, titles, front, out);
       put('entrance', it.id, out);
     });
   } catch (e) {
@@ -459,7 +502,9 @@ function main() {
       '-filter_complex', `[0][1]xfade=transition=fade:duration=0.4:offset=0.3,format=yuv420p,scale=${W}:${H}`,
       '-an', '-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '36', '-t', '1.0', join(loopDir, 'crossfade.webm')]);
     const gvf = B.finishChain('grain');
-    sh('ffmpeg', ['-v', 'error', '-y', '-loop', '1', '-i', person, '-t', '1.2', '-vf', `format=yuv420p,${gvf},scale=${W}:${H}`,
+    // Subtle ken-burns (slow zoom and pan) plus grain, so the still has a little motion.
+    sh('ffmpeg', ['-v', 'error', '-y', '-loop', '1', '-i', person, '-t', '1.5',
+      '-vf', `scale=1188:2112,crop=1080:1920:x='(in_w-out_w)*t/1.5':y='(in_h-out_h)*t/3',format=yuv420p,${gvf},scale=${W}:${H}`,
       '-an', '-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '36', '-r', '16', join(loopDir, 'grain.webm')]);
   } catch (e) {
     console.warn('loop encode skipped: ' + e.message.split('\n')[0]);
@@ -472,7 +517,7 @@ function main() {
 
 A labelled gallery of every option in aigent-talking-head: effects, film finishes, looks, caption styles, font pairings, themes, title entrances, transitions, the SFX pack and the music beds.
 
-Open \`index.html\` in a browser, or serve this folder. Rebuild with \`npm run showcase\` from the repo root (needs ffmpeg, Chrome, and \`npm run effects:setup\` for the 51 effect stills). Stills are synthetic. No private footage.
+Open \`index.html\` in a browser, or serve this folder. Rebuild with \`npm run showcase\` from the repo root (needs ffmpeg, Chrome, and \`npm run effects:setup\` for the 51 effect stills and the person mask). Stills use \`source/presenter.jpg\`, an AI-generated fictional person made for this project, licensed Apache-2.0 with the repo. No private footage and no third-party portraits.
 
 This folder is GitHub Pages-ready (\`.nojekyll\`). Repo settings and workflows are not changed by the generator.
 `);
@@ -494,7 +539,25 @@ This folder is GitHub Pages-ready (\`.nojekyll\`). Repo settings and workflows a
     console.error('showcase is over 25 MB; shrink stills before committing');
     process.exitCode = 1;
   }
+  try {
+    await writePreview();
+    console.log('wrote showcase/preview.png');
+  } catch (e) {
+    console.warn('preview.png skipped: ' + (e.message || e).toString().split('\n')[0]);
+  }
   rmSync(work, { recursive: true, force: true });
+}
+
+async function writePreview() {
+  const { chromium } = await import('playwright-core');
+  const { pathToFileURL } = await import('url');
+  const { findChrome } = await import('./chrome.mjs');
+  const browser = await chromium.launch({ executablePath: findChrome(), headless: true });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 1600 }, deviceScaleFactor: 1 });
+  await page.goto(pathToFileURL(join(OUT, 'index.html')).href, { waitUntil: 'load' });
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: join(OUT, 'preview.png') });
+  await browser.close();
 }
 
 main();

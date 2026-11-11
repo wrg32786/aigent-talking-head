@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import { findChrome } from './chrome.mjs';
 // Run from the job's build/ folder (holds captions.js):  node <kit>/render.mjs <durationSec> [t1,t2,... for stills only]
 // Writes ovl/%04d.png (and ovlt/%04d.png when captions.js has kinetic titles), or stills/t<sec>.png.
+// STILLS_LAYERS=1 with a stills-only run writes stills-front/ and stills-titles/ so a mask can put titles behind the person.
 // If build/ has no theme.js yet, it is copied from the kit; overlay.html always is (see below). THEME=<name> picks kit/themes/<name>.js
 // (default aigent); after that, edit build/theme.js or delete it to switch. Chrome: CHROME_PATH, else auto-detected. THEME=neutral is the unbranded offline look.
 const KIT = dirname(fileURLToPath(import.meta.url)), ROOT = process.cwd(), FPS = +(process.env.FPS || 24), DUR = +(process.argv[2] || 36.8);
@@ -51,7 +52,10 @@ if (titles.length) console.log('titles', titles.map(t => `${t.start}s ${t.entran
 const lockups = await p.evaluate(() => (window.__lockups ? window.__lockups() : []));
 writeFileSync(join(ROOT, 'lockups.json'), JSON.stringify(lockups, null, 1) + '\n');
 if (lockups.length) console.log('lockups', lockups.filter(l => l.kind === 'title').length, 'titles +', lockups.filter(l => l.kind === 'kinetic').length, 'lines,', [...new Set(lockups.map(l => l.arrange))].join('/'));
-const passes = only ? [['stills', 'all']] : titles.length ? [['ovl', 'front'], ['ovlt', 'titles']] : [['ovl', 'all']];
+const split = !!(only && process.env.STILLS_LAYERS);
+const passes = split
+  ? (titles.length ? [['stills-front', 'front'], ['stills-titles', 'titles']] : [['stills-front', 'all']])
+  : only ? [['stills', 'all']] : titles.length ? [['ovl', 'front'], ['ovlt', 'titles']] : [['ovl', 'all']];
 if (!only && !titles.length) rmSync(join(ROOT, 'ovlt'), { recursive: true, force: true });
 const list = only || [...Array(Math.round(DUR * FPS)).keys()].map(f => f / FPS);
 let i = 0;

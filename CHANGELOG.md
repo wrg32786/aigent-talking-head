@@ -2,7 +2,8 @@
 
 ## 1.3.0 (unreleased)
 
-- **Offer the menu, and a labelled showcase.** The menu of finishes, looks, caption styles, fonts, themes, title entrances, transitions, 51 effects, SFX and music beds is easy to miss. Agents must show it before drafting and again before the final render (`AGENTS.md`, `skills/talking-head-ad/SKILL.md`): run `npm run menu` (every option, grouped, with a one-line label, sourced from the catalogs so a new entry cannot stay hidden), point at [showcase/index.html](showcase/index.html), suggest 2 or 3 options per category, and vary film finishes across scenes. `npm run showcase` generates the self-contained gallery (synthetic stills, no private footage). `npm run check` and `npm run smoke` fail if the menu or the showcase omit a catalog entry.
+- **Offer the menu, and a labelled showcase.** The menu of finishes, looks, caption styles, fonts, themes, title entrances, transitions, 51 effects, SFX and music beds is easy to miss. Agents must show it before drafting and again before the final render (`AGENTS.md`, `skills/talking-head-ad/SKILL.md`): run `npm run menu` (every option, grouped, with a one-line label, sourced from the catalogs so a new entry cannot stay hidden), point at [showcase/index.html](showcase/index.html), suggest 2 or 3 options per category, and vary film finishes across scenes. `npm run showcase` generates the self-contained gallery from an AI-generated fictional presenter (`showcase/source/presenter.jpg`, Apache-2.0 with the repo; titles are composited behind the head with the person mask). `npm run check` and `npm run smoke` fail if the menu or the showcase omit a catalog entry.
+- **Teal finish reads teal and orange.** The `teal` film finish now uses a colorbalance grade (teal shadows, warm skin) instead of a curves pair that went purple/magenta on real skin. Aliases `teal-orange` and `teal_orange` still resolve to it.
 
 ## 1.2.0 (unreleased)
 

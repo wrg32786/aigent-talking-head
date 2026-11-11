@@ -11,7 +11,7 @@ From [The AIgent](https://theaigent.xyz). Turn a phone recording into a finished
 
 HeyGen cinematic takes are an optional second source; they cut in the same way as phone clips.
 
-The full menu of film finishes, looks, caption styles, fonts, themes, title entrances, transitions, 51 effects, SFX and music beds is easy to miss. Run `npm run menu` to print every option with a short label, or open the labelled gallery at [showcase/index.html](showcase/index.html) (`npm run showcase` rebuilds it). Agents must offer this menu before drafting and again before the final render, suggest 2 or 3 options per category, and vary finishes across scenes rather than one look on the whole reel.
+The full menu of film finishes, looks, caption styles, fonts, themes, title entrances, transitions, 51 effects, SFX and music beds is easy to miss. Run `npm run menu` to print every option with a short label, or open the labelled gallery at [showcase/index.html](showcase/index.html) (`npm run showcase` rebuilds it; stills use an AI-generated fictional presenter). Agents must offer this menu before drafting and again before the final render, suggest 2 or 3 options per category, and vary finishes across scenes rather than one look on the whole reel.
 
 ## Quick start: phone clip to reel
 
@@ -196,3 +196,4 @@ Code and docs: Apache-2.0, Copyright 2026 Will Gwyn (wrg32786). See [LICENSE](LI
 - `effects/vendor/claude-video-effects/`: [claude-video-effects](https://github.com/Vibha-Ramprakash/claude-video-effects) by Vibha Ramprakash, MIT. Its models (YuNet, MIT; MediaPipe Selfie Segmenter, Apache-2.0) and fonts (SIL OFL 1.1, Permanent Marker Apache-2.0) keep their own licences; see `NOTICE` and `effects/README.md`.
 - Person-mask quality backend (installed by `npm run effects:setup`, not vendored): [rembg](https://github.com/danielgatis/rembg) by Daniel Gatis, MIT; [onnxruntime](https://github.com/microsoft/onnxruntime) by Microsoft, MIT; birefnet-general-lite weights from [BiRefNet](https://github.com/ZhengPeng7/BiRefNet) by ZhengPeng, MIT, downloaded on first use into rembg's cache. See [THIRD_PARTY.md](THIRD_PARTY.md).
 - `kit/music/*.mp3`: our own tracks, made by Will Gwyn with Suno (song ids in `kit/music/beds.json`). For The AIgent's videos only; not covered by the Apache-2.0 licence. See [kit/music/README.md](kit/music/README.md).
+- `showcase/source/presenter.jpg`: an AI-generated fictional person made for this project, to demo finishes, titles and effects. No third-party rights. Licensed Apache-2.0 with the repo. See [THIRD_PARTY.md](THIRD_PARTY.md).
