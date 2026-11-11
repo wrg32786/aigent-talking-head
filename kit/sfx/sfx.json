@@ -1,0 +1,820 @@
+{
+  "version": 1,
+  "note": "Will-approved cinematic pack (01-03, 05-32; 04 reverse cymbal rejected). Auto-picked on effect hits by kit/sfx-plan.cjs. The locked cut.json set (whoosh, swipe, boom, click, typing, plus legacy F and D) stays at kit/sfx/ root and is unchanged.",
+  "categories": [
+    "hit",
+    "riser",
+    "release",
+    "whoosh",
+    "swipe",
+    "pop",
+    "ui",
+    "glitch",
+    "camera",
+    "paper",
+    "counter",
+    "sub",
+    "shimmer"
+  ],
+  "effects": {
+    "locked-on": {
+      "category": "ui",
+      "hit": 0.12
+    },
+    "rabbit-hole": {
+      "category": "whoosh",
+      "hit": 0.25,
+      "riser": true
+    },
+    "spotlight": {
+      "category": "shimmer",
+      "hit": 0.15
+    },
+    "backdrop-word": {
+      "category": "pop",
+      "hit": 0.1
+    },
+    "orbit": {
+      "category": "whoosh",
+      "hit": 0.3
+    },
+    "led-sign": {
+      "category": "glitch",
+      "hit": 0.05
+    },
+    "dot-reveal": {
+      "category": "pop",
+      "hit": 0.1
+    },
+    "red-collage": {
+      "category": "hit",
+      "hit": 0.02,
+      "release": true
+    },
+    "cover-star": {
+      "category": "camera",
+      "hit": 0.02
+    },
+    "glass-widgets": {
+      "category": "ui",
+      "hit": 0.05
+    },
+    "over-the-shoulder-zoom": {
+      "category": "counter",
+      "hit": 0.9
+    },
+    "carousel-spin": {
+      "category": "whoosh",
+      "hit": 0.3
+    },
+    "huge-strike": {
+      "category": "hit",
+      "hit": 0.66,
+      "riser": true,
+      "release": true
+    },
+    "match-cut": {
+      "category": "glitch",
+      "hit": 0.02,
+      "release": true
+    },
+    "crayon-write": {
+      "category": "paper",
+      "hit": 0.04
+    },
+    "fan-build": {
+      "category": "riser",
+      "hit": 0.05,
+      "riser": true
+    },
+    "timeline": {
+      "category": "ui",
+      "hit": 0.02
+    },
+    "place-in-grid": {
+      "category": "camera",
+      "hit": 0.02
+    },
+    "slow-push": {
+      "category": "sub",
+      "hit": 0.04,
+      "riser": true,
+      "release": true
+    },
+    "pastel-word": {
+      "category": "pop",
+      "hit": 0.04,
+      "release": true
+    },
+    "noise": {
+      "category": "glitch",
+      "hit": 0.08
+    },
+    "lineup": {
+      "category": "swipe",
+      "hit": 0.08
+    },
+    "lean-in": {
+      "category": "whoosh",
+      "hit": 0.12,
+      "riser": true
+    },
+    "the-bill": {
+      "category": "paper",
+      "hit": 0.08
+    },
+    "moody": {
+      "category": "shimmer",
+      "hit": 0.1
+    },
+    "swipe": {
+      "category": "swipe",
+      "hit": 0.08
+    },
+    "todo": {
+      "category": "ui",
+      "hit": 0.06
+    },
+    "comment-box": {
+      "category": "ui",
+      "hit": 0.08,
+      "release": true
+    },
+    "tap": {
+      "category": "ui",
+      "hit": 0.04
+    },
+    "pause-point": {
+      "category": "shimmer",
+      "hit": 0.1
+    },
+    "uninstall": {
+      "category": "hit",
+      "hit": 0.08,
+      "release": true
+    },
+    "reel-frame": {
+      "category": "camera",
+      "hit": 0.08
+    },
+    "shortcut-rain": {
+      "category": "ui",
+      "hit": 0.08
+    },
+    "reject-stamp": {
+      "category": "hit",
+      "hit": 0.06,
+      "release": true
+    },
+    "countdown-flip": {
+      "category": "counter",
+      "hit": 0.06
+    },
+    "scribble": {
+      "category": "paper",
+      "hit": 0.06
+    },
+    "split-headline": {
+      "category": "glitch",
+      "hit": 0.06
+    },
+    "check-pills": {
+      "category": "pop",
+      "hit": 0.06
+    },
+    "headline-box": {
+      "category": "pop",
+      "hit": 0.08
+    },
+    "profile-wall": {
+      "category": "ui",
+      "hit": 0.08
+    },
+    "tier-list": {
+      "category": "counter",
+      "hit": 0.08
+    },
+    "broll-split": {
+      "category": "swipe",
+      "hit": 0.1
+    },
+    "phone-fan": {
+      "category": "whoosh",
+      "hit": 0.1
+    },
+    "headline-wall": {
+      "category": "hit",
+      "hit": 0.08
+    },
+    "checklist": {
+      "category": "ui",
+      "hit": 0.06
+    },
+    "liquid-glass-graph": {
+      "category": "counter",
+      "hit": 0.1
+    },
+    "apple-toggles": {
+      "category": "ui",
+      "hit": 0.06
+    },
+    "messages": {
+      "category": "ui",
+      "hit": 0.08
+    },
+    "tape-label": {
+      "category": "paper",
+      "hit": 0.06
+    },
+    "select-resize": {
+      "category": "ui",
+      "hit": 0.08
+    },
+    "wave-trim": {
+      "category": "whoosh",
+      "hit": 0.1
+    }
+  },
+  "sounds": [
+    {
+      "id": "01-cinematic-hit-a",
+      "file": "hit/01-cinematic-hit-a.mp3",
+      "category": "hit",
+      "duration": 2.592,
+      "hit": 0.12,
+      "gain": 0.5,
+      "effects": [
+        "huge-strike",
+        "red-collage",
+        "uninstall",
+        "reject-stamp",
+        "slow-push"
+      ],
+      "source": "https://daedal.art/resources/transition-sfx-pack/",
+      "license": "CC0-1.0",
+      "credit": "DAEDAL Transition SFX Pack, DAEDAL_Impact_01_Cinematic_Boom.wav",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "02-cinematic-hit-b",
+      "file": "hit/02-cinematic-hit-b.mp3",
+      "category": "hit",
+      "duration": 3.024,
+      "hit": 0.16,
+      "gain": 0.5,
+      "effects": [
+        "huge-strike",
+        "headline-wall",
+        "uninstall",
+        "reject-stamp"
+      ],
+      "source": "https://daedal.art/resources/transition-sfx-pack/",
+      "license": "CC0-1.0",
+      "credit": "DAEDAL Transition SFX Pack, DAEDAL_Impact_04_Hit_Tail.wav",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "03-riser-tension",
+      "file": "riser/03-riser-tension.mp3",
+      "category": "riser",
+      "duration": 3.456,
+      "hit": 2.69,
+      "gain": 0.38,
+      "effects": [
+        "huge-strike",
+        "fan-build",
+        "rabbit-hole",
+        "lean-in",
+        "slow-push"
+      ],
+      "source": "https://daedal.art/resources/transition-sfx-pack/",
+      "license": "CC0-1.0",
+      "credit": "DAEDAL Transition SFX Pack, DAEDAL_Riser_01_Tension_3s.wav",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "05-whoosh-fast",
+      "file": "whoosh/05-whoosh-fast.mp3",
+      "category": "whoosh",
+      "duration": 1.08,
+      "hit": 0.35,
+      "gain": 0.42,
+      "effects": [
+        "orbit",
+        "over-the-shoulder-zoom",
+        "match-cut",
+        "lean-in"
+      ],
+      "source": "https://daedal.art/resources/transition-sfx-pack/",
+      "license": "CC0-1.0",
+      "credit": "DAEDAL Transition SFX Pack, DAEDAL_Whoosh_01_Fast.wav",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "06-whoosh-cinematic-deep",
+      "file": "whoosh/06-whoosh-cinematic-deep.mp3",
+      "category": "whoosh",
+      "duration": 1.512,
+      "hit": 0.68,
+      "gain": 0.42,
+      "effects": [
+        "rabbit-hole",
+        "carousel-spin",
+        "slow-push",
+        "phone-fan"
+      ],
+      "source": "https://daedal.art/resources/transition-sfx-pack/",
+      "license": "CC0-1.0",
+      "credit": "DAEDAL Transition SFX Pack, DAEDAL_Whoosh_03_Deep.wav",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "07-whoosh-whip",
+      "file": "whoosh/07-whoosh-whip.mp3",
+      "category": "whoosh",
+      "duration": 1.368,
+      "hit": 0.31,
+      "gain": 0.42,
+      "effects": [
+        "orbit",
+        "carousel-spin",
+        "huge-strike",
+        "wave-trim"
+      ],
+      "source": "https://daedal.art/resources/transition-sfx-pack/",
+      "license": "CC0-1.0",
+      "credit": "DAEDAL Transition SFX Pack, DAEDAL_Whoosh_04_Whip.wav",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "08-swipe-up",
+      "file": "swipe/08-swipe-up.mp3",
+      "category": "swipe",
+      "duration": 0.672,
+      "hit": 0.14,
+      "gain": 0.4,
+      "effects": [
+        "timeline",
+        "place-in-grid",
+        "carousel-spin",
+        "swipe",
+        "broll-split"
+      ],
+      "source": "https://daedal.art/resources/transition-sfx-pack/",
+      "license": "CC0-1.0",
+      "credit": "DAEDAL Transition SFX Pack, DAEDAL_Swipe_01_Up.wav",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "09-swipe-down",
+      "file": "swipe/09-swipe-down.mp3",
+      "category": "swipe",
+      "duration": 0.648,
+      "hit": 0.1,
+      "gain": 0.4,
+      "effects": [
+        "timeline",
+        "match-cut",
+        "place-in-grid",
+        "swipe"
+      ],
+      "source": "https://daedal.art/resources/transition-sfx-pack/",
+      "license": "CC0-1.0",
+      "credit": "DAEDAL Transition SFX Pack, DAEDAL_Swipe_02_Down.wav",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "10-pop-bubble",
+      "file": "pop/10-pop-bubble.mp3",
+      "category": "pop",
+      "duration": 0.408,
+      "hit": 0.0,
+      "gain": 0.45,
+      "effects": [
+        "pastel-word",
+        "backdrop-word",
+        "dot-reveal",
+        "check-pills"
+      ],
+      "source": "https://daedal.art/resources/transition-sfx-pack/",
+      "license": "CC0-1.0",
+      "credit": "DAEDAL Transition SFX Pack, DAEDAL_Pop_03_Bubble.wav",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "11-pop-sticker",
+      "file": "pop/11-pop-sticker.mp3",
+      "category": "pop",
+      "duration": 0.408,
+      "hit": 0.0,
+      "gain": 0.45,
+      "effects": [
+        "cover-star",
+        "pastel-word",
+        "backdrop-word",
+        "headline-box"
+      ],
+      "source": "https://daedal.art/resources/transition-sfx-pack/",
+      "license": "CC0-1.0",
+      "credit": "DAEDAL Transition SFX Pack, DAEDAL_Pop_01.wav",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "12-ui-click-glass",
+      "file": "ui/12-ui-click-glass.mp3",
+      "category": "ui",
+      "duration": 0.312,
+      "hit": 0.0,
+      "gain": 0.4,
+      "effects": [
+        "glass-widgets",
+        "tap",
+        "apple-toggles",
+        "todo"
+      ],
+      "source": "https://kenney.nl/assets/interface-sounds",
+      "license": "CC0-1.0",
+      "credit": "Kenney Interface Sounds, glass_001.ogg (also https://opengameart.org/content/interface-sounds)",
+      "channels": 1,
+      "sampleRate": 48000
+    },
+    {
+      "id": "13-ui-tick",
+      "file": "ui/13-ui-tick.mp3",
+      "category": "ui",
+      "duration": 0.288,
+      "hit": 0.18,
+      "gain": 0.4,
+      "effects": [
+        "timeline",
+        "glass-widgets",
+        "countdown-flip",
+        "checklist"
+      ],
+      "source": "https://kenney.nl/assets/interface-sounds",
+      "license": "CC0-1.0",
+      "credit": "Kenney Interface Sounds, tick_002.ogg, 3-hit listen burst",
+      "channels": 1,
+      "sampleRate": 48000
+    },
+    {
+      "id": "14-ui-notification",
+      "file": "ui/14-ui-notification.mp3",
+      "category": "ui",
+      "duration": 0.84,
+      "hit": 0.16,
+      "gain": 0.4,
+      "effects": [
+        "comment-box",
+        "glass-widgets",
+        "messages",
+        "profile-wall"
+      ],
+      "source": "https://daedal.art/resources/ui-sounds/",
+      "license": "CC0-1.0",
+      "credit": "DAEDAL UI Sounds, DAEDAL_UI_025_Notification.wav",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "15-glitch-digital-a",
+      "file": "glitch/15-glitch-digital-a.mp3",
+      "category": "glitch",
+      "duration": 1.032,
+      "hit": 0.52,
+      "gain": 0.42,
+      "effects": [
+        "led-sign",
+        "match-cut",
+        "split-headline",
+        "noise"
+      ],
+      "source": "https://daedal.art/resources/transition-sfx-pack/",
+      "license": "CC0-1.0",
+      "credit": "DAEDAL Transition SFX Pack, DAEDAL_Glitch_03.wav",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "16-glitch-digital-b",
+      "file": "glitch/16-glitch-digital-b.mp3",
+      "category": "glitch",
+      "duration": 1.44,
+      "hit": 0.93,
+      "gain": 0.42,
+      "effects": [
+        "match-cut",
+        "led-sign",
+        "noise",
+        "headline-wall"
+      ],
+      "source": "https://daedal.art/resources/transition-sfx-pack/",
+      "license": "CC0-1.0",
+      "credit": "DAEDAL Transition SFX Pack, DAEDAL_Glitch_04.wav",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "17-camera-shutter",
+      "file": "camera/17-camera-shutter.mp3",
+      "category": "camera",
+      "duration": 0.912,
+      "hit": 0.13,
+      "gain": 0.45,
+      "effects": [
+        "cover-star",
+        "place-in-grid",
+        "red-collage",
+        "reel-frame"
+      ],
+      "source": "https://opengameart.org/content/camera",
+      "license": "CC0-1.0",
+      "credit": "themightyglider photo.ogg, rearranged from https://archive.org/details/CameraShutterSound (CC0)",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "18-camera-flash",
+      "file": "camera/18-camera-flash.mp3",
+      "category": "camera",
+      "duration": 0.48,
+      "hit": 0.01,
+      "gain": 0.4,
+      "effects": [
+        "cover-star",
+        "red-collage",
+        "place-in-grid"
+      ],
+      "source": "original",
+      "license": "CC0-1.0",
+      "credit": "Synthesized for this pack (original, dedicated CC0)",
+      "channels": 1,
+      "sampleRate": 48000
+    },
+    {
+      "id": "19-paper-scribble",
+      "file": "paper/19-paper-scribble.mp3",
+      "category": "paper",
+      "duration": 1.344,
+      "hit": 1.05,
+      "gain": 0.45,
+      "effects": [
+        "crayon-write",
+        "scribble",
+        "tape-label",
+        "the-bill"
+      ],
+      "source": "https://freesound.org/s/571800/",
+      "license": "CC0-1.0",
+      "credit": "pencil_write by NachtmahrTV; pack https://opengameart.org/content/pencil-sounds (AntumDeluge)",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "20-cha-ching",
+      "file": "counter/20-cha-ching.mp3",
+      "category": "counter",
+      "duration": 0.936,
+      "hit": 0.47,
+      "gain": 0.4,
+      "effects": [
+        "over-the-shoulder-zoom",
+        "liquid-glass-graph",
+        "tier-list"
+      ],
+      "source": "https://opengameart.org/content/rpg-sound-pack",
+      "license": "CC0-1.0",
+      "credit": "artisticdude RPG Sound Pack, coin2.wav",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "21-counter-tickup",
+      "file": "counter/21-counter-tickup.mp3",
+      "category": "counter",
+      "duration": 0.984,
+      "hit": 0.62,
+      "gain": 0.42,
+      "effects": [
+        "over-the-shoulder-zoom",
+        "timeline",
+        "countdown-flip"
+      ],
+      "source": "original",
+      "license": "CC0-1.0",
+      "credit": "Synthesized rising 6-tick count (original, dedicated CC0)",
+      "channels": 1,
+      "sampleRate": 48000
+    },
+    {
+      "id": "22-sub-drop",
+      "file": "sub/22-sub-drop.mp3",
+      "category": "sub",
+      "duration": 2.088,
+      "hit": 0.13,
+      "gain": 0.48,
+      "effects": [
+        "pastel-word",
+        "slow-push",
+        "huge-strike",
+        "moody"
+      ],
+      "source": "https://daedal.art/resources/transition-sfx-pack/",
+      "license": "CC0-1.0",
+      "credit": "DAEDAL Transition SFX Pack, DAEDAL_Impact_03_Sub_Drop.wav",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "23-shimmer-sparkle-a",
+      "file": "shimmer/23-shimmer-sparkle-a.mp3",
+      "category": "shimmer",
+      "duration": 0.576,
+      "hit": 0.0,
+      "gain": 0.4,
+      "effects": [
+        "spotlight",
+        "cover-star",
+        "pause-point"
+      ],
+      "source": "https://kenney.nl/assets/interface-sounds",
+      "license": "CC0-1.0",
+      "credit": "Kenney Interface Sounds, confirmation_002.ogg",
+      "channels": 1,
+      "sampleRate": 48000
+    },
+    {
+      "id": "24-shimmer-sparkle-b",
+      "file": "shimmer/24-shimmer-sparkle-b.mp3",
+      "category": "shimmer",
+      "duration": 2.424,
+      "hit": 0.13,
+      "gain": 0.38,
+      "effects": [
+        "spotlight",
+        "slow-push",
+        "pause-point"
+      ],
+      "source": "original",
+      "license": "CC0-1.0",
+      "credit": "Synthesized spotlight shimmer (original, dedicated CC0)",
+      "channels": 1,
+      "sampleRate": 48000
+    },
+    {
+      "id": "25-riser-pitch-sweep",
+      "file": "riser/25-riser-pitch-sweep.mp3",
+      "category": "riser",
+      "duration": 3.192,
+      "hit": 3.05,
+      "gain": 0.38,
+      "effects": [
+        "huge-strike",
+        "slow-push",
+        "rabbit-hole"
+      ],
+      "source": "original",
+      "license": "CC0-1.0",
+      "credit": "Synthesized cinematic pitch-sweep riser (original, dedicated CC0)",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "26-riser-supersaw-swell",
+      "file": "riser/26-riser-supersaw-swell.mp3",
+      "category": "riser",
+      "duration": 3.576,
+      "hit": 3.45,
+      "gain": 0.38,
+      "effects": [
+        "huge-strike",
+        "fan-build",
+        "lean-in"
+      ],
+      "source": "original",
+      "license": "CC0-1.0",
+      "credit": "Synthesized filtered supersaw swell (original, dedicated CC0)",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "27-riser-pulse-accel",
+      "file": "riser/27-riser-pulse-accel.mp3",
+      "category": "riser",
+      "duration": 3.336,
+      "hit": 3.19,
+      "gain": 0.36,
+      "effects": [
+        "huge-strike",
+        "fan-build",
+        "carousel-spin"
+      ],
+      "source": "original",
+      "license": "CC0-1.0",
+      "credit": "Synthesized pulsing accelerating build (original, dedicated CC0)",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "28-riser-shepard",
+      "file": "riser/28-riser-shepard.mp3",
+      "category": "riser",
+      "duration": 3.984,
+      "hit": 3.85,
+      "gain": 0.36,
+      "effects": [
+        "rabbit-hole",
+        "slow-push",
+        "lean-in"
+      ],
+      "source": "original",
+      "license": "CC0-1.0",
+      "credit": "Synthesized Shepard-tone riser (original, dedicated CC0)",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "29-release-downlifter",
+      "file": "release/29-release-downlifter.mp3",
+      "category": "release",
+      "duration": 2.28,
+      "hit": 0.07,
+      "gain": 0.4,
+      "effects": [
+        "huge-strike",
+        "red-collage",
+        "uninstall",
+        "match-cut"
+      ],
+      "source": "original",
+      "license": "CC0-1.0",
+      "credit": "Synthesized downlifter / downward sweep (original, dedicated CC0)",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "30-release-pad-bloom",
+      "file": "release/30-release-pad-bloom.mp3",
+      "category": "release",
+      "duration": 2.64,
+      "hit": 0.24,
+      "gain": 0.4,
+      "effects": [
+        "slow-push",
+        "pastel-word",
+        "moody"
+      ],
+      "source": "original",
+      "license": "CC0-1.0",
+      "credit": "Synthesized warm Dadd9 pad bloom (original, dedicated CC0)",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "31-release-airy-exhale",
+      "file": "release/31-release-airy-exhale.mp3",
+      "category": "release",
+      "duration": 2.088,
+      "hit": 0.06,
+      "gain": 0.4,
+      "effects": [
+        "red-collage",
+        "pastel-word",
+        "moody"
+      ],
+      "source": "original",
+      "license": "CC0-1.0",
+      "credit": "Synthesized airy filtered exhale (original, dedicated CC0)",
+      "channels": 2,
+      "sampleRate": 48000
+    },
+    {
+      "id": "32-release-resolve-chord",
+      "file": "release/32-release-resolve-chord.mp3",
+      "category": "release",
+      "duration": 2.424,
+      "hit": 0.17,
+      "gain": 0.4,
+      "effects": [
+        "pastel-word",
+        "slow-push",
+        "comment-box"
+      ],
+      "source": "original",
+      "license": "CC0-1.0",
+      "credit": "Synthesized Dsus4-to-Dadd9 resolve (original, dedicated CC0)",
+      "channels": 2,
+      "sampleRate": 48000
+    }
+  ]
+}

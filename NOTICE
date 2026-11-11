@@ -4,9 +4,12 @@ Copyright 2026 Will Gwyn (wrg32786)
 Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 Third-party files keep their own terms:
-- kit/sfx/*.mp3, kit/sfx/whoosh.wav, kit/sfx/swipe.wav: Freesound CC0 (credits in README.md).
+- kit/sfx/F-cinematic-woosh-648729.mp3, kit/sfx/D-quick-woosh-683101.mp3, kit/sfx/whoosh.wav, kit/sfx/swipe.wav: Freesound CC0 (credits in README.md).
 - kit/sfx/boom.wav, click.wav, typing.wav: from motion-pack by ANVEAI (https://github.com/ANVEAI/motion-pack),
   CC0 1.0 under its LICENSE-MEDIA.
+- kit/sfx/{hit,riser,release,whoosh,swipe,pop,ui,glitch,camera,paper,counter,sub,shimmer}/: 31-sound
+  cinematic pack, all CC0 1.0 (DAEDAL, Kenney, OpenGameArt/Freesound, archive.org, and original synths
+  dedicated CC0). Credits in THIRD_PARTY.md and kit/sfx/sfx.json.
 - kit/fonts/*.ttf: Google Fonts under the SIL Open Font License 1.1 (kit/fonts/OFL-*.txt).
 - kit/transitions.json adapts motion-pack's xfade name map (MIT). The hormozi and karaoke caption looks follow
   Capite (https://github.com/muneebkhan08/Capite), MIT, Copyright (c) 2026 Capite Contributors. Title entrances

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 import { createRequire } from 'module';
 const KITR = createRequire(import.meta.url)('../kit/rules.cjs');
+const SFXPLAN = createRequire(import.meta.url)('../kit/sfx-plan.cjs');
 const PAIRS = JSON.parse(readFileSync(join(HERE, '..', 'kit', 'fonts', 'pairings.json'), 'utf8')).pairings;
 const esc = s => String(s).replace(/\|/g, '\\|');
 export function renderCatalog(cat) {
@@ -17,14 +18,18 @@ export function renderCatalog(cat) {
   const TN = Object.entries(KITR.TRANSITIONS.names);
   const PN = Object.entries(PAIRS).filter(([, v]) => v).map(([k, v]) => `\`${k}\` (${[v.display, v.secondary, v.script].filter(Boolean).map(r => r.family).join(' + ')})`);
   const SND = Object.entries(KITR.SFX).filter(([k]) => !/^[FD]$/.test(k));
-  const total = E.length + MODES.length + STYLES.length + KITR.ENTRANCES.length + TN.length + SND.length + PN.length;
+  const PACK = SFXPLAN.loadManifest();
+  const byCat = {};
+  for (const s of PACK.sounds) (byCat[s.category] = byCat[s.category] || []).push(s.id);
+  const total = E.length + MODES.length + STYLES.length + KITR.ENTRANCES.length + TN.length + SND.length + PACK.sounds.length + PN.length;
   L.push('## Everything available', '', `${total} things to offer, in one list. Tell the user what fits their moment, not the whole list.`, '',
     `- **${E.length} video effects** (this catalog, \`npm run fx\`): ${E.map(e => '`' + e.name + '`').join(', ')}.`,
     `- **${MODES.length} overlay modes** (\`captions.js\` flips, \`mode\`): ${MODES.join('; ')}.`,
     `- **${STYLES.length} caption styles** (\`captionStyle\`, or \`style\` per flip): ${STYLES.join('; ')}.`,
     `- **${KITR.ENTRANCES.length} kinetic title entrances** (mode 7 \`entrance\`, each once per video; flicker on the hook and payoff only): ${KITR.ENTRANCES.map(x => '`' + x + '`').join(', ')}.`,
     `- **${TN.length} named transitions** (\`cut.json\` per segment \`transition\`; default \`glitch\` seam; any of ffmpeg's 58 xfade modes also works): ${TN.map(([k, v]) => '`' + k + '`' + (v ? '' : ' (seam)')).join(', ')}.`,
-    `- **${SND.length} sounds**, the locked set (\`cut.json\` \`sfx\`; fewer and deeper): ${SND.map(([k, v]) => `\`${k}\` ${v.use}`).join('; ')}.`,
+    `- **${SND.length} locked sounds**, the cut-seam set (\`cut.json\` \`sfx\`; fewer and deeper): ${SND.map(([k, v]) => `\`${k}\` ${v.use}`).join('; ')}.`,
+    '- **' + PACK.sounds.length + ' pack sounds** (`kit/sfx/sfx.json`, auto-picked on `npm run fx` unless `--sfx off`): ' + PACK.categories.map(c => '`' + c + '` ' + (byCat[c] || []).map(id => '`' + id + '`').join(', ')).join('; ') + '. Per-effect override: `"sfx": "<id>"` or `"sfx": false`.',
     `- **${PN.length} font pairings** (\`--fonts\`, plus \`theme\` and your own licensed fonts in kit/fonts/local/): ${PN.join(', ')}.`,
     '- **Camera**: zoom punch on every cut (`punch`), big punch (`bigPunch`, +12% over 0.3 s) on the cut after the hook and into the payoff.', '');
   L.push('**How to read it**', '', '- **Moments**: where in the script it fits. ' + Object.entries(cat.moments).map(([k, v]) => `\`${k}\` ${v}`).join(' '), `- **Energy**: ${Object.entries(cat.energy).map(([k, v]) => `\`${k}\` (${v})`).join(', ')}.`, '- **Needs**: `face` = placed relative to the face (needs a face in frame), `segmentation` = hides behind you, `word-cue` = should land on a spoken word, `text` / `numbers` / `images` = you supply copy, real numbers or a folder of pictures.', '- **Captions**: `safe` = keep captions on; `check` = the caption track moves up to `altY` (default 330) for that window, read a check frame (`--still`); `off` = captions and kinetic titles are hidden for that window automatically (add `"captions": "on"` to the plan entry to keep them).', '- **Required** options must be in the plan (see "Needs your copy"); upstream defaults never show. `name`/`handle` come from the plan\'s `profile`.', '');
