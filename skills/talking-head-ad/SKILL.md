@@ -28,17 +28,37 @@ Skip this when the teammate already has a script.
    `npm run check` lints captions, titles and cards for these and fails on them.
 4. **Takes.** Ask for 2 or 3 full takes. One take shot from an extreme angle (low, high, or very close) makes a strong hook: pass `--hook <that file>`.
 
+## Offer the menu (mandatory)
+
+Do this before you draft, and again before the final render. The menu of effects, graphics, finishes and looks is easy to miss; the user should see it and use the variety.
+
+1. First ask how they want to pick the look: use a saved brand preset (`npm run preset -- --list`; `npm run reel -- --preset <name>`), customize from the menu, or let you choose (`--preset auto`, then tell them what you picked and why). If they have no preset, offer to import a brand guide they drop in `brand-guide/` or pass as a file: `npm run brand:import -- <pdf|image|markdown>`. That writes a draft under `kit/presets/local/` for them to confirm. Presets work without a guide. Any flag or `cut.json` field they set wins over the preset.
+2. Run `npm run menu` (every option, grouped, with a one-line label) and point the user at [showcase/index.html](../../showcase/index.html). Rebuild the gallery with `npm run showcase` if it is missing.
+3. Show short labels and suggest 2 or 3 options per category that fit this reel:
+   - brand presets (`aigent`, `one-word`, `hormozi-bold`, `karaoke`, `minimal-clean`, `cinematic`, `editorial`, `muse-pill`, `retro-scan-lines`, `neutral`)
+   - film finishes (grain, vignette, chroma, scan-lines, warm, cool, teal, crushed, mono, bleach), including per-scene variety on `cut.json` segments; do not use one finish on every shot
+   - beat-sync (on by default when a bed is set; `--no-beat-sync` to leave times alone)
+   - looks (`kinetic`, `oneword`, `muse`, `classic`, `one-word`) and caption styles (`kinetic`, `oneword`, `pill`, `hormozi`, `karaoke`, `classic`, `one-word`); `oneword` is the strongest caption look here (one word at a time, type cards; kit/looks/oneword.md), and `--broll <folder>` with shots of the work itself (hands typing, the screen) adds cutaways
+   - font pairings (`theme`, `modern`, `druk`, `elegant`, `editorial`)
+   - themes (`aigent` default, `neutral` unbranded)
+   - title entrances (7, each used at most once)
+   - transitions (50 names in `kit/transitions.json`; glitch seam is the default)
+   - the 51 effects, grouped by moment (see also [effects/CATALOG.md](../../effects/CATALOG.md))
+   - the SFX pack (`kit/sfx/sfx.json`)
+   - music beds (`npm run music`, or the beds section of the menu)
+4. Vary looks across scenes rather than one finish, style or effect for everything. Ask before you reuse one look on the whole reel.
+
 ## Phone clip to reel (start here)
 
 1. Find the clip: `npm run reel` with no path uses every video from the newest recording session in `inbox/` (files within 2 hours of the newest; `--newest` for one), or pass the files the teammate names. If the inbox is empty, ask them to drop it in.
-2. The default theme is AIgent. Use it unless they ask for another look: `--theme neutral` (unbranded, offline) or their own `kit/themes/<name>.js`. Don't use the Skool mark for another brand. Offer a music bed: `npm run music` lists our library (`kit/music/`). Suggest two or three that fit the reel's energy and let the human pick by ear, or use their own file. Offer a font pairing (`--fonts modern|druk|elegant|editorial`, default the theme's fonts) and a look (`--look oneword` for one word at a time with type cards, the strongest caption style here; add `--broll <folder>` with shots of the work itself (hands typing, the screen) for cutaways; `--look kinetic` default, `muse` for pill captions, `classic` for the old captions).
+2. The default theme is AIgent. Use it unless they ask for another look: `--theme neutral` (unbranded, offline) or their own `kit/themes/<name>.js`. Don't use the Skool mark for another brand. **Offer the menu** (section above) if you have not already: finishes with per-scene variety, beat-sync, looks and caption styles, font pairings, themes, title entrances and transitions, plus beds. Suggest two or three that fit the reel's energy and let the human pick by ear, or use their own file.
 3. Draft it: `npm run reel -- inbox/<file> [inbox/<take2> ...] --theme <name> [--fonts druk] [--hook <take>] [--bed <library name>|music.wav] [--bed-start 0] [--cropx 0.4] --draft`
    - `--cropx` moves the 9:16 crop for a sideways clip (0 left, 0.5 centre, 1 right). Read `jobs/<name>/clips/clips-sheet.png` to check the face is in frame.
    - `--model medium.en` is faster than the default large-v3 for a first pass.
    - With a bed, beat-sync is on by default: punches, SFX and title entrances snap to the bed (speech cuts stay put). Pass `--no-beat-sync` to leave the times alone, or `--finish grain,vignette` for a film look on the picture.
 4. Read `jobs/<name>/clips/clips.md`. `npm run reel` already dropped every `retake` row. Remove slates and asides ("Okay, take two...") from `build/cut.json`, and trim the `out` of clips that end mid-move.
 5. Edit `build/captions.js`. It's a draft with every phrase in the caption style (`kinetic` by default, key words in `emph`), and one title per beat as a mode 7 flip. Fix misheard words against what the teammate said, rewrite titles that don't read as a headline, and add a count-up, card or CTA if wanted (see step 4 below).
-6. Build it: `npm run reel -- --rebuild --name <name>` writes `jobs/<name>/reel-vN.mp4`, a new number each time.
+6. Before the final render, **offer the menu again**. Confirm finishes (vary them across scenes), beat-sync, the look, fonts, theme, title entrances and transitions. Then build: `npm run reel -- --rebuild --name <name>` writes `jobs/<name>/reel-vN.mp4`, a new number each time.
 7. **Verify (mandatory):** `npm run verify -- <name>` must print `VERIFY PASS`. Read `jobs/<name>/verify/contact.png` and every still it lists (each title mid-entrance and settled, the big punches, the payoff) before you hand over the reel path. Then offer the effects pass (next section) if they want more motion.
 
 Leave out `--draft` to go straight to `reel-v1.mp4` in one command. The draft step is better when someone will watch it.
@@ -48,7 +68,7 @@ Leave out `--draft` to go straight to `reel-v1.mp4` in one command. The draft st
 After the reel is cut and captioned, you can add effects from [`effects/CATALOG.md`](../../effects/CATALOG.md) (51 starter effects by Vibha Ramprakash; machine-readable in `effects/catalog.json`). Set up once with `npm run effects:setup`.
 
 1. **Read the transcript** (`jobs/<name>/build/captions.js` or `clips/clips.md`) and mark the moments with output-clock times: hook (first 2 s), key claims, numbers or proof, lists or steps, reveals, objections ("but", "no", "stop"), and the CTA. Note the energy of each part (calm, medium, high) from the delivery and the words.
-2. **Tell the user what's available**, briefly: the moments you found, and for each one 2 or 3 effect options from the catalog that fit the moment and its energy, with a one-line "what it does". Offer a menu preset if one fits (below). Ask them to pick, or to say "you choose".
+2. **Tell the user what's available**, briefly: the moments you found, and for each one 2 or 3 effect options from the catalog that fit the moment and its energy, with a one-line "what it does". Point them at [showcase/index.html](../../showcase/index.html) (or `npm run menu`) so they can see every labelled effect. Offer a menu preset if one fits (below). Ask them to pick, or to say "you choose".
 3. **Build the plan**: 3 to 6 effects. A hook effect in the first 2 s, a CTA effect at the end, and no more than one `high` effect every 5 s. Use each effect's typical duration. Put real copy and numbers in every required option (ask for numbers; never invent them). The "Needs your copy" table in `effects/CATALOG.md` (and `required` / `requiredIf` / `fromProfile` in `catalog.json`) lists what each effect needs. Pull headlines, labels and stats from the transcript where you can. 31 effects ship with the upstream author's brand, handle or demo stats as defaults, and `npm run fx` refuses the plan until you replace them. `glass-widgets`, for example, needs `title`, `text` (the big number), `sub` and `chart` (`label::value::bar|values`); its calendar and "now editing" lines fill in with today's date and the job name. Put the teammate's name and handle in `"profile"`. The "Edited by Claude" pill on `glass-widgets` stays off unless the user asks for it: then add `"pill": true` (or their own text, `"pill": "Made by |Sam"`) to that entry, or pass `--pill`. Save it as `jobs/<name>/fx.json`:
    ```json
    {"profile": {"name": "Sam", "handle": "@sam.makes"},

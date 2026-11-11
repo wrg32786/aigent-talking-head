@@ -40,3 +40,7 @@ Third-party files keep their own terms:
   assets were brought over.
 - librosa (pip): librosa by the librosa developers (https://github.com/librosa/librosa), ISC.
   Installed by pip install -r requirements.txt, not vendored.
+
+- showcase/source/presenter.jpg: an AI-generated fictional person made for this
+  project (and the derived presenter-mask.png). Not a real person's portrait.
+  Licensed Apache-2.0 with this repo.

@@ -1,0 +1,23 @@
+{
+  "name": "karaoke",
+  "label": "Colour wipe as each word is said",
+  "theme": "aigent",
+  "look": "kinetic",
+  "captionStyle": "karaoke",
+  "fonts": "modern",
+  "titles": true,
+  "finish": null,
+  "finishPool": [
+    "grain"
+  ],
+  "transition": "crossfade",
+  "effectsFavourites": [
+    "spotlight",
+    "pastel-word",
+    "tap",
+    "comment-box"
+  ],
+  "bed": null,
+  "punch": true,
+  "notes": "A left-to-right colour wipe follows the voice. Good for lyric-like delivery."
+}

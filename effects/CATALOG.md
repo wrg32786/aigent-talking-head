@@ -48,23 +48,23 @@ These effects ship with the upstream author's brand names, handle or demo stats 
 | `spotlight` | text (when look=sparkle) | - | - | text (look=sparkle): CLAUDE |
 | `the-bill` | text | - | - | text: ORDER #1021\|1x orbit\|1x spotlight... |
 | `todo` | text | - | - | text: drop your video into Claude\|install the skill\|type /effects |
-| `comment-box` | text, reply, chip | handle | handle | text: EFFECTS; handle: vibha.in.progress; reply: Sent you the pack; chip: 22 effects |
+| `comment-box` | text, reply, chip | handle | handle | text: EFFECTS; handle: the upstream author's handle; reply: Sent you the pack; chip: 22 effects |
 | `uninstall` | text | - | - | - |
 | `reel-frame` | - | handle (as text) | text | text: @your.handle |
 | `reject-stamp` | text | - | - | - |
 | `cover-star` | text, lines | - | issue, right | text: VIBE / EFFECTS; issue: THE AI ISSUE · 2026 / THE ONE-CLIP ISSUE · NO. 42; lines: 22 effects\|you can steal...; right: the art of the\|effortless edit |
-| `glass-widgets` | text, title, sub, chart, label (when look=simple) | name, handle | song, song_sub, day, date, event, chart_tag | title: Claude; text: 38 / 22; sub: effects\|one clip; name: Vibha; handle: @vibha.in.progress; chart: Top reels · 197K · fixed bars (hard-coded); song: soft UI pops; song_sub: sfx · 25.7s (hard-coded); day/date/event: WED 21 Post 2 reels · tonight; label (look=simple): glass UI; pill: Edited by Claude (hard-coded) |
+| `glass-widgets` | text, title, sub, chart, label (when look=simple) | name, handle | song, song_sub, day, date, event, chart_tag | title: Claude; text: 38 / 22; sub: effects\|one clip; name: the upstream author's name; handle: the upstream author's handle; chart: Top reels · 197K · fixed bars (hard-coded); song: soft UI pops; song_sub: sfx · 25.7s (hard-coded); day/date/event: WED 21 Post 2 reels · tonight; label (look=simple): glass UI; pill: Edited by Claude (hard-coded) |
 | `red-collage` | text, lines | - | tag | text: EDIT; lines: ONE CLIP.\|22 EFFECTS.\|ZERO APPS.; tag: REC · RED COLLAGE |
 | `split-headline` | text, pill | - | hl | text: Claude\|edits my\|reels.; hl: edits; pill: in seconds ↗ |
-| `pastel-word` | text | name, handle | - | text: REELS; name: Vibha; handle: @vibha.in.progress |
-| `check-pills` | text | handle | board | text: Hook\|Captions\|Cuts\|B-roll; handle: @vibha.in.progress; board: Reels · 22 effects |
+| `pastel-word` | text | name, handle | - | text: REELS; name: the upstream author's name; handle: the upstream author's handle |
+| `check-pills` | text | handle | board | text: Hook\|Captions\|Cuts\|B-roll; handle: the upstream author's handle; board: Reels · 22 effects |
 | `timeline` | sub | - | - | sub: timeline by Claude |
 | `headline-box` | text | - | - | text: How I got Claude\|to edit my reels. |
-| `profile-wall` | count | name | sub | name: vibha.in.progress; count: 197000; sub: top reel |
+| `profile-wall` | count | name | sub | name: the upstream author's handle; count: 197000; sub: top reel |
 | `tier-list` | title, item, others | - | - | title: best way to edit a reel?; item: Claude; others: templates\|timelines\|apps\|doing it by hand |
 | `broll-split` | images, text | - | - | text: 4 hrs → 4 min |
 | `phone-fan` | text | - | - | text: 22 effects.\|zero editing apps. |
-| `headline-wall` | text, total, label | handle | - | text: the author's reel headlines (Claude, ChatGPT...); total: 672K; label: views from 7 reels; handle: @vibha.in.progress (hard-coded) |
+| `headline-wall` | text, total, label | handle | - | text: the author's reel headlines (Claude, ChatGPT...); total: 672K; label: views from 7 reels; handle: the upstream author's handle (hard-coded) |
 | `checklist` | text, title | - | - | title: Claude is editing your clip |
 | `liquid-glass-graph` | text, to, donut, kpi, bars (when look=bento) | - | - | text: RETENTION / VIEWS; to: 59% / 197K; donut (bento): 29%::ERASE share; kpi (bento): 672K::views · top 7 reels; bars (bento): 197\|140\|124\|83\|50::top reels |
 | `match-cut` | text | - | - | text: Claude |

@@ -5,7 +5,7 @@
 //   node <kit>/autocaption.mjs --out captions.js [--force] [--words 4] [--chars 22] [--shift 0.3] [--hero] [--logo logo.svg]
 // Every phrase is a plain caption (mode 0). --hero makes the last phrase before each seam a spray hero word (mode 1).
 // --cards adds type cards (mode 8, flat-colour cutaways; the oneword look). --titles makes it a kinetic title instead (mode 7, one per beat, up to 7, each with its own entrance; behind the
-// person when a mask is made). --style kinetic (default: every word animates in, one emphasis word per phrase)|oneword (one word at a time)|classic|pill|hormozi|karaoke sets
+// person when a mask is made). --style kinetic (default: every word animates in, one emphasis word per phrase)|oneword (one word at a time, the full look)|classic|pill|hormozi|karaoke|one-word (one big word, simple) sets
 // captionStyle; pill groups 3 to 5 words. --fonts <pairing>[,<pairing>...] writes "fonts" (kit/fonts/pairings.json; several cycle).
 // Every caption carries its word times ("words") so pills, hormozi and karaoke can follow the voice.
 // Seams get glitchAt entries. --shift adds seconds to every word (Whisper often runs 0.3-0.6 s early on cinematic takes).
@@ -17,7 +17,7 @@ import { basename, dirname, join } from 'path';
 const argv = process.argv.slice(2);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i < 0 ? d : (argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : true); };
 const STYLE = String(opt('style', 'kinetic')), PILLISH = STYLE !== 'classic';
-if (!['kinetic', 'oneword', 'classic', 'pill', 'hormozi', 'karaoke'].includes(STYLE)) { console.error('--style must be kinetic, oneword, classic, pill, hormozi or karaoke'); process.exit(1); }
+if (!['kinetic', 'oneword', 'classic', 'pill', 'hormozi', 'karaoke', 'one-word'].includes(STYLE)) { console.error('--style must be kinetic, oneword, classic, pill, hormozi, karaoke or one-word'); process.exit(1); }
 const OUT = opt('out', 'captions.draft.js'), MAXW = +opt('words', STYLE === 'pill' ? 5 : 4), MINW = STYLE === 'kinetic' ? 2 : PILLISH ? 3 : 1, MAXC = +opt('chars', 22), SHIFT = +opt('shift', 0), GAP = +opt('gap', 0.35);
 if (existsSync(OUT) && OUT !== 'captions.draft.js' && !opt('force', false)) { console.error(`${OUT} exists; pass --force to overwrite`); process.exit(1); }
 if (!existsSync('cut.json')) { console.error('No cut.json here. Run from your build/ folder.'); process.exit(1); }
@@ -137,7 +137,7 @@ if (opt('cards', false)) {
   flips.sort((a, b) => a.start - b.start || a.mode - b.mode);
 }
 flips.forEach(f => delete f._beatEnd);
-const caps = { note: `Auto-drafted by kit/autocaption.mjs from Whisper word times. Hand-tweak before shipping: modes 0 caption, 1 spray hero word, 2 sticker, 3 count-up, 4 takeover card, 5 logo plate, 6 CTA sticker, 7 kinetic title (entrance: stagger-rise|slam|blur-rise|slide-left|elastic|flip|pop-zoom, each once; flicker only on the first and last title). end 99 = hold to the end. captionStyle: kinetic|classic|pill|hormozi|karaoke; hero = word indices set big in the display face (titles and kinetic captions are two-font lockups; \"lockup\": false for one font).`, captionStyle: STYLE, ...(opt('fonts', null) && opt('fonts') !== true ? { fonts: opt('fonts') } : {}), flips, glitchAt: [0.02, ...seams], bursts: [], captionY: 1300 };
+const caps = { note: `Auto-drafted by kit/autocaption.mjs from Whisper word times. Hand-tweak before shipping: modes 0 caption, 1 spray hero word, 2 sticker, 3 count-up, 4 takeover card, 5 logo plate, 6 CTA sticker, 7 kinetic title (entrance: stagger-rise|slam|blur-rise|slide-left|elastic|flip|pop-zoom, each once; flicker only on the first and last title). end 99 = hold to the end. captionStyle: kinetic|classic|pill|hormozi|karaoke|one-word; hero = word indices set big in the display face (titles and kinetic captions are two-font lockups; \"lockup\": false for one font).`, captionStyle: STYLE, ...(opt('fonts', null) && opt('fonts') !== true ? { fonts: opt('fonts') } : {}), flips, glitchAt: opt('no-glitch', false) ? [] : [0.02, ...seams], bursts: [], captionY: 1300 };
 const logo = opt('logo', null); if (logo && logo !== true) caps.logo = logo;
 writeFileSync(OUT, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
 console.log(`${flips.length} captions from ${words.length} words -> ${OUT}  (seams ${JSON.stringify(seams)}, total ${total}s)`);

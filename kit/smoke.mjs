@@ -17,8 +17,10 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { findChrome } from './chrome.mjs';
 import { createRequire } from 'module';
+import { coverage, showcaseHas, sourceCatalogIds } from './menu.mjs';
 const SFXPLAN = createRequire(import.meta.url)('./sfx-plan.cjs');
 const B = createRequire(import.meta.url)('./beats.cjs');
+const P = createRequire(import.meta.url)('./preset.cjs');
 
 const KIT = dirname(fileURLToPath(import.meta.url));
 const keep = process.argv.includes('--keep'), whisper = process.argv.includes('--whisper');
@@ -30,10 +32,62 @@ const fail = m => { throw new Error(m); };
 
 const work = mkdtempSync(join(tmpdir(), 'talking-head-smoke-'));
 const build = join(work, 'build'); mkdirSync(build);
+const node = process.execPath;
 let ok = false;
 try {
   step('ffmpeg and ffprobe on PATH', () => { run('ffmpeg', ['-version']); run('ffprobe', ['-version']); });
   step(`Chrome found (${findChrome()})`, () => {});
+  step('menu and showcase cover every catalog entry', () => {
+    const cov = coverage();
+    if (!cov.ok) fail('menu missing catalog entries: ' + cov.missing.join(', '));
+    const htmlPath = join(dirname(KIT), 'showcase', 'index.html');
+    if (!existsSync(htmlPath)) fail('showcase/index.html is missing; run npm run showcase');
+    const html = readFileSync(htmlPath, 'utf8');
+    const has = showcaseHas(html, sourceCatalogIds());
+    if (!has.ok) fail('showcase missing labels: ' + has.missing.join(', '));
+  });
+  step('presets: shipped list, save/load, flag override, auto pick', () => {
+    const want = ['aigent', 'one-word', 'hormozi-bold', 'karaoke', 'minimal-clean', 'cinematic', 'editorial', 'muse-pill', 'retro-scan-lines', 'neutral'];
+    for (const name of want) {
+      const pset = P.load(name);
+      if (!pset) fail('missing shipped preset ' + name);
+      const errs = P.validate(pset);
+      if (errs.length) fail(name + ': ' + errs.join('; '));
+    }
+    if (P.shipped().length < want.length) fail('shipped count ' + P.shipped().length);
+    const job = join(work, 'preset-job'); mkdirSync(job, { recursive: true });
+    writeFileSync(join(job, 'cut.json'), JSON.stringify({
+      segs: [{ file: 'a.mp4', in: 0, out: 1, finish: 'grain' }, { file: 'b.mp4', in: 0, out: 1, finish: 'teal', transition: 'crossfade' }],
+      titles: 'ovlt/%04d.png', bed: 'vinyl-sunrise', punch: 0.1
+    }));
+    writeFileSync(join(job, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'hormozi', fonts: 'druk', flips: [] }) + ';\n');
+    const dir = join(work, 'saved-presets');
+    const dest = P.save('smoke-style', P.fromJob(job), dir);
+    const loaded = P.load('smoke-style', { dir });
+    if (!loaded || loaded.captionStyle !== 'hormozi' || !(loaded.finishPool || []).includes('grain')) fail('save/load: ' + JSON.stringify(loaded) + ' from ' + dest);
+    const cut = { segs: [{ in: 0, out: 1 }, { in: 0, out: 1 }, { in: 0, out: 1 }] };
+    P.apply(P.load('cinematic'), { cut }, { finish: 'mono' });
+    if (cut.finish !== 'mono') fail('user finish should win, got ' + JSON.stringify(cut));
+    if (cut.segs.some(s => s.finish)) fail('finish pool should not apply when the user set finish: ' + JSON.stringify(cut.segs));
+    const cut2 = { segs: [{ in: 0, out: 1 }, { in: 0, out: 1 }, { in: 0, out: 1 }] };
+    P.apply(P.load('cinematic'), { cut: cut2 }, {});
+    const finishes = cut2.segs.map(s => s.finish);
+    if (new Set(finishes).size < 2) fail('expected per-scene finish variety: ' + JSON.stringify(finishes));
+    const auto = P.pickAuto({ want: 'one-word' });
+    if (auto.name !== 'one-word') fail('auto should pick one-word, got ' + auto.name);
+  });
+  step('brand:import from a synthetic markdown guide and a colour swatch', () => {
+    const fix = join(dirname(KIT), 'tests', 'fixtures', 'brand-guide');
+    const out = join(work, 'imported.json');
+    run(node, [join(KIT, 'brand-import.mjs'), join(fix, 'guide.md'), '--name', 'north-star', '--out', out], work);
+    const d = JSON.parse(readFileSync(out, 'utf8'));
+    if (d.fonts !== 'druk') fail('expected druk from the guide, got ' + JSON.stringify(d.fonts));
+    if (!/short sentences/i.test(d.notes || '') || !/light-grey|Never invent/i.test(d.notes || '')) fail('imported notes missing do/do-not lines: ' + d.notes);
+    const out2 = join(work, 'swatch.json');
+    run(node, [join(KIT, 'brand-import.mjs'), join(fix, 'swatch.png'), '--name', 'swatch', '--out', out2], work);
+    const d2 = JSON.parse(readFileSync(out2, 'utf8'));
+    if (!d2.colors || d2.colors.length < 2) fail('expected a palette from the swatch: ' + JSON.stringify(d2.colors));
+  });
   step('synthetic clip + bed', () => {
     run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=640x360:rate=24:duration=3', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=3:sample_rate=48000',
       '-shortest', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', 'seg1.mp4'], work);
@@ -50,7 +104,6 @@ try {
     segs: [{ file: '../seg1.mp4', in: 0, out: 1.8, fadeIn: 0.25 }, { file: '../seg1.mp4', in: 1.8, out: 3.0, pad: 0.2, cropX: 0.3 }],
     tail: 0.3, hits: [[1.8, 24]], sfx: { F: [1.8], D: [2.4] }, bed: '../bed.wav', bedVol: 0.2, overlay: 'ovl/%04d.png'
   }));
-  const node = process.execPath;
   step('timeline.mjs', () => { const o = run(node, [join(KIT, 'timeline.mjs')], build); if (!/seams: \[1\.8\]/.test(o)) fail('unexpected seams:\n' + o); });
   step('autocaption.mjs -> captions.js', () => {
     run(node, [join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--hero'], build);
@@ -67,7 +120,57 @@ try {
     if (!/aigent/.test(readFileSync(join(build, 'theme.js'), 'utf8'))) fail('aigent theme not used by default');
     if (statSync(join(build, 'stills', 't0.60.png')).size < 8000) fail('caption still looks blank');
   });
-  step('render overlay frames (2 s)', () => { run(node, [join(KIT, 'render.mjs'), '2'], build); const n = readdirSync(join(build, 'ovl')).length; if (n !== 48) fail('frames ' + n); });
+  step('one-word caption style: the spoken word changes between stills', () => {
+    const b = join(work, 'one-word'); mkdirSync(b, { recursive: true });
+    writeFileSync(join(b, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify({
+      captionStyle: 'one-word', fonts: 'druk',
+      flips: [{ start: 0, end: 2, text: 'Record one take', mode: 0, words: [[0, 0.6, 'Record'], [0.6, 1.2, 'one'], [1.2, 2, 'take']] }]
+    }) + ';\n');
+    run(node, [join(KIT, 'render.mjs'), '0', '0.30,0.90'], b, { THEME: 'aigent', FONTS: 'druk' });
+    const a = readFileSync(join(b, 'stills', 't0.30.png'));
+    const c = readFileSync(join(b, 'stills', 't0.90.png'));
+    if (Buffer.compare(a, c) === 0) fail('one-word stills at 0.30 and 0.90 should show different words');
+  });
+  // alpha ink of a layer still: rows with any pixel over half opaque -> { n, y0, y1, mid }
+  const ink = png => {
+    const raw = execFileSync('ffmpeg', ['-v', 'error', '-i', png, '-vf', 'alphaextract', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], { maxBuffer: 1 << 26 });
+    let n = 0, y0 = -1, y1 = -1;
+    for (let y = 0; y < 1920; y++) { let row = 0; for (let x = 0; x < 1080; x++) if (raw[y * 1080 + x] > 128) row++; if (row) { n += row; if (y0 < 0) y0 = y; y1 = y; } }
+    return { n, y0, y1, mid: (y0 + y1) / 2 };
+  };
+  const layered = (dir, doc, times, env = {}) => {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(doc) + ';\n');
+    run(node, [join(KIT, 'render.mjs'), '0', times.map(t => t.toFixed(2)).join(',')], dir, { THEME: 'aigent', FONTS: 'theme', STILLS_LAYERS: '1', ...env });
+    return t => ({ titles: ink(join(dir, 'stills-titles', `t${t.toFixed(2)}.png`)), front: ink(join(dir, 'stills-front', `t${t.toFixed(2)}.png`)) });
+  };
+  step('titles: slam lands behind the head, rises high, partner line in front', () => {
+    const at = layered(join(work, 'slam'), { captionStyle: 'kinetic', flips: [{ start: 0, end: 2.4, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam', flicker: false }] }, [0.15, 1.4]);
+    const a = at(0.15), b = at(1.4);
+    if (!a.titles.n || !b.titles.n) fail('slam title missing on the titles layer');
+    if (a.titles.mid < 520) fail('slam should land low, behind the head (centre ' + a.titles.mid + ')');
+    if (a.titles.mid - b.titles.mid < 200) fail('slam should rise after landing: ' + a.titles.mid + ' -> ' + b.titles.mid);
+    if (b.titles.y1 > 470) fail('resting title should sit high so the word clears the head, bottom at ' + b.titles.y1);
+    if (a.front.n) fail('partner words should wait for the rise');
+    if (!b.front.n) fail('partner words should draw on the front layer (in front of the person)');
+    if (b.front.y0 < b.titles.y1 - 10) fail('partner line should hang below the hero: ' + JSON.stringify(b));
+    const still = layered(join(work, 'slam-norise'), { captionStyle: 'kinetic', titleRise: false, flips: [{ start: 0, end: 2.4, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam', flicker: false }] }, [0.4]);
+    const c = still(0.4);
+    if (Math.abs(c.titles.mid - b.titles.mid) > 30) fail('titleRise false should land at the resting height: ' + c.titles.mid + ' vs ' + b.titles.mid);
+  });
+  step('one-word: exactly one word on screen, title included', () => {
+    const at = layered(join(work, 'one-word-title'), { captionStyle: 'one-word', flips: [
+      { start: 0, end: 0.9, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam', flicker: false },
+      { start: 0, end: 2, text: 'Record one take', mode: 0, words: [[0, 0.6, 'Record'], [0.6, 1.2, 'one'], [1.2, 2, 'take']] }] }, [0.3, 1.5]);
+    const a = at(0.3), b = at(1.5);
+    if (!a.titles.n) fail('title word missing');
+    if (a.front.n) fail('one-word: caption or partner words drawn while the title is up');
+    if (a.titles.y1 - a.titles.y0 > 330) fail('one-word title should be a single word, ink height ' + (a.titles.y1 - a.titles.y0));
+    if (b.titles.n || !b.front.n) fail('one-word: after the title the caption word should be the only word');
+    if (b.front.y1 - b.front.y0 > 330) fail('one-word caption should be one line, ink height ' + (b.front.y1 - b.front.y0));
+  });
+  step('render overlay frames (2 s)', () => {
+ run(node, [join(KIT, 'render.mjs'), '2'], build); const n = readdirSync(join(build, 'ovl')).length; if (n !== 48) fail('frames ' + n); });
   step('sfx pack manifest + auto-pick', () => {
     const v = SFXPLAN.validateManifest();
     if (v.errs.length) fail('sfx.json: ' + v.errs.join('; '));

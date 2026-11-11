@@ -1,0 +1,25 @@
+{
+  "name": "editorial",
+  "label": "Editorial serif lockup, restrained grade",
+  "theme": "aigent",
+  "look": "kinetic",
+  "captionStyle": "kinetic",
+  "fonts": "editorial",
+  "titles": true,
+  "finish": null,
+  "finishPool": [
+    "mono",
+    "grain",
+    "crushed"
+  ],
+  "transition": "dip",
+  "effectsFavourites": [
+    "headline-box",
+    "timeline",
+    "slow-push",
+    "dot-reveal"
+  ],
+  "bed": null,
+  "punch": true,
+  "notes": "Serif display with a partner face, a quieter grade (mono, grain or crushed) across scenes."
+}

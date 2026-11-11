@@ -13,6 +13,8 @@ HeyGen cinematic takes are an optional second source; they cut in the same way a
 
 See what it makes: [the demo reel](kit/example/demo-reel/) (40 s, 20 effects, with the plan files that built it) and [the font pairings](kit/fonts/README.md#examples).
 
+The full menu of film finishes, looks, caption styles, fonts, themes, title entrances, transitions, 51 effects, SFX, music beds and brand presets is easy to miss. Run `npm run menu` to print every option with a short label, or open the labelled gallery at [showcase/index.html](showcase/index.html) (`npm run showcase` rebuilds it; stills use an AI-generated fictional presenter). Agents must offer this menu before drafting and again before the final render, suggest 2 or 3 options per category, and vary finishes across scenes rather than one look on the whole reel.
+
 ## Quick start: phone clip to reel
 
 1. **Install once** (see [Install](#install)), then check it works: `npm run smoke` should end with `SMOKE PASS`.
@@ -51,7 +53,7 @@ npm run fx -- --name <clip-name> --plan fx.json --still 1.2,6.5   # check frames
 npm run fx -- --name <clip-name> --plan fx.json           # render
 ```
 
-The effects come from [claude-video-effects](https://github.com/Vibha-Ramprakash/claude-video-effects) by Vibha Ramprakash (MIT), vendored at a pinned commit. See [effects/README.md](effects/README.md) for the catalog, the caption-safety rule and `npm run effects:update`.
+The effects come from [claude-video-effects](https://github.com/Vibha-Ramprakash/claude-video-effects) by Vibha Ramprakash (MIT), vendored at a pinned commit. See [effects/README.md](effects/README.md) for the catalog, the caption-safety rule and `npm run effects:update`. The labelled stills for every effect also live in [showcase/index.html](showcase/index.html).
 
 ## Install
 
@@ -78,7 +80,7 @@ Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FRE
 
 ## Looks, caption styles and fonts
 
-`--look` picks the whole edit (`kinetic` default, `oneword`, `muse`, `classic`); `--style`, `--fonts`, `--no-titles`, `--no-punch`, `--no-mask` and `--mask birefnet|birefnet-portrait|mediapipe` override single parts. The same `--mask` on `npm run fx` (or `"maskModel"` in `cut.json`) gives the effects that cut-out too.
+`--look` picks the whole edit (`kinetic` default, `oneword`, `muse`, `classic`, `one-word`); `--style`, `--fonts`, `--no-titles`, `--no-punch`, `--no-mask` and `--mask birefnet|birefnet-portrait|mediapipe` override single parts. `oneword` is the full one-word-at-a-time look (type cards, cycling pairings, kit/looks/oneword.md); `--style one-word` is the simple version, one big word at a time. The same `--mask` on `npm run fx` (or `"maskModel"` in `cut.json`) gives the effects that cut-out too.
 
 | Look | Captions | Titles | Notes |
 |---|---|---|---|
@@ -88,7 +90,7 @@ Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FRE
 
 Caption styles: `kinetic` (font lockups), `pill`, `hormozi` (bold caps with a cyan active word), `karaoke` (colour wipe as each word is said), `classic`. Set `"captionStyle"` in `captions.js` to change one job.
 
-Titles use 7 entrances (stagger rise, slam, blur rise, slide left, elastic, flip, pop zoom), never the same one twice in a video, with a flicker only on the hook and the payoff. Set them by hand as mode 7 flips in `captions.js` (`"entrance"` to pick one, `"hero"` for the big word), or leave them to `autocaption.mjs --titles`. The person mask that puts those titles behind the head is `kit/mask.py`. MediaPipe is the default (fast). For a final reel, `--mask birefnet` (or `"maskModel": "birefnet"` in `cut.json`) uses rembg with birefnet-general-lite: slower on CPU (several seconds per title frame) but much tighter on hair and hands. Optional `"person": "person.mkv"` writes an edge-decontaminated person layer.
+Titles use 7 entrances (stagger rise, slam, blur rise, slide left, elastic, flip, pop zoom), never the same one twice in a video, with a flicker only on the hook and the payoff. Set them by hand as mode 7 flips in `captions.js` (`"entrance"` to pick one, `"hero"` for the big word), or leave them to `autocaption.mjs --titles`. Titles rest high so the word stays readable (`"titleY"`, default 290); the slam lands behind the head, then rises to that height (`"titleSlamY"`, default 600; `"titleRise": false` to skip the rise). The smaller partner words draw in front of the person. The person mask that puts those titles behind the head is `kit/mask.py`. MediaPipe is the default (fast). For a final reel, `--mask birefnet` (or `"maskModel": "birefnet"` in `cut.json`) uses rembg with birefnet-general-lite: slower on CPU (several seconds per title frame) but much tighter on hair and hands. Optional `"person": "person.mkv"` writes an edge-decontaminated person layer.
 
 **`--look oneword`** is the high bar: one word on screen at a time, each word's size and face picked by its role (small filler, body words, a big italic-serif hero with the rest of the phrase building under it), flat-colour type cards cutting in as text-only b-roll, a key word behind your head on the first and last beat, and, with `--broll <folder>`, cutaways to your own clips while the voice runs on. Rules and numbers: [kit/looks/oneword.md](kit/looks/oneword.md).
 
@@ -183,6 +185,23 @@ Agents: start at [AGENTS.md](AGENTS.md).
 - Re-transcribe the full render with the music in. It must match the script.
 - `npm run verify` passes and someone has looked at the contact sheet before the reel goes out.
 
+## Brand presets
+
+A preset is a saved mix of theme, look, caption style, fonts, finishes (including a per-scene variety pool), transitions, effect favourites, and optional bed or SFX prefs.
+
+Shipped styles, all built from existing options: `aigent` (default), `one-word` (one big word at a time, punchy), `hormozi-bold`, `karaoke`, `minimal-clean`, `cinematic`, `editorial`, `muse-pill`, `retro-scan-lines`, and `neutral`. Each has a labelled tile in [showcase/index.html](showcase/index.html) and appears in `npm run menu`.
+
+```
+npm run preset -- --list
+npm run reel -- inbox/take.mov --preset one-word
+npm run reel -- inbox/take.mov --preset auto          # picks one and prints what it chose
+npm run reel -- inbox/take.mov --preset cinematic --finish grain   # any flag wins over the preset
+npm run preset -- --save my-style --from <job>        # user-saved, gitignored under kit/presets/local/
+npm run brand:import -- brand-guide/guide.pdf         # optional; draft preset for the human to confirm
+```
+
+Three modes: use a saved preset, customize (flags and `cut.json` fields override the preset), or let the agent choose (`--preset auto`). A brand guide (PDF, image or markdown) is optional; drop it in `brand-guide/` or pass the file. Import extracts a colour palette, named fonts (mapped to shipped OFL pairings or `kit/fonts/local/`), tone notes, and a nearby logo if there is one. If `pdftoppm` or `pdftotext` are missing, the command says so and still accepts images and markdown.
+
 ## Credits and licences
 
 Code and docs: Apache-2.0, Copyright 2026 Will Gwyn (wrg32786). See [LICENSE](LICENSE). The files below keep their own licences and marks.
@@ -198,3 +217,4 @@ Code and docs: Apache-2.0, Copyright 2026 Will Gwyn (wrg32786). See [LICENSE](LI
 - `effects/vendor/claude-video-effects/`: [claude-video-effects](https://github.com/Vibha-Ramprakash/claude-video-effects) by Vibha Ramprakash, MIT. Its models (YuNet, MIT; MediaPipe Selfie Segmenter, Apache-2.0) and fonts (SIL OFL 1.1, Permanent Marker Apache-2.0) keep their own licences; see `NOTICE` and `effects/README.md`.
 - Person-mask quality backend (installed by `npm run effects:setup`, not vendored): [rembg](https://github.com/danielgatis/rembg) by Daniel Gatis, MIT; [onnxruntime](https://github.com/microsoft/onnxruntime) by Microsoft, MIT; birefnet-general-lite weights from [BiRefNet](https://github.com/ZhengPeng7/BiRefNet) by ZhengPeng, MIT, downloaded on first use into rembg's cache. See [THIRD_PARTY.md](THIRD_PARTY.md).
 - `kit/music/*.mp3`: our own tracks, made by Will Gwyn with Suno (song ids in `kit/music/beds.json`). For The AIgent's videos only; not covered by the Apache-2.0 licence. See [kit/music/README.md](kit/music/README.md).
+- `showcase/source/presenter.jpg`: an AI-generated fictional person made for this project, to demo finishes, titles and effects. No third-party rights. Licensed Apache-2.0 with the repo. See [THIRD_PARTY.md](THIRD_PARTY.md).

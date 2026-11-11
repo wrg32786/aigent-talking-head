@@ -821,8 +821,8 @@ def glass_widgets_v1(c, e):
     cy2 = y_top + bh + mg * 0.45 + bh / 2
     g = glass(c, bw, bh, bh * 0.28, bx, cy2, amt=0.14, dark=gd); d = ImageDraw.Draw(g)
     av = face_chip(c, e, bh * 0.62); g.alpha_composite(av, (int(bw - bh * 0.19 - av.width), int((bh - av.height) / 2)))
-    d.text((bh * 0.2, bh * 0.36), e.o.get('name', 'Vibha'), font=font('uib', bh * 0.22), fill=(255, 255, 255, 255), anchor='lm')
-    d.text((bh * 0.2, bh * 0.66), e.o.get('handle', '@vibha.in.progress'), font=font('uim', bh * 0.14), fill=(255, 255, 255, 215), anchor='lm')
+    d.text((bh * 0.2, bh * 0.36), e.o.get('name', 'Your Name'), font=font('uib', bh * 0.22), fill=(255, 255, 255, 255), anchor='lm')
+    d.text((bh * 0.2, bh * 0.66), e.o.get('handle', '@yourhandle'), font=font('uim', bh * 0.14), fill=(255, 255, 255, 215), anchor='lm')
     place(c, g, bx, cy2, 0.6 + 0.4 * pop(c, 0.24), 0, al * clamp((c.lt - 0.24) / 0.1), behind=True)
     f1, f2 = font('uim', W * 0.045), font('uib', W * 0.045)
     pre, hi = e.o.get('pill', 'Edited by |Claude').split('|') if '|' in e.o.get('pill', 'Edited by |Claude') else (e.o['pill'], '')
@@ -908,8 +908,8 @@ def fx_pastel_word(c, e):
     cw, chh = W * 0.86, W * 0.15; cy = H * 0.865 + (1 - ease_out((c.lt - 0.15) / 0.35)) * H * 0.2
     card_ = rrect(cw, chh, chh * 0.3, (255, 255, 255, 248)); d = ImageDraw.Draw(card_)
     av = face_chip(c, e, chh * 0.64); card_.alpha_composite(av, (int(chh * 0.18), int((chh - av.height) / 2)))
-    d.text((chh * 0.98, chh * 0.38), e.o.get('name', 'Vibha'), font=font('uib', chh * 0.22), fill=(20, 20, 22, 255), anchor='lm')
-    h1 = e.o.get('handle', '@vibha.in.progress  ·  '); f = font('uim', chh * 0.15)
+    d.text((chh * 0.98, chh * 0.38), e.o.get('name', 'Your Name'), font=font('uib', chh * 0.22), fill=(20, 20, 22, 255), anchor='lm')
+    h1 = e.o.get('handle', '@yourhandle  ·  '); f = font('uim', chh * 0.15)
     d.text((chh * 0.98, chh * 0.66), h1, font=f, fill=(140, 140, 150, 255), anchor='lm')
     d.text((chh * 0.98 + f.getlength(h1), chh * 0.66), e.o.get('role', 'creator'), font=f, fill=PURPLE + (255,), anchor='lm')
     at = e.d * 0.6; on = c.lt >= at
@@ -940,7 +940,7 @@ def fx_check_pills(c, e):
         d.text((bw * 0.19, bw * 0.1), title, font=font('uib', bw * 0.06), fill=(20, 20, 22, 255), anchor='lm')
         gr = thumb_grid(e.cards, 3, 3, int(bw * 0.28), int(bw * 0.025), i0=i * 3)
         im.alpha_composite(gr, ((bw - gr.width) // 2, int(bw * 0.2))); return shadowed(im, 16, 8, 70)
-    b1 = cached(e, 'b1', lambda: board(0, e.o.get('handle', '@vibha.in.progress')))
+    b1 = cached(e, 'b1', lambda: board(0, e.o.get('handle', '@yourhandle')))
     b2 = cached(e, 'b2', lambda: board(1, e.o.get('board', 'Reels  ·  22 effects')))
     by = max(H * 0.17, c.fy - c.fw * 0.9)
     place(c, b1, W * 0.25, by, 0.6 + 0.4 * pop(c, 0.0), 8, al * clamp(c.lt / 0.1), behind=True)
@@ -1041,7 +1041,7 @@ def fx_profile_wall(c, e):
     if swap < 1: d.text((cw / 2, chh * 0.33), f'{n:,}', font=font('uib', chh * 0.3), fill=(255, 255, 255, int(255 * (1 - swap))), anchor='mm')
     if swap > 0: d.text((cw / 2, chh * 0.33), e.o.get('label', 'views'), font=font('uib', chh * 0.3), fill=(255, 255, 255, int(255 * swap)), anchor='mm')
     av = face_chip(c, e, chh * 0.3); g.alpha_composite(av, (int(chh * 0.14), int(chh * 0.58)))
-    d.text((chh * 0.52, chh * 0.68), e.o.get('name', 'vibha.in.progress'), font=font('uib', chh * 0.09), fill=(255, 255, 255, 255), anchor='lm')
+    d.text((chh * 0.52, chh * 0.68), e.o.get('name', 'yourhandle'), font=font('uib', chh * 0.09), fill=(255, 255, 255, 255), anchor='lm')
     d.text((chh * 0.52, chh * 0.8), e.o.get('sub', 'top reel'), font=font('uim', chh * 0.075), fill=(170, 170, 176, 255), anchor='lm')
     on = c.lt >= e.d * 0.7
     d.rounded_rectangle([cw - chh * 0.95, chh * 0.62, cw - chh * 0.14, chh * 0.86], chh * 0.12, fill=((60, 60, 66, 255) if on else (255, 255, 255, 255)))
@@ -1200,7 +1200,7 @@ def fx_headline_wall(c, e):
         for j, ln in enumerate(lines): d.text((cw * 0.08, cw * 0.07 + j * lh), ln, font=f, fill=fg + (255,))
         my = chh - cw * 0.085; s = cw * 0.04
         d.polygon([(cw * 0.08, my - s / 2), (cw * 0.08, my + s / 2), (cw * 0.08 + s * 0.9, my)], fill=(255, 48, 64, 255))
-        d.text((cw * 0.08 + s * 1.5, my), ('@vibha.in.progress  ·  ' + meta) if meta else '@vibha.in.progress', font=font('uim', cw * 0.045), fill=fg + (170,), anchor='lm')
+        d.text((cw * 0.08 + s * 1.5, my), ('@yourhandle  ·  ' + meta) if meta else '@yourhandle', font=font('uim', cw * 0.045), fill=fg + (170,), anchor='lm')
         return shadowed(im, 14, 8, 110)
     N = int(e.o.get('count', 13))
     cards = cached(e, 'cards', lambda: [hcard(i) for i in range(N)])
@@ -1319,8 +1319,8 @@ def glass_widgets_v2(c, e):
     cy3 = by + bh / 2 + 22 * u + bh / 2
     g = G(bw, bh, bx, cy3, bh * 0.28); d = ImageDraw.Draw(g)
     av = face_chip(c, e, bh * 0.62); g.alpha_composite(av, (int(bw - bh * 0.19 - av.width), int((bh - av.height) / 2)))
-    d.text((bh * 0.2, bh * 0.36), e.o.get('name', 'Vibha'), font=font('uib', bh * 0.22), fill=white + (255,), anchor='lm')
-    d.text((bh * 0.2, bh * 0.66), e.o.get('handle', '@vibha.in.progress'), font=font('uim', bh * 0.14), fill=white + (215,), anchor='lm')
+    d.text((bh * 0.2, bh * 0.36), e.o.get('name', 'Your Name'), font=font('uib', bh * 0.22), fill=white + (255,), anchor='lm')
+    d.text((bh * 0.2, bh * 0.66), e.o.get('handle', '@yourhandle'), font=font('uim', bh * 0.14), fill=white + (215,), anchor='lm')
     show(g, bx, cy3, 2)
     # 4 · views artifact (a mini page inside the glass)
     aw, ah = 330 * u, 330 * u; dx, dy = 50 * u + aw / 2, ay + S / 2 + 26 * u + ah / 2
@@ -1412,7 +1412,7 @@ def comment_sheet(c, e):
     """Reels 1021 + VOX look: an Instagram Comments sheet above your head (your hair in front). The word types in, posts,
     gets a heart, then your reply drops in with a link chip."""
     W, H = c.W, c.H; u = W / 1080; al = fade(c, e)
-    word = e.o.get('text', 'EFFECTS'); handle = e.o.get('handle', 'vibha.in.progress')
+    word = e.o.get('text', 'EFFECTS'); handle = e.o.get('handle', 'yourhandle')
     reply = e.o.get('reply', 'Sent you the pack'); chip = e.o.get('chip', '22 effects')
     sw, sh = 740 * u, 450 * u
     t_post = 0.3 + 0.06 * len(word) + 0.1; t_heart, t_rep = t_post + 0.25, t_post + 0.4

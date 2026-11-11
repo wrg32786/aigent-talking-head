@@ -26,5 +26,14 @@ __pycache__/
 ovlt/
 *.mkv
 kit/fonts/local/
+
+# committed showcase gallery (media stills live under showcase/media; a few short loops)
+!showcase/
+!showcase/**
+!showcase/loops/*.webm
+
+# user-saved brand presets and dropped brand guides
+kit/presets/local/
+/brand-guide/
 # the example reel is the one video kept in git
 !kit/example/demo-reel/demo-reel.mp4

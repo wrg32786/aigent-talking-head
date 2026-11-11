@@ -1,0 +1,21 @@
+{
+  "name": "minimal-clean",
+  "label": "Quiet type, hard cuts, little or no grade",
+  "theme": "neutral",
+  "look": "classic",
+  "captionStyle": "classic",
+  "fonts": "theme",
+  "titles": false,
+  "finish": null,
+  "finishPool": [],
+  "transition": "cut",
+  "effectsFavourites": [
+    "dot-reveal",
+    "slow-push",
+    "spotlight",
+    "todo"
+  ],
+  "bed": null,
+  "punch": false,
+  "notes": "No titles, no film finish, no zoom punch. Let the face and the words do the work."
+}

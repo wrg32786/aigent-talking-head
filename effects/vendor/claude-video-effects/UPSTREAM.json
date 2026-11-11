@@ -31,6 +31,7 @@
   "fonts/PlayfairDisplay.ttf",
   "fonts/SpaceMono-Bold.ttf"
  ],
+ "scrubbed": "sample name and handle fallbacks in scripts/fx.py replaced with neutral text (SCRUB in effects/update.mjs)",
  "excluded": [
   "README.md (promo links)",
   "assets/ (promo image)",

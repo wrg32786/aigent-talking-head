@@ -1,0 +1,25 @@
+{
+  "name": "hormozi-bold",
+  "label": "Bold caps, cyan on the spoken word, punchy cuts",
+  "theme": "aigent",
+  "look": "kinetic",
+  "captionStyle": "hormozi",
+  "fonts": "druk",
+  "titles": true,
+  "finish": null,
+  "finishPool": [
+    "grain",
+    "crushed"
+  ],
+  "transition": "glitch",
+  "effectsFavourites": [
+    "huge-strike",
+    "reject-stamp",
+    "lean-in",
+    "countdown-flip",
+    "the-bill"
+  ],
+  "bed": null,
+  "punch": true,
+  "notes": "Heavy outlined caps in the lower third, the active word in the accent colour."
+}

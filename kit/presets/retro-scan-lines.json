@@ -1,0 +1,26 @@
+{
+  "name": "retro-scan-lines",
+  "label": "CRT scan lines, chroma, a slightly worn grade",
+  "theme": "aigent",
+  "look": "kinetic",
+  "captionStyle": "hormozi",
+  "fonts": "druk",
+  "titles": true,
+  "finish": "scan-lines",
+  "finishPool": [
+    "scan-lines",
+    "chroma",
+    "grain"
+  ],
+  "transition": "glitch",
+  "effectsFavourites": [
+    "led-sign",
+    "noise",
+    "scribble",
+    "reject-stamp",
+    "crayon-write"
+  ],
+  "bed": null,
+  "punch": true,
+  "notes": "A retro video look. Vary scan-lines, chroma and grain across scenes so it does not sit on every shot the same way."
+}

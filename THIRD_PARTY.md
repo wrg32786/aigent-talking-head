@@ -20,6 +20,7 @@ What this repo ships from other projects, and what it only took ideas from. Lice
 | `kit/sfx/camera/18-camera-flash.mp3`, `counter/21-counter-tickup.mp3`, `shimmer/24-shimmer-sparkle-b.mp3`, `riser/25-riser-pitch-sweep.mp3`, `riser/26-riser-supersaw-swell.mp3`, `riser/27-riser-pulse-accel.mp3`, `riser/28-riser-shepard.mp3`, `release/29-release-downlifter.mp3`, `release/30-release-pad-bloom.mp3`, `release/31-release-airy-exhale.mp3`, `release/32-release-resolve-chord.mp3` | Original cinematic synths written for this pack, dedicated CC0 1.0 | CC0 1.0 |
 | `kit/fonts/*.ttf` | [Google Fonts](https://github.com/google/fonts): Archivo Black, Allura, Pinyon Script, Unbounded, Hanken Grotesk, Marcellus, Instrument Serif, Crimson Pro, Libre Caslon Text, Literata, Bricolage Grotesque, Gloock, Pirata One, Nunito Sans, Michroma, Cardo, Red Hat Display, Red Hat Mono, Plus Jakarta Sans, Ribeye, Caprasimo, League Spartan, Fraunces, Inter Tight, Chewy. Unmodified. | SIL Open Font License 1.1, each with its `OFL-<name>.txt`; Chewy is Apache-2.0 (`LICENSE-chewy.txt`). Marcellus has the Reserved Font Name "Marcellus". |
 | `effects/vendor/claude-video-effects/` | Vibha Ramprakash, see `NOTICE` | MIT (models and fonts keep their own licences) |
+| `showcase/source/presenter.jpg` (and the derived `presenter-mask.png`) | AI-generated fictional person made for this project, to demo the showcase gallery. Not a portrait of a real person. No third-party stock or likeness rights. | Apache-2.0, same as this repo |
 
 ## Adapted from Will's other work
 

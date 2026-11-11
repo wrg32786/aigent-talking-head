@@ -33,11 +33,19 @@ const files = [...KEEP, ...fonts];
 for (const f of files) if (!existsSync(join(src, f))) { console.error('upstream is missing ' + f + '; update effects/update.mjs'); process.exit(1); }
 rmSync(DEST, { recursive: true, force: true });
 for (const f of files) { mkdirSync(dirname(join(DEST, f)), { recursive: true }); copyFileSync(join(src, f), join(DEST, f)); }
+// Upstream's sample identity (its author's name and handle as rendering fallbacks) stays out of reels and out of this
+// tree: neutral fallbacks replace it here. The docstring's attribution line is not quoted, so it stays as written.
+const SCRUB = [["'@vibha.in.progress", "'@yourhandle"], ["'vibha.in.progress'", "'yourhandle'"], ["'Vibha'", "'Your Name'"]];
+{
+  const p = join(DEST, 'scripts', 'fx.py'); let fx = readFileSync(p, 'utf8');
+  for (const [a, b] of SCRUB) { if (!fx.includes(a)) console.warn('  note: scrub ' + a + ' matched nothing; upstream changed'); fx = fx.split(a).join(b); }
+  writeFileSync(p, fx);
+}
 const bytes = files.reduce((a, f) => a + statSync(join(DEST, f)).size, 0);
 writeFileSync(join(DEST, 'UPSTREAM.json'), JSON.stringify({
   repo: 'https://github.com/Vibha-Ramprakash/claude-video-effects', commit, committed_at: date, fetched_at: new Date().toISOString(),
   license: 'MIT (code), SIL OFL 1.1 / Apache-2.0 (fonts, see fonts/), MIT (YuNet) and Apache-2.0 (MediaPipe selfie segmenter), see models/NOTICE.md',
-  files, excluded: ['README.md (promo links)', 'assets/ (promo image)', 'scripts/setup.sh (replaced by npm run effects:setup)'], bytes
+  files, scrubbed: 'sample name and handle fallbacks in scripts/fx.py replaced with neutral text (SCRUB in effects/update.mjs)', excluded: ['README.md (promo links)', 'assets/ (promo image)', 'scripts/setup.sh (replaced by npm run effects:setup)'], bytes
 }, null, 1) + '\n');
 console.log(`vendored ${files.length} files (${(bytes / 1e6).toFixed(1)} MB) at ${commit.slice(0, 12)} (${date})`);
 // flag anything promotional that slipped into the copied text, so we don't surface it to users

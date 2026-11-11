@@ -26,7 +26,7 @@ const FINISH = {
   'scan-lines': { does: 'CRT scan lines', vf: (p) => { const op = p.opacity ?? 0.3, d = Math.max(1, p.density ?? 4), k = (1 - op).toFixed(3); return `geq=lum='if(eq(mod(Y\\,${d})\\,0)\\,lum(X\\,Y)*${k}\\,lum(X\\,Y))':cb='cb(X\\,Y)':cr='cr(X\\,Y)'`; } },
   warm: { does: 'warm grade', vf: (p) => { const s = p.strength ?? 0.4; return `colorbalance=rs=${(0.2 * s).toFixed(3)}:gs=${(0.05 * s).toFixed(3)}:bs=${(-0.15 * s).toFixed(3)}`; } },
   cool: { does: 'cool grade', vf: (p) => { const s = p.strength ?? 0.4; return `colorbalance=rs=${(-0.12 * s).toFixed(3)}:bs=${(0.18 * s).toFixed(3)}`; } },
-  teal: { does: 'teal shadows, warm highlights', vf: (p) => { const s = (p.strength ?? 0.6) * 0.15; return `curves=r='0/0 0.3/${(0.3 + s).toFixed(3)} 1/${Math.min(1, 1 + s).toFixed(3)}':b='0/${Math.min(1, s).toFixed(3)} 0.7/${(0.7 - s).toFixed(3)} 1/${Math.max(0, 1 - s).toFixed(3)}'`; } },
+  teal: { does: 'subtle teal shadows, warm skin', vf: (p) => { const k = (p.strength ?? 0.5) / 0.5; const n = (x) => (x * k).toFixed(3); return `colorbalance=rs=${n(-0.10)}:gs=${n(0.04)}:bs=${n(0.12)}:rm=0:gm=0:bm=0:rh=${n(0.06)}:gh=${n(0.02)}:bh=${n(-0.04)}`; } },
   crushed: { does: 'crushed blacks', vf: (p) => { const c = p.strength ?? 0.5; return `curves=all='0/0 ${(0.2 - c * 0.08).toFixed(3)}/0 0.5/${(0.5 - c * 0.06).toFixed(3)} 1/1'`; } },
   mono: { does: 'black and white', vf: () => 'hue=s=0' },
   bleach: { does: 'bleach-bypass grade', vf: (p) => { const s = p.strength ?? 0.7; return `hue=s=${(1 - s * 0.65).toFixed(3)},eq=contrast=${(1 + s * 0.4).toFixed(3)}:brightness=${(-s * 0.05).toFixed(3)}:gamma=1.05`; } },
