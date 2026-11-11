@@ -17,7 +17,7 @@ Hard rules:
 - Run `npm run verify -- <job>` before you hand over any reel, and look at `jobs/<job>/verify/contact.png`. It must print `VERIFY PASS`. Fix what it flags, don't explain it away.
 - Copy follows the humanizer rules in the talking-head-ad skill: no em dashes, no "not X, but Y", no hype words. `npm run check -- <job>` lints it.
 - Verify every render: re-transcribe it with the music in, and read frame strips across every seam. A probe proves something exists; your eye on the frames proves it looks right.
-- You can't hear. Never call a sound good. Build an audition and let the human pick by ear. Fewer, deeper sounds: never one on every cut.
+- You can't hear. Never call a sound good. Build an audition and let the human pick by ear. Fewer, deeper sounds: never one on every cut. Prefer the shipped pack (`kit/sfx/sfx.json`, auto-picked on `npm run fx`) or a CC0 file the human has already chosen; don't invent new raw synthetic swooshes.
 - Never fabricate copy the offer contradicts, such as "free" on a paid product.
 - Number versions (`-v1`, `-v2`, ...) and keep the old ones for comparison. `npm run reel` does this for you.
 - Ask which theme to use if the teammate hasn't said. Don't use the AIgent theme or the Skool mark for another brand.

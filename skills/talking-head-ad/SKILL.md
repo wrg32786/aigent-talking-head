@@ -10,7 +10,7 @@ The main path: a teammate records on their phone, drops the file in `inbox/`, an
 - **Clips.** Whisper transcribes the recording (or every take), splits it into sentences, flags flubbed retakes and keeps the best take of each sentence.
 - **Cut.** The keep clips are joined with a glitch seam and a 10% zoom punch at each cut, and a bigger eased punch after the hook and into the payoff.
 - **Overlay.** A canvas layer animates every spoken word, adds one kinetic title per beat behind the presenter's head, and any cards, styled by a theme and a font pairing.
-- **Sound.** A few deep sounds on the key cuts only; the music bed, if any, ducks under the voice.
+- **Sound.** A few deep sounds on the key cuts only (locked set). On the effects pass, the 31-sound cinematic pack is auto-picked per effect hit and ducked under the voice; the music bed, if any, also ducks.
 
 Every version gets checked with `npm run verify` and by re-transcribing it. All scripts live in `../../kit`. The rules below come from a working reel workflow; follow them unless the teammate asks otherwise.
 
@@ -32,7 +32,7 @@ Skip this when the teammate already has a script.
 
 1. Find the clip: `npm run reel` with no path uses every video from the newest recording session in `inbox/` (files within 2 hours of the newest; `--newest` for one), or pass the files the teammate names. If the inbox is empty, ask them to drop it in.
 2. Ask which theme if they haven't said: `neutral` (default) or `aigent` (AIgent brand only), or their own `kit/themes/<name>.js`. Ask for a music file if they want one. Offer a font pairing (`--fonts modern|druk|elegant|editorial`, default the theme's fonts) and a look (`--look kinetic` default, `muse` for pill captions, `classic` for the old captions).
-3. Draft it: `npm run reel -- inbox/<file> [inbox/<take2> ...] --theme <name> [--fonts druk] [--hook <take>] [--bed music.wav] [--cropx 0.4] --draft`
+3. Draft it: `npm run reel -- inbox/<file> [inbox/<take2> ...] --theme <name> [--fonts druk] [--hook <take>] [--bed music.wav] [--bed-start 0] [--cropx 0.4] --draft`
    - `--cropx` moves the 9:16 crop for a sideways clip (0 left, 0.5 centre, 1 right). Read `jobs/<name>/clips/clips-sheet.png` to check the face is in frame.
    - `--model medium.en` is faster than the default large-v3 for a first pass.
 4. Read `jobs/<name>/clips/clips.md`. `npm run reel` already dropped every `retake` row. Remove slates and asides ("Okay, take two...") from `build/cut.json`, and trim the `out` of clips that end mid-move.
@@ -56,7 +56,7 @@ After the reel is cut and captioned, you can add effects from [`effects/CATALOG.
                 {"fx": "countdown-flip", "start": 18.5, "end": 21.5}]}
    ```
 4. **Captions.** Effects rated `off` hide the captions and the titles for their window automatically, `check` ones move the caption track to the top of the frame (and still need a look), and `safe` ones keep captions on. Only one effect in the caption band at a time, and none while a sticker, hero word or CTA caption is up.
-5. **Check, then render.** `npm run fx -- --name <name> --plan jobs/<name>/fx.json --still <middle of each effect>`; read every PNG in `build/fx/` (face covered? text cut off? captions crowded?). Fix the plan, then run without `--still` to get `jobs/<name>/reel-fx-vN.mp4`. The audio is exactly the reel's.
+5. **Check, then render.** `npm run fx -- --name <name> --plan jobs/<name>/fx.json --still <middle of each effect>`; read every PNG in `build/fx/` (face covered? text cut off? captions crowded?). Fix the plan, then run without `--still` to get `jobs/<name>/reel-fx-vN.mp4`. Pack sounds are auto-picked onto each effect hit (see Sound); pass `--sfx off` to keep the reel's audio unchanged.
 6. Fix the notes the command prints (pacing, durations, missing copy) before you hand it over. `--allow-demo-copy` only fills neutral `[placeholders]` for a quick look; never ship that.
 
 **Effects menu presets** (offer one when the user doesn't know what they want):
@@ -137,14 +137,16 @@ Use this when mixing sources or when you need finer control. Work in a job folde
 - Never write copy the offer contradicts. The Skool group is paid, so the ad can't say "free school".
 - The Skool mark (`kit/example/skool-logo.svg`) is only for The AIgent's own Skool group. Never use it for another brand.
 
-## 5. Sound (in `cut.json`)
+## 5. Sound (in `cut.json` and `fx.json`)
 
-- The locked set: `whoosh` (the cinematic woosh), `swipe` (the quick woosh), `boom` (deep impact), `click`, `typing`. Mono 48 kHz WAV, all CC0. Use them as `"sfx": {"whoosh": [3.2], "boom": [[12.4, 0.55]]}` (a time, or `[time, gain]`). Each sound's measured peak lands on the time you give. The old keys `F` and `D` still work.
-- **Fewer and deeper.** Never a sound on every cut; the glitch seam already marks the cut. Put a whoosh on the big punches, a click or typing under a card or title that needs it, and the loudest sound (usually `boom`) on the payoff. `npm run check` flags a sound on every cut and more than about one sound every 3 s.
-- The whoosh and swipe are Will's picks by ear; boom, click and typing have not been auditioned yet.
-- Never use synthetic noise swooshes; they read as cheap static.
+- The locked cut-seam set: `whoosh` (the cinematic woosh), `swipe` (the quick woosh), `boom` (deep impact), `click`, `typing`. Mono 48 kHz WAV, all CC0. Use them as `"sfx": {"whoosh": [3.2], "boom": [[12.4, 0.55]]}` (a time, or `[time, gain]`). Each sound's measured peak lands on the time you give. The old keys `F` and `D` still work.
+- **Cinematic pack** (`kit/sfx/sfx.json`, 31 sounds, all CC0, Will-approved: 01-03 and 05-32; 04 was rejected). Categories: hit, riser, release, whoosh, swipe, pop, ui, glitch, camera, paper, counter, sub, shimmer. `npm run fx` auto-picks one primary sound per effect from the mapped category, rotates so the same id does not repeat until the category is exhausted, aligns the sound's hit point to the effect, ends risers on the hit for build moments, and starts a release just after heavy hits. Pack and locked-set sounds both duck under the voice.
+- Per-effect override in `fx.json`: `"sfx": "25-riser-pitch-sweep"` forces that id, `"sfx": false` skips the effect. Global off: `npm run fx -- --name <job> --plan fx.json --sfx off` (or `NOSFX=1`). Manual placements also go in `cut.json` as `"sfxHits": [{ "id": "11-pop-sticker", "t": 1.2 }]`.
+- **Fewer and deeper.** Never a sound on every cut; the glitch seam already marks the cut. Put a whoosh on the big punches, a click or typing under a card or title that needs it, and the loudest sound (usually `boom`) on the payoff. `npm run check` flags a sound on every cut and more than about one sound every 3 s, and validates the pack manifest.
+- The locked whoosh and swipe, and the whole 31-sound pack, are Will's picks by ear; boom, click and typing have not been auditioned yet.
+- Don't invent new raw synthetic noise swooshes; they read as cheap static. Use the shipped pack (which includes Will-approved cinematic synths) or a CC0 file the human has already chosen.
 - To choose new sounds, run `node kit/fs.mjs "<query>"` (CC0 only). Build an audition with one 3 s seam clip per candidate and let a human pick by ear. An agent can't hear.
-- `bed` is the music. A bed the human has timed starts at 0 with `bedNoFade`. It ducks under the voice automatically. Set `bedVol` about 0.16 for a bed near -13 LUFS, or 0.22 for one near -16.
+- `bed` is the music. Pass `--bed music.wav --bed-start 0` on `npm run reel`, or set `bed` / `bedStart` in `cut.json`. A bed the human has timed starts at 0 with `bedNoFade`. It ducks under the voice automatically. Set `bedVol` about 0.16 for a bed near -13 LUFS, or 0.22 for one near -16.
 
 ## 6. Verify every version
 

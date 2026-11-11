@@ -15,6 +15,8 @@ import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { findChrome } from './chrome.mjs';
+import { createRequire } from 'module';
+const SFXPLAN = createRequire(import.meta.url)('./sfx-plan.cjs');
 
 const KIT = dirname(fileURLToPath(import.meta.url));
 const keep = process.argv.includes('--keep'), whisper = process.argv.includes('--whisper');
@@ -64,6 +66,36 @@ try {
     if (statSync(join(build, 'stills', 't0.60.png')).size < 8000) fail('caption still looks blank');
   });
   step('render overlay frames (2 s)', () => { run(node, [join(KIT, 'render.mjs'), '2'], build); const n = readdirSync(join(build, 'ovl')).length; if (n !== 48) fail('frames ' + n); });
+  step('sfx pack manifest + auto-pick', () => {
+    const v = SFXPLAN.validateManifest();
+    if (v.errs.length) fail('sfx.json: ' + v.errs.join('; '));
+    const man = SFXPLAN.loadManifest();
+    if (man.sounds.length !== 31) fail('expected 31 pack sounds, got ' + man.sounds.length);
+    const hits = SFXPLAN.planHits([
+      { fx: 'locked-on', start: 0.0, end: 1.0 },
+      { fx: 'rabbit-hole', start: 1.2, end: 2.4 },
+      { fx: 'huge-strike', start: 2.6, end: 4.0 },
+      { fx: 'timeline', start: 2.65, end: 3.4, sfx: false },
+      { fx: 'spotlight', start: 4.2, end: 5.5, sfx: '24-shimmer-sparkle-b' }
+    ]);
+    if (!hits.some(h => h.fx === 'locked-on' && h.role === 'primary')) fail('no primary for locked-on: ' + JSON.stringify(hits));
+    if (!hits.some(h => h.fx === 'rabbit-hole' && h.role === 'riser')) fail('rabbit-hole should get a riser');
+    if (!hits.some(h => h.fx === 'huge-strike' && h.role === 'release')) fail('huge-strike should get a release');
+    if (hits.some(h => h.fx === 'timeline')) fail('sfx:false was ignored');
+    const spot = hits.find(h => h.fx === 'spotlight' && h.role === 'primary');
+    if (!spot || spot.id !== '24-shimmer-sparkle-b') fail('override not honoured: ' + JSON.stringify(spot));
+    const primaries = hits.filter(h => h.role === 'primary').map(h => h.id);
+    if (new Set(primaries).size !== primaries.length) fail('primary ids repeated: ' + primaries);
+  });
+  step('assemble.cjs places a pack sound', () => {
+    const cut = JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8'));
+    cut.sfxHits = [{ id: '11-pop-sticker', t: 1.2 }];
+    writeFileSync(join(build, 'cut.json'), JSON.stringify(cut));
+    const log = run(node, [join(KIT, 'assemble.cjs'), 'smoke-pack.mp4'], build);
+    if (!existsSync(join(build, 'smoke-pack.mp4'))) fail('no smoke-pack.mp4\n' + log);
+    const d = +run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', 'smoke-pack.mp4'], build).trim();
+    if (Math.abs(d - 3.5) > 0.25) fail('pack assemble duration ' + d);
+  });
   step('assemble.cjs -> smoke.mp4', () => run(node, [join(KIT, 'assemble.cjs'), 'smoke.mp4'], build));
   step('output is 1080x1920 with audio, ~3.5 s', () => {
     const j = JSON.parse(run('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,width,height:format=duration', '-of', 'json', 'smoke.mp4'], build));

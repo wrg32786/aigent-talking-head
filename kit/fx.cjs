@@ -4,15 +4,19 @@
 //   npm run fx -- some-video.mp4 --plan fx.json [--out x.mp4]   -> any video; effects draw over whatever is baked in
 //   npm run fx -- --list                                  -> the catalog, grouped by moment
 // Other flags: --jobs <dir>, --allow-demo-copy (fill neutral [placeholders] for missing copy; never upstream text), --captions on|off (force for all),
-//   --pill (turn on the upstream "Edited by Claude" pill on glass-widgets; off by default, or set "pill" per entry).
-// Job mode keeps audio exactly as the reel: the picture is rebuilt as  graded cut -> effects -> caption overlay
-// -> glitch hits, and the sound is mixed from the segments as usual (voice, wooshes, ducked bed).
+//   --pill (turn on the upstream "Edited by Claude" pill on glass-widgets; off by default, or set "pill" per entry),
+//   --sfx off (no pack auto-pick and no locked-set sounds; or NOSFX=1). Per-effect in fx.json: "sfx": "01-cinematic-hit-a" or "sfx": false.
+// Job mode rebuilds the picture as graded cut -> effects -> caption overlay -> glitch hits, and the sound is mixed
+// from the segments as usual (voice, locked-set wooshes, auto-picked pack sounds, ducked bed). Pack sounds are
+// auto-picked from kit/sfx/sfx.json: one per effect, no-repeat rotation, risers ending on the hit, releases after
+// heavy hits, ducked under the voice.
 //
 // fx.json (times are on the reel's output clock, the same as captions.js):
 // { "profile": {"name": "Sam", "handle": "@sam.makes"},
 //   "effects": [ {"fx": "lean-in", "start": 0.4, "end": 1.4},
 //                {"fx": "checklist", "start": 6, "end": 10, "text": "Record::phone|Drop::inbox|Ask::Claude", "title": "Your workflow"},
-//                {"fx": "tap", "start": 14, "end": 16, "captions": "off"} ] }
+//                {"fx": "tap", "start": 14, "end": 16, "captions": "off"},
+//                {"fx": "spotlight", "start": 18, "end": 20, "sfx": "24-shimmer-sparkle-b"} ] }
 // Per-entry "captions": "off" hides captions for that window, "on" keeps them even for effects the catalog marks "off".
 const { execFileSync } = require('child_process');
 const fs = require('fs');
@@ -26,9 +30,10 @@ const byName = Object.fromEntries(cat.effects.map(e => [e.name, e]));
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = k => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : undefined; };
-const VALUED = new Set(['name', 'plan', 'still', 'out', 'jobs', 'captions']);
+const VALUED = new Set(['name', 'plan', 'still', 'out', 'jobs', 'captions', 'sfx']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const die = m => { console.error(m); process.exit(1); };
+const SFXPLAN = require('./sfx-plan.cjs');
 const sh = (cmd, args, cwd, env) => execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } });
 
 if (flag('list')) {
@@ -149,7 +154,17 @@ if (still) {
 }
 const fxv = path.join(dir, 'base-fx.mp4');
 sh(PY, [RUNNER, '--plan', pf, base, fxv]);
+const sfxOff = opt('sfx') === 'off' || flag('no-sfx') || process.env.NOSFX;
+let sfxHits = [];
+if (!sfxOff) {
+  sfxHits = SFXPLAN.planHits(plan);
+  const cutNow = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8'));
+  cutNow.sfxHits = sfxHits;
+  fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cutNow, null, 1));
+  fs.writeFileSync(path.join(dir, 'sfx-hits.json'), JSON.stringify({ note: 'Auto-picked by kit/fx.cjs from kit/sfx/sfx.json. Override a line in fx.json with "sfx": "<id>" or "sfx": false, then re-run.', hits: sfxHits }, null, 1));
+  sfxHits.forEach(h => console.log(`  sfx  ${h.t.toFixed(2).padStart(6)}s  ${h.fx.padEnd(24)} ${h.id.padEnd(28)} ${h.role}`));
+}
 let v = 1; while (fs.existsSync(path.join(job, `reel-fx-v${v}.mp4`))) v++;
 const out = path.join(job, `reel-fx-v${v}.mp4`);
-sh(process.execPath, [path.join(KIT, 'assemble.cjs'), out], build, { BASE: fxv, OVL_OFF: ovlOff });
-console.log(`\nReel with effects: ${out}${ovlOff ? `  (captions hidden: ${ovlOff})` : ''}`);
+sh(process.execPath, [path.join(KIT, 'assemble.cjs'), out], build, { BASE: fxv, OVL_OFF: ovlOff, ...(sfxOff ? { NOSFX: '1' } : {}) });
+console.log(`\nReel with effects: ${out}${ovlOff ? `  (captions hidden: ${ovlOff})` : ''}${sfxOff ? '  (sfx off)' : sfxHits.length ? `  (${sfxHits.length} pack sounds)` : ''}`);

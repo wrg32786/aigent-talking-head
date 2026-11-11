@@ -24,7 +24,7 @@ HeyGen cinematic takes are an optional second source; they cut in the same way a
 
    ```
    npm run reel                          # newest video in inbox/, neutral theme
-   npm run reel -- inbox/my-take.mov --theme aigent --cropx 0.4 --bed music.wav
+   npm run reel -- inbox/my-take.mov --theme aigent --cropx 0.4 --bed music.wav --bed-start 0
    npm run reel -- inbox/take1.mov inbox/take2.mov --hook take2.mov --fonts druk
    ```
 
@@ -95,7 +95,7 @@ These are defaults in `cut.json`; `npm run check -- <job>` flags anything that b
 
 - **Zoom punch.** `"punch": 0.1` scales every other segment 10% so each cut lands as a jump; `false` turns it off. `"bigPunch": true` on a segment eases in another 12% over 0.3 s; `npm run reel` puts it on the cut after the hook and the cut into the payoff. `"zoom"` and `"punchY"` per segment override the amount and the vertical centre.
 - **Transitions.** The glitch seam stays the default. `"transition": "crossfade"` on a segment (or at the top level for all of them) uses an ffmpeg xfade instead; `"transitionDur"` sets the length. The 50 names (crossfade, dip, flash, whip, iris, zoom, pixelate, ...) are in `kit/transitions.json` and `effects/CATALOG.md`.
-- **Sounds.** Fewer and deeper. The locked set is `whoosh`, `swipe`, `boom`, `click`, `typing` (mono 48 kHz WAV, CC0), used as `"sfx": {"whoosh": [3.2], "boom": [[12.4, 0.55]]}`. Never a sound on every cut, and the key moment (the payoff) gets the loudest one. You still pick sounds by ear.
+- **Sounds.** Fewer and deeper. The locked cut-seam set is `whoosh`, `swipe`, `boom`, `click`, `typing` (mono 48 kHz WAV, CC0), used as `"sfx": {"whoosh": [3.2], "boom": [[12.4, 0.55]]}`. Never a sound on every cut, and the key moment (the payoff) gets the loudest one. A 31-sound cinematic pack in `kit/sfx/` (see `kit/sfx/sfx.json`) is auto-picked on `npm run fx` for each effect hit: category mapping, no-repeat rotation, the hit point aligned to the effect, risers ending on the hit, releases after heavy hits, ducked under the voice. Override per effect with `"sfx": "01-cinematic-hit-a"` or `"sfx": false`, or turn the pack off with `--sfx off`. You still pick sounds by ear.
 - **Copy.** No em or en dashes, no "not X, but Y", no staged run-ups ("Here's the thing:"), no dramatic closers, no hype words. `npm run check` lints the captions, titles and card copy.
 - **Script shape.** A hook, one reveal per beat, a payoff: 40 to 55 words, 15 to 20 s. Over 25 s, cut a middle sentence.
 
@@ -157,9 +157,10 @@ Agents: start at [AGENTS.md](AGENTS.md).
 | `kit/timeline.mjs` | Maps segment word times onto the output clock and prints the seams. |
 | `kit/overlay.html` | Caption layer, driven by `captions.js` and styled by `theme.js`. |
 | `kit/render.mjs` | Renders the overlay to PNG frames (24 fps) or to stills. Run it from `build/`. |
-| `kit/assemble.cjs` | The cut. Any number of segments from any source, cover-cropped to 1080x1920, zoom punch, glitch seams or named transitions, titles behind the person, overlay, sounds, ducked bed, -14 LUFS. |
+| `kit/assemble.cjs` | The cut. Any number of segments from any source, cover-cropped to 1080x1920, zoom punch, glitch seams or named transitions, titles behind the person, overlay, locked-set and pack sounds (both ducked under the voice), ducked bed, -14 LUFS. |
+| `kit/sfx-plan.cjs` | Pack manifest, validation, and effect-hit auto-pick. |
 | `kit/fs.mjs` | Freesound search, CC0 only. |
-| `kit/sfx/` | The locked sound set (WAV) and the two original woosh MP3s. |
+| `kit/sfx/` | Locked cut-seam set (WAV + legacy woosh MP3s) and the 31-sound cinematic pack (`sfx.json`). |
 | `kit/example/` | The Awakening ad's real `cut.json` and `captions.js`, a real-footage cut, the HeyGen retake prompt, and the Skool mark used only by that ad. |
 
 ## Rules the pipeline carries
@@ -180,6 +181,7 @@ Code and docs: Apache-2.0, Copyright 2026 Will Gwyn (wrg32786). See [LICENSE](LI
 - `kit/sfx/D-quick-woosh-683101.mp3`: "quick woosh" by florianreichelt, Freesound 683101, CC0.
 - `kit/sfx/whoosh.wav` and `kit/sfx/swipe.wav`: mono 48 kHz WAV conversions of the two Freesound files above, CC0.
 - `kit/sfx/boom.wav`, `click.wav`, `typing.wav`: from [motion-pack](https://github.com/ANVEAI/motion-pack) by ANVEAI (sounds `snd.hit.deep_impact`, `snd.ui.click`, `snd.ui.typing_burst`), CC0 1.0 under its LICENSE-MEDIA.
+- `kit/sfx/{hit,riser,release,whoosh,swipe,pop,ui,glitch,camera,paper,counter,sub,shimmer}/` and `kit/sfx/sfx.json`: 31-sound cinematic pack (Will-approved). DAEDAL Transition / UI packs, Kenney Interface Sounds, OpenGameArt / Freesound CC0 items, and original synths dedicated CC0. Full credits in [THIRD_PARTY.md](THIRD_PARTY.md).
 - `kit/fonts/`: Google Fonts under the SIL Open Font License 1.1, each with its licence file. See [kit/fonts/README.md](kit/fonts/README.md).
 - Ideas adapted, no code copied: the transition name map from motion-pack (MIT), the Hormozi and karaoke caption looks from [Capite](https://github.com/muneebkhan08/Capite) (MIT), the title entrances from [motion-anything](https://github.com/nexu-io/motion-anything) (Apache-2.0, reference only). See [THIRD_PARTY.md](THIRD_PARTY.md).
 - `kit/example/skool-logo.svg`: the Skool wordmark, a trademark of Skool. It's included only to mark The AIgent's own Skool group in the Awakening example; it isn't in any theme. Don't use it for other brands.
