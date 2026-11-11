@@ -11,6 +11,8 @@ Turn a phone recording into a finished 9:16 reel. Record yourself on your phone,
 
 HeyGen cinematic takes are an optional second source; they cut in the same way as phone clips.
 
+See what it makes: [the demo reel](kit/example/demo-reel/) (40 s, 20 effects, with the plan files that built it) and [the font pairings](kit/fonts/README.md#examples).
+
 ## Quick start: phone clip to reel
 
 1. **Install once** (see [Install](#install)), then check it works: `npm run smoke` should end with `SMOKE PASS`.
@@ -164,7 +166,7 @@ Agents: start at [AGENTS.md](AGENTS.md).
 | `kit/fs.mjs` | Freesound search, CC0 only. |
 | `kit/sfx/` | Locked cut-seam set (WAV + legacy woosh MP3s) and the 31-sound cinematic pack (`sfx.json`). |
 | `kit/music/` | Our music beds (MP3, all at -13 LUFS) and `beds.json`. `npm run music` lists them, `npm run music:add -- <file>` adds one. See [kit/music/README.md](kit/music/README.md). |
-| `kit/example/` | The Awakening ad's real `cut.json` and `captions.js`, a real-footage cut, the HeyGen retake prompt, and the Skool mark used only by that ad. |
+| `kit/example/` | The Awakening ad's real `cut.json` and `captions.js`, a real-footage cut, the HeyGen retake prompt, and the Skool mark used only by that ad. `demo-reel/` holds a finished reel with its `cut.json`, `fx.json` and `captions.js`. |
 
 ## Rules the pipeline carries
 

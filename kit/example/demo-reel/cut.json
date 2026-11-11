@@ -1,0 +1,365 @@
+{
+ "note": "Demo reel v2 (Will, 2026-11-10 edit plan). Written by make-plan.cjs; edit that, not this.",
+ "segs": [
+  {
+   "file": "../src/take-2-54-24.mp4",
+   "in": 11.8,
+   "out": 16.217
+  },
+  {
+   "file": "../src/take-2-54-24.mp4",
+   "in": 17.18,
+   "out": 18.847
+  },
+  {
+   "file": "../src/take-2-54-24.mp4",
+   "in": 18.84,
+   "out": 20.59,
+   "bigPunch": true
+  },
+  {
+   "file": "../src/take-2-54-24.mp4",
+   "in": 20.82,
+   "out": 22.57
+  },
+  {
+   "file": "../src/take-2-54-24.mp4",
+   "in": 23.3,
+   "out": 25.217
+  },
+  {
+   "file": "../src/take-2-54-24.mp4",
+   "in": 25.2,
+   "out": 26.95
+  },
+  {
+   "file": "../src/take-2-54-24.mp4",
+   "in": 27.32,
+   "out": 28.987
+  },
+  {
+   "file": "../src/take-2-54-24.mp4",
+   "in": 28.98,
+   "out": 30.897
+  },
+  {
+   "file": "../src/take-2-54-24.mp4",
+   "in": 31.04,
+   "out": 33.04
+  },
+  {
+   "file": "../src/take-2-54-24.mp4",
+   "in": 33.16,
+   "out": 35.327
+  },
+  {
+   "file": "../src/take-2-54-24.mp4",
+   "in": 35.34,
+   "out": 37.632
+  },
+  {
+   "file": "../src/take-2-54-24.mp4",
+   "in": 37.76,
+   "out": 39.593
+  },
+  {
+   "file": "../src/take-2-54-24.mp4",
+   "in": 39.58,
+   "out": 41.372
+  },
+  {
+   "file": "../src/take-2-54-24.mp4",
+   "in": 41.38,
+   "out": 43.047
+  },
+  {
+   "file": "../src/take-2-54-24.mp4",
+   "in": 43.06,
+   "out": 44.81
+  },
+  {
+   "file": "../src/take-2-54-24.mp4",
+   "in": 44.88,
+   "out": 46.422
+  },
+  {
+   "file": "../src/take-2-54-24.mp4",
+   "in": 46.44,
+   "out": 48.148
+  },
+  {
+   "file": "../src/take-2-54-24.mp4",
+   "in": 48.16,
+   "out": 50.16
+  },
+  {
+   "file": "../src/take-2-54-24.mp4",
+   "in": 50.16,
+   "out": 52.493
+  },
+  {
+   "file": "../src/take-2-52-10.mp4",
+   "in": 52.18,
+   "out": 54.055,
+   "bigPunch": true
+  }
+ ],
+ "tail": 0.7,
+ "punch": 0.1,
+ "hits": [],
+ "sounds": {
+  "hw_click_latch": {
+   "file": "../sfx/hw_click_latch.wav",
+   "peak": 0.02
+  },
+  "whoosh_magic_swirl": {
+   "file": "../sfx/whoosh_magic_swirl.wav",
+   "peak": 0.54
+  },
+  "sparkle_shimmer": {
+   "file": "../sfx/sparkle_shimmer.wav",
+   "peak": 0.24
+  },
+  "hit_low_thump": {
+   "file": "../sfx/hit_low_thump.wav",
+   "peak": 0.01
+  },
+  "whoosh_flyby": {
+   "file": "../sfx/whoosh_flyby.wav",
+   "peak": 0.54
+  },
+  "hw_led_on": {
+   "file": "../sfx/hw_led_on.wav",
+   "peak": 0.04
+  },
+  "tx_pixel_dissolve": {
+   "file": "../sfx/tx_pixel_dissolve.wav",
+   "peak": 0.14
+  },
+  "hit_slam": {
+   "file": "../sfx/hit_slam.wav",
+   "peak": 0
+  },
+  "camera_shutter": {
+   "file": "../sfx/camera_shutter.wav",
+   "peak": 0
+  },
+  "ui_pop": {
+   "file": "../sfx/ui_pop.wav",
+   "peak": 0
+  },
+  "ui_zoom_in": {
+   "file": "../sfx/ui_zoom_in.wav",
+   "peak": 0.4
+  },
+  "ui_count_run": {
+   "file": "../sfx/ui_count_run.wav",
+   "peak": 0.63
+  },
+  "whoosh_swish_s": {
+   "file": "../sfx/whoosh_swish_s.wav",
+   "peak": 0.13
+  },
+  "hit_stab": {
+   "file": "../sfx/hit_stab.wav",
+   "peak": 0.05
+  },
+  "tx_smash_cut": {
+   "file": "../sfx/tx_smash_cut.wav",
+   "peak": 0.01
+  },
+  "ui_highlight_draw": {
+   "file": "../sfx/ui_highlight_draw.wav",
+   "peak": 0.29
+  },
+  "paper_card_riffle": {
+   "file": "../sfx/paper_card_riffle.wav",
+   "peak": 0.23
+  },
+  "tx_cut_tick": {
+   "file": "../sfx/tx_cut_tick.wav",
+   "peak": 0
+  },
+  "ui_tick": {
+   "file": "../sfx/ui_tick.wav",
+   "peak": 0
+  },
+  "ui_drop_snap": {
+   "file": "../sfx/ui_drop_snap.wav",
+   "peak": 0
+  },
+  "trailer_reverse_swell_1s": {
+   "file": "../sfx/trailer_reverse_swell_1s.wav",
+   "peak": 0.93
+  },
+  "ui_success_chime": {
+   "file": "../sfx/ui_success_chime.wav",
+   "peak": 0.1
+  }
+ },
+ "sfx": {
+  "hw_click_latch": [
+   [
+    0.12,
+    1.758
+   ]
+  ],
+  "whoosh_magic_swirl": [
+   [
+    4.67,
+    1.758
+   ]
+  ],
+  "sparkle_shimmer": [
+   [
+    6.23,
+    0.316
+   ]
+  ],
+  "hit_low_thump": [
+   [
+    7.93,
+    0.562
+   ]
+  ],
+  "whoosh_flyby": [
+   [
+    9.88,
+    1.758
+   ]
+  ],
+  "hw_led_on": [
+   [
+    11.55,
+    0.501
+   ]
+  ],
+  "typing": [
+   [
+    11.8,
+    0.372
+   ]
+  ],
+  "tx_pixel_dissolve": [
+   [
+    13.35,
+    0.398
+   ]
+  ],
+  "hit_slam": [
+   [
+    14.94,
+    0.501
+   ]
+  ],
+  "camera_shutter": [
+   [
+    16.85,
+    0.562
+   ]
+  ],
+  "ui_pop": [
+   [
+    18.88,
+    0.501
+   ],
+   [
+    19.13,
+    0.507
+   ]
+  ],
+  "ui_zoom_in": [
+   [
+    21.9,
+    0.447
+   ]
+  ],
+  "ui_count_run": [
+   [
+    22.03,
+    0.224
+   ]
+  ],
+  "whoosh": [
+   [
+    23.59,
+    1.567
+   ]
+  ],
+  "whoosh_swish_s": [
+   [
+    25.25,
+    0.224
+   ]
+  ],
+  "hit_stab": [
+   [
+    25.79,
+    0.531
+   ]
+  ],
+  "tx_smash_cut": [
+   [
+    26.94,
+    0.398
+   ]
+  ],
+  "ui_highlight_draw": [
+   [
+    28.62,
+    0.447
+   ]
+  ],
+  "paper_card_riffle": [
+   [
+    30.38,
+    0.562
+   ]
+  ],
+  "tx_cut_tick": [
+   [
+    31.89,
+    0.562
+   ]
+  ],
+  "ui_tick": [
+   [
+    32.33,
+    1.758
+   ]
+  ],
+  "ui_drop_snap": [
+   [
+    33.6,
+    0.501
+   ]
+  ],
+  "boom": [
+   [
+    35.62,
+    0.631
+   ]
+  ],
+  "trailer_reverse_swell_1s": [
+   [
+    37.96,
+    0.316
+   ]
+  ],
+  "ui_success_chime": [
+   [
+    39.45,
+    0.501
+   ]
+  ]
+ },
+ "overlay": "ovl/%04d.png",
+ "bed": "yeehaw",
+ "bedStart": 0,
+ "bedVol": 0.43,
+ "bedDuckRatio": 2.3,
+ "bedDuckLead": 0.12,
+ "bedNoFade": true,
+ "bedFadeOut": 1.2,
+ "sfxHits": []
+}

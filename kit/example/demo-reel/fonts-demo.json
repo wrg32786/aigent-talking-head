@@ -1,0 +1,26 @@
+{
+ "about": "Unbounded Black caps in the accent colour + small tracked Inter (demo reel v2 plan)",
+ "display": {
+  "family": "Unbounded",
+  "file": "../../fonts/Unbounded-VF.ttf",
+  "weight": 900,
+  "tracking": -0.03,
+  "upper": true
+ },
+ "secondary": {
+  "family": "Inter",
+  "file": "../../../effects/vendor/claude-video-effects/fonts/Inter.ttf",
+  "weight": 600
+ },
+ "script": null,
+ "lockup": {
+  "arrange": "stack",
+  "partner": "secondary",
+  "scale": 0.36,
+  "partnerUpper": true,
+  "partnerTracking": 0.2,
+  "justify": true,
+  "heroColor": "accent",
+  "partnerColor": "text"
+ }
+}

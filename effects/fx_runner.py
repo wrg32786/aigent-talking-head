@@ -40,10 +40,14 @@ def glass_widgets_v2(c, e):"""),
     ("""'artifact · views.html'""", """e.o.get('chart_tag', 'artifact · stats.html')"""),
     ("""'sfx · 25.7s'""", """e.o.get('song_sub', 'edit')"""),
     # any effect: "face": 0.7 lays it out as if the tracked face were 70% as wide. The effects size and place
-    # themselves from the face width, so a tight shot pushes fans, rings and lines off the frame; under 1 pulls them in,
-    # over 1 lifts behind-head words clear of a hat.
+    # themselves from the face width, so a tight shot pushes fans, rings and lines off the frame; under 1 pulls them in.
+    # any effect: "drop": 0.4 moves everything it draws behind the person down by 0.4 face widths. Upstream sets
+    # behind-head words above the head; the point of them is that the head covers part of the word (Will, 2026-11-10),
+    # so drop them until it does and read a check frame.
     ("""c.lt = t - f.start; EFFECTS[f.name][0](c, f)""",
-     """c.lt = t - f.start; _k = float(f.o.get('face', 1)); c.fw *= _k; EFFECTS[f.name][0](c, f); c.fw /= _k"""),
+     """c.lt = t - f.start; _k = float(f.o.get('face', 1)); c.drop = float(f.o.get('drop', 0)) * c.fw; c.fw *= _k; EFFECTS[f.name][0](c, f); c.fw /= _k; c.drop = 0"""),
+    ("""h, w = L.shape[:2]; x, y = int(round(x)), int(round(y))""",
+     """h, w = L.shape[:2]; x, y = int(round(x)), int(round(y + (getattr(c, 'drop', 0) if behind else 0)))"""),
     # pastel-word: the profile card sat at a fixed 86.5% of the height, under Instagram's own caption; "card_y" moves it
     ("""cy = H * 0.865 + (1 - ease_out((c.lt - 0.15) / 0.35)) * H * 0.2""",
      """cy = H * float(e.o.get('card_y', 0.865)) + (1 - ease_out((c.lt - 0.15) / 0.35)) * H * 0.2"""),

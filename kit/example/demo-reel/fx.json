@@ -1,0 +1,175 @@
+{
+ "profile": {
+  "name": "Will Gwyn",
+  "handle": "@the_aigent_news"
+ },
+ "effects": [
+  {
+   "fx": "locked-on",
+   "zoom": 1.15,
+   "sfx": false,
+   "start": 0,
+   "end": 4.397
+  },
+  {
+   "fx": "rabbit-hole",
+   "sfx": false,
+   "start": 4.417,
+   "end": 6.063
+  },
+  {
+   "fx": "spotlight",
+   "look": "sparkle",
+   "text": "SPOTLIGHT",
+   "face": 1.3,
+   "drop": 0.15,
+   "sfx": false,
+   "start": 6.083,
+   "end": 7.813
+  },
+  {
+   "fx": "backdrop-word",
+   "text": "BACKDROP",
+   "drop": 0.08,
+   "sfx": false,
+   "start": 7.833,
+   "end": 9.563
+  },
+  {
+   "fx": "orbit",
+   "images": "covers",
+   "count": 6,
+   "sfx": false,
+   "start": 9.583,
+   "end": 11.48
+  },
+  {
+   "fx": "led-sign",
+   "text": "LED|SIGN",
+   "sfx": false,
+   "start": 11.5,
+   "end": 13.23
+  },
+  {
+   "fx": "dot-reveal",
+   "sfx": false,
+   "start": 13.25,
+   "end": 14.897
+  },
+  {
+   "fx": "red-collage",
+   "text": "RED",
+   "lines": " ",
+   "sfx": false,
+   "start": 14.917,
+   "end": 16.813,
+   "captions": "on"
+  },
+  {
+   "fx": "cover-star",
+   "text": "COVER",
+   "lines": "Magazine|51 FX|1 clip|Claude",
+   "sfx": false,
+   "start": 16.833,
+   "end": 18.813
+  },
+  {
+   "fx": "glass-widgets",
+   "title": "Effects in the repo",
+   "text": "51",
+   "sub": "one phone clip|cut by Claude",
+   "chart": "This reel::20::2|4|6|8|10|13|16|18|20",
+   "sfx": false,
+   "start": 18.833,
+   "end": 20.98,
+   "captions": "on"
+  },
+  {
+   "fx": "over-the-shoulder-zoom",
+   "text": "In this reel|In the repo",
+   "to": "20|51",
+   "zoom": 1.35,
+   "sfx": false,
+   "start": 21,
+   "end": 23.272
+  },
+  {
+   "fx": "carousel-spin",
+   "images": "covers",
+   "count": 12,
+   "face": 0.6,
+   "size": 0.24,
+   "sfx": false,
+   "start": 23.292,
+   "end": 25.105
+  },
+  {
+   "fx": "huge-strike",
+   "text": "HUGE",
+   "at": 0.6,
+   "drop": 0.5,
+   "sfx": false,
+   "start": 25.125,
+   "end": 26.897
+  },
+  {
+   "fx": "match-cut",
+   "text": "HEADLINES",
+   "sfx": false,
+   "start": 26.917,
+   "end": 28.563
+  },
+  {
+   "fx": "crayon-write",
+   "text": "CRAYON",
+   "drop": 0.5,
+   "sfx": false,
+   "start": 28.583,
+   "end": 30.313
+  },
+  {
+   "fx": "fan-build",
+   "images": "covers",
+   "count": 12,
+   "face": 0.7,
+   "sfx": false,
+   "start": 30.333,
+   "end": 31.855
+  },
+  {
+   "fx": "timeline",
+   "text": "talking-head",
+   "sub": "cut by Claude",
+   "sfx": false,
+   "start": 31.875,
+   "end": 33.563,
+   "captions": "on"
+  },
+  {
+   "fx": "place-in-grid",
+   "images": "covers",
+   "views": "|",
+   "sfx": false,
+   "start": 33.583,
+   "end": 35.563,
+   "captions": "on"
+  },
+  {
+   "fx": "slow-push",
+   "zoom": 1.15,
+   "sfx": false,
+   "start": 35.583,
+   "end": 37.897
+  },
+  {
+   "fx": "pastel-word",
+   "text": "FOLLOW",
+   "role": "",
+   "card_y": 0.84,
+   "card_guard": "off",
+   "sfx": false,
+   "start": 37.917,
+   "end": 40.472
+  }
+ ]
+}
