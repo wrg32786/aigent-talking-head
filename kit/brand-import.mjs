@@ -198,10 +198,12 @@ export async function importGuide(src, opts = {}) {
     };
     const dest = opts.out || join(Preset.LOCAL, name + '.json');
     mkdirSync(dirname(dest), { recursive: true });
-    // validate may fail on unknown custom bits; keep colors extra
-    try { Preset.save(name, { ...draft, colors: undefined, fontMentions: undefined, logo: draft.logo, source: undefined, draft: true }); }
-    catch {
-      writeFileSync(dest, JSON.stringify(draft, null, 2) + '\n');
+    // --out writes only the file asked for and never touches kit/presets/local (an existing local preset of the same
+    // name would change later reels). Without --out, the validated preset is saved there; validate may fail on unknown
+    // custom bits, and the rich draft below is written either way.
+    if (!opts.out) {
+      try { Preset.save(name, { ...draft, colors: undefined, fontMentions: undefined, logo: draft.logo, source: undefined, draft: true }); }
+      catch {}
     }
     // Always write the rich draft (colours, mentions) to the dest
     writeFileSync(dest, JSON.stringify(draft, null, 2) + '\n');

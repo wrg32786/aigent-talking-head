@@ -103,9 +103,11 @@ function validate(p) {
   if (p.theme && !themes().includes(p.theme)) errs.push(`unknown theme "${p.theme}"`);
   if (p.look && !LOOKS.includes(p.look)) errs.push(`unknown look "${p.look}"`);
   if (p.captionStyle && !STYLES.includes(p.captionStyle)) errs.push(`unknown captionStyle "${p.captionStyle}"`);
-  if (p.fonts && p.fonts !== 'theme' && !fontNames().includes(p.fonts) && !p.fonts.startsWith('local')) {
+  // a comma list cycles pairings (the oneword look's default); each name is checked on its own
+  for (const f of (p.fonts ? String(p.fonts).split(',').map(s => s.trim()) : [])) {
+    if (f === 'theme' || fontNames().includes(f) || f.startsWith('local')) continue;
     // local fonts are allowed as a name under kit/fonts/local/; don't fail unknown here if it looks like a custom id
-    if (!isPlain(p.fonts)) errs.push(`bad fonts "${p.fonts}"`);
+    if (!isPlain(f)) errs.push(`bad fonts "${p.fonts}"`);
   }
   if (p.finish) {
     try { B.parseFinish(p.finish); } catch (e) { errs.push(e.message); }
@@ -157,6 +159,8 @@ function apply(preset, dest, overrides = {}) {
     if (punch === false && !has('punch')) cut.punch = false;
     if (transition && !has('transition') && Array.isArray(cut.segs)) {
       cut.segs.forEach((s, i) => { if (!s.transition) s.transition = transition; });
+      // "cut" is a hard cut with no seam: no glitch hits on the picture (captions drop theirs via autocaption --no-glitch)
+      if (transition === 'cut') { cut.hits = []; applied.noGlitch = true; }
     }
     if (has('finish') && overrides.finish) {
       cut.finish = overrides.finish;

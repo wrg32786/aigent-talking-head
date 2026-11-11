@@ -69,12 +69,15 @@ if (presetArg === 'auto') {
   if (preset.draft) console.warn('note: preset "' + preset.name + '" is a draft from a brand guide; confirm it before you ship.');
   console.log('preset:', preset.name, '-', preset.label || '');
 }
-const look = opt('look', (preset && preset.look) || 'kinetic');
+// An explicit --look wins over the preset: its caption style, its titles rule and (oneword) its font cycle come with it.
+const lookFlag = opt('look');
+const look = lookFlag || (preset && preset.look) || 'kinetic';
 if (!P.LOOKS.includes(look)) die('--look must be ' + P.LOOKS.join(', '));
-const STYLE = opt('style', (preset && preset.captionStyle) || ({ kinetic: 'kinetic', oneword: 'oneword', muse: 'pill', classic: 'classic', 'one-word': 'one-word' }[look]));
+const LOOK_STYLE = { kinetic: 'kinetic', oneword: 'oneword', muse: 'pill', classic: 'classic', 'one-word': 'one-word' };
+const STYLE = opt('style', (!lookFlag && preset && preset.captionStyle) || LOOK_STYLE[look]);
 if (STYLE && !P.STYLES.includes(STYLE)) die('--style must be ' + P.STYLES.join(', '));
-const TITLES = flag('no-titles') ? false : (flag('titles') ? true : (preset && preset.titles !== undefined ? !!preset.titles : look !== 'classic'));
-const FONTS = opt('fonts', preset && preset.fonts) || (look === 'oneword' ? 'instrument,literata,bricolage' : undefined);
+const TITLES = flag('no-titles') ? false : (flag('titles') ? true : (!lookFlag && preset && preset.titles !== undefined ? !!preset.titles : look !== 'classic'));
+const FONTS = opt('fonts') || (lookFlag && look === 'oneword' ? 'instrument,literata,bricolage' : (preset && preset.fonts) || (look === 'oneword' ? 'instrument,literata,bricolage' : undefined));
 const name = opt('name') || (src ? path.basename(src).replace(/\.[^.]+$/, '') : path.basename(path.resolve(clipsArg || '.')))
   .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'reel';
 const job = path.resolve(opt('jobs', path.join(ROOT, 'jobs')), name), build = path.join(job, 'build');
@@ -139,7 +142,7 @@ if (!flag('rebuild')) {
   // 3. captions from the clips' word times
   const logo = opt('logo');
   if (logo) fs.copyFileSync(path.resolve(logo), path.join(build, path.basename(logo)));
-  sh(process.execPath, [path.join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--force', ...(TITLES ? ['--titles'] : look === 'oneword' ? [] : ['--hero']), ...(look === 'oneword' ? ['--cards'] : []), '--style', STYLE, ...(FONTS ? ['--fonts', FONTS] : []), ...(logo ? ['--logo', path.basename(logo)] : [])], build);
+  sh(process.execPath, [path.join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--force', ...(cut.hits && cut.hits.length === 0 ? ['--no-glitch'] : []), ...(TITLES ? ['--titles'] : look === 'oneword' ? [] : ['--hero']), ...(look === 'oneword' ? ['--cards'] : []), '--style', STYLE, ...(FONTS ? ['--fonts', FONTS] : []), ...(logo ? ['--logo', path.basename(logo)] : [])], build);
   // --broll <folder>: cutaways from your own clips. A phrase that isn't a type card or under a title cuts to the next
   // clip in the folder (every third phrase, 0.8 to 2.2 s), the voice running on; see "inserts" in kit/assemble.cjs.
   if (opt('broll')) {

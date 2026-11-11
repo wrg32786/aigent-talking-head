@@ -16,6 +16,9 @@ const require = createRequire(import.meta.url);
 const B = require('./beats.cjs');
 const Preset = require('./preset.cjs');
 const KIT = dirname(fileURLToPath(import.meta.url));
+// fx.cjs fills these before the runner sees a plan; calling the runner directly must do the same, or the upstream
+// author's name and handle (its defaults) show in the stills
+const FX_CAT = Object.fromEntries(JSON.parse(readFileSync(join(dirname(KIT), 'effects', 'catalog.json'), 'utf8')).effects.map(e => [e.name, e]));
 const ROOT = dirname(KIT);
 const OUT = join(ROOT, 'showcase');
 const W = 540, H = 960;
@@ -281,6 +284,11 @@ function runEffectBatch(fxPy, runner, person, imgs, batch, work, fps) {
   const plan = { profile: { name: 'Showcase', handle: '@showcase' }, effects: [] };
   batch.forEach((e, i) => {
     const row = { ...demoFields(e), start: +(i * slot).toFixed(2), end: +((i + 1) * slot).toFixed(2) };
+    const ce = FX_CAT[e.id] || {}, prof = plan.profile;
+    const tok = { '$profile.name': prof.name, '$profile.handle': prof.handle, '$job': 'showcase', '$day': 'MON', '$date': '1', '$issue': 'ISSUE  ·  SHOWCASE' };
+    for (const k of ce.fromProfile || []) row[k] = prof[k === 'text' ? 'handle' : k];
+    for (const [k, v] of Object.entries(ce.neutral || {})) if (row[k] === undefined) row[k] = tok[v] ?? v;
+    if (e.id === 'glass-widgets' && row.pill === undefined) row.pill = '';   // the upstream "Edited by Claude" pill is off unless asked for, as in fx.cjs
     if ((e.required || []).includes('images') || (e.needs || []).includes('images')) row.images = imgs;
     plan.effects.push(row);
   });
@@ -292,7 +300,8 @@ function runEffectBatch(fxPy, runner, person, imgs, batch, work, fps) {
   writeFileSync(planPath, JSON.stringify(plan, null, 1));
   const mid = batch.map((_, i) => (i * slot + 0.7).toFixed(2));
   const stillOut = join(dir, 'fxstill.png');
-  sh(fxPy, [runner, '--plan', planPath, clip, stillOut, '--still', mid.join(',')], dir);
+  // PYTHONUTF8 as in fx.cjs: Windows Python reads the plan as cp1252 otherwise and a middle dot renders as mojibake
+  sh(fxPy, [runner, '--plan', planPath, clip, stillOut, '--still', mid.join(',')], dir, { PYTHONUTF8: '1' });
   return batch.map((e, i) => {
     const t = mid[i];
     let src = expectedStillName(stillOut, t, fps);
