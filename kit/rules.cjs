@@ -93,7 +93,7 @@ function resolveTitles(CAP) {
 
 // Person-mask path and backend. cut.json may use "mask": "mask.mkv" or
 // "mask": {"file":"mask.mkv","model":"birefnet","person":"person.mkv"}, plus optional top-level "maskModel" / "person".
-const MASK_MODELS = { birefnet: 'birefnet', 'birefnet-general-lite': 'birefnet', mediapipe: 'mediapipe' };
+const MASK_MODELS = { birefnet: 'birefnet', 'birefnet-general-lite': 'birefnet', 'birefnet-portrait': 'birefnet-portrait', mediapipe: 'mediapipe' };
 function maskSpec(cut, opts = {}) {
   const m = cut && cut.mask;
   if (!m && !opts.model && !cut?.maskModel) return { file: null, model: null, person: null };
@@ -101,7 +101,7 @@ function maskSpec(cut, opts = {}) {
   const raw = opts.model || cut.maskModel || (m && typeof m === 'object' && m.model) || process.env.MASK_MODEL || '';
   const key = String(raw || '').toLowerCase();
   const model = key ? (MASK_MODELS[key] || null) : null; // null = let mask.py pick (birefnet if cached, else mediapipe)
-  if (key && !MASK_MODELS[key]) throw new Error('unknown mask model ' + raw + ' (use birefnet or mediapipe)');
+  if (key && !MASK_MODELS[key]) throw new Error('unknown mask model ' + raw + ' (use birefnet, birefnet-portrait or mediapipe)');
   const person = opts.person || cut.person || (m && typeof m === 'object' && m.person) || null;
   return { file, model, person };
 }

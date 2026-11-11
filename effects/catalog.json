@@ -227,7 +227,7 @@
   {
    "n": 6,
    "name": "backdrop-word",
-   "does": "A giant word drops in behind you.",
+   "does": "A giant word in tall type rises in behind you, letter by letter, with your head cutting into it.",
    "zone": "behind head, top",
    "moments": [
     "hook",
@@ -244,7 +244,8 @@
    "options": {
     "text": "the word",
     "color": "hex",
-    "font": "bold or serif"
+    "font": "anton (default, tall), bold or serif",
+    "rise": "how far the word eases up after it lands, as a share of its height (default 0.3; 0 stays put)"
    },
    "required": [
     "text"

@@ -10,7 +10,7 @@
 //   "tail": 0.3,                        seconds to hold the last frame at the end
 //   "hits": [[11.66,24],[12.66,14]],     output-time glitch/shake hits [time, strength]
 //   "sfx": {"F":[11.66],"D":[12.66]},    output times. F = cinematic woosh on cuts, D = quick woosh on card moves
-//   "bed": "vinyl-sunrise" (a kit/music library name) or "music.wav", "bedStart": 0, "bedVol": 0.16, "bedNoFade": true,
+//   "bed": "vinyl-sunrise" (a kit/music library name) or "music.wav", "bedStart": 0, "bedVol": 0.16, "bedNoFade": true, "bedFadeOut": 1.4,
 //   "overlay": "ovl/%04d.png",           optional; leave out for a clean cut
 //   "titles": "ovlt/%04d.png",           optional kinetic-title layer (render.mjs writes it); drawn under the person when
 //   "mask": "mask.mkv",                  a person mask is given (kit/mask.py), else in front of the picture
@@ -160,28 +160,41 @@ if (C.titles) {
     f.push(`[g][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gm]`); vcur = 'gm';
   }
 }
-if (C.overlay) {
-  const o = inp('-framerate', '24', '-i', C.overlay);
-  const off = (process.env.OVL_OFF || '').split(',').filter(Boolean).map(w => w.split('-').map(Number)).filter(([a, b]) => b > a);
-  const en = off.length ? `:enable='not(${off.map(([a, b]) => `between(t,${a},${b})`).join('+')})'` : '';
-  f.push(`[${vcur}][${o}:v]overlay=format=auto:eof_action=pass${en}[o]`); vcur = 'o';
-}
-if (hits.length) {
+// b-roll inserts: "inserts": [{"file": "../broll/typing.mov", "at": 12.3, "dur": 1.5, "in": 0, "bw": true}] in cut.json.
+// The insert's picture replaces yours for its span while the voice runs on (its own audio is dropped). It covers the
+// picture and any titles, and the captions draw on top of it. "in" is where to start in the clip; "bw" makes it black
+// and white. Captions in the oneword look move up into the insert's open space ("y", default 640) and can take a
+// "tint" to match its light.
+(C.inserts || []).forEach((s, k) => {
+  const n = inp('-i', s.file), a0 = +s.at, d = +s.dur, i0 = +(s.in || 0);
+  f.push(`[${n}:v]trim=${i0}:${(i0 + d).toFixed(3)},${V},scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1${s.bw ? ',hue=s=0' : ''},setpts=PTS+${a0}/TB[ins${k}]`,
+    `[${vcur}][ins${k}]overlay=eof_action=pass:enable='between(t,${a0},${(a0 + d).toFixed(3)})'[vi${k}]`);
+  vcur = `vi${k}`;
+});
+// The caption layer and the glitch shake go on in a second pass when there are captions. In one graph, the caption
+// frames together with the person mask and the b-roll inserts ran ffmpeg at a tenth of real time or less (2026-11-11,
+// oneword look); split in two, both passes run faster than real time.
+const ovlOn = (process.env.OVL_OFF || '').split(',').filter(Boolean).map(w => w.split('-').map(Number)).filter(([a, b]) => b > a);
+const ovlEn = ovlOn.length ? `:enable='not(${ovlOn.map(([a, b]) => `between(t,${a},${b})`).join('+')})'` : '';
+function shake(g, src) {
+  if (!hits.length) return src;
   const env = hz => hits.map(([h, a]) => `${a}*gte(t,${h})*exp(-8*(t-${h}))*sin(2*PI*${hz}*(t-${h}))`).join('+');
   const win = hits.map(([h]) => `between(t,${(h - .04).toFixed(2)},${(h + .17).toFixed(2)})`).join('+');
-  f.push(`[${vcur}]split[sa][sb]`, `[sa][sb]overlay=x='${env(17)}':y='${env(23)}':eval=frame[sh]`, `[sh]rgbashift=rh=-16:bh=16:rv=4:bv=-4:enable='${win}',noise=c0s=46:c0f=t+u:enable='${win}'[hv]`);
-  vcur = 'hv';
+  g.push(`[${src}]split[sa][sb]`, `[sa][sb]overlay=x='${env(17)}':y='${env(23)}':eval=frame[sh]`, `[sh]rgbashift=rh=-16:bh=16:rv=4:bv=-4:enable='${win}',noise=c0s=46:c0f=t+u:enable='${win}'[hv]`);
+  return 'hv';
 }
+if (!C.overlay) vcur = shake(f, vcur);
 f.push(`[${vcur}]fps=24,trim=0:${LEN}[vo]`);
 
 // Sound: the locked set in kit/rules.cjs, plus pack hits from cut.json sfxHits (or sfx-hits.json).
 // Each sound's hit point (measured peak, or the cutoff for a riser) lands on the time given.
-const lbl = [];
+// A job can add its own sound files in cut.json: "sounds": {"name": {"file": "../sfx/x.wav", "peak": 0.2, "vol": 0.4}} (file relative to build/).
+const lbl = [], SFX = { ...R.SFX, ...Object.fromEntries(Object.entries(C.sounds || {}).map(([k, s]) => [k, { peak: 0, vol: 0.4, ...s, file: path.resolve(s.file) }])) };
 if (!process.env.NOSFX) {
   for (const k of Object.keys(C.sfx || {})) {
-    const S = R.SFX[k]; if (!S) { console.error(`unknown sfx "${k}"; use one of ${Object.keys(R.SFX).join(', ')}`); process.exit(1); }
+    const S = SFX[k]; if (!S) { console.error(`unknown sfx "${k}"; use one of ${Object.keys(SFX).join(', ')}`); process.exit(1); }
     const ts = R.sfxHits(C.sfx[k]); if (!ts.length) continue;
-    const n = inp('-i', path.join(KIT, S.file));
+    const n = inp('-i', path.resolve(KIT, S.file));
     f.push(`[${n}:a]${A},asplit=${ts.length}` + ts.map((_, j) => `[${k}s${j}]`).join(''));
     ts.forEach((h, j) => { const ms = Math.max(0, Math.round((h.t - S.peak) * 1000)); f.push(`[${k}s${j}]volume=${h.g ?? S.vol},adelay=${ms}|${ms}[${k}d${j}]`); lbl.push(`[${k}d${j}]`); });
   }
@@ -206,8 +219,8 @@ const bed = !process.env.NOBED && C.bed;
 if (bed) {
   const bf = R.bedFile(bed); if (!fs.existsSync(bf)) { console.error(`bed "${bed}": no such file ${bf}` + (R.isBed(bed) ? ' (beds.json lists it; restore kit/music)' : ' (not a library bed either: npm run music)')); process.exit(1); }
   const n = inp('-i', bf);
-  const st = +(C.bedStart || 0), vol = +(process.env.BEDVOL || C.bedVol || 0.22), nofade = process.env.BEDNOFADE || C.bedNoFade;
-  f.push(`[${n}:a]atrim=${st}:${(st + LEN + .2).toFixed(2)},${A},volume=${vol}${nofade ? '' : ',afade=t=in:d=0.3'},afade=t=out:st=${(LEN - 1.4).toFixed(2)}:d=1.4[bed]`);
+  const st = +(C.bedStart || 0), vol = +(process.env.BEDVOL || C.bedVol || 0.22), nofade = process.env.BEDNOFADE || C.bedNoFade, fo = +(C.bedFadeOut ?? 1.4);
+  f.push(`[${n}:a]atrim=${st}:${(st + LEN + .2).toFixed(2)},${A},volume=${vol}${nofade ? '' : ',afade=t=in:d=0.3'},afade=t=out:st=${(LEN - fo).toFixed(2)}:d=${fo}[bed]`);
 }
 // Duck SFX and the bed under the voice. Without bed ducking, hi-hats masked "school" into "pool".
 if (lbl.length || bed) {
@@ -217,9 +230,22 @@ if (lbl.length || bed) {
   f.push(`[ca]asplit=${keys.length}${keys.join('')}`);
   mix[0] = '[cak]';
   if (lbl.length) { f.push('[sfxraw][keyS]sidechaincompress=threshold=0.04:ratio=3:attack=5:release=180:makeup=1[sfx]'); mix.push('[sfx]'); }
-  if (bed) { f.push('[bed][keyB]sidechaincompress=threshold=0.03:ratio=6:attack=15:release=250:makeup=1[bedd]'); mix.push('[bedd]'); }
+  if (bed) {
+    // "bedDuckRatio": lower = the music dips less under the voice. "bedDuckLead": seconds the dip starts BEFORE each word
+    // (the key is the voice moved earlier), so a soft first consonant isn't masked while the compressor is still reacting.
+    const lead = +(C.bedDuckLead || 0);
+    if (lead > 0) f.push(`[keyB]atrim=start=${lead},asetpts=PTS-STARTPTS[keyBl]`);
+    f.push(`[bed][keyB${lead > 0 ? 'l' : ''}]sidechaincompress=threshold=0.03:ratio=${+(C.bedDuckRatio || 6)}:attack=15:release=${lead > 0 ? 250 + Math.round(lead * 1000) : 250}:makeup=1[bedd]`); mix.push('[bedd]');
+  }
 }
 f.push(`${mix.join('')}amix=inputs=${mix.length}:normalize=0:duration=first,atrim=0:${LEN},loudnorm=I=-14:TP=-1:LRA=11,aresample=48000[ao]`);
-args.push('-filter_complex', f.join(';'), '-map', '[vo]', '-map', '[ao]', '-c:v', 'libx264', '-crf', '17', '-preset', 'medium', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', out);
+const pre = C.overlay ? out.replace(/(\.[^.\\/]+)?$/, '.pre.mp4') : null;
+args.push('-filter_complex', f.join(';'), '-map', '[vo]', '-map', '[ao]', '-fps_mode', 'cfr', '-r', '24', '-c:v', 'libx264', ...(pre ? ['-crf', '12', '-preset', 'veryfast'] : ['-crf', '17', '-preset', 'medium']), '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', ...(pre ? [] : ['-movflags', '+faststart']), pre || out);
 execFileSync('ffmpeg', args, { stdio: 'inherit' });
+if (pre) {
+  const g = [`[0:v][1:v]overlay=format=auto:eof_action=pass${ovlEn}[o]`], v = shake(g, 'o');
+  g.push(`[${v}]fps=24,trim=0:${LEN}[vo]`);
+  execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', pre, '-framerate', '24', '-i', C.overlay, '-filter_complex', g.join(';'), '-map', '[vo]', '-map', '0:a', '-fps_mode', 'cfr', '-r', '24', '-c:v', 'libx264', '-crf', '17', '-preset', 'medium', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', out], { stdio: 'inherit' });
+  fs.rmSync(pre, { force: true });
+}
 console.log('wrote', out, 'len', LEN);

@@ -2,13 +2,16 @@
 # Runs with the effects venv (npm run effects:setup). reel.cjs runs it when cut.json has "titles" + "mask".
 #
 #   effects/.venv/bin/python kit/mask.py base.mp4 mask.mkv [--windows 0.4-2.1,5.0-7.2] [--clear 0.0,0.0,0.2,0.3]
-#       [--model birefnet|mediapipe] [--person person.mkv] [--download] [--no-download]
+#       [--model birefnet|birefnet-portrait|mediapipe] [--person person.mkv] [--download] [--no-download]
 #
 # Backends:
 #   birefnet  rembg + birefnet-general-lite (MIT weights, downloaded on first use into rembg's cache, ~214 MB).
 #             Native input is 1024x1024. The quality option: tighter hair and hands than MediaPipe. Slow on CPU
 #             (several seconds per frame); much faster with CUDA if onnxruntime-gpu is installed.
-#   mediapipe Vendored MediaPipe Selfie Segmenter at 360x640. Fast default. Use this for drafts and smoke.
+#   birefnet-portrait  rembg + birefnet-portrait: the best edge on a person (picked from a side-by-side), about half
+#             the speed of lite. Both BiRefNet models use the GPU when ONNX Runtime has a provider for it.
+#   mediapipe Vendored MediaPipe Selfie Segmenter at 360x640. Fast default. Use this for drafts and smoke. If it cannot
+#             load (Windows Smart App Control blocks its DLL) and the birefnet weights are cached, birefnet is used.
 # Both backends then run kit/mask_refine.py (hole fill, speck removal, guided edge refine, flow-guided temporal
 # smoothing, light erode + feather). --person writes a BGRA layer with edge decontamination.
 #
@@ -29,7 +32,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 import mask_refine as R  # noqa: E402
 
-MODELS = {"birefnet": "birefnet", "birefnet-general-lite": "birefnet", "mediapipe": "mediapipe"}
+MODELS = {"birefnet": "birefnet", "birefnet-general-lite": "birefnet", "birefnet-portrait": "birefnet-portrait", "mediapipe": "mediapipe"}
 BIREFNET_SESSION = "birefnet-general-lite"
 # rembg's official host of the BiRefNet-General-Lite ONNX (MIT, ZhengPeng). md5 is rembg's published checksum.
 BIREFNET_URL = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx"
@@ -68,14 +71,15 @@ def windows():
     flips = json.loads(m.group(1)).get("flips", []) if m else []
     return [(max(0, f["start"] - 0.1), f["end"] + 0.1) for f in flips if f.get("mode") == 7]
 
-def birefnet_model_path():
+def birefnet_model_path(model="birefnet"):
     try:
-        from rembg.sessions.birefnet_general_lite import BiRefNetSessionGeneralLite
+        if model == "birefnet-portrait":
+            from rembg.sessions.birefnet_portrait import BiRefNetSessionPortrait as S
+        else:
+            from rembg.sessions.birefnet_general_lite import BiRefNetSessionGeneralLite as S
     except ImportError:
         return None
-    fname = f"{BiRefNetSessionGeneralLite.name()}.onnx"
-    existing = BiRefNetSessionGeneralLite.resolve_existing(fname)
-    return existing
+    return S.resolve_existing(f"{S.name()}.onnx")
 
 def download_birefnet():
     from rembg import new_session
@@ -86,9 +90,8 @@ def download_birefnet():
     print("cached", path, f"({os.path.getsize(path) / 1048576:.1f} MB)")
     return path
 
-def open_birefnet():
-    from rembg import new_session
-    return new_session(BIREFNET_SESSION)  # rembg picks CUDA/ROCm/OpenVINO if present, else CPU
+def open_birefnet(model="birefnet"):
+    return R.matte_session(model)  # GPU provider when ONNX Runtime has one (DirectML, CUDA, CoreML), else CPU
 
 def open_mediapipe():
     import mediapipe as mp
@@ -104,7 +107,7 @@ def open_mediapipe():
 def resolve_model(requested, allow_download):
     want = MODELS.get((requested or "").lower())
     if requested and not want:
-        raise SystemExit(f"unknown --model {requested!r}; use birefnet or mediapipe")
+        raise SystemExit(f"unknown --model {requested!r}; use birefnet, birefnet-portrait or mediapipe")
     cached = birefnet_model_path()
     if want == "birefnet":
         try:
@@ -116,6 +119,14 @@ def resolve_model(requested, allow_download):
                 raise SystemExit("birefnet-general-lite weights are not cached. Run: npm run effects:setup -- --birefnet")
             download_birefnet()
         return "birefnet"
+    if want == "birefnet-portrait":   # best edge on a person, about half the speed of lite; rembg fetches its weights on first use
+        try:
+            import rembg  # noqa: F401
+        except ImportError:
+            raise SystemExit("rembg is not installed. Run: npm run effects:setup")
+        if not allow_download and not birefnet_model_path(want):
+            raise SystemExit("birefnet-portrait weights are not cached and downloads are off (--no-download or MASK_NODL). Run once without them.")
+        return want
     if want == "mediapipe":
         return "mediapipe"
     return "mediapipe"  # fast default; pass --model birefnet for the quality path
@@ -148,12 +159,19 @@ if person_path:
                              "-c:v", "ffv1", "-pix_fmt", "bgra", person_path], stdin=subprocess.PIPE)
 
 seg = session = mp = None
-if model == "birefnet":
+if model == "mediapipe":
+    try:
+        seg, mp = open_mediapipe()
+    except (OSError, ImportError) as e:   # a blocked DLL can surface as either
+        # Windows Smart App Control blocks MediaPipe's unsigned DLL (WinError 4551); ONNX Runtime still loads.
+        if not birefnet_model_path():
+            raise SystemExit(f"MediaPipe could not load ({e}). Run: npm run effects:setup -- --birefnet, then use --mask birefnet")
+        print(f"note: MediaPipe could not load ({e}); using birefnet instead", flush=True)
+        model = "birefnet"
+if model != "mediapipe":
     t_load = time.time()
-    session = open_birefnet()
-    print(f"birefnet session ready in {time.time() - t_load:.1f}s", flush=True)
-else:
-    seg, mp = open_mediapipe()
+    session = open_birefnet(model)
+    print(f"{model} session ready in {time.time() - t_load:.1f}s on {session.inner_session.get_providers()[0]}", flush=True)
 
 from PIL import Image  # after the backend is chosen, so mediapipe-only runs do not need rembg
 
@@ -179,10 +197,8 @@ while True:
         state["prev_a"] = state["prev_g"] = None
         cur_w = wi
     t_inf = time.time()
-    if model == "birefnet":
-        raw = np.array(session.predict(Image.fromarray(rgb))[0], dtype=np.float32) / 255
-        if raw.shape != (OH, OW):
-            raw = cv2.resize(raw, (OW, OH), interpolation=cv2.INTER_LINEAR)
+    if model != "mediapipe":
+        raw = R.matte_raw(session, rgb)
     else:
         sm = cv2.resize(rgb, (SW, SH), interpolation=cv2.INTER_AREA)
         m = seg.segment_for_video(mp.Image(image_format=mp.ImageFormat.SRGB, data=np.ascontiguousarray(sm)), int(t * 1000))
@@ -212,7 +228,7 @@ for s in stats:
     n = max(1, s["frames"]); s["person"] = round(s["person"] / n, 3); s["coverage"] = round(s["coverage"] / n, 3); s["band"] = round(s["band"] / n, 3)
 spf = round(infer_t / infer_n, 3) if infer_n else None
 meta = {"src": a.src, "frames": written, "size": [OW, OH], "model": model,
-        "session": BIREFNET_SESSION if model == "birefnet" else "selfie_segmenter",
+        "session": R.MATTE_MODELS.get(model, "selfie_segmenter"),
         "s_per_frame": spf, "refined": infer_n, "windows": stats, "clear": clear,
         "person": person_path}
 json.dump(meta, open(os.path.splitext(a.out)[0] + ".json", "w"), indent=1)

@@ -26,3 +26,5 @@ __pycache__/
 ovlt/
 *.mkv
 kit/fonts/local/
+# the example reel is the one video kept in git
+!kit/example/demo-reel/demo-reel.mp4
