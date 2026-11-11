@@ -145,18 +145,30 @@ if (C.titles) {
     f.push(`[g][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gm]`); vcur = 'gm';
   }
 }
-if (C.overlay) {
-  const o = inp('-framerate', '24', '-i', C.overlay);
-  const off = (process.env.OVL_OFF || '').split(',').filter(Boolean).map(w => w.split('-').map(Number)).filter(([a, b]) => b > a);
-  const en = off.length ? `:enable='not(${off.map(([a, b]) => `between(t,${a},${b})`).join('+')})'` : '';
-  f.push(`[${vcur}][${o}:v]overlay=format=auto:eof_action=pass${en}[o]`); vcur = 'o';
-}
-if (hits.length) {
+// b-roll inserts: "inserts": [{"file": "../broll/typing.mov", "at": 12.3, "dur": 1.5, "in": 0, "bw": true}] in cut.json.
+// The insert's picture replaces yours for its span while the voice runs on (its own audio is dropped). It covers the
+// picture and any titles, and the captions draw on top of it. "in" is where to start in the clip; "bw" makes it black
+// and white. Captions in the oneword look move up into the insert's open space ("y", default 640) and can take a
+// "tint" to match its light.
+(C.inserts || []).forEach((s, k) => {
+  const n = inp('-i', s.file), a0 = +s.at, d = +s.dur, i0 = +(s.in || 0);
+  f.push(`[${n}:v]trim=${i0}:${(i0 + d).toFixed(3)},${V},scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1${s.bw ? ',hue=s=0' : ''},setpts=PTS+${a0}/TB[ins${k}]`,
+    `[${vcur}][ins${k}]overlay=eof_action=pass:enable='between(t,${a0},${(a0 + d).toFixed(3)})'[vi${k}]`);
+  vcur = `vi${k}`;
+});
+// The caption layer and the glitch shake go on in a second pass when there are captions. In one graph, the caption
+// frames together with the person mask and the b-roll inserts ran ffmpeg at a tenth of real time or less (2026-11-11,
+// oneword look); split in two, both passes run faster than real time.
+const ovlOn = (process.env.OVL_OFF || '').split(',').filter(Boolean).map(w => w.split('-').map(Number)).filter(([a, b]) => b > a);
+const ovlEn = ovlOn.length ? `:enable='not(${ovlOn.map(([a, b]) => `between(t,${a},${b})`).join('+')})'` : '';
+function shake(g, src) {
+  if (!hits.length) return src;
   const env = hz => hits.map(([h, a]) => `${a}*gte(t,${h})*exp(-8*(t-${h}))*sin(2*PI*${hz}*(t-${h}))`).join('+');
   const win = hits.map(([h]) => `between(t,${(h - .04).toFixed(2)},${(h + .17).toFixed(2)})`).join('+');
-  f.push(`[${vcur}]split[sa][sb]`, `[sa][sb]overlay=x='${env(17)}':y='${env(23)}':eval=frame[sh]`, `[sh]rgbashift=rh=-16:bh=16:rv=4:bv=-4:enable='${win}',noise=c0s=46:c0f=t+u:enable='${win}'[hv]`);
-  vcur = 'hv';
+  g.push(`[${src}]split[sa][sb]`, `[sa][sb]overlay=x='${env(17)}':y='${env(23)}':eval=frame[sh]`, `[sh]rgbashift=rh=-16:bh=16:rv=4:bv=-4:enable='${win}',noise=c0s=46:c0f=t+u:enable='${win}'[hv]`);
+  return 'hv';
 }
+if (!C.overlay) vcur = shake(f, vcur);
 f.push(`[${vcur}]fps=24,trim=0:${LEN}[vo]`);
 
 // Sound: the locked set in kit/rules.cjs, plus pack hits from cut.json sfxHits (or sfx-hits.json).
@@ -212,6 +224,13 @@ if (lbl.length || bed) {
   }
 }
 f.push(`${mix.join('')}amix=inputs=${mix.length}:normalize=0:duration=first,atrim=0:${LEN},loudnorm=I=-14:TP=-1:LRA=11,aresample=48000[ao]`);
-args.push('-filter_complex', f.join(';'), '-map', '[vo]', '-map', '[ao]', '-c:v', 'libx264', '-crf', '17', '-preset', 'medium', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', out);
+const pre = C.overlay ? out.replace(/(\.[^.\\/]+)?$/, '.pre.mp4') : null;
+args.push('-filter_complex', f.join(';'), '-map', '[vo]', '-map', '[ao]', '-fps_mode', 'cfr', '-r', '24', '-c:v', 'libx264', ...(pre ? ['-crf', '12', '-preset', 'veryfast'] : ['-crf', '17', '-preset', 'medium']), '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', ...(pre ? [] : ['-movflags', '+faststart']), pre || out);
 execFileSync('ffmpeg', args, { stdio: 'inherit' });
+if (pre) {
+  const g = [`[0:v][1:v]overlay=format=auto:eof_action=pass${ovlEn}[o]`], v = shake(g, 'o');
+  g.push(`[${v}]fps=24,trim=0:${LEN}[vo]`);
+  execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', pre, '-framerate', '24', '-i', C.overlay, '-filter_complex', g.join(';'), '-map', '[vo]', '-map', '0:a', '-fps_mode', 'cfr', '-r', '24', '-c:v', 'libx264', '-crf', '17', '-preset', 'medium', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', out], { stdio: 'inherit' });
+  fs.rmSync(pre, { force: true });
+}
 console.log('wrote', out, 'len', LEN);

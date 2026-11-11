@@ -18,6 +18,7 @@
 | `recoleta` | Fraunces 700, accent | Hanken Grotesk 600, small caps tracked out | `stack` | Recoleta + Berthold |
 | `haas` | Inter Tight 800, white | Inter Tight 400, white | `stack` | Neue Haas Grotesk Display + Helvetica Neue |
 | `wabbit` | Archivo Black caps, white | Chewy, accent | `overlap`: a brush tail under the hero's right corner | Archivo Black + Wascally Wabbit |
+| `instrument` | Instrument Serif Italic, white | Inter Tight 600, white | `stack` | the real pair; the `--look oneword` default |
 
 ## Examples
 
@@ -28,6 +29,7 @@ One title and one caption line in each pairing. `npm run fonts:examples` rebuild
 | ![literata](examples/literata.jpg) `literata` | ![bricolage](examples/bricolage.jpg) `bricolage` | ![pirata](examples/pirata.jpg) `pirata` | ![michroma](examples/michroma.jpg) `michroma` | ![redhat](examples/redhat.jpg) `redhat` |
 | ![jakarta](examples/jakarta.jpg) `jakarta` | ![grotesk-times](examples/grotesk-times.jpg) `grotesk-times` | ![avantgarde](examples/avantgarde.jpg) `avantgarde` | ![recoleta](examples/recoleta.jpg) `recoleta` | ![haas](examples/haas.jpg) `haas` |
 | ![wabbit](examples/wabbit.jpg) `wabbit` | ![modern](examples/modern.jpg) `modern` | ![druk](examples/druk.jpg) `druk` | ![elegant](examples/elegant.jpg) `elegant` | ![editorial](examples/editorial.jpg) `editorial` |
+| ![instrument](examples/instrument.jpg) `instrument` | | | | |
 
 ## Lockups: the two faces together
 

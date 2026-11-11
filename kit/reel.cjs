@@ -4,13 +4,14 @@
 // Options: --theme aigent|neutral (default neutral)  --cropx 0.4 (face left of centre)  --model medium.en
 //          --name <job>  --clips <dir> (reuse an existing clip.py folder, skips transcription)  --newest (inbox: newest file only)
 //          --hook <take> (first sentence from this take: your most extreme angle)
-//          --look kinetic|muse|classic (default kinetic: every word animated + one kinetic title per beat behind the head;
+//          --look kinetic|oneword|muse|classic (default kinetic: every word animated + one kinetic title per beat behind the head;
+//            oneword = one word at a time, type sizes and faces changing per word, flat-colour type cards;
 //            muse = pill captions + titles; classic = the original captions + spray hero word)
-//          --style kinetic|classic|pill|hormozi|karaoke (override the caption style)  --no-titles  --fonts modern|druk|elegant|editorial|<any name in kit/fonts/pairings.json>|<local> (a,b,c cycles them, one per title)
+//          --style kinetic|oneword|classic|pill|hormozi|karaoke (override the caption style)  --no-titles  --fonts modern|druk|elegant|editorial|<any name in kit/fonts/pairings.json>|<local> (a,b,c cycles them, one per title)
 //          --no-punch (no zoom punch)  --no-mask (titles in front, skip the person mask)
 //          --mask birefnet|mediapipe (person-mask backend; default mediapipe, fast. birefnet is the quality option, slow on CPU)
 //          --draft (stop after captions.js so you can edit it)  --rebuild (re-render + re-assemble an edited job)
-//          --bed <name from npm run music> or --bed music.wav  --bed-start 0  --logo logo.svg  --jobs <dir> (default jobs/)  --force
+//          --broll <folder> (cutaways from your own clips, voice running on)  --bed <name from npm run music> or --bed music.wav  --bed-start 0  --logo logo.svg  --jobs <dir> (default jobs/)  --force
 //          --sfx off  (skip locked-set sounds on this draft; also used by npm run fx)
 // Writes jobs/<name>/: clips/ (clip.py output), build/ (cut.json, captions.js, theme.js, overlay frames), reel-vN.mp4.
 // Steps: clip.py (Whisper, best take per sentence, retakes flagged) -> cut.json from every "keep" clip (zoom punch on
@@ -27,7 +28,7 @@ const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask']);
+const VALUED = new Set(['theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const die = m => { console.error(m); process.exit(1); };
@@ -48,12 +49,12 @@ if (!srcs.length && !clipsArg && !flag('rebuild')) {
 }
 const src = srcs[0];
 // looks: kinetic (default: every word animates in, hero words big behind the head as kinetic titles), muse (pills +
-// titles), classic (the original captions + spray hero word, no titles)
+// titles), oneword (one word at a time + type cards, kit/looks/oneword.md), classic (the original captions + spray hero word, no titles)
 const look = opt('look', 'kinetic');
-if (!['kinetic', 'muse', 'classic'].includes(look)) die('--look must be kinetic, muse or classic');
-const STYLE = opt('style', { kinetic: 'kinetic', muse: 'pill', classic: 'classic' }[look]);
+if (!['kinetic', 'oneword', 'muse', 'classic'].includes(look)) die('--look must be kinetic, oneword, muse or classic');
+const STYLE = opt('style', { kinetic: 'kinetic', oneword: 'oneword', muse: 'pill', classic: 'classic' }[look]);
 const TITLES = !flag('no-titles') && (flag('titles') || look !== 'classic');
-const FONTS = opt('fonts');
+const FONTS = opt('fonts') || (look === 'oneword' ? 'instrument,literata,bricolage' : undefined);
 const name = opt('name') || (src ? path.basename(src).replace(/\.[^.]+$/, '') : path.basename(path.resolve(clipsArg || '.')))
   .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'reel';
 const job = path.resolve(opt('jobs', path.join(ROOT, 'jobs')), name), build = path.join(job, 'build');
@@ -104,7 +105,46 @@ if (!flag('rebuild')) {
   // 3. captions from the clips' word times
   const logo = opt('logo');
   if (logo) fs.copyFileSync(path.resolve(logo), path.join(build, path.basename(logo)));
-  sh(process.execPath, [path.join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--force', TITLES ? '--titles' : '--hero', '--style', STYLE, ...(FONTS ? ['--fonts', FONTS] : []), ...(logo ? ['--logo', path.basename(logo)] : [])], build);
+  sh(process.execPath, [path.join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--force', ...(TITLES ? ['--titles'] : look === 'oneword' ? [] : ['--hero']), ...(look === 'oneword' ? ['--cards'] : []), '--style', STYLE, ...(FONTS ? ['--fonts', FONTS] : []), ...(logo ? ['--logo', path.basename(logo)] : [])], build);
+  // --broll <folder>: cutaways from your own clips. A phrase that isn't a type card or under a title cuts to the next
+  // clip in the folder (every third phrase, 0.8 to 2.2 s), the voice running on; see "inserts" in kit/assemble.cjs.
+  if (opt('broll')) {
+    const dir = path.resolve(opt('broll')), files = fs.readdirSync(dir).filter(f => VIDEO.test(f)).sort().map(f => path.join(dir, f));
+    if (!files.length) die('No video files in ' + dir);
+    const fl = R.readCaptions(path.join(build, 'captions.js')).flips || [], busy = fl.filter(x => x.mode === 8 || x.mode === 7);
+    const free = fl.filter(x => x.mode === 0 && !busy.some(b => x.start < b.end && b.start < x.end));
+    const cutF = path.join(build, 'cut.json'), cj = JSON.parse(fs.readFileSync(cutF, 'utf8'));
+    const durOf = f => +execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', f]).toString().trim();
+    cj.inserts = free.filter((_, i) => i % 3 === 2).map((x, k) => { const file = files[k % files.length], dur = +Math.min(2.2, Math.max(0.8, x.end - x.start)).toFixed(2);
+      return { file: path.relative(build, file).split(path.sep).join('/'), at: x.start, dur, in: +Math.max(0, Math.min(1, durOf(file) - dur)).toFixed(2) }; });
+    fs.writeFileSync(cutF, JSON.stringify(cj, null, 1));
+    console.log(`b-roll: ${cj.inserts.length} inserts from ${files.length} clips`);
+  }
+  // shapes to set words on (kit/anchors.py): a cutaway sets its word on a hard line in the shot (else the head, else a
+  // shoulder); on your own shot every third free key word sits on your head or a shoulder while the small words run on
+  const fxPyA = path.join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+  if (look === 'oneword' && fs.existsSync(fxPyA)) {
+    const cutF = path.join(build, 'cut.json'), cj = JSON.parse(fs.readFileSync(cutF, 'utf8')), capF = path.join(build, 'captions.js'), CAPS = R.readCaptions(capF);
+    const ins = cj.inserts || [], fl = CAPS.flips || [], busy = fl.filter(x => x.mode === 8 || x.mode === 7).concat(ins.map(s => ({ start: s.at, end: s.at + s.dur })));
+    const heroAt = x => { const w = (x.words || [])[Array.isArray(x.hero) ? x.hero[0] : 0]; return w ? w[0] : x.start; };
+    // shapes on your own shot are an accent, twice a reel: a phrase near a third of the way in traces your outline, a
+    // key word near two thirds sits on your head (or a shoulder)
+    const free = fl.filter(x => x.mode === 0 && !busy.some(b => x.start < b.end && b.start < x.end)), end = fl.reduce((m, x) => Math.max(m, x.end), 0);
+    const near = (p, not) => free.filter(x => x !== not && (x.words || []).length >= (p < 0.5 ? 3 : 1)).sort((a, b) => Math.abs(a.start - end * p) - Math.abs(b.start - end * p))[0];
+    const f1 = near(0.35), f2 = near(0.7, f1), face = [f1, f2].filter(Boolean);
+    sh(process.execPath, [path.join(KIT, 'assemble.cjs'), 'base.mp4'], build, { BASEONLY: '1' });
+    const q = [...ins.map(s => [path.resolve(build, s.file), +(s.in + s.dur / 2).toFixed(2)]), ...face.map(x => [path.join(build, 'base.mp4'), +(heroAt(x) + 0.1).toFixed(2)])];
+    if (q.length) {
+      const found = execFileSync(fxPyA, [path.join(KIT, 'anchors.py'), ...q.flat().map(String)], { env: { ...process.env, PYTHONUTF8: '1' }, maxBuffer: 1 << 24 }).toString().trim().split(/\r?\n/).map(l => JSON.parse(l));
+      const box = s => s && { y: s.y, x0: s.x0, x1: s.x1 };
+      ins.forEach((s, k) => { const A = found[k]; const L = A && (A.line || A.head || A.shoulders[0]); if (L) s.line = box(L); });
+      // alternate: a key word on the head, the phrase curving along the outline over the head and shoulders, a shoulder
+      face.forEach((x, k) => { const A = found[ins.length + k]; if (!A) return; if (x === f1 && A.arc) { x.arc = A.arc; return; } const L = A.head || A.shoulders[0]; if (L) x.anchor = box(L); });
+      fs.writeFileSync(cutF, JSON.stringify(cj, null, 1));
+      fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(CAPS, null, 1) + ';\n');
+      console.log(`shapes: ${ins.filter(s => s.line).length} of ${ins.length} cutaways set on a shape in the shot, ${face.filter(x => x.anchor).length} key words on your head or a shoulder, ${face.filter(x => x.arc).length} phrases along your outline`);
+    }
+  }
   // 4. theme
   const th = path.join(KIT, 'themes', opt('theme', 'neutral') + '.js');
   if (!fs.existsSync(th)) die('No theme ' + th);
@@ -133,4 +173,7 @@ if (cut.titles && cut.mask) {
 let v = 1; while (fs.existsSync(path.join(job, `reel-v${v}.mp4`))) v++;
 const out = path.join(job, `reel-v${v}.mp4`);
 sh(process.execPath, [path.join(KIT, 'assemble.cjs'), out], build, (flag('no-sfx') || opt('sfx') === 'off') ? { NOSFX: '1' } : {});
+// is every caption word readable against what's behind it (kit/legibility.py)? Printed, not blocking
+{ const py = path.join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+  if (cut.overlay && fs.existsSync(py)) try { execFileSync(py, [path.join(KIT, 'legibility.py'), build, out], { stdio: 'inherit', env: { ...process.env, PYTHONUTF8: '1' } }); } catch { console.warn('note: some caption moments read under 3:1 against the picture (listed above). Move the word, change its colour or pick another shot.'); } }
 console.log(`\nReel: ${out}\nCheck it: npm run verify -- ${name} (contact sheet, ffprobe, loudness, mask), watch it, read clips/clips.md for skipped retakes, then edit build/captions.js or build/cut.json and run: npm run reel -- --rebuild --name ${name}`);

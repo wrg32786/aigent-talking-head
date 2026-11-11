@@ -4,19 +4,20 @@
 //   node <kit>/autocaption.mjs                 -> writes captions.draft.js (never overwrites captions.js)
 //   node <kit>/autocaption.mjs --out captions.js [--force] [--words 4] [--chars 22] [--shift 0.3] [--hero] [--logo logo.svg]
 // Every phrase is a plain caption (mode 0). --hero makes the last phrase before each seam a spray hero word (mode 1).
-// --titles makes it a kinetic title instead (mode 7, one per beat, up to 7, each with its own entrance; behind the
-// person when a mask is made). --style kinetic (default: every word animates in, one emphasis word per phrase)|classic|pill|hormozi|karaoke sets
+// --cards adds type cards (mode 8, flat-colour cutaways; the oneword look). --titles makes it a kinetic title instead (mode 7, one per beat, up to 7, each with its own entrance; behind the
+// person when a mask is made). --style kinetic (default: every word animates in, one emphasis word per phrase)|oneword (one word at a time)|classic|pill|hormozi|karaoke sets
 // captionStyle; pill groups 3 to 5 words. --fonts <pairing>[,<pairing>...] writes "fonts" (kit/fonts/pairings.json; several cycle).
 // Every caption carries its word times ("words") so pills, hormozi and karaoke can follow the voice.
 // Seams get glitchAt entries. --shift adds seconds to every word (Whisper often runs 0.3-0.6 s early on cinematic takes).
 // Hand-tweak the result: change modes, merge or split flips, add a card/countUp/cta block, then render.
 import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { execFileSync } from 'child_process';
 import { basename, dirname, join } from 'path';
 
 const argv = process.argv.slice(2);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i < 0 ? d : (argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : true); };
 const STYLE = String(opt('style', 'kinetic')), PILLISH = STYLE !== 'classic';
-if (!['kinetic', 'classic', 'pill', 'hormozi', 'karaoke'].includes(STYLE)) { console.error('--style must be kinetic, classic, pill, hormozi or karaoke'); process.exit(1); }
+if (!['kinetic', 'oneword', 'classic', 'pill', 'hormozi', 'karaoke'].includes(STYLE)) { console.error('--style must be kinetic, oneword, classic, pill, hormozi or karaoke'); process.exit(1); }
 const OUT = opt('out', 'captions.draft.js'), MAXW = +opt('words', STYLE === 'pill' ? 5 : 4), MINW = STYLE === 'kinetic' ? 2 : PILLISH ? 3 : 1, MAXC = +opt('chars', 22), SHIFT = +opt('shift', 0), GAP = +opt('gap', 0.35);
 if (existsSync(OUT) && OUT !== 'captions.draft.js' && !opt('force', false)) { console.error(`${OUT} exists; pass --force to overwrite`); process.exit(1); }
 if (!existsSync('cut.json')) { console.error('No cut.json here. Run from your build/ folder.'); process.exit(1); }
@@ -32,6 +33,22 @@ function wordsFor(file) {
   return c ? c.words : [];
 }
 
+// Word starts snap to the sound. Whisper's word times drift (often 0.1 to 0.3 s on these takes), so each start moves
+// to the nearest rise in the voice's loudness within 0.15 s, where the voice comes back after at least 30 ms of quiet.
+// A word with no such rise near it keeps Whisper's time. --no-snap turns it off.
+const onsetCache = {};
+function onsetsFor(file, t0, t1) {
+  const key = `${file}@${t0}-${t1}`; if (onsetCache[key]) return onsetCache[key];
+  let pcm; try { pcm = execFileSync('ffmpeg', ['-v', 'error', '-ss', String(t0), '-to', String(t1), '-i', file, '-ac', '1', '-ar', '8000', '-f', 'f32le', '-'], { maxBuffer: 1 << 28 }); } catch { return (onsetCache[key] = []); }
+  const x = new Float32Array(pcm.buffer, pcm.byteOffset, pcm.length >> 2), hop = 80, env = [];
+  for (let i = 0; i + hop <= x.length; i += hop) { let s = 0; for (let k = i; k < i + hop; k++) s += x[k] * x[k]; env.push(Math.sqrt(s / hop)); }
+  const sorted = [...env].sort((p, q) => p - q), lo = sorted[Math.floor(sorted.length * 0.2)] || 0, hi = sorted[Math.floor(sorted.length * 0.95)] || 0;
+  const thr = lo + (hi - lo) * 0.18, out = []; let quiet = 0;
+  for (let i = 1; i < env.length; i++) { if (env[i] < thr) quiet++; else { if (quiet >= 3) out.push(t0 + i * 0.01); quiet = 0; } }
+  return (onsetCache[key] = out);
+}
+const snapTo = (on, a) => { let best = null; for (const o of on) if (Math.abs(o - a) <= 0.15 && (best === null || Math.abs(o - a) < Math.abs(best - a))) best = o; return best === null ? a : best - 0.01; };
+const SNAP = !opt('no-snap', false);
 // segment words on the output clock (same maths as timeline.mjs)
 let t = 0; const seams = [], words = [];
 C.segs.forEach((s, i) => {
@@ -39,7 +56,12 @@ C.segs.forEach((s, i) => {
   if (i) seams.push(+start.toFixed(3));
   const ws = wordsFor(s.file);
   if (!ws.length) console.warn(`no word times for ${s.file} (run kit/tx.py on it, or use clip.py clips)`);
-  for (const [a, b, w] of ws) if (a >= s.in - 0.05 && b <= s.out + 0.05 && w) words.push({ s: Math.max(start, speech + a - s.in + SHIFT), e: Math.min(end, speech + b - s.in + SHIFT), w, seg: i });
+  const on = SNAP && ws.length ? onsetsFor(s.file, s.in, s.out) : [];
+  for (const [a0, b, w] of ws) { if (!(a0 >= s.in - 0.05 && b <= s.out + 0.05 && w)) continue; const a = on.length ? Math.min(snapTo(on, a0), b - 0.05) : a0;
+    // a stutter or a Whisper double ("backdrop backdrop"): the same word again straight after itself is dropped
+    const prev = words[words.length - 1], nw = x => String(x).toLowerCase().replace(/[^a-z0-9']/g, '');
+    if (prev && prev.seg === i && nw(prev.w) === nw(w) && speech + a - s.in - prev.e < 0.8) { prev.e = Math.min(end, speech + b - s.in + SHIFT); continue; }
+    words.push({ s: Math.max(start, speech + a - s.in + SHIFT), e: Math.min(end, speech + b - s.in + SHIFT), w, seg: i }); }
   t = end;
 });
 const total = +(t + (C.tail ?? 0.3)).toFixed(2);
@@ -74,22 +96,38 @@ const flips = phrases.map((p, i) => {
   // kinetic: the phrase is set as a font lockup; "hero" = the word(s) in the display face (the longest non-filler
   // word, or a number), the rest in the pairing's partner face (script or secondary). Edit "hero" to change it.
   const kin = {};
-  if (STYLE === 'kinetic') kin.hero = [heroIdx(ws.map(w => w[2]))];
+  if (STYLE === 'kinetic' || STYLE === 'oneword') kin.hero = [heroIdx(ws.map(w => w[2]))];
   return { start: +p[0].s.toFixed(2), end: +end.toFixed(2), text: hero ? text.replace(/[.?!]+$/, '').toUpperCase() : text, mode: hero ? 1 : 0, ...(last ? { _beatEnd: p[0].seg } : {}), ...(PILLISH ? { words: ws } : {}), ...kin };
 });
 // --titles: one kinetic title per beat (segment), from the beat's last phrase, held to the cut. Up to 7 (the first
 // six beats plus the payoff), so no entrance repeats. That phrase leaves the caption track (the title says it).
 if (opt('titles', false)) {
   const beats = flips.filter(f => f._beatEnd !== undefined);
-  const pick = beats.length > 7 ? [...beats.slice(0, 6), beats[beats.length - 1]] : beats;
+  // oneword: only the opening beat and the last one, as a single word behind the head while the words run on
+  const pick = STYLE === 'oneword' ? [...new Set([beats[0], beats[beats.length - 1]])].filter(Boolean) : beats.length > 7 ? [...beats.slice(0, 6), beats[beats.length - 1]] : beats;
   const segEnd = i => { let t = 0; for (let k = 0; k <= i; k++) t += (C.segs[k].out - C.segs[k].in) + (C.segs[k].pad || 0); return t; };
   for (const f of pick) {
     // a title is a font lockup too: the hero word big in the display face, the rest of the phrase in the partner face
     const words = f.text.replace(/[.?!,]+$/, '').split(/\s+/);
-    flips.push({ start: f.start, end: +Math.min(total, f._beatEnd === C.segs.length - 1 ? 99 : segEnd(f._beatEnd)).toFixed(2), text: words.join(' '), hero: [heroIdx(words)], mode: 7 });
+    const tEnd = +Math.min(total, f._beatEnd === C.segs.length - 1 ? 99 : segEnd(f._beatEnd)).toFixed(2);
+    if (STYLE === 'oneword') { flips.push({ start: f.start, end: tEnd, text: words[heroIdx(words)].replace(/[^\w'$%-]+$/, ''), mode: 7, lockup: false }); continue; }
+    flips.push({ start: f.start, end: tEnd, text: words.join(' '), hero: [heroIdx(words)], mode: 7 });
     f._title = true; // the title says this phrase big behind the head, so the caption track skips it
   }
   for (let k = flips.length - 1; k >= 0; k--) if (flips[k]._title) flips.splice(k, 1);
+  flips.sort((a, b) => a.start - b.start || a.mode - b.mode);
+}
+// --cards: type cards (mode 8), the oneword look's text-only cutaways. The second phrase and every third after it cut
+// to flat colour for up to 1.6 s of the phrase (phrases under 0.9 s and phrases with a behind-head word are skipped), cycling the palette; "Step 2", "tip three" and the like
+// get the number behind the words.
+if (opt('cards', false)) {
+  const BG = ['navy', 'paper', 'blue', 'cream'], NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+  const caps0 = flips.filter(f => f.mode === 0);
+  caps0.forEach((f, i) => {
+    if (i % 3 !== 1 || f.end - f.start < 0.9 || flips.some(x => x.mode === 7 && x.start < f.end && f.start < x.end)) return; // never over a behind-head word
+    const m = f.text.match(/\b(?:step|tip|rule|part|number|no\.?)\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/i);
+    flips.push({ start: f.start, end: +Math.min(f.end, f.start + 1.6).toFixed(2), mode: 8, bg: BG[Math.floor(i / 3) % BG.length], ...(m ? { number: String(NUM[m[1].toLowerCase()] || m[1]) } : {}) }); // a cutaway, 0.9 to 1.6 s
+  });
   flips.sort((a, b) => a.start - b.start || a.mode - b.mode);
 }
 flips.forEach(f => delete f._beatEnd);

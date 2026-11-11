@@ -105,6 +105,22 @@ try {
     if (!a) fail('no audio stream');
     if (Math.abs(d - 3.5) > 0.25) fail('duration ' + d);
   });
+  step('b-roll insert covers the picture for its span only, voice and length unchanged; check refuses a missing insert', () => {
+    run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=red:s=720x1280:r=24:d=2', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', 'insert.mp4'], work);
+    const cutF = join(build, 'cut.json'), keep = readFileSync(cutF, 'utf8');
+    writeFileSync(cutF, JSON.stringify({ ...JSON.parse(keep), inserts: [{ file: '../insert.mp4', at: 0.8, dur: 0.8, in: 0.2 }] }));
+    try {
+      run(node, [join(KIT, 'assemble.cjs'), 'ins.mp4'], build);
+      const px = t => [...execFileSync('ffmpeg', ['-v', 'error', '-ss', String(t), '-i', 'ins.mp4', '-frames:v', '1', '-vf', 'format=rgb24,crop=1:1:20:20', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'], { cwd: build })];
+      const red = px(1.2), after = px(2.0);
+      if (!(red[0] > 180 && red[1] < 70 && red[2] < 70)) fail('insert not on screen at 1.2 s: ' + red);
+      if (after[0] > 180 && after[1] < 70 && after[2] < 70) fail('insert still on screen at 2.0 s');
+      const d = +run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', 'ins.mp4'], build);
+      if (Math.abs(d - 3.5) > 0.25) fail('insert changed the length: ' + d);
+      writeFileSync(cutF, JSON.stringify({ ...JSON.parse(keep), inserts: [{ file: '../nope.mp4', at: 0.8, dur: 0.8 }] }));
+      try { run(node, [join(KIT, 'check.mjs'), build], work); fail('check passed a missing insert'); } catch (e) { if (!/inserts\[0\]: no file/.test(String(e.stdout || ''))) throw e; }
+    } finally { writeFileSync(cutF, keep); }
+  });
   step('AIgent preset stills', () => {
     rmSync(join(build, 'theme.js'));
     run(node, [join(KIT, 'render.mjs'), '0', '0.6'], build, { THEME: 'aigent' });
@@ -226,6 +242,33 @@ try {
     writeFileSync(capF, keep);
     try { run(node, [join(KIT, 'render.mjs'), '0', '1.0'], b, { FONTS: 'helvetica-please' }); fail('unknown pairing accepted'); } catch (e) { if (!/Unknown font pairing/.test(String(e.stderr || ''))) throw e; }
     run(node, [join(KIT, 'render.mjs'), '0', '1.0'], b, { FONTS: 'theme' });
+  });
+  step('oneword look: one word at a time, hero in the display face with the phrase building under it, type card in front', () => {
+    const b = join(work, 'jobs', 'muse', 'build'), capF = join(b, 'captions.js'), keep = readFileSync(capF, 'utf8');
+    const ws = (t0, s) => s.split(' ').map((x, i) => [+(t0 + i * 0.25).toFixed(2), +(t0 + i * 0.25 + 0.25).toFixed(2), x]);
+    writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'oneword', fonts: 'instrument', flips: [
+      { start: 0, end: 1.6, text: 'Record the whole take on your phone', mode: 0, words: ws(0, 'Record the whole take on your phone'), hero: 'take' },
+      { start: 1.8, end: 3.0, text: 'Step two: drop it in', mode: 0, words: ws(1.8, 'Step two: drop it in') },
+      { start: 1.8, end: 3.0, mode: 8, bg: 'navy', number: '2' }] }) + ';\n');
+    const o = run(node, [join(KIT, 'render.mjs'), '0', '0.3,1.2,2.4'], b);
+    if (!/fonts instrument/.test(o)) fail('instrument pairing not applied: ' + o);
+    const W = JSON.parse(readFileSync(join(b, 'oneword.json'), 'utf8')), at = s => W.find(w => Math.abs(w.t - s) < 0.01);
+    if (W.length !== 12) fail('expected one state per word (12), got ' + W.length);
+    if (at(0).txt !== 'Record' || at(0).face !== 'body' || at(0.25).face !== 'small') fail('words before the hero: ' + JSON.stringify(W.slice(0, 3)));
+    const h = at(0.75), last = at(1.5);
+    if (h.txt !== 'take' || h.face !== 'hero' || h.size < 1.6 * at(0).size) fail('hero: ' + JSON.stringify(h));
+    if (last.txt !== 'take' || last.tail !== 'on your phone') fail('the phrase should build under the hero: ' + JSON.stringify(last));
+    if (!W.filter(w => w.t >= 1.8).every(w => w.card && w.ink === '#efe6cf')) fail('words on the card should take its ink: ' + JSON.stringify(W.slice(7)));
+    if (!W.some(w => w.face === 'stack') && !W.some(w => w.face === 'big')) { /* too few phrases here for the stack or big words; the oneword demo shows them */ }
+    if (new Set(W.filter(w => w.card).map(w => w.x + ',' + w.y)).size < 3) fail('words on a card should move around it, not sit in one spot: ' + JSON.stringify(W.filter(w => w.card)));
+    const px = (f, x, y) => [...execFileSync('ffmpeg', ['-v', 'error', '-i', join(b, 'stills', f), '-vf', `crop=1:1:${x}:${y}`, '-f', 'rawvideo', '-pix_fmt', 'rgba', '-'], { cwd: b })];
+    const card = px('t2.40.png', 8, 8), face = px('t1.20.png', 8, 8);
+    if (card[0] !== 14 || card[1] !== 26 || card[2] !== 51 || card[3] !== 255) fail('card should fill the frame navy, got ' + card);
+    if (face[3] !== 0) fail('no card: the overlay corner should be clear, got ' + face);
+    writeFileSync(capF, keep);
+  });
+  if (existsSync(fxPy)) step('legibility.py: contrast of the letters against the picture round them (self-test)', () => {
+    run(fxPy, ['-c', 'import sys; sys.path.insert(0, sys.argv[1]); import legibility, anchors; legibility.selftest(); anchors.selftest()', KIT], work, { PYTHONUTF8: '1' });
   });
   step('music beds: only real library names resolve; a missing bed fails the check; add refuses a taken or empty name', () => {
     const b = join(work, 'jobs', 'muse', 'build'), cutF = join(b, 'cut.json'), keep = readFileSync(cutF, 'utf8'), add = join(KIT, 'music', 'add.mjs');

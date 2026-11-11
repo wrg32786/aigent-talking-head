@@ -46,7 +46,7 @@ function checkJob(captionsFile, cutFile, label) {
     if (f.lockup && typeof f.lockup === 'object' && f.lockup.arrange && !ARR.includes(f.lockup.arrange)) errs.push(`flip ${f.start}s: lockup arrange "${f.lockup.arrange}" (${ARR.join(', ')})`);
   }
   if (CAP.lockup && CAP.lockup.arrange && !ARR.includes(CAP.lockup.arrange)) errs.push(`lockup arrange "${CAP.lockup.arrange}" (${ARR.join(', ')})`);
-  if (CAP.captionStyle && !['kinetic', 'classic', 'pill', 'hormozi', 'karaoke'].includes(CAP.captionStyle)) errs.push(`captionStyle "${CAP.captionStyle}" (kinetic, classic, pill, hormozi, karaoke)`);
+  if (CAP.captionStyle && !['kinetic', 'oneword', 'classic', 'pill', 'hormozi', 'karaoke'].includes(CAP.captionStyle)) errs.push(`captionStyle "${CAP.captionStyle}" (kinetic, oneword, classic, pill, hormozi, karaoke)`);
   if (cutFile && existsSync(cutFile)) {
     const C = JSON.parse(readFileSync(cutFile, 'utf8')), TL = R.timeline(C);
     if (C.lockup && C.lockup.arrange && !ARR.includes(C.lockup.arrange)) errs.push(`cut.json lockup arrange "${C.lockup.arrange}" (${ARR.join(', ')})`);
@@ -55,6 +55,7 @@ function checkJob(captionsFile, cutFile, label) {
     for (const k of Object.keys(C.sfx || {})) if (!R.SFX[k] && !(C.sounds || {})[k]) errs.push(`sfx "${k}": use ${Object.keys(R.SFX).join(', ')}, or add it to "sounds" in cut.json`);
     for (const h of C.sfxHits || []) if (!SFXPLAN.lookup(h.id)) errs.push(`sfxHits "${h.id}" is not in kit/sfx/sfx.json`);
     for (const [k, s] of Object.entries(C.sounds || {})) if (!s.file || !existsSync(resolve(dirname(cutFile), s.file))) errs.push(`sounds.${k}: no file at ${s.file}`);
+    for (const [k, s] of (C.inserts || []).entries()) { if (!s.file || !existsSync(resolve(dirname(cutFile), s.file))) errs.push(`inserts[${k}]: no file at ${s.file}`); if (!(+s.dur > 0) || +s.at < 0 || +s.at + +s.dur > TL.total + 0.01) errs.push(`inserts[${k}]: at ${s.at} + dur ${s.dur} is outside the ${TL.total} s cut`); }
     if (C.bed) { const lib = R.isBed(C.bed);
       if (!existsSync(lib ? R.bedFile(C.bed) : resolve(dirname(cutFile), String(C.bed)))) errs.push(lib ? `bed "${C.bed}": kit/music/${R.BEDS[C.bed].file} is missing (beds.json lists it)` : `bed "${C.bed}": not a library bed (npm run music) and no such file`); }
     const seams = TL.seams.map(x => x.toFixed(2));

@@ -434,6 +434,33 @@
     "justify": false,
     "scriptBoost": 1.1
    }
+  },
+  "instrument": {
+   "about": "Instrument Serif Italic + Inter Tight: a condensed italic serif for the key word over a clean grotesk for the rest. The oneword look's pairing",
+   "display": {
+    "family": "Instrument Serif",
+    "file": "InstrumentSerif-Italic.ttf",
+    "weight": 400,
+    "style": "italic",
+    "tracking": -0.01
+   },
+   "secondary": {
+    "family": "Inter Tight",
+    "file": "InterTight-VF.ttf",
+    "weight": 600
+   },
+   "script": null,
+   "lockup": {
+    "arrange": "stack",
+    "partner": "secondary",
+    "scale": 0.42,
+    "heroUpper": false,
+    "partnerUpper": false,
+    "partnerTracking": 0,
+    "justify": false,
+    "heroColor": "text",
+    "partnerColor": "text"
+   }
   }
  }
 }

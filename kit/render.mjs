@@ -37,7 +37,7 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
   }
   // font lockup overrides from cut.json ("lockup" for the job, "hero" per flip start) -> lockover.js
   { let C = {}; try { C = JSON.parse(readFileSync(join(ROOT, 'cut.json'), 'utf8')); } catch {}
-    writeFileSync(join(ROOT, 'lockover.js'), 'window.LOCKOVER=' + JSON.stringify({ lockup: C.lockup || null, hero: C.hero || null }) + ';\n'); }
+    writeFileSync(join(ROOT, 'lockover.js'), 'window.LOCKOVER=' + JSON.stringify({ lockup: C.lockup || null, hero: C.hero || null, inserts: (C.inserts || []).map(s => ({ at: +s.at, dur: +s.dur, y: s.y, tint: s.tint, line: s.line, arc: s.arc })) }) + ';\n'); }
   if (!existsSync(join(ROOT, 'fxzones.js'))) writeFileSync(join(ROOT, 'fxzones.js'), 'window.FXZONES=[];\n');
 }
 const b = await chromium.launch({ executablePath: findChrome() });
@@ -53,6 +53,9 @@ if (titles.length) console.log('titles', titles.map(t => `${t.start}s ${t.entran
 // Font lockups (titles and kinetic lines, two faces per phrase): written out so they can be checked without pixels
 const lockups = await p.evaluate(() => (window.__lockups ? window.__lockups() : []));
 writeFileSync(join(ROOT, 'lockups.json'), JSON.stringify(lockups, null, 1) + '\n');
+// one-word captions: what each word shows as (face, size, the line building under a hero, on a card or not)
+const ow = await p.evaluate(() => (window.__oneword ? window.__oneword() : []));
+if (ow.length) { writeFileSync(join(ROOT, 'oneword.json'), JSON.stringify(ow, null, 1) + '\n'); console.log('oneword', ow.length, 'words,', ow.filter(w => w.face === 'hero').length, 'heroes,', ow.filter(w => w.card).length, 'on cards'); }
 if (lockups.length) console.log('lockups', lockups.filter(l => l.kind === 'title').length, 'titles +', lockups.filter(l => l.kind === 'kinetic').length, 'lines,', [...new Set(lockups.map(l => l.arrange))].join('/'));
 const passes = only ? [['stills', 'all']] : titles.length ? [['ovl', 'front'], ['ovlt', 'titles']] : [['ovl', 'all']];
 if (!only && !titles.length) rmSync(join(ROOT, 'ovlt'), { recursive: true, force: true });
