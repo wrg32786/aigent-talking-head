@@ -1,5 +1,5 @@
 // One-time setup for the effects pass: a Python venv at effects/.venv with the vendored requirements
-// (numpy, opencv-python, pillow, mediapipe; about 150 MB) plus rembg + onnxruntime for the BiRefNet
+// (numpy, opencv-python, pillow, mediapipe; about 150 MB) plus rembg + onnxruntime (the DirectML build on Windows) for the BiRefNet
 // person-mask backend (another ~390 MB of packages). Safe to re-run. Prints READY.   npm run effects:setup
 // Pass --birefnet to also download the birefnet-general-lite weights (~214 MB) into rembg's cache.
 // Python: set PYTHON, else the first of python3.12, python3.11, python3.13, python3.10, python3 (py -3 on Windows).

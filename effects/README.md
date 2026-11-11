@@ -14,6 +14,23 @@
 - **Check:** `npm run effects:check` fails if the catalog doesn't cover exactly the effects in `fx.py`, if a runner patch no longer matches, or if `CATALOG.md` is stale (`npm run effects:catalog` regenerates it from the JSON).
 - **Runner patches:** `fx_runner.py` runs the vendored `fx.py` unchanged on disk, with small in-memory patches so the upstream author's handle comes from the plan, and the upstream "Edited by Claude" pill on `glass-widgets` is off by default. Opt in per entry with `"pill": true` (upstream text) or your own `"pill": "Made by |Sam"`, or for the whole plan with `npm run fx -- ... --pill`. `kit/fx.cjs` fills `name`/`handle` from the plan's `profile` and refuses plans that leave required copy unset. Optional fields that would show the author's content get neutral values (today's date, the job name). The runner also makes the `glass-widgets` stats card (`chart`) and its other fixed lines configurable. See "Needs your copy" in CATALOG.md for all 31 effects affected.
 
+## The person cut-out
+
+The effects sit behind and around the speaker, so the cut-out edge shows in every one. Pick it with `--mask` on `npm run fx` (default: the job's `"maskModel"` in `cut.json`, the same setting the titles-behind-the-head mask uses):
+
+| `--mask` | Edge | Speed at 1080x1920 |
+|---|---|---|
+| `mediapipe` (default) | Soft, a ragged fringe round hats and hair | about 250 frames a second |
+| `birefnet` (birefnet-general-lite) | Clean | 0.98 s a frame on an Intel Arc GPU, 4.2 s on CPU |
+| `birefnet-portrait` | Cleanest, keeps hair curls | 1.94 s a frame on the same GPU, 8.8 s on CPU |
+
+- Both BiRefNet mattes come from rembg through `kit/mask_refine.py`: the same models, GPU session and cleanup (hole fill, speck removal, guided edge, flow-guided temporal smoothing) as `kit/mask.py`, so titles and effects get one cut-out.
+- ONNX Runtime uses the GPU when it has a provider for it. On Windows `npm run effects:setup` installs the DirectML build, which runs on any DirectX 12 card.
+- The raw matte for each frame is cached in `build/fx/matte-<model>/` under a hash of the frame's pixels. A re-render only infers frames that changed; a copy or sound change infers none.
+- The cut-out is made at 1080 px (`FX_TRACK_W`), and the face detector stays at 540 px so effect layout matches the MediaPipe path.
+- Windows Smart App Control blocks MediaPipe's unsigned DLL (`WinError 4551`). The BiRefNet mattes don't load MediaPipe, so `--mask birefnet` runs natively there. For a MediaPipe render on such a machine, set `FX_WSL` to a Python inside WSL that has the effects packages.
+- Any effect takes `"face": 0.7` to lay itself out as if the tracked face were 70% as wide. The effects size and place themselves from the face width, so a tight shot pushes fans, rings and lines off the frame.
+
 ## Captions and effects
 
 Our caption band sits at about 60 to 78% of the frame height (`kineticY` / `captionY` 1320). Kinetic titles sit behind the presenter at about Y=560. Captions and titles are composited after the effects, so camera moves never zoom or crop them. Each effect is rated in the catalog:
@@ -28,4 +45,4 @@ Pairing rule: one effect in the caption band at a time, and nothing in the band 
 
 ## Credits
 
-Effects code: MIT, Copyright (c) 2026 Vibha Ramprakash. Face tracking: OpenCV YuNet (MIT). Person cut-out for the effects pass: MediaPipe Selfie Segmenter (Apache-2.0). The kit's title mask can also use rembg (MIT) with BiRefNet-general-lite weights (MIT, downloaded at first use); see the repo THIRD_PARTY.md. Fonts: Archivo Black, Instrument Serif, Space Mono, Inter, Anton, Montserrat, Playfair Display (SIL OFL 1.1; full text in `licenses/OFL-1.1.txt`) and Permanent Marker (Apache-2.0). These are starter versions of the author's effects.
+Effects code: MIT, Copyright (c) 2026 Vibha Ramprakash. Face tracking: OpenCV YuNet (MIT). Person cut-out for the effects pass: MediaPipe Selfie Segmenter (Apache-2.0) by default, or rembg (MIT) with BiRefNet weights (MIT) through `--mask`. The kit's title mask can also use rembg (MIT) with BiRefNet-general-lite weights (MIT, downloaded at first use); see the repo THIRD_PARTY.md. Fonts: Archivo Black, Instrument Serif, Space Mono, Inter, Anton, Montserrat, Playfair Display (SIL OFL 1.1; full text in `licenses/OFL-1.1.txt`) and Permanent Marker (Apache-2.0). These are starter versions of the author's effects.

@@ -39,14 +39,16 @@ const sh = (cmd, args, cwd, env) => execFileSync(cmd, args, { cwd, stdio: 'inher
 // Python inside WSL that has the effects packages (e.g. /root/fxvenv/bin/python), FX_WSL_DISTRO to pick a distro.
 const WSL = process.platform === 'win32' && process.env.FX_WSL;
 const wp = s => (typeof s === 'string' && /^[A-Za-z]:[\\/]/.test(s) ? '/mnt/' + s[0].toLowerCase() + s.slice(2).split('\\').join('/') : s);
-// --matte <rembg model> (or FX_MATTE): cut the person out with rembg instead of MediaPipe, e.g. birefnet-portrait (best
-// edge) or birefnet-general-lite (about twice as fast). Runs natively from effects/.venv-matte (rembg + ONNX Runtime),
-// so it needs no WSL. Masks are cached in build/fx/matte-<model>/ and only made again for frames that changed.
-const MATTE = opt('matte') || process.env.FX_MATTE;
-const PYM = path.join(FX, '.venv-matte', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+// --mask birefnet | birefnet-portrait | mediapipe: the person cut-out the effects use. Default: the job's cut.json
+// "maskModel" (the same setting the titles-behind-the-head mask reads), else MASK_MODEL / FX_MATTE, else MediaPipe.
+// The BiRefNet mattes come from rembg through kit/mask_refine.py, need no MediaPipe (so no WSL on Windows), and the slow
+// raw matte is cached per frame in build/fx/matte-<model>/. birefnet-portrait has the best edge; birefnet is twice as fast.
+const R = require('./rules.cjs');
+let MATTE = opt('mask') || opt('matte') || process.env.FX_MATTE || process.env.MASK_MODEL;
+const matteModel = m => { if (!m) return undefined; const k = R.MASK_MODELS[String(m).toLowerCase()]; if (!k) die('unknown mask model ' + m + ' (use birefnet, birefnet-portrait or mediapipe)'); return k === 'mediapipe' ? undefined : k; };
 const runFx = args => {
   // PYTHONUTF8: Windows Python reads the plan as cp1252 otherwise, and "·" in a plan comes out as "Â·" on screen
-  if (MATTE) return sh(PYM, [RUNNER, ...args], undefined, { PYTHONUTF8: '1', FX_MATTE: MATTE, FX_MATTE_CACHE: path.join(path.dirname(args[2]), 'matte-' + MATTE), FX_TRACK_W: process.env.FX_TRACK_W || '1080' });
+  if (matteModel(MATTE)) return sh(PY, [RUNNER, ...args], undefined, { PYTHONUTF8: '1', FX_MATTE: matteModel(MATTE), FX_MATTE_CACHE: path.dirname(args[2]), FX_TRACK_W: process.env.FX_TRACK_W || '1080' });
   if (!WSL) return sh(PY, [RUNNER, ...args], undefined, { PYTHONUTF8: '1' });
   const i = args.indexOf('--plan'), pf = args[i + 1], plan = JSON.parse(fs.readFileSync(pf, 'utf8'));
   const wpf = pf.replace(/\.json$/, '.wsl.json'); fs.writeFileSync(wpf, JSON.stringify(plan, (k, v) => wp(v), 1));   // image folders in the plan too
@@ -62,8 +64,7 @@ if (flag('list')) {
   console.log('\nFull details: effects/CATALOG.md');
   process.exit(0);
 }
-if (MATTE && !fs.existsSync(PYM)) die('No effects/.venv-matte. Make it: python -m venv effects/.venv-matte, then pip install rembg onnxruntime-directml (or onnxruntime) opencv-python numpy pillow');
-if (!MATTE && !WSL && !fs.existsSync(PY)) die('Effects are not set up yet. Run: npm run effects:setup');
+if (!(WSL && !matteModel(MATTE)) && !fs.existsSync(PY)) die('Effects are not set up yet. Run: npm run effects:setup');
 const planPath = opt('plan'); if (!planPath) die('Pass --plan fx.json (see the header of kit/fx.cjs or effects/CATALOG.md)');
 const raw = JSON.parse(fs.readFileSync(planPath, 'utf8'));
 const profile = raw.profile || {};
@@ -137,6 +138,8 @@ const job = path.resolve(opt('jobs') || path.join(ROOT, 'jobs'), name), build = 
 if (!fs.existsSync(path.join(build, 'cut.json'))) die('No ' + path.join(build, 'cut.json') + '. Make the reel first (npm run reel).');
 fs.mkdirSync(dir, { recursive: true });
 const cut = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8'));
+if (!MATTE) MATTE = R.maskSpec(cut).model;   // the job's own mask model, so titles and effects share one cut-out
+if (matteModel(MATTE)) console.log('> person cut-out for the effects:', matteModel(MATTE));
 const LEN = cut.segs.reduce((a, s) => a + (s.out - s.in) + (s.pad || 0), 0) + (cut.tail ?? 0.3);
 if (cut.overlay && !fs.existsSync(path.join(build, 'ovl'))) sh(process.execPath, [path.join(KIT, 'render.mjs'), LEN.toFixed(2)], build);
 // Caption zones: effects the catalog marks "off" hide the caption track and the kinetic titles for their window;

@@ -50,6 +50,10 @@ def glass_widgets_v2(c, e):"""),
     # pastel-word: the face guard erased half the card (and its Follow button) when the speaker leans in; "card_guard": "off" keeps it whole
     ("""place(c, shadowed(card_, 18, 8, 90), W / 2, cy, sq, 0, al * clamp((c.lt - 0.15) / 0.12), guard=True)""",
      """place(c, shadowed(card_, 18, 8, 90), W / 2, cy, sq, 0, al * clamp((c.lt - 0.15) / 0.12), guard=str(e.o.get('card_guard', 'on')) != 'off')"""),
+    # rabbit-hole: the person mask faded with the tunnel, so for the first 0.4 s and last 0.3 s the tunnelled copies
+    # ghosted across the speaker's face. Keep the speaker fully in front; the tunnel still fades in and out behind.
+    ("""m = c.m[..., None] * k  # you stay in front while the room tunnels behind you""",
+     """m = c.m[..., None]  # you stay in front while the room tunnels behind you"""),
     # the person is tracked and cut out at 540 px wide; FX_TRACK_W raises it so a sharper matte (FX_MATTE) keeps its edge
     ("""aw = 540 if sw <= sh else int(round(540 * sw / sh / 2)) * 2;""",
      """_tw = int(os.environ.get('FX_TRACK_W', 540)); aw = _tw if sw <= sh else int(round(_tw * sw / sh / 2)) * 2;"""),
@@ -57,42 +61,54 @@ def glass_widgets_v2(c, e):"""),
 
 
 def matte_tracker(g):
-    """FX_MATTE=<rembg model>: cut the person out with rembg (ONNX Runtime) instead of MediaPipe's selfie segmenter.
+    """FX_MATTE=<birefnet | birefnet-portrait>: cut the person out with rembg instead of MediaPipe's selfie segmenter.
 
-    Why: the selfie segmenter leaves a ragged fringe (Will picked birefnet-portrait from a side-by-side, 2026-11-10), and
-    its unsigned DLL is blocked by Windows Smart App Control, while ONNX Runtime loads. It uses the GPU when the runtime
-    has a provider for it (DirectML on Windows). Masks are slow to make (about 1 to 2 s a frame on an Arc GPU), so each
-    one is cached in FX_MATTE_CACHE under a hash of the frame's pixels: a re-render only makes masks for frames that changed.
+    Same matte as the titles get in kit/mask.py: the model, the GPU session and the cleanup (hole fill, speck removal,
+    guided edge, flow-guided temporal smoothing, light erode + feather) all come from kit/mask_refine.py.
+    Why: the selfie segmenter leaves a ragged fringe round a cap (birefnet-portrait won a five-way side-by-side,
+    2026-11-10), and its unsigned DLL is blocked by Windows Smart App Control, while ONNX Runtime loads.
+    The raw matte is the slow part (about 1 to 2 s a frame on an Arc GPU), so each one is cached in FX_MATTE_CACHE
+    under a hash of the frame's pixels: a re-render only infers frames that changed. Cleanup always runs fresh.
     """
     import hashlib
-    import onnxruntime as ort
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'kit'))
+    import mask_refine as MR
     from PIL import Image
-    from rembg import new_session, remove
     cv2, np = g['cv2'], g['np']
-    model, cache = os.environ['FX_MATTE'], os.environ.get('FX_MATTE_CACHE')
+    model = os.environ['FX_MATTE']
+    if model not in MR.MATTE_MODELS: sys.exit(f"unknown matte model {model!r}; use one of {', '.join(MR.MATTE_MODELS)}")
+    cache = os.environ.get('FX_MATTE_CACHE') and os.path.join(os.environ['FX_MATTE_CACHE'], 'matte-' + MR.MATTE_MODELS[model])
     if cache: os.makedirs(cache, exist_ok=True)
 
     class Tracker:
         def __init__(self, aw, ah):
-            have = ort.get_available_providers()
-            self.sess = new_session(model, providers=[p for p in ('DmlExecutionProvider', 'CUDAExecutionProvider', 'CoreMLExecutionProvider', 'CPUExecutionProvider') if p in have])
+            self.sess = MR.matte_session(model)
             # the face detector stays at upstream's 540 px: at full size it misses a close face and the layout drifts
             self.k = aw / 540; self.fs = (540, int(round(ah / self.k / 2)) * 2)
             self.fd = cv2.FaceDetectorYN.create(os.path.join(g['ROOT'], 'models', 'yunet.onnx'), '', self.fs, 0.6, 0.3, 20)
-            self.prev = None; self.made = self.hit = 0
-            print(f'matte: {model} on {self.sess.inner_session.get_providers()[0]}, {aw}x{ah}', flush=True)
+            self.state = {'prev_a': None, 'prev_g': None, 'grid': None}; self._prev = None; self.made = self.hit = 0
+            print(f'matte: {MR.MATTE_MODELS[model]} on {self.sess.inner_session.get_providers()[0]}, {aw}x{ah}', flush=True)
 
-        def mask(self, rgb):
+        @property
+        def prev(self): return self._prev
+
+        @prev.setter
+        def prev(self, v):   # upstream sets prev = None between effect windows: start the temporal smoothing afresh
+            self._prev = v
+            if v is None: self.state['prev_a'] = self.state['prev_g'] = None
+
+        def raw(self, rgb):
             f = cache and os.path.join(cache, hashlib.sha1(rgb.tobytes()).hexdigest() + '.png')
-            if f and os.path.exists(f): self.hit += 1; return np.asarray(Image.open(f))
-            m = remove(Image.fromarray(rgb), session=self.sess, only_mask=True).convert('L')
-            if f: m.save(f)
+            if f and os.path.exists(f): self.hit += 1; return np.asarray(Image.open(f), np.float32) / 255
+            a = MR.matte_raw(self.sess, rgb)
+            if f: Image.fromarray(np.clip(a * 255 + 0.5, 0, 255).astype(np.uint8)).save(f)
             self.made += 1
             if self.made % 50 == 0: print(f'matte: {self.made} masks made, {self.hit} from cache', flush=True)
-            return np.asarray(m)
+            return a
 
         def __call__(self, rgb, ms):   # same contract as upstream: (uint8 mask, (face x, face y, face width) or None)
-            m = self.mask(rgb)
+            a, _ = MR.refine_frame(self.raw(rgb), rgb, self.state)
+            m = np.clip(a * 255 + 0.5, 0, 255).astype(np.uint8); self._prev = m
             _, f = self.fd.detect(cv2.cvtColor(cv2.resize(rgb, self.fs, interpolation=cv2.INTER_AREA), cv2.COLOR_RGB2BGR))
             face = None
             if f is not None and len(f):

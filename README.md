@@ -75,7 +75,7 @@ Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FRE
 
 ## Looks, caption styles and fonts
 
-`--look` picks the whole edit; `--style`, `--fonts`, `--no-titles`, `--no-punch`, `--no-mask` and `--mask birefnet|mediapipe` override single parts.
+`--look` picks the whole edit; `--style`, `--fonts`, `--no-titles`, `--no-punch`, `--no-mask` and `--mask birefnet|birefnet-portrait|mediapipe` override single parts. The same `--mask` on `npm run fx` (or `"maskModel"` in `cut.json`) gives the effects that cut-out too.
 
 | Look | Captions | Titles | Notes |
 |---|---|---|---|

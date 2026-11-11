@@ -3,5 +3,7 @@
 # and are downloaded on first use into rembg's cache (~214 MB), not vendored.
 # onnxruntime is MIT (Microsoft). Python 3.11+.
 # Do not use rembg's default bria-rmbg model: it has a non-MIT commercial licence.
+# Windows gets the DirectML build: same API, uses any DirectX 12 GPU (about 4.5x on an Intel Arc), CPU otherwise.
 rembg
-onnxruntime
+onnxruntime; sys_platform != "win32"
+onnxruntime-directml; sys_platform == "win32"
