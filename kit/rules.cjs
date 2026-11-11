@@ -111,6 +111,8 @@ function maskSpec(cut, opts = {}) {
 // on the way in (npm run music:add), so the reel default bedVol 0.16 fits every one. A bed is a library name
 // ("vinyl-sunrise") or a path to your own file.
 const BEDS = JSON.parse(fs.readFileSync(path.join(KIT, 'music/beds.json'), 'utf8'));
-const bedFile = b => (BEDS[b] ? path.join(KIT, 'music', BEDS[b].file) : b);
+// own keys only ("constructor" is not a bed), and only entries that name their file
+const isBed = b => typeof b === 'string' && Object.hasOwn(BEDS, b) && typeof (BEDS[b] || {}).file === 'string';
+const bedFile = b => (isBed(b) ? path.join(KIT, 'music', BEDS[b].file) : b);
 
-module.exports = { BEDS, bedFile, SFX, CUT_SOUNDS, sfxHits, ENTRANCES, TITLE_ENTER, TITLE_MODE, PUNCH, TRANSITIONS, xfadeMode, timeline, lintCopy, scriptShape, readCaptions, resolveTitles, maskSpec, MASK_MODELS };
+module.exports = { BEDS, isBed, bedFile, SFX, CUT_SOUNDS, sfxHits, ENTRANCES, TITLE_ENTER, TITLE_MODE, PUNCH, TRANSITIONS, xfadeMode, timeline, lintCopy, scriptShape, readCaptions, resolveTitles, maskSpec, MASK_MODELS };

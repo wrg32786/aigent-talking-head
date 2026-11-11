@@ -97,7 +97,7 @@ if (!flag('rebuild')) {
     }
   }
   // a library name stays a name in cut.json (portable across machines); your own file becomes an absolute path
-  const bed = opt('bed'); if (bed) Object.assign(cut, { bed: require('./rules.cjs').BEDS[bed] ? bed : path.resolve(bed), bedVol: 0.16, ...(opt('bed-start') != null ? { bedStart: +opt('bed-start') } : {}) });
+  const bed = opt('bed'); if (bed) Object.assign(cut, { bed: require('./rules.cjs').isBed(bed) ? bed : path.resolve(bed), bedVol: 0.16, ...(opt('bed-start') != null ? { bedStart: +opt('bed-start') } : {}) });
   if (fs.existsSync(path.join(build, 'cut.json')) && !flag('force')) die('build/cut.json exists. Use --rebuild to render your edits, or --force to redraft.');
   fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
   console.log(`cut.json: ${segs.length} segments, seams ${JSON.stringify(seams)}`);

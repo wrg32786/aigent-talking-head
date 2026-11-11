@@ -189,7 +189,8 @@ const mix = ['[ca]'];
 if (lbl.length) f.push(`${lbl.join('')}amix=inputs=${lbl.length}:normalize=0,volume=0.8[sfxraw]`);
 const bed = !process.env.NOBED && C.bed;
 if (bed) {
-  const n = inp('-i', R.bedFile(bed));
+  const bf = R.bedFile(bed); if (!fs.existsSync(bf)) { console.error(`bed "${bed}": no such file ${bf}` + (R.isBed(bed) ? ' (beds.json lists it; restore kit/music)' : ' (not a library bed either: npm run music)')); process.exit(1); }
+  const n = inp('-i', bf);
   const st = +(C.bedStart || 0), vol = +(process.env.BEDVOL || C.bedVol || 0.22), nofade = process.env.BEDNOFADE || C.bedNoFade;
   f.push(`[${n}:a]atrim=${st}:${(st + LEN + .2).toFixed(2)},${A},volume=${vol}${nofade ? '' : ',afade=t=in:d=0.3'},afade=t=out:st=${(LEN - 1.4).toFixed(2)}:d=1.4[bed]`);
 }

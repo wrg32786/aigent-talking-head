@@ -38,7 +38,7 @@ An agent can't hear. Offer the human two or three beds that fit the reel's energ
 npm run music:add -- "C:/Users/you/Downloads/New Track.wav" ["Another.wav" ...]
 ```
 
-Each file gets a name from its title (lowercase, `&` becomes `and`), is matched to -13 LUFS, checked after conversion (the script fails if the result is more than 1 LU off), and added to `beds.json`. Commit the MP3 and `beds.json` together.
+Each file gets a name from its title (lowercase, `&` becomes `and`), is matched to -13 LUFS, checked after conversion (the script fails if the result is more than 1 LU off), and added to `beds.json`. A name that is already in the library is refused: rename the file, or pass `--replace` to overwrite that bed. Nothing in the library changes until a track has converted and passed its check. Commit the MP3 and `beds.json` together.
 
 ## Rights
 
