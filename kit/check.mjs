@@ -11,6 +11,7 @@ import { join, resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 const R = createRequire(import.meta.url)('./rules.cjs');
+const SFXPLAN = createRequire(import.meta.url)('./sfx-plan.cjs');
 const KIT = dirname(fileURLToPath(import.meta.url)), ROOT = dirname(KIT);
 const argv = process.argv.slice(2), warnOnly = argv.includes('--warn-only');
 const target = argv.find(a => !a.startsWith('--'));
@@ -52,10 +53,11 @@ function checkJob(captionsFile, cutFile, label) {
     for (const [k, h] of Object.entries(C.hero || {})) { const f = flips.find(x => Math.abs(x.start - +k) < 0.006 && (x.mode === 0 || x.mode === R.TITLE_MODE)); if (!f) errs.push(`cut.json hero "${k}": no caption or title starts at ${k}s`); else if (!heroOk(f, h)) errs.push(`cut.json hero "${k}": ${JSON.stringify(h)} is not in "${f.text}"`); }
     (C.segs || []).forEach((s, i) => { if (s.transition && R.xfadeMode(s.transition) === undefined) errs.push(`seg ${i}: unknown transition "${s.transition}" (kit/transitions.json)`); });
     for (const k of Object.keys(C.sfx || {})) if (!R.SFX[k]) errs.push(`sfx "${k}": use ${Object.keys(R.SFX).join(', ')}`);
+    for (const h of C.sfxHits || []) if (!SFXPLAN.lookup(h.id)) errs.push(`sfxHits "${h.id}" is not in kit/sfx/sfx.json`);
     if (C.bed && !R.BEDS[C.bed] && !existsSync(resolve(dirname(cutFile), C.bed))) errs.push(`bed "${C.bed}": not a library bed (npm run music) and no such file`);
     const seams = TL.seams.map(x => x.toFixed(2));
     if (seams.length >= 3) for (const k of R.CUT_SOUNDS) { const on = R.sfxHits((C.sfx || {})[k]).map(h => h.t.toFixed(2)); if (seams.every(x => on.includes(x))) warns.push(`sfx.${k} is on every cut. Fewer and deeper: keep it for the big cuts.`); }
-    const n = Object.values(C.sfx || {}).reduce((a, l) => a + R.sfxHits(l).length, 0);
+    const n = Object.values(C.sfx || {}).reduce((a, l) => a + R.sfxHits(l).length, 0) + (C.sfxHits || []).length;
     if (n > Math.max(3, TL.total / 3)) warns.push(`${n} sounds in ${TL.total.toFixed(1)} s; fewer and deeper reads better`);
     const bp = (C.segs || []).filter(s => s.bigPunch).length;
     if (bp > 2) warns.push(`${bp} big punches; use them on the cut after the hook and the cut into the payoff`);
@@ -67,6 +69,10 @@ function checkJob(captionsFile, cutFile, label) {
 }
 
 const results = [];
+{
+  const v = SFXPLAN.validateManifest();
+  results.push({ label: 'kit/sfx/sfx.json', errs: v.errs, warns: v.warns });
+}
 if (target) {
   let b = resolve(target);
   if (!existsSync(join(b, 'cut.json')) && existsSync(join(ROOT, 'jobs', target, 'build'))) b = join(ROOT, 'jobs', target, 'build');

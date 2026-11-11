@@ -91,10 +91,26 @@ function resolveTitles(CAP) {
   return ts.map((t, i) => ({ ...t, entrance: t.entrance || free.shift() || ENTRANCES[i % ENTRANCES.length], flicker: (i === 0 || i === ts.length - 1) ? t.flicker !== false : false, role: i === 0 ? 'hook' : i === ts.length - 1 ? 'payoff' : 'beat' }));
 }
 
+// Person-mask path and backend. cut.json may use "mask": "mask.mkv" or
+// "mask": {"file":"mask.mkv","model":"birefnet","person":"person.mkv"}, plus optional top-level "maskModel" / "person".
+const MASK_MODELS = { birefnet: 'birefnet', 'birefnet-general-lite': 'birefnet', mediapipe: 'mediapipe' };
+function maskSpec(cut, opts = {}) {
+  const m = cut && cut.mask;
+  if (!m && !opts.model && !cut?.maskModel) return { file: null, model: null, person: null };
+  const file = !m ? null : (typeof m === 'string' ? m : (m.file || m.path || 'mask.mkv'));
+  const raw = opts.model || cut.maskModel || (m && typeof m === 'object' && m.model) || process.env.MASK_MODEL || '';
+  const key = String(raw || '').toLowerCase();
+  const model = key ? (MASK_MODELS[key] || null) : null; // null = let mask.py pick (birefnet if cached, else mediapipe)
+  if (key && !MASK_MODELS[key]) throw new Error('unknown mask model ' + raw + ' (use birefnet or mediapipe)');
+  const person = opts.person || cut.person || (m && typeof m === 'object' && m.person) || null;
+  return { file, model, person };
+}
+
+
 // Music beds: our own tracks in kit/music/, listed in beds.json (npm run music). Each is loudness-matched to -13 LUFS
 // on the way in (npm run music:add), so the reel default bedVol 0.16 fits every one. A bed is a library name
 // ("vinyl-sunrise") or a path to your own file.
 const BEDS = JSON.parse(fs.readFileSync(path.join(KIT, 'music/beds.json'), 'utf8'));
 const bedFile = b => (BEDS[b] ? path.join(KIT, 'music', BEDS[b].file) : b);
 
-module.exports = { BEDS, bedFile, SFX, CUT_SOUNDS, sfxHits, ENTRANCES, TITLE_ENTER, TITLE_MODE, PUNCH, TRANSITIONS, xfadeMode, timeline, lintCopy, scriptShape, readCaptions, resolveTitles };
+module.exports = { BEDS, bedFile, SFX, CUT_SOUNDS, sfxHits, ENTRANCES, TITLE_ENTER, TITLE_MODE, PUNCH, TRANSITIONS, xfadeMode, timeline, lintCopy, scriptShape, readCaptions, resolveTitles, maskSpec, MASK_MODELS };

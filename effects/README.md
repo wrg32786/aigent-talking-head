@@ -3,7 +3,7 @@
 51 starter video effects from [claude-video-effects](https://github.com/Vibha-Ramprakash/claude-video-effects) by Vibha Ramprakash, run as a second pass over a reel you already cut and captioned. The effects follow your face and can sit behind your head. Your captions are added back on top afterwards, and the audio is exactly the reel's.
 
 - **Pick:** [CATALOG.md](CATALOG.md) lists every effect by moment (hook, claim, list, reveal, proof, objection, CTA, transition), energy, needs, duration and caption compatibility, plus menu presets. The machine-readable version is [catalog.json](catalog.json).
-- **Set up once:** `npm run effects:setup` (a Python venv at `effects/.venv`, about 150 MB: numpy, opencv-python, pillow, mediapipe).
+- **Set up once:** `npm run effects:setup` (a Python venv at `effects/.venv`, about 150 MB: numpy, opencv-python, pillow, mediapipe, plus rembg + onnxruntime for the BiRefNet person mask, another ~390 MB). `npm run effects:setup -- --birefnet` also downloads the birefnet-general-lite weights (~214 MB) into rembg's cache. The person mask itself is `kit/mask.py` (`--model birefnet` or `mediapipe`).
 - **Run:** `npm run fx -- --name <job> --plan fx.json --still 1.2,6.5` for check frames, then without `--still` for `jobs/<job>/reel-fx-vN.mp4`. `npm run fx -- --list` prints the menu. Plan format: see the header of `kit/fx.cjs`.
 
 ## How the upstream code is included
@@ -28,4 +28,4 @@ Pairing rule: one effect in the caption band at a time, and nothing in the band 
 
 ## Credits
 
-Effects code: MIT, Copyright (c) 2026 Vibha Ramprakash. Face tracking: OpenCV YuNet (MIT). Person cut-out: MediaPipe Selfie Segmenter (Apache-2.0). Fonts: Archivo Black, Instrument Serif, Space Mono, Inter, Anton, Montserrat, Playfair Display (SIL OFL 1.1; full text in `licenses/OFL-1.1.txt`) and Permanent Marker (Apache-2.0). These are starter versions of the author's effects.
+Effects code: MIT, Copyright (c) 2026 Vibha Ramprakash. Face tracking: OpenCV YuNet (MIT). Person cut-out for the effects pass: MediaPipe Selfie Segmenter (Apache-2.0). The kit's title mask can also use rembg (MIT) with BiRefNet-general-lite weights (MIT, downloaded at first use); see the repo THIRD_PARTY.md. Fonts: Archivo Black, Instrument Serif, Space Mono, Inter, Anton, Montserrat, Playfair Display (SIL OFL 1.1; full text in `licenses/OFL-1.1.txt`) and Permanent Marker (Apache-2.0). These are starter versions of the author's effects.

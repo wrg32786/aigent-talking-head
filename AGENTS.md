@@ -14,10 +14,11 @@ Use the scripts in `kit/` as they are. Put job data in `jobs/<name>/build/cut.js
 Install Claude Code skills by copying the two folders under `skills/` into `.claude/skills/`. The SKILL.md files point back to `kit/` by relative path, so keep the repo next to them or fix the paths.
 
 Hard rules:
+- For titles behind the head, prefer `npm run reel -- --mask birefnet` (or `"maskModel": "birefnet"` in `cut.json`) on the real footage: tighter hair and hands than MediaPipe, after `npm run effects:setup -- --birefnet`. It is slow on CPU (several seconds per title frame). MediaPipe is the fast fallback and what `npm run smoke` uses. Judge mask quality on composited stills, by eye; `mask.json` is for coverage numbers, not a colour preview of the matte.
 - Run `npm run verify -- <job>` before you hand over any reel, and look at `jobs/<job>/verify/contact.png`. It must print `VERIFY PASS`. Fix what it flags, don't explain it away.
 - Copy follows the humanizer rules in the talking-head-ad skill: no em dashes, no "not X, but Y", no hype words. `npm run check -- <job>` lints it.
 - Verify every render: re-transcribe it with the music in, and read frame strips across every seam. A probe proves something exists; your eye on the frames proves it looks right.
-- You can't hear. Never call a sound good. Build an audition and let the human pick by ear. Fewer, deeper sounds: never one on every cut.
+- You can't hear. Never call a sound good. Build an audition and let the human pick by ear. Fewer, deeper sounds: never one on every cut. Prefer the shipped pack (`kit/sfx/sfx.json`, auto-picked on `npm run fx`) or a CC0 file the human has already chosen; don't invent new raw synthetic swooshes.
 - Never fabricate copy the offer contradicts, such as "free" on a paid product.
 - Number versions (`-v1`, `-v2`, ...) and keep the old ones for comparison. `npm run reel` does this for you.
 - Ask which theme to use if the teammate hasn't said. Don't use the AIgent theme or the Skool mark for another brand.

@@ -18,8 +18,10 @@ effects/.venv/
 __pycache__/
 *.pyc
 
-# the locked sound set ships as WAV
+# shipped sounds (locked WAV set + cinematic pack mp3s)
 !kit/sfx/*.wav
+!kit/sfx/**/*.mp3
+!kit/sfx/sfx.json
 # per-job renders
 ovlt/
 *.mkv

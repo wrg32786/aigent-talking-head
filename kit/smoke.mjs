@@ -1,4 +1,5 @@
 // End-to-end smoke test on a synthetic clip. No footage, keys or network needed.
+// The person mask uses MediaPipe (--mask mediapipe) so this does not download birefnet-general-lite (~214 MB).
 //   npm run smoke                 (or: node kit/smoke.mjs [--keep] [--whisper])
 // Makes a 3 s colour-bars + tone clip with ffmpeg, fakes word timings, drafts captions with autocaption.mjs,
 // renders stills and 2 s of overlay frames in headless Chrome (neutral theme, plus AIgent stills), assembles
@@ -15,6 +16,8 @@ import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { findChrome } from './chrome.mjs';
+import { createRequire } from 'module';
+const SFXPLAN = createRequire(import.meta.url)('./sfx-plan.cjs');
 
 const KIT = dirname(fileURLToPath(import.meta.url));
 const keep = process.argv.includes('--keep'), whisper = process.argv.includes('--whisper');
@@ -64,6 +67,36 @@ try {
     if (statSync(join(build, 'stills', 't0.60.png')).size < 8000) fail('caption still looks blank');
   });
   step('render overlay frames (2 s)', () => { run(node, [join(KIT, 'render.mjs'), '2'], build); const n = readdirSync(join(build, 'ovl')).length; if (n !== 48) fail('frames ' + n); });
+  step('sfx pack manifest + auto-pick', () => {
+    const v = SFXPLAN.validateManifest();
+    if (v.errs.length) fail('sfx.json: ' + v.errs.join('; '));
+    const man = SFXPLAN.loadManifest();
+    if (man.sounds.length !== 31) fail('expected 31 pack sounds, got ' + man.sounds.length);
+    const hits = SFXPLAN.planHits([
+      { fx: 'locked-on', start: 0.0, end: 1.0 },
+      { fx: 'rabbit-hole', start: 1.2, end: 2.4 },
+      { fx: 'huge-strike', start: 2.6, end: 4.0 },
+      { fx: 'timeline', start: 2.65, end: 3.4, sfx: false },
+      { fx: 'spotlight', start: 4.2, end: 5.5, sfx: '24-shimmer-sparkle-b' }
+    ]);
+    if (!hits.some(h => h.fx === 'locked-on' && h.role === 'primary')) fail('no primary for locked-on: ' + JSON.stringify(hits));
+    if (!hits.some(h => h.fx === 'rabbit-hole' && h.role === 'riser')) fail('rabbit-hole should get a riser');
+    if (!hits.some(h => h.fx === 'huge-strike' && h.role === 'release')) fail('huge-strike should get a release');
+    if (hits.some(h => h.fx === 'timeline')) fail('sfx:false was ignored');
+    const spot = hits.find(h => h.fx === 'spotlight' && h.role === 'primary');
+    if (!spot || spot.id !== '24-shimmer-sparkle-b') fail('override not honoured: ' + JSON.stringify(spot));
+    const primaries = hits.filter(h => h.role === 'primary').map(h => h.id);
+    if (new Set(primaries).size !== primaries.length) fail('primary ids repeated: ' + primaries);
+  });
+  step('assemble.cjs places a pack sound', () => {
+    const cut = JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8'));
+    cut.sfxHits = [{ id: '11-pop-sticker', t: 1.2 }];
+    writeFileSync(join(build, 'cut.json'), JSON.stringify(cut));
+    const log = run(node, [join(KIT, 'assemble.cjs'), 'smoke-pack.mp4'], build);
+    if (!existsSync(join(build, 'smoke-pack.mp4'))) fail('no smoke-pack.mp4\n' + log);
+    const d = +run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', 'smoke-pack.mp4'], build).trim();
+    if (Math.abs(d - 3.5) > 0.25) fail('pack assemble duration ' + d);
+  });
   step('assemble.cjs -> smoke.mp4', () => run(node, [join(KIT, 'assemble.cjs'), 'smoke.mp4'], build));
   step('output is 1080x1920 with audio, ~3.5 s', () => {
     const j = JSON.parse(run('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,width,height:format=duration', '-of', 'json', 'smoke.mp4'], build));
@@ -87,7 +120,7 @@ try {
       { id: 'clip-001', file: 'clips/clip-001.mp4', dur: 1.5, status: 'retake(see clip-002)', text: 'Hi I mean', words: w('Hi I mean') },
       { id: 'clip-002', file: 'clips/clip-002.mp4', dur: 1.5, status: 'keep', text: 'Hi team, this works.', words: w('Hi team, this works.') },
       { id: 'clip-003', file: 'clips/clip-003.mp4', dur: 1.5, status: 'keep', text: 'Drop clips in inbox.', words: w('Drop clips in inbox.') }] }));
-    run(node, [join(KIT, 'reel.cjs'), '--clips', clips, '--jobs', join(work, 'jobs'), '--name', 'smoke-reel'], work);
+    run(node, [join(KIT, 'reel.cjs'), '--clips', clips, '--jobs', join(work, 'jobs'), '--name', 'smoke-reel', '--mask', 'mediapipe'], work);
     const cut = JSON.parse(readFileSync(join(work, 'jobs', 'smoke-reel', 'build', 'cut.json'), 'utf8'));
     if (cut.segs.length !== 2) fail('retake not skipped: ' + cut.segs.length + ' segs');
     const dcap = readFileSync(join(work, 'jobs', 'smoke-reel', 'build', 'captions.js'), 'utf8');
@@ -95,7 +128,7 @@ try {
     const out = join(work, 'jobs', 'smoke-reel', 'reel-v1.mp4'); if (!existsSync(out)) fail('no reel-v1.mp4');
     const d = +run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', out]).trim();
     if (Math.abs(d - 3.3) > 0.25) fail('reel duration ' + d);
-    run(node, [join(KIT, 'reel.cjs'), '--rebuild', '--jobs', join(work, 'jobs'), '--name', 'smoke-reel'], work);
+    run(node, [join(KIT, 'reel.cjs'), '--rebuild', '--jobs', join(work, 'jobs'), '--name', 'smoke-reel', '--mask', 'mediapipe'], work);
     if (!existsSync(join(work, 'jobs', 'smoke-reel', 'reel-v2.mp4'))) fail('--rebuild did not write reel-v2.mp4');
   });
   // --- Muse edit rules: multi-take picking, zoom punch, kinetic titles, pills, named transitions, sound rules, check, verify
@@ -123,7 +156,7 @@ try {
       '-shortest', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', `clip-00${i + 1}.mp4`], clips));
     const w = txt => txt.split(' ').map((x, i) => [0.1 + i * 0.25, 0.33 + i * 0.25, x]);
     writeFileSync(join(clips, 'clips.json'), JSON.stringify({ src: 'synthetic', clips: lines.map((t, i) => ({ id: `clip-00${i + 1}`, file: `clips/clip-00${i + 1}.mp4`, dur: 1.6, status: 'keep', text: t, words: w(t) })) }));
-    run(node, [join(KIT, 'reel.cjs'), '--clips', clips, '--jobs', join(work, 'jobs'), '--name', 'muse', '--look', 'muse'], work);
+    run(node, [join(KIT, 'reel.cjs'), '--clips', clips, '--jobs', join(work, 'jobs'), '--name', 'muse', '--look', 'muse', '--mask', 'mediapipe'], work);
     const b = join(work, 'jobs', 'muse', 'build');
     const cut = JSON.parse(readFileSync(join(b, 'cut.json'), 'utf8'));
     if (cut.punch !== 0.1 || !cut.segs[1].bigPunch || !cut.segs[3].bigPunch || cut.segs[2].bigPunch) fail('punch plan: ' + JSON.stringify(cut.segs.map(s => s.bigPunch || 0)));

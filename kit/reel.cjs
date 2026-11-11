@@ -8,8 +8,10 @@
 //            muse = pill captions + titles; classic = the original captions + spray hero word)
 //          --style kinetic|classic|pill|hormozi|karaoke (override the caption style)  --no-titles  --fonts modern|druk|elegant|editorial|<local>
 //          --no-punch (no zoom punch)  --no-mask (titles in front, skip the person mask)
+//          --mask birefnet|mediapipe (person-mask backend; default mediapipe, fast. birefnet is the quality option, slow on CPU)
 //          --draft (stop after captions.js so you can edit it)  --rebuild (re-render + re-assemble an edited job)
-//          --bed <name from npm run music> or --bed music.wav  --logo logo.svg  --jobs <dir> (default jobs/)  --force
+//          --bed <name from npm run music> or --bed music.wav  --bed-start 0  --logo logo.svg  --jobs <dir> (default jobs/)  --force
+//          --sfx off  (skip locked-set sounds on this draft; also used by npm run fx)
 // Writes jobs/<name>/: clips/ (clip.py output), build/ (cut.json, captions.js, theme.js, overlay frames), reel-vN.mp4.
 // Steps: clip.py (Whisper, best take per sentence, retakes flagged) -> cut.json from every "keep" clip (zoom punch on
 // every cut, big punch after the hook and into the payoff, a few sounds on the key cuts only) -> autocaption ->
@@ -19,12 +21,13 @@
 const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const R = require('./rules.cjs');
 
 const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts']);
+const VALUED = new Set(['theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const die = m => { console.error(m); process.exit(1); };
@@ -85,9 +88,16 @@ if (!flag('rebuild')) {
     if (seams.length >= 2) sfx.boom = [[last, 0.55]];
   }
   const cut = { note: `Drafted by kit/reel.cjs from ${keep.length} keep clips (${clips.length - keep.length} retakes skipped). Edit, then: npm run reel -- --rebuild --name ${name}`, segs, tail: 0.3, punch: flag('no-punch') ? false : 0.1, hits: [[0.02, 14], ...seams.map(s => [s, 24])], sfx, overlay: 'ovl/%04d.png' };
-  if (TITLES) Object.assign(cut, { titles: 'ovlt/%04d.png', ...(flag('no-mask') ? {} : { mask: 'mask.mkv' }) });
+  if (TITLES) {
+    if (flag('no-mask')) Object.assign(cut, { titles: 'ovlt/%04d.png' });
+    else {
+      const model = opt('mask');
+      if (model) R.maskSpec({ mask: 'mask.mkv', maskModel: model }); // validate
+      Object.assign(cut, { titles: 'ovlt/%04d.png', mask: 'mask.mkv', ...(model ? { maskModel: model } : {}) });
+    }
+  }
   // a library name stays a name in cut.json (portable across machines); your own file becomes an absolute path
-  const bed = opt('bed'); if (bed) Object.assign(cut, { bed: require('./rules.cjs').BEDS[bed] ? bed : path.resolve(bed), bedVol: 0.16 });
+  const bed = opt('bed'); if (bed) Object.assign(cut, { bed: require('./rules.cjs').BEDS[bed] ? bed : path.resolve(bed), bedVol: 0.16, ...(opt('bed-start') != null ? { bedStart: +opt('bed-start') } : {}) });
   if (fs.existsSync(path.join(build, 'cut.json')) && !flag('force')) die('build/cut.json exists. Use --rebuild to render your edits, or --force to redraft.');
   fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
   console.log(`cut.json: ${segs.length} segments, seams ${JSON.stringify(seams)}`);
@@ -111,15 +121,16 @@ sh(process.execPath, [path.join(KIT, 'render.mjs'), LEN.toFixed(2)], build);
 // person mask for the kinetic titles: the graded cut, segmented in the title windows (needs npm run effects:setup)
 if (cut.titles && cut.mask) {
   const fxPy = path.join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+  const spec = R.maskSpec(cut, { model: opt('mask') });
   if (!fs.existsSync(fxPy)) console.warn('note: no person mask (npm run effects:setup to put titles behind the speaker); titles go in front');
   else {
-    sh(process.execPath, [path.join(KIT, 'assemble.cjs'), 'base.mp4'], build, { BASEONLY: '1' });
-    const R = require('./rules.cjs');
+    sh(process.execPath, [path.join(KIT, 'assemble.cjs'), 'base.mp4'], build, { BASEONLY: '1' }); // BASEONLY already drops sfx and bed
     const win = R.resolveTitles(R.readCaptions(path.join(build, 'captions.js'))).map(t => `${Math.max(0, t.start - 0.1).toFixed(2)}-${Math.min(LEN, t.end + 0.1).toFixed(2)}`).join(',');
-    sh(fxPy, [path.join(KIT, 'mask.py'), 'base.mp4', cut.mask, ...(win ? ['--windows', win] : [])], build);
+    const maskArgs = [path.join(KIT, 'mask.py'), 'base.mp4', spec.file || 'mask.mkv', ...(win ? ['--windows', win] : []), ...(spec.model ? ['--model', spec.model] : []), ...(spec.person ? ['--person', spec.person] : [])];
+    sh(fxPy, maskArgs, build);
   }
 }
 let v = 1; while (fs.existsSync(path.join(job, `reel-v${v}.mp4`))) v++;
 const out = path.join(job, `reel-v${v}.mp4`);
-sh(process.execPath, [path.join(KIT, 'assemble.cjs'), out], build);
+sh(process.execPath, [path.join(KIT, 'assemble.cjs'), out], build, (flag('no-sfx') || opt('sfx') === 'off') ? { NOSFX: '1' } : {});
 console.log(`\nReel: ${out}\nCheck it: npm run verify -- ${name} (contact sheet, ffprobe, loudness, mask), watch it, read clips/clips.md for skipped retakes, then edit build/captions.js or build/cut.json and run: npm run reel -- --rebuild --name ${name}`);

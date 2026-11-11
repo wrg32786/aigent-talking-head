@@ -24,7 +24,7 @@ HeyGen cinematic takes are an optional second source; they cut in the same way a
 
    ```
    npm run reel                          # newest video in inbox/, neutral theme
-   npm run reel -- inbox/my-take.mov --theme aigent --cropx 0.4 --bed vinyl-sunrise
+   npm run reel -- inbox/my-take.mov --theme aigent --cropx 0.4 --bed vinyl-sunrise --bed-start 0
    npm run music                         # list the music beds
    npm run reel -- inbox/take1.mov inbox/take2.mov --hook take2.mov --fonts druk
    ```
@@ -41,7 +41,8 @@ The first run downloads the Whisper model (large-v3, about 3 GB). Pass `--model 
 After the reel is made, ask your agent to "add effects". It reads the transcript, finds the hook, claims, numbers, lists and CTA, and offers 2 or 3 effects for each from a menu of 51 (spotlight, backdrop word, checklist, glass graph, stamps, countdowns and more). Then it renders `jobs/<clip-name>/reel-fx-v1.mp4`, with your captions kept on top and the same audio.
 
 ```
-npm run effects:setup                                     # once: Python venv with OpenCV + MediaPipe (~150 MB)
+npm run effects:setup                                     # once: Python venv with OpenCV + MediaPipe (~150 MB) and rembg + onnxruntime (~390 MB more, for the BiRefNet mask)
+npm run effects:setup -- --birefnet                       # also download birefnet-general-lite (~214 MB) into rembg's cache
 npm run fx -- --list                                      # the menu, by moment
 npm run fx -- --name <clip-name> --plan fx.json --still 1.2,6.5   # check frames
 npm run fx -- --name <clip-name> --plan fx.json           # render
@@ -74,7 +75,7 @@ Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FRE
 
 ## Looks, caption styles and fonts
 
-`--look` picks the whole edit; `--style`, `--fonts`, `--no-titles`, `--no-punch` and `--no-mask` override single parts.
+`--look` picks the whole edit; `--style`, `--fonts`, `--no-titles`, `--no-punch`, `--no-mask` and `--mask birefnet|mediapipe` override single parts.
 
 | Look | Captions | Titles | Notes |
 |---|---|---|---|
@@ -84,7 +85,7 @@ Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FRE
 
 Caption styles: `kinetic` (font lockups), `pill`, `hormozi` (bold caps with a cyan active word), `karaoke` (colour wipe as each word is said), `classic`. Set `"captionStyle"` in `captions.js` to change one job.
 
-Titles use 7 entrances (stagger rise, slam, blur rise, slide left, elastic, flip, pop zoom), never the same one twice in a video, with a flicker only on the hook and the payoff. Set them by hand as mode 7 flips in `captions.js` (`"entrance"` to pick one, `"hero"` for the big word), or leave them to `autocaption.mjs --titles`.
+Titles use 7 entrances (stagger rise, slam, blur rise, slide left, elastic, flip, pop zoom), never the same one twice in a video, with a flicker only on the hook and the payoff. Set them by hand as mode 7 flips in `captions.js` (`"entrance"` to pick one, `"hero"` for the big word), or leave them to `autocaption.mjs --titles`. The person mask that puts those titles behind the head is `kit/mask.py`. MediaPipe is the default (fast). For a final reel, `--mask birefnet` (or `"maskModel": "birefnet"` in `cut.json`) uses rembg with birefnet-general-lite: slower on CPU (several seconds per title frame) but much tighter on hair and hands. Optional `"person": "person.mkv"` writes an edge-decontaminated person layer.
 
 Font pairings (`--fonts`, or `"fonts"` in `captions.js`): `theme` (default), `modern`, `druk`, `elegant`, `editorial`. A pairing is two faces set together: every title and kinetic line is a lockup with the hero word big in the display face and the rest of the phrase in the partner face (script or sans/serif) beside, under or across it. `"hero"` on a phrase picks the hero word. All shipped fonts are SIL OFL Google Fonts; your own licensed fonts go in `kit/fonts/local/` (gitignored). See [kit/fonts/README.md](kit/fonts/README.md).
 
@@ -96,7 +97,7 @@ These are defaults in `cut.json`; `npm run check -- <job>` flags anything that b
 
 - **Zoom punch.** `"punch": 0.1` scales every other segment 10% so each cut lands as a jump; `false` turns it off. `"bigPunch": true` on a segment eases in another 12% over 0.3 s; `npm run reel` puts it on the cut after the hook and the cut into the payoff. `"zoom"` and `"punchY"` per segment override the amount and the vertical centre.
 - **Transitions.** The glitch seam stays the default. `"transition": "crossfade"` on a segment (or at the top level for all of them) uses an ffmpeg xfade instead; `"transitionDur"` sets the length. The 50 names (crossfade, dip, flash, whip, iris, zoom, pixelate, ...) are in `kit/transitions.json` and `effects/CATALOG.md`.
-- **Sounds.** Fewer and deeper. The locked set is `whoosh`, `swipe`, `boom`, `click`, `typing` (mono 48 kHz WAV, CC0), used as `"sfx": {"whoosh": [3.2], "boom": [[12.4, 0.55]]}`. Never a sound on every cut, and the key moment (the payoff) gets the loudest one. You still pick sounds by ear.
+- **Sounds.** Fewer and deeper. The locked cut-seam set is `whoosh`, `swipe`, `boom`, `click`, `typing` (mono 48 kHz WAV, CC0), used as `"sfx": {"whoosh": [3.2], "boom": [[12.4, 0.55]]}`. Never a sound on every cut, and the key moment (the payoff) gets the loudest one. A 31-sound cinematic pack in `kit/sfx/` (see `kit/sfx/sfx.json`) is auto-picked on `npm run fx` for each effect hit: category mapping, no-repeat rotation, the hit point aligned to the effect, risers ending on the hit, releases after heavy hits, ducked under the voice. Override per effect with `"sfx": "01-cinematic-hit-a"` or `"sfx": false`, or turn the pack off with `--sfx off`. You still pick sounds by ear.
 - **Copy.** No em or en dashes, no "not X, but Y", no staged run-ups ("Here's the thing:"), no dramatic closers, no hype words. `npm run check` lints the captions, titles and card copy.
 - **Script shape.** A hook, one reveal per beat, a payoff: 40 to 55 words, 15 to 20 s. Over 25 s, cut a middle sentence.
 
@@ -145,7 +146,7 @@ Agents: start at [AGENTS.md](AGENTS.md).
 | `kit/check.mjs` | `npm run check [job]`: copy lint, titles, transitions, sounds, punches and script shape. |
 | `kit/verify.mjs` | `npm run verify -- <job>`: ffprobe, loudness, title and punch stills, contact sheet, mask alpha, copy lint. Run it before every delivery. |
 | `kit/rules.cjs` | The shared edit rules: sounds, entrances, punch amounts, transitions, copy lint, script shape. |
-| `kit/mask.py` | Person mask for titles-behind-the-head (MediaPipe selfie segmenter from the effects venv). |
+| `kit/mask.py` | Person mask for titles-behind-the-head. `--model birefnet` (rembg birefnet-general-lite, quality, weights downloaded on first use) or `--model mediapipe` (fast fallback). `kit/mask_refine.py` is the shared cleanup. |
 | `kit/fonts/`, `kit/fonts.mjs` | Font pairings and their OFL files. |
 | `kit/transitions.json` | Transition names mapped to ffmpeg xfade modes. |
 | `kit/themes/` | Theme presets: `neutral.js` (default) and `aigent.js`. |
@@ -158,9 +159,10 @@ Agents: start at [AGENTS.md](AGENTS.md).
 | `kit/timeline.mjs` | Maps segment word times onto the output clock and prints the seams. |
 | `kit/overlay.html` | Caption layer, driven by `captions.js` and styled by `theme.js`. |
 | `kit/render.mjs` | Renders the overlay to PNG frames (24 fps) or to stills. Run it from `build/`. |
-| `kit/assemble.cjs` | The cut. Any number of segments from any source, cover-cropped to 1080x1920, zoom punch, glitch seams or named transitions, titles behind the person, overlay, sounds, ducked bed, -14 LUFS. |
+| `kit/assemble.cjs` | The cut. Any number of segments from any source, cover-cropped to 1080x1920, zoom punch, glitch seams or named transitions, titles behind the person, overlay, locked-set and pack sounds (both ducked under the voice), ducked bed, -14 LUFS. |
+| `kit/sfx-plan.cjs` | Pack manifest, validation, and effect-hit auto-pick. |
 | `kit/fs.mjs` | Freesound search, CC0 only. |
-| `kit/sfx/` | The locked sound set (WAV) and the two original woosh MP3s. |
+| `kit/sfx/` | Locked cut-seam set (WAV + legacy woosh MP3s) and the 31-sound cinematic pack (`sfx.json`). |
 | `kit/music/` | Our music beds (MP3, all at -13 LUFS) and `beds.json`. `npm run music` lists them, `npm run music:add -- <file>` adds one. See [kit/music/README.md](kit/music/README.md). |
 | `kit/example/` | The Awakening ad's real `cut.json` and `captions.js`, a real-footage cut, the HeyGen retake prompt, and the Skool mark used only by that ad. |
 
@@ -182,8 +184,10 @@ Code and docs: Apache-2.0, Copyright 2026 Will Gwyn (wrg32786). See [LICENSE](LI
 - `kit/sfx/D-quick-woosh-683101.mp3`: "quick woosh" by florianreichelt, Freesound 683101, CC0.
 - `kit/sfx/whoosh.wav` and `kit/sfx/swipe.wav`: mono 48 kHz WAV conversions of the two Freesound files above, CC0.
 - `kit/sfx/boom.wav`, `click.wav`, `typing.wav`: from [motion-pack](https://github.com/ANVEAI/motion-pack) by ANVEAI (sounds `snd.hit.deep_impact`, `snd.ui.click`, `snd.ui.typing_burst`), CC0 1.0 under its LICENSE-MEDIA.
+- `kit/sfx/{hit,riser,release,whoosh,swipe,pop,ui,glitch,camera,paper,counter,sub,shimmer}/` and `kit/sfx/sfx.json`: 31-sound cinematic pack (Will-approved). DAEDAL Transition / UI packs, Kenney Interface Sounds, OpenGameArt / Freesound CC0 items, and original synths dedicated CC0. Full credits in [THIRD_PARTY.md](THIRD_PARTY.md).
 - `kit/fonts/`: Google Fonts under the SIL Open Font License 1.1, each with its licence file. See [kit/fonts/README.md](kit/fonts/README.md).
 - Ideas adapted, no code copied: the transition name map from motion-pack (MIT), the Hormozi and karaoke caption looks from [Capite](https://github.com/muneebkhan08/Capite) (MIT), the title entrances from [motion-anything](https://github.com/nexu-io/motion-anything) (Apache-2.0, reference only). See [THIRD_PARTY.md](THIRD_PARTY.md).
 - `kit/example/skool-logo.svg`: the Skool wordmark, a trademark of Skool. It's included only to mark The AIgent's own Skool group in the Awakening example; it isn't in any theme. Don't use it for other brands.
 - `effects/vendor/claude-video-effects/`: [claude-video-effects](https://github.com/Vibha-Ramprakash/claude-video-effects) by Vibha Ramprakash, MIT. Its models (YuNet, MIT; MediaPipe Selfie Segmenter, Apache-2.0) and fonts (SIL OFL 1.1, Permanent Marker Apache-2.0) keep their own licences; see `NOTICE` and `effects/README.md`.
+- Person-mask quality backend (installed by `npm run effects:setup`, not vendored): [rembg](https://github.com/danielgatis/rembg) by Daniel Gatis, MIT; [onnxruntime](https://github.com/microsoft/onnxruntime) by Microsoft, MIT; birefnet-general-lite weights from [BiRefNet](https://github.com/ZhengPeng7/BiRefNet) by ZhengPeng, MIT, downloaded on first use into rembg's cache. See [THIRD_PARTY.md](THIRD_PARTY.md).
 - `kit/music/*.mp3`: our own tracks, made by Will Gwyn with Suno (song ids in `kit/music/beds.json`). For The AIgent's videos only; not covered by the Apache-2.0 licence. See [kit/music/README.md](kit/music/README.md).

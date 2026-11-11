@@ -4,9 +4,12 @@ Copyright 2026 Will Gwyn (wrg32786)
 Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 Third-party files keep their own terms:
-- kit/sfx/*.mp3, kit/sfx/whoosh.wav, kit/sfx/swipe.wav: Freesound CC0 (credits in README.md).
+- kit/sfx/F-cinematic-woosh-648729.mp3, kit/sfx/D-quick-woosh-683101.mp3, kit/sfx/whoosh.wav, kit/sfx/swipe.wav: Freesound CC0 (credits in README.md).
 - kit/sfx/boom.wav, click.wav, typing.wav: from motion-pack by ANVEAI (https://github.com/ANVEAI/motion-pack),
   CC0 1.0 under its LICENSE-MEDIA.
+- kit/sfx/{hit,riser,release,whoosh,swipe,pop,ui,glitch,camera,paper,counter,sub,shimmer}/: 31-sound
+  cinematic pack, all CC0 1.0 (DAEDAL, Kenney, OpenGameArt/Freesound, archive.org, and original synths
+  dedicated CC0). Credits in THIRD_PARTY.md and kit/sfx/sfx.json.
 - kit/fonts/*.ttf: Google Fonts under the SIL Open Font License 1.1 (kit/fonts/OFL-*.txt).
 - kit/transitions.json adapts motion-pack's xfade name map (MIT). The hormozi and karaoke caption looks follow
   Capite (https://github.com/muneebkhan08/Capite), MIT, Copyright (c) 2026 Capite Contributors. Title entrances
@@ -20,5 +23,12 @@ Third-party files keep their own terms:
   - fonts/: Archivo Black, Instrument Serif, Space Mono, Inter, Anton, Montserrat, Playfair Display under the
     SIL Open Font License 1.1 (effects/licenses/OFL-1.1.txt and fonts/OFL-*.txt); Permanent Marker under
     Apache-2.0 (fonts/LICENSE-PermanentMarker.txt).
+- rembg (pip): rembg by Daniel Gatis (https://github.com/danielgatis/rembg), MIT, Copyright (c) 2020 Daniel Gatis.
+  Installed by npm run effects:setup, not vendored.
+- onnxruntime (pip): ONNX Runtime by Microsoft (https://github.com/microsoft/onnxruntime), MIT,
+  Copyright (c) Microsoft Corporation. Installed by npm run effects:setup, not vendored.
+- birefnet-general-lite weights: BiRefNet by ZhengPeng (https://github.com/ZhengPeng7/BiRefNet), MIT,
+  Copyright (c) 2024 ZhengPeng. Downloaded on first use into rembg's cache from rembg's v0.0.0 release
+  (BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx, md5 4fab47adc4ff364be1713e97b7e66334). Not in git.
 - kit/music/*.mp3: original tracks made by Will Gwyn with Suno (song ids in kit/music/beds.json), for The AIgent's
   own videos only. Not covered by the Apache license.
