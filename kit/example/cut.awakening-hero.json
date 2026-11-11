@@ -8,6 +8,6 @@
   "tail": 0.3,
   "hits": [[0.02,14],[11.66,24],[12.66,14],[23.33,24],[25.475,24],[33.55,14]],
   "sfx": {"F": [11.66, 23.33, 25.475], "D": [12.66, 14.20, 26.28, 33.55]},
-  "bed": "Awaken Freedom.wav", "bedStart": 0, "bedVol": 0.16, "bedNoFade": true,
+  "bed": "awaken-freedom", "bedStart": 0, "bedVol": 0.16, "bedNoFade": true,
   "overlay": "ovl/%04d.png"
 }

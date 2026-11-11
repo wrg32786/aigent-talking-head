@@ -10,7 +10,7 @@
 //          --no-punch (no zoom punch)  --no-mask (titles in front, skip the person mask)
 //          --mask birefnet|mediapipe (person-mask backend; default mediapipe, fast. birefnet is the quality option, slow on CPU)
 //          --draft (stop after captions.js so you can edit it)  --rebuild (re-render + re-assemble an edited job)
-//          --bed music.wav  --bed-start 0  --logo logo.svg  --jobs <dir> (default jobs/)  --force
+//          --bed <name from npm run music> or --bed music.wav  --bed-start 0  --logo logo.svg  --jobs <dir> (default jobs/)  --force
 //          --sfx off  (skip locked-set sounds on this draft; also used by npm run fx)
 // Writes jobs/<name>/: clips/ (clip.py output), build/ (cut.json, captions.js, theme.js, overlay frames), reel-vN.mp4.
 // Steps: clip.py (Whisper, best take per sentence, retakes flagged) -> cut.json from every "keep" clip (zoom punch on
@@ -96,7 +96,8 @@ if (!flag('rebuild')) {
       Object.assign(cut, { titles: 'ovlt/%04d.png', mask: 'mask.mkv', ...(model ? { maskModel: model } : {}) });
     }
   }
-  const bed = opt('bed'); if (bed) Object.assign(cut, { bed: path.resolve(bed), bedVol: 0.16, ...(opt('bed-start') != null ? { bedStart: +opt('bed-start') } : {}) });
+  // a library name stays a name in cut.json (portable across machines); your own file becomes an absolute path
+  const bed = opt('bed'); if (bed) Object.assign(cut, { bed: require('./rules.cjs').isBed(bed) ? bed : path.resolve(bed), bedVol: 0.16, ...(opt('bed-start') != null ? { bedStart: +opt('bed-start') } : {}) });
   if (fs.existsSync(path.join(build, 'cut.json')) && !flag('force')) die('build/cut.json exists. Use --rebuild to render your edits, or --force to redraft.');
   fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
   console.log(`cut.json: ${segs.length} segments, seams ${JSON.stringify(seams)}`);

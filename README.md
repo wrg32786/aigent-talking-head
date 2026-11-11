@@ -6,7 +6,7 @@ From [The AIgent](https://theaigent.xyz). Turn a phone recording into a finished
 - tight cuts with a glitch seam and a 10% zoom punch on every cut, a bigger punch after the hook and into the payoff, and a few sounds on the key cuts only
 - every spoken word animated (kinetic type, key words bigger in the accent colour), drafted from the transcript, in a theme and font pairing you pick
 - one kinetic title per beat, behind your head (the person is cut out with a segmentation mask)
-- your music bed, ducked under the voice, if you add one
+- a music bed from our own library (`kit/music/`, 11 tracks) or your own track, ducked under the voice
 - a numbered version (`reel-v1.mp4`, `reel-v2.mp4`, ...) every time you rebuild
 
 HeyGen cinematic takes are an optional second source; they cut in the same way as phone clips.
@@ -24,7 +24,8 @@ HeyGen cinematic takes are an optional second source; they cut in the same way a
 
    ```
    npm run reel                          # newest video in inbox/, AIgent theme
-   npm run reel -- inbox/my-take.mov --theme neutral --cropx 0.4 --bed music.wav --bed-start 0
+   npm run reel -- inbox/my-take.mov --theme neutral --cropx 0.4 --bed vinyl-sunrise --bed-start 0
+   npm run music                         # list the music beds
    npm run reel -- inbox/take1.mov inbox/take2.mov --hook take2.mov --fonts druk
    ```
 
@@ -55,7 +56,7 @@ The effects come from [claude-video-effects](https://github.com/Vibha-Ramprakash
 |---|---|---|---|
 | Node 18+ | `brew install node` | your package manager or nodejs.org | nodejs.org installer |
 | ffmpeg + ffprobe | `brew install ffmpeg` | `sudo apt install ffmpeg` | `winget install ffmpeg` |
-| Python 3.9+ | `brew install python` | usually installed | python.org installer (gives `py`) |
+| Python 3.9+ (3.11+ for the BiRefNet mask) | `brew install python` | usually installed | python.org installer (gives `py`) |
 | Chrome or Chromium | google.com/chrome | `google-chrome` or `chromium` package | google.com/chrome |
 
 Then, in the repo folder:
@@ -162,6 +163,7 @@ Agents: start at [AGENTS.md](AGENTS.md).
 | `kit/sfx-plan.cjs` | Pack manifest, validation, and effect-hit auto-pick. |
 | `kit/fs.mjs` | Freesound search, CC0 only. |
 | `kit/sfx/` | Locked cut-seam set (WAV + legacy woosh MP3s) and the 31-sound cinematic pack (`sfx.json`). |
+| `kit/music/` | Our music beds (MP3, all at -13 LUFS) and `beds.json`. `npm run music` lists them, `npm run music:add -- <file>` adds one. See [kit/music/README.md](kit/music/README.md). |
 | `kit/example/` | The Awakening ad's real `cut.json` and `captions.js`, a real-footage cut, the HeyGen retake prompt, and the Skool mark used only by that ad. |
 
 ## Rules the pipeline carries
@@ -182,10 +184,10 @@ Code and docs: Apache-2.0, Copyright 2026 Will Gwyn (wrg32786). See [LICENSE](LI
 - `kit/sfx/D-quick-woosh-683101.mp3`: "quick woosh" by florianreichelt, Freesound 683101, CC0.
 - `kit/sfx/whoosh.wav` and `kit/sfx/swipe.wav`: mono 48 kHz WAV conversions of the two Freesound files above, CC0.
 - `kit/sfx/boom.wav`, `click.wav`, `typing.wav`: from [motion-pack](https://github.com/ANVEAI/motion-pack) by ANVEAI (sounds `snd.hit.deep_impact`, `snd.ui.click`, `snd.ui.typing_burst`), CC0 1.0 under its LICENSE-MEDIA.
-- `kit/sfx/{hit,riser,release,whoosh,swipe,pop,ui,glitch,camera,paper,counter,sub,shimmer}/` and `kit/sfx/sfx.json`: 31-sound cinematic pack (Will-approved). DAEDAL Transition / UI packs, Kenney Interface Sounds, OpenGameArt / Freesound CC0 items, and original synths dedicated CC0. Full credits in [THIRD_PARTY.md](THIRD_PARTY.md).
+- `kit/sfx/{hit,riser,release,whoosh,swipe,pop,ui,glitch,camera,paper,counter,sub,shimmer}/` and `kit/sfx/sfx.json`: 31-sound cinematic pack. DAEDAL Transition / UI packs, Kenney Interface Sounds, OpenGameArt / Freesound CC0 items, and original synths dedicated CC0. Full credits in [THIRD_PARTY.md](THIRD_PARTY.md).
 - `kit/fonts/`: Google Fonts under the SIL Open Font License 1.1, each with its licence file. See [kit/fonts/README.md](kit/fonts/README.md).
 - Ideas adapted, no code copied: the transition name map from motion-pack (MIT), the Hormozi and karaoke caption looks from [Capite](https://github.com/muneebkhan08/Capite) (MIT), the title entrances from [motion-anything](https://github.com/nexu-io/motion-anything) (Apache-2.0, reference only). See [THIRD_PARTY.md](THIRD_PARTY.md).
 - `kit/example/skool-logo.svg`: the Skool wordmark, a trademark of Skool. It's included only to mark The AIgent's own Skool group in the Awakening example; it isn't in any theme. Don't use it for other brands.
 - `effects/vendor/claude-video-effects/`: [claude-video-effects](https://github.com/Vibha-Ramprakash/claude-video-effects) by Vibha Ramprakash, MIT. Its models (YuNet, MIT; MediaPipe Selfie Segmenter, Apache-2.0) and fonts (SIL OFL 1.1, Permanent Marker Apache-2.0) keep their own licences; see `NOTICE` and `effects/README.md`.
 - Person-mask quality backend (installed by `npm run effects:setup`, not vendored): [rembg](https://github.com/danielgatis/rembg) by Daniel Gatis, MIT; [onnxruntime](https://github.com/microsoft/onnxruntime) by Microsoft, MIT; birefnet-general-lite weights from [BiRefNet](https://github.com/ZhengPeng7/BiRefNet) by ZhengPeng, MIT, downloaded on first use into rembg's cache. See [THIRD_PARTY.md](THIRD_PARTY.md).
-- Music beds are not included. Bring your own licensed track.
+- `kit/music/*.mp3`: our own tracks, made by Will Gwyn with Suno (song ids in `kit/music/beds.json`). For The AIgent's videos only; not covered by the Apache-2.0 licence. See [kit/music/README.md](kit/music/README.md).

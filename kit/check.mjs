@@ -54,6 +54,8 @@ function checkJob(captionsFile, cutFile, label) {
     (C.segs || []).forEach((s, i) => { if (s.transition && R.xfadeMode(s.transition) === undefined) errs.push(`seg ${i}: unknown transition "${s.transition}" (kit/transitions.json)`); });
     for (const k of Object.keys(C.sfx || {})) if (!R.SFX[k]) errs.push(`sfx "${k}": use ${Object.keys(R.SFX).join(', ')}`);
     for (const h of C.sfxHits || []) if (!SFXPLAN.lookup(h.id)) errs.push(`sfxHits "${h.id}" is not in kit/sfx/sfx.json`);
+    if (C.bed) { const lib = R.isBed(C.bed);
+      if (!existsSync(lib ? R.bedFile(C.bed) : resolve(dirname(cutFile), String(C.bed)))) errs.push(lib ? `bed "${C.bed}": kit/music/${R.BEDS[C.bed].file} is missing (beds.json lists it)` : `bed "${C.bed}": not a library bed (npm run music) and no such file`); }
     const seams = TL.seams.map(x => x.toFixed(2));
     if (seams.length >= 3) for (const k of R.CUT_SOUNDS) { const on = R.sfxHits((C.sfx || {})[k]).map(h => h.t.toFixed(2)); if (seams.every(x => on.includes(x))) warns.push(`sfx.${k} is on every cut. Fewer and deeper: keep it for the big cuts.`); }
     const n = Object.values(C.sfx || {}).reduce((a, l) => a + R.sfxHits(l).length, 0) + (C.sfxHits || []).length;

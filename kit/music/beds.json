@@ -1,0 +1,101 @@
+{
+ "awaken-freedom": {
+  "title": "Awaken Freedom",
+  "file": "awaken-freedom.mp3",
+  "seconds": 51.2,
+  "lufs": -12.9,
+  "source": "Suno",
+  "suno_id": "5e84bc12-e56e-4a8c-aa33-55835c6815ae",
+  "made": "2026-11-09T02:30:14Z"
+ },
+ "chopped-and-screwed-east": {
+  "title": "Chopped & Screwed East",
+  "file": "chopped-and-screwed-east.mp3",
+  "seconds": 133.6,
+  "lufs": -13,
+  "source": "Suno",
+  "suno_id": "f016ba01-719c-4b22-b90b-9d9631dd44b5",
+  "made": "2026-11-10T22:59:34Z"
+ },
+ "cinematic-build": {
+  "title": "Cinematic Build",
+  "file": "cinematic-build.mp3",
+  "seconds": 157.5,
+  "lufs": -13,
+  "source": "Suno",
+  "suno_id": "43787ff8-8eda-436d-8d25-104b49b85ae4",
+  "made": "2026-11-10T23:13:56Z"
+ },
+ "distorted-silk-road": {
+  "title": "Distorted Silk Road",
+  "file": "distorted-silk-road.mp3",
+  "seconds": 174,
+  "lufs": -13,
+  "source": "Suno",
+  "suno_id": "19698cf7-2dbf-4e55-acf3-36393f9b0d23",
+  "made": "2026-11-10T23:01:31Z"
+ },
+ "granular-stabs": {
+  "title": "Granular Stabs",
+  "file": "granular-stabs.mp3",
+  "seconds": 149.8,
+  "lufs": -13,
+  "source": "Suno",
+  "suno_id": "2ffa978c-4123-438d-afcd-ff96ae62160a",
+  "made": "2026-11-10T23:26:15Z"
+ },
+ "houston-drumline": {
+  "title": "Houston Drumline",
+  "file": "houston-drumline.mp3",
+  "seconds": 136.8,
+  "lufs": -12.9,
+  "source": "Suno",
+  "suno_id": "8b27e9a2-f7c1-4549-afe8-e629c001070a",
+  "made": "2026-11-10T23:08:49Z"
+ },
+ "rise-with-the-bass": {
+  "title": "Rise with the Bass",
+  "file": "rise-with-the-bass.mp3",
+  "seconds": 155.6,
+  "lufs": -12.9,
+  "source": "Suno",
+  "suno_id": "14691ef6-c93a-418e-8f54-e38913a3e056",
+  "made": "2026-11-10T23:16:15Z"
+ },
+ "rise-with-the-beat": {
+  "title": "Rise with the Beat",
+  "file": "rise-with-the-beat.mp3",
+  "seconds": 176.2,
+  "lufs": -12.9,
+  "source": "Suno",
+  "suno_id": "b9170ac8-c215-422f-9044-4ac3f50653cb",
+  "made": "2026-11-10T23:18:00Z"
+ },
+ "vinyl-sunrise": {
+  "title": "Vinyl Sunrise",
+  "file": "vinyl-sunrise.mp3",
+  "seconds": 94.9,
+  "lufs": -12.8,
+  "source": "Suno",
+  "suno_id": "2499c257-b54b-4077-8183-288326a5dbcd",
+  "made": "2026-11-10T23:28:13Z"
+ },
+ "vinyl-velocity": {
+  "title": "Vinyl Velocity",
+  "file": "vinyl-velocity.mp3",
+  "seconds": 141.9,
+  "lufs": -13,
+  "source": "Suno",
+  "suno_id": "f15b3c96-a336-48e5-b57f-4fb5b15b2325",
+  "made": "2026-11-10T23:21:33Z"
+ },
+ "yeehaw": {
+  "title": "YEEHAW",
+  "file": "yeehaw.mp3",
+  "seconds": 149.8,
+  "lufs": -13,
+  "source": "Suno",
+  "suno_id": "6a30aa5d-f1ca-452e-9b92-8d5d733fec3f",
+  "made": "2026-11-10T23:20:29Z"
+ }
+}

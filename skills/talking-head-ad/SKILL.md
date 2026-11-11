@@ -31,8 +31,8 @@ Skip this when the teammate already has a script.
 ## Phone clip to reel (start here)
 
 1. Find the clip: `npm run reel` with no path uses every video from the newest recording session in `inbox/` (files within 2 hours of the newest; `--newest` for one), or pass the files the teammate names. If the inbox is empty, ask them to drop it in.
-2. The default theme is AIgent. Use it unless they ask for another look: `--theme neutral` (unbranded, offline) or their own `kit/themes/<name>.js`. Don't use the Skool mark for another brand. Ask for a music file if they want one. Offer a font pairing (`--fonts modern|druk|elegant|editorial`, default the theme's fonts) and a look (`--look kinetic` default, `muse` for pill captions, `classic` for the old captions).
-3. Draft it: `npm run reel -- inbox/<file> [inbox/<take2> ...] --theme <name> [--fonts druk] [--hook <take>] [--bed music.wav] [--bed-start 0] [--cropx 0.4] --draft`
+2. The default theme is AIgent. Use it unless they ask for another look: `--theme neutral` (unbranded, offline) or their own `kit/themes/<name>.js`. Don't use the Skool mark for another brand. Offer a music bed: `npm run music` lists our library (`kit/music/`). Suggest two or three that fit the reel's energy and let the human pick by ear, or use their own file. Offer a font pairing (`--fonts modern|druk|elegant|editorial`, default the theme's fonts) and a look (`--look kinetic` default, `muse` for pill captions, `classic` for the old captions).
+3. Draft it: `npm run reel -- inbox/<file> [inbox/<take2> ...] --theme <name> [--fonts druk] [--hook <take>] [--bed <library name>|music.wav] [--bed-start 0] [--cropx 0.4] --draft`
    - `--cropx` moves the 9:16 crop for a sideways clip (0 left, 0.5 centre, 1 right). Read `jobs/<name>/clips/clips-sheet.png` to check the face is in frame.
    - `--model medium.en` is faster than the default large-v3 for a first pass.
 4. Read `jobs/<name>/clips/clips.md`. `npm run reel` already dropped every `retake` row. Remove slates and asides ("Okay, take two...") from `build/cut.json`, and trim the `out` of clips that end mid-move.
@@ -146,7 +146,7 @@ Use this when mixing sources or when you need finer control. Work in a job folde
 - The locked whoosh and swipe, and the whole 31-sound pack, are Will's picks by ear; boom, click and typing have not been auditioned yet.
 - Don't invent new raw synthetic noise swooshes; they read as cheap static. Use the shipped pack (which includes Will-approved cinematic synths) or a CC0 file the human has already chosen.
 - To choose new sounds, run `node kit/fs.mjs "<query>"` (CC0 only). Build an audition with one 3 s seam clip per candidate and let a human pick by ear. An agent can't hear.
-- `bed` is the music. Pass `--bed music.wav --bed-start 0` on `npm run reel`, or set `bed` / `bedStart` in `cut.json`. A bed the human has timed starts at 0 with `bedNoFade`. It ducks under the voice automatically. Set `bedVol` about 0.16 for a bed near -13 LUFS, or 0.22 for one near -16.
+- `bed` is the music: a library name from `kit/music/beds.json` (`"bed": "vinyl-sunrise"`) or a file path. Pass `--bed <name> --bed-start 0` on `npm run reel`, or set `bed` / `bedStart` in `cut.json`. A bed the human has timed starts at 0 with `bedNoFade`; otherwise pick a musical start with `bedStart`. It ducks under the voice automatically. Every library bed sits at -13 LUFS, so `bedVol` 0.16 fits all of them; for your own file, use about 0.16 near -13 LUFS or 0.22 near -16. Add new tracks with `npm run music:add -- <file>`, never by copying a file in by hand.
 
 ## 6. Verify every version
 

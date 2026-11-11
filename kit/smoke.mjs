@@ -11,7 +11,7 @@
 // The synthetic clip has no face, so this proves the pipeline runs and falls back cleanly, not detection quality.
 // --keep leaves the work folder in place and prints its path.
 import { execFileSync } from 'child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, statSync, existsSync, rmSync, readdirSync } from 'fs';
+import { copyFileSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, statSync, existsSync, rmSync, readdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -218,6 +218,20 @@ try {
     writeFileSync(capF, keep);
     try { run(node, [join(KIT, 'render.mjs'), '0', '1.0'], b, { FONTS: 'helvetica-please' }); fail('unknown pairing accepted'); } catch (e) { if (!/Unknown font pairing/.test(String(e.stderr || ''))) throw e; }
     run(node, [join(KIT, 'render.mjs'), '0', '1.0'], b, { FONTS: 'theme' });
+  });
+  step('music beds: only real library names resolve; a missing bed fails the check; add refuses a taken or empty name', () => {
+    const b = join(work, 'jobs', 'muse', 'build'), cutF = join(b, 'cut.json'), keep = readFileSync(cutF, 'utf8'), add = join(KIT, 'music', 'add.mjs');
+    for (const bed of ['constructor', 'no-such-bed']) {
+      writeFileSync(cutF, JSON.stringify({ ...JSON.parse(keep), bed }));
+      try { run(node, [join(KIT, 'check.mjs'), b], work); fail('check passed bed "' + bed + '"'); } catch (e) { if (!/not a library bed/.test(String(e.stdout || ''))) throw e; }
+    }
+    writeFileSync(cutF, keep);
+    const lib = join(KIT, 'music', 'vinyl-sunrise.mp3'), before = statSync(lib).mtimeMs;
+    for (const [name, want] of [['Vinyl Sunrise.wav', /already in the library/], ['!!!.wav', /no letters or digits/]]) {
+      copyFileSync(join(work, 'bed.wav'), join(work, name));
+      try { run(node, [add, join(work, name)], work); fail('music:add accepted ' + name); } catch (e) { if (!want.test(String(e.stderr || ''))) throw e; }
+    }
+    if (statSync(lib).mtimeMs !== before || existsSync(join(KIT, 'music', '.mp3'))) fail('music:add wrote to the library on a refused import');
   });
   step('check.mjs flags em dashes and banned phrases in captions', () => {
     const b = join(work, 'jobs', 'muse', 'build');
