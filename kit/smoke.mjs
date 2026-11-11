@@ -271,6 +271,11 @@ try {
     writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'oneword', fonts: 'instrument,literata,bricolage', flips: [ph(0), ph(1), ph(2), ph(3), { start: 1.3, end: 2.1, mode: 8, bg: 'ink' }] }) + ';\n');
     const o2 = run(node, [join(KIT, 'render.mjs'), '0', '2.0'], b);
     if (/pairing mix/.test(o2)) fail('one frame shows two font pairings: ' + o2);
+    // a chain: a title overlaps a caption that overlaps a card; the whole chain keeps one pairing
+    writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'oneword', fonts: 'instrument,literata,bricolage', flips: [ph(0), ph(1), ph(2),
+      { start: 1.8, end: 3.0, text: 'one two', mode: 0, words: ws(1.8, 'one two') }, { start: 0, end: 2, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam' }, { start: 2.5, end: 3.0, mode: 8, bg: 'ink' }] }) + ';\n');
+    const o3 = run(node, [join(KIT, 'render.mjs'), '0', '2.7'], b);
+    if (/pairing mix/.test(o3)) fail('a chain of overlaps shows two font pairings: ' + o3);
     writeFileSync(capF, keep);
   });
   if (existsSync(fxPy)) step('legibility.py: contrast of the letters against the picture round them (self-test)', () => {

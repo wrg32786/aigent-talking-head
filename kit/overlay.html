@@ -243,9 +243,15 @@ const OW={small:.62,body:1.25,hero:2.3,under:.62},INS=(window.LOCKOVER||{}).inse
 // title already up, and a phrase under a card or title takes theirs, so one frame never shows two pairings.
 if(CYC.length>1){const ow=flips.filter(c=>c[3]===0&&(c[4].style||CSTYLE)==='oneword');
  if(ow.length){ow.forEach(c=>{c.ps=CYC[Math.floor(c.owN/3)%CYC.length]});
-  const over=flips.filter(c=>c[3]!==0).sort((p,q)=>p[0]-q[0]),hit=(p,q)=>p[0]<q[1]&&q[0]<p[1];
-  over.forEach((c,k)=>{const up=over.slice(0,k).find(x=>hit(x,c));if(up){c.ps=up.ps;return}let b=null;for(const p of ow)if(p[0]<=c[0]+.2&&(!b||p[0]>=b[0]))b=p;if(b)c.ps=b.ps});
-  ow.forEach(c=>{const up=over.find(x=>hit(x,c));if(up)c.ps=up.ps})}}
+  // One pairing per connected group: everything that overlaps, directly or through a chain (a card over a caption
+  // over a title), takes the pairing of the group's first oneword phrase, or of the phrase it comes up with.
+  const all=flips.filter(c=>c[3]!==0||ow.includes(c)).sort((p,q)=>p[0]-q[0]),hit=(p,q)=>p[0]<q[1]&&q[0]<p[1];
+  const par=all.map((_,i)=>i),root=i=>par[i]===i?i:(par[i]=root(par[i]));
+  for(let i=0;i<all.length;i++)for(let j=i+1;j<all.length&&all[j][0]<all[i][1];j++)if(hit(all[i],all[j]))par[root(j)]=root(i);
+  const groups={};all.forEach((c,i)=>{(groups[root(i)]=groups[root(i)]||[]).push(c)});
+  for(const g of Object.values(groups)){const cap=g.find(c=>ow.includes(c));let ps=cap&&cap.ps;
+   if(!ps){let b=null;for(const p of ow)if(p[0]<=g[0][0]+.2&&(!b||p[0]>=b[0]))b=p;ps=b?b.ps:g[0].ps}
+   g.forEach(c=>{c.ps=ps})}}}
 window.__pairMix=()=>{const m=[];for(const c of flips)for(const d of flips)if(c!==d&&c[0]<d[1]&&d[0]<c[1]&&c.ps!==d.ps)m.push([c[0],d[0]]);return m};
 function owAt0(c,t){const ws=wordsOf(c),n=ws.length;let i=-1;for(let k=0;k<n;k++)if(t>=ws[k][0]-.02)i=k;if(i<0)return null;
  const h=heroOf(ws,c[4])[0],cd=cardAt(t),bi=!cd&&insertAt(t),y=cd?960:bi?(bi.y||640):zoneAt(t)==='move'?ALTY:(c[4].y||KY),base=bi&&bi.tint||IV;

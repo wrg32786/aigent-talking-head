@@ -52,8 +52,9 @@ const SNAP = !opt('no-snap', false);
 // A Whisper double is one spoken word written twice: the copies overlap, or one is stretched over a second or more of
 // other sound ("backdrop" 8.24-10.30 s then "backdrop," 10.30-10.56 s on the 11-10 demo). It shows once, at the shorter
 // copy's time. A real repeat ("that that", a stutter) is two normal-length words and stays. --no-dedupe keeps every copy.
-const DEDUPE = !opt('no-dedupe', false), isDouble = (p, q) => q.s < p.e - 0.02 || p.e - p.s > 1 || q.e - q.s > 1;
-if (isDouble({ s: 1, e: 1.2 }, { s: 1.2, e: 1.4 }) || !isDouble({ s: 8.24, e: 10.3 }, { s: 10.3, e: 10.56 })) throw new Error('autocaption: dedupe self-check failed');
+// Close together too: two copies more than 0.8 s apart are two spoken words ("No." ... "No."), however long either one runs.
+const DEDUPE = !opt('no-dedupe', false), isDouble = (p, q) => q.s - p.e < 0.8 && (q.s < p.e - 0.02 || p.e - p.s > 1 || q.e - q.s > 1);
+if (isDouble({ s: 1, e: 1.2 }, { s: 1.2, e: 1.4 }) || isDouble({ s: 0, e: 1.2 }, { s: 4, e: 4.3 }) || !isDouble({ s: 8.24, e: 10.3 }, { s: 10.3, e: 10.56 })) throw new Error('autocaption: dedupe self-check failed');
 // segment words on the output clock (same maths as timeline.mjs)
 let t = 0; const seams = [], words = [];
 C.segs.forEach((s, i) => {
