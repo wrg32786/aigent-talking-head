@@ -1,30 +1,64 @@
 # mask.py: person mask for the kinetic titles, so big text sits behind the speaker and in front of the background.
-# Runs with the effects venv (npm run effects:setup), reusing the vendored claude-video-effects segmenter (MediaPipe
-# Selfie Segmenter + guided filter + temporal smoothing). reel.cjs runs it for you when cut.json has "titles" + "mask".
+# Runs with the effects venv (npm run effects:setup). reel.cjs runs it when cut.json has "titles" + "mask".
 #
 #   effects/.venv/bin/python kit/mask.py base.mp4 mask.mkv [--windows 0.4-2.1,5.0-7.2] [--clear 0.0,0.0,0.2,0.3]
+#       [--model birefnet|mediapipe] [--person person.mkv] [--download] [--no-download]
 #
-# - Segments at 360x640 and upscales only the alpha to 1080x1920 (the Muse rule: a full-size pass adds nothing but time).
+# Backends:
+#   birefnet  rembg + birefnet-general-lite (MIT weights, downloaded on first use into rembg's cache, ~214 MB).
+#             Native input is 1024x1024. The quality option: tighter hair and hands than MediaPipe. Slow on CPU
+#             (several seconds per frame); much faster with CUDA if onnxruntime-gpu is installed.
+#   mediapipe Vendored MediaPipe Selfie Segmenter at 360x640. Fast default. Use this for drafts and smoke.
+# Both backends then run kit/mask_refine.py (hole fill, speck removal, guided edge refine, flow-guided temporal
+# smoothing, light erode + feather). --person writes a BGRA layer with edge decontamination.
+#
 # - Only frames inside the title windows are segmented; every other frame is alpha 0 (titles are empty there anyway).
 #   Windows default to the mode-7 flips in captions.js in the current folder, plus 0.1 s either side.
-# - --clear x0,y0,x1,y1 (0..1 of the frame, repeatable) zeroes alpha in a box: use it when the mask leaks onto a
-#   background object (a painting, a lamp, a surfboard). cut.json "maskClear": [[x0,y0,x1,y1], ...] does the same.
+# - --clear x0,y0,x1,y1 (0..1 of the frame, repeatable) zeroes alpha in a box. cut.json "maskClear": [[x0,y0,x1,y1], ...]
+#   does the same.
+# - cut.json "mask": "mask.mkv" or {"file":"mask.mkv","model":"birefnet","person":"person.mkv"}; "maskModel" also works.
+#   CLI --model and MASK_MODEL override. --no-mask on npm run reel skips this step.
 # - Writes mask.json next to the mask: per window, frames, share of frames with a person, mean coverage, and the
-#   mean alpha in the title band. Judge a mask by these numbers, never by eye: viewers show colour where alpha is 0.
-import sys, os, json, re, subprocess, argparse
-import numpy as np
+#   mean alpha in the title band, plus the backend used and seconds per frame. Judge a raw mask.mkv by these numbers
+#   (a colour viewer shows tint where alpha is 0); judge quality on composited stills, by eye.
+import sys, os, json, re, subprocess, argparse, time
+import numpy as np, cv2
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+sys.path.insert(0, HERE)
+import mask_refine as R  # noqa: E402
+
+MODELS = {"birefnet": "birefnet", "birefnet-general-lite": "birefnet", "mediapipe": "mediapipe"}
+BIREFNET_SESSION = "birefnet-general-lite"
+# rembg's official host of the BiRefNet-General-Lite ONNX (MIT, ZhengPeng). md5 is rembg's published checksum.
+BIREFNET_URL = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx"
+BIREFNET_MD5 = "4fab47adc4ff364be1713e97b7e66334"
+OW, OH = 1080, 1920
+SW, SH = 360, 640  # MediaPipe analysis size (a full-size MediaPipe pass adds time, not quality)
 
 ap = argparse.ArgumentParser()
-ap.add_argument("src"); ap.add_argument("out")
+ap.add_argument("src", nargs="?")
+ap.add_argument("out", nargs="?")
 ap.add_argument("--windows", default=None)
 ap.add_argument("--clear", action="append", default=[])
 ap.add_argument("--fps", type=float, default=24)
+ap.add_argument("--model", default=None, help="birefnet (quality) or mediapipe (fast, default). birefnet is several seconds per frame on CPU")
+ap.add_argument("--person", default=None, help="write a BGRA person layer (edge-decontaminated) to this path")
+ap.add_argument("--download", action="store_true", help="download birefnet-general-lite into rembg's cache and exit")
+ap.add_argument("--no-download", action="store_true", help="do not fetch weights; fall back to mediapipe if they are missing")
 a = ap.parse_args()
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(os.path.dirname(HERE), "effects"))
-import fx_runner  # noqa: E402
-Tracker = fx_runner.load()["Tracker"]
+def cut_json():
+    if not os.path.exists("cut.json"):
+        return {}
+    return json.load(open("cut.json"))
+
+def cut_mask(cut):
+    m = cut.get("mask")
+    if isinstance(m, dict):
+        return m.get("file") or m.get("path") or "mask.mkv", m.get("model"), m.get("person")
+    return m, cut.get("maskModel"), cut.get("person")
 
 def windows():
     if a.windows:
@@ -34,44 +68,156 @@ def windows():
     flips = json.loads(m.group(1)).get("flips", []) if m else []
     return [(max(0, f["start"] - 0.1), f["end"] + 0.1) for f in flips if f.get("mode") == 7]
 
+def birefnet_model_path():
+    try:
+        from rembg.sessions.birefnet_general_lite import BiRefNetSessionGeneralLite
+    except ImportError:
+        return None
+    fname = f"{BiRefNetSessionGeneralLite.name()}.onnx"
+    existing = BiRefNetSessionGeneralLite.resolve_existing(fname)
+    return existing
+
+def download_birefnet():
+    from rembg import new_session
+    from rembg.sessions.birefnet_general_lite import BiRefNetSessionGeneralLite
+    print("downloading", BIREFNET_SESSION, "from", BIREFNET_URL, "md5", BIREFNET_MD5, flush=True)
+    new_session(BIREFNET_SESSION, providers=["CPUExecutionProvider"])
+    path = BiRefNetSessionGeneralLite.download_models()
+    print("cached", path, f"({os.path.getsize(path) / 1048576:.1f} MB)")
+    return path
+
+def open_birefnet():
+    from rembg import new_session
+    return new_session(BIREFNET_SESSION)  # rembg picks CUDA/ROCm/OpenVINO if present, else CPU
+
+def open_mediapipe():
+    import mediapipe as mp
+    from mediapipe.tasks.python import vision
+    from mediapipe.tasks.python.core.base_options import BaseOptions
+    model = os.path.join(ROOT, "effects", "vendor", "claude-video-effects", "models", "selfie_segmenter.tflite")
+    if not os.path.exists(model):
+        raise SystemExit("MediaPipe selfie segmenter missing: " + model)
+    return vision.ImageSegmenter.create_from_options(vision.ImageSegmenterOptions(
+        base_options=BaseOptions(model_asset_path=model),
+        running_mode=vision.RunningMode.VIDEO, output_confidence_masks=True, output_category_mask=False)), mp
+
+def resolve_model(requested, allow_download):
+    want = MODELS.get((requested or "").lower())
+    if requested and not want:
+        raise SystemExit(f"unknown --model {requested!r}; use birefnet or mediapipe")
+    cached = birefnet_model_path()
+    if want == "birefnet":
+        try:
+            import rembg  # noqa: F401
+        except ImportError:
+            raise SystemExit("rembg is not installed. Run: npm run effects:setup")
+        if not cached:
+            if not allow_download:
+                raise SystemExit("birefnet-general-lite weights are not cached. Run: npm run effects:setup -- --birefnet")
+            download_birefnet()
+        return "birefnet"
+    if want == "mediapipe":
+        return "mediapipe"
+    return "mediapipe"  # fast default; pass --model birefnet for the quality path
+
+if a.download:
+    download_birefnet()
+    sys.exit(0)
+
+if not a.src or not a.out:
+    raise SystemExit("usage: mask.py src.mp4 mask.mkv [--model birefnet|mediapipe] [--windows ...] [--person person.mkv]")
+
+cut = cut_json()
+_, cut_model, cut_person = cut_mask(cut)
+requested = a.model or os.environ.get("MASK_MODEL") or cut_model
+allow_dl = not a.no_download and os.environ.get("MASK_NODL") not in ("1", "true")
+model = resolve_model(requested, allow_dl)
+person_path = a.person or cut_person
+print(f"mask backend: {model}" + (" + person layer" if person_path else ""), flush=True)
+
 W = windows()
 clear = [list(map(float, c.split(","))) for c in a.clear]
-if os.path.exists("cut.json"):
-    clear += json.load(open("cut.json")).get("maskClear", [])
-SW, SH = 360, 640
-dec = subprocess.Popen(["ffmpeg", "-v", "error", "-i", a.src, "-vf", f"scale={SW}:{SH}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], stdout=subprocess.PIPE)
-enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "gray", "-s", f"{SW}x{SH}", "-r", str(a.fps), "-i", "-",
-                        "-vf", "scale=1080:1920:flags=bicubic", "-c:v", "ffv1", "-pix_fmt", "gray", a.out], stdin=subprocess.PIPE)
-tr, cur_w, stats = None, None, [{"window": [round(x, 2), round(y, 2)], "frames": 0, "person": 0, "coverage": 0.0, "band": 0.0} for x, y in W]
-zero = np.zeros((SH, SW), np.uint8)
-k = -1
+clear += cut.get("maskClear", [])
+
+dec = subprocess.Popen(["ffmpeg", "-v", "error", "-i", a.src, "-vf", f"scale={OW}:{OH}:flags=bicubic", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], stdout=subprocess.PIPE)
+enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "gray", "-s", f"{OW}x{OH}", "-r", str(a.fps), "-i", "-",
+                        "-c:v", "ffv1", "-pix_fmt", "gray", a.out], stdin=subprocess.PIPE)
+penc = None
+if person_path:
+    penc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "bgra", "-s", f"{OW}x{OH}", "-r", str(a.fps), "-i", "-",
+                             "-c:v", "ffv1", "-pix_fmt", "bgra", person_path], stdin=subprocess.PIPE)
+
+seg = session = mp = None
+if model == "birefnet":
+    t_load = time.time()
+    session = open_birefnet()
+    print(f"birefnet session ready in {time.time() - t_load:.1f}s", flush=True)
+else:
+    seg, mp = open_mediapipe()
+
+from PIL import Image  # after the backend is chosen, so mediapipe-only runs do not need rembg
+
+zero = np.zeros((OH, OW), np.uint8)
+zero_bgra = np.zeros((OH, OW, 4), np.uint8)
+stats = [{"window": [round(x, 2), round(y, 2)], "frames": 0, "person": 0, "coverage": 0.0, "band": 0.0} for x, y in W]
+state, cur_w, infer_t, infer_n = {"prev_a": None, "prev_g": None, "grid": None}, None, 0.0, 0
+k, t0 = -1, time.time()
 while True:
     k += 1
-    buf = dec.stdout.read(SW * SH * 3)
-    if len(buf) < SW * SH * 3:
+    buf = dec.stdout.read(OW * OH * 3)
+    if len(buf) < OW * OH * 3:
         break
     t = k / a.fps
     wi = next((i for i, (x, y) in enumerate(W) if x <= t <= y), None)
     if wi is None:
-        enc.stdin.write(zero.tobytes()); cur_w = None; continue
-    if tr is None:
-        tr = Tracker(SW, SH)  # one segmenter for the whole run (timestamps stay increasing)
+        enc.stdin.write(zero.tobytes())
+        if penc: penc.stdin.write(zero_bgra.tobytes())
+        cur_w = None
+        continue
+    rgb = np.frombuffer(buf, np.uint8).reshape(OH, OW, 3)
     if wi != cur_w:
-        tr.prev, cur_w = None, wi  # fresh temporal smoothing per window
-    rgb = np.frombuffer(buf, np.uint8).reshape(SH, SW, 3)
-    m, _ = tr(rgb, int(t * 1000))
+        state["prev_a"] = state["prev_g"] = None
+        cur_w = wi
+    t_inf = time.time()
+    if model == "birefnet":
+        raw = np.array(session.predict(Image.fromarray(rgb))[0], dtype=np.float32) / 255
+        if raw.shape != (OH, OW):
+            raw = cv2.resize(raw, (OW, OH), interpolation=cv2.INTER_LINEAR)
+    else:
+        sm = cv2.resize(rgb, (SW, SH), interpolation=cv2.INTER_AREA)
+        m = seg.segment_for_video(mp.Image(image_format=mp.ImageFormat.SRGB, data=np.ascontiguousarray(sm)), int(t * 1000))
+        raw = cv2.resize(m.confidence_masks[-1].numpy_view().reshape(SH, SW).astype(np.float32), (OW, OH), interpolation=cv2.INTER_LINEAR)
+    infer_t += time.time() - t_inf; infer_n += 1
+    alpha, _ = R.refine_frame(raw, rgb, state)
     for x0, y0, x1, y1 in clear:
-        m[int(y0 * SH):int(y1 * SH), int(x0 * SW):int(x1 * SW)] = 0
-    s = stats[wi]; on = m > 127
+        alpha[int(y0 * OH):int(y1 * OH), int(x0 * OW):int(x1 * OW)] = 0
+    mu = np.ascontiguousarray(np.clip(alpha * 255 + 0.5, 0, 255).astype(np.uint8))
+    s = stats[wi]; on = mu > 127
     s["frames"] += 1; s["person"] += int(on.mean() > 0.02); s["coverage"] += float(on.mean())
-    s["band"] += float(m[int(SH * 0.22):int(SH * 0.36)].mean() / 255)  # rows behind a title at y ~ 560 of 1920
-    enc.stdin.write(np.ascontiguousarray(m).tobytes())
+    s["band"] += float(mu[int(OH * 0.22):int(OH * 0.36)].mean() / 255)
+    enc.stdin.write(mu.tobytes())
+    if penc:
+        prgb, pa = R.decontaminate(rgb, alpha)
+        enc_bgra = np.dstack([prgb[..., 2], prgb[..., 1], prgb[..., 0], pa])  # BGRA
+        penc.stdin.write(np.ascontiguousarray(enc_bgra).tobytes())
+    if infer_n and infer_n % 24 == 0:
+        print(f"mask {model} {infer_n} frames, {infer_t / infer_n:.2f} s/frame infer, {(time.time() - t0) / max(1, k + 1):.2f} s/frame wall", flush=True)
+
 written = k
-enc.stdin.close(); dec.stdout.close(); enc.wait(); dec.wait()
+enc.stdin.close();
+if penc: penc.stdin.close()
+dec.stdout.close(); enc.wait(); dec.wait()
+if penc: penc.wait()
 for s in stats:
     n = max(1, s["frames"]); s["person"] = round(s["person"] / n, 3); s["coverage"] = round(s["coverage"] / n, 3); s["band"] = round(s["band"] / n, 3)
-json.dump({"src": a.src, "frames": written, "size": [1080, 1920], "analysis": [SW, SH], "windows": stats, "clear": clear},
-          open(os.path.splitext(a.out)[0] + ".json", "w"), indent=1)
+spf = round(infer_t / infer_n, 3) if infer_n else None
+meta = {"src": a.src, "frames": written, "size": [OW, OH], "model": model,
+        "session": BIREFNET_SESSION if model == "birefnet" else "selfie_segmenter",
+        "s_per_frame": spf, "refined": infer_n, "windows": stats, "clear": clear,
+        "person": person_path}
+json.dump(meta, open(os.path.splitext(a.out)[0] + ".json", "w"), indent=1)
 for s in stats:
     print(f"mask {s['window'][0]:.2f}-{s['window'][1]:.2f}s: person in {s['person'] * 100:.0f}% of frames, coverage {s['coverage'] * 100:.1f}%, title band alpha {s['band']:.2f}")
-print("wrote", a.out)
+print("wrote", a.out, f"[{model}, {spf if spf is not None else 'n/a'} s/frame]")
+if person_path:
+    print("wrote", person_path)

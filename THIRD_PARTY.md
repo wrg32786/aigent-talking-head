@@ -38,8 +38,20 @@ What this repo ships from other projects, and what it only took ideas from. Lice
 
 - **Title entrances** (`kit/overlay.html`): the seven entrance styles were written from scratch for canvas, with [nexu-io/motion-anything](https://github.com/nexu-io/motion-anything) (Apache-2.0) as a visual reference only.
 
+## Installed at setup, not vendored
+
+These are fetched by `npm run effects:setup` (and the BiRefNet weights on first `kit/mask.py --model birefnet`, or `npm run effects:setup -- --birefnet`). They are not in git. Licences were checked from the primary sources on Nov 10, 2026.
+
+| What | From | Licence |
+|---|---|---|
+| rembg (Python package) | [danielgatis/rembg](https://github.com/danielgatis/rembg), [LICENSE.txt](https://github.com/danielgatis/rembg/blob/main/LICENSE.txt) | MIT, Copyright (c) 2020 Daniel Gatis. Covers rembg's code only, not third-party model weights. |
+| onnxruntime (Python package) | [microsoft/onnxruntime](https://github.com/microsoft/onnxruntime), [LICENSE](https://github.com/microsoft/onnxruntime/blob/main/LICENSE) | MIT, Copyright (c) Microsoft Corporation. |
+| birefnet-general-lite weights (`BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx`, md5 `4fab47adc4ff364be1713e97b7e66334`) | Hosted by rembg at [releases/v0.0.0](https://github.com/danielgatis/rembg/releases/download/v0.0.0/BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx). Upstream: [ZhengPeng7/BiRefNet](https://github.com/ZhengPeng7/BiRefNet), [LICENSE](https://github.com/ZhengPeng7/BiRefNet/blob/main/LICENSE). The author confirmed that the released checkpoints are also MIT ([issue 316](https://github.com/ZhengPeng7/BiRefNet/issues/316)); the [BiRefNet_lite](https://huggingface.co/ZhengPeng7/BiRefNet_lite) model card is `license: mit`. | MIT, Copyright (c) 2024 ZhengPeng. Cached by rembg (typically `~/.rembg/models/birefnet-general-lite/`), about 214 MB. |
+
+Do not use rembg's default `bria-rmbg` model with this kit: RMBG-2.0 has a separate BRIA licence that requires a paid agreement for commercial use.
+
 ## Linked, not included
 
 - [rea-video](https://github.com/JuneYaooo/rea-video) (Apache-2.0) and [instaloader](https://github.com/instaloader/instaloader) (MIT): optional tools for the reference-teardown step in the talking-head-ad skill. Install them yourself if you want that step.
-- Not used at all: ViralCutter (GPL), react-bits, GSAP.
+- Not used at all: ViralCutter (GPL), react-bits, GSAP, Robust Video Matting (RVM, GPL-3.0). RVM was tried for a one-off hero-reel mask and must stay out of the repo.
 - Commercial fonts the pairings stand in for (Druk, Helvetica, Optitimes, Sloop, Vanguard, Athelas) are not included. Put your own licensed copies in `kit/fonts/local/`, which is gitignored.

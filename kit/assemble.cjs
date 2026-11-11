@@ -14,6 +14,8 @@
 //   "overlay": "ovl/%04d.png",           optional; leave out for a clean cut
 //   "titles": "ovlt/%04d.png",           optional kinetic-title layer (render.mjs writes it); drawn under the person when
 //   "mask": "mask.mkv",                  a person mask is given (kit/mask.py), else in front of the picture
+//   "maskModel": "birefnet",             birefnet (rembg birefnet-general-lite, quality) or mediapipe (fast)
+//   "person": "person.mkv",              optional BGRA person layer from mask.py --person (edge-decontaminated)
 //   "punch": 0.10                        zoom punch: every cut toggles a 10% punch-in (true = 0.10, false/absent = off)
 // }
 // Per segment, also: "bigPunch": true (an extra 12% push over 0.3 s from this cut; use it on the cut after the hook
@@ -124,13 +126,22 @@ const ovlOff = (process.env.OVL_OFF || '').split(',').filter(Boolean).map(w => w
 const offEn = ovlOff.length ? `:enable='not(${ovlOff.map(([a, b]) => `between(t,${a},${b})`).join('+')})'` : '';
 if (C.titles) {
   const t = inp('-framerate', '24', '-i', C.titles);
-  if (C.mask && fs.existsSync(C.mask)) {
-    const m = inp('-i', C.mask);
+  const spec = require('./rules.cjs').maskSpec(C);
+  const personFile = spec.person && fs.existsSync(spec.person) ? spec.person : null;
+  const maskFile = spec.file && fs.existsSync(spec.file) ? spec.file : null;
+  if (personFile) {
+    const p = inp('-i', personFile);
+    f.push(`[g][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gt]`,
+      `[${p}:v]format=bgra,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS[pr]`,
+      `[gt][pr]overlay=format=auto:eof_action=pass[gm]`);
+    vcur = 'gm';
+  } else if (maskFile) {
+    const m = inp('-i', maskFile);
     f.push(`[g]split[gb][gp]`, `[gb][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gt]`, `[${m}:v]format=gray,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS[mk]`,
       `[gp][mk]alphamerge[person]`, `[gt][person]overlay=format=auto:eof_action=pass[gm]`);
     vcur = 'gm';
   } else {
-    if (C.mask) console.warn(`note: mask ${C.mask} not found; titles go in front of the picture (run kit/mask.py)`);
+    if (spec.file || C.mask) console.warn(`note: mask ${spec.file || C.mask} not found; titles go in front of the picture (run kit/mask.py)`);
     f.push(`[g][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gm]`); vcur = 'gm';
   }
 }
