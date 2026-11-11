@@ -32,11 +32,13 @@ Skip this when the teammate already has a script.
 
 Do this before you draft, and again before the final render. The menu of effects, graphics, finishes and looks is easy to miss; the user should see it and use the variety.
 
-1. Run `npm run menu` (every option, grouped, with a one-line label) and point the user at [showcase/index.html](../../showcase/index.html). Rebuild the gallery with `npm run showcase` if it is missing.
-2. Show short labels and suggest 2 or 3 options per category that fit this reel:
+1. First ask how they want to pick the look: use a saved brand preset (`npm run preset -- --list`; `npm run reel -- --preset <name>`), customize from the menu, or let you choose (`--preset auto`, then tell them what you picked and why). If they have no preset, offer to import a brand guide they drop in `brand-guide/` or pass as a file: `npm run brand:import -- <pdf|image|markdown>`. That writes a draft under `kit/presets/local/` for them to confirm. Presets work without a guide. Any flag or `cut.json` field they set wins over the preset.
+2. Run `npm run menu` (every option, grouped, with a one-line label) and point the user at [showcase/index.html](../../showcase/index.html). Rebuild the gallery with `npm run showcase` if it is missing.
+3. Show short labels and suggest 2 or 3 options per category that fit this reel:
+   - brand presets (`aigent`, `one-word`, `hormozi-bold`, `karaoke`, `minimal-clean`, `cinematic`, `editorial`, `muse-pill`, `retro-scan-lines`, `neutral`)
    - film finishes (grain, vignette, chroma, scan-lines, warm, cool, teal, crushed, mono, bleach), including per-scene variety on `cut.json` segments; do not use one finish on every shot
    - beat-sync (on by default when a bed is set; `--no-beat-sync` to leave times alone)
-   - looks (`kinetic`, `muse`, `classic`) and caption styles (`kinetic`, `pill`, `hormozi`, `karaoke`, `classic`)
+   - looks (`kinetic`, `muse`, `classic`, `one-word`) and caption styles (`kinetic`, `pill`, `hormozi`, `karaoke`, `classic`, `one-word`)
    - font pairings (`theme`, `modern`, `druk`, `elegant`, `editorial`)
    - themes (`aigent` default, `neutral` unbranded)
    - title entrances (7, each used at most once)
@@ -44,7 +46,7 @@ Do this before you draft, and again before the final render. The menu of effects
    - the 51 effects, grouped by moment (see also [effects/CATALOG.md](../../effects/CATALOG.md))
    - the SFX pack (`kit/sfx/sfx.json`)
    - music beds (`npm run music`, or the beds section of the menu)
-3. Vary looks across scenes rather than one finish, style or effect for everything. Ask before you reuse one look on the whole reel.
+4. Vary looks across scenes rather than one finish, style or effect for everything. Ask before you reuse one look on the whole reel.
 
 ## Phone clip to reel (start here)
 

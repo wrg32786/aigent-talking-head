@@ -1,0 +1,21 @@
+{
+  "name": "neutral",
+  "label": "Unbranded, offline, system fonts, no logo",
+  "theme": "neutral",
+  "look": "kinetic",
+  "captionStyle": "kinetic",
+  "fonts": "theme",
+  "titles": true,
+  "finish": null,
+  "finishPool": [],
+  "transition": "cut",
+  "effectsFavourites": [
+    "dot-reveal",
+    "slow-push",
+    "todo",
+    "spotlight"
+  ],
+  "bed": null,
+  "punch": true,
+  "notes": "Use when the reel is not for The AIgent, or when the teammate wants a clean unbranded look."
+}

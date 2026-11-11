@@ -14,6 +14,8 @@
     "check": "node kit/check.mjs",
     "menu": "node kit/menu.mjs",
     "showcase": "node kit/showcase.mjs",
+    "preset": "node kit/preset.cjs",
+    "brand:import": "node kit/brand-import.mjs",
     "verify": "node kit/verify.mjs",
     "chrome": "node kit/chrome.mjs",
     "fx": "node kit/fx.cjs",

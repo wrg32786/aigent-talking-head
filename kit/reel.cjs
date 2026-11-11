@@ -4,9 +4,9 @@
 // Options: --theme aigent|neutral (default aigent)  --cropx 0.4 (face left of centre)  --model medium.en
 //          --name <job>  --clips <dir> (reuse an existing clip.py folder, skips transcription)  --newest (inbox: newest file only)
 //          --hook <take> (first sentence from this take: your most extreme angle)
-//          --look kinetic|muse|classic (default kinetic: every word animated + one kinetic title per beat behind the head;
-//            muse = pill captions + titles; classic = the original captions + spray hero word)
-//          --style kinetic|classic|pill|hormozi|karaoke (override the caption style)  --no-titles  --fonts modern|druk|elegant|editorial|<local>
+//          --look kinetic|muse|classic|one-word (default kinetic: every word animated + one kinetic title per beat behind the head;
+//            muse = pill captions + titles; classic = the original captions + spray hero word; one-word = one big word at a time)
+//          --style kinetic|classic|pill|hormozi|karaoke|one-word (override the caption style)  --no-titles  --fonts modern|druk|elegant|editorial|<local>
 //          --no-punch (no zoom punch)  --no-mask (titles in front, skip the person mask)
 //          --mask birefnet|mediapipe (person-mask backend; default mediapipe, fast. birefnet is the quality option, slow on CPU)
 //          --draft (stop after captions.js so you can edit it)  --rebuild (re-render + re-assemble an edited job)
@@ -14,6 +14,7 @@
 //          --sfx off  (skip locked-set sounds on this draft; also used by npm run fx)
 //          --beat-sync / --no-beat-sync  (default on when a bed is set: snap punches, SFX, titles and fx hits to the bed)
 //          --finish grain[,vignette,...]  optional film look (grain, vignette, chroma, scan-lines, warm, cool, teal, crushed, mono, bleach)
+//          --preset <name>|auto  apply a brand style (npm run preset -- --list). Flags you pass win over the preset.
 // Writes jobs/<name>/: clips/ (clip.py output), build/ (cut.json, captions.js, theme.js, overlay frames), reel-vN.mp4.
 // Steps: clip.py (Whisper, best take per sentence, retakes flagged) -> cut.json from every "keep" clip (zoom punch on
 // every cut, big punch after the hook and into the payoff, a few sounds on the key cuts only) -> autocaption ->
@@ -25,12 +26,13 @@ const fs = require('fs');
 const path = require('path');
 const R = require('./rules.cjs');
 const B = require('./beats.cjs');
+const P = require('./preset.cjs');
 
 const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'finish']);
+const VALUED = new Set(['theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'finish', 'preset']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const die = m => { console.error(m); process.exit(1); };
@@ -51,12 +53,26 @@ if (!srcs.length && !clipsArg && !flag('rebuild')) {
 }
 const src = srcs[0];
 // looks: kinetic (default: every word animates in, hero words big behind the head as kinetic titles), muse (pills +
-// titles), classic (the original captions + spray hero word, no titles)
-const look = opt('look', 'kinetic');
-if (!['kinetic', 'muse', 'classic'].includes(look)) die('--look must be kinetic, muse or classic');
-const STYLE = opt('style', { kinetic: 'kinetic', muse: 'pill', classic: 'classic' }[look]);
-const TITLES = !flag('no-titles') && (flag('titles') || look !== 'classic');
-const FONTS = opt('fonts');
+// titles), classic (the original captions + spray hero word, no titles), one-word (one big word at a time + titles)
+const presetArg = opt('preset');
+let preset = null;
+if (presetArg === 'auto') {
+  preset = P.pickAuto();
+  console.log(`preset auto: picked "${preset.name}" (${preset.label || preset.name}). Vary looks across scenes. Pass --preset <name> or flags to pin the choice.`);
+} else if (presetArg) {
+  preset = P.load(presetArg);
+  if (!preset) die('Unknown preset "' + presetArg + '". See npm run preset -- --list');
+  const perrs = P.validate(preset);
+  if (perrs.length) die('Invalid preset "' + presetArg + '": ' + perrs.join('; '));
+  if (preset.draft) console.warn('note: preset "' + preset.name + '" is a draft from a brand guide; confirm it before you ship.');
+  console.log('preset:', preset.name, '-', preset.label || '');
+}
+const look = opt('look', (preset && preset.look) || 'kinetic');
+if (!P.LOOKS.includes(look)) die('--look must be ' + P.LOOKS.join(', '));
+const STYLE = opt('style', (preset && preset.captionStyle) || ({ kinetic: 'kinetic', muse: 'pill', classic: 'classic', 'one-word': 'one-word' }[look]));
+if (STYLE && !P.STYLES.includes(STYLE)) die('--style must be ' + P.STYLES.join(', '));
+const TITLES = flag('no-titles') ? false : (flag('titles') ? true : (preset && preset.titles !== undefined ? !!preset.titles : look !== 'classic'));
+const FONTS = opt('fonts', preset && preset.fonts);
 const name = opt('name') || (src ? path.basename(src).replace(/\.[^.]+$/, '') : path.basename(path.resolve(clipsArg || '.')))
   .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'reel';
 const job = path.resolve(opt('jobs', path.join(ROOT, 'jobs')), name), build = path.join(job, 'build');
@@ -78,7 +94,8 @@ if (!flag('rebuild')) {
   const rel = p => path.relative(build, path.isAbsolute(p) ? p : path.join(path.dirname(clipsDir), p)).split(path.sep).join('/');
   const segs = keep.map((c, i) => ({ file: rel(path.join(clipsDir, path.basename(c.file))), in: 0, out: +c.dur.toFixed(3), ...(i === 0 ? { fadeIn: 0.25 } : {}) }));
   // big punch on the cut after the hook and the cut into the payoff (with 3+ segments)
-  if (!flag('no-punch') && segs.length >= 3) { segs[1].bigPunch = true; segs[segs.length - 1].bigPunch = true; }
+  const wantPunch = flag('no-punch') ? false : (preset && preset.punch === false ? false : true);
+  if (wantPunch && segs.length >= 3) { segs[1].bigPunch = true; segs[segs.length - 1].bigPunch = true; }
   let t = 0; const seams = [];
   segs.forEach((s, i) => { if (i) seams.push(+t.toFixed(3)); t += s.out - s.in; });
   // sound, fewer and deeper: a whoosh on the big-punch cuts (or the first cut), the boom (loudest) into the payoff;
@@ -90,7 +107,7 @@ if (!flag('rebuild')) {
     if (wh.length) sfx.whoosh = wh;
     if (seams.length >= 2) sfx.boom = [[last, 0.55]];
   }
-  const cut = { note: `Drafted by kit/reel.cjs from ${keep.length} keep clips (${clips.length - keep.length} retakes skipped). Edit, then: npm run reel -- --rebuild --name ${name}`, segs, tail: 0.3, punch: flag('no-punch') ? false : 0.1, hits: [[0.02, 14], ...seams.map(s => [s, 24])], sfx, overlay: 'ovl/%04d.png' };
+  const cut = { note: `Drafted by kit/reel.cjs from ${keep.length} keep clips (${clips.length - keep.length} retakes skipped). Edit, then: npm run reel -- --rebuild --name ${name}`, segs, tail: 0.3, punch: wantPunch ? 0.1 : false, hits: [[0.02, 14], ...seams.map(s => [s, 24])], sfx, overlay: 'ovl/%04d.png' };
   if (TITLES) {
     if (flag('no-mask')) Object.assign(cut, { titles: 'ovlt/%04d.png' });
     else {
@@ -100,10 +117,20 @@ if (!flag('rebuild')) {
     }
   }
   // a library name stays a name in cut.json (portable across machines); your own file becomes an absolute path
-  const bed = opt('bed'); if (bed) Object.assign(cut, { bed: require('./rules.cjs').isBed(bed) ? bed : path.resolve(bed), bedVol: 0.16, ...(opt('bed-start') != null ? { bedStart: +opt('bed-start') } : {}) });
+  const bed = opt('bed') || (preset && preset.bed) || undefined;
+  if (bed) Object.assign(cut, { bed: require('./rules.cjs').isBed(bed) ? bed : path.resolve(bed), bedVol: 0.16, ...(opt('bed-start') != null ? { bedStart: +opt('bed-start') } : {}) });
   if (flag('no-beat-sync')) cut.beatSync = false;
   else if (flag('beat-sync') || bed) cut.beatSync = true;
-  const finish = opt('finish'); if (finish) { try { B.parseFinish(finish); } catch (e) { die(e.message); } cut.finish = finish; }
+  const finish = opt('finish') || (preset && !preset.finishPool && preset.finish) || undefined;
+  if (finish) { try { B.parseFinish(finish); } catch (e) { die(e.message); } cut.finish = finish; }
+  if (preset) {
+    P.apply(preset, { cut }, {
+      finish: opt('finish') || undefined,
+      bed: opt('bed') || undefined,
+      punch: flag('no-punch') ? false : undefined,
+      beatSync: flag('no-beat-sync') ? false : (flag('beat-sync') ? true : undefined),
+    });
+  }
   if (fs.existsSync(path.join(build, 'cut.json')) && !flag('force')) die('build/cut.json exists. Use --rebuild to render your edits, or --force to redraft.');
   fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
   console.log(`cut.json: ${segs.length} segments, seams ${JSON.stringify(seams)}`);
@@ -112,7 +139,7 @@ if (!flag('rebuild')) {
   if (logo) fs.copyFileSync(path.resolve(logo), path.join(build, path.basename(logo)));
   sh(process.execPath, [path.join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--force', TITLES ? '--titles' : '--hero', '--style', STYLE, ...(FONTS ? ['--fonts', FONTS] : []), ...(logo ? ['--logo', path.basename(logo)] : [])], build);
   // 4. theme
-  const th = path.join(KIT, 'themes', opt('theme', 'aigent') + '.js');
+  const th = path.join(KIT, 'themes', opt('theme', (preset && preset.theme) || 'aigent') + '.js');
   if (!fs.existsSync(th)) die('No theme ' + th);
   fs.copyFileSync(th, path.join(build, 'theme.js'));
   if (flag('draft')) { console.log(`\nDraft ready. Edit ${build}/captions.js (and cut.json), then: npm run reel -- --rebuild --name ${name}`); process.exit(0); }

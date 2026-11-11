@@ -20,6 +20,7 @@ import { createRequire } from 'module';
 import { coverage, showcaseHas, sourceCatalogIds } from './menu.mjs';
 const SFXPLAN = createRequire(import.meta.url)('./sfx-plan.cjs');
 const B = createRequire(import.meta.url)('./beats.cjs');
+const P = createRequire(import.meta.url)('./preset.cjs');
 
 const KIT = dirname(fileURLToPath(import.meta.url));
 const keep = process.argv.includes('--keep'), whisper = process.argv.includes('--whisper');
@@ -31,6 +32,7 @@ const fail = m => { throw new Error(m); };
 
 const work = mkdtempSync(join(tmpdir(), 'talking-head-smoke-'));
 const build = join(work, 'build'); mkdirSync(build);
+const node = process.execPath;
 let ok = false;
 try {
   step('ffmpeg and ffprobe on PATH', () => { run('ffmpeg', ['-version']); run('ffprobe', ['-version']); });
@@ -43,6 +45,48 @@ try {
     const html = readFileSync(htmlPath, 'utf8');
     const has = showcaseHas(html, sourceCatalogIds());
     if (!has.ok) fail('showcase missing labels: ' + has.missing.join(', '));
+  });
+  step('presets: shipped list, save/load, flag override, auto pick', () => {
+    const want = ['aigent', 'one-word', 'hormozi-bold', 'karaoke', 'minimal-clean', 'cinematic', 'editorial', 'muse-pill', 'retro-scan-lines', 'neutral'];
+    for (const name of want) {
+      const pset = P.load(name);
+      if (!pset) fail('missing shipped preset ' + name);
+      const errs = P.validate(pset);
+      if (errs.length) fail(name + ': ' + errs.join('; '));
+    }
+    if (P.shipped().length < want.length) fail('shipped count ' + P.shipped().length);
+    const job = join(work, 'preset-job'); mkdirSync(job, { recursive: true });
+    writeFileSync(join(job, 'cut.json'), JSON.stringify({
+      segs: [{ file: 'a.mp4', in: 0, out: 1, finish: 'grain' }, { file: 'b.mp4', in: 0, out: 1, finish: 'teal', transition: 'crossfade' }],
+      titles: 'ovlt/%04d.png', bed: 'vinyl-sunrise', punch: 0.1
+    }));
+    writeFileSync(join(job, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'hormozi', fonts: 'druk', flips: [] }) + ';\n');
+    const dir = join(work, 'saved-presets');
+    const dest = P.save('smoke-style', P.fromJob(job), dir);
+    const loaded = P.load('smoke-style', { dir });
+    if (!loaded || loaded.captionStyle !== 'hormozi' || !(loaded.finishPool || []).includes('grain')) fail('save/load: ' + JSON.stringify(loaded) + ' from ' + dest);
+    const cut = { segs: [{ in: 0, out: 1 }, { in: 0, out: 1 }, { in: 0, out: 1 }] };
+    P.apply(P.load('cinematic'), { cut }, { finish: 'mono' });
+    if (cut.finish !== 'mono') fail('user finish should win, got ' + JSON.stringify(cut));
+    if (cut.segs.some(s => s.finish)) fail('finish pool should not apply when the user set finish: ' + JSON.stringify(cut.segs));
+    const cut2 = { segs: [{ in: 0, out: 1 }, { in: 0, out: 1 }, { in: 0, out: 1 }] };
+    P.apply(P.load('cinematic'), { cut: cut2 }, {});
+    const finishes = cut2.segs.map(s => s.finish);
+    if (new Set(finishes).size < 2) fail('expected per-scene finish variety: ' + JSON.stringify(finishes));
+    const auto = P.pickAuto({ want: 'one-word' });
+    if (auto.name !== 'one-word') fail('auto should pick one-word, got ' + auto.name);
+  });
+  step('brand:import from a synthetic markdown guide and a colour swatch', () => {
+    const fix = join(dirname(KIT), 'tests', 'fixtures', 'brand-guide');
+    const out = join(work, 'imported.json');
+    run(node, [join(KIT, 'brand-import.mjs'), join(fix, 'guide.md'), '--name', 'north-star', '--out', out], work);
+    const d = JSON.parse(readFileSync(out, 'utf8'));
+    if (d.fonts !== 'druk') fail('expected druk from the guide, got ' + JSON.stringify(d.fonts));
+    if (!/short sentences/i.test(d.notes || '') || !/light-grey|Never invent/i.test(d.notes || '')) fail('imported notes missing do/do-not lines: ' + d.notes);
+    const out2 = join(work, 'swatch.json');
+    run(node, [join(KIT, 'brand-import.mjs'), join(fix, 'swatch.png'), '--name', 'swatch', '--out', out2], work);
+    const d2 = JSON.parse(readFileSync(out2, 'utf8'));
+    if (!d2.colors || d2.colors.length < 2) fail('expected a palette from the swatch: ' + JSON.stringify(d2.colors));
   });
   step('synthetic clip + bed', () => {
     run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=640x360:rate=24:duration=3', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=3:sample_rate=48000',
@@ -60,7 +104,6 @@ try {
     segs: [{ file: '../seg1.mp4', in: 0, out: 1.8, fadeIn: 0.25 }, { file: '../seg1.mp4', in: 1.8, out: 3.0, pad: 0.2, cropX: 0.3 }],
     tail: 0.3, hits: [[1.8, 24]], sfx: { F: [1.8], D: [2.4] }, bed: '../bed.wav', bedVol: 0.2, overlay: 'ovl/%04d.png'
   }));
-  const node = process.execPath;
   step('timeline.mjs', () => { const o = run(node, [join(KIT, 'timeline.mjs')], build); if (!/seams: \[1\.8\]/.test(o)) fail('unexpected seams:\n' + o); });
   step('autocaption.mjs -> captions.js', () => {
     run(node, [join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--hero'], build);
@@ -77,7 +120,19 @@ try {
     if (!/aigent/.test(readFileSync(join(build, 'theme.js'), 'utf8'))) fail('aigent theme not used by default');
     if (statSync(join(build, 'stills', 't0.60.png')).size < 8000) fail('caption still looks blank');
   });
-  step('render overlay frames (2 s)', () => { run(node, [join(KIT, 'render.mjs'), '2'], build); const n = readdirSync(join(build, 'ovl')).length; if (n !== 48) fail('frames ' + n); });
+  step('one-word caption style: the spoken word changes between stills', () => {
+    const b = join(work, 'one-word'); mkdirSync(b, { recursive: true });
+    writeFileSync(join(b, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify({
+      captionStyle: 'one-word', fonts: 'druk',
+      flips: [{ start: 0, end: 2, text: 'Record one take', mode: 0, words: [[0, 0.6, 'Record'], [0.6, 1.2, 'one'], [1.2, 2, 'take']] }]
+    }) + ';\n');
+    run(node, [join(KIT, 'render.mjs'), '0', '0.30,0.90'], b, { THEME: 'aigent', FONTS: 'druk' });
+    const a = readFileSync(join(b, 'stills', 't0.30.png'));
+    const c = readFileSync(join(b, 'stills', 't0.90.png'));
+    if (Buffer.compare(a, c) === 0) fail('one-word stills at 0.30 and 0.90 should show different words');
+  });
+  step('render overlay frames (2 s)', () => {
+ run(node, [join(KIT, 'render.mjs'), '2'], build); const n = readdirSync(join(build, 'ovl')).length; if (n !== 48) fail('frames ' + n); });
   step('sfx pack manifest + auto-pick', () => {
     const v = SFXPLAN.validateManifest();
     if (v.errs.length) fail('sfx.json: ' + v.errs.join('; '));

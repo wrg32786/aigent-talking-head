@@ -1,0 +1,25 @@
+{
+  "name": "muse-pill",
+  "label": "Pill captions and kinetic titles behind the head",
+  "theme": "aigent",
+  "look": "muse",
+  "captionStyle": "pill",
+  "fonts": "theme",
+  "titles": true,
+  "finish": null,
+  "finishPool": [
+    "grain",
+    "vignette"
+  ],
+  "transition": "glitch",
+  "effectsFavourites": [
+    "checklist",
+    "todo",
+    "apple-toggles",
+    "tap",
+    "liquid-glass-graph"
+  ],
+  "bed": null,
+  "punch": true,
+  "notes": "The muse look: 3 to 5 words in a lower-third pill, titles still behind the head."
+}

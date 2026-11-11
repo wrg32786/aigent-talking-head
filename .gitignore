@@ -31,3 +31,7 @@ kit/fonts/local/
 !showcase/
 !showcase/**
 !showcase/loops/*.webm
+
+# user-saved brand presets and dropped brand guides
+kit/presets/local/
+/brand-guide/

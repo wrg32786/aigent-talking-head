@@ -14,6 +14,7 @@ import { loadMenu, demoFields, sourceCatalogIds, showcaseHas } from './menu.mjs'
 
 const require = createRequire(import.meta.url);
 const B = require('./beats.cjs');
+const Preset = require('./preset.cjs');
 const KIT = dirname(fileURLToPath(import.meta.url));
 const ROOT = dirname(KIT);
 const OUT = join(ROOT, 'showcase');
@@ -311,6 +312,13 @@ function runEffectBatch(fxPy, runner, person, imgs, batch, work, fps) {
 
 async function main() {
   const menu = loadMenu();
+  // The committed gallery shows shipped presets only. Local drafts (brand:import,
+  // user saves) still appear in `npm run menu`.
+  const presetSec = menu.sections.find(s => s.id === 'presets');
+  if (presetSec) {
+    const names = new Set(Preset.shipped().map(p => p.name));
+    presetSec.items = presetSec.items.filter(it => names.has(it.id));
+  }
   const py = whichPy();
   const work = mkdtempSync(join(tmpdir(), 'ath-showcase-'));
   const stills = {};
@@ -438,7 +446,35 @@ async function main() {
     }
   }
 
-  const fxPy = join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+  const presetSec = menu.sections.find(s => s.id === 'presets');
+  if (presetSec) {
+    console.log('presets');
+    for (const pr of presetSec.items) {
+      const full = Preset.load(pr.id) || {};
+      typeOrCard('preset', pr, out => {
+        const style = full.captionStyle || 'kinetic';
+        const fonts = full.fonts && full.fonts !== 'theme' ? full.fonts : 'theme';
+        const theme = full.theme || 'aigent';
+        const doc = captionsDoc(style, fonts);
+        if (full.titles === false) doc.flips = doc.flips.filter(f => f.mode !== 7);
+        writeFileSync(join(build, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(doc) + ';\n');
+        const pool = (full.finishPool && full.finishPool.length) ? full.finishPool : (full.finish ? [full.finish] : []);
+        let plate = PERSON;
+        if (pool[0]) {
+          plate = join(work, 'preset-plate-' + pr.id + '.png');
+          const vf = B.finishChain(pool[0]);
+          sh('ffmpeg', ['-v', 'error', '-y', '-loop', '1', '-i', PERSON, '-t', '0.3',
+            '-vf', `format=yuv444p,${vf},format=yuv420p`, '-frames:v', '1', '-update', '1', plate]);
+        }
+        const prev = PERSON;
+        PERSON = plate;
+        try { typeStill(build, mid, { THEME: theme, FONTS: fonts }, out); }
+        finally { PERSON = prev; }
+      });
+    }
+  }
+
+    const fxPy = join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
   const runner = join(ROOT, 'effects', 'fx_runner.py');
   const effects = menu.sections.find(s => s.id === 'effects').items;
   if (!skipEffects && existsSync(fxPy) && existsSync(runner)) {

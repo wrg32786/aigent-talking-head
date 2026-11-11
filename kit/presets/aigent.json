@@ -1,0 +1,25 @@
+{
+  "name": "aigent",
+  "label": "AIgent brand, kinetic type, cyan accent (default)",
+  "theme": "aigent",
+  "look": "kinetic",
+  "captionStyle": "kinetic",
+  "fonts": "theme",
+  "titles": true,
+  "finish": null,
+  "finishPool": [
+    "grain",
+    "vignette"
+  ],
+  "transition": "glitch",
+  "effectsFavourites": [
+    "lean-in",
+    "backdrop-word",
+    "checklist",
+    "spotlight",
+    "tap"
+  ],
+  "bed": null,
+  "punch": true,
+  "notes": "The default house style. Vary grain and vignette across scenes rather than one finish on everything."
+}

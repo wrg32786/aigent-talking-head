@@ -11,7 +11,7 @@ From [The AIgent](https://theaigent.xyz). Turn a phone recording into a finished
 
 HeyGen cinematic takes are an optional second source; they cut in the same way as phone clips.
 
-The full menu of film finishes, looks, caption styles, fonts, themes, title entrances, transitions, 51 effects, SFX and music beds is easy to miss. Run `npm run menu` to print every option with a short label, or open the labelled gallery at [showcase/index.html](showcase/index.html) (`npm run showcase` rebuilds it; stills use an AI-generated fictional presenter). Agents must offer this menu before drafting and again before the final render, suggest 2 or 3 options per category, and vary finishes across scenes rather than one look on the whole reel.
+The full menu of film finishes, looks, caption styles, fonts, themes, title entrances, transitions, 51 effects, SFX, music beds and brand presets is easy to miss. Run `npm run menu` to print every option with a short label, or open the labelled gallery at [showcase/index.html](showcase/index.html) (`npm run showcase` rebuilds it; stills use an AI-generated fictional presenter). Agents must offer this menu before drafting and again before the final render, suggest 2 or 3 options per category, and vary finishes across scenes rather than one look on the whole reel.
 
 ## Quick start: phone clip to reel
 
@@ -78,7 +78,7 @@ Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FRE
 
 ## Looks, caption styles and fonts
 
-`--look` picks the whole edit; `--style`, `--fonts`, `--no-titles`, `--no-punch`, `--no-mask` and `--mask birefnet|mediapipe` override single parts.
+`--look` picks the whole edit (`kinetic`, `muse`, `classic`, `one-word`); `--style`, `--fonts`, `--no-titles`, `--no-punch`, `--no-mask` and `--mask birefnet|mediapipe` override single parts. `--style one-word` shows one big word at a time.
 
 | Look | Captions | Titles | Notes |
 |---|---|---|---|
@@ -180,6 +180,23 @@ Agents: start at [AGENTS.md](AGENTS.md).
 - Only real sounds, picked by a human ear. An agent can't judge audio, so give the human an audition.
 - Re-transcribe the full render with the music in. It must match the script.
 - `npm run verify` passes and someone has looked at the contact sheet before the reel goes out.
+
+## Brand presets
+
+A preset is a saved mix of theme, look, caption style, fonts, finishes (including a per-scene variety pool), transitions, effect favourites, and optional bed or SFX prefs.
+
+Shipped styles, all built from existing options: `aigent` (default), `one-word` (one big word at a time, punchy), `hormozi-bold`, `karaoke`, `minimal-clean`, `cinematic`, `editorial`, `muse-pill`, `retro-scan-lines`, and `neutral`. Each has a labelled tile in [showcase/index.html](showcase/index.html) and appears in `npm run menu`.
+
+```
+npm run preset -- --list
+npm run reel -- inbox/take.mov --preset one-word
+npm run reel -- inbox/take.mov --preset auto          # picks one and prints what it chose
+npm run reel -- inbox/take.mov --preset cinematic --finish grain   # any flag wins over the preset
+npm run preset -- --save my-style --from <job>        # user-saved, gitignored under kit/presets/local/
+npm run brand:import -- brand-guide/guide.pdf         # optional; draft preset for the human to confirm
+```
+
+Three modes: use a saved preset, customize (flags and `cut.json` fields override the preset), or let the agent choose (`--preset auto`). A brand guide (PDF, image or markdown) is optional; drop it in `brand-guide/` or pass the file. Import extracts a colour palette, named fonts (mapped to shipped OFL pairings or `kit/fonts/local/`), tone notes, and a nearby logo if there is one. If `pdftoppm` or `pdftotext` are missing, the command says so and still accepts images and markdown.
 
 ## Credits and licences
 

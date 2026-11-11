@@ -14,6 +14,7 @@ const require = createRequire(import.meta.url);
 const B = require('./beats.cjs');
 const R = require('./rules.cjs');
 const SFXPLAN = require('./sfx-plan.cjs');
+const Preset = require('./preset.cjs');
 
 const KIT = dirname(fileURLToPath(import.meta.url));
 const ROOT = dirname(KIT);
@@ -22,6 +23,7 @@ const LOOKS = [
   { id: 'kinetic', flag: '--look kinetic', label: 'every word animates, plus a kinetic title behind the head (default)' },
   { id: 'muse', flag: '--look muse', label: 'pill captions and kinetic titles behind the head' },
   { id: 'classic', flag: '--look classic', label: 'the original phrase captions and a spray-painted hero word, no titles' },
+  { id: 'one-word', flag: '--look one-word', label: 'one big word at a time on screen, kinetic and punchy, plus titles behind the head' },
 ];
 const CAPTION_STYLES = [
   { id: 'kinetic', flag: '--style kinetic  or  "captionStyle": "kinetic"', label: 'two-font lockup, hero word big in the display face' },
@@ -29,6 +31,7 @@ const CAPTION_STYLES = [
   { id: 'hormozi', flag: '--style hormozi  or  "captionStyle": "hormozi"', label: 'bold caps with a cyan active word' },
   { id: 'karaoke', flag: '--style karaoke  or  "captionStyle": "karaoke"', label: 'colour wipe as each word is said' },
   { id: 'classic', flag: '--style classic  or  "captionStyle": "classic"', label: 'the original phrase captions' },
+  { id: 'one-word', flag: '--style one-word  or  "captionStyle": "one-word"', label: 'one big word at a time, punchy, in the display face' },
 ];
 const BEAT_SYNC = [
   { id: 'beat-sync', flag: '--beat-sync  or  "beatSync": true', label: 'snap punches, SFX, fx hits and title entrances to the bed (default when a bed is set)' },
@@ -125,6 +128,14 @@ export function loadMenu() {
     label: `${b.title} (${b.seconds}s, ${b.lufs} LUFS)`,
   }));
 
+  const presetItems = Preset.list().map(p => ({
+    kind: 'preset', id: p.name, section: 'presets',
+    flag: `--preset ${p.name}`,
+    label: p.label || p.name,
+    shipped: !!p.shipped,
+    draft: !!p.draft,
+  }));
+
   const sections = [
     { id: 'finishes', title: 'Film finishes', hint: 'On the picture, before titles. Set globally or per segment, and vary them across scenes rather than one look on everything.', items: finishes },
     { id: 'beat-sync', title: 'Beat-sync', hint: 'When a music bed is set, accents can land on the music. Speech cuts stay put.', items: beatSync },
@@ -137,6 +148,7 @@ export function loadMenu() {
     { id: 'effects', title: 'Effects', hint: 'Optional second pass (npm run fx). 51 starter effects, grouped by moment.', items: effects, moments, effectsByMoment },
     { id: 'sfx', title: 'SFX pack', hint: '31 CC0 sounds, auto-picked on npm run fx. Locked cut set is whoosh, swipe, boom, click, typing.', items: sfx },
     { id: 'beds', title: 'Music beds', hint: 'Our own tracks, loudness-matched to -13 LUFS. Hear them with the files in kit/music/.', items: beds },
+    { id: 'presets', title: 'Brand presets', hint: 'A saved mix of theme, look, type, finishes and favourites. npm run reel -- --preset <name>. Flags you pass win. --preset auto picks one and prints what it chose.', items: presetItems },
   ];
 
   const items = sections.flatMap(s => s.items);
@@ -170,6 +182,7 @@ export function sourceCatalogIds() {
     look: LOOKS.map(x => x.id),
     captionStyle: CAPTION_STYLES.map(x => x.id),
     beatSync: BEAT_SYNC.map(x => x.id),
+    preset: Preset.shipped().map(p => p.name),
   };
 }
 

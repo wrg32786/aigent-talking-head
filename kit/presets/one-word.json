@@ -1,0 +1,25 @@
+{
+  "name": "one-word",
+  "label": "One big word at a time on screen, kinetic and punchy",
+  "theme": "aigent",
+  "look": "one-word",
+  "captionStyle": "one-word",
+  "fonts": "druk",
+  "titles": true,
+  "finish": null,
+  "finishPool": [
+    "grain",
+    "chroma"
+  ],
+  "transition": "glitch",
+  "effectsFavourites": [
+    "lean-in",
+    "huge-strike",
+    "reject-stamp",
+    "countdown-flip",
+    "backdrop-word"
+  ],
+  "bed": null,
+  "punch": true,
+  "notes": "Each spoken word fills the caption band, one at a time. Titles still sit behind the head."
+}

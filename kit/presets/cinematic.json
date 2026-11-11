@@ -1,0 +1,27 @@
+{
+  "name": "cinematic",
+  "label": "Teal-and-orange film grade, grain, vignette",
+  "theme": "aigent",
+  "look": "kinetic",
+  "captionStyle": "kinetic",
+  "fonts": "editorial",
+  "titles": true,
+  "finish": null,
+  "finishPool": [
+    "teal",
+    "grain",
+    "vignette",
+    "crushed"
+  ],
+  "transition": "film",
+  "effectsFavourites": [
+    "spotlight",
+    "moody",
+    "slow-push",
+    "timeline",
+    "lean-in"
+  ],
+  "bed": "cinematic-build",
+  "punch": true,
+  "notes": "A film look with teal shadows and warm skin, varied across scenes. Suggest cinematic-build as the bed and let the human pick by ear."
+}

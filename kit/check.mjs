@@ -48,7 +48,7 @@ function checkJob(captionsFile, cutFile, label) {
     if (f.lockup && typeof f.lockup === 'object' && f.lockup.arrange && !ARR.includes(f.lockup.arrange)) errs.push(`flip ${f.start}s: lockup arrange "${f.lockup.arrange}" (${ARR.join(', ')})`);
   }
   if (CAP.lockup && CAP.lockup.arrange && !ARR.includes(CAP.lockup.arrange)) errs.push(`lockup arrange "${CAP.lockup.arrange}" (${ARR.join(', ')})`);
-  if (CAP.captionStyle && !['kinetic', 'classic', 'pill', 'hormozi', 'karaoke'].includes(CAP.captionStyle)) errs.push(`captionStyle "${CAP.captionStyle}" (kinetic, classic, pill, hormozi, karaoke)`);
+  if (CAP.captionStyle && !['kinetic', 'classic', 'pill', 'hormozi', 'karaoke', 'one-word'].includes(CAP.captionStyle)) errs.push(`captionStyle "${CAP.captionStyle}" (kinetic, classic, pill, hormozi, karaoke, one-word)`);
   if (cutFile && existsSync(cutFile)) {
     const C = JSON.parse(readFileSync(cutFile, 'utf8')), TL = R.timeline(C);
     if (C.lockup && C.lockup.arrange && !ARR.includes(C.lockup.arrange)) errs.push(`cut.json lockup arrange "${C.lockup.arrange}" (${ARR.join(', ')})`);
@@ -124,7 +124,7 @@ if (target) {
     const has = showcaseHas(html, ids);
     const errs = has.missing.map(x => 'showcase missing ' + x);
     // Visual kinds should also have a still under showcase/media so a new effect cannot hide.
-    const visual = ['finish', 'effect', 'transition', 'font', 'theme', 'entrance', 'look', 'captionStyle'];
+    const visual = ['finish', 'effect', 'transition', 'font', 'theme', 'entrance', 'look', 'captionStyle', 'preset'];
     for (const kind of visual) {
       for (const id of ids[kind] || []) {
         const token = `data-id="${kind}:${id}"`;
@@ -132,7 +132,7 @@ if (target) {
         const base = join(ROOT, 'showcase', 'media');
         const dirs = {
           finish: 'finish', effect: 'effect', transition: 'transition', font: 'font',
-          theme: 'theme', entrance: 'entrance', look: 'look', captionStyle: 'caption',
+          theme: 'theme', entrance: 'entrance', look: 'look', captionStyle: 'caption', preset: 'preset',
         };
         const img = join(base, dirs[kind], id + '.jpg');
         if (!existsSync(img) || !statSync(img).size) errs.push(`showcase still missing ${kind}:${id} (${img})`);
