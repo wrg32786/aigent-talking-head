@@ -31,7 +31,7 @@ Skip this when the teammate already has a script.
 ## Phone clip to reel (start here)
 
 1. Find the clip: `npm run reel` with no path uses every video from the newest recording session in `inbox/` (files within 2 hours of the newest; `--newest` for one), or pass the files the teammate names. If the inbox is empty, ask them to drop it in.
-2. Ask which theme if they haven't said: `neutral` (default) or `aigent` (AIgent brand only), or their own `kit/themes/<name>.js`. Ask for a music file if they want one. Offer a font pairing (`--fonts modern|druk|elegant|editorial`, default the theme's fonts) and a look (`--look kinetic` default, `muse` for pill captions, `classic` for the old captions).
+2. The default theme is AIgent. Use it unless they ask for another look: `--theme neutral` (unbranded, offline) or their own `kit/themes/<name>.js`. Don't use the Skool mark for another brand. Ask for a music file if they want one. Offer a font pairing (`--fonts modern|druk|elegant|editorial`, default the theme's fonts) and a look (`--look kinetic` default, `muse` for pill captions, `classic` for the old captions).
 3. Draft it: `npm run reel -- inbox/<file> [inbox/<take2> ...] --theme <name> [--fonts druk] [--hook <take>] [--bed music.wav] [--bed-start 0] [--cropx 0.4] --draft`
    - `--cropx` moves the 9:16 crop for a sideways clip (0 left, 0.5 centre, 1 right). Read `jobs/<name>/clips/clips-sheet.png` to check the face is in frame.
    - `--model medium.en` is faster than the default large-v3 for a first pass.
@@ -85,7 +85,7 @@ Use this when mixing sources or when you need finer control. Work in a job folde
 - A raw file can also go straight into `cut.json`. Add `cropX` to place the face, and `"norm": true` for camera audio.
 
 **Optional: HeyGen takes** (`create_video_from_cinematic_avatar`; needs a HeyGen account)
-- Settings: `seedance_2`, 9:16, 1080p, 12 to 13 s per take. A take costs about 177 credits.
+- Settings: `seedance_2`, 9:16, 1080p, 12 to 13 s per take. A take uses HeyGen credits.
 - Prompt for a seated presenter with a slow dolly push-in and a gentle arc, at eye level, with no cuts.
 - Write one gesture per line, for example: lean in on the question, open hands on the promise, count on the number, point at camera on the CTA and hold it.
 - Put the exact dialogue in quotes, followed by "said once each, no repeated words".
@@ -126,7 +126,7 @@ Use this when mixing sources or when you need finer control. Work in a job folde
 - **Titles.** One per beat, at most 7: `{"start": 0.2, "end": 3.1, "text": "Stop editing by hand", "mode": 7, "hero": "editing"}` (a lockup: the hero word big, the rest in the partner face). Each gets a different entrance (`stagger-rise`, `slam`, `blur-rise`, `slide-left`, `elastic`, `flip`, `pop-zoom`), picked in order unless you set `"entrance"`. Only the hook and the payoff flicker. Titles sit at about Y=560, behind the presenter: `build/mask.mkv` (made by `kit/mask.py` from the effects venv) cuts the person out on top of them. For a final reel, use the BiRefNet backend (`npm run reel -- --mask birefnet`, or `"maskModel": "birefnet"` in `cut.json`) after `npm run effects:setup -- --birefnet`. It is slower on CPU (several seconds per title frame) but tighter on hair and hands than MediaPipe, which is the fast fallback and what smoke uses. Optional `"person": "person.mkv"` writes an edge-decontaminated BGRA layer that assemble will prefer. Without the effects venv, titles go in front. If the mask leaks onto the background, add `"maskClear": [[x0, y0, x1, y1]]` in `cut.json`. Judge quality on composited stills, by eye.
 - **Fonts.** `"fonts": "druk"` (or `--fonts`) picks a pairing from `kit/fonts/`. The two faces always appear together as a designed lockup (modern: heavy caps + a script tail tucked under it; druk: wide caps + a small tracked sans line; elegant: serif caps + script across it; editorial: serif italic + roman). Pick the hero word per phrase with `"hero": "editing"` (or word indices) on the title or caption, or `"hero": {"<start>": "words"}` in `cut.json`; `"lockup": false` sets one phrase in one font. See `kit/fonts/README.md`. Teammates' own licensed fonts go in `kit/fonts/local/`, never in git.
 - Check a few frames first: `node ../../kit/render.mjs 0 "2.7,13.6,25.9"` writes `stills/`.
-- **Theme.** `build/theme.js` sets colours, fonts and logo. `render.mjs` copies `kit/themes/neutral.js` there if it's missing (`THEME=aigent` picks the AIgent preset). Edit it per job, or add `"theme": {...}` overrides in `captions.js`. A logo plate (mode 5) needs `"logo": "file.svg"` in `captions.js` (file in `build/`) or `theme.logo`; without one, mode 5 draws nothing.
+- **Theme.** `build/theme.js` sets colours, fonts and logo. `render.mjs` copies `kit/themes/aigent.js` there if it's missing (`THEME=neutral` picks the unbranded offline preset). Edit it per job, or add `"theme": {...}` overrides in `captions.js`. A logo plate (mode 5) needs `"logo": "file.svg"` in `captions.js` (file in `build/`) or `theme.logo`; without one, mode 5 draws nothing.
 - AIgent theme rules (AIgent jobs only):
   - Captions are Hanken Grotesk 400 in `#f1e8dc`.
   - Hero words, stickers and cards are Sofia Sans Extra Condensed caps, weight 760 to 860, tracking -0.01em.

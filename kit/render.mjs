@@ -8,7 +8,7 @@ import { findChrome } from './chrome.mjs';
 // Run from the job's build/ folder (holds captions.js):  node <kit>/render.mjs <durationSec> [t1,t2,... for stills only]
 // Writes ovl/%04d.png (and ovlt/%04d.png when captions.js has kinetic titles), or stills/t<sec>.png.
 // If build/ has no theme.js yet, it is copied from the kit; overlay.html always is (see below). THEME=<name> picks kit/themes/<name>.js
-// (default neutral); after that, edit build/theme.js or delete it to switch. Chrome: CHROME_PATH, else auto-detected.
+// (default aigent); after that, edit build/theme.js or delete it to switch. Chrome: CHROME_PATH, else auto-detected. THEME=neutral is the unbranded offline look.
 const KIT = dirname(fileURLToPath(import.meta.url)), ROOT = process.cwd(), FPS = +(process.env.FPS || 24), DUR = +(process.argv[2] || 36.8);
 const only = process.argv[3] ? process.argv[3].split(',').map(Number) : null;
 if (!existsSync(join(ROOT, 'captions.js'))) { console.error('No captions.js here. Run render.mjs from your build/ folder.'); process.exit(1); }
@@ -18,7 +18,7 @@ if (!existsSync(join(ROOT, 'captions.js'))) { console.error('No captions.js here
   if (!existsSync(o)) { copyFileSync(k, o); console.log('copied kit/overlay.html'); }
   else if (!process.env.KEEP_OVERLAY && readFileSync(o, 'utf8') !== readFileSync(k, 'utf8')) { copyFileSync(k, o); console.log('overlay.html <- kit (KEEP_OVERLAY=1 keeps your copy)'); } }
 if (!existsSync(join(ROOT, 'theme.js'))) {
-  const t = join(KIT, 'themes', (process.env.THEME || 'neutral') + '.js');
+  const t = join(KIT, 'themes', (process.env.THEME || 'aigent') + '.js');
   if (existsSync(t)) { copyFileSync(t, join(ROOT, 'theme.js')); console.log('theme.js <-', t); }
   else console.warn(`no theme.js and no ${t}; using the built-in neutral look`);
 }

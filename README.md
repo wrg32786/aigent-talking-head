@@ -1,6 +1,6 @@
 # aigent-talking-head
 
-Turn a phone recording into a finished 9:16 reel. Record yourself on your phone, drop the file in `inbox/`, and ask Claude (or any coding agent) to make the reel. You get:
+From [The AIgent](https://theaigent.xyz). Turn a phone recording into a finished 9:16 reel. Record yourself on your phone, drop the file in `inbox/`, and ask Claude (or any coding agent) to make the reel. You get:
 
 - clean clips cut on sentence boundaries, with flubbed retakes flagged and skipped, and the best take of each sentence picked when you record several takes
 - tight cuts with a glitch seam and a 10% zoom punch on every cut, a bigger punch after the hook and into the payoff, and a few sounds on the key cuts only
@@ -23,8 +23,8 @@ HeyGen cinematic takes are an optional second source; they cut in the same way a
    or run it yourself:
 
    ```
-   npm run reel                          # newest video in inbox/, neutral theme
-   npm run reel -- inbox/my-take.mov --theme aigent --cropx 0.4 --bed music.wav --bed-start 0
+   npm run reel                          # newest video in inbox/, AIgent theme
+   npm run reel -- inbox/my-take.mov --theme neutral --cropx 0.4 --bed music.wav --bed-start 0
    npm run reel -- inbox/take1.mov inbox/take2.mov --hook take2.mov --fonts druk
    ```
 
@@ -106,10 +106,10 @@ The look of the captions lives in a theme file: colours, fonts, an optional web-
 
 | Theme | Look |
 |---|---|
-| `kit/themes/neutral.js` | Default. White captions, yellow accent, system fonts, no logo, works offline. |
-| `kit/themes/aigent.js` | AIgent brand guide: cyan `#5cf9e2`, Hanken Grotesk and Sofia Sans Extra Condensed (Google Fonts). |
+| `kit/themes/aigent.js` | Default. AIgent brand guide: cyan `#5cf9e2`, Hanken Grotesk and Sofia Sans Extra Condensed (Google Fonts). |
+| `kit/themes/neutral.js` | Unbranded opt-out (`--theme neutral`). White captions, yellow accent, system fonts, no logo, works offline. |
 
-Pick one with `--theme` (or `THEME=aigent` for `render.mjs`). It's copied into the job as `build/theme.js`, so you can edit colours for one job, or copy a preset to `kit/themes/<yours>.js` for your own brand. A `"theme": {...}` block in `captions.js` overrides single fields, and `"logo": "file.svg"` there puts a logo on the logo-plate flips.
+The default is AIgent. Pass `--theme neutral` (or `THEME=neutral` for `render.mjs`) for an unbranded offline look, or add your own `kit/themes/<yours>.js`. The chosen file is copied into the job as `build/theme.js`, so you can edit colours for one job. A `"theme": {...}` block in `captions.js` overrides single fields, and `"logo": "file.svg"` there puts a logo on the logo-plate flips.
 
 ## Step by step (manual control)
 
@@ -148,7 +148,7 @@ Agents: start at [AGENTS.md](AGENTS.md).
 | `kit/mask.py` | Person mask for titles-behind-the-head. `--model birefnet` (rembg birefnet-general-lite, quality, weights downloaded on first use) or `--model mediapipe` (fast fallback). `kit/mask_refine.py` is the shared cleanup. |
 | `kit/fonts/`, `kit/fonts.mjs` | Font pairings and their OFL files. |
 | `kit/transitions.json` | Transition names mapped to ffmpeg xfade modes. |
-| `kit/themes/` | Theme presets: `neutral.js` (default) and `aigent.js`. |
+| `kit/themes/` | Theme presets: `aigent.js` (default) and `neutral.js`. |
 | `kit/chrome.mjs` | Finds Chrome on Mac, Linux or Windows; `CHROME_PATH` overrides. |
 | `kit/smoke.mjs` | `npm run smoke`: synthetic end-to-end test (includes the effects pass once `npm run effects:setup` has run). |
 | `kit/fx.cjs` | `npm run fx`: the effects pass over a job's reel (check frames, render, captions kept on top). |

@@ -1,4 +1,4 @@
-// Neutral theme: the default. No brand, no web fonts, no logo. Works offline.
+// Neutral theme: unbranded opt-out (`--theme neutral` or THEME=neutral). No brand, no web fonts, no logo. Works offline.
 // Copy a theme into your build/ folder as theme.js (render.mjs does this for you; THEME=<name> picks one),
 // then edit it. captions.js can also override any field with a "theme": {...} block.
 window.THEME = {
