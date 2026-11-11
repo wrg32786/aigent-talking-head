@@ -6,7 +6,7 @@
 // Every phrase is a plain caption (mode 0). --hero makes the last phrase before each seam a spray hero word (mode 1).
 // --titles makes it a kinetic title instead (mode 7, one per beat, up to 7, each with its own entrance; behind the
 // person when a mask is made). --style kinetic (default: every word animates in, one emphasis word per phrase)|classic|pill|hormozi|karaoke sets
-// captionStyle; pill groups 3 to 5 words. --fonts <pairing> writes "fonts" (kit/fonts/pairings.json).
+// captionStyle; pill groups 3 to 5 words. --fonts <pairing>[,<pairing>...] writes "fonts" (kit/fonts/pairings.json; several cycle).
 // Every caption carries its word times ("words") so pills, hormozi and karaoke can follow the voice.
 // Seams get glitchAt entries. --shift adds seconds to every word (Whisper often runs 0.3-0.6 s early on cinematic takes).
 // Hand-tweak the result: change modes, merge or split flips, add a card/countUp/cta block, then render.

@@ -23,13 +23,16 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
   else console.warn(`no theme.js and no ${t}; using the built-in neutral look`);
 }
 // Font pairing -> fonts.js: FONTS=<name|path.json> wins, then "fonts" in captions.js, else the fonts.js already here
-// (none = the theme's own fonts). fxzones.js (from fx.cjs) tells the caption track where effects need the band.
+// (none = the theme's own fonts). Several names ("literata,bricolage,michroma") cycle: the first is the base and
+// titles take them in turn (overlay.html). fxzones.js (from fx.cjs) tells the caption track where effects need the band.
 {
   const CAP = createRequire(import.meta.url)('./rules.cjs').readCaptions(join(ROOT, 'captions.js'));
   const want = process.env.FONTS || CAP.fonts;
   if (want || !existsSync(join(ROOT, 'fonts.js'))) {
-    const fp = resolveFonts(want || 'theme');
-    writeFileSync(join(ROOT, 'fonts.js'), 'window.FONTS=' + JSON.stringify(fp) + ';\n');
+    const names = (Array.isArray(want) ? want : String(want || 'theme').split(',')).map(s => String(s).trim()).filter(Boolean);
+    const sets = names.map(n => resolveFonts(n) || { name: 'theme' }), fp = resolveFonts(names[0]);
+    writeFileSync(join(ROOT, 'fonts.js'), 'window.FONTS=' + JSON.stringify(fp) + ';\n' + (sets.length > 1 ? 'window.FONTSETS=' + JSON.stringify(sets) + ';\n' : ''));
+    if (sets.length > 1) console.log('font cycle', sets.map(s => s.name).join(' > '));
     if (fp) console.log('fonts', fp.name, [fp.display, fp.secondary, fp.script].filter(Boolean).map(r => r.family).join(' + '));
   }
   // font lockup overrides from cut.json ("lockup" for the job, "hero" per flip start) -> lockover.js

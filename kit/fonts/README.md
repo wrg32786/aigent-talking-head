@@ -7,6 +7,27 @@
 | `druk` | Unbounded 900 caps (wide), accent | Hanken Grotesk 600, small caps tracked out to the hero's width | `stack` | Druk Wide + Helvetica |
 | `elegant` | Marcellus caps, white | Pinyon Script, accent | `overlap`: script centred across the hero's baseline | Optitimes + Sloop |
 | `editorial` | Instrument Serif Italic, accent | Libre Caslon Text 500 roman | `inline` on one baseline when it fits, else stacked | Vanguard + Athelas |
+| `literata` | Archivo Black caps, white | Literata 500, accent | `stack` | the real pair: Archivo Black + Literata |
+| `bricolage` | Bricolage Grotesque 800, white | Gloock, accent | `stack` | the real pair: Bricolage Grotesque + Gloock |
+| `pirata` | Pirata One (blackletter), accent | Nunito Sans 700, white | `stack` | the real pair: Pirata One + Nunito Sans |
+| `michroma` | Michroma caps (wide), white | Cardo Italic, accent | `stack` | the real pair: Michroma + Cardo |
+| `redhat` | Red Hat Display 900 caps, accent | Red Hat Mono 500, small caps tracked out | `stack` | the real pair: Red Hat Display + Red Hat Mono |
+| `jakarta` | Plus Jakarta Sans 800 caps, white | Ribeye, accent | `overlap`: a script tail under the hero's right corner | the real pair: Plus Jakarta Sans + Ribeye |
+| `grotesk-times` | Hanken Grotesk 800, white | Crimson Pro 500, accent | `inline` when it fits, else stacked | ID Grotesk + Times |
+| `avantgarde` | League Spartan 800 caps, white | Caprasimo, accent | `stack` | Avant Garde + Cooper |
+| `recoleta` | Fraunces 700, accent | Hanken Grotesk 600, small caps tracked out | `stack` | Recoleta + Berthold |
+| `haas` | Inter Tight 800, white | Inter Tight 400, white | `stack` | Neue Haas Grotesk Display + Helvetica Neue |
+| `wabbit` | Archivo Black caps, white | Chewy, accent | `overlap`: a brush tail under the hero's right corner | Archivo Black + Wascally Wabbit |
+
+## Examples
+
+One title and one caption line in each pairing. `npm run fonts:examples` rebuilds these from `pairings.json`.
+
+| | | | | |
+|:---:|:---:|:---:|:---:|:---:|
+| ![literata](examples/literata.jpg) `literata` | ![bricolage](examples/bricolage.jpg) `bricolage` | ![pirata](examples/pirata.jpg) `pirata` | ![michroma](examples/michroma.jpg) `michroma` | ![redhat](examples/redhat.jpg) `redhat` |
+| ![jakarta](examples/jakarta.jpg) `jakarta` | ![grotesk-times](examples/grotesk-times.jpg) `grotesk-times` | ![avantgarde](examples/avantgarde.jpg) `avantgarde` | ![recoleta](examples/recoleta.jpg) `recoleta` | ![haas](examples/haas.jpg) `haas` |
+| ![wabbit](examples/wabbit.jpg) `wabbit` | ![modern](examples/modern.jpg) `modern` | ![druk](examples/druk.jpg) `druk` | ![elegant](examples/elegant.jpg) `elegant` | ![editorial](examples/editorial.jpg) `editorial` |
 
 ## Lockups: the two faces together
 
@@ -24,7 +45,23 @@ Or for the whole job: `"lockup": {...}` at the top of `captions.js`, or in `buil
 
 Use: `npm run reel -- inbox/take.mov --fonts druk`, or `FONTS=elegant node kit/render.mjs ...`, or `"fonts": "editorial"` in `captions.js`.
 
-All files here are SIL Open Font License 1.1 fonts from Google Fonts (github.com/google/fonts, checked Nov 10, 2026), committed unmodified, each with its `OFL-<name>.txt`. Marcellus has the Reserved Font Name "Marcellus": don't ship a modified copy under that name. Druk, Helvetica, Optitimes, Sloop, Vanguard and Athelas are commercial and are not included.
+## Cycling pairings in one reel
+
+List several, comma-separated, and the reel cycles them: `--fonts literata,bricolage,michroma`, or `"fonts": "literata,bricolage,michroma"` in `captions.js`.
+
+- Each kinetic title takes the next pairing in turn, then the list starts again.
+- Every caption line, sticker, spray word and pill takes the pairing of the title it sits under, so one combo is on screen at a time.
+- A pairing is always applied whole (hero face, partner face, script, tracking and lockup rule together). A phrase never mixes faces from two combos.
+- The first name is the base: it sets everything before the first title. A reel with no kinetic titles stays on it.
+- `build/lockups.json` shows which pairing each phrase got (`fonts`, `faces`).
+
+`--fonts literata,bricolage,michroma,redhat`:
+
+![Four title beats, one pairing each](examples/cycle.gif)
+
+![The same four beats as stills](examples/cycle.jpg)
+
+All files here are fonts from Google Fonts (github.com/google/fonts, checked Nov 10, 2026), committed unmodified. All are SIL Open Font License 1.1, each with its `OFL-<name>.txt`, except Chewy, which is Apache-2.0 (`LICENSE-chewy.txt`). Variable fonts are saved as `<Name>-VF.ttf`. The first six new pairings use the exact fonts from Will's list (Nov 10, 2026); the last five are free stand-ins for commercial pairs, and "The Editorial Method + Collidge" has no close free pair, so it isn't here. Marcellus has the Reserved Font Name "Marcellus": don't ship a modified copy under that name. Druk, Helvetica, Optitimes, Sloop, Vanguard and Athelas are commercial and are not included.
 
 ## Your own licensed fonts
 

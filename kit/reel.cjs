@@ -6,7 +6,7 @@
 //          --hook <take> (first sentence from this take: your most extreme angle)
 //          --look kinetic|muse|classic (default kinetic: every word animated + one kinetic title per beat behind the head;
 //            muse = pill captions + titles; classic = the original captions + spray hero word)
-//          --style kinetic|classic|pill|hormozi|karaoke (override the caption style)  --no-titles  --fonts modern|druk|elegant|editorial|<local>
+//          --style kinetic|classic|pill|hormozi|karaoke (override the caption style)  --no-titles  --fonts modern|druk|elegant|editorial|<any name in kit/fonts/pairings.json>|<local> (a,b,c cycles them, one per title)
 //          --no-punch (no zoom punch)  --no-mask (titles in front, skip the person mask)
 //          --mask birefnet|mediapipe (person-mask backend; default mediapipe, fast. birefnet is the quality option, slow on CPU)
 //          --draft (stop after captions.js so you can edit it)  --rebuild (re-render + re-assemble an edited job)

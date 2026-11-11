@@ -189,7 +189,7 @@ try {
     writeFileSync(join(b, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(caps) + ';\n');
     try { run(node, [join(KIT, 'check.mjs'), b], work); fail('check passed 8 titles with a repeated entrance'); } catch (e) { if (!/entrance "slam" already used|8 titles/.test(String(e.stdout || ''))) throw e; }
   });
-  step('font pairings: druk, modern, elegant, editorial load and render as two-font lockups; unknown pairing refused', () => {
+  step('font pairings: all 15 load and render as two-font lockups; a list cycles them as whole pairs; unknown pairing refused', () => {
     const b = join(work, 'jobs', 'muse', 'build'), capF = join(b, 'captions.js'), keep = readFileSync(capF, 'utf8');
     const w = (t0, txt) => txt.split(' ').map((x, i) => [+(t0 + i * 0.2).toFixed(2), +(t0 + i * 0.2 + 0.2).toFixed(2), x]);
     writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'kinetic', flips: [
@@ -197,24 +197,32 @@ try {
       { start: 0, end: 2, text: 'Record one take on your phone', mode: 0, words: w(0, 'Record one take on your phone'), hero: 'record' },
       { start: 2, end: 4, text: 'Drop the file in the inbox', mode: 7 },
       { start: 2, end: 4, text: 'Ask for the reel', mode: 0, words: w(2, 'Ask for the reel') }] }) + ';\n');
-    for (const fp of ['druk', 'modern', 'elegant', 'editorial']) {
+    for (const fp of ['druk', 'modern', 'elegant', 'editorial', 'literata', 'bricolage', 'pirata', 'michroma', 'redhat', 'jakarta', 'grotesk-times', 'avantgarde', 'recoleta', 'haas', 'wabbit']) {
       const o = run(node, [join(KIT, 'render.mjs'), '0', '1.0'], b, { FONTS: fp });
       if (!new RegExp('fonts ' + fp).test(o)) fail('pairing not applied: ' + fp + '\n' + o);
       if (!/"url":"file:/.test(readFileSync(join(b, 'fonts.js'), 'utf8'))) fail('fonts.js has no font files for ' + fp);
       // two-font lockups: every multi-word title and kinetic line pairs a big hero with a smaller partner on one line
       const L = JSON.parse(readFileSync(join(b, 'lockups.json'), 'utf8'));
       if (!L.some(l => l.kind === 'title')) fail(fp + ': no title lockups');
-      const want = { druk: 'stack', modern: 'overlap', elegant: 'overlap' }[fp];
+      const want = { druk: 'stack', modern: 'overlap', elegant: 'overlap', jakarta: 'overlap', wabbit: 'overlap', redhat: 'stack', pirata: 'stack' }[fp];
       for (const l of L) {
         if (!l.partners.length) continue;
         for (const q of l.partners) { const r = q.size / l.heroSize; if (r < 0.25 || r > 0.9) fail(`${fp} ${l.kind} ${l.start}s: partner/hero size ${r.toFixed(2)}`); if (q.w > 960) fail(`${fp}: partner "${q.txt}" wider than the frame`); }
         if (l.kind === 'kinetic') for (const q of l.partners) if (q.size < (q.script ? 60 : 46) || q.size / l.heroSize < 0.5) fail(`${fp} kinetic ${l.start}s: partner "${q.txt}" ${q.size}px (hero ${l.heroSize}px) is too small to read`);
         if (want && l.arrange !== want) fail(`${fp}: ${l.kind} arranged ${l.arrange}, want ${want}`);
         if ((fp === 'modern' || fp === 'elegant') && !l.partners.every(q => q.script)) fail(fp + ': partner is not the script face');
-        if (l.kind === 'title' && l.hero.length <= 7 && l.heroW < 0.8 * 960 && l.heroSize < 360) fail(`${fp}: title hero "${l.hero}" only ${l.heroW}px wide`);
+        // an inline lockup shares its line with the partner, so the whole line has to fill the width, not the hero alone
+        const span = l.arrange === 'inline' ? l.box[2] - l.box[0] : l.heroW;
+        if (l.kind === 'title' && l.hero.length <= 7 && span < 0.8 * 960 && l.heroSize < 360) fail(`${fp}: title hero "${l.hero}" only ${span}px wide`);
       }
       if (!L.some(l => l.partners.length)) fail(fp + ': no lockup has a partner face');
     }
+    // a list cycles: titles take the pairings in turn, each caption line takes its title's pair, no phrase mixes two
+    { const o = run(node, [join(KIT, 'render.mjs'), '0', '1.0'], b, { FONTS: 'literata,bricolage,michroma' });
+      if (!/font cycle literata > bricolage > michroma/.test(o)) fail('font cycle not applied: ' + o);
+      const got = JSON.parse(readFileSync(join(b, 'lockups.json'), 'utf8')).map(l => `${l.kind} ${l.start} ${l.fonts} ${l.faces.join('+')}`).join('; ');
+      const want = 'title 0 literata Archivo Black+Literata; kinetic 0 literata Archivo Black+Literata; title 2 bricolage Bricolage Grotesque+Gloock; kinetic 2 bricolage Bricolage Grotesque+Gloock';
+      if (got !== want) fail('font cycle lockups: ' + got); }
     writeFileSync(capF, keep);
     try { run(node, [join(KIT, 'render.mjs'), '0', '1.0'], b, { FONTS: 'helvetica-please' }); fail('unknown pairing accepted'); } catch (e) { if (!/Unknown font pairing/.test(String(e.stderr || ''))) throw e; }
     run(node, [join(KIT, 'render.mjs'), '0', '1.0'], b, { FONTS: 'theme' });
