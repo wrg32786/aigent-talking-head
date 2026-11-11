@@ -26,3 +26,4 @@ __pycache__/
 ovlt/
 *.mkv
 kit/fonts/local/
+effects/.venv-matte/

@@ -50,7 +50,60 @@ def glass_widgets_v2(c, e):"""),
     # pastel-word: the face guard erased half the card (and its Follow button) when the speaker leans in; "card_guard": "off" keeps it whole
     ("""place(c, shadowed(card_, 18, 8, 90), W / 2, cy, sq, 0, al * clamp((c.lt - 0.15) / 0.12), guard=True)""",
      """place(c, shadowed(card_, 18, 8, 90), W / 2, cy, sq, 0, al * clamp((c.lt - 0.15) / 0.12), guard=str(e.o.get('card_guard', 'on')) != 'off')"""),
+    # the person is tracked and cut out at 540 px wide; FX_TRACK_W raises it so a sharper matte (FX_MATTE) keeps its edge
+    ("""aw = 540 if sw <= sh else int(round(540 * sw / sh / 2)) * 2;""",
+     """_tw = int(os.environ.get('FX_TRACK_W', 540)); aw = _tw if sw <= sh else int(round(_tw * sw / sh / 2)) * 2;"""),
 ]
+
+
+def matte_tracker(g):
+    """FX_MATTE=<rembg model>: cut the person out with rembg (ONNX Runtime) instead of MediaPipe's selfie segmenter.
+
+    Why: the selfie segmenter leaves a ragged fringe (Will picked birefnet-portrait from a side-by-side, 2026-11-10), and
+    its unsigned DLL is blocked by Windows Smart App Control, while ONNX Runtime loads. It uses the GPU when the runtime
+    has a provider for it (DirectML on Windows). Masks are slow to make (about 1 to 2 s a frame on an Arc GPU), so each
+    one is cached in FX_MATTE_CACHE under a hash of the frame's pixels: a re-render only makes masks for frames that changed.
+    """
+    import hashlib
+    import onnxruntime as ort
+    from PIL import Image
+    from rembg import new_session, remove
+    cv2, np = g['cv2'], g['np']
+    model, cache = os.environ['FX_MATTE'], os.environ.get('FX_MATTE_CACHE')
+    if cache: os.makedirs(cache, exist_ok=True)
+
+    class Tracker:
+        def __init__(self, aw, ah):
+            have = ort.get_available_providers()
+            self.sess = new_session(model, providers=[p for p in ('DmlExecutionProvider', 'CUDAExecutionProvider', 'CoreMLExecutionProvider', 'CPUExecutionProvider') if p in have])
+            # the face detector stays at upstream's 540 px: at full size it misses a close face and the layout drifts
+            self.k = aw / 540; self.fs = (540, int(round(ah / self.k / 2)) * 2)
+            self.fd = cv2.FaceDetectorYN.create(os.path.join(g['ROOT'], 'models', 'yunet.onnx'), '', self.fs, 0.6, 0.3, 20)
+            self.prev = None; self.made = self.hit = 0
+            print(f'matte: {model} on {self.sess.inner_session.get_providers()[0]}, {aw}x{ah}', flush=True)
+
+        def mask(self, rgb):
+            f = cache and os.path.join(cache, hashlib.sha1(rgb.tobytes()).hexdigest() + '.png')
+            if f and os.path.exists(f): self.hit += 1; return np.asarray(Image.open(f))
+            m = remove(Image.fromarray(rgb), session=self.sess, only_mask=True).convert('L')
+            if f: m.save(f)
+            self.made += 1
+            if self.made % 50 == 0: print(f'matte: {self.made} masks made, {self.hit} from cache', flush=True)
+            return np.asarray(m)
+
+        def __call__(self, rgb, ms):   # same contract as upstream: (uint8 mask, (face x, face y, face width) or None)
+            m = self.mask(rgb)
+            _, f = self.fd.detect(cv2.cvtColor(cv2.resize(rgb, self.fs, interpolation=cv2.INTER_AREA), cv2.COLOR_RGB2BGR))
+            face = None
+            if f is not None and len(f):
+                r = max(f, key=lambda r: r[2] * r[3] * r[-1]); face = ((r[0] + r[2] / 2) * self.k, (r[1] + r[3] / 2) * self.k, r[2] * self.k)
+            else:   # no face found: estimate it from the top of the matte, as upstream does
+                rows = np.where((m > 127).sum(1) > m.shape[1] * 0.01)[0]
+                if len(rows):
+                    top = rows[0]; band = m[top:top + max(4, int(m.shape[0] * 0.06))] > 127; xs = np.where(band.any(0))[0]
+                    fw = max(8.0, (xs.max() - xs.min()) * 0.8); face = (float(xs.mean()), top + fw * 0.7, fw)
+            return m, face
+    return Tracker
 
 
 def load():
@@ -62,6 +115,7 @@ def load():
         src = src.replace(old, new)
     g = {'__name__': 'fx_vendored', '__file__': VENDOR}
     exec(compile(src, VENDOR, 'exec'), g)
+    if os.environ.get('FX_MATTE'): g['Tracker'] = matte_tracker(g)
     return g
 
 

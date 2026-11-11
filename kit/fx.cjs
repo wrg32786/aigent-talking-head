@@ -30,7 +30,7 @@ const byName = Object.fromEntries(cat.effects.map(e => [e.name, e]));
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = k => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : undefined; };
-const VALUED = new Set(['name', 'plan', 'still', 'out', 'jobs', 'captions', 'sfx']);
+const VALUED = new Set(['name', 'plan', 'still', 'out', 'jobs', 'captions', 'sfx', 'mask', 'matte']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const die = m => { console.error(m); process.exit(1); };
 const SFXPLAN = require('./sfx-plan.cjs');
@@ -39,8 +39,15 @@ const sh = (cmd, args, cwd, env) => execFileSync(cmd, args, { cwd, stdio: 'inher
 // Python inside WSL that has the effects packages (e.g. /root/fxvenv/bin/python), FX_WSL_DISTRO to pick a distro.
 const WSL = process.platform === 'win32' && process.env.FX_WSL;
 const wp = s => (typeof s === 'string' && /^[A-Za-z]:[\\/]/.test(s) ? '/mnt/' + s[0].toLowerCase() + s.slice(2).split('\\').join('/') : s);
+// --matte <rembg model> (or FX_MATTE): cut the person out with rembg instead of MediaPipe, e.g. birefnet-portrait (best
+// edge) or birefnet-general-lite (about twice as fast). Runs natively from effects/.venv-matte (rembg + ONNX Runtime),
+// so it needs no WSL. Masks are cached in build/fx/matte-<model>/ and only made again for frames that changed.
+const MATTE = opt('matte') || process.env.FX_MATTE;
+const PYM = path.join(FX, '.venv-matte', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
 const runFx = args => {
-  if (!WSL) return sh(PY, [RUNNER, ...args]);
+  // PYTHONUTF8: Windows Python reads the plan as cp1252 otherwise, and "·" in a plan comes out as "Â·" on screen
+  if (MATTE) return sh(PYM, [RUNNER, ...args], undefined, { PYTHONUTF8: '1', FX_MATTE: MATTE, FX_MATTE_CACHE: path.join(path.dirname(args[2]), 'matte-' + MATTE), FX_TRACK_W: process.env.FX_TRACK_W || '1080' });
+  if (!WSL) return sh(PY, [RUNNER, ...args], undefined, { PYTHONUTF8: '1' });
   const i = args.indexOf('--plan'), pf = args[i + 1], plan = JSON.parse(fs.readFileSync(pf, 'utf8'));
   const wpf = pf.replace(/\.json$/, '.wsl.json'); fs.writeFileSync(wpf, JSON.stringify(plan, (k, v) => wp(v), 1));   // image folders in the plan too
   const a = args.slice(); a[i + 1] = wpf;
@@ -55,7 +62,8 @@ if (flag('list')) {
   console.log('\nFull details: effects/CATALOG.md');
   process.exit(0);
 }
-if (!WSL && !fs.existsSync(PY)) die('Effects are not set up yet. Run: npm run effects:setup');
+if (MATTE && !fs.existsSync(PYM)) die('No effects/.venv-matte. Make it: python -m venv effects/.venv-matte, then pip install rembg onnxruntime-directml (or onnxruntime) opencv-python numpy pillow');
+if (!MATTE && !WSL && !fs.existsSync(PY)) die('Effects are not set up yet. Run: npm run effects:setup');
 const planPath = opt('plan'); if (!planPath) die('Pass --plan fx.json (see the header of kit/fx.cjs or effects/CATALOG.md)');
 const raw = JSON.parse(fs.readFileSync(planPath, 'utf8'));
 const profile = raw.profile || {};
