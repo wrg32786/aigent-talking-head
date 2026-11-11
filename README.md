@@ -40,7 +40,8 @@ The first run downloads the Whisper model (large-v3, about 3 GB). Pass `--model 
 After the reel is made, ask your agent to "add effects". It reads the transcript, finds the hook, claims, numbers, lists and CTA, and offers 2 or 3 effects for each from a menu of 51 (spotlight, backdrop word, checklist, glass graph, stamps, countdowns and more). Then it renders `jobs/<clip-name>/reel-fx-v1.mp4`, with your captions kept on top and the same audio.
 
 ```
-npm run effects:setup                                     # once: Python venv with OpenCV + MediaPipe (~150 MB)
+npm run effects:setup                                     # once: Python venv with OpenCV + MediaPipe (~150 MB) and rembg + onnxruntime (~390 MB more, for the BiRefNet mask)
+npm run effects:setup -- --birefnet                       # also download birefnet-general-lite (~214 MB) into rembg's cache
 npm run fx -- --list                                      # the menu, by moment
 npm run fx -- --name <clip-name> --plan fx.json --still 1.2,6.5   # check frames
 npm run fx -- --name <clip-name> --plan fx.json           # render
@@ -73,7 +74,7 @@ Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FRE
 
 ## Looks, caption styles and fonts
 
-`--look` picks the whole edit; `--style`, `--fonts`, `--no-titles`, `--no-punch` and `--no-mask` override single parts.
+`--look` picks the whole edit; `--style`, `--fonts`, `--no-titles`, `--no-punch`, `--no-mask` and `--mask birefnet|mediapipe` override single parts.
 
 | Look | Captions | Titles | Notes |
 |---|---|---|---|
@@ -83,7 +84,7 @@ Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FRE
 
 Caption styles: `kinetic` (font lockups), `pill`, `hormozi` (bold caps with a cyan active word), `karaoke` (colour wipe as each word is said), `classic`. Set `"captionStyle"` in `captions.js` to change one job.
 
-Titles use 7 entrances (stagger rise, slam, blur rise, slide left, elastic, flip, pop zoom), never the same one twice in a video, with a flicker only on the hook and the payoff. Set them by hand as mode 7 flips in `captions.js` (`"entrance"` to pick one, `"hero"` for the big word), or leave them to `autocaption.mjs --titles`.
+Titles use 7 entrances (stagger rise, slam, blur rise, slide left, elastic, flip, pop zoom), never the same one twice in a video, with a flicker only on the hook and the payoff. Set them by hand as mode 7 flips in `captions.js` (`"entrance"` to pick one, `"hero"` for the big word), or leave them to `autocaption.mjs --titles`. The person mask that puts those titles behind the head is `kit/mask.py`. MediaPipe is the default (fast). For a final reel, `--mask birefnet` (or `"maskModel": "birefnet"` in `cut.json`) uses rembg with birefnet-general-lite: slower on CPU (several seconds per title frame) but much tighter on hair and hands. Optional `"person": "person.mkv"` writes an edge-decontaminated person layer.
 
 Font pairings (`--fonts`, or `"fonts"` in `captions.js`): `theme` (default), `modern`, `druk`, `elegant`, `editorial`. A pairing is two faces set together: every title and kinetic line is a lockup with the hero word big in the display face and the rest of the phrase in the partner face (script or sans/serif) beside, under or across it. `"hero"` on a phrase picks the hero word. All shipped fonts are SIL OFL Google Fonts; your own licensed fonts go in `kit/fonts/local/` (gitignored). See [kit/fonts/README.md](kit/fonts/README.md).
 
@@ -144,7 +145,7 @@ Agents: start at [AGENTS.md](AGENTS.md).
 | `kit/check.mjs` | `npm run check [job]`: copy lint, titles, transitions, sounds, punches and script shape. |
 | `kit/verify.mjs` | `npm run verify -- <job>`: ffprobe, loudness, title and punch stills, contact sheet, mask alpha, copy lint. Run it before every delivery. |
 | `kit/rules.cjs` | The shared edit rules: sounds, entrances, punch amounts, transitions, copy lint, script shape. |
-| `kit/mask.py` | Person mask for titles-behind-the-head (MediaPipe selfie segmenter from the effects venv). |
+| `kit/mask.py` | Person mask for titles-behind-the-head. `--model birefnet` (rembg birefnet-general-lite, quality, weights downloaded on first use) or `--model mediapipe` (fast fallback). `kit/mask_refine.py` is the shared cleanup. |
 | `kit/fonts/`, `kit/fonts.mjs` | Font pairings and their OFL files. |
 | `kit/transitions.json` | Transition names mapped to ffmpeg xfade modes. |
 | `kit/themes/` | Theme presets: `neutral.js` (default) and `aigent.js`. |
@@ -186,4 +187,5 @@ Code and docs: Apache-2.0, Copyright 2026 Will Gwyn (wrg32786). See [LICENSE](LI
 - Ideas adapted, no code copied: the transition name map from motion-pack (MIT), the Hormozi and karaoke caption looks from [Capite](https://github.com/muneebkhan08/Capite) (MIT), the title entrances from [motion-anything](https://github.com/nexu-io/motion-anything) (Apache-2.0, reference only). See [THIRD_PARTY.md](THIRD_PARTY.md).
 - `kit/example/skool-logo.svg`: the Skool wordmark, a trademark of Skool. It's included only to mark The AIgent's own Skool group in the Awakening example; it isn't in any theme. Don't use it for other brands.
 - `effects/vendor/claude-video-effects/`: [claude-video-effects](https://github.com/Vibha-Ramprakash/claude-video-effects) by Vibha Ramprakash, MIT. Its models (YuNet, MIT; MediaPipe Selfie Segmenter, Apache-2.0) and fonts (SIL OFL 1.1, Permanent Marker Apache-2.0) keep their own licences; see `NOTICE` and `effects/README.md`.
+- Person-mask quality backend (installed by `npm run effects:setup`, not vendored): [rembg](https://github.com/danielgatis/rembg) by Daniel Gatis, MIT; [onnxruntime](https://github.com/microsoft/onnxruntime) by Microsoft, MIT; birefnet-general-lite weights from [BiRefNet](https://github.com/ZhengPeng7/BiRefNet) by ZhengPeng, MIT, downloaded on first use into rembg's cache. See [THIRD_PARTY.md](THIRD_PARTY.md).
 - Music beds are not included. Bring your own licensed track.

@@ -1,0 +1,7 @@
+# Optional quality person-mask backend (kit/mask.py --model birefnet).
+# rembg is MIT (Daniel Gatis). birefnet-general-lite weights are MIT (ZhengPeng)
+# and are downloaded on first use into rembg's cache (~214 MB), not vendored.
+# onnxruntime is MIT (Microsoft). Python 3.11+.
+# Do not use rembg's default bria-rmbg model: it has a non-MIT commercial licence.
+rembg
+onnxruntime

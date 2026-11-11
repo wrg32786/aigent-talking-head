@@ -101,10 +101,13 @@ if (stills.length) {
 }
 
 // 4. mask, measured
-if (C.titles && C.mask) {
-  const mf = join(build, C.mask);
-  if (!existsSync(mf)) notes.push(`no mask file (${C.mask}): titles are in front of the speaker. npm run effects:setup, then rebuild.`);
-  else for (const t of titles) {
+const mask = R.maskSpec(C);
+if (C.titles && mask.file) {
+  const mf = join(build, mask.file);
+  if (!existsSync(mf)) notes.push(`no mask file (${mask.file}): titles are in front of the speaker. npm run effects:setup, then rebuild.`);
+  else {
+    if (mask.model) lines.push(`ok    mask model ${mask.model}`);
+    for (const t of titles) {
     const tm = Math.min(t.start + R.TITLE_ENTER + 0.2, t.end - 0.05);
     const buf = execFileSync('ffmpeg', ['-v', 'error', '-ss', tm.toFixed(3), '-i', mf, '-frames:v', '1', '-vf', 'scale=270:480', '-f', 'rawvideo', '-pix_fmt', 'gray', '-']);
     let on = 0, sum = 0, band = 0, bn = 0; const y0 = Math.round(480 * 0.22), y1 = Math.round(480 * 0.36);
@@ -117,6 +120,7 @@ if (C.titles && C.mask) {
   if (existsSync(mf)) {
     const off = TL.total > 0.5 ? [0.05].filter(x => !titles.some(t => x >= t.start - 0.1 && x <= t.end + 0.1)) : [];
     for (const tm of off) { const b = execFileSync('ffmpeg', ['-v', 'error', '-ss', String(tm), '-i', mf, '-frames:v', '1', '-vf', 'scale=90:160', '-f', 'rawvideo', '-pix_fmt', 'gray', '-']); ok(b.every(x => x <= 8), `mask is empty outside the title windows (t=${tm}s, max alpha ${Math.max(...b)})`); }
+    }
   }
 }
 
