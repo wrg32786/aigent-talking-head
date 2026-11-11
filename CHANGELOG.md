@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.0 (unreleased)
+
+- **Offer the menu, and a labelled showcase.** The menu of finishes, looks, caption styles, fonts, themes, title entrances, transitions, 51 effects, SFX and music beds is easy to miss. Agents must show it before drafting and again before the final render (`AGENTS.md`, `skills/talking-head-ad/SKILL.md`): run `npm run menu` (every option, grouped, with a one-line label, sourced from the catalogs so a new entry cannot stay hidden), point at [showcase/index.html](showcase/index.html), suggest 2 or 3 options per category, and vary film finishes across scenes. `npm run showcase` generates the self-contained gallery (synthetic stills, no private footage). `npm run check` and `npm run smoke` fail if the menu or the showcase omit a catalog entry.
+
 ## 1.2.0 (unreleased)
 
 - **Beat-sync and film finish.** When a music bed is set, `kit/beats.py` (librosa) writes `build/beat-grid.json` from the bed at `bedStart` for the reel length: tempo, beats, onsets, energy, and intensity-filtered drops. `"beatSync": true` (the default when a bed is set; `--no-beat-sync` to turn it off) snaps zoom punches, pack and locked-set SFX, fx hit points, and title entrances to the nearest beat or onset within 120 ms, and adds a short camera shake on strong drops (at most two per shot). Speech cuts and lip sync do not move. Optional `"finish"` on the cut or a segment applies an ffmpeg film look on the picture, before titles: `grain`, `vignette`, `chroma`, `scan-lines`, `warm`, `cool`, `teal`, `crushed`, `mono`, `bleach`. No LUT files or light-leak assets. Adapted from the author's music-video project and relicensed Apache-2.0. `npm run check` validates finish names; `npm run smoke` covers the snap rules and a finish render.

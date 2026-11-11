@@ -12,6 +12,8 @@
     "smoke": "node kit/smoke.mjs",
     "smoke:whisper": "node kit/smoke.mjs --whisper",
     "check": "node kit/check.mjs",
+    "menu": "node kit/menu.mjs",
+    "showcase": "node kit/showcase.mjs",
     "verify": "node kit/verify.mjs",
     "chrome": "node kit/chrome.mjs",
     "fx": "node kit/fx.cjs",

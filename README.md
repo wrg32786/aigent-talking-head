@@ -11,6 +11,8 @@ From [The AIgent](https://theaigent.xyz). Turn a phone recording into a finished
 
 HeyGen cinematic takes are an optional second source; they cut in the same way as phone clips.
 
+The full menu of film finishes, looks, caption styles, fonts, themes, title entrances, transitions, 51 effects, SFX and music beds is easy to miss. Run `npm run menu` to print every option with a short label, or open the labelled gallery at [showcase/index.html](showcase/index.html) (`npm run showcase` rebuilds it). Agents must offer this menu before drafting and again before the final render, suggest 2 or 3 options per category, and vary finishes across scenes rather than one look on the whole reel.
+
 ## Quick start: phone clip to reel
 
 1. **Install once** (see [Install](#install)), then check it works: `npm run smoke` should end with `SMOKE PASS`.
@@ -49,7 +51,7 @@ npm run fx -- --name <clip-name> --plan fx.json --still 1.2,6.5   # check frames
 npm run fx -- --name <clip-name> --plan fx.json           # render
 ```
 
-The effects come from [claude-video-effects](https://github.com/Vibha-Ramprakash/claude-video-effects) by Vibha Ramprakash (MIT), vendored at a pinned commit. See [effects/README.md](effects/README.md) for the catalog, the caption-safety rule and `npm run effects:update`.
+The effects come from [claude-video-effects](https://github.com/Vibha-Ramprakash/claude-video-effects) by Vibha Ramprakash (MIT), vendored at a pinned commit. See [effects/README.md](effects/README.md) for the catalog, the caption-safety rule and `npm run effects:update`. The labelled stills for every effect also live in [showcase/index.html](showcase/index.html).
 
 ## Install
 

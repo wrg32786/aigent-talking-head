@@ -17,6 +17,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { findChrome } from './chrome.mjs';
 import { createRequire } from 'module';
+import { coverage, showcaseHas, sourceCatalogIds } from './menu.mjs';
 const SFXPLAN = createRequire(import.meta.url)('./sfx-plan.cjs');
 const B = createRequire(import.meta.url)('./beats.cjs');
 
@@ -34,6 +35,15 @@ let ok = false;
 try {
   step('ffmpeg and ffprobe on PATH', () => { run('ffmpeg', ['-version']); run('ffprobe', ['-version']); });
   step(`Chrome found (${findChrome()})`, () => {});
+  step('menu and showcase cover every catalog entry', () => {
+    const cov = coverage();
+    if (!cov.ok) fail('menu missing catalog entries: ' + cov.missing.join(', '));
+    const htmlPath = join(dirname(KIT), 'showcase', 'index.html');
+    if (!existsSync(htmlPath)) fail('showcase/index.html is missing; run npm run showcase');
+    const html = readFileSync(htmlPath, 'utf8');
+    const has = showcaseHas(html, sourceCatalogIds());
+    if (!has.ok) fail('showcase missing labels: ' + has.missing.join(', '));
+  });
   step('synthetic clip + bed', () => {
     run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=640x360:rate=24:duration=3', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=3:sample_rate=48000',
       '-shortest', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', 'seg1.mp4'], work);

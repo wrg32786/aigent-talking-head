@@ -2,10 +2,11 @@
 
 The usual job: a teammate recorded themselves on their phone, dropped the file in `inbox/`, and asks you to make the reel.
 
-1. **Make the reel.** Read [skills/talking-head-ad/SKILL.md](skills/talking-head-ad/SKILL.md) and start at "Phone clip to reel". The one command is `npm run reel` (newest video in `inbox/`), or `npm run reel -- inbox/<file> --theme <name>`.
-2. **Only want clips** from a long recording? Read [skills/clip-raw-footage/SKILL.md](skills/clip-raw-footage/SKILL.md).
-3. **Effects** are an optional second pass: the "Pick effects" section of the talking-head-ad skill, with the menu in [effects/CATALOG.md](effects/CATALOG.md). Use `npm run fx`, not the vendored upstream `SKILL.md`, so captions stay on top and the teammate's own name and handle are used.
-4. **HeyGen takes** are optional. They're covered in the talking-head-ad skill under "Optional: HeyGen takes".
+1. **Offer the menu (mandatory).** Before you draft, and again before the final render, show the user the options so the menu of effects, graphics, finishes and looks never stays hidden. Run `npm run menu` (every option, grouped, with a one-line label) and point them at the labelled gallery in [showcase/index.html](showcase/index.html) (`npm run showcase` rebuilds it). Cover film finishes (including per-scene variety), beat-sync, looks and caption styles, font pairings, themes, title entrances, transitions, the 51 effects by moment, the SFX pack, and the music beds. Suggest 2 or 3 options per category that fit this reel. Vary looks across scenes rather than one finish for everything.
+2. **Make the reel.** Read [skills/talking-head-ad/SKILL.md](skills/talking-head-ad/SKILL.md) and start at "Phone clip to reel". The one command is `npm run reel` (newest video in `inbox/`), or `npm run reel -- inbox/<file> --theme <name>`.
+3. **Only want clips** from a long recording? Read [skills/clip-raw-footage/SKILL.md](skills/clip-raw-footage/SKILL.md).
+4. **Effects** are an optional second pass: the "Pick effects" section of the talking-head-ad skill, with the menu in [effects/CATALOG.md](effects/CATALOG.md) and the same showcase. Use `npm run fx`, not the vendored upstream `SKILL.md`, so captions stay on top and the teammate's own name and handle are used.
+5. **HeyGen takes** are optional. They're covered in the talking-head-ad skill under "Optional: HeyGen takes".
 
 Setup check: `npm install`, `pip install -r requirements.txt`, then `npm run smoke` must print `SMOKE PASS` and `npm run check` must print `CHECK PASS`. If Chrome isn't found, set `CHROME_PATH`; if Python isn't `python3`, set `PYTHON`.
 
@@ -14,6 +15,7 @@ Use the scripts in `kit/` as they are. Put job data in `jobs/<name>/build/cut.js
 Install Claude Code skills by copying the two folders under `skills/` into `.claude/skills/`. The SKILL.md files point back to `kit/` by relative path, so keep the repo next to them or fix the paths.
 
 Hard rules:
+- Offer the menu before drafting and again before the final render. `npm run menu` prints every option; [showcase/index.html](showcase/index.html) shows them labelled. Suggest 2 or 3 per category, and vary film finishes across scenes.
 - For titles behind the head, prefer `npm run reel -- --mask birefnet` (or `"maskModel": "birefnet"` in `cut.json`) on the real footage: tighter hair and hands than MediaPipe, after `npm run effects:setup -- --birefnet`. It is slow on CPU (several seconds per title frame). MediaPipe is the fast fallback and what `npm run smoke` uses. Judge mask quality on composited stills, by eye; `mask.json` is for coverage numbers, not a colour preview of the matte.
 - Run `npm run verify -- <job>` before you hand over any reel, and look at `jobs/<job>/verify/contact.png`. It must print `VERIFY PASS`. Fix what it flags, don't explain it away.
 - Copy follows the humanizer rules in the talking-head-ad skill: no em dashes, no "not X, but Y", no hype words. `npm run check -- <job>` lints it.

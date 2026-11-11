@@ -7,6 +7,7 @@
 // transition, sound or film-finish name. Warnings: flicker on a middle title, a sound on every cut, more than 2 big punches, a possible
 // forced triad, the script shape (40-55 words, 15-20 s; over 25 s cut a middle sentence), and beat-sync on with no bed.
 import { existsSync, readFileSync, statSync } from 'fs';
+import { coverage, showcaseHas, sourceCatalogIds } from './menu.mjs';
 import { join, resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
@@ -107,6 +108,38 @@ if (target) {
   const self = { label: 'copy lint self-test', errs: miss.map(x => `lint missed: "${x}"`), warns: [] };
   if (R.lintCopy('Drop your clip in the inbox and ask for the reel.').errs.length) self.errs.push('lint flagged a clean line');
   results.push(self);
+
+  const menuCov = coverage();
+  results.push({
+    label: 'menu covers catalogs',
+    errs: menuCov.missing.map(x => 'menu missing ' + x),
+    warns: menuCov.extra.map(x => 'menu extra ' + x),
+  });
+  const htmlPath = join(ROOT, 'showcase', 'index.html');
+  if (!existsSync(htmlPath)) {
+    results.push({ label: 'showcase/index.html covers catalogs', errs: ['showcase/index.html is missing; run npm run showcase'], warns: [] });
+  } else {
+    const html = readFileSync(htmlPath, 'utf8');
+    const ids = sourceCatalogIds();
+    const has = showcaseHas(html, ids);
+    const errs = has.missing.map(x => 'showcase missing ' + x);
+    // Visual kinds should also have a still under showcase/media so a new effect cannot hide.
+    const visual = ['finish', 'effect', 'transition', 'font', 'theme', 'entrance', 'look', 'captionStyle'];
+    for (const kind of visual) {
+      for (const id of ids[kind] || []) {
+        const token = `data-id="${kind}:${id}"`;
+        if (!html.includes(token)) continue;
+        const base = join(ROOT, 'showcase', 'media');
+        const dirs = {
+          finish: 'finish', effect: 'effect', transition: 'transition', font: 'font',
+          theme: 'theme', entrance: 'entrance', look: 'look', captionStyle: 'caption',
+        };
+        const img = join(base, dirs[kind], id + '.jpg');
+        if (!existsSync(img) || !statSync(img).size) errs.push(`showcase still missing ${kind}:${id} (${img})`);
+      }
+    }
+    results.push({ label: 'showcase/index.html covers catalogs', errs, warns: [] });
+  }
 }
 let bad = 0;
 for (const r of results) {
