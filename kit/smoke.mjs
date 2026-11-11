@@ -131,6 +131,44 @@ try {
     const c = readFileSync(join(b, 'stills', 't0.90.png'));
     if (Buffer.compare(a, c) === 0) fail('one-word stills at 0.30 and 0.90 should show different words');
   });
+  // alpha ink of a layer still: rows with any pixel over half opaque -> { n, y0, y1, mid }
+  const ink = png => {
+    const raw = execFileSync('ffmpeg', ['-v', 'error', '-i', png, '-vf', 'alphaextract', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], { maxBuffer: 1 << 26 });
+    let n = 0, y0 = -1, y1 = -1;
+    for (let y = 0; y < 1920; y++) { let row = 0; for (let x = 0; x < 1080; x++) if (raw[y * 1080 + x] > 128) row++; if (row) { n += row; if (y0 < 0) y0 = y; y1 = y; } }
+    return { n, y0, y1, mid: (y0 + y1) / 2 };
+  };
+  const layered = (dir, doc, times, env = {}) => {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(doc) + ';\n');
+    run(node, [join(KIT, 'render.mjs'), '0', times.map(t => t.toFixed(2)).join(',')], dir, { THEME: 'aigent', FONTS: 'theme', STILLS_LAYERS: '1', ...env });
+    return t => ({ titles: ink(join(dir, 'stills-titles', `t${t.toFixed(2)}.png`)), front: ink(join(dir, 'stills-front', `t${t.toFixed(2)}.png`)) });
+  };
+  step('titles: slam lands behind the head, rises high, partner line in front', () => {
+    const at = layered(join(work, 'slam'), { captionStyle: 'kinetic', flips: [{ start: 0, end: 2.4, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam', flicker: false }] }, [0.15, 1.4]);
+    const a = at(0.15), b = at(1.4);
+    if (!a.titles.n || !b.titles.n) fail('slam title missing on the titles layer');
+    if (a.titles.mid < 520) fail('slam should land low, behind the head (centre ' + a.titles.mid + ')');
+    if (a.titles.mid - b.titles.mid < 200) fail('slam should rise after landing: ' + a.titles.mid + ' -> ' + b.titles.mid);
+    if (b.titles.y1 > 470) fail('resting title should sit high so the word clears the head, bottom at ' + b.titles.y1);
+    if (a.front.n) fail('partner words should wait for the rise');
+    if (!b.front.n) fail('partner words should draw on the front layer (in front of the person)');
+    if (b.front.y0 < b.titles.y1 - 10) fail('partner line should hang below the hero: ' + JSON.stringify(b));
+    const still = layered(join(work, 'slam-norise'), { captionStyle: 'kinetic', titleRise: false, flips: [{ start: 0, end: 2.4, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam', flicker: false }] }, [0.4]);
+    const c = still(0.4);
+    if (Math.abs(c.titles.mid - b.titles.mid) > 30) fail('titleRise false should land at the resting height: ' + c.titles.mid + ' vs ' + b.titles.mid);
+  });
+  step('one-word: exactly one word on screen, title included', () => {
+    const at = layered(join(work, 'one-word-title'), { captionStyle: 'one-word', flips: [
+      { start: 0, end: 0.9, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam', flicker: false },
+      { start: 0, end: 2, text: 'Record one take', mode: 0, words: [[0, 0.6, 'Record'], [0.6, 1.2, 'one'], [1.2, 2, 'take']] }] }, [0.3, 1.5]);
+    const a = at(0.3), b = at(1.5);
+    if (!a.titles.n) fail('title word missing');
+    if (a.front.n) fail('one-word: caption or partner words drawn while the title is up');
+    if (a.titles.y1 - a.titles.y0 > 330) fail('one-word title should be a single word, ink height ' + (a.titles.y1 - a.titles.y0));
+    if (b.titles.n || !b.front.n) fail('one-word: after the title the caption word should be the only word');
+    if (b.front.y1 - b.front.y0 > 330) fail('one-word caption should be one line, ink height ' + (b.front.y1 - b.front.y0));
+  });
   step('render overlay frames (2 s)', () => {
  run(node, [join(KIT, 'render.mjs'), '2'], build); const n = readdirSync(join(build, 'ovl')).length; if (n !== 48) fail('frames ' + n); });
   step('sfx pack manifest + auto-pick', () => {

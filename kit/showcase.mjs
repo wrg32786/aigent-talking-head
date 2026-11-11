@@ -261,7 +261,8 @@ function captionsDoc(style, fonts, titles) {
   if (titles) {
     titles.forEach((ent, i) => flips.push({ start: i * 1.2, end: i * 1.2 + 1.1, text: 'Record one take', mode: 7, hero: [0], entrance: ent }));
   } else {
-    flips.push({ start: 0, end: 2.4, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam' });
+    // one-word keeps one word on screen: the title is the word until it leaves, then the caption words take over
+    flips.push({ start: 0, end: style === 'one-word' ? 0.9 : 2.4, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam' });
   }
   flips.push({ start: 0, end: 2.4, text: 'Record one take on your phone', mode: 0, words, hero: 'record' });
   return { captionStyle: style, ...(fonts ? { fonts } : {}), flips };
@@ -383,7 +384,8 @@ async function main() {
   console.log('type stills');
   const build = join(work, 'type');
   mkdirSync(build, { recursive: true });
-  const mid = 0.7;
+  const mid = 1.0; // after the default slam title has risen to its resting height
+  const stillAt = style => (style === 'one-word' ? 1.5 : mid); // one-word: after the title, on the word "phone"
   const typeOrCard = (kind, it, fn) => {
     const out = join(OUT, 'media', kind, it.id + '.jpg');
     try { fn(out); }
@@ -396,7 +398,7 @@ async function main() {
   for (const st of menu.sections.find(s => s.id === 'caption-styles').items) {
     typeOrCard('caption', st, out => {
       writeFileSync(join(build, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(captionsDoc(st.id, 'theme')) + ';\n');
-      typeStill(build, mid, { THEME: 'aigent', FONTS: 'theme' }, out);
+      typeStill(build, stillAt(st.id), { THEME: 'aigent', FONTS: 'theme' }, out);
     });
   }
   for (const fo of menu.sections.find(s => s.id === 'fonts').items) {
@@ -411,19 +413,20 @@ async function main() {
       typeStill(build, mid, { THEME: th.id }, out);
     });
   }
-  const lookStyle = { kinetic: 'kinetic', muse: 'pill', classic: 'classic' };
+  const lookStyle = { kinetic: 'kinetic', muse: 'pill', classic: 'classic', 'one-word': 'one-word' };
   for (const lk of menu.sections.find(s => s.id === 'looks').items) {
     typeOrCard('look', lk, out => {
       const doc = captionsDoc(lookStyle[lk.id] || 'kinetic', 'theme');
       if (lk.id === 'classic') doc.flips = doc.flips.filter(f => f.mode !== 7);
       writeFileSync(join(build, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(doc) + ';\n');
-      typeStill(build, mid, { THEME: 'aigent', FONTS: 'theme' }, out);
+      typeStill(build, stillAt(lookStyle[lk.id] || 'kinetic'), { THEME: 'aigent', FONTS: 'theme' }, out);
     });
   }
   const ents = menu.sections.find(s => s.id === 'title-entrances').items;
   try {
     writeFileSync(join(build, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(captionsDoc('kinetic', 'theme', ents.map(i => i.id))) + ';\n');
-    const entTimes = ents.map((_, i) => (i * 1.2 + 0.15).toFixed(2));
+    // slam is shown after it lands and rises clear of the head; the rest mid-entrance
+    const entTimes = ents.map((it, i) => (i * 1.2 + (it.id === 'slam' ? 1.0 : 0.15)).toFixed(2));
     for (const d of ['stills', 'stills-front', 'stills-titles']) {
       if (existsSync(join(build, d))) rmSync(join(build, d), { recursive: true, force: true });
     }
@@ -446,10 +449,10 @@ async function main() {
     }
   }
 
-  const presetSec = menu.sections.find(s => s.id === 'presets');
-  if (presetSec) {
+  const presetTiles = menu.sections.find(s => s.id === 'presets');
+  if (presetTiles) {
     console.log('presets');
-    for (const pr of presetSec.items) {
+    for (const pr of presetTiles.items) {
       const full = Preset.load(pr.id) || {};
       typeOrCard('preset', pr, out => {
         const style = full.captionStyle || 'kinetic';
@@ -468,7 +471,7 @@ async function main() {
         }
         const prev = PERSON;
         PERSON = plate;
-        try { typeStill(build, mid, { THEME: theme, FONTS: fonts }, out); }
+        try { typeStill(build, stillAt(style), { THEME: theme, FONTS: fonts }, out); }
         finally { PERSON = prev; }
       });
     }
