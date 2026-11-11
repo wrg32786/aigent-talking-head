@@ -1,7 +1,7 @@
 // One command from a phone clip (or several takes) to a draft reel.
 //   npm run reel                        -> the takes in inbox/ (every video from the newest recording session; one file is fine)
 //   npm run reel -- inbox/my-take.mov   -> that file;  npm run reel -- inbox/a.mov inbox/b.mov  -> those takes
-// Options: --theme aigent|neutral (default neutral)  --cropx 0.4 (face left of centre)  --model medium.en
+// Options: --theme aigent|neutral (default aigent)  --cropx 0.4 (face left of centre)  --model medium.en
 //          --name <job>  --clips <dir> (reuse an existing clip.py folder, skips transcription)  --newest (inbox: newest file only)
 //          --hook <take> (first sentence from this take: your most extreme angle)
 //          --look kinetic|muse|classic (default kinetic: every word animated + one kinetic title per beat behind the head;
@@ -105,7 +105,7 @@ if (!flag('rebuild')) {
   if (logo) fs.copyFileSync(path.resolve(logo), path.join(build, path.basename(logo)));
   sh(process.execPath, [path.join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--force', TITLES ? '--titles' : '--hero', '--style', STYLE, ...(FONTS ? ['--fonts', FONTS] : []), ...(logo ? ['--logo', path.basename(logo)] : [])], build);
   // 4. theme
-  const th = path.join(KIT, 'themes', opt('theme', 'neutral') + '.js');
+  const th = path.join(KIT, 'themes', opt('theme', 'aigent') + '.js');
   if (!fs.existsSync(th)) die('No theme ' + th);
   fs.copyFileSync(th, path.join(build, 'theme.js'));
   if (flag('draft')) { console.log(`\nDraft ready. Edit ${build}/captions.js (and cut.json), then: npm run reel -- --rebuild --name ${name}`); process.exit(0); }

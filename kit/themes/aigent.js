@@ -1,4 +1,4 @@
-// AIgent preset (Plinth dark brand guide). Accent #5cf9e2 is the only cyan; cards are square.
+// AIgent preset (Plinth dark brand guide), the default look. Accent #5cf9e2 is the only cyan; cards are square.
 // Captions: Hanken Grotesk 400. Hero words, stickers, cards: Sofia Sans Extra Condensed caps 760-860.
 window.THEME = {
   name: 'aigent',

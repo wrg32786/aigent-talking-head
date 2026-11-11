@@ -2,6 +2,8 @@
 
 ## 1.2.0 (unreleased)
 
+- **Public-ready sanitization.** AIgent is the default theme (`--theme neutral` for an unbranded offline look). The HeyGen retake example no longer includes account or asset ids.
+
 Edit rules from the Muse reel workflow, plus parts of a motion design pack, adapted to 1080x1920 at 24 fps.
 
 - **Cinematic SFX pack.** 31 Will-approved sounds in `kit/sfx/` (`sfx.json`), all CC0. `npm run fx` auto-picks one per effect hit (category map, no-repeat rotation, hit-point alignment, risers ending on the hit, releases after heavy hits, ducked under the voice). Override with `"sfx": "<id>"` or `"sfx": false` on an effect, or `--sfx off`. `--bed-start` sets where a music bed begins. The locked cut-seam set is unchanged.
