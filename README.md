@@ -25,6 +25,7 @@ HeyGen cinematic takes are an optional second source; they cut in the same way a
    ```
    npm run reel                          # newest video in inbox/, AIgent theme
    npm run reel -- inbox/my-take.mov --theme neutral --cropx 0.4 --bed vinyl-sunrise --bed-start 0
+   npm run reel -- inbox/my-take.mov --bed vinyl-sunrise --finish grain,vignette
    npm run music                         # list the music beds
    npm run reel -- inbox/take1.mov inbox/take2.mov --hook take2.mov --fonts druk
    ```
@@ -98,6 +99,8 @@ These are defaults in `cut.json`; `npm run check -- <job>` flags anything that b
 - **Zoom punch.** `"punch": 0.1` scales every other segment 10% so each cut lands as a jump; `false` turns it off. `"bigPunch": true` on a segment eases in another 12% over 0.3 s; `npm run reel` puts it on the cut after the hook and the cut into the payoff. `"zoom"` and `"punchY"` per segment override the amount and the vertical centre.
 - **Transitions.** The glitch seam stays the default. `"transition": "crossfade"` on a segment (or at the top level for all of them) uses an ffmpeg xfade instead; `"transitionDur"` sets the length. The 50 names (crossfade, dip, flash, whip, iris, zoom, pixelate, ...) are in `kit/transitions.json` and `effects/CATALOG.md`.
 - **Sounds.** Fewer and deeper. The locked cut-seam set is `whoosh`, `swipe`, `boom`, `click`, `typing` (mono 48 kHz WAV, CC0), used as `"sfx": {"whoosh": [3.2], "boom": [[12.4, 0.55]]}`. Never a sound on every cut, and the key moment (the payoff) gets the loudest one. A 31-sound cinematic pack in `kit/sfx/` (see `kit/sfx/sfx.json`) is auto-picked on `npm run fx` for each effect hit: category mapping, no-repeat rotation, the hit point aligned to the effect, risers ending on the hit, releases after heavy hits, ducked under the voice. Override per effect with `"sfx": "01-cinematic-hit-a"` or `"sfx": false`, or turn the pack off with `--sfx off`. You still pick sounds by ear.
+- **Beat-sync.** When a bed is set, `kit/beats.py` analyses it from `bedStart` for the reel length and writes `build/beat-grid.json` (tempo, beats, onsets, energy, strong drops). `"beatSync": true` (the default with a bed; `--no-beat-sync` or `"beatSync": false` to turn it off) snaps zoom punches, SFX, fx hit points and title entrances to the nearest beat or onset within 120 ms (`"beatWindow"`), and adds a short camera shake on strong drops, at most two per shot. Speech cuts and lip sync do not move. Needs `librosa` (`pip install -r requirements.txt`).
+- **Film finish.** `"finish": "grain"` (or a list, or `{ "grain": { "intensity": 0.4 } }`) applies an ffmpeg look to the picture, before titles and captions, so the type stays clean. Names: `grain`, `vignette`, `chroma`, `scan-lines`, `warm`, `cool`, `teal`, `crushed`, `mono`, `bleach`. Set it on the whole cut or on one segment. No LUT files or light-leak overlays. `--finish grain,vignette` on `npm run reel`.
 - **Copy.** No em or en dashes, no "not X, but Y", no staged run-ups ("Here's the thing:"), no dramatic closers, no hype words. `npm run check` lints the captions, titles and card copy.
 - **Script shape.** A hook, one reveal per beat, a payoff: 40 to 55 words, 15 to 20 s. Over 25 s, cut a middle sentence.
 

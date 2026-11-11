@@ -21,6 +21,10 @@ What this repo ships from other projects, and what it only took ideas from. Lice
 | `kit/fonts/*.ttf` | [Google Fonts](https://github.com/google/fonts): Archivo Black, Allura, Pinyon Script, Unbounded, Hanken Grotesk, Marcellus, Instrument Serif, Crimson Pro, Libre Caslon Text. Unmodified. | SIL Open Font License 1.1, each with its `OFL-<name>.txt`. Marcellus has the Reserved Font Name "Marcellus". |
 | `effects/vendor/claude-video-effects/` | Vibha Ramprakash, see `NOTICE` | MIT (models and fonts keep their own licences) |
 
+## Adapted from Will's other work
+
+- **Beat grid and film-finish looks** (`kit/beats.py`, `kit/beats.cjs`): the librosa analysis (tempo, beats, onsets, RMS energy, drop spikes plus an intensity filter) and the ffmpeg-builtin film looks (grain, vignette, chromatic aberration, scan lines, colour grades) are adapted from Will Gwyn's private `music-video` project (`pipeline/audio_analysis.py`, `pipeline/effects_planner.py`, `pipeline/scene_effects.py`). Relicensed Apache-2.0 by the author for this repo. No brand portraits, project files, LUT `.cube` files or light-leak overlays were copied.
+
 ## Ideas adapted (no code copied)
 
 - **Transition names** (`kit/transitions.json`): the mapping of friendly names to stock ffmpeg `xfade` modes follows motion-pack's `transitions/lib/xfade.js`. motion-pack code is MIT; the map was rewritten as JSON here.
@@ -46,6 +50,7 @@ These are fetched by `npm run effects:setup` (and the BiRefNet weights on first 
 |---|---|---|
 | rembg (Python package) | [danielgatis/rembg](https://github.com/danielgatis/rembg), [LICENSE.txt](https://github.com/danielgatis/rembg/blob/main/LICENSE.txt) | MIT, Copyright (c) 2020 Daniel Gatis. Covers rembg's code only, not third-party model weights. |
 | onnxruntime (Python package) | [microsoft/onnxruntime](https://github.com/microsoft/onnxruntime), [LICENSE](https://github.com/microsoft/onnxruntime/blob/main/LICENSE) | MIT, Copyright (c) Microsoft Corporation. |
+| librosa (Python package) | [librosa/librosa](https://github.com/librosa/librosa), [LICENSE.md](https://github.com/librosa/librosa/blob/main/LICENSE.md) | ISC. Beat / onset / energy analysis in `kit/beats.py`. Pulled in by `pip install -r requirements.txt`, not in git. Runtime deps (numpy, scipy, soundfile, numba, and soxr for resampling) stay at install time; soxr is LGPL-2.1, same class of requirement as the ffmpeg binary already needed by the kit. |
 | birefnet-general-lite weights (`BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx`, md5 `4fab47adc4ff364be1713e97b7e66334`) | Hosted by rembg at [releases/v0.0.0](https://github.com/danielgatis/rembg/releases/download/v0.0.0/BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx). Upstream: [ZhengPeng7/BiRefNet](https://github.com/ZhengPeng7/BiRefNet), [LICENSE](https://github.com/ZhengPeng7/BiRefNet/blob/main/LICENSE). The author confirmed that the released checkpoints are also MIT ([issue 316](https://github.com/ZhengPeng7/BiRefNet/issues/316)); the [BiRefNet_lite](https://huggingface.co/ZhengPeng7/BiRefNet_lite) model card is `license: mit`. | MIT, Copyright (c) 2024 ZhengPeng. Cached by rembg (typically `~/.rembg/models/birefnet-general-lite/`), about 214 MB. |
 
 Do not use rembg's default `bria-rmbg` model with this kit: RMBG-2.0 has a separate BRIA licence that requires a paid agreement for commercial use.

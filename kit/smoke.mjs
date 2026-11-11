@@ -18,6 +18,7 @@ import { fileURLToPath } from 'url';
 import { findChrome } from './chrome.mjs';
 import { createRequire } from 'module';
 const SFXPLAN = createRequire(import.meta.url)('./sfx-plan.cjs');
+const B = createRequire(import.meta.url)('./beats.cjs');
 
 const KIT = dirname(fileURLToPath(import.meta.url));
 const keep = process.argv.includes('--keep'), whisper = process.argv.includes('--whisper');
@@ -263,6 +264,81 @@ try {
     if (!existsSync(join(v, 'contact.png'))) fail('no contact sheet');
     if (readdirSync(v).filter(f => /title-mid/.test(f)).length !== 4 || readdirSync(v).filter(f => /big-punch/.test(f)).length !== 2) fail('verify stills: ' + readdirSync(v));
   });
+  step('beat-sync helpers: snap within 120 ms, never move speech cuts, cap two drop shakes per shot; unknown finish fails check', () => {
+    const times = [0, 0.5, 1.0, 1.5, 2.0];
+    const hit = B.snap(1.08, times, 0.12);
+    if (!hit.snapped || Math.abs(hit.t - 1.0) > 1e-6) fail('should snap 1.08 to 1.00: ' + JSON.stringify(hit));
+    const miss = B.snap(1.25, times, 0.12);
+    if (miss.snapped || miss.t !== 1.25) fail('1.25 is outside the window: ' + JSON.stringify(miss));
+    const cut = {
+      segs: [
+        { file: 'a.mp4', in: 0.4, out: 1.82 },
+        { file: 'b.mp4', in: 0.2, out: 1.4, bigPunch: true }
+      ],
+      tail: 0.3, punch: 0.1, bed: 'x.wav', beatSync: true,
+      sfx: { whoosh: [1.5], boom: [[2.68, 0.55]] },
+      hits: [[1.52, 24]],
+      sfxHits: [{ id: '11-pop-sticker', t: 1.08 }]
+    };
+    const caps = { flips: [{ start: 0.05, end: 1.4, text: 'Stay put', mode: 0 }, { start: 1.58, end: 2.8, text: 'SNAP ME', mode: 7 }] };
+    const grid = { tempo_bpm: 120, beats: [0, 0.5, 1.0, 1.5, 2.0, 2.5], onsets: [1.0, 1.5], drops: [
+      { time: 1.52, intensity: 0.95, type: 'energy_spike' },
+      { time: 1.7, intensity: 0.92, type: 'energy_spike' },
+      { time: 1.85, intensity: 0.99, type: 'energy_spike' },
+      { time: 2.6, intensity: 0.9, type: 'energy_spike' }
+    ] };
+    const { cut: c2, captions } = B.applySync(cut, caps, grid);
+    if (c2.segs[0].in !== 0.4 || c2.segs[0].out !== 1.82 || c2.segs[1].in !== 0.2 || c2.segs[1].out !== 1.4) fail('speech cuts moved: ' + JSON.stringify(c2.segs));
+    const whoosh = Array.isArray(c2.sfx.whoosh[0]) ? c2.sfx.whoosh[0][0] : c2.sfx.whoosh[0];
+    if (Math.abs(whoosh - 1.5) > 1e-6) fail('whoosh should sit on 1.5: ' + JSON.stringify(c2.sfx));
+    if (Math.abs(c2.sfxHits[0].t - 1.0) > 1e-6) fail('pack hit should snap 1.08 -> 1.0: ' + JSON.stringify(c2.sfxHits));
+    const title = captions.flips.find(f => f.mode === 7);
+    if (Math.abs(title.start - 1.5) > 0.011) fail('title entrance should snap to 1.5: ' + title.start);
+    if (Math.abs(captions.flips[0].start - 0.05) > 1e-6) fail('speech caption moved');
+    // first drop is already on a snapped hit; the next two are in seg 1; cap is 2
+    const inSeg1 = (c2.dropHits || []).filter(([t]) => t >= 1.5 && t < 2.7);
+    if (inSeg1.length > B.MAX_SHAKES_PER_SEG) fail('drop-shake cap broken: ' + JSON.stringify(c2.dropHits));
+    if (Math.abs((c2.segs[1].punchDelay || 0) - 0.08) > 0.011) fail('big punch should delay ~80 ms to the 1.5s beat, got ' + c2.segs[1].punchDelay);
+    if (B.finishChain(['grain', 'vignette']).indexOf('noise=') < 0 || B.finishChain('chroma').indexOf('rgbashift') < 0) fail('finish chain');
+    if (B.finishName('scan_lines') !== 'scan_lines' && !B.FINISH['scan-lines']) fail('scan-lines alias');
+    const b = join(work, 'jobs', 'muse', 'build');
+    const keep = readFileSync(join(b, 'cut.json'), 'utf8');
+    writeFileSync(join(b, 'cut.json'), JSON.stringify({ ...JSON.parse(keep), finish: 'not-a-look' }));
+    try { run(node, [join(KIT, 'check.mjs'), b], work); fail('check passed unknown finish'); } catch (e) { if (!/unknown finish/.test(String(e.stdout || e.message || ''))) throw e; }
+    writeFileSync(join(b, 'cut.json'), keep);
+  });
+  step('film finish: grain+vignette changes the picture, not the duration', () => {
+    const b = join(work, 'jobs', 'muse', 'build');
+    const cut = JSON.parse(readFileSync(join(b, 'cut.json'), 'utf8'));
+    const plain = { ...cut, overlay: undefined, titles: undefined, mask: undefined, sfx: {}, hits: [], dropHits: [], punch: false, finish: undefined, beatSync: false, segs: cut.segs.map(({ bigPunch, punchDelay, finish, ...s }) => s) };
+    writeFileSync(join(b, 'cut.json'), JSON.stringify(plain)); run(node, [join(KIT, 'assemble.cjs'), 'fin-plain.mp4'], b);
+    writeFileSync(join(b, 'cut.json'), JSON.stringify({ ...plain, finish: ['grain', 'vignette'] })); run(node, [join(KIT, 'assemble.cjs'), 'fin-look.mp4'], b);
+    const d = f => +run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', f], b).trim();
+    if (Math.abs(d('fin-plain.mp4') - d('fin-look.mp4')) > 0.05) fail('finish changed the length');
+    const frame = (f, t) => execFileSync('ffmpeg', ['-v', 'error', '-ss', String(t), '-i', f, '-frames:v', '1', '-vf', 'scale=108:192', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], { cwd: b });
+    const diff = (x, y) => x.reduce((a, v, k) => a + Math.abs(v - y[k]), 0) / x.length;
+    if (diff(frame('fin-plain.mp4', 0.8), frame('fin-look.mp4', 0.8)) < 0.5) fail('finish did not change the picture');
+    writeFileSync(join(b, 'cut.json'), JSON.stringify(cut));
+  });
+  {
+    const py = process.env.PYTHON || (process.platform === 'win32' ? 'py' : 'python3');
+    let has = false;
+    try { run(py, ['-c', 'import librosa']); has = true; } catch {}
+    if (has) step('beats.py on a click bed + python tests', () => {
+      const o = run(py, [join(dirname(KIT), 'tests', 'test_beats.py')], work);
+      if (!/OK/.test(o) && !/OK$/.test(o.trim().split('\n').pop() || '')) {
+        // unittest prints OK to stderr; execFileSync merges? we only have stdout. Accept exit 0.
+      }
+      run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'aevalsrc=0.8*lt(mod(t\\,0.5)\\,0.012)*sin(2*PI*1000*t):s=48000:d=6', 'clicks.wav'], work);
+      const out = join(work, 'grid.json');
+      const log = run(py, [join(KIT, 'beats.py'), join(work, 'clicks.wav'), '--start', '0.5', '--duration', '4', '--out', out], work);
+      const g = JSON.parse(readFileSync(out, 'utf8'));
+      if (!(g.tempo_bpm > 80 && g.tempo_bpm < 160) || !g.beats.length) fail('click grid: ' + log + JSON.stringify(g));
+      if (g.bed_start !== 0.5) fail('bed_start not recorded');
+      if (Math.min(...g.beats) < -0.01) fail('beats should be on the reel clock');
+    });
+    else console.log('- beats.py on a click bed + python tests ... skipped (pip install -r requirements.txt for librosa)');
+  }
   if (effects) step('effects pass: moody + locked-on + checklist (captions off) + glass-widgets (no pill, no upstream sample content), check frames + render', () => {
     if (!existsSync(fxPy)) fail('effects not set up: npm run effects:setup');
     run(node, [join(dirname(KIT), 'effects', 'check.mjs')], work);

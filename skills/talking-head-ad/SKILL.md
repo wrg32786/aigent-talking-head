@@ -35,6 +35,7 @@ Skip this when the teammate already has a script.
 3. Draft it: `npm run reel -- inbox/<file> [inbox/<take2> ...] --theme <name> [--fonts druk] [--hook <take>] [--bed <library name>|music.wav] [--bed-start 0] [--cropx 0.4] --draft`
    - `--cropx` moves the 9:16 crop for a sideways clip (0 left, 0.5 centre, 1 right). Read `jobs/<name>/clips/clips-sheet.png` to check the face is in frame.
    - `--model medium.en` is faster than the default large-v3 for a first pass.
+   - With a bed, beat-sync is on by default: punches, SFX and title entrances snap to the bed (speech cuts stay put). Pass `--no-beat-sync` to leave the times alone, or `--finish grain,vignette` for a film look on the picture.
 4. Read `jobs/<name>/clips/clips.md`. `npm run reel` already dropped every `retake` row. Remove slates and asides ("Okay, take two...") from `build/cut.json`, and trim the `out` of clips that end mid-move.
 5. Edit `build/captions.js`. It's a draft with every phrase in the caption style (`kinetic` by default, key words in `emph`), and one title per beat as a mode 7 flip. Fix misheard words against what the teammate said, rewrite titles that don't read as a headline, and add a count-up, card or CTA if wanted (see step 4 below).
 6. Build it: `npm run reel -- --rebuild --name <name>` writes `jobs/<name>/reel-vN.mp4`, a new number each time.
@@ -147,6 +148,8 @@ Use this when mixing sources or when you need finer control. Work in a job folde
 - Don't invent new raw synthetic noise swooshes; they read as cheap static. Use the shipped pack (which includes Will-approved cinematic synths) or a CC0 file the human has already chosen.
 - To choose new sounds, run `node kit/fs.mjs "<query>"` (CC0 only). Build an audition with one 3 s seam clip per candidate and let a human pick by ear. An agent can't hear.
 - `bed` is the music: a library name from `kit/music/beds.json` (`"bed": "vinyl-sunrise"`) or a file path. Pass `--bed <name> --bed-start 0` on `npm run reel`, or set `bed` / `bedStart` in `cut.json`. A bed the human has timed starts at 0 with `bedNoFade`; otherwise pick a musical start with `bedStart`. It ducks under the voice automatically. Every library bed sits at -13 LUFS, so `bedVol` 0.16 fits all of them; for your own file, use about 0.16 near -13 LUFS or 0.22 near -16. Add new tracks with `npm run music:add -- <file>`, never by copying a file in by hand.
+- **Beat-sync.** On by default when a bed is set (`"beatSync": true`, or `--beat-sync`). `kit/beats.py` writes `build/beat-grid.json` from the bed at `bedStart` for the reel length. Punches, locked-set and pack SFX, fx hit points and title entrances snap to the nearest beat or onset within 120 ms (`"beatWindow"`). Strong drops get a short camera shake, at most two per shot. Never move `segs[].in` / `out` (lip sync stays put). Turn it off with `--no-beat-sync` or `"beatSync": false` if the human has already timed the accents by hand. Needs librosa (`pip install -r requirements.txt`).
+- **Film finish.** `"finish": "grain"` (or `["grain","vignette"]`, or `{ "grain": { "intensity": 0.4 } }`) on the cut or a segment. Looks: `grain`, `vignette`, `chroma`, `scan-lines`, `warm`, `cool`, `teal`, `crushed`, `mono`, `bleach`. Applied on the picture before titles, so captions stay sharp. `--finish grain,vignette` on `npm run reel`. No LUT or light-leak files.
 
 ## 6. Verify every version
 

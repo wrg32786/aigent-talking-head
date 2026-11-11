@@ -12,6 +12,8 @@
 //          --draft (stop after captions.js so you can edit it)  --rebuild (re-render + re-assemble an edited job)
 //          --bed <name from npm run music> or --bed music.wav  --bed-start 0  --logo logo.svg  --jobs <dir> (default jobs/)  --force
 //          --sfx off  (skip locked-set sounds on this draft; also used by npm run fx)
+//          --beat-sync / --no-beat-sync  (default on when a bed is set: snap punches, SFX, titles and fx hits to the bed)
+//          --finish grain[,vignette,...]  optional film look (grain, vignette, chroma, scan-lines, warm, cool, teal, crushed, mono, bleach)
 // Writes jobs/<name>/: clips/ (clip.py output), build/ (cut.json, captions.js, theme.js, overlay frames), reel-vN.mp4.
 // Steps: clip.py (Whisper, best take per sentence, retakes flagged) -> cut.json from every "keep" clip (zoom punch on
 // every cut, big punch after the hook and into the payoff, a few sounds on the key cuts only) -> autocaption ->
@@ -22,12 +24,13 @@ const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const R = require('./rules.cjs');
+const B = require('./beats.cjs');
 
 const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask']);
+const VALUED = new Set(['theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'finish']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const die = m => { console.error(m); process.exit(1); };
@@ -98,6 +101,9 @@ if (!flag('rebuild')) {
   }
   // a library name stays a name in cut.json (portable across machines); your own file becomes an absolute path
   const bed = opt('bed'); if (bed) Object.assign(cut, { bed: require('./rules.cjs').isBed(bed) ? bed : path.resolve(bed), bedVol: 0.16, ...(opt('bed-start') != null ? { bedStart: +opt('bed-start') } : {}) });
+  if (flag('no-beat-sync')) cut.beatSync = false;
+  else if (flag('beat-sync') || bed) cut.beatSync = true;
+  const finish = opt('finish'); if (finish) { try { B.parseFinish(finish); } catch (e) { die(e.message); } cut.finish = finish; }
   if (fs.existsSync(path.join(build, 'cut.json')) && !flag('force')) die('build/cut.json exists. Use --rebuild to render your edits, or --force to redraft.');
   fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
   console.log(`cut.json: ${segs.length} segments, seams ${JSON.stringify(seams)}`);
@@ -112,8 +118,26 @@ if (!flag('rebuild')) {
   if (flag('draft')) { console.log(`\nDraft ready. Edit ${build}/captions.js (and cut.json), then: npm run reel -- --rebuild --name ${name}`); process.exit(0); }
 }
 
-// 5. render + assemble
-const cut = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8'));
+// 5. beat-sync (optional), then render + assemble
+let cut = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8'));
+if (flag('no-beat-sync')) cut.beatSync = false;
+else if (flag('beat-sync')) cut.beatSync = true;
+if (B.wantBeatSync(cut) && cut.bed) {
+  const grid = B.analyseBed(cut, build, { required: flag('beat-sync'), python: PY });
+  if (grid) {
+    const capFile = path.join(build, 'captions.js');
+    const caps = fs.existsSync(capFile) ? R.readCaptions(capFile) : null;
+    const synced = B.applySync(cut, caps, grid);
+    cut = synced.cut;
+    fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
+    if (synced.captions) B.writeCaptions(capFile, synced.captions);
+    const nDrop = (cut.dropHits || []).length;
+    console.log(`beat-sync: ${grid.tempo_bpm} BPM, ${(grid.beats || []).length} beats, ${nDrop} drop shakes (window ${B.windowOf(cut)}s); speech cuts unchanged`);
+  }
+} else if (cut.dropHits) {
+  delete cut.dropHits;
+  fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
+}
 const LEN = cut.segs.reduce((a, s) => a + (s.out - s.in) + (s.pad || 0), 0) + (cut.tail ?? 0.3);
 // copy lint and title/sound rules: printed, not blocking (npm run check -- <name> and npm run verify fail on errors)
 try { sh(process.execPath, [path.join(KIT, 'check.mjs'), build, '--warn-only'], build); } catch {}
