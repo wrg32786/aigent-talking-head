@@ -271,7 +271,7 @@ try {
     if (!existsSync(join(v, 'contact.png'))) fail('no contact sheet');
     if (readdirSync(v).filter(f => /title-mid/.test(f)).length !== 4 || readdirSync(v).filter(f => /big-punch/.test(f)).length !== 2) fail('verify stills: ' + readdirSync(v));
   });
-  if (effects) step('effects pass: moody + locked-on + checklist (captions off) + glass-widgets (no pill, no upstream sample content), check frames + render', () => {
+  if (effects) step('effects pass: moody + locked-on + backdrop-word + checklist (captions off) + glass-widgets (no pill, no upstream sample content), check frames + render', () => {
     if (!existsSync(fxPy)) fail('effects not set up: npm run effects:setup');
     run(node, [join(dirname(KIT), 'effects', 'check.mjs')], work);
     const plan = join(work, 'fx.json');
@@ -279,6 +279,7 @@ try {
       { fx: 'moody', start: 0, end: 1.2, grade: 'cool' },
       { fx: 'locked-on', start: 0.2, end: 1.4, text: 'SMOKE' },
       { fx: 'checklist', start: 1.6, end: 3.1, text: 'Record::phone|Drop::inbox|Ask::your agent', title: 'Smoke test' },
+      { fx: 'backdrop-word', start: 0.4, end: 1.5, text: 'SMOKE' },
       { fx: 'glass-widgets', start: 2.2, end: 3.2, text: '3X', title: 'Smoke', sub: 'reels|this week', chart: 'Signups::1.2K::3|5|8|13|21' }] }));
     // glass-widgets has no pill unless the plan opts in
     const jobs = join(work, 'jobs'), fxdir = join(jobs, 'smoke-reel', 'build', 'fx');

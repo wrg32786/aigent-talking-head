@@ -95,7 +95,7 @@ These effects ship with the upstream author's brand names, handle or demo stats 
 | 3 | `locked-on` 🎥 | Corner brackets snap onto your face and the camera follows you, with a tag pill under the face. | hook, claim | medium | face, segmentation | 1.5-3.5 s | **safe**: Camera move; captions are added after, so they never zoom. | backdrop-word, scribble | other camera effects in the same window |
 | 4 | `orbit` | Your reels circle your head: in front at the bottom, behind you at the top. | proof, hook | high | face, segmentation, images | 2.5-4 s | **check**: The front of the ring passes around chest height; check frames against the caption band. | spotlight, slow-push | carousel-spin, fan-build, noise |
 | 5 | `lean-in` 🎥 | A fast punch-in on one word. | claim, reveal, objection | high | face, word-cue | 0.6-1.5 s | **safe**: Camera move only. | reject-stamp, huge-strike, backdrop-word | slow-push or other camera effects in the same window |
-| 6 | `backdrop-word` | A giant word drops in behind you. | hook, claim, reveal | medium | face, segmentation, text | 1.5-3 s | **safe**: Behind the head, above the caption band. | lean-in, locked-on | other behind-head words (huge-strike, crayon-write, match-cut, led-sign) |
+| 6 | `backdrop-word` | A giant word in tall type rises in behind you, letter by letter, with your head cutting into it. | hook, claim, reveal | medium | face, segmentation, text | 1.5-3 s | **safe**: Behind the head, above the caption band. | lean-in, locked-on | other behind-head words (huge-strike, crayon-write, match-cut, led-sign) |
 | 7 | `spotlight` 🎥 | Kills the lights and keeps you lit, with an optional glowing word behind you. look=sparkle (alias glitter-spotlight) adds golden rays and sparkles. | reveal, hook, cta | medium | face, segmentation | 2-4 s | **safe**: Darkens the room; captions stay bright on top. | backdrop-word, orbit | moody, timeline or other grades in the same window |
 | 8 | `the-bill` | Prints your instructions like a receipt into the wall above your head. | list, proof | medium | face, segmentation, text | 2.5-4.5 s | **safe**: Top of frame. | checklist (later), lean-in | lineup, todo (same zone) |
 | 9 | `moody` | A colour grade: darker, softer, teal shadows. grade= moody, bw, warm, cool or pop. | transition, objection | calm | nothing (no face needed) | 2-10 s | **safe**: Grade only. Works with no face in frame. | slow-push, huge-strike | other grades (spotlight, timeline, red-collage) |
@@ -151,7 +151,7 @@ Pass options as keys on the plan entry (`{"fx": "backdrop-word", "start": 3.2, "
 - `locked-on`: text (tag, default LOCKED ON), zoom (default 1.35)
 - `orbit`: images (folder of covers (defaults to frames from this clip)), count (default 6), speed (default 1.9), size (default 0.2)
 - `lean-in`: zoom (default 1.45, max 2), speed (default 0.18 s)
-- `backdrop-word`: **text** (the word), color (hex), font (bold or serif)
+- `backdrop-word`: **text** (the word), color (hex), font (anton (default, tall), bold or serif)
 - `spotlight`: text (glowing word behind you (optional)), color (hex), push (slow push, default 1.1), look (sparkle for glitter-spotlight)
 - `the-bill`: **text** (lines joined with |)
 - `moody`: grade (moody, bw, warm, cool, pop)

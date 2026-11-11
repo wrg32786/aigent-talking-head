@@ -31,6 +31,7 @@ The effects sit behind and around the speaker, so the cut-out edge shows in ever
 - Windows Smart App Control blocks MediaPipe's unsigned DLL (`WinError 4551`). The BiRefNet mattes don't load MediaPipe, so `--mask birefnet` runs natively there. For a MediaPipe render on such a machine, set `FX_WSL` to a Python inside WSL that has the effects packages.
 - Any effect takes `"face": 0.7` to lay itself out as if the tracked face were 70% as wide. The effects size and place themselves from the face width, so a tight shot pushes fans, rings and lines off the frame.
 - Any effect takes `"drop": 0.5` to move everything it draws behind the speaker down by half a face width. Upstream sets some behind-head words (`huge-strike`, `crayon-write`) clear above the head. The point of them is that the head covers part of the word, so drop them until it does and read a check frame. Never raise `"face"` to lift a word clear of a hat.
+- `backdrop-word` is rebuilt here (`effects/fx_runner.py`): the word is set in Anton, a tall condensed face, as wide as the frame allows, and its letters rise in one after another from behind the speaker. It sits low enough that the head cuts into it without `"drop"`.
 
 ## Captions and effects
 

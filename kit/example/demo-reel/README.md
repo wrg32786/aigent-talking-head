@@ -30,7 +30,7 @@ The plan files are for reading. They won't re-run as they stand, because three t
 ## What to copy from it
 
 - **Effects land on the word.** Every cut sits 0.1 s before the word, and the effect starts on the cut. Word onsets were measured from the audio, because Whisper's word times drifted on these takes.
-- **Words sit behind the head.** `backdrop-word`, `huge-strike`, `spotlight` and `crayon-write` carry `"drop"` so the cap cuts into each word. A word floating clear above the head misses the point of the effect.
+- **Words sit behind the head.** The cap cuts into every behind-head word. `backdrop-word` does it on its own (tall type, letters rising in one by one); `huge-strike`, `spotlight` and `crayon-write` carry `"drop"`. Drop too far and the word stops reading: `huge-strike` sits at 0.2. A word floating clear above the head misses the point of the effect.
 - **Captions step aside.** Only the lines whose effect has no text of its own get a caption.
 - **Sounds are levelled against the mix.** Each effect sound was measured against the voice and music at its moment, and the buried ones were raised.
 

@@ -149,7 +149,45 @@ def load():
                 try: return matte_tracker(g)(aw, ah)
                 except ImportError: sys.exit('The birefnet cut-out is not installed. Run: npm run effects:setup -- --birefnet')
         g['Tracker'] = tracker
+    g['EFFECTS']['backdrop-word'] = (backdrop_letters(g), 'a giant word in tall type rises in behind you, letter by letter')
     return g
+
+
+def backdrop_letters(g):
+    """backdrop-word, rebuilt (Will, 2026-11-10: "a bigger taller font, and letter by letter reveals").
+
+    The word is set in Anton, a tall condensed face, as wide as the frame allows. Its letters rise up from behind the
+    speaker one after another, overshoot a little and settle, each with a tilt that straightens. It sits low enough
+    that the head covers the bottom of the word; "drop" moves it further. Options: text, color, font (any upstream
+    font name; default anton).
+    """
+    font, text_img, place, rgb, clamp, ease_back, ease_out, cached = (g[k] for k in ('font', 'text_img', 'place', 'rgb', 'clamp', 'ease_back', 'ease_out', 'cached'))
+
+    def build(c, e):
+        word, kind = str(e.o.get('text', 'CLAUDE')), e.o.get('font', 'anton')
+        size = int(c.H * 0.26)
+        while size > 10 and font(kind, size).getlength(word) + 0.03 * size * (len(word) - 1) > c.W * 0.94: size = int(size * 0.95)
+        f, im = font(kind, size), text_img(word, size, kind, fill=rgb(e.o.get('color'), g['CREAM']), shadow=10)
+        bb = f.getbbox(word); x0 = (im.width - (bb[2] - bb[0])) / 2 - bb[0]   # where the text origin sits in the image
+        # one slice per letter, cut at the advance boundaries so every letter keeps the shared baseline
+        cuts = [0] + [round(x0 + f.getlength(word[:i])) for i in range(1, len(word))] + [im.width]
+        letters = [(im.crop((a, 0, b, im.height)), (a + b) / 2) for a, b in zip(cuts, cuts[1:]) if b > a]
+        return letters, im.width, im.height, 0.03 * size
+
+    def fx(c, e):
+        letters, w, h, gap = cached(e, 'letters', lambda: build(c, e))
+        al = clamp((e.d - c.lt) / 0.2)
+        if al <= 0: return
+        n = len(letters); st = min(0.06, 0.5 / max(1, n))   # the whole word is in by about 0.9 s
+        cx, cy = c.W / 2 * 0.6 + c.fx * 0.4, c.fy - c.fw * 0.95 - h * 0.08
+        left = cx - (w + gap * (n - 1)) / 2
+        for i, (im, mx) in enumerate(letters):
+            t = c.lt - i * st
+            if t <= 0: break
+            k = ease_back(t / 0.42)
+            place(c, im, left + mx + i * gap, cy + (1 - k) * h * 0.55, 1 + 0.12 * (1 - ease_out(t / 0.35)),
+                  (1 - ease_out(t / 0.5)) * (7 if i % 2 else -7), al * clamp(t / 0.1), behind=True)
+    return fx
 
 
 if __name__ == '__main__':

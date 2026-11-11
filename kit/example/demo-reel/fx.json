@@ -30,7 +30,6 @@
   {
    "fx": "backdrop-word",
    "text": "BACKDROP",
-   "drop": 0.08,
    "sfx": false,
    "start": 7.833,
    "end": 9.563
@@ -107,7 +106,7 @@
    "fx": "huge-strike",
    "text": "HUGE",
    "at": 0.6,
-   "drop": 0.5,
+   "drop": 0.2,
    "sfx": false,
    "start": 25.125,
    "end": 26.897
