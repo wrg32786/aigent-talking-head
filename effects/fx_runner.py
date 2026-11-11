@@ -132,6 +132,19 @@ def load():
     g = {'__name__': 'fx_vendored', '__file__': VENDOR}
     exec(compile(src, VENDOR, 'exec'), g)
     if os.environ.get('FX_MATTE'): g['Tracker'] = matte_tracker(g)
+    else:
+        up = g['Tracker']
+
+        def tracker(aw, ah):
+            try: return up(aw, ah)
+            except OSError as e:
+                # Windows Smart App Control blocks MediaPipe's unsigned DLL (WinError 4551); ONNX Runtime still loads,
+                # so use the rembg matte, the same fallback kit/mask.py takes for the titles
+                print(f'note: MediaPipe could not load ({e}); using birefnet instead', flush=True)
+                os.environ['FX_MATTE'] = 'birefnet'
+                try: return matte_tracker(g)(aw, ah)
+                except ImportError: sys.exit('The birefnet cut-out is not installed. Run: npm run effects:setup -- --birefnet')
+        g['Tracker'] = tracker
     return g
 
 
