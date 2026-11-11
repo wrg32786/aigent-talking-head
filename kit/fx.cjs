@@ -49,11 +49,13 @@ const matteModel = m => { if (!m) return undefined; const k = R.MASK_MODELS[Stri
 const runFx = args => {
   // PYTHONUTF8: Windows Python reads the plan as cp1252 otherwise, and "·" in a plan comes out as "Â·" on screen
   if (matteModel(MATTE)) return sh(PY, [RUNNER, ...args], undefined, { PYTHONUTF8: '1', FX_MATTE: matteModel(MATTE), FX_MATTE_CACHE: path.dirname(args[2]), FX_TRACK_W: process.env.FX_TRACK_W || '1080' });
-  if (!WSL) return sh(PY, [RUNNER, ...args], undefined, { PYTHONUTF8: '1' });
+  // MediaPipe chosen (or nothing set): an FX_MATTE left in the environment must not switch the runner to a matte
+  if (!WSL) return sh(PY, [RUNNER, ...args], undefined, { PYTHONUTF8: '1', FX_MATTE: '' });
   const i = args.indexOf('--plan'), pf = args[i + 1], plan = JSON.parse(fs.readFileSync(pf, 'utf8'));
   const wpf = pf.replace(/\.json$/, '.wsl.json'); fs.writeFileSync(wpf, JSON.stringify(plan, (k, v) => wp(v), 1));   // image folders in the plan too
   const a = args.slice(); a[i + 1] = wpf;
-  sh('wsl.exe', [...(process.env.FX_WSL_DISTRO ? ['-d', process.env.FX_WSL_DISTRO] : []), '--', WSL, wp(RUNNER), ...a.map(wp)]);
+  // --exec runs the Python straight, without the Linux shell, so a file name like take$(id).mp4 or O'Brien.mp4 stays a name
+  sh('wsl.exe', [...(process.env.FX_WSL_DISTRO ? ['-d', process.env.FX_WSL_DISTRO] : []), '--exec', WSL, wp(RUNNER), ...a.map(wp)], undefined, { FX_MATTE: '' });
 };
 
 if (flag('list')) {

@@ -141,7 +141,7 @@ def load():
 
         def tracker(aw, ah):
             try: return up(aw, ah)
-            except OSError as e:
+            except (OSError, ImportError) as e:   # a blocked DLL can surface as either
                 # Windows Smart App Control blocks MediaPipe's unsigned DLL (WinError 4551); ONNX Runtime still loads,
                 # so use the rembg matte, the same fallback kit/mask.py takes for the titles
                 print(f'note: MediaPipe could not load ({e}); using birefnet instead', flush=True)
@@ -157,9 +157,11 @@ def backdrop_letters(g):
     """backdrop-word, rebuilt (Will, 2026-11-10: "a bigger taller font, and letter by letter reveals").
 
     The word is set in Anton, a tall condensed face, as wide as the frame allows. Its letters rise up from behind the
-    speaker one after another, overshoot a little and settle, each with a tilt that straightens. It sits low enough
-    that the head covers the bottom of the word; "drop" moves it further. Options: text, color, font (any upstream
-    font name; default anton).
+    speaker one after another, overshoot a little and settle, each with a tilt that straightens. It lands low, with the
+    head over the bottom of the word, holds a beat, then eases up so the head only just cuts into it and the word reads
+    (Will, 2026-11-11: "not fully covered just slightly and they should rise up with motion after they land").
+    "drop" moves the landing lower. Options: text, color, font (any upstream font name; default anton), rise (how far
+    it eases up, as a share of the word's height; default 0.3, 0 keeps it where it lands).
     """
     font, text_img, place, rgb, clamp, ease_back, ease_out, cached = (g[k] for k in ('font', 'text_img', 'place', 'rgb', 'clamp', 'ease_back', 'ease_out', 'cached'))
 
@@ -181,6 +183,8 @@ def backdrop_letters(g):
         n = len(letters); st = min(0.06, 0.5 / max(1, n))   # the whole word is in by about 0.9 s
         cx, cy = c.W / 2 * 0.6 + c.fx * 0.4, c.fy - c.fw * 0.95 - h * 0.08
         left = cx - (w + gap * (n - 1)) / 2
+        land = (n - 1) * st + 0.42   # the last letter has settled
+        cy -= float(e.o.get('rise', 0.3)) * h * ease_out(clamp((c.lt - land - 0.15) / 0.45))
         for i, (im, mx) in enumerate(letters):
             t = c.lt - i * st
             if t <= 0: break

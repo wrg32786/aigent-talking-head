@@ -71,14 +71,15 @@ def windows():
     flips = json.loads(m.group(1)).get("flips", []) if m else []
     return [(max(0, f["start"] - 0.1), f["end"] + 0.1) for f in flips if f.get("mode") == 7]
 
-def birefnet_model_path():
+def birefnet_model_path(model="birefnet"):
     try:
-        from rembg.sessions.birefnet_general_lite import BiRefNetSessionGeneralLite
+        if model == "birefnet-portrait":
+            from rembg.sessions.birefnet_portrait import BiRefNetSessionPortrait as S
+        else:
+            from rembg.sessions.birefnet_general_lite import BiRefNetSessionGeneralLite as S
     except ImportError:
         return None
-    fname = f"{BiRefNetSessionGeneralLite.name()}.onnx"
-    existing = BiRefNetSessionGeneralLite.resolve_existing(fname)
-    return existing
+    return S.resolve_existing(f"{S.name()}.onnx")
 
 def download_birefnet():
     from rembg import new_session
@@ -123,6 +124,8 @@ def resolve_model(requested, allow_download):
             import rembg  # noqa: F401
         except ImportError:
             raise SystemExit("rembg is not installed. Run: npm run effects:setup")
+        if not allow_download and not birefnet_model_path(want):
+            raise SystemExit("birefnet-portrait weights are not cached and downloads are off (--no-download or MASK_NODL). Run once without them.")
         return want
     if want == "mediapipe":
         return "mediapipe"
@@ -159,7 +162,7 @@ seg = session = mp = None
 if model == "mediapipe":
     try:
         seg, mp = open_mediapipe()
-    except OSError as e:
+    except (OSError, ImportError) as e:   # a blocked DLL can surface as either
         # Windows Smart App Control blocks MediaPipe's unsigned DLL (WinError 4551); ONNX Runtime still loads.
         if not birefnet_model_path():
             raise SystemExit(f"MediaPipe could not load ({e}). Run: npm run effects:setup -- --birefnet, then use --mask birefnet")

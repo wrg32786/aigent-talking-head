@@ -6,11 +6,11 @@ One word on screen at a time, set in changing sizes and faces, with flat-colour 
 npm run reel -- inbox/take.mov --look oneword --broll inbox/broll
 ```
 
-That sets `captionStyle: "oneword"`, three font pairings cycling every three phrases (`instrument`, `literata`, `bricolage`: an italic serif, then heavy caps, then a bold grotesk as the key word's face), type cards, two words behind the head, and, with `--broll`, cutaways to your own clips. Any other pairing works with `--fonts`. The display face should be a contrasting italic or serif, and the partner face a clean grotesk.
+That sets `captionStyle: "oneword"`, three font pairings cycling every three phrases (`instrument`, `literata`, `bricolage`: an italic serif, then heavy caps, then a bold grotesk as the key word's face; a card or title takes the pairing of the phrase it comes up with, so one frame never mixes two), type cards, two words behind the head, and, with `--broll`, cutaways to your own clips. Any other pairing works with `--fonts`. The display face should be a contrasting italic or serif, and the partner face a clean grotesk.
 
 ## The rules
 
-**One word at a time.** Each spoken word replaces the last on its own word time, centred at chest height (`kineticY`, 1320 px at 1080x1920). Every word has an entrance, even a small one: ordinary words rise in over about 0.1 s, the key word blurs in, the newest word on a line under the key word or along a curve fades up into place. Word starts snap to the sound (the nearest rise in the voice's loudness within 0.15 s of Whisper's time), and a word Whisper heard twice in a row is shown once. While a behind-head word is up, the chest track never says the same word again. Pace runs at about 4 words a second, the speed people speak, so the eye reads one word per beat.
+**One word at a time.** Each spoken word replaces the last on its own word time, centred at chest height (`kineticY`, 1320 px at 1080x1920). Every word has an entrance, even a small one: ordinary words rise in over about 0.1 s, the key word blurs in, the newest word on a line under the key word or along a curve fades up into place. Word starts snap to the sound (the nearest rise in the voice's loudness within 0.15 s of Whisper's time), and a word Whisper wrote twice for one sound (the copies overlap, or one is stretched past a second) is shown once; a real repeat like "that that" stays (`--no-dedupe` keeps every copy). While a behind-head word is up, the chest track never says the same word again. Pace runs at about 4 words a second, the speed people speak, so the eye reads one word per beat.
 
 **Three sizes, two faces.** Every phrase has a hero word: the longest non-filler word, a number, or the `"hero"` you set.
 

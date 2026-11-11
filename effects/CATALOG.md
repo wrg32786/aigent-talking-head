@@ -151,7 +151,7 @@ Pass options as keys on the plan entry (`{"fx": "backdrop-word", "start": 3.2, "
 - `locked-on`: text (tag, default LOCKED ON), zoom (default 1.35)
 - `orbit`: images (folder of covers (defaults to frames from this clip)), count (default 6), speed (default 1.9), size (default 0.2)
 - `lean-in`: zoom (default 1.45, max 2), speed (default 0.18 s)
-- `backdrop-word`: **text** (the word), color (hex), font (anton (default, tall), bold or serif)
+- `backdrop-word`: **text** (the word), color (hex), font (anton (default, tall), bold or serif), rise (how far the word eases up after it lands, as a share of its height (default 0.3; 0 stays put))
 - `spotlight`: text (glowing word behind you (optional)), color (hex), push (slow push, default 1.1), look (sparkle for glitter-spotlight)
 - `the-bill`: **text** (lines joined with |)
 - `moody`: grade (moody, bw, warm, cool, pop)

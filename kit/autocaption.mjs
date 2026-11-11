@@ -49,6 +49,11 @@ function onsetsFor(file, t0, t1) {
 }
 const snapTo = (on, a) => { let best = null; for (const o of on) if (Math.abs(o - a) <= 0.15 && (best === null || Math.abs(o - a) < Math.abs(best - a))) best = o; return best === null ? a : best - 0.01; };
 const SNAP = !opt('no-snap', false);
+// A Whisper double is one spoken word written twice: the copies overlap, or one is stretched over a second or more of
+// other sound ("backdrop" 8.24-10.30 s then "backdrop," 10.30-10.56 s on the 11-10 demo). It shows once, at the shorter
+// copy's time. A real repeat ("that that", a stutter) is two normal-length words and stays. --no-dedupe keeps every copy.
+const DEDUPE = !opt('no-dedupe', false), isDouble = (p, q) => q.s < p.e - 0.02 || p.e - p.s > 1 || q.e - q.s > 1;
+if (isDouble({ s: 1, e: 1.2 }, { s: 1.2, e: 1.4 }) || !isDouble({ s: 8.24, e: 10.3 }, { s: 10.3, e: 10.56 })) throw new Error('autocaption: dedupe self-check failed');
 // segment words on the output clock (same maths as timeline.mjs)
 let t = 0; const seams = [], words = [];
 C.segs.forEach((s, i) => {
@@ -58,10 +63,10 @@ C.segs.forEach((s, i) => {
   if (!ws.length) console.warn(`no word times for ${s.file} (run kit/tx.py on it, or use clip.py clips)`);
   const on = SNAP && ws.length ? onsetsFor(s.file, s.in, s.out) : [];
   for (const [a0, b, w] of ws) { if (!(a0 >= s.in - 0.05 && b <= s.out + 0.05 && w)) continue; const a = on.length ? Math.min(snapTo(on, a0), b - 0.05) : a0;
-    // a stutter or a Whisper double ("backdrop backdrop"): the same word again straight after itself is dropped
     const prev = words[words.length - 1], nw = x => String(x).toLowerCase().replace(/[^a-z0-9']/g, '');
-    if (prev && prev.seg === i && nw(prev.w) === nw(w) && speech + a - s.in - prev.e < 0.8) { prev.e = Math.min(end, speech + b - s.in + SHIFT); continue; }
-    words.push({ s: Math.max(start, speech + a - s.in + SHIFT), e: Math.min(end, speech + b - s.in + SHIFT), w, seg: i }); }
+    const cur = { s: Math.max(start, speech + a - s.in + SHIFT), e: Math.min(end, speech + b - s.in + SHIFT), w, seg: i };
+    if (DEDUPE && prev && prev.seg === i && nw(prev.w) === nw(w) && isDouble(prev, cur)) { if (cur.e - cur.s < prev.e - prev.s) Object.assign(prev, cur); continue; }
+    words.push(cur); }
   t = end;
 });
 const total = +(t + (C.tail ?? 0.3)).toFixed(2);

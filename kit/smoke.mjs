@@ -265,6 +265,11 @@ try {
     const card = px('t2.40.png', 8, 8), face = px('t1.20.png', 8, 8);
     if (card[0] !== 14 || card[1] !== 26 || card[2] !== 51 || card[3] !== 255) fail('card should fill the frame navy, got ' + card);
     if (face[3] !== 0) fail('no card: the overlay corner should be clear, got ' + face);
+    // three pairings cycling: a card that spans a pairing change keeps one pairing on screen with the words under it
+    const ph = k => ({ start: k * 0.6, end: k * 0.6 + 0.5, text: 'one two', mode: 0, words: ws(k * 0.6, 'one two') });
+    writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'oneword', fonts: 'instrument,literata,bricolage', flips: [ph(0), ph(1), ph(2), ph(3), { start: 1.3, end: 2.1, mode: 8, bg: 'ink' }] }) + ';\n');
+    const o2 = run(node, [join(KIT, 'render.mjs'), '0', '2.0'], b);
+    if (/pairing mix/.test(o2)) fail('one frame shows two font pairings: ' + o2);
     writeFileSync(capF, keep);
   });
   if (existsSync(fxPy)) step('legibility.py: contrast of the letters against the picture round them (self-test)', () => {

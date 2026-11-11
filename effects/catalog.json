@@ -244,7 +244,8 @@
    "options": {
     "text": "the word",
     "color": "hex",
-    "font": "anton (default, tall), bold or serif"
+    "font": "anton (default, tall), bold or serif",
+    "rise": "how far the word eases up after it lands, as a share of its height (default 0.3; 0 stays put)"
    },
    "required": [
     "text"

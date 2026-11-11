@@ -56,6 +56,9 @@ writeFileSync(join(ROOT, 'lockups.json'), JSON.stringify(lockups, null, 1) + '\n
 // one-word captions: what each word shows as (face, size, the line building under a hero, on a card or not)
 const ow = await p.evaluate(() => (window.__oneword ? window.__oneword() : []));
 if (ow.length) { writeFileSync(join(ROOT, 'oneword.json'), JSON.stringify(ow, null, 1) + '\n'); console.log('oneword', ow.length, 'words,', ow.filter(w => w.face === 'hero').length, 'heroes,', ow.filter(w => w.card).length, 'on cards'); }
+// two pairings on screen at once (with "fonts": "a,b,c" cycling) is a defect; smoke checks for this line
+const mix = await p.evaluate(() => (window.__pairMix ? window.__pairMix() : []));
+if (mix.length) console.log('pairing mix at', mix.map(m => m.join('/')).join(', '));
 if (lockups.length) console.log('lockups', lockups.filter(l => l.kind === 'title').length, 'titles +', lockups.filter(l => l.kind === 'kinetic').length, 'lines,', [...new Set(lockups.map(l => l.arrange))].join('/'));
 const passes = only ? [['stills', 'all']] : titles.length ? [['ovl', 'front'], ['ovlt', 'titles']] : [['ovl', 'all']];
 if (!only && !titles.length) rmSync(join(ROOT, 'ovlt'), { recursive: true, force: true });
