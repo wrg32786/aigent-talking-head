@@ -10,7 +10,7 @@
 //   "tail": 0.3,                        seconds to hold the last frame at the end
 //   "hits": [[11.66,24],[12.66,14]],     output-time glitch/shake hits [time, strength]
 //   "sfx": {"F":[11.66],"D":[12.66]},    output times. F = cinematic woosh on cuts, D = quick woosh on card moves
-//   "bed": "vinyl-sunrise" (a kit/music library name) or "music.wav", "bedStart": 0, "bedVol": 0.16, "bedNoFade": true,
+//   "bed": "vinyl-sunrise" (a kit/music library name) or "music.wav", "bedStart": 0, "bedVol": 0.16, "bedNoFade": true, "bedFadeOut": 1.4,
 //   "overlay": "ovl/%04d.png",           optional; leave out for a clean cut
 //   "titles": "ovlt/%04d.png",           optional kinetic-title layer (render.mjs writes it); drawn under the person when
 //   "mask": "mask.mkv",                  a person mask is given (kit/mask.py), else in front of the picture
@@ -161,12 +161,13 @@ f.push(`[${vcur}]fps=24,trim=0:${LEN}[vo]`);
 
 // Sound: the locked set in kit/rules.cjs, plus pack hits from cut.json sfxHits (or sfx-hits.json).
 // Each sound's hit point (measured peak, or the cutoff for a riser) lands on the time given.
-const lbl = [];
+// A job can add its own sound files in cut.json: "sounds": {"name": {"file": "../sfx/x.wav", "peak": 0.2, "vol": 0.4}} (file relative to build/).
+const lbl = [], SFX = { ...R.SFX, ...Object.fromEntries(Object.entries(C.sounds || {}).map(([k, s]) => [k, { peak: 0, vol: 0.4, ...s, file: path.resolve(s.file) }])) };
 if (!process.env.NOSFX) {
   for (const k of Object.keys(C.sfx || {})) {
-    const S = R.SFX[k]; if (!S) { console.error(`unknown sfx "${k}"; use one of ${Object.keys(R.SFX).join(', ')}`); process.exit(1); }
+    const S = SFX[k]; if (!S) { console.error(`unknown sfx "${k}"; use one of ${Object.keys(SFX).join(', ')}`); process.exit(1); }
     const ts = R.sfxHits(C.sfx[k]); if (!ts.length) continue;
-    const n = inp('-i', path.join(KIT, S.file));
+    const n = inp('-i', path.resolve(KIT, S.file));
     f.push(`[${n}:a]${A},asplit=${ts.length}` + ts.map((_, j) => `[${k}s${j}]`).join(''));
     ts.forEach((h, j) => { const ms = Math.max(0, Math.round((h.t - S.peak) * 1000)); f.push(`[${k}s${j}]volume=${h.g ?? S.vol},adelay=${ms}|${ms}[${k}d${j}]`); lbl.push(`[${k}d${j}]`); });
   }
@@ -191,8 +192,8 @@ const bed = !process.env.NOBED && C.bed;
 if (bed) {
   const bf = R.bedFile(bed); if (!fs.existsSync(bf)) { console.error(`bed "${bed}": no such file ${bf}` + (R.isBed(bed) ? ' (beds.json lists it; restore kit/music)' : ' (not a library bed either: npm run music)')); process.exit(1); }
   const n = inp('-i', bf);
-  const st = +(C.bedStart || 0), vol = +(process.env.BEDVOL || C.bedVol || 0.22), nofade = process.env.BEDNOFADE || C.bedNoFade;
-  f.push(`[${n}:a]atrim=${st}:${(st + LEN + .2).toFixed(2)},${A},volume=${vol}${nofade ? '' : ',afade=t=in:d=0.3'},afade=t=out:st=${(LEN - 1.4).toFixed(2)}:d=1.4[bed]`);
+  const st = +(C.bedStart || 0), vol = +(process.env.BEDVOL || C.bedVol || 0.22), nofade = process.env.BEDNOFADE || C.bedNoFade, fo = +(C.bedFadeOut ?? 1.4);
+  f.push(`[${n}:a]atrim=${st}:${(st + LEN + .2).toFixed(2)},${A},volume=${vol}${nofade ? '' : ',afade=t=in:d=0.3'},afade=t=out:st=${(LEN - fo).toFixed(2)}:d=${fo}[bed]`);
 }
 // Duck SFX and the bed under the voice. Without bed ducking, hi-hats masked "school" into "pool".
 if (lbl.length || bed) {
@@ -202,7 +203,13 @@ if (lbl.length || bed) {
   f.push(`[ca]asplit=${keys.length}${keys.join('')}`);
   mix[0] = '[cak]';
   if (lbl.length) { f.push('[sfxraw][keyS]sidechaincompress=threshold=0.04:ratio=3:attack=5:release=180:makeup=1[sfx]'); mix.push('[sfx]'); }
-  if (bed) { f.push('[bed][keyB]sidechaincompress=threshold=0.03:ratio=6:attack=15:release=250:makeup=1[bedd]'); mix.push('[bedd]'); }
+  if (bed) {
+    // "bedDuckRatio": lower = the music dips less under the voice. "bedDuckLead": seconds the dip starts BEFORE each word
+    // (the key is the voice moved earlier), so a soft first consonant isn't masked while the compressor is still reacting.
+    const lead = +(C.bedDuckLead || 0);
+    if (lead > 0) f.push(`[keyB]atrim=start=${lead},asetpts=PTS-STARTPTS[keyBl]`);
+    f.push(`[bed][keyB${lead > 0 ? 'l' : ''}]sidechaincompress=threshold=0.03:ratio=${+(C.bedDuckRatio || 6)}:attack=15:release=${lead > 0 ? 250 + Math.round(lead * 1000) : 250}:makeup=1[bedd]`); mix.push('[bedd]');
+  }
 }
 f.push(`${mix.join('')}amix=inputs=${mix.length}:normalize=0:duration=first,atrim=0:${LEN},loudnorm=I=-14:TP=-1:LRA=11,aresample=48000[ao]`);
 args.push('-filter_complex', f.join(';'), '-map', '[vo]', '-map', '[ao]', '-c:v', 'libx264', '-crf', '17', '-preset', 'medium', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', out);

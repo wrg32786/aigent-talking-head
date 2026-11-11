@@ -39,6 +39,17 @@ def glass_widgets_v2(c, e):"""),
     ("""hh = (ih * 0.42) * v / 197 * q""", """hh = (ih * 0.42) * v / (max(vals) or 1) * q"""),
     ("""'artifact · views.html'""", """e.o.get('chart_tag', 'artifact · stats.html')"""),
     ("""'sfx · 25.7s'""", """e.o.get('song_sub', 'edit')"""),
+    # any effect: "face": 0.7 lays it out as if the tracked face were 70% as wide. The effects size and place
+    # themselves from the face width, so a tight shot pushes fans, rings and lines off the frame; under 1 pulls them in,
+    # over 1 lifts behind-head words clear of a hat.
+    ("""c.lt = t - f.start; EFFECTS[f.name][0](c, f)""",
+     """c.lt = t - f.start; _k = float(f.o.get('face', 1)); c.fw *= _k; EFFECTS[f.name][0](c, f); c.fw /= _k"""),
+    # pastel-word: the profile card sat at a fixed 86.5% of the height, under Instagram's own caption; "card_y" moves it
+    ("""cy = H * 0.865 + (1 - ease_out((c.lt - 0.15) / 0.35)) * H * 0.2""",
+     """cy = H * float(e.o.get('card_y', 0.865)) + (1 - ease_out((c.lt - 0.15) / 0.35)) * H * 0.2"""),
+    # pastel-word: the face guard erased half the card (and its Follow button) when the speaker leans in; "card_guard": "off" keeps it whole
+    ("""place(c, shadowed(card_, 18, 8, 90), W / 2, cy, sq, 0, al * clamp((c.lt - 0.15) / 0.12), guard=True)""",
+     """place(c, shadowed(card_, 18, 8, 90), W / 2, cy, sq, 0, al * clamp((c.lt - 0.15) / 0.12), guard=str(e.o.get('card_guard', 'on')) != 'off')"""),
 ]
 
 

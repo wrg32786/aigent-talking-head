@@ -35,6 +35,17 @@ const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.ha
 const die = m => { console.error(m); process.exit(1); };
 const SFXPLAN = require('./sfx-plan.cjs');
 const sh = (cmd, args, cwd, env) => execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } });
+// Windows only: when Application Control blocks MediaPipe's DLL, run the effects in WSL instead. Set FX_WSL to the
+// Python inside WSL that has the effects packages (e.g. /root/fxvenv/bin/python), FX_WSL_DISTRO to pick a distro.
+const WSL = process.platform === 'win32' && process.env.FX_WSL;
+const wp = s => (typeof s === 'string' && /^[A-Za-z]:[\\/]/.test(s) ? '/mnt/' + s[0].toLowerCase() + s.slice(2).split('\\').join('/') : s);
+const runFx = args => {
+  if (!WSL) return sh(PY, [RUNNER, ...args]);
+  const i = args.indexOf('--plan'), pf = args[i + 1], plan = JSON.parse(fs.readFileSync(pf, 'utf8'));
+  const wpf = pf.replace(/\.json$/, '.wsl.json'); fs.writeFileSync(wpf, JSON.stringify(plan, (k, v) => wp(v), 1));   // image folders in the plan too
+  const a = args.slice(); a[i + 1] = wpf;
+  sh('wsl.exe', [...(process.env.FX_WSL_DISTRO ? ['-d', process.env.FX_WSL_DISTRO] : []), '--', WSL, wp(RUNNER), ...a.map(wp)]);
+};
 
 if (flag('list')) {
   for (const m of Object.keys(cat.moments)) {
@@ -44,7 +55,7 @@ if (flag('list')) {
   console.log('\nFull details: effects/CATALOG.md');
   process.exit(0);
 }
-if (!fs.existsSync(PY)) die('Effects are not set up yet. Run: npm run effects:setup');
+if (!WSL && !fs.existsSync(PY)) die('Effects are not set up yet. Run: npm run effects:setup');
 const planPath = opt('plan'); if (!planPath) die('Pass --plan fx.json (see the header of kit/fx.cjs or effects/CATALOG.md)');
 const raw = JSON.parse(fs.readFileSync(planPath, 'utf8'));
 const profile = raw.profile || {};
@@ -109,7 +120,7 @@ if (direct) {
   const pf = path.join(path.dirname(path.resolve(out)), path.basename(out).replace(/\.[^.]+$/, '') + '.plan.json');
   fs.writeFileSync(pf, JSON.stringify({ effects: clean }, null, 1));
   console.warn('note: direct mode draws effects over anything already in the video, captions included. Use --name <job> to keep captions on top.');
-  sh(PY, [RUNNER, '--plan', pf, path.resolve(direct), path.resolve(out), ...(still ? ['--still', still] : [])]);
+  runFx(['--plan', pf, path.resolve(direct), path.resolve(out), ...(still ? ['--still', still] : [])]);
   process.exit(0);
 }
 
@@ -139,7 +150,7 @@ console.log('> base cut (no captions) for the effects');
 sh(process.execPath, [path.join(KIT, 'assemble.cjs'), base], build, { BASEONLY: '1' });
 if (still) {
   for (const f of fs.readdirSync(dir)) if (/^check.*\.png$/.test(f)) fs.rmSync(path.join(dir, f));
-  sh(PY, [RUNNER, '--plan', pf, base, path.join(dir, 'check.png'), '--still', still]);
+  runFx(['--plan', pf, base, path.join(dir, 'check.png'), '--still', still]);
   const pngs = fs.readdirSync(dir).filter(f => /^check(_[0-9.]+)?\.png$/.test(f));
   for (const f of pngs) {
     const png = path.join(dir, f), m = f.match(/_([0-9.]+)\.png$/), t = m ? +m[1] : +still;
@@ -153,7 +164,7 @@ if (still) {
   process.exit(0);
 }
 const fxv = path.join(dir, 'base-fx.mp4');
-sh(PY, [RUNNER, '--plan', pf, base, fxv]);
+runFx(['--plan', pf, base, fxv]);
 const sfxOff = opt('sfx') === 'off' || flag('no-sfx') || process.env.NOSFX;
 let sfxHits = [];
 if (!sfxOff) {

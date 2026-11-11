@@ -52,8 +52,9 @@ function checkJob(captionsFile, cutFile, label) {
     if (C.lockup && C.lockup.arrange && !ARR.includes(C.lockup.arrange)) errs.push(`cut.json lockup arrange "${C.lockup.arrange}" (${ARR.join(', ')})`);
     for (const [k, h] of Object.entries(C.hero || {})) { const f = flips.find(x => Math.abs(x.start - +k) < 0.006 && (x.mode === 0 || x.mode === R.TITLE_MODE)); if (!f) errs.push(`cut.json hero "${k}": no caption or title starts at ${k}s`); else if (!heroOk(f, h)) errs.push(`cut.json hero "${k}": ${JSON.stringify(h)} is not in "${f.text}"`); }
     (C.segs || []).forEach((s, i) => { if (s.transition && R.xfadeMode(s.transition) === undefined) errs.push(`seg ${i}: unknown transition "${s.transition}" (kit/transitions.json)`); });
-    for (const k of Object.keys(C.sfx || {})) if (!R.SFX[k]) errs.push(`sfx "${k}": use ${Object.keys(R.SFX).join(', ')}`);
+    for (const k of Object.keys(C.sfx || {})) if (!R.SFX[k] && !(C.sounds || {})[k]) errs.push(`sfx "${k}": use ${Object.keys(R.SFX).join(', ')}, or add it to "sounds" in cut.json`);
     for (const h of C.sfxHits || []) if (!SFXPLAN.lookup(h.id)) errs.push(`sfxHits "${h.id}" is not in kit/sfx/sfx.json`);
+    for (const [k, s] of Object.entries(C.sounds || {})) if (!s.file || !existsSync(resolve(dirname(cutFile), s.file))) errs.push(`sounds.${k}: no file at ${s.file}`);
     if (C.bed) { const lib = R.isBed(C.bed);
       if (!existsSync(lib ? R.bedFile(C.bed) : resolve(dirname(cutFile), String(C.bed)))) errs.push(lib ? `bed "${C.bed}": kit/music/${R.BEDS[C.bed].file} is missing (beds.json lists it)` : `bed "${C.bed}": not a library bed (npm run music) and no such file`); }
     const seams = TL.seams.map(x => x.toFixed(2));
