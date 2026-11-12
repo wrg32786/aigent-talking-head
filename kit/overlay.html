@@ -46,8 +46,9 @@ const TITLES=flips.filter(c=>c[3]===7).sort((a,b)=>a[0]-b[0]);
 // (at most two punch titles behind, never consecutive). Same as kit/rules.cjs resolveTitles(). cut.json titleLayer
 // can arrive via LOCKOVER.titleLayer. Partner words of a behind title still draw in front of the person.
 // Titles rest high (titleY, centre of the hero word) so most of the word clears the head; only its lower edge tucks
-// behind the hair. The slam lands lower (titleSlamY), holds, then rises to titleY ("titleRise": false on a title,
-// or for the whole job, lands it at titleY). Slam rise runs for behind and front titles.
+// behind the hair (default 345, chosen so a ~230 px hero on a typical 9:16 talking-head meets the crown). The slam
+// lands lower (titleSlamY), holds 0.5 s, then rises for 0.35 s to titleY ("titleRise": false on a title, or for the
+// whole job, lands it at titleY). Slam rise runs for behind and front titles.
 const LAYERS=['front','behind','auto'];
 const jobLayer=(()=>{const v=String((CAP.titleLayer!=null?CAP.titleLayer:((window.LOCKOVER||{}).titleLayer))||'front').toLowerCase();return LAYERS.includes(v)?v:'front'})();
 {const raw=TITLES.map(c=>{const v=String((c[4].layer!=null?c[4].layer:jobLayer)).toLowerCase();return LAYERS.includes(v)?v:jobLayer});
@@ -56,9 +57,9 @@ const jobLayer=(()=>{const v=String((CAP.titleLayer!=null?CAP.titleLayer:((windo
  if(autos.length){const scored=autos.map(i=>{const c=TITLES[i];let s=0;if(i===0||i===TITLES.length-1)s+=3;if(c.entr==='slam')s+=2;if(c.flick)s+=1;return{i,s}}).sort((a,b)=>b.s-a.s||a.i-b.i);
   for(const {i} of scored){if(behind.size>=2)break;if(behind.has(i-1)||behind.has(i+1))continue;behind.add(i)}}
  TITLES.forEach((c,i)=>{c.layer=behind.has(i)?'behind':'front'})}
-const TY=CAP.titleY||290,TSY=CAP.titleSlamY||600,PY=CAP.pillY||1480,KY=CAP.kineticY||CAP.captionY||1320,ALTY=CAP.altY||330,CSTYLE=CAP.captionStyle||'kinetic';
+const TY=CAP.titleY||345,TSY=CAP.titleSlamY||600,PY=CAP.pillY||1480,KY=CAP.kineticY||CAP.captionY||1320,ALTY=CAP.altY||330,CSTYLE=CAP.captionStyle||'kinetic';
 const ONEW=CSTYLE==='one-word'; // the simple one-word style; "oneword" is the full look further down
-// Slam rise: lands at titleSlamY, holds .15 s, then a smooth .35 s ease up to the resting titleY. Returns the y offset.
+// Slam rise: lands at titleSlamY, holds 0.5 s, then a smooth 0.35 s ease up to the resting titleY. Returns the y offset.
 const RISE={hold:.5,dur:.35};const riseOff=(c,dt)=>{if(c.entr!=='slam'||c[4].titleRise===false||CAP.titleRise===false)return 0;const d=TSY-TY;if(d<=0)return 0;const q=cl((dt-RISE.hold)/RISE.dur),e=q<.5?4*q*q*q:1-Math.pow(-2*q+2,3)/2;return d*(1-e)};
 const riseEnd=c=>riseOff(c,0)?RISE.hold+RISE.dur*.6-.24:0; // partners start as the rise settles
 // Pairing per flip. With a cycle the titles take the pairings in turn, and every other flip takes the pairing of the

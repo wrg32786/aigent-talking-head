@@ -152,6 +152,7 @@ try {
     if (a.titles.mid < 520) fail('slam should land low, behind the head (centre ' + a.titles.mid + ')');
     if (a.titles.mid - b.titles.mid < 200) fail('slam should rise after landing: ' + a.titles.mid + ' -> ' + b.titles.mid);
     if (b.titles.y1 > 470) fail('resting title should sit high so the word clears the head, bottom at ' + b.titles.y1);
+    if (b.titles.y1 < 430) fail('resting title should reach the hair so the lower edge can tuck, bottom at ' + b.titles.y1);
     if (a.front.n) fail('partner words should wait for the rise');
     if (!b.front.n) fail('partner words should draw on the front layer (in front of the person)');
     if (b.front.y0 < b.titles.y1 - 10) fail('partner line should hang below the hero: ' + JSON.stringify(b));

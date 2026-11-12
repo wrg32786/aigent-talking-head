@@ -394,102 +394,14 @@ async function main() {
   }
 
   console.log('type stills');
-  const build = join(work, 'type');
-  mkdirSync(build, { recursive: true });
-  const mid = 1.0; // after the default slam title has risen to its resting height
-  const stillAt = style => (style === 'one-word' ? 1.5 : mid); // one-word: after the title, on the word "phone"
-  const typeOrCard = (kind, it, fn) => {
-    const out = join(OUT, 'media', kind, it.id + '.jpg');
-    try { fn(out); }
-    catch (e) {
-      console.warn(kind + ' ' + it.id + ' failed, using card: ' + e.message.split('\n')[0]);
-      cardStill(py, work, kind, it.id, it.label, out);
-    }
-    put(it.kind, it.id, out);
-  };
-  for (const st of menu.sections.find(s => s.id === 'caption-styles').items) {
-    typeOrCard('caption', st, out => {
-      writeFileSync(join(build, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(captionsDoc(st.id, 'theme')) + ';\n');
-      typeStill(build, stillAt(st.id), { THEME: 'aigent', FONTS: 'theme' }, out);
-    });
-  }
-  for (const fo of menu.sections.find(s => s.id === 'fonts').items) {
-    typeOrCard('font', fo, out => {
-      writeFileSync(join(build, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(captionsDoc('kinetic', fo.id)) + ';\n');
-      typeStill(build, mid, { THEME: 'aigent', FONTS: fo.id }, out);
-    });
-  }
-  for (const th of menu.sections.find(s => s.id === 'themes').items) {
-    typeOrCard('theme', th, out => {
-      writeFileSync(join(build, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(captionsDoc('kinetic', 'theme')) + ';\n');
-      typeStill(build, mid, { THEME: th.id }, out);
-    });
-  }
-  const lookStyle = { kinetic: 'kinetic', oneword: 'oneword', muse: 'pill', classic: 'classic', 'one-word': 'one-word' };
-  for (const lk of menu.sections.find(s => s.id === 'looks').items) {
-    typeOrCard('look', lk, out => {
-      const doc = captionsDoc(lookStyle[lk.id] || 'kinetic', 'theme');
-      if (lk.id === 'classic') doc.flips = doc.flips.filter(f => f.mode !== 7);
-      writeFileSync(join(build, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(doc) + ';\n');
-      typeStill(build, stillAt(lookStyle[lk.id] || 'kinetic'), { THEME: 'aigent', FONTS: 'theme' }, out);
-    });
-  }
-  const ents = menu.sections.find(s => s.id === 'title-entrances').items;
-  try {
-    writeFileSync(join(build, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(captionsDoc('kinetic', 'theme', ents.map(i => i.id))) + ';\n');
-    // slam is shown after it lands and rises clear of the head; the rest mid-entrance
-    const entTimes = ents.map((it, i) => (i * 1.2 + (it.id === 'slam' ? 1.0 : 0.15)).toFixed(2));
-    for (const d of ['stills', 'stills-front', 'stills-titles']) {
-      if (existsSync(join(build, d))) rmSync(join(build, d), { recursive: true, force: true });
-    }
-    try { rmSync(join(build, 'theme.js')); } catch {}
-    sh(node, [join(KIT, 'render.mjs'), '0', entTimes.join(',')], build, { THEME: 'aigent', FONTS: 'theme', STILLS_LAYERS: '1' });
-    ents.forEach((it, i) => {
-      const t = +entTimes[i];
-      const out = join(OUT, 'media', 'entrance', it.id + '.jpg');
-      const front = pickLayerStill(join(build, 'stills-front'), t);
-      const titles = pickLayerStill(join(build, 'stills-titles'), t);
-      composeOverPerson(PERSON, MASK, titles, front, out);
-      put('entrance', it.id, out);
-    });
-  } catch (e) {
-    console.warn('title entrances failed, using cards: ' + e.message.split('\n')[0]);
-    for (const it of ents) {
-      const out = join(OUT, 'media', 'entrance', it.id + '.jpg');
-      cardStill(py, work, 'entrance', it.id, it.label, out);
-      put('entrance', it.id, out);
-    }
-  }
+  refreshTypeStills(py, work, stills, put, menu);
 
-  const presetTiles = menu.sections.find(s => s.id === 'presets');
-  if (presetTiles) {
-    console.log('presets');
-    for (const pr of presetTiles.items) {
-      const full = Preset.load(pr.id) || {};
-      typeOrCard('preset', pr, out => {
-        const style = full.captionStyle || 'kinetic';
-        const fonts = full.fonts && full.fonts !== 'theme' ? full.fonts : 'theme';
-        const theme = full.theme || 'aigent';
-        const doc = captionsDoc(style, fonts);
-        if (full.titles === false) doc.flips = doc.flips.filter(f => f.mode !== 7);
-        writeFileSync(join(build, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(doc) + ';\n');
-        const pool = (full.finishPool && full.finishPool.length) ? full.finishPool : (full.finish ? [full.finish] : []);
-        let plate = PERSON;
-        if (pool[0]) {
-          plate = join(work, 'preset-plate-' + pr.id + '.png');
-          const vf = B.finishChain(pool[0]);
-          sh('ffmpeg', ['-v', 'error', '-y', '-loop', '1', '-i', PERSON, '-t', '0.3',
-            '-vf', `format=yuv444p,${vf},format=yuv420p`, '-frames:v', '1', '-update', '1', plate]);
-        }
-        const prev = PERSON;
-        PERSON = plate;
-        try { typeStill(build, stillAt(style), { THEME: theme, FONTS: fonts }, out); }
-        finally { PERSON = prev; }
-      });
-    }
-  }
+  console.log('title layer stills');
+  renderTitleLayerStills(py, work, stills, put);
+  console.log('title entrances (front)');
+  refreshEntranceStills(work, stills, put, menu);
 
-    const fxPy = join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+  const fxPy = join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
   const runner = join(ROOT, 'effects', 'fx_runner.py');
   const effects = menu.sections.find(s => s.id === 'effects').items;
   if (!skipEffects && existsSync(fxPy) && existsSync(runner)) {
@@ -650,20 +562,94 @@ function loadExistingStills() {
   return stills;
 }
 
+
+function refreshTypeStills(py, work, stills, put, menu) {
+  PERSON = presenterPath();
+  MASK = existsSync(PRESENTER_MASK) ? PRESENTER_MASK : null;
+  const build = join(work, 'type');
+  mkdirSync(build, { recursive: true });
+  const mid = 1.0; // after the default slam title has risen to its resting height
+  const stillAt = style => (style === 'one-word' ? 1.5 : mid); // one-word: after the title, on the word "phone"
+  const typeOrCard = (kind, it, fn) => {
+    const out = join(OUT, 'media', kind, it.id + '.jpg');
+    try { fn(out); }
+    catch (e) {
+      console.warn(kind + ' ' + it.id + ' failed, using card: ' + e.message.split('\n')[0]);
+      cardStill(py, work, kind, it.id, it.label, out);
+    }
+    put(it.kind, it.id, out);
+  };
+  for (const st of menu.sections.find(s => s.id === 'caption-styles').items) {
+    typeOrCard('caption', st, out => {
+      writeFileSync(join(build, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(captionsDoc(st.id, 'theme')) + ';\n');
+      typeStill(build, stillAt(st.id), { THEME: 'aigent', FONTS: 'theme' }, out);
+    });
+  }
+  for (const fo of menu.sections.find(s => s.id === 'fonts').items) {
+    typeOrCard('font', fo, out => {
+      writeFileSync(join(build, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(captionsDoc('kinetic', fo.id)) + ';\n');
+      typeStill(build, mid, { THEME: 'aigent', FONTS: fo.id }, out);
+    });
+  }
+  for (const th of menu.sections.find(s => s.id === 'themes').items) {
+    typeOrCard('theme', th, out => {
+      writeFileSync(join(build, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(captionsDoc('kinetic', 'theme')) + ';\n');
+      typeStill(build, mid, { THEME: th.id }, out);
+    });
+  }
+  const lookStyle = { kinetic: 'kinetic', oneword: 'oneword', muse: 'pill', classic: 'classic', 'one-word': 'one-word' };
+  for (const lk of menu.sections.find(s => s.id === 'looks').items) {
+    typeOrCard('look', lk, out => {
+      const doc = captionsDoc(lookStyle[lk.id] || 'kinetic', 'theme');
+      if (lk.id === 'classic') doc.flips = doc.flips.filter(f => f.mode !== 7);
+      writeFileSync(join(build, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(doc) + ';\n');
+      typeStill(build, stillAt(lookStyle[lk.id] || 'kinetic'), { THEME: 'aigent', FONTS: 'theme' }, out);
+    });
+  }
+  const presetTiles = menu.sections.find(s => s.id === 'presets');
+  if (presetTiles) {
+    console.log('presets');
+    for (const pr of presetTiles.items) {
+      const full = Preset.load(pr.id) || {};
+      typeOrCard('preset', pr, out => {
+        const style = full.captionStyle || 'kinetic';
+        const fonts = full.fonts && full.fonts !== 'theme' ? full.fonts : 'theme';
+        const theme = full.theme || 'aigent';
+        const doc = captionsDoc(style, fonts);
+        if (full.titles === false) doc.flips = doc.flips.filter(f => f.mode !== 7);
+        writeFileSync(join(build, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(doc) + ';\n');
+        const pool = (full.finishPool && full.finishPool.length) ? full.finishPool : (full.finish ? [full.finish] : []);
+        let plate = PERSON;
+        if (pool[0]) {
+          plate = join(work, 'preset-plate-' + pr.id + '.png');
+          const vf = B.finishChain(pool[0]);
+          sh('ffmpeg', ['-v', 'error', '-y', '-loop', '1', '-i', PERSON, '-t', '0.3',
+            '-vf', `format=yuv444p,${vf},format=yuv420p`, '-frames:v', '1', '-update', '1', plate]);
+        }
+        const prev = PERSON;
+        PERSON = plate;
+        try { typeStill(build, stillAt(style), { THEME: theme, FONTS: fonts }, out); }
+        finally { PERSON = prev; }
+      });
+    }
+  }
+}
+
 function renderTitleLayerStills(py, work, stills, put) {
   mkdirSync(join(OUT, 'media', 'titleLayer'), { recursive: true });
   PERSON = presenterPath();
   MASK = existsSync(PRESENTER_MASK) ? PRESENTER_MASK : null;
   const build = join(work, 'title-layer-build');
   mkdirSync(build, { recursive: true });
-  const slamAt = 0.30; // mid-hold of the slam, when the word is still low and the behind cut is obvious
+  // After slam hold (0.5 s) + rise (0.35 s) the word is at resting titleY, readable, with only its lower edge tucked.
+  const restAt = 1.00;
   for (const layer of ['front', 'behind']) {
     const doc = { captionStyle: 'kinetic', flips: [
       { start: 0, end: 2.4, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam', flicker: false, layer },
     ] };
     writeFileSync(join(build, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(doc) + ';\n');
     const out = join(OUT, 'media', 'titleLayer', layer + '.jpg');
-    typeStill(build, slamAt, { THEME: 'aigent', FONTS: 'theme' }, out);
+    typeStill(build, restAt, { THEME: 'aigent', FONTS: 'theme' }, out);
     put('titleLayer', layer, out);
   }
   const autoOut = join(OUT, 'media', 'titleLayer', 'auto.jpg');
@@ -707,6 +693,8 @@ async function rebuildFromStills() {
   const put = (kind, id, file) => { stills[`${kind}:${id}`] = relPath(file); };
   console.log('title layer stills');
   renderTitleLayerStills(py, work, stills, put);
+  console.log('type stills');
+  refreshTypeStills(py, work, stills, put, menu);
   console.log('title entrances (front)');
   try { refreshEntranceStills(work, stills, put, menu); }
   catch (e) { console.warn('entrances refresh failed: ' + (e.message || e).toString().split('\n')[0]); }
