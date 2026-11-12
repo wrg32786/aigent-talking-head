@@ -150,7 +150,7 @@ function placeOf(cs) {
 // Outline and shadow of the caption words, from teardown.py's ring measures (caption_look samples) on the cues that
 // are the running captions: a hard dark band right at the letters is an outline (thick when it carries on into the
 // next ring), a milder darkening a soft shadow, else none. Samples on a dark background are skipped.
-function captionLook(samples, cues) {
+function captionLook(samples, cues, layerSamples) {
   const key = c => `${r2(c.t0)}|${c.text}`, want = cues ? new Set([...cues].map(key)) : null;
   const vs = (samples || []).filter(m => !want || want.has(key(m))).map(m => {
     if (m.far < 70) return null;
@@ -160,7 +160,13 @@ function captionLook(samples, cues) {
   }).filter(Boolean);
   if (vs.length < 3) return null;
   const outl = vs.filter(v => v === 'thin' || v === 'thick');
-  return { outline: outl.length >= 0.5 * vs.length ? (outl.filter(v => v === 'thick').length >= outl.length / 2 ? 'thick' : 'thin') : 'none',
+  // front or behind the person (teardown.py caption_layer): on the words whose box meets the person (30 or more pixels of
+  // the eroded mask), letters that vanish over the person (text density there under a third of the density beside it,
+  // in the same rows) are drawn behind; behind when 60% or more of at least 2 such words are
+  const ov = (layerSamples || []).filter(m => (!want || want.has(key(m))) && m.on_n >= 30 && m.text_off_person >= 0.05);
+  const beh = ov.filter(m => m.text_on_person < 0.3 * m.text_off_person).length;
+  const layer = ov.length >= 2 ? (beh >= 0.6 * ov.length ? 'behind' : 'front') : null;
+  return { layer, layerN: ov.length, layerBehind: beh, outline: outl.length >= 0.5 * vs.length ? (outl.filter(v => v === 'thick').length >= outl.length / 2 ? 'thick' : 'thin') : 'none',
     shadow: vs.filter(v => v === 'shadow').length >= 0.4 * vs.length ? 'soft' : 'none', n: vs.length };
 }
 
@@ -315,8 +321,8 @@ function convert(b, extras = {}, opts = {}) {
   const dropped = [...(picked.dropped || []), ...picked.filter(t => owned(t)).map(t => ({ t: t.start, text: t.text, why: `part of the ${owned(t).type} at ${owned(t).start}s` }))];
   const cs = captionStyle(b);
   const owc = oneWordStream(b);
-  const cl2 = captionLook((extras.caption_look || {}).samples, owc ? owc.cues : null);
-  if (cl2) Object.assign(cs, { outline: cl2.outline, shadow: cl2.shadow, lookN: cl2.n });
+  const cl2 = captionLook((extras.caption_look || {}).samples, owc ? owc.cues : null, (extras.caption_look || {}).layer_samples);
+  if (cl2) Object.assign(cs, { outline: cl2.outline, shadow: cl2.shadow, lookN: cl2.n, layer: cl2.layer, layerN: cl2.layerN, layerBehind: cl2.layerBehind });
   const look = cs.style === 'one-word' ? 'one-word' : cs.style === 'pill' ? 'muse' : 'kinetic';
   const shots = (b.shots || []).map((s, i) => {
     const m = { ...((s.aspects && s.aspects.grade && s.aspects.grade.measured) || {}), ...(extras.shots && extras.shots[i] ? extras.shots[i] : {}) };
@@ -359,7 +365,7 @@ function convert(b, extras = {}, opts = {}) {
     `\`npm run reel -- --recipe ${opts.recipePath || 'teardown/' + name + '/Reel.md'} --clip inbox/your-clip.mp4\``, '',
     '## Brand kit', '- preset: aigent', '- theme: aigent', `- colors: ${colours.join(', ') || 'none'}`, '- fonts: theme', '- logo: none', '',
     '## Music', `- bed: ${hasMusic && bed ? bed.name : 'none'}`, `- bpm: ${bpm ? Math.round(bpm) : ''}`, `- beat-sync: ${hasMusic ? 'on' : 'off'}`, '',
-    '## Style', `- look: ${look}`, `- captions: ${cs.style}`, ...(cs.position ? [`- caption-position: ${cs.position}`] : []), ...(cs.color ? [`- caption-color: ${cs.color}`] : []), ...(cs.outline ? [`- caption-outline: ${cs.outline}`] : []), ...(cs.shadow ? [`- caption-shadow: ${cs.shadow}`] : []), ...(cs.textCase && cs.style === 'one-word' ? [`- caption-case: ${cs.textCase}`] : []), `- titles: ${titles.length ? 'on' : 'off'}`, `- title-layer: ${layerDefault}`,
+    '## Style', `- look: ${look}`, `- captions: ${cs.style}`, ...(cs.position ? [`- caption-position: ${cs.position}`] : []), ...(cs.color ? [`- caption-color: ${cs.color}`] : []), ...(cs.outline ? [`- caption-outline: ${cs.outline}`] : []), ...(cs.shadow ? [`- caption-shadow: ${cs.shadow}`] : []), ...(cs.textCase && cs.style === 'one-word' ? [`- caption-case: ${cs.textCase}`] : []), ...(cs.layer ? [`- caption-layer: ${cs.layer}`] : []), `- titles: ${titles.length ? 'on' : 'off'}`, `- title-layer: ${layerDefault}`,
     `- finish: ${jobFinish ? jobFinish.split(',').join(', ') : 'none'}`, `- transition: ${shots.some(s => /dissolve|fade|cross/.test(s.transitionIn || '')) ? 'crossfade' : 'glitch'}`,
     `- punch: ${zoomShots || jumpCuts || avgShot < 3 ? 'on' : 'off'}`, '- effects: none', '',
     '## Shots', '', '```videomd-timeline'];
@@ -412,6 +418,7 @@ function convert(b, extras = {}, opts = {}) {
     `| Length, shots | ${dur}s, ${shots.length} shots (avg ${avgShot.toFixed(1)}s) | scene cuts${jumpCuts ? `, ${jumpCuts} jump cuts` : ''} |`,
     `| Captions | ${cs.style} (look ${look}) | ${cs.why} |`,
     `| Caption place | ${cs.position || 'unknown'}${cs.color ? ', ' + cs.color : ''} | median centre of the caption boxes${cs.y != null ? ' (' + Math.round(cs.y * 100) + '% down)' : ''} and their median fill, snapped to white or black when close |`,
+    `| Caption layer | ${cs.layer || 'not measured'} | ${cs.layerN ? `${cs.layerBehind} of ${cs.layerN} caption words that overlap the person lose their letters over the person (behind the head)` : 'no caption word overlaps the person, or no person mask'}${cs.layer ? '' : '; top captions default to auto (behind at the top)'} |`,
     `| Caption look | outline ${cs.outline || 'not measured'}, shadow ${cs.shadow || 'not measured'}${cs.textCase ? ', ' + cs.textCase + ' case' : ''} | ${cs.lookN ? `the ring of picture just outside the letters on ${cs.lookN} caption words: a hard dark band is an outline, a milder darkening a shadow` : 'not measured (extras did not run)'}; case from the words read |`,
     `| Titles | ${titles.length} | big on-screen text that is not a running caption or a graphic's word, one at a time, up to 7${dropped.length ? `; ${dropped.length} left out (listed below)` : ''} |`,
     `| Graphics | ${graphics.length ? ['ordinal-sticker', 'app-label', 'screen-card'].map(k => `${graphics.filter(g => g.type === k).length} ${k}`).join(', ') : 'none found'} | ${extras.graphics ? 'frames every 0.25 s: spiky yellow shape + ordinal word, square tile + label, dark rectangle + small UI text' : 'not measured (extras did not run)'} |`,

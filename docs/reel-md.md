@@ -104,6 +104,7 @@ Every section is optional except the card. Anything left out falls back to the p
 | caption-outline | `none`, `thin`, `thick` (default thick) | `--caption-outline`, the one-word caption's outline |
 | caption-shadow | `none`, `soft` (default soft) | `--caption-shadow`, the one-word caption's shadow |
 | caption-case | `upper`, `lower`, `as-said` (default upper) | `--caption-case`, the one-word caption's letter case |
+| caption-layer | `front`, `behind`, `auto` (default auto: behind for top captions, front elsewhere) | `--caption-layer`. Behind draws captions under the person mask, like a behind title: any part over the head or hair is hidden, the rest stays fully visible. The mask runs over the caption spans, and top one-word captions are lifted so they sit on the highest point the head reaches (only the bottom of the letters tucks behind the hair). The legibility check measures only the visible part |
 | titles | `on` or `off` | `--no-titles` |
 | title-layer | `front`, `behind`, `auto` | `--title-layer` |
 | finish | finish names, comma list, or `none` (on the whole reel) | `--finish` |

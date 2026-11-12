@@ -214,7 +214,7 @@ try {
     if (dark(join(work, 'look-thick', 'stills', 't0.50.png')) < 500) fail('the default outline should draw a dark edge');
   });
   step('caption position and colour: top vs bottom band, colour changes the word', () => {
-    const doc = extra => ({ captionStyle: 'one-word', fonts: 'theme', ...extra, flips: [{ start: 0, end: 2, text: 'Record one take', mode: 0, words: [[0, 1, 'Record'], [1, 2, 'one']] }] });
+    const doc = extra => ({ captionStyle: 'one-word', fonts: 'theme', captionLayer: 'front', ...extra, flips: [{ start: 0, end: 2, text: 'Record one take', mode: 0, words: [[0, 1, 'Record'], [1, 2, 'one']] }] });
     const front = (name, d) => { const dir = join(work, name); mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(d) + ';\n');
       run(node, [join(KIT, 'render.mjs'), '0', '0.50'], dir, { THEME: 'aigent', FONTS: 'theme', STILLS_LAYERS: '1' }); return ink(join(dir, 'stills-front', 't0.50.png')); };
     const top = front('cap-top', doc({ captionPosition: 'top' }));
@@ -223,6 +223,25 @@ try {
     if (!(top.mid < 600 && bot.mid > 1100)) fail(`caption-position: top centre ${top.mid}, bottom centre ${bot.mid}`);
     front('cap-red', doc({ captionPosition: 'top', captionColor: '#ff2020' }));
     if (Buffer.compare(readFileSync(join(work, 'cap-red', 'stills-front', 't0.50.png')), readFileSync(join(work, 'cap-top', 'stills-front', 't0.50.png'))) === 0) fail('caption-color did not change the word');
+  });
+  step('caption layer: behind and auto (top) draw under the person mask, front stays in front, behind sits above the head', () => {
+    const flips = [{ start: 0, end: 2, text: 'Record one take', mode: 0, words: [[0, 1, 'Record'], [1, 2, 'one']] }];
+    const at = (name, extra) => layered(join(work, name), { captionStyle: 'one-word', fonts: 'theme', captionPosition: 'top', ...extra, flips }, [0.5])(0.5);
+    // a job with nothing behind has no title layer: front only
+    const frontOnly = (name, extra) => { const d = join(work, name); mkdirSync(d, { recursive: true }); writeFileSync(join(d, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'one-word', fonts: 'theme', ...extra, flips }) + ';\n');
+      run(node, [join(KIT, 'render.mjs'), '0', '0.50'], d, { THEME: 'aigent', FONTS: 'theme', STILLS_LAYERS: '1' });
+      const tf = join(d, 'stills-titles', 't0.50.png'); return { front: ink(join(d, 'stills-front', 't0.50.png')), titles: existsSync(tf) ? ink(tf) : { n: 0 } }; };
+    const beh = at('clay-behind', { captionLayer: 'behind' }), auto = at('clay-auto', {}), fr = frontOnly('clay-front', { captionPosition: 'top', captionLayer: 'front' });
+    if (!beh.titles.n || beh.front.n) fail('behind: caption should be on the title layer only');
+    if (!auto.titles.n || auto.front.n) fail('auto at the top should draw behind');
+    if (!fr.front.n || fr.titles.n) fail('front: caption should be on the front layer only');
+    const bot = frontOnly('clay-auto-bottom', { captionPosition: 'bottom' });
+    if (!bot.front.n || bot.titles.n) fail('auto at the bottom should stay in front');
+    const head = at('clay-head', { captionLayer: 'behind', headTop: 300 });
+    if (!(head.titles.mid < beh.titles.mid && head.titles.mid < 300)) fail(`behind word should sit above the head top: ${head.titles.mid} vs ${beh.titles.mid}`);
+    const lj = JSON.parse(readFileSync(join(work, 'clay-behind', 'layers.json'), 'utf8'));
+    if (lj.captions !== 'behind') fail('layers.json: ' + JSON.stringify(lj));
+    if (R.captionLayer({ captionPosition: 'top' }) !== 'behind' || R.captionLayer({}) !== 'front' || R.captionLayer({ captionPosition: 'top', captionLayer: 'front' }) !== 'front') fail('rules captionLayer');
   });
   step('graphics: ordinal sticker behind the head, app label with your icon, screen card from your video, placeholders', () => {
     const g = join(work, 'gfx'); mkdirSync(g, { recursive: true });
@@ -303,6 +322,10 @@ try {
     const plain = [0, 1, 2, 3].map(i => ({ t0: i, text: 'w' + i, near: 120, mid: 119, far: 118 })), outl = [0, 1, 2, 3].map(i => ({ t0: i, text: 'w' + i, near: 20, mid: 30, far: 120 }));
     const lk = (x) => V.captionLook(x, null);
     if (lk(plain).outline !== 'none' || lk(plain).shadow !== 'none' || lk(outl).outline !== 'thick') fail('caption look: ' + JSON.stringify([lk(plain), lk(outl)]));
+    // caption layer: letters gone where the word meets the person -> behind; letters there too -> front
+    const gone = [0, 1, 2].map(i => ({ t0: i, text: 'w' + i, on_n: 400, text_on_person: 0.01, text_off_person: 0.2 })), kept = gone.map(m => ({ ...m, text_on_person: 0.2 }));
+    const ly = x => V.captionLook(plain, null, x);
+    if (ly(gone).layer !== 'behind' || ly(kept).layer !== 'front' || ly(gone.slice(0, 1)).layer !== null) fail('caption layer verdict: ' + JSON.stringify([ly(gone), ly(kept)]));
   });
   step('render overlay frames (2 s)', () => {
  run(node, [join(KIT, 'render.mjs'), '2'], build); const n = readdirSync(join(build, 'ovl')).length; if (n !== 48) fail('frames ' + n); });

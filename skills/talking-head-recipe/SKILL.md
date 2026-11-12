@@ -22,7 +22,7 @@ npm run reelmd -- package my.Reel.md out/               # full VIDEO.md package
 When the user describes a reel they like ("fast cuts, one word at a time, black and white flashback, big yellow title that slams in behind the guy's head"):
 
 1. Start from the closest example in `examples/recipes/`, or the closest preset.
-2. Map each thing they said to a field: caption style, place and colour, look, titles (entrance, layer, text), graphics (ordinal stickers, app labels, screen cards in a `reel-graphics` block, with their own icon and screen files, or a confirmed public page as a card's `source`), the one-word caption look (`caption-outline`, `caption-shadow`, `caption-case`), finish per shot, punch, transition, bed and beat sync, colours, fonts. Use only names from `npm run menu`.
+2. Map each thing they said to a field: caption style, place and colour, look, caption layer (front, or behind the head: words over the hair are hidden by it), titles (entrance, layer, text), graphics (ordinal stickers, app labels, screen cards in a `reel-graphics` block, with their own icon and screen files, or a confirmed public page as a card's `source`), the one-word caption look (`caption-outline`, `caption-shadow`, `caption-case`), finish per shot, punch, transition, bed and beat sync, colours, fonts. Use only names from `npm run menu`.
 3. Write the shot list in story order (hook, beats, payoff) with times that fit their clip length. Keep entrances unique (seven exist, each once).
 4. Run `npm run reelmd -- check` and fix every error.
 5. Show the user the summary it prints and the parts you guessed. Let them change it.

@@ -55,7 +55,7 @@ function checkJob(captionsFile, cutFile, label) {
   }
   if (CAP.lockup && CAP.lockup.arrange && !ARR.includes(CAP.lockup.arrange)) errs.push(`lockup arrange "${CAP.lockup.arrange}" (${ARR.join(', ')})`);
   if (CAP.captionPosition && !['top', 'middle', 'bottom'].includes(CAP.captionPosition)) errs.push(`captionPosition "${CAP.captionPosition}" (top, middle, bottom)`);
-  for (const [k, vals] of [['captionOutline', ['none', 'thin', 'thick']], ['captionShadow', ['none', 'soft']], ['captionCase', ['upper', 'lower', 'as-said']]]) if (CAP[k] && !vals.includes(CAP[k])) errs.push(`${k} "${CAP[k]}" (${vals.join(', ')})`);
+  for (const [k, vals] of [['captionOutline', ['none', 'thin', 'thick']], ['captionShadow', ['none', 'soft']], ['captionCase', ['upper', 'lower', 'as-said']], ['captionLayer', ['front', 'behind', 'auto']]]) if (CAP[k] && !vals.includes(CAP[k])) errs.push(`${k} "${CAP[k]}" (${vals.join(', ')})`);
   if (CAP.captionColor && !/^#[0-9a-f]{6}$/i.test(CAP.captionColor)) errs.push(`captionColor "${CAP.captionColor}" (a #rrggbb colour)`);
   // graphics (kit/graphics.json): an icon or screen file that is named must exist; leaving it out draws the placeholder
   for (const f of flips.filter(x => x.mode >= 9 && x.mode <= 11)) {

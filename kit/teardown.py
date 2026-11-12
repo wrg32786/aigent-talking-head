@@ -441,25 +441,27 @@ def head_width(mask, centre=False):
     if not len(band):
         return None
     w = float(np.median(band))
-    return (round(w / W, 3), round((top + 0.65 * w) / H, 3)) if centre else round(w / W, 3)
+    return (round(w / W, 3), round((top + 0.65 * w) / H, 3), round(top / H, 3)) if centre else round(w / W, 3)
 
 
 def cmd_headwidth(a):
-    """Median head width (share of the frame width) over a few frames of a clip, for sizing a burst to the head."""
+    """Median head width (share of the frame width) over a few frames of a clip, for sizing a burst to the head, and
+    the highest the top of the head goes (head_top, share of the frame height), for keeping behind captions readable."""
     import numpy as np
     seg = person_mask_fn()
     if not seg:
         print(json.dumps({"head_w": None, "note": "no person mask (npm run effects:setup)"})); return
     d = probe(a.video).get("duration") or 10
     ws = []
-    for k in range(5):
-        img = frame_at(a.video, d * (k + 0.5) / 5, 540)
+    for k in range(9):
+        img = frame_at(a.video, d * (k + 0.5) / 9, 540)
         if img is not None:
             w = head_width(seg(img), True)
             if w:
                 ws.append(w)
     print(json.dumps({"head_w": round(float(np.median([w[0] for w in ws])), 3) if ws else None,
-                      "head_cy": round(float(np.median([w[1] for w in ws])), 3) if ws else None, "frames": len(ws)}))
+                      "head_cy": round(float(np.median([w[1] for w in ws])), 3) if ws else None,
+                      "head_top": round(float(min(w[2] for w in ws)), 3) if ws else None, "frames": len(ws)}))
 
 
 def caption_look(video, cues, n=60):
@@ -495,7 +497,8 @@ def caption_look(video, cues, n=60):
         if near.sum() < 20 or far.sum() < 20:
             continue
         ln, lm, lf = float(np.median(L[near])), float(np.median(L[mid])), float(np.median(L[far]))
-        out.append({"t0": c["t0"], "text": c["text"], "near": round(ln, 1), "mid": round(lm, 1), "far": round(lf, 1), "h": hh})
+        rec = {"t0": c["t0"], "text": c["text"], "near": round(ln, 1), "mid": round(lm, 1), "far": round(lf, 1), "h": hh}
+        out.append(rec)
     # a hard dark band right at the letters, much darker than the background: an outline (thick when it carries on
     # into the mid ring); a milder darkening: a shadow; else none
     def verdict(m):
@@ -513,6 +516,39 @@ def caption_look(video, cues, n=60):
         res["outline"] = (max(set(outl), key=outl.count) if len(outl) >= 0.5 * len(vs) else "none")
         res["shadow"] = "soft" if sum(v == "shadow" for v in vs) >= 0.4 * len(vs) else "none"
     return res
+
+
+def caption_layer(video, cues, seg):
+    """Front or behind the person, for big single words in the top 40% of the frame: where a word's box meets the
+    person (the mask eroded a few pixels, so its soft edge does not count), are the letters still there? Letters drawn
+    behind the head vanish over it: a word whose tail stops at the hairline. Returns one sample per word that meets the
+    person: pixels of box over the person, text density there and beside it."""
+    import cv2, numpy as np
+    if seg is None:
+        return []
+    out = []
+    for c in cues:
+        bb = c.get("bbox")
+        if not bb or len(str(c.get("text", "")).split()) != 1 or (c.get("line_h") or bb[3]) < 0.04 or bb[1] > 0.4 or (c.get("conf") or 1) < 0.6:
+            continue
+        img = frame_at(video, (c["t0"] + c.get("t1", c["t0"] + 0.3)) / 2, 720)
+        if img is None:
+            continue
+        H, W = img.shape[:2]
+        pm = cv2.erode(seg(img).astype(np.uint8), np.ones((7, 7), np.uint8)).astype(bool)
+        x0, y0, x1, y1 = int(bb[0] * W), int(bb[1] * H), int((bb[0] + bb[2]) * W), int(min(1, bb[1] + bb[3] * 1.25) * H)  # a little below: tails
+        mb = pm[y0:y1, x0:x1]
+        if mb.sum() < 30:
+            continue
+        g = cv2.cvtColor(img[y0:y1, x0:x1], cv2.COLOR_BGR2GRAY)
+        tb = g >= 215
+        # letters beside the person, in the same rows as the overlap (a fair comparison)
+        rows = mb.any(axis=1)
+        off = (~mb) & rows[:, None]
+        if off.sum() < 30:
+            off = ~mb
+        out.append({"t0": c["t0"], "text": c["text"], "on_n": int(mb.sum()), "text_on_person": round(float(tb[mb].mean()), 3), "text_off_person": round(float(tb[off].mean()), 3)})
+    return out
 
 
 def detect_graphics(video, cues, seg=None, step=0.25):
@@ -664,6 +700,7 @@ def cmd_extras(a):
     gx = out["graphics"]
     try:
         out["caption_look"] = caption_look(a.video, cues)
+        out["caption_look"]["layer_samples"] = caption_layer(a.video, cues, seg)
     except Exception as e:
         print(f"note: caption outline check failed: {e}")
     json.dump(out, open(a.out, "w"), indent=1)

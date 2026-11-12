@@ -22,7 +22,7 @@ const GRAPHICS = Object.fromEntries(JSON.parse(fs.readFileSync(path.join(__dirna
 const CAPTION_POSITIONS = ['top', 'middle', 'bottom'];
 const SRC = require('./sources.cjs');
 // the one-word caption's look: Reel.md key -> captions.js key and its values
-const CAPTION_LOOK = { 'caption-outline': ['captionOutline', ['none', 'thin', 'thick']], 'caption-shadow': ['captionShadow', ['none', 'soft']], 'caption-case': ['captionCase', ['upper', 'lower', 'as-said']] };
+const CAPTION_LOOK = { 'caption-outline': ['captionOutline', ['none', 'thin', 'thick']], 'caption-shadow': ['captionShadow', ['none', 'soft']], 'caption-case': ['captionCase', ['upper', 'lower', 'as-said']], 'caption-layer': ['captionLayer', ['front', 'behind', 'auto']] };
 const ENTRANCES = ['stagger-rise', 'slam', 'blur-rise', 'slide-left', 'elastic', 'flip', 'pop-zoom'];
 const LAYERS = ['front', 'behind', 'auto'];
 
