@@ -1,6 +1,6 @@
 ---
 name: talking-head-teardown
-description: "Tear down a reference reel the user provides (a local video file) into a Reel.md recipe with rea-video, show the user what was detected (cuts, captions, titles and their entrances, front/behind, finishes, music tempo, colours), let them adjust it, then remake the style with their own clip and brand in aigent-talking-head. Use when someone says make it like this reel, copy this style, break down this video, or remake this with my clip."
+description: "Tear down a reference reel the user provides (a local video file, or a single Instagram post link) into a Reel.md recipe with rea-video, show the user what was detected (cuts, captions, titles and their entrances, front/behind, finishes, music tempo, colours), let them adjust it, then remake the style with their own clip and brand in aigent-talking-head. Use when someone says make it like this reel, copy this style, break down this video, or remake this with my clip."
 ---
 
 # Teardown, then remake
@@ -9,7 +9,7 @@ Work inside an aigent-talking-head checkout; if there is none, read https://raw.
 
 ## 1. Get the reference
 
-Only a local file the user gives you. Do not download from social platforms; if they send a link, ask them to save the video themselves where the platform and creator allow it, and pass you the file.
+Use a local file the user gives you. If they send a single Instagram post or reel link, you may run `npm run teardown -- --url <link>`, which fetches that one post anonymously with instaloader if it is installed (`pip install instaloader`). Confirm they have the rights to the content. Never log in, never fetch profiles or in bulk, and if Instagram refuses, stop and ask them for the file. For any other site, ask them to save the video themselves where the platform and creator allow it.
 
 ## 2. Tear it down
 

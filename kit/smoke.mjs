@@ -385,7 +385,11 @@ try {
     if (!existsSync(join(td, 'out', 'teardown.md')) || !existsSync(join(td, 'out', 'contact.jpg'))) fail('teardown report or contact sheet missing');
     const fb = JSON.parse(readFileSync(join(td, 'out', 'fallback.json'), 'utf8'));
     if (!fb.packaging.note) { const words = r.titles.map(t => t.text.toUpperCase()).join(' '); if (!/HELLO/.test(words) || !/FOLLOW/.test(words)) fail('OCR titles: ' + words); }
-    try { run(node, [join(KIT, 'teardown.mjs'), 'https://example.com/reel.mp4'], work); fail('teardown accepted a URL'); } catch (e) { if (!/local files only/.test(String(e.stderr || ''))) throw e; }
+    // URLs: other sites are refused; --url takes one Instagram post and needs instaloader. No network here.
+    try { run(node, [join(KIT, 'teardown.mjs'), 'https://example.com/reel.mp4'], work); fail('teardown accepted a URL'); } catch (e) { if (!/single Instagram post with --url/.test(String(e.stderr || ''))) throw e; }
+    try { run(node, [join(KIT, 'teardown.mjs'), '--url', 'https://example.com/reel.mp4'], work); fail('teardown --url accepted a non-Instagram URL'); } catch (e) { if (!/single Instagram post or reel link/.test(String(e.stderr || ''))) throw e; }
+    try { run(node, [join(KIT, 'teardown.mjs'), '--url', 'https://www.instagram.com/someprofile/'], work); fail('teardown --url accepted a profile URL'); } catch (e) { if (!/Profiles, hashtags/.test(String(e.stderr || ''))) throw e; }
+    try { run(node, [join(KIT, 'teardown.mjs'), '--url', 'https://www.instagram.com/reel/ABCdef12345/'], work, { PYTHON: join(work, 'no-python-here') }); fail('teardown --url ran without instaloader'); } catch (e) { if (!/needs instaloader/.test(String(e.stderr || ''))) throw e; }
   });
   step('title entrances: mid-entrance differs from settled, all seven resolve once, flicker on hook + payoff only', () => {
     const b = join(work, 'jobs', 'muse', 'build');

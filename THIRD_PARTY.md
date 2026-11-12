@@ -72,6 +72,6 @@ Do not use rembg's default `bria-rmbg` model with this kit: RMBG-2.0 has a separ
 
 ## Linked, not included
 
-- No downloader for social platforms is included or recommended. Teardown reads local files the user provides.
+- Teardown reads local files the user provides. The one optional exception: `npm run teardown -- --url <instagram post>` uses [instaloader](https://github.com/instaloader/instaloader) (MIT) when the user has installed it (`pip install instaloader`, commented in requirements.txt, not on the default path) to fetch the single named post anonymously. No login, no profile or bulk fetching. Users must have the rights to the content and follow Instagram's terms. No other platform downloader is included.
 - Not used at all: ViralCutter (GPL), react-bits, GSAP, Robust Video Matting (RVM, GPL-3.0). RVM was tried for a one-off hero-reel mask and must stay out of the repo.
 - Commercial fonts the pairings stand in for (Druk, Helvetica, Optitimes, Sloop, Vanguard, Athelas) are not included. Put your own licensed copies in `kit/fonts/local/`, which is gitignored.

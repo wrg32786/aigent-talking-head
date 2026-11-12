@@ -7,7 +7,14 @@ npm run teardown -- reference.mp4                 # writes teardown/reference/Re
 npm run reel -- --recipe teardown/reference/Reel.md --clip inbox/my-clip.mp4
 ```
 
-Only local files you provide. There is no downloader for TikTok, Instagram, YouTube or anything else. Get the video yourself where the platform and the creator allow it.
+Local files you provide. The one exception is an optional helper for a single Instagram post:
+
+```
+pip install instaloader                                           # optional extra (MIT), not installed by default
+npm run teardown -- --url https://www.instagram.com/reel/<code>/  # fetches that one post into teardown-in/ (gitignored), then tears it down
+```
+
+It fetches only the post you name, anonymously. It never logs in, and it does not fetch profiles, hashtags, stories or anything in bulk. If Instagram asks for a login or rate-limits the request, it stops and says so; download the video yourself instead. You must have the rights to the content, and you must follow Instagram's terms. Other sites (TikTok, YouTube and so on) are not supported: save the video yourself where the platform and the creator allow it, then pass the file.
 
 ## What runs
 

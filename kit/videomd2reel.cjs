@@ -31,7 +31,8 @@ function loadBreakdown(p) {
 
 // Big on-screen words that are not running captions, at most seven (one per entrance), in time order.
 function pickTitles(b, max = 7) {
-  const cues = ((b.packaging || {}).text_cues || []).filter(c => c && c.text);
+  const ow = oneWordStream(b);
+  const cues = ((b.packaging || {}).text_cues || []).filter(c => c && c.text && !(ow && ow.cues.has(c)));
   const ok = c => {
     if (!c.t1 || c.t1 <= c.t0) return false;
     const txt = String(c.text).trim();
@@ -60,9 +61,26 @@ function pickTitles(b, max = 7) {
 }
 const clean = t => String(t).replace(/\s+/g, ' ').replace(/[|]/g, '/').replace(/\u2014/g, ',').trim();
 
+const norm = t => String(t).toLowerCase().replace(/[^a-z0-9]/g, '');
+// One big word at a time that matches the speech (the one-word caption look). rea-video files these as labels, so
+// they are found by matching single big words on screen to the transcript's word times.
+function oneWordStream(b) {
+  const words = ((b.speech || {}).words || []).map(w => ({ t: w[0], w: norm(w[2]) })).filter(w => w.w.length >= 2);
+  if (words.length < 8) return null;
+  const cues = ((b.packaging || {}).text_cues || []).filter(c => c.text && String(c.text).trim().split(/\s+/).length === 1 && (c.line_h ?? (c.bbox ? c.bbox[3] : 0)) >= 0.04 && (c.t1 - c.t0) <= 1.6 && (c.conf ?? 1) >= 0.6);
+  const hit = cues.filter(c => { const n = norm(c.text); return n.length >= 2 && words.some(w => Math.abs(w.t - c.t0) <= 0.8 && (w.w === n || (n.length >= 4 && (w.w.startsWith(n) || n.startsWith(w.w))))); });
+  if (hit.length < 8) return null;
+  const bands = {}; hit.forEach(c => { bands[c.band] = (bands[c.band] || 0) + 1; });
+  const band = Object.entries(bands).sort((a, c) => c[1] - a[1])[0][0];
+  return { cues: new Set(hit), band, n: hit.length, of: words.length };
+}
+
 // Running captions -> one of our caption styles.
 function captionStyle(b) {
-  const subs = ((b.packaging || {}).text_cues || []).filter(c => c.kind === 'subtitle');
+  const ow = oneWordStream(b);
+  if (ow) return { style: 'one-word', why: `${ow.n} big single words on screen match the speech (${ow.of} words spoken), mostly in the ${ow.band} band`, band: ow.band };
+  // tiny text (a screen recording, a UI) is not a caption
+  const subs = ((b.packaging || {}).text_cues || []).filter(c => c.kind === 'subtitle' && (c.line_h ?? (c.bbox ? c.bbox[3] : 1)) >= 0.025);
   if (!subs.length) return { style: 'kinetic', why: 'no running captions found; kinetic is the house default' };
   const words = subs.map(c => String(c.text).trim().split(/\s+/).length);
   const avgW = words.reduce((a, x) => a + x, 0) / words.length;
@@ -245,7 +263,7 @@ function convert(b, extras = {}, opts = {}) {
   return { md, report: R.join('\n'), titles, shots, captionStyle: cs.style, jobFinish, bpm, bed };
 }
 
-module.exports = { convert, pickTitles, captionStyle, finishOf, suggestBed, loadBreakdown, ENTRANCE_MAP };
+module.exports = { convert, pickTitles, captionStyle, oneWordStream, finishOf, suggestBed, loadBreakdown, ENTRANCE_MAP };
 
 if (require.main === module) {
   const argv = process.argv.slice(2);

@@ -40,3 +40,5 @@ kit/presets/local/
 
 # teardowns of reference reels (npm run teardown)
 /teardown/
+# single posts fetched by npm run teardown -- --url (optional instaloader helper)
+/teardown-in/

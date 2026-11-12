@@ -47,7 +47,7 @@ npm run teardown -- reference.mp4                                       # what i
 npm run reel -- --recipe teardown/reference/Reel.md --clip inbox/me.mp4  # the same style, your clip and brand
 ```
 
-[rea-video](https://github.com/JuneYaooo/rea-video) breaks the reference down shot by shot; the kit maps it onto the menu above and shows you what it found before anything renders. Local files only. How accurate it is: [docs/teardown.md](docs/teardown.md).
+[rea-video](https://github.com/JuneYaooo/rea-video) breaks the reference down shot by shot; the kit maps it onto the menu above and shows you what it found before anything renders. Local files, or one Instagram post with `--url` if you install the optional instaloader (you need the rights to it). How accurate it is: [docs/teardown.md](docs/teardown.md).
 
 ## Reel.md recipes
 
@@ -231,7 +231,7 @@ Agents: start at [AGENTS.md](AGENTS.md).
 |---|---|
 | `kit/reel.cjs` | `npm run reel`: inbox clip (or several takes) to draft reel in one command (clip, cut, captions, check, render, mask, assemble), plus `--draft` and `--rebuild`. |
 | `kit/reelmd.cjs` | `npm run reelmd -- check\|compile\|export\|package`: Reel.md recipes ([spec](docs/reel-md.md)), applied by `npm run reel -- --recipe`. Examples in `examples/recipes/`. |
-| `kit/teardown.mjs`, `kit/videomd2reel.cjs`, `kit/teardown.py` | `npm run teardown -- <file>`: rea-video breakdown to Reel.md, report and contact sheet; built-in fallback analyzer and the front/behind and vignette extras ([docs](docs/teardown.md)). |
+| `kit/teardown.mjs`, `kit/videomd2reel.cjs`, `kit/teardown.py`, `kit/ig_fetch.py` | `npm run teardown -- <file>`: rea-video breakdown to Reel.md, report and contact sheet; built-in fallback analyzer the front/behind and vignette extras, and the optional single-post Instagram fetch ([docs](docs/teardown.md)). |
 | `INSTALL.md`, `skills/` | One-line agent install, and skills for `npx skills add wrg32786/aigent-talking-head`. |
 | `kit/autocaption.mjs` | Drafts `captions.js` from Whisper word times (`words.json` or `clips.json`), in any caption style, with `--titles`. Never overwrites without `--force`. |
 | `kit/check.mjs` | `npm run check [job]`: copy lint, titles, transitions, sounds, punches and script shape. |

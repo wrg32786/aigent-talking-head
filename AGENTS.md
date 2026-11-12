@@ -16,7 +16,7 @@ Skills: `npx skills add wrg32786/aigent-talking-head` installs them in Claude Co
 
 Recipes: a [Reel.md](docs/reel-md.md) is a plain-Markdown, VIDEO.md-compatible recipe for a reel (brand kit, music, finishes per shot, titles with entrance and layer, caption style). `npm run reel -- --recipe <Reel.md> --clip <file>` applies it; `npm run reelmd -- export <job>` saves a finished reel as one. Precedence: flags, then the recipe, then its preset, then defaults.
 
-Teardown: `npm run teardown -- <local video>` breaks a reference reel down with rea-video into a Reel.md, a report and a contact sheet ([docs/teardown.md](docs/teardown.md)). Show the user what was detected and let them adjust it before you remake. Local files only; no downloader.
+Teardown: `npm run teardown -- <local video>` breaks a reference reel down with rea-video into a Reel.md, a report and a contact sheet ([docs/teardown.md](docs/teardown.md)). Show the user what was detected and let them adjust it before you remake. Local files, or one Instagram post with `--url` when instaloader is installed (no login, no bulk; the user must have the rights).
 
 Hard rules:
 - Offer the menu before drafting and again before the final render. First ask: saved brand preset, customize, or let you choose. `npm run menu` prints every option; [showcase/index.html](showcase/index.html) shows them labelled. Suggest 2 or 3 per category, and vary film finishes across scenes.
