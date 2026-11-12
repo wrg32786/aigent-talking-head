@@ -1,6 +1,6 @@
 ---
 name: talking-head-ad
-description: "Turn a teammate's phone recording or takes (dropped in inbox/) into a vertical 9:16 talking-head reel: best take per sentence, zoom-punched cuts, every word animated, kinetic titles behind the head, a few deep sounds on the key cuts, a ducked music bed, checked with npm run verify. HeyGen cinematic takes are an optional extra source. Use when someone says 'make a reel from my clip' or is making or fixing a presenter ad."
+description: "Turn a teammate's phone recording or takes (dropped in inbox/) into a vertical 9:16 talking-head reel: best take per sentence, zoom-punched cuts, every word animated, kinetic titles (in front by default, or behind the head), a few deep sounds on the key cuts, a ducked music bed, checked with npm run verify. HeyGen cinematic takes are an optional extra source. Use when someone says 'make a reel from my clip' or is making or fixing a presenter ad."
 ---
 
 # Talking-head ad
@@ -42,6 +42,7 @@ Do this before you draft, and again before the final render. The menu of effects
    - font pairings (`theme`, `modern`, `druk`, `elegant`, `editorial`)
    - themes (`aigent` default, `neutral` unbranded)
    - title entrances (7, each used at most once)
+   - title layer: front (default), behind the head, or auto (only the strongest 1 or 2 punch titles behind, never consecutive). Offer this per title. `"layer": "front"|"behind"|"auto"` on a title, or `"titleLayer"` for the job.
    - transitions (50 names in `kit/transitions.json`; glitch seam is the default)
    - the 51 effects, grouped by moment (see also [effects/CATALOG.md](../../effects/CATALOG.md))
    - the SFX pack (`kit/sfx/sfx.json`)
@@ -58,7 +59,7 @@ Do this before you draft, and again before the final render. The menu of effects
    - With a bed, beat-sync is on by default: punches, SFX and title entrances snap to the bed (speech cuts stay put). Pass `--no-beat-sync` to leave the times alone, or `--finish grain,vignette` for a film look on the picture.
 4. Read `jobs/<name>/clips/clips.md`. `npm run reel` already dropped every `retake` row. Remove slates and asides ("Okay, take two...") from `build/cut.json`, and trim the `out` of clips that end mid-move.
 5. Edit `build/captions.js`. It's a draft with every phrase in the caption style (`kinetic` by default, key words in `emph`), and one title per beat as a mode 7 flip. Fix misheard words against what the teammate said, rewrite titles that don't read as a headline, and add a count-up, card or CTA if wanted (see step 4 below).
-6. Before the final render, **offer the menu again**. Confirm finishes (vary them across scenes), beat-sync, the look, fonts, theme, title entrances and transitions. Then build: `npm run reel -- --rebuild --name <name>` writes `jobs/<name>/reel-vN.mp4`, a new number each time.
+6. Before the final render, **offer the menu again**. Confirm finishes (vary them across scenes), beat-sync, the look, fonts, theme, title entrances, title layer (front vs behind, per title) and transitions. Then build: `npm run reel -- --rebuild --name <name>` writes `jobs/<name>/reel-vN.mp4`, a new number each time.
 7. **Verify (mandatory):** `npm run verify -- <name>` must print `VERIFY PASS`. Read `jobs/<name>/verify/contact.png` and every still it lists (each title mid-entrance and settled, the big punches, the payoff) before you hand over the reel path. Then offer the effects pass (next section) if they want more motion.
 
 Leave out `--draft` to go straight to `reel-v1.mp4` in one command. The draft step is better when someone will watch it.

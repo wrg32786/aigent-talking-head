@@ -17,5 +17,6 @@
   ],
   "bed": null,
   "punch": true,
-  "notes": "Use when the reel is not for The AIgent, or when the teammate wants a clean unbranded look."
+  "notes": "Use when the reel is not for The AIgent, or when the teammate wants a clean unbranded look.",
+  "titleLayer": "front"
 }

@@ -21,5 +21,6 @@
   ],
   "bed": null,
   "punch": true,
-  "notes": "Serif display with a partner face, a quieter grade (mono, grain or crushed) across scenes."
+  "notes": "Serif display with a partner face, a quieter grade (mono, grain or crushed) across scenes.",
+  "titleLayer": "front"
 }

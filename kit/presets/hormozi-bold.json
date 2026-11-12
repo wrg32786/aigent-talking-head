@@ -21,5 +21,6 @@
   ],
   "bed": null,
   "punch": true,
-  "notes": "Heavy outlined caps in the lower third, the active word in the accent colour."
+  "notes": "Heavy outlined caps in the lower third, the active word in the accent colour.",
+  "titleLayer": "front"
 }

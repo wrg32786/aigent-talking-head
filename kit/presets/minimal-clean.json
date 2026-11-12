@@ -17,5 +17,6 @@
   ],
   "bed": null,
   "punch": false,
-  "notes": "No titles, no film finish, no zoom punch. Let the face and the words do the work."
+  "notes": "No titles, no film finish, no zoom punch. Let the face and the words do the work.",
+  "titleLayer": "front"
 }

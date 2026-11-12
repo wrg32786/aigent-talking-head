@@ -117,6 +117,7 @@ function validate(p) {
   }
   if (p.transition && !transitionNames().includes(p.transition)) errs.push(`unknown transition "${p.transition}"`);
   if (p.bed && !R.isBed(p.bed)) errs.push(`unknown bed "${p.bed}" (library names only in a shipped preset)`);
+  if (p.titleLayer && !R.TITLE_LAYERS.includes(String(p.titleLayer).toLowerCase())) errs.push(`unknown titleLayer "${p.titleLayer}" (front, behind, auto)`);
   return errs;
 }
 
@@ -138,6 +139,7 @@ function apply(preset, dest, overrides = {}) {
   const bed = pick('bed');
   const transition = pick('transition');
   const beatSync = has('beatSync') ? overrides.beatSync : preset.beatSync;
+  const titleLayer = has('titleLayer') ? overrides.titleLayer : (preset.titleLayer !== undefined ? preset.titleLayer : undefined);
 
   const applied = { name: preset.name, label: preset.label };
   if (theme) applied.theme = theme;
@@ -148,6 +150,7 @@ function apply(preset, dest, overrides = {}) {
   if (punch !== undefined) applied.punch = punch;
   if (bed) applied.bed = bed;
   if (beatSync !== undefined) applied.beatSync = beatSync;
+  if (titleLayer !== undefined) applied.titleLayer = titleLayer;
 
   if (cut && typeof cut === 'object') {
     cut.preset = preset.name;
@@ -156,6 +159,7 @@ function apply(preset, dest, overrides = {}) {
       if (cut.bedVol == null) cut.bedVol = 0.16;
     }
     if (beatSync !== undefined && !has('beatSync')) cut.beatSync = beatSync;
+    if (titleLayer !== undefined && !has('titleLayer') && cut.titleLayer == null) cut.titleLayer = titleLayer;
     if (punch === false && !has('punch')) cut.punch = false;
     if (transition && !has('transition') && Array.isArray(cut.segs)) {
       cut.segs.forEach((s, i) => { if (!s.transition) s.transition = transition; });
@@ -180,6 +184,7 @@ function apply(preset, dest, overrides = {}) {
   if (caps && typeof caps === 'object') {
     if (style && !has('style')) caps.captionStyle = style;
     if (fonts && !has('fonts')) caps.fonts = fonts;
+    if (titleLayer !== undefined && !has('titleLayer') && caps.titleLayer == null) caps.titleLayer = titleLayer;
   }
   return { cut, captions: caps, applied, theme: applied.theme, look: applied.look, style: applied.captionStyle, fonts: applied.fonts, titles: applied.titles };
 }
@@ -233,6 +238,7 @@ function fromJob(jobDir) {
     bed: typeof cut.bed === 'string' && R.isBed(cut.bed) ? cut.bed : undefined,
     punch: cut.punch === false ? false : true,
     beatSync: cut.beatSync,
+    titleLayer: caps.titleLayer || cut.titleLayer,
     notes: 'Saved from a job. Check theme, look and effect favourites before you rely on this as a house style.',
   };
 }

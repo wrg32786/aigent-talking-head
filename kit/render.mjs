@@ -38,7 +38,7 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
   }
   // font lockup overrides from cut.json ("lockup" for the job, "hero" per flip start) -> lockover.js
   { let C = {}; try { C = JSON.parse(readFileSync(join(ROOT, 'cut.json'), 'utf8')); } catch {}
-    writeFileSync(join(ROOT, 'lockover.js'), 'window.LOCKOVER=' + JSON.stringify({ lockup: C.lockup || null, hero: C.hero || null, inserts: (C.inserts || []).map(s => ({ at: +s.at, dur: +s.dur, y: s.y, tint: s.tint, line: s.line, arc: s.arc })) }) + ';\n'); }
+    writeFileSync(join(ROOT, 'lockover.js'), 'window.LOCKOVER=' + JSON.stringify({ lockup: C.lockup || null, hero: C.hero || null, titleLayer: C.titleLayer || null, inserts: (C.inserts || []).map(s => ({ at: +s.at, dur: +s.dur, y: s.y, tint: s.tint, line: s.line, arc: s.arc })) }) + ';\n'); }
   if (!existsSync(join(ROOT, 'fxzones.js'))) writeFileSync(join(ROOT, 'fxzones.js'), 'window.FXZONES=[];\n');
 }
 const b = await chromium.launch({ executablePath: findChrome() });
@@ -47,10 +47,10 @@ await p.goto(pathToFileURL(join(ROOT, 'overlay.html')).href, { waitUntil: 'netwo
 await p.waitForFunction(() => window.__ready === true, null, { timeout: 20000 });
 if ((await p.evaluate(() => window.__logo)) === false) { console.error('logo failed to load (check "logo" in captions.js or theme.logo)'); await b.close(); process.exit(1); }
 console.log('theme', await p.evaluate(() => window.__theme));
-// Kinetic titles (mode 7) get their own layer, ovlt/, so assemble.cjs can draw them behind the person; ovl/ then
-// holds everything else. Stills always show every layer together.
+// Behind-head titles (mode 7, layer behind) get their own layer, ovlt/, so assemble.cjs can draw them behind the person; ovl/ then
+// holds front titles, partner words and captions. Stills always show every layer together.
 const titles = await p.evaluate(() => window.__titles || []);
-if (titles.length) console.log('titles', titles.map(t => `${t.start}s ${t.entrance}${t.flicker ? '+flicker' : ''}`).join(', '));
+if (titles.length) console.log('titles', titles.map(t => `${t.start}s ${t.entrance}${t.flicker ? '+flicker' : ''}${t.layer && t.layer !== 'front' ? ' ' + t.layer : ''}`).join(', '));
 // Font lockups (titles and kinetic lines, two faces per phrase): written out so they can be checked without pixels
 const lockups = await p.evaluate(() => (window.__lockups ? window.__lockups() : []));
 writeFileSync(join(ROOT, 'lockups.json'), JSON.stringify(lockups, null, 1) + '\n');

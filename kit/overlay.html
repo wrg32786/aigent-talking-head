@@ -36,17 +36,30 @@ const Y=CAP.captionY||1300; // caption band: chest, below the face box. Measure 
 // mode 0 caption, 1 spray hero word, 2 sticker, 3 count-up, 4 takeover card, 5 logo plate, 6 CTA sticker (+ optional sub line), 7 kinetic title (see below)
 const flips=CAP.flips.map(f=>[f.start,f.end,f.text,f.mode,f]);
 // mode 7 = kinetic title (one per beat). Seven entrances, each used once per video, resolved in time order; flicker only
-// on the first title (hook) and the last (payoff). Titles render on their own layer (render.mjs LAYER=titles) so
-// assemble.cjs can put them behind the person mask. Same rules as kit/rules.cjs resolveTitles().
+// on the first title (hook) and the last (payoff). Behind-head hero words render on their own layer
+// (render.mjs LAYER=titles) so assemble.cjs can put them behind the person mask. Front titles stay on the front layer.
+// Same rules as kit/rules.cjs resolveTitles().
 const ENTR=['stagger-rise','slam','blur-rise','slide-left','elastic','flip','pop-zoom'];
 const TITLES=flips.filter(c=>c[3]===7).sort((a,b)=>a[0]-b[0]);
 {const used=new Set(TITLES.map(c=>c[4].entrance).filter(Boolean)),free=ENTR.filter(e=>!used.has(e));TITLES.forEach((c,i)=>{c.entr=c[4].entrance||free.shift()||ENTR[i%7];c.flick=(i===0||i===TITLES.length-1)&&c[4].flicker!==false})}
+// Title layer: front (default, whole title in front of the person), behind (hero word behind the head), or auto
+// (at most two punch titles behind, never consecutive). Same as kit/rules.cjs resolveTitles(). cut.json titleLayer
+// can arrive via LOCKOVER.titleLayer. Partner words of a behind title still draw in front of the person.
 // Titles rest high (titleY, centre of the hero word) so most of the word clears the head; only its lower edge tucks
-// behind the hair. The slam lands lower, behind the head (titleSlamY), holds, then rises to titleY ("titleRise": false
-// on a title, or for the whole job, lands it at titleY). Partner words of a title draw in front of the person.
-const TY=CAP.titleY||290,TSY=CAP.titleSlamY||600,PY=CAP.pillY||1480,KY=CAP.kineticY||CAP.captionY||1320,ALTY=CAP.altY||330,CSTYLE=CAP.captionStyle||'kinetic';
+// behind the hair (default 345, chosen so a ~230 px hero on a typical 9:16 talking-head meets the crown). The slam
+// lands lower (titleSlamY), holds 0.5 s, then rises for 0.35 s to titleY ("titleRise": false on a title, or for the
+// whole job, lands it at titleY). Slam rise runs for behind and front titles.
+const LAYERS=['front','behind','auto'];
+const jobLayer=(()=>{const v=String((CAP.titleLayer!=null?CAP.titleLayer:((window.LOCKOVER||{}).titleLayer))||'front').toLowerCase();return LAYERS.includes(v)?v:'front'})();
+{const raw=TITLES.map(c=>{const v=String((c[4].layer!=null?c[4].layer:jobLayer)).toLowerCase();return LAYERS.includes(v)?v:jobLayer});
+ const behind=new Set();raw.forEach((v,i)=>{if(v==='behind')behind.add(i)});
+ const autos=raw.map((v,i)=>v==='auto'?i:-1).filter(i=>i>=0);
+ if(autos.length){const scored=autos.map(i=>{const c=TITLES[i];let s=0;if(i===0||i===TITLES.length-1)s+=3;if(c.entr==='slam')s+=2;if(c.flick)s+=1;return{i,s}}).sort((a,b)=>b.s-a.s||a.i-b.i);
+  for(const {i} of scored){if(behind.size>=2)break;if(behind.has(i-1)||behind.has(i+1))continue;behind.add(i)}}
+ TITLES.forEach((c,i)=>{c.layer=behind.has(i)?'behind':'front'})}
+const TY=CAP.titleY||345,TSY=CAP.titleSlamY||600,PY=CAP.pillY||1480,KY=CAP.kineticY||CAP.captionY||1320,ALTY=CAP.altY||330,CSTYLE=CAP.captionStyle||'kinetic';
 const ONEW=CSTYLE==='one-word'; // the simple one-word style; "oneword" is the full look further down
-// Slam rise: lands at titleSlamY, holds .15 s, then a smooth .35 s ease up to the resting titleY. Returns the y offset.
+// Slam rise: lands at titleSlamY, holds 0.5 s, then a smooth 0.35 s ease up to the resting titleY. Returns the y offset.
 const RISE={hold:.5,dur:.35};const riseOff=(c,dt)=>{if(c.entr!=='slam'||c[4].titleRise===false||CAP.titleRise===false)return 0;const d=TSY-TY;if(d<=0)return 0;const q=cl((dt-RISE.hold)/RISE.dur),e=q<.5?4*q*q*q:1-Math.pow(-2*q+2,3)/2;return d*(1-e)};
 const riseEnd=c=>riseOff(c,0)?RISE.hold+RISE.dur*.6-.24:0; // partners start as the rise settles
 // Pairing per flip. With a cycle the titles take the pairings in turn, and every other flip takes the pairing of the
@@ -342,7 +355,7 @@ const titleUp=t=>zoneAt(t)!=='hide'&&TITLES.some(c=>t>=c[0]&&t<c[1]);
 function caption(c,t){const st=c[4].style||CSTYLE;if(st==='one-word'&&titleUp(t))return;const yo=zoneAt(t)==='move'?ALTY:0;if(st==='kinetic')return kinetic(c,t);if(st==='oneword')return oneword(c,t);if(st==='pill')return pill(c,t,yo);if(st==='hormozi')return boldCap(c,t,false,yo);if(st==='karaoke')return boldCap(c,t,true,yo);if(st==='one-word')return oneWord(c,t,yo);glyphs(c[2],fit([c[2]],S,CSZ,980),540,yo||Y,t-c[0],IV,true)}
 let LAYER='all';
 function flip(t){for(const c of flips){if(t<c[0]||t>=c[1])continue;use(c.ps);const dt=t-c[0],m=c[3],out=c[1]>90?1:cl((c[1]-t)/.05);ctx.save();ctx.globalAlpha=out;
-if(m===7){if(zoneAt(t)!=='hide')title(c,t,LAYER==='titles'?'hero':LAYER==='front'?'partner':'all')}
+if(m===7){if(zoneAt(t)!=='hide'){const lay=c.layer||'front';if(LAYER==='titles'){if(lay==='behind')title(c,t,'hero')}else if(LAYER==='front'){title(c,t,lay==='behind'?'partner':'all')}else title(c,t,'all')}}
 else if(LAYER==='titles'){}
 else if(m===8)typeCard(c);
 else if(m===0)caption(c,t);
@@ -355,9 +368,9 @@ else if(m===6){sticker(c[2],fit(c[2].split('|'),F,170,700),540,Y-20,dt,7,F);cons
 ctx.restore()}}
 function burst(dt,seed){if(dt<-.1||dt>.42)return;const r=rng(seed),p=(dt+.1)/.52,a=Math.sin(Math.PI*cl(p));ctx.save();ctx.translate(540,Y);ctx.lineCap='round';for(let i=0;i<54;i++){const ang=r()*6.283,sp=.6+r()*.9,len=120+r()*520,st=120+p*sp*1150;ctx.strokeStyle=i%3?CY:IV;ctx.globalAlpha=a*(.35+r()*.6);ctx.lineWidth=2+r()*7;ctx.beginPath();ctx.moveTo(Math.cos(ang)*st,Math.sin(ang)*st);ctx.lineTo(Math.cos(ang)*(st+len),Math.sin(ang)*(st+len));ctx.stroke()}ctx.restore()}
 function glitch(t){glitchAt.forEach((h,i)=>{const dt=t-h;if(dt<-.05||dt>.2)return;const r=rng(Math.floor(t*24)*97+i*13+5),a=1-Math.max(0,dt)/.2;ctx.save();for(let k=0;k<16;k++){const y=r()*1920,hh=4+r()*r()*90;ctx.globalAlpha=a*(.12+r()*.5);ctx.fillStyle=k%3===0?CY:IV;ctx.fillRect(r()*200-100,y,r()>.4?1300:200+r()*700,hh)}ctx.fillStyle=IV;for(let k=0;k<2600;k++){ctx.globalAlpha=a*r()*.55;ctx.fillRect(r()*1080,r()*1920,2+r()*3,2)}ctx.restore()})}
-// layer: 'all' (default), 'front' (everything but titles) or 'titles' (titles only, for the behind-the-person pass)
+// layer: 'all' (default), 'front' (captions, plus front titles and partner words) or 'titles' (behind-head hero words only)
 window.seek=(t,layer)=>{LAYER=layer||'all';ctx.clearRect(0,0,1080,1920);flip(t);if(LAYER==='titles')return;(CAP.bursts||[]).forEach((h,i)=>burst(t-h,7919*(i+3)));glitch(t)};
-window.__titles=TITLES.map(c=>({start:c[0],end:c[1],text:c[2],entrance:c.entr,flicker:c.flick}));
+window.__titles=TITLES.map(c=>({start:c[0],end:c[1],text:c[2],entrance:c.entr,flicker:c.flick,layer:c.layer||'front'}));
 // Fonts: optional web-font stylesheet from the theme, then wait for every face we draw with, then the logo.
 const css=TH.fontCss?new Promise(r=>{const l=document.createElement('link');l.rel='stylesheet';l.href=TH.fontCss;l.onload=r;l.onerror=r;document.head.appendChild(l)}):Promise.resolve();
 css.then(()=>Promise.all(FACES)).then(()=>Promise.all([...Object.values(SETS).flatMap(s=>[...(s.SCF?[document.fonts.load(fnt(s.SCF,90))]:[]),document.fonts.load(fnt(s.S,CSZ)),document.fonts.load(fnt(s.G,160)),document.fonts.load(fnt(s.F,150)),document.fonts.load(fnt(s.K,46))]),document.fonts.ready,new Promise(r=>{if(!LOGO||SK.complete)return r();SK.onload=r;SK.onerror=r})])).finally(()=>{window.__logo=LOGO?SK.naturalWidth>0:null;window.__skool=window.__logo;window.__theme=TH.name||'custom';window.__fonts=CYC.length>1?CYC.map(s=>s.name).join(','):BASE.name;window.seek(0);window.__ready=true});

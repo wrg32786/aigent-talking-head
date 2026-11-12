@@ -24,7 +24,7 @@ What this repo ships from other projects, and what it only took ideas from. Lice
 
 ## Adapted from Will's other work
 
-- **Beat grid and film-finish looks** (`kit/beats.py`, `kit/beats.cjs`): the librosa analysis (tempo, beats, onsets, RMS energy, drop spikes plus an intensity filter) and the ffmpeg-builtin film looks (grain, vignette, chromatic aberration, scan lines, colour grades) are adapted from Will Gwyn's private `music-video` project (`pipeline/audio_analysis.py`, `pipeline/effects_planner.py`, `pipeline/scene_effects.py`). Relicensed Apache-2.0 by the author for this repo. No brand portraits, project files, LUT `.cube` files or light-leak overlays were copied.
+- **Beat grid and film-finish looks** (`kit/beats.py`, `kit/beats.cjs`): the librosa analysis (tempo, beats, onsets, RMS energy, drop spikes plus an intensity filter) and the ffmpeg-builtin film looks (grain, vignette, chromatic aberration, scan lines, colour grades) are adapted from Will Gwyn's `music-video` project (`pipeline/audio_analysis.py`, `pipeline/effects_planner.py`, `pipeline/scene_effects.py`). Relicensed Apache-2.0 by the author for this repo. No brand portraits, project files, LUT `.cube` files or light-leak overlays were copied.
 
 ## Ideas adapted (no code copied)
 

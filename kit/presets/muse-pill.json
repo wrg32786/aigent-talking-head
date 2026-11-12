@@ -1,6 +1,6 @@
 {
   "name": "muse-pill",
-  "label": "Pill captions and kinetic titles behind the head",
+  "label": "Pill captions and kinetic titles (front by default)",
   "theme": "aigent",
   "look": "muse",
   "captionStyle": "pill",
@@ -21,5 +21,6 @@
   ],
   "bed": null,
   "punch": true,
-  "notes": "The muse look: 3 to 5 words in a lower-third pill, titles still behind the head."
+  "notes": "The muse look: 3 to 5 words in a lower-third pill. Titles sit in front unless you set layer behind or auto.",
+  "titleLayer": "front"
 }

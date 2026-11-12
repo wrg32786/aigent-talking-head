@@ -4,13 +4,14 @@ A 40-second reel made with this kit from one phone recording session: 20 effects
 
 [![Four frames from the demo reel](poster.jpg)](demo-reel.mp4)
 
-`demo-reel.mp4` is the finished reel scaled to 720x1280 for the repo. The master is 1080x1920.
+`demo-reel.mp4` is the finished reel scaled to 720x1280 for the repo. The master is 1080x1920. `before-after.gif` is a short loop of the same take: the phone clip on the left, the finished reel on the right.
 
 ## What's here
 
 | File | What it is |
 |---|---|
 | `demo-reel.mp4` | The reel: 40.5 s, -14.3 LUFS, true peak -1.0 dBTP (`npm run verify`). |
+| `before-after.gif` | A short loop: the phone clip beside the finished reel (spotlight, backdrop-word, orbit). `before-after.jpg` is a still from it. |
 | `cut.json` | The edit: 20 segments from two takes of the same script, 26 effect sounds, and the `yeehaw` music bed ducked under the voice. |
 | `fx.json` | The effects plan: one effect per segment, each starting on its cut. |
 | `captions.js` | Kinetic captions for the lines where the effect has no text of its own. |
@@ -36,4 +37,4 @@ The plan files are for reading. They won't re-run as they stand, because three t
 
 ## Rights
 
-The footage shows Will Gwyn, and the music is our own track (`kit/music/yeehaw.mp3`). Both are for The AIgent's own use and are not covered by the repo's Apache-2.0 licence.
+The footage shows Will Gwyn, including the before/after loop, and is for The AIgent's own use; it is not covered by the repo's Apache-2.0 licence. The music bed (`kit/music/yeehaw.mp3`) is [CC0 1.0](../../music/LICENSE.md).
