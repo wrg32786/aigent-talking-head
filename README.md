@@ -18,6 +18,12 @@ Phone clip on the left, finished reel on the right. [Watch the 40-second demo](k
 
 ![51 effects](showcase/sheets/effects.jpg)
 
+## Graphics
+
+Ordinal sticker, app label and screen card, each with its own entrance. Bring your icon or screen recording, or the kit draws a neutral placeholder (shown).
+
+![Graphics: ordinal sticker, app label, screen card](showcase/sheets/graphics.jpg)
+
 ## Film finishes
 
 ![Film finishes](showcase/sheets/finishes.jpg)

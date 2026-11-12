@@ -74,11 +74,17 @@ def main():
     except (OSError, ValueError): pass
     try: hits += [float(h) for h in json.loads(re.search(r'=\s*(\{.*\})\s*;?\s*$', open(os.path.join(build, 'captions.js'), encoding='utf-8').read(), re.S).group(1)).get('glitchAt', [])]
     except (OSError, ValueError, AttributeError): pass
+    # graphics (ordinal stickers, app labels, screen cards: modes 9 to 11) bring their own backing, and their opaque
+    # tiles and cards would be read as giant letters: skip the moments they are up
+    gfx = []
+    try: gfx = [(float(f['start']), float(f['end'])) for f in json.loads(re.search(r'=\s*(\{.*\})\s*;?\s*$', open(os.path.join(build, 'captions.js'), encoding='utf-8').read(), re.S).group(1)).get('flips', []) if 9 <= int(f.get('mode', 0)) <= 11]
+    except (OSError, ValueError, AttributeError, KeyError, TypeError): pass
     bad, seen = [], 0
     for k, fr in enumerate(frames):
         i = k * every
         if i >= n: break
         if any(-0.08 <= i / 24 - h <= 0.3 for h in hits): continue
+        if any(a - 0.05 <= i / 24 <= b + 0.05 for a, b in gfx): continue
         # the caption layer can land a frame early or late on the picture at a cut: take the best of the three
         rs = [check(np.asarray(Image.open(os.path.join(ovl, f'{j:04d}.png')).convert('RGBA'))[..., 3].astype(np.float32) / 255, fr) for j in (i - 1, i, i + 1) if 0 <= j < n]
         if any(x is None for x in rs): continue  # a card or a glitch on one of them: not a fair read

@@ -24,14 +24,14 @@ rea-video (Apache-2.0) does the breakdown. If it is not installed, the command s
 Before any render, show the user:
 
 - the summary the command prints,
-- `teardown/<name>/teardown.md` (titles with entrance and layer, finish per shot with the reason, caption style, tempo and suggested bed, colours),
+- `teardown/<name>/teardown.md` (caption style, place and colour, titles with entrance and layer, what was left out of the titles and why, graphics found, finish per shot with the reason, tempo and suggested bed, colours),
 - `teardown/<name>/contact.jpg` (detected titles boxed and labelled).
 
-Say plainly which parts are guesses: caption style and finishes are the nearest match on a short menu, subtle grades are often missed, front or behind is a colour test, and OCR misreads stylised type.
+Say plainly which parts are guesses: caption style and finishes are the nearest match on a short menu, subtle grades are often missed, front or behind is a colour test, and OCR misreads stylised type. A finish is only assigned when the grade is strong or changes across shots; an even warm cast is read as room light. Graphics (ordinal stickers, app labels, screen cards) are drawn as generic placeholders: ask for the user's own icons and screen recordings and add them as `icon` and `src` in the `reel-graphics` block.
 
 ## 4. Let them adjust
 
-Ask what to change, and edit `teardown/<name>/Reel.md`: their preset and colours under `## Brand kit`, their bed under `## Music`, finishes per shot, title entrances and layers (offer front or behind per title), caption style. Run `npm run reelmd -- check teardown/<name>/Reel.md` after every edit. Offer the menu for anything they want to swap (see the talking-head-reel skill).
+Ask what to change, and edit `teardown/<name>/Reel.md`: their preset and colours under `## Brand kit`, their bed under `## Music`, finishes per shot, title entrances and layers (offer front or behind per title), caption style, place and colour (`caption-position`, `caption-color`), and the graphics (keep, drop, retime, or add their own `icon` and `src` files). Run `npm run reelmd -- check teardown/<name>/Reel.md` after every edit. Offer the menu for anything they want to swap (see the talking-head-reel skill).
 
 ## 5. Remake
 

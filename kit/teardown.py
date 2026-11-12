@@ -8,7 +8,8 @@
 #       Writes a breakdown in the same subset of fields kit/videomd2reel.cjs reads from rea-video's breakdown.json.
 #   python kit/teardown.py extras ref.mp4 --breakdown breakdown.json --out extras.json [--sheet contact.jpg]
 #       Per-shot vignette and noise, front/behind hints for big text (MediaPipe person mask, if it loads), and a
-#       labelled contact sheet of sampled frames.
+#       labelled contact sheet of sampled frames, and graphics (ordinal stickers, app labels, screen cards; kit/graphics.json)
+#       from frames every 0.25 s plus the OCR cues for their words.
 #
 # Every number here is a heuristic from pixel statistics. It gets the shape of a reel right more often than the
 # details; the teardown report says what was measured and what was guessed.
@@ -293,6 +294,207 @@ def layer_hint(img, mask, bb, fill):
     return "front", round(over, 3)
 
 
+# ---------- graphics: ordinal stickers, app labels, screen cards (kit/graphics.json) ----------
+ORDINALS = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth", "next", "last", "finally"]
+
+
+def ordinal_word(txt):
+    """FIRST, SECO (typed in part), 3RD, #2 ... -> the full word, or None."""
+    t = re.sub(r"[^a-z0-9#]", "", str(txt).lower())
+    if not t or len(t) > 9:
+        return None
+    m = re.fullmatch(r"#?(\d{1,2})(st|nd|rd|th)?", t)
+    if m:
+        n = int(m.group(1))
+        return ORDINALS[n - 1].upper() if 1 <= n <= 10 and (m.group(2) or t.startswith("#")) else None
+    for w in ORDINALS:
+        if w == t or (len(t) >= 4 and w.startswith(t)):
+            return w.upper()
+    return None
+
+
+def _hex(bgr):
+    return "#%02x%02x%02x" % (int(bgr[2]), int(bgr[1]), int(bgr[0]))
+
+
+def _bursts(img, hsv, mask):
+    """Spiky warm-yellow shapes (a starburst), split or whole. Returns bbox, colour, layer hint."""
+    import cv2, numpy as np
+    h, w = hsv.shape[:2]
+    y = ((hsv[..., 0] >= 15) & (hsv[..., 0] <= 38) & (hsv[..., 1] >= 60) & (hsv[..., 2] >= 185)).astype(np.uint8)
+    y = cv2.morphologyEx(y, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+    cs, _ = cv2.findContours(y, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    keep, area = [], 0.0
+    for c in cs:
+        a = cv2.contourArea(c)
+        if a < 0.003 * h * w:
+            continue
+        sol = a / max(1.0, cv2.contourArea(cv2.convexHull(c)))
+        if sol < 0.8:  # spikes: much less than its hull (a sticker or a lamp is near 1)
+            keep.append(c); area += a
+    if area < 0.012 * h * w:
+        return None
+    pts = np.concatenate(keep)
+    x, yy, bw, bh = cv2.boundingRect(pts)
+    hull = np.zeros((h, w), np.uint8); cv2.fillPoly(hull, [cv2.convexHull(pts)], 1); hull = hull.astype(bool)
+    col = _hex(np.median(img[y.astype(bool)], axis=0))
+    layer = None
+    if mask is not None:
+        over = float(mask[hull].mean())
+        yb = y.astype(bool)
+        on_p = float(yb[hull & mask].mean()) if (hull & mask).any() else 0.0
+        on_bg = float(yb[hull & ~mask].mean()) if (hull & ~mask).any() else 0.0
+        layer = "behind" if over > 0.12 and on_bg > 0.2 and on_p < 0.25 * on_bg else "front"
+    return {"bbox": [round(x / w, 3), round(yy / h, 3), round(bw / w, 3), round(bh / h, 3)], "color": col, "layer": layer}
+
+
+def _rects(g):
+    import cv2, numpy as np
+    e = cv2.dilate(cv2.Canny(g, 40, 120), np.ones((3, 3), np.uint8))
+    cs, _ = cv2.findContours(e, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    for c in cs:
+        x, y, bw, bh = cv2.boundingRect(c)
+        if bw * bh and cv2.contourArea(c) / (bw * bh) >= 0.78:
+            yield x, y, bw, bh
+
+
+def _cards(img, hsv, g):
+    """Wide rectangles with a dark inside (a screenshot or terminal card). The colour just outside is the border."""
+    import numpy as np
+    h, w = g.shape
+    out = []
+    for x, y, bw, bh in _rects(g):
+        if bw < 0.3 * w or bh < 0.08 * h or bw * bh > 0.6 * w * h:
+            continue
+        inner = hsv[y + bh // 8:y + bh - bh // 8, x + bw // 8:x + bw - bw // 8]
+        if inner.size == 0 or inner[..., 2].mean() > 90:
+            continue
+        m = max(3, int(0.03 * w))
+        x0, y0, x1, y1 = max(0, x - m), max(0, y - m), min(w, x + bw + m), min(h, y + bh + m)
+        band = np.ones((y1 - y0, x1 - x0), bool); band[y - y0 + 2:y - y0 + bh - 2, x - x0 + 2:x - x0 + bw - 2] = False
+        ring = img[y0:y1, x0:x1][band]; rh = hsv[y0:y1, x0:x1][band]
+        sat = ring[(rh[:, 1] > 70) & (rh[:, 2] > 110)]
+        border = _hex(np.median(sat, axis=0)) if len(sat) > 0.05 * len(ring) else None
+        out.append({"bbox": [round(x / w, 3), round(y / h, 3), round(bw / w, 3), round(bh / h, 3)], "border": border})
+    out.sort(key=lambda c: -c["bbox"][2] * c["bbox"][3])
+    return out[:1]
+
+
+def _tiles(img, g):
+    """Small squares that stand out from what is around them (an app icon)."""
+    import cv2, numpy as np
+    h, w = g.shape
+    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB).astype(np.float32)
+    out = []
+    for x, y, bw, bh in _rects(g):
+        if not (0.07 * w <= bw <= 0.3 * w and 0.75 <= bw / max(1, bh) <= 1.33):
+            continue
+        inner = lab[y + bh // 6:y + bh - bh // 6, x + bw // 6:x + bw - bw // 6].reshape(-1, 3)
+        m = max(4, bw // 6)
+        x0, y0, x1, y1 = max(0, x - m), max(0, y - m), min(w, x + bw + m), min(h, y + bh + m)
+        ring = np.concatenate([lab[y0:y, x0:x1].reshape(-1, 3), lab[y + bh:y1, x0:x1].reshape(-1, 3), lab[y:y + bh, x0:x].reshape(-1, 3), lab[y:y + bh, x + bw:x1].reshape(-1, 3)])
+        if not len(inner) or not len(ring) or float(np.linalg.norm(inner.mean(0) - ring.mean(0))) < 30:
+            continue
+        col = _hex(np.median(img[y + bh // 6:y + bh - bh // 6, x + bw // 6:x + bw - bw // 6].reshape(-1, 3), axis=0))
+        out.append({"bbox": [round(x / w, 3), round(y / h, 3), round(bw / w, 3), round(bh / h, 3)], "tile": col})
+    # one per spot: the outer square
+    out.sort(key=lambda t: -t["bbox"][2])
+    res = []
+    for t in out:
+        if not any(abs(t["bbox"][0] - r["bbox"][0]) < 0.08 and abs(t["bbox"][1] - r["bbox"][1]) < 0.08 for r in res):
+            res.append(t)
+    return res[:2]
+
+
+def _inside(bb, box, pad=0.0):
+    cx, cy = bb[0] + bb[2] / 2, bb[1] + bb[3] / 2
+    return box[0] - pad <= cx <= box[0] + box[2] + pad and box[1] - pad <= cy <= box[1] + box[3] + pad
+
+
+def _group(hits, step, near):
+    """Consecutive samples of one graphic -> events (start, end, the samples)."""
+    ev = []
+    for t, d in hits:
+        e = next((e for e in reversed(ev) if t - e["t1"] <= step * 1.6 and near(e["d"][-1], d)), None)
+        if e:
+            e["t1"] = t; e["d"].append(d)
+        else:
+            ev.append({"t0": t, "t1": t, "d": [d]})
+    return ev
+
+
+def detect_graphics(video, cues, seg=None, step=0.25):
+    """Ordinal stickers, app labels and screen cards, from frames every `step` s plus the OCR cues for their words."""
+    import cv2, numpy as np
+    info = probe(video)
+    W, H = 540, 960
+    p = subprocess.Popen(["ffmpeg", "-v", "error", "-i", video, "-vf", f"fps={1 / step},scale={W}:{H}", "-f", "rawvideo", "-pix_fmt", "bgr24", "-"], stdout=subprocess.PIPE)
+    bursts, cards, tiles, i = [], [], [], 0
+    while True:
+        buf = p.stdout.read(W * H * 3)
+        if len(buf) < W * H * 3:
+            break
+        img = np.frombuffer(buf, np.uint8).reshape(H, W, 3).copy()
+        t = round(i * step, 2); i += 1
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV); g = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        mask = seg(img) if seg else None
+        b = _bursts(img, hsv, mask)
+        if b:
+            bursts.append((t, b))
+        cs = _cards(img, hsv, g)
+        for c in cs:
+            cards.append((t, c))
+        for tl in _tiles(img, g):
+            if not any(_inside(tl["bbox"], c["bbox"]) for c in cs):
+                tiles.append((t, tl))
+    p.wait()
+    at = lambda c, a, z: c.get("t0", 0) <= z + 0.3 and c.get("t1", 0) >= a - 0.3
+    close = lambda a, b, k: abs(a["bbox"][0] - b["bbox"][0]) < k and abs(a["bbox"][1] - b["bbox"][1]) < k
+    out = []
+    # ordinal stickers: a burst for 1 s or more; the word is an ordinal read on screen at the same time
+    for n, e in enumerate([e for e in _group(bursts, step, lambda a, b: True) if e["t1"] - e["t0"] >= step]):
+        a, z = e["t0"], e["t1"] + step
+        words = [(ordinal_word(c["text"]), c) for c in cues if at(c, a, z) and (c.get("conf") or 1) >= 0.5]
+        words = [x for x in words if x[0]]
+        bb = [round(float(np.median([d["bbox"][k] for d in e["d"]])), 3) for k in range(4)]
+        layers = [d["layer"] for d in e["d"] if d["layer"]]
+        out.append({"type": "ordinal-sticker", "start": a, "end": round(z, 2), "text": words[0][0] if words else None, "cue": words[0][1]["text"] if words else None,
+                    "bbox": bb, "color": e["d"][len(e["d"]) // 2]["color"], "layer": max(set(layers), key=layers.count) if layers else None, "samples": len(e["d"])})
+    # screen cards: a dark rectangle for 1 s or more with small UI text read inside it
+    for e in _group(cards, step, lambda a, b: close(a, b, 0.12)):
+        if e["t1"] - e["t0"] < step:
+            continue
+        a, z = e["t0"], e["t1"] + step
+        bb = [round(float(np.median([d["bbox"][k] for d in e["d"]])), 3) for k in range(4)]
+        ui = [c for c in cues if at(c, a, z) and c.get("bbox") and (c.get("line_h") or c["bbox"][3]) < 0.03 and _inside(c["bbox"], bb, 0.04)]
+        if len(ui) < 2:
+            continue
+        borders = [d["border"] for d in e["d"] if d["border"]]
+        out.append({"type": "screen-card", "start": a, "end": round(z, 2), "bbox": bb, "border": max(set(borders), key=borders.count) if borders else None, "ui_text": len(ui), "samples": len(e["d"])})
+    # app labels: a square tile with a short label read just under or beside it
+    for e in _group(tiles, step, lambda a, b: close(a, b, 0.1)):
+        a, z = e["t0"], e["t1"] + step
+        bb = [round(float(np.median([d["bbox"][k] for d in e["d"]])), 3) for k in range(4)]
+        def label_ok(c):
+            cb = c.get("bbox")
+            if not cb or (c.get("conf") or 1) < 0.6 or not at(c, a, z):
+                return False
+            txt = str(c["text"]).strip()
+            if not (2 <= len(re.sub(r"[^A-Za-z0-9]", "", txt)) <= 24) or len(txt.split()) > 4 or (c.get("line_h") or cb[3]) < 0.025:
+                return False
+            below = bb[1] + bb[3] * 0.5 <= cb[1] <= bb[1] + bb[3] + 0.1 and cb[0] <= bb[0] + bb[2] and cb[0] + cb[2] >= bb[0]
+            beside = abs((cb[1] + cb[3] / 2) - (bb[1] + bb[3] / 2)) < bb[3] * 0.6 and bb[0] + bb[2] - 0.02 <= cb[0] <= bb[0] + bb[2] + 0.12
+            return below or beside
+        labels = sorted([c for c in cues if label_ok(c)], key=lambda c: -(c.get("conf") or 1))
+        if not labels:
+            continue
+        tl = e["d"][len(e["d"]) // 2]["tile"]
+        out.append({"type": "app-label", "start": a, "end": round(max(z, labels[0].get("t1", z)), 2), "text": re.sub(r"\s+", " ", str(labels[0]["text"])).strip(), "cue": labels[0]["text"],
+                    "bbox": bb, "tile": tl, "samples": len(e["d"])})
+    out.sort(key=lambda x: x["start"])
+    return out
+
+
 def cmd_extras(a):
     import cv2, numpy as np
     b = json.load(open(a.breakdown))
@@ -325,8 +527,16 @@ def cmd_extras(a):
     if a.sheet and sheet:
         contact_sheet(sheet, a.sheet)
         out["sheet"] = a.sheet
+    cues = ((b.get("packaging") or {}).get("text_cues")) or []
+    try:
+        out["graphics"] = detect_graphics(a.video, cues, seg)
+    except Exception as e:  # graphics are a bonus; the rest of the teardown stands without them
+        print(f"note: graphics detection failed: {e}")
+        out["graphics"] = []
+    gx = out["graphics"]
     json.dump(out, open(a.out, "w"), indent=1)
     sys.stdout.flush()
+    print(f"graphics: {sum(g['type'] == 'ordinal-sticker' for g in gx)} ordinal stickers, {sum(g['type'] == 'app-label' for g in gx)} app labels, {sum(g['type'] == 'screen-card' for g in gx)} screen cards")
     print(f"extras: {len(out['shots'])} shots measured, {len(out['titles'])} title layers ({'MediaPipe mask' if seg else 'no person mask; layers not estimated'})")
 
 

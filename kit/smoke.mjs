@@ -191,6 +191,71 @@ try {
     if (b.titles.n || !b.front.n) fail('one-word: after the title the caption word should be the only word');
     if (b.front.y1 - b.front.y0 > 330) fail('one-word caption should be one line, ink height ' + (b.front.y1 - b.front.y0));
   });
+  step('caption position and colour: top vs bottom band, colour changes the word', () => {
+    const doc = extra => ({ captionStyle: 'one-word', fonts: 'theme', ...extra, flips: [{ start: 0, end: 2, text: 'Record one take', mode: 0, words: [[0, 1, 'Record'], [1, 2, 'one']] }] });
+    const front = (name, d) => { const dir = join(work, name); mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(d) + ';\n');
+      run(node, [join(KIT, 'render.mjs'), '0', '0.50'], dir, { THEME: 'aigent', FONTS: 'theme', STILLS_LAYERS: '1' }); return ink(join(dir, 'stills-front', 't0.50.png')); };
+    const top = front('cap-top', doc({ captionPosition: 'top' }));
+    const bot = front('cap-bottom', doc({ captionPosition: 'bottom' }));
+    if (!top.n || !bot.n) fail('caption word missing');
+    if (!(top.mid < 600 && bot.mid > 1100)) fail(`caption-position: top centre ${top.mid}, bottom centre ${bot.mid}`);
+    front('cap-red', doc({ captionPosition: 'top', captionColor: '#ff2020' }));
+    if (Buffer.compare(readFileSync(join(work, 'cap-red', 'stills-front', 't0.50.png')), readFileSync(join(work, 'cap-top', 'stills-front', 't0.50.png'))) === 0) fail('caption-color did not change the word');
+  });
+  step('graphics: ordinal sticker behind the head, app label with your icon, screen card from your video, placeholders', () => {
+    const g = join(work, 'gfx'); mkdirSync(g, { recursive: true });
+    run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=0x3366ff:s=128x128', '-frames:v', '1', join(g, 'icon.png')]);
+    run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=640x400:rate=24', '-t', '1', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', join(g, 'screen.mp4')]);
+    const flips = [
+      { start: 0, end: 1.5, mode: 9, text: 'FIRST', layer: 'behind' },
+      { start: 2, end: 3.5, mode: 10, text: 'My App', icon: join(g, 'icon.png') },
+      { start: 4, end: 5.5, mode: 11, src: join(g, 'screen.mp4'), border: '#d87b5b' },
+      { start: 6, end: 7.5, mode: 10, text: 'Placeholder' },
+      { start: 6, end: 7.5, mode: 11 }];
+    const at = layered(g, { captionStyle: 'one-word', flips }, [0.8, 2.8, 4.9, 6.9]);
+    const o = at(0.8), a = at(2.8), c = at(4.9), p = at(6.9);
+    if (!o.titles.n) fail('the ordinal burst should be on the behind-the-head layer');
+    if (!o.front.n || o.front.mid > o.titles.mid) fail('the ordinal word should be on the front layer, above the burst');
+    if (!a.front.n || a.titles.n) fail('app label should draw in front only');
+    if (!c.front.n || c.front.mid < 1000) fail('screen card should sit in the lower middle, centre ' + c.front.mid);
+    if (!p.front.n) fail('placeholders missing');
+    const rep = JSON.parse(readFileSync(join(g, 'graphics.json'), 'utf8'));
+    const kinds = rep.map(x => `${x.mode}:${x.asset}:${x.loaded}`).join(' ');
+    if (kinds !== '9:placeholder:true 10:image:true 11:video:true 10:placeholder:true 11:placeholder:true') fail('graphics report: ' + kinds);
+    if (!readdirSync(join(g, 'gfx')).length) fail('screen card video frames not extracted');
+    const GX = JSON.parse(readFileSync(join(KIT, 'graphics.json'), 'utf8')).graphics;
+    if (GX.map(x => x.mode).join(',') !== '9,10,11' || GX.some(x => !x.entrance || !x.detect)) fail('kit/graphics.json: modes, entrance and detect rule for each graphic');
+  });
+  step('teardown mapping: stray caption words left out of titles, room light is not a finish, graphics mapped', () => {
+    const V = createRequire(import.meta.url)('./videomd2reel.cjs');
+    const cue = (t0, t1, text, extra = {}) => ({ t0, t1, text, kind: 'label', band: 'top', conf: 0.95, line_h: 0.07, bbox: [0.3, 0.15, 0.4, 0.07], style: { fill: '#ffffff' }, ...extra });
+    const words = [[0, 0.5, 'start'], [0.5, 1, 'with'], [1, 1.5, 'the'], [1.5, 2, 'brainstorm'], [2, 2.5, 'plugin'], [2.5, 3, 'now'], [3, 3.5, 'runs'], [3.5, 4, 'fast'], [4, 4.6, 'today']];
+    const b = { packaging: { text_cues: [
+      ...words.map(w => cue(w[0], w[1], w[2].toUpperCase())),
+      cue(1.5, 2, 'brainstom'),                                      // the word being said, OCR misspelt: a caption
+      cue(3, 3.5, 'nuns', { line_h: 0.05 }),                         // misread caption word at caption size: a caption
+      cue(4.8, 6.5, 'BIG IDEA', { line_h: 0.12, band: 'middle', bbox: [0.2, 0.45, 0.6, 0.12] }), // styled apart: a title
+      cue(2, 2.5, 'PLUGIN', { line_h: 0.11, style: { fill: '#ffffff', box: true } })] }, speech: { words } };
+    const t = V.pickTitles(b);
+    const txt = t.map(x => x.text).join(' / ');
+    if (!/BIG IDEA/.test(txt) || /brainstom|nuns/i.test(txt)) fail('titles: ' + txt);
+    if (!t.dropped.some(d => d.text === 'nuns') ) fail('dropped list should name the stray word: ' + JSON.stringify(t.dropped));
+    // even warm cast on every shot = room light; mono on one shot only = a finish
+    const shot = (finish, m) => ({ finish, finishWhy: 'grade', m });
+    const warm = { shadow_b: 4, mean_b: 3, sat: 0.3, contrast: 0.4 };
+    const shots = [shot('warm', warm), shot('warm', warm), shot('warm', warm), shot('mono,warm', { ...warm, sat: 0.01 })];
+    const notes = V.gradeChoice(shots);
+    if (shots.slice(0, 3).some(s => s.finish) || !/mono/.test(shots[3].finish || '') || /warm/.test(shots[3].finish || '')) fail('finish choice: ' + shots.map(s => s.finish).join(' / '));
+    if (!notes.length || !/room/.test(notes[0])) fail('ambient note missing: ' + notes);
+    const gm = V.mapGraphics(b, { graphics: [
+      { type: 'ordinal-sticker', start: 0.5, end: 1.5, text: 'FIRST', layer: 'behind', color: '#f2e8a0', bbox: [0.15, 0.2, 0.7, 0.2] },
+      { type: 'ordinal-sticker', start: 3, end: 4, text: null, layer: 'behind', color: '#f2e8a0', bbox: [0.15, 0.2, 0.7, 0.2] },
+      { type: 'app-label', start: 3.2, end: 4, text: 'My App', tile: '#da4559', bbox: [0.1, 0.5, 0.2, 0.11] },
+      { type: 'screen-card', start: 5, end: 9, border: '#d87b5b', ui_text: 6, bbox: [0.17, 0.55, 0.66, 0.3] }] });
+    const s = gm.map(x => `${x.type}:${x.text || ''}${x.guess ? '~' : ''}`).join(' ');
+    if (s !== 'ordinal-sticker:FIRST ordinal-sticker:SECOND~ app-label:My App screen-card:') fail('mapped graphics: ' + s);
+    if (!(gm[0].size > 300 && gm[0].y > 0.3 && gm[3].y > 0.6)) fail('graphic geometry: ' + JSON.stringify(gm.map(x => [x.x, x.y, x.size, x.w])));
+  });
   step('render overlay frames (2 s)', () => {
  run(node, [join(KIT, 'render.mjs'), '2'], build); const n = readdirSync(join(build, 'ovl')).length; if (n !== 48) fail('frames ' + n); });
   step('sfx pack manifest + auto-pick', () => {
@@ -341,6 +406,20 @@ try {
     const t = c.captions.titles.map(x => `${x.start}-${x.end} ${x.entrance} ${x.layer} ${x.text}`).join(' / ');
     if (t !== '0.2-1.4 slam behind Stop scrolling / 4.1-5.5 pop-zoom front Do this') fail('titles changed: ' + t);
     if (RM.exportJob(c.cut, { ...c.captions, flips: c.captions.titles }, { name: 'smoke-roundtrip' }) !== md) fail('export is not stable across a round trip');
+    // caption place and colour, and graphics, survive the round trip
+    const gcaps = { captionStyle: 'one-word', captionPosition: 'top', captionColor: '#ffffff', flips: [
+      { start: 1, end: 2, mode: 9, text: 'FIRST', layer: 'behind', color: '#f2e8a0', size: 360 },
+      { start: 1.2, end: 2.5, mode: 10, text: 'My App', tile: '#da4559', x: 0.1, y: 0.5 },
+      { start: 3, end: 6, mode: 11, src: join(work, 'screen.mp4'), border: '#d87b5b', w: 0.66 }] };
+    const gmd = RM.exportJob(cut, gcaps, { name: 'smoke-graphics' });
+    if (!/- caption-position: top/.test(gmd) || !/```reel-graphics/.test(gmd)) fail('export lost caption-position or graphics:\n' + gmd);
+    const gr = RM.parse(gmd, join(work, 'g.Reel.md')), gv = RM.validate(gr);
+    if (gv.errs.length) fail('graphics Reel.md invalid: ' + gv.errs.join('; '));
+    const gc = RM.compile(gr);
+    if (gc.captions.captionPosition !== 'top' || gc.captions.captionColor !== '#ffffff') fail('caption place: ' + JSON.stringify(gc.captions));
+    const sig = fl => JSON.stringify(fl.map(f => [f.start, f.end, f.mode, f.text || '', f.layer || '', f.size || 0, f.src || '']));
+    if (sig(gc.captions.graphics) !== sig(gcaps.flips)) fail('graphics changed:\n' + sig(gc.captions.graphics) + '\n' + sig(gcaps.flips));
+    if (!RM.validate(RM.parse(gmd.replace('type app-label', 'type banner'), 'bad.md')).errs.length) fail('an unknown graphic type should fail the check');
     const pkg = join(work, 'videomd-pkg'); RM.toPackage(r, pkg);
     if (!existsSync(join(pkg, 'VIDEO.md')) || !existsSync(join(pkg, 'video', 'timeline.md')) || readdirSync(join(pkg, 'video', 'shots')).length !== 3) fail('VIDEO.md package incomplete');
     const py = process.env.PYTHON || 'python3';

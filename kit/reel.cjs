@@ -21,6 +21,9 @@
 //            punches, title entrances and layers in order. Flags win over the recipe; the recipe wins over the preset it names.
 //            --recipe-titles also uses the recipe's title text and times instead of titles drafted from your words.
 //          --clip <file>  the video to use (same as passing the path; reads well with --recipe)
+//            A recipe's graphics (ordinal stickers, app labels, screen cards) land at the recipe's times; icon and src
+//            paths are relative to the recipe, and anything left out is drawn as a neutral placeholder.
+//          --caption-position top|middle|bottom  --caption-color #rrggbb  where the captions sit and their colour
 // Writes jobs/<name>/: clips/ (clip.py output), build/ (cut.json, captions.js, theme.js, overlay frames), reel-vN.mp4.
 // Steps: clip.py (Whisper, best take per sentence, retakes flagged) -> cut.json from every "keep" clip (zoom punch on
 // every cut, big punch after the hook and into the payoff, a few sounds on the key cuts only) -> autocaption ->
@@ -39,7 +42,7 @@ const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer']);
+const VALUED = new Set(['caption-position', 'caption-color', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const die = m => { console.error(m); process.exit(1); };
@@ -203,6 +206,29 @@ if (!flag('rebuild')) {
       fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
     }
   }
+  // caption band and colour (--caption-position top|middle|bottom, --caption-color #rrggbb, or the recipe's Style), and
+  // the recipe's graphics (ordinal stickers, app labels, screen cards) at the recipe's times, inside your clip's length
+  {
+    const pos = opt('caption-position') || (preset && preset.captionPosition), col = opt('caption-color') || (preset && preset.captionColor);
+    if (pos && !RM.CAPTION_POSITIONS.includes(String(pos))) die('--caption-position must be ' + RM.CAPTION_POSITIONS.join(', '));
+    if (col && !/^#[0-9a-f]{6}$/i.test(String(col))) die('--caption-color must be a #rrggbb colour');
+    const gfx = recipe ? RM.graphicFlips(recipe) : [];
+    if (pos || col || gfx.length) {
+      const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF);
+      if (pos) caps.captionPosition = String(pos);
+      if (col) caps.captionColor = String(col).toLowerCase();
+      if (gfx.length) {
+        const len = segs.reduce((a, sg) => a + (sg.out - sg.in), 0), fit = gfx.filter(g => g.start < len - 0.3).map(g => ({ ...g, end: +Math.min(g.end, len).toFixed(3) }));
+        caps.flips = (caps.flips || []).filter(f => !(f.mode >= 9 && f.mode <= 11)).concat(fit);
+        // a sticker behind the head needs the title layer and the person mask, even with no titles
+        if (fit.some(g => g.layer === 'behind') && !cut.titles) Object.assign(cut, flag('no-mask') ? { titles: 'ovlt/%04d.png' } : { titles: 'ovlt/%04d.png', mask: 'mask.mkv', ...(opt('mask') ? { maskModel: opt('mask') } : {}) });
+        fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
+        console.log(`recipe graphics: ${fit.length} of ${gfx.length} fit your ${len.toFixed(1)} s (${fit.filter(g => g.icon || g.src).length} with your files, the rest drawn as placeholders)`);
+      }
+      if (pos || col) console.log(`captions: ${pos || 'default band'}${col ? ', ' + String(col).toLowerCase() : ''}`);
+      fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
+    }
+  }
   // --broll <folder>: cutaways from your own clips. A phrase that isn't a type card or under a title cuts to the next
   // clip in the folder (every third phrase, 0.8 to 2.2 s), the voice running on; see "inserts" in kit/assemble.cjs.
   if (opt('broll')) {
@@ -275,9 +301,11 @@ try { sh(process.execPath, [path.join(KIT, 'check.mjs'), build, '--warn-only'], 
 sh(process.execPath, [path.join(KIT, 'render.mjs'), LEN.toFixed(2)], build);
 // person mask only for titles that sit behind the head (needs npm run effects:setup)
 if (cut.titles && cut.mask) {
-  const behind = R.resolveTitles(R.readCaptions(path.join(build, 'captions.js')), cut).filter(t => t.layer === 'behind');
+  const capsNow = R.readCaptions(path.join(build, 'captions.js'));
+  const behind = R.resolveTitles(capsNow, cut).filter(t => t.layer === 'behind')
+    .concat((capsNow.flips || []).filter(f => f.mode === 9 && f.layer === 'behind').map(f => ({ start: f.start, end: f.end })));
   if (!behind.length) {
-    console.log('title layer: all titles in front; skipping the person mask');
+    console.log('title layer: all titles and stickers in front; skipping the person mask');
   } else {
     const fxPy = path.join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
     const spec = R.maskSpec(cut, { model: opt('mask') });

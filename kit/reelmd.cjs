@@ -16,7 +16,10 @@ const fs = require('fs');
 const path = require('path');
 
 const KIT = __dirname, ROOT = path.dirname(KIT);
-const SHOTS_BLOCK = 'videomd-timeline', TITLES_BLOCK = 'reel-titles', SCRIPT_BLOCK = 'reel-script';
+const SHOTS_BLOCK = 'videomd-timeline', TITLES_BLOCK = 'reel-titles', SCRIPT_BLOCK = 'reel-script', GRAPHICS_BLOCK = 'reel-graphics';
+// graphic overlays (kit/graphics.json): type -> captions.js mode
+const GRAPHICS = Object.fromEntries(JSON.parse(fs.readFileSync(path.join(__dirname, 'graphics.json'), 'utf8')).graphics.map(g => [g.id, g.mode]));
+const CAPTION_POSITIONS = ['top', 'middle', 'bottom'];
 const ENTRANCES = ['stagger-rise', 'slam', 'blur-rise', 'slide-left', 'elastic', 'flip', 'pop-zoom'];
 const LAYERS = ['front', 'behind', 'auto'];
 
@@ -119,11 +122,13 @@ function parse(text, file = 'Reel.md') {
   const shotLines = fenced(body, SHOTS_BLOCK) || [];
   const titleLines = fenced(body, TITLES_BLOCK) || [];
   const scriptLines = fenced(body, SCRIPT_BLOCK) || [];
+  const graphicLines = fenced(body, GRAPHICS_BLOCK) || [];
   const shots = shotLines.map(l => parseLine(l, file + ' shots'));
   const titles = titleLines.map(l => parseLine(l, file + ' titles'));
   const script = scriptLines.map(l => parseLine(l, file + ' script'));
+  const graphics = graphicLines.map(l => parseLine(l, file + ' graphics'));
   const title = (body.match(/^#\s+(.+)$/m) || [])[1];
-  return { file, card, title, brand, music, style, shots, titles, script, notes: (S._intro || '').replace(/^#\s+.+$/m, '').trim() };
+  return { file, card, title, brand, music, style, shots, titles, script, graphics, notes: (S._intro || '').replace(/^#\s+.+$/m, '').trim() };
 }
 
 function validate(r) {
@@ -140,6 +145,16 @@ function validate(r) {
     if (t.entrance && !ENTRANCES.includes(t.entrance)) errs.push(`titles #${pad2(t.n)}: unknown entrance "${t.entrance}" (${ENTRANCES.join(', ')})`);
     if (t.layer && !LAYERS.includes(t.layer)) errs.push(`titles #${pad2(t.n)}: layer must be front, behind or auto`);
   });
+  (r.graphics || []).forEach(g => {
+    const type = g.type || g['type~'];
+    if (!GRAPHICS[type]) errs.push(`graphics #${pad2(g.n)}: type must be ${Object.keys(GRAPHICS).join(', ')}`);
+    for (const k of ['color', 'border', 'tile', 'ink']) if (g[k] && !/^#[0-9a-f]{6}$/i.test(g[k])) errs.push(`graphics #${pad2(g.n)}: ${k} must be a #rrggbb colour`);
+    if (g.layer && !['front', 'behind'].includes(g.layer)) errs.push(`graphics #${pad2(g.n)}: layer must be front or behind`);
+    for (const k of ['icon', 'src']) if (g[k] && !none(g[k]) && !fs.existsSync(path.resolve(path.dirname(r.file || '.'), g[k]))) warn.push(`graphics #${pad2(g.n)}: ${k} ${g[k]} not found next to the recipe; the placeholder is drawn`);
+  });
+  const st = r.style || {};
+  if (st['caption-position'] && !none(st['caption-position']) && !CAPTION_POSITIONS.includes(st['caption-position'])) errs.push(`style: caption-position must be ${CAPTION_POSITIONS.join(', ')}`);
+  if (st['caption-color'] && !none(st['caption-color']) && !/^#[0-9a-f]{6}$/i.test(st['caption-color'])) errs.push('style: caption-color must be a #rrggbb colour');
   const P = require('./preset.cjs');
   const pre = toPreset(r);
   const perrs = P.validate({ ...pre, bed: pre.bed && !require('./rules.cjs').isBed(pre.bed) ? undefined : pre.bed });
@@ -164,6 +179,8 @@ function toPreset(r) {
   if (list(b.colors).length) out.colors = list(b.colors);
   if (!none(s.look)) out.look = s.look;
   if (!none(s.captions)) out.captionStyle = s.captions;
+  if (!none(s['caption-position'])) out.captionPosition = String(s['caption-position']).toLowerCase();
+  if (!none(s['caption-color'])) out.captionColor = String(s['caption-color']).toLowerCase();
   if (onOff(s.titles) !== undefined) out.titles = onOff(s.titles);
   if (!none(s['title-layer'])) out.titleLayer = s['title-layer'].toLowerCase();
   if (s.finish !== undefined) { const f = list(s.finish); out.finish = f.length ? f.join(',') : null; delete out.finishPool; }
@@ -203,6 +220,21 @@ function titleFlips(r) {
   });
 }
 
+// Graphics as captions.js flips (mode 9 ordinal sticker, 10 app label, 11 screen card). icon and src are resolved
+// against the recipe's folder; "~" fields (a teardown's guesses) count the same as plain ones.
+function graphicFlips(r) {
+  const dir = path.dirname(path.resolve(r.file || 'Reel.md'));
+  const v = (g, k) => g[k] !== undefined ? g[k] : g[k + '~'];
+  return (r.graphics || []).filter(g => GRAPHICS[v(g, 'type')]).map(g => {
+    const f = { start: +g.start, end: +g.end, mode: GRAPHICS[v(g, 'type')] };
+    const text = v(g, 'text'); if (text != null && !none(text)) f.text = String(text).replace(/\s*\/\s*/g, ' ');
+    for (const k of ['layer', 'color', 'ink', 'border', 'tile']) { const x = v(g, k); if (x != null && !none(x)) f[k] = String(x); }
+    for (const k of ['x', 'y', 'w', 'in', 'size']) { const x = v(g, k); if (x != null && x !== '' && !isNaN(+x)) f[k] = +x; }
+    for (const k of ['icon', 'src']) { const x = v(g, k); if (x != null && !none(x)) f[k] = path.resolve(dir, String(x)); }
+    return f;
+  });
+}
+
 // Reel.md -> { cut, captions }. cut.segs is complete only when every shot names a src; otherwise the shot list is a
 // per-shot plan (shotPlan) that reel.cjs lays over the segments it drafts from your clip.
 function compile(r) {
@@ -226,9 +258,12 @@ function compile(r) {
   if (pre.transition && pre.transition !== 'glitch' && full) cut.segs.forEach((s, i) => { if (i && !s.transition) s.transition = pre.transition; });
   const captions = {};
   if (pre.captionStyle) captions.captionStyle = pre.captionStyle;
+  if (pre.captionPosition) captions.captionPosition = pre.captionPosition;
+  if (pre.captionColor) captions.captionColor = pre.captionColor;
   if (pre.fonts) captions.fonts = pre.fonts;
   if (pre.titleLayer) captions.titleLayer = pre.titleLayer;
   if (r.titles.length) captions.titles = titleFlips(r);
+  if ((r.graphics || []).length) captions.graphics = graphicFlips(r);
   return { cut, captions, preset: pre };
 }
 
@@ -265,6 +300,7 @@ function exportJob(cut, caps, opts = {}) {
   if (cut.bedVol != null) L.push(`- bed-volume: ${cut.bedVol}`);
   L.push(`- beat-sync: ${cut.beatSync === false ? 'off' : cut.bed ? 'on' : 'off'}`, '');
   L.push('## Style', `- look: ${opts.look || pre.look || 'kinetic'}`, `- captions: ${(caps && caps.captionStyle) || pre.captionStyle || 'kinetic'}`, `- titles: ${flips.length ? 'on' : 'off'}`,
+    ...(caps && caps.captionPosition ? [`- caption-position: ${caps.captionPosition}`] : []), ...(caps && caps.captionColor ? [`- caption-color: ${caps.captionColor}`] : []),
     `- title-layer: ${(caps && caps.titleLayer) || cut.titleLayer || 'front'}`, `- finish: ${fin}`, `- transition: ${jobTrans}`, `- punch: ${cut.punch === false ? 'off' : 'on'}`, `- effects: ${(pre.effectsFavourites || []).join(', ') || 'none'}`, '');
   L.push('## Shots', '', '```' + SHOTS_BLOCK);
   for (const sh of shots) {
@@ -285,6 +321,19 @@ function exportJob(cut, caps, opts = {}) {
       if (x.layer) f.push(`layer ${x.layer}`);
       if (Array.isArray(x.hero)) f.push(`hero ${x.hero.join(',')}`);
       f.push(`text ${String(x.text || '').replace(/\s*\|\s*/g, ' / ').replace(/\n/g, ' ')}`);
+      L.push(f.join(' | '));
+    });
+    L.push('```', '');
+  }
+  const gfx = ((caps && caps.flips) || []).filter(f => f.mode >= 9 && f.mode <= 11).sort((a, b) => a.start - b.start);
+  if (gfx.length) {
+    const TYPE = Object.fromEntries(Object.entries(GRAPHICS).map(([k, m]) => [m, k]));
+    L.push('## Graphics', '', '```' + GRAPHICS_BLOCK);
+    gfx.forEach((g, i) => {
+      const f = [`#${pad2(i + 1)} ${fmtT(g.start)}-${fmtT(g.end >= 99 ? dur : g.end)}`, `type ${TYPE[g.mode]}`];
+      if (g.text) f.push(`text ${String(g.text).replace(/\n/g, ' ')}`);
+      for (const k of ['layer', 'color', 'ink', 'border', 'tile', 'x', 'y', 'w', 'in', 'size']) if (g[k] != null) f.push(`${k} ${g[k]}`);
+      for (const k of ['icon', 'src']) if (g[k]) f.push(`${k} ${g[k]}`);
       L.push(f.join(' | '));
     });
     L.push('```', '');
@@ -314,10 +363,12 @@ function summary(r) {
     `brand: preset ${r.brand.preset || 'none'}, theme ${p.theme || 'aigent'}, fonts ${p.fonts || 'theme'}${p.colors ? ', colors ' + p.colors.join(' ') : ''}`,
     `music: bed ${p.bed || 'none'}, beat-sync ${p.beatSync === false ? 'off' : p.beatSync || p.bed ? 'on (when a bed is set)' : 'off'}${p.bpm ? ', ~' + p.bpm + ' BPM in the reference' : ''}`,
     `style: look ${p.look || 'kinetic'}, captions ${p.captionStyle || 'kinetic'}, title layer ${p.titleLayer || 'front'}, finish ${p.finishPool ? 'vary across shots: ' + p.finishPool.join('/') : p.finish || 'none'}, transition ${p.transition || 'glitch'}`,
-    ...r.titles.map(t => `  title #${pad2(t.n)} ${t.start}-${t.end}s ${t.entrance || 'any entrance'}, ${t.layer || 'job layer'}: ${t.text || ''}`)].join('\n');
+    ...(p.captionPosition || p.captionColor ? [`captions at ${p.captionPosition || 'the default band'}${p.captionColor ? ', colour ' + p.captionColor : ''}`] : []),
+    ...r.titles.map(t => `  title #${pad2(t.n)} ${t.start}-${t.end}s ${t.entrance || 'any entrance'}, ${t.layer || 'job layer'}: ${t.text || ''}`),
+    ...(r.graphics || []).map(g => `  graphic #${pad2(g.n)} ${g.start}-${g.end}s ${g.type || g['type~']}${(g.text || g['text~']) ? ': ' + (g.text || g['text~']) : ''}${g.icon || g.src ? ' (your file)' : ' (placeholder)'}`)].join('\n');
 }
 
-module.exports = { parse, load, validate, compile, toPreset, shotSettings, titleFlips, exportJob, toPackage, summary, parseYaml, dumpYaml, parseLine, ENTRANCES, LAYERS };
+module.exports = { parse, load, validate, compile, toPreset, shotSettings, titleFlips, graphicFlips, GRAPHICS, CAPTION_POSITIONS, exportJob, toPackage, summary, parseYaml, dumpYaml, parseLine, ENTRANCES, LAYERS };
 
 if (require.main === module) {
   const argv = process.argv.slice(2), cmd = argv[0];

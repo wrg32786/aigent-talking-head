@@ -17,7 +17,7 @@ const ROOT = dirname(KIT);
 const OUT = join(ROOT, 'showcase');
 const SHEETS = join(OUT, 'sheets');
 const FOLDER = {
-  finish: 'finish', effect: 'effect', transition: 'transition', font: 'font',
+  finish: 'finish', effect: 'effect', graphic: 'graphic', transition: 'transition', font: 'font',
   theme: 'theme', entrance: 'entrance', look: 'look', captionStyle: 'caption',
   preset: 'preset', bed: 'bed', sfx: 'sfx', beatSync: 'beatSync', titleLayer: 'titleLayer',
 };
@@ -62,6 +62,7 @@ function writeContactSheets(menu) {
     outDir: SHEETS,
     sheets: [
       { id: 'effects', title: 'Effects', subtitle: '51', cols: 7, tile_w: 220, label_h: 48, items: sectionItems(menu, 'effects', 'effect') },
+      { id: 'graphics', title: 'Graphics', subtitle: 'placeholders shown; bring your icon or screen recording', cols: 3, tile_w: 280, label_h: 56, items: sectionItems(menu, 'graphics', 'graphic').map(it => ({ ...it, caption: it.id + ' · ' + (it.flag.match(/entrance ([a-z-]+)/) || [])[1] })) },
       { id: 'finishes', title: 'Film finishes', subtitle: '10', cols: 5, tile_w: 280, label_h: 52, items: sectionItems(menu, 'finishes', 'finish') },
       { id: 'title-layer', type: 'pair', title: 'Title layer', subtitle: 'same title, front vs behind', tile_w: 360, label_h: 56,
         left: { src: stillPath('titleLayer', 'front'), label: 'In front' },
@@ -95,6 +96,7 @@ function writeGalleryMarkdown(menu) {
   const blocks = [];
   const groups = [
     ['Effects', 'effects', 'effect', 5],
+    ['Graphics', 'graphics', 'graphic', 3],
     ['Film finishes', 'finishes', 'finish', 5],
     ['Title layer', 'title-layer', 'titleLayer', 3],
     ['Title entrances', 'title-entrances', 'entrance', 7],

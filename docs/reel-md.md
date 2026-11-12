@@ -99,6 +99,8 @@ Every section is optional except the card. Anything left out falls back to the p
 |---|---|---|
 | look | `kinetic`, `oneword`, `muse`, `classic`, `one-word` | `--look` |
 | captions | `kinetic`, `oneword`, `pill`, `hormozi`, `karaoke`, `classic`, `one-word` | `--style` |
+| caption-position | `top`, `middle`, `bottom` | `--caption-position`, the captions' band |
+| caption-color | `#rrggbb` | `--caption-color`, the caption word colour (the one-word word, classic and pill text, the hormozi highlight) |
 | titles | `on` or `off` | `--no-titles` |
 | title-layer | `front`, `behind`, `auto` | `--title-layer` |
 | finish | finish names, comma list, or `none` (on the whole reel) | `--finish` |
@@ -127,6 +129,26 @@ Every section is optional except the card. Anything left out falls back to the p
 | hero | word indexes, comma list | the title's `hero` |
 | text | the words | the title's `text` |
 
+**Graphics** (fenced `reel-graphics`, optional): one line per graphic, times on the reel clock. The kit's own generic designs, listed in `kit/graphics.json` and in `npm run menu`.
+
+```reel-graphics
+#01 2.5-3.5 | type ordinal-sticker | text FIRST | layer behind | color #f2e8a0
+#02 2.8-4 | type app-label | text My App | icon my-icon.png
+#03 4-9 | type screen-card | src my-screen.mp4 | border #d87b5b
+```
+
+| Key | Values | Maps to |
+|---|---|---|
+| type | `ordinal-sticker` (mode 9, entrance burst-pop), `app-label` (mode 10, tile-pop), `screen-card` (mode 11, card-rise) | the flip's `mode` |
+| text | the ordinal word or the label | the flip's `text` |
+| layer | `front` or `behind` (ordinal sticker: the burst goes behind your head, with the person mask) | `layer` |
+| color, ink | burst colour and word colour (ordinal sticker) | `color`, `ink` |
+| icon, tile | an image for the app tile (relative to the Reel.md), or leave it out for a generic glyph on a `tile` colour | `icon`, `tile` |
+| src, border, in | an image or a video for the screen card (relative to the Reel.md), its border colour, and seconds into the video | `src`, `border`, `in` |
+| x, y, w, size | position (0 to 1), card width (0 to 1), burst radius or tile side in pixels | the same keys |
+
+With no `icon` or `src` the graphic is drawn as a neutral placeholder (a letter glyph, a fake code window), so a teardown never copies someone else's screenshots or logos. Graphics outside your clip's length are dropped.
+
 **Script** (fenced `reel-script`, optional): `#NN start-end | say <words>`. Written by teardowns so you can see the reference's timing. Your remake uses your own words.
 
 ## How a recipe is applied
@@ -135,6 +157,7 @@ Every section is optional except the card. Anything left out falls back to the p
 
 - Brand kit, music and style apply like a preset.
 - Shot lines apply in order to the segments drafted from your clip: shot 1 to segment 1, and so on. Extra shots are ignored; extra segments keep the defaults.
+- Caption position and colour apply to your captions; graphics apply at their times (those past the end of your clip are dropped).
 - Titles apply their entrance and layer, in order, to the titles drafted from your words. Add `--recipe-titles` to use the recipe's title text and times instead.
 - When every shot names a `src`, `npm run reelmd -- compile` writes a complete `cut.json` you can drop into `jobs/<name>/build/` and render with `--rebuild`.
 

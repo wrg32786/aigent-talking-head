@@ -1,8 +1,10 @@
 # Showcase
 
-Labelled contact sheets of every effect, film finish, title entrance, caption style, font pairing and preset. The root README shows these too.
+Labelled contact sheets of every effect, graphic, film finish, title entrance, caption style, font pairing and preset. The root README shows these too.
 
 ![Effects](sheets/effects.jpg)
+
+![Graphics](sheets/graphics.jpg)
 
 ![Film finishes](sheets/finishes.jpg)
 

@@ -1,7 +1,9 @@
 // VIDEO.md (a rea-video breakdown) -> Reel.md. Maps what a teardown measured onto the talking-head menu:
-//   captions        -> caption style (one-word, pill, karaoke, hormozi, kinetic) and look
-//   big on-screen text -> titles, with the nearest of the seven entrances and a front/behind hint
-//   colour grade    -> nearest film finish per shot (grain, vignette, scan-lines, warm, cool, teal, crushed, mono, bleach)
+//   captions        -> caption style (one-word, pill, karaoke, hormozi, kinetic), look, caption position and colour
+//   big on-screen text -> titles, with the nearest of the seven entrances and a front/behind hint (a word the speaker
+//                      is saying, styled like the captions, is a caption word and is left out)
+//   graphics        -> ordinal stickers, app labels, screen cards (kit/teardown.py extras finds them)
+//   colour grade    -> nearest film finish per shot, only when the grade changes across shots or is strong
 //   cuts and beats  -> shot list, punch, beat sync;  music BPM -> the closest library bed
 //   palette and text colours -> brand kit colours
 //
@@ -29,17 +31,40 @@ function loadBreakdown(p) {
   return b;
 }
 
-// Big on-screen words that are not running captions, at most seven (one per entrance), in time order.
-function pickTitles(b, max = 7) {
+// Big on-screen words that are not running captions, in time order. Up to ten here; convert() drops the ones a graphic
+// owns (an ordinal word, an app label) and keeps seven, one per entrance.
+// A word the speaker is saying at that moment is a caption word, not a title, unless it is styled apart from the
+// captions: clearly bigger (1.35x the caption height), boxed, multicolour or a styled sticker (huazi). Those dropped
+// are listed on the result's .dropped for the report.
+function pickTitles(b, max = 10) {
   const ow = oneWordStream(b);
-  const cues = ((b.packaging || {}).text_cues || []).filter(c => c && c.text && !(ow && ow.cues.has(c)));
+  const all = ((b.packaging || {}).text_cues || []).filter(c => c && c.text);
+  const cues = all.filter(c => !(ow && ow.cues.has(c)));
+  const hOf = c => c.line_h ?? (c.bbox ? c.bbox[3] : 0);
+  const med = a => { const x = a.filter(v => v > 0).sort((p, q) => p - q); return x.length ? x[Math.floor(x.length / 2)] : 0; };
+  const capRef = ow ? med([...ow.cues].map(hOf)) : med(all.filter(c => c.kind === 'subtitle' && hOf(c) >= 0.025).map(hOf));
+  const spoken = ((b.speech || {}).words || []).map(w => ({ a: w[0], z: w[1], w: norm(w[2]) })).filter(w => w.w.length >= 2);
+  const dropped = [];
+  const sayingIt = c => {
+    const ws = String(c.text).split(/[\s/|]+/).map(norm).filter(w => w.length >= 2);
+    if (!ws.length || !spoken.length) return false;
+    const near = spoken.filter(w => w.a <= c.t1 + 0.3 && w.z >= c.t0 - 0.8).map(w => w.w);
+    const hit = ws.filter(w => near.some(n => sameWord(n, w))).length;
+    return hit / ws.length >= 0.5;
+  };
+  const styledApart = c => (capRef && hOf(c) >= capRef * 1.35) || c.kind === 'huazi' || !!(c.style && (c.style.box || c.style.multicolor));
   const ok = c => {
     if (!c.t1 || c.t1 <= c.t0) return false;
     const txt = String(c.text).trim();
     if (c.kind === 'subtitle' || c.part_of_picture) return false;
     if ((c.conf ?? 1) < 0.6 || txt.replace(/[^A-Za-z0-9]/g, '').length < 3 || /^[@#]|\.(com|html|io)\b/i.test(txt)) return false;
-    const h = c.line_h ?? (c.bbox ? c.bbox[3] : 0);
-    return h >= 0.04 && (c.t1 - c.t0) >= 0.3;
+    const h = hOf(c);
+    if (!(h >= 0.04 && (c.t1 - c.t0) >= 0.3)) return false;
+    if (capRef && sayingIt(c) && !styledApart(c)) { dropped.push({ t: r2(c.t0), text: clean(c.text), why: 'the word being said, styled like the captions' }); return false; }
+    // with one-word captions, a single word in the caption band at caption size is one of them even when the
+    // transcript heard it differently (Claude heard as "Clod")
+    if (ow && !styledApart(c) && !/[\s/|]/.test(txt) && c.band === ow.band && h <= capRef * 1.35 && h >= capRef * 0.6 && (c.t1 - c.t0) <= 1.6) { dropped.push({ t: r2(c.t0), text: clean(c.text), why: 'one of the one-word captions (same place and size)' }); return false; }
+    return true;
   };
   const cand = cues.filter(ok).map(c => ({ c, score: (c.line_h ?? c.bbox[3]) * Math.min(2, c.t1 - c.t0) * (c.conf ?? 1) * (c.bbox ? Math.min(1, c.bbox[2] * 2) : 1) }));
   cand.sort((a, b2) => b2.score - a.score);
@@ -51,17 +76,22 @@ function pickTitles(b, max = 7) {
   }
   picked.sort((a, b2) => a.c.t0 - b2.c.t0);
   const used = new Set();
-  return picked.map((x, i) => {
+  const out = picked.map((x, i) => {
     const kind = x.c.anim_in && x.c.anim_in.kind;
     let ent = kind ? ENTRANCE_MAP[kind] : undefined;
     if (ent && used.has(ent)) ent = undefined; // each entrance once per reel; the engine fills a free one
     if (ent) used.add(ent);
     return { n: i + 1, start: r2(x.c.t0), end: r2(Math.max(x.c.t1, x.c.t0 + 0.8)), text: clean(x.c.text), entrance: ent, seenAs: kind || 'unknown', bbox: x.c.bbox, fill: x.c.style && x.c.style.fill, band: x.c.band };
   });
+  out.dropped = dropped;
+  return out;
 }
 const clean = t => String(t).replace(/\s+/g, ' ').replace(/[|]/g, '/').replace(/\u2014/g, ',').trim();
 
 const norm = t => String(t).toLowerCase().replace(/[^a-z0-9]/g, '');
+// near-equal words: OCR and ASR each drop or swap a letter now and then (brainstom / brainstorm)
+function lev(a, b) { const d = Array.from({ length: b.length + 1 }, (_, i) => i); for (let i = 1; i <= a.length; i++) { let p = d[0]; d[0] = i; for (let j = 1; j <= b.length; j++) { const t = d[j]; d[j] = Math.min(d[j] + 1, d[j - 1] + 1, p + (a[i - 1] === b[j - 1] ? 0 : 1)); p = t; } } return d[b.length]; }
+const sameWord = (a, b) => a === b || (Math.min(a.length, b.length) >= 4 && (a.startsWith(b) || b.startsWith(a))) || (Math.min(a.length, b.length) >= 5 && lev(a, b) <= 1);
 // One big word at a time that matches the speech (the one-word caption look). rea-video files these as labels, so
 // they are found by matching single big words on screen to the transcript's word times.
 function oneWordStream(b) {
@@ -78,7 +108,7 @@ function oneWordStream(b) {
 // Running captions -> one of our caption styles.
 function captionStyle(b) {
   const ow = oneWordStream(b);
-  if (ow) return { style: 'one-word', why: `${ow.n} big single words on screen match the speech (${ow.of} words spoken), mostly in the ${ow.band} band`, band: ow.band };
+  if (ow) return { style: 'one-word', why: `${ow.n} big single words on screen match the speech (${ow.of} words spoken), mostly in the ${ow.band} band`, band: ow.band, ...placeOf([...ow.cues]) };
   // tiny text (a screen recording, a UI) is not a caption
   const subs = ((b.packaging || {}).text_cues || []).filter(c => c.kind === 'subtitle' && (c.line_h ?? (c.bbox ? c.bbox[3] : 1)) >= 0.025);
   if (!subs.length) return { style: 'kinetic', why: 'no running captions found; kinetic is the house default' };
@@ -90,11 +120,27 @@ function captionStyle(b) {
   const caps = share(c => /[A-Z]/.test(c.text) && c.text === c.text.toUpperCase()), stroke = share(c => c.style && c.style.stroke_ratio > 0.015);
   const avgDur = subs.reduce((a, c) => a + (c.t1 - c.t0), 0) / subs.length;
   const facts = `${subs.length} caption cues, ${avgW.toFixed(1)} words and ${avgChars.toFixed(0)} letters each, ${avgDur.toFixed(2)} s on screen, boxed ${Math.round(boxed * 100)}%, highlighted ${Math.round(multi * 100)}%, upper case ${Math.round(caps * 100)}%`;
-  if (avgW <= 1.3 && avgChars <= 9 && avgDur < 0.9) return { style: 'one-word', why: facts };
-  if (boxed >= 0.5) return { style: 'pill', why: facts };
-  if (multi >= 0.4) return { style: 'karaoke', why: facts };
-  if (caps >= 0.6 && stroke >= 0.4) return { style: 'hormozi', why: facts };
-  return { style: 'kinetic', why: facts };
+  const pl = placeOf(subs);
+  if (avgW <= 1.3 && avgChars <= 9 && avgDur < 0.9) return { style: 'one-word', why: facts, ...pl };
+  if (boxed >= 0.5) return { style: 'pill', why: facts, ...pl };
+  if (multi >= 0.4) return { style: 'karaoke', why: facts, ...pl };
+  if (caps >= 0.6 && stroke >= 0.4) return { style: 'hormozi', why: facts, ...pl };
+  return { style: 'kinetic', why: facts, ...pl };
+}
+// Where the captions sit (top / middle / bottom from the median centre of their boxes) and their colour (the median
+// fill, snapped to white or black when it is close, since OCR reads anti-aliased edges into the fill).
+function placeOf(cs) {
+  const ys = cs.filter(c => c.bbox).map(c => c.bbox[1] + c.bbox[3] / 2).sort((a, z) => a - z);
+  const y = ys.length ? ys[Math.floor(ys.length / 2)] : null;
+  const position = y == null ? null : y < 0.36 ? 'top' : y > 0.6 ? 'bottom' : 'middle';
+  const fills = cs.map(c => c.style && c.style.fill).filter(hexOK).map(h => parseInt(h.slice(1), 16)).map(n => [n >> 16, (n >> 8) & 255, n & 255]);
+  let color = null;
+  if (fills.length) {
+    const m = [0, 1, 2].map(k => { const v = fills.map(f => f[k]).sort((a, z) => a - z); return v[Math.floor(v.length / 2)]; });
+    const lumi = (0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]) / 255, sat = Math.max(...m) ? (Math.max(...m) - Math.min(...m)) / Math.max(...m) : 0;
+    color = sat < 0.12 && lumi > 0.82 ? '#ffffff' : sat < 0.12 && lumi < 0.15 ? '#000000' : '#' + m.map(v => v.toString(16).padStart(2, '0')).join('');
+  }
+  return { position, color, y: y == null ? null : r2(y) };
 }
 
 // One shot's grade -> a finish (or none). Calibrated on the shipped finishes applied to showcase/source/presenter.jpg,
@@ -116,6 +162,38 @@ function finishOf(m) {
   else if ((m.noise ?? 0) > 2.5) { f.push('grain'); why.push(`noise ${m.noise}`); }
   if (m.vignette != null && m.vignette < 0.12) { f.push('vignette'); why.push(`corners at ${Math.round(m.vignette * 100)}% of the ring inside them`); }
   return { finish: f.length ? f.join(',') : null, why: why.join('; ') || 'natural' };
+}
+
+// A finish is only assigned when the grade is a choice, not the room. Per finish: the measure it rests on, how far the
+// shots that have it must sit from the shots that do not (the grade changes across shots), and what counts as strong
+// enough to keep even when every shot has it. Warm lamp light on every shot is the room, so it is dropped.
+const GRADE = {
+  warm: { v: m => m.shadow_b ?? 0, gap: 3, strong: m => (m.shadow_b ?? 0) > 10 || (m.mean_b ?? 0) > 20 },
+  cool: { v: m => -(m.shadow_b ?? 0), gap: 3, strong: m => (m.shadow_b ?? 0) < -6 },
+  teal: { v: m => (m.highlight_b ?? 0) - (m.shadow_b ?? 0), gap: 8, strong: m => (m.highlight_b ?? 0) - (m.shadow_b ?? 0) > 28 },
+  bleach: { v: m => -(m.sat ?? 0), gap: 0.1, strong: m => m.contrast > 0.4 && m.sat < 0.12 },
+  crushed: { v: m => m.dark_share ?? 0, gap: 0.12, strong: m => (m.dark_share ?? 0) > 0.5 },
+  mono: { v: m => -(m.sat ?? 0), gap: 0.1, strong: () => true },
+  'scan-lines': { v: m => m.scan ?? m.x_scan ?? 0, gap: 0.8, strong: m => (m.scan ?? m.x_scan ?? 0) > 3 },
+  grain: { v: m => m.noise ?? 0, gap: 1.2, strong: m => (m.noise ?? 0) > 5 },
+  vignette: { v: m => -(m.vignette ?? 1), gap: 0.15, strong: m => m.vignette != null && m.vignette < 0.06 },
+};
+function gradeChoice(shots) {
+  const notes = [];
+  const all = new Set(shots.flatMap(s => (s.finish || '').split(',').filter(Boolean)));
+  for (const f of all) {
+    const G = GRADE[f]; if (!G) continue;
+    const has = shots.filter(s => (s.finish || '').split(',').includes(f)), not = shots.filter(s => !has.includes(s));
+    const avg = a => a.reduce((x, s) => x + G.v(s.m), 0) / a.length;
+    const differs = not.length > 0 && avg(has) - avg(not) >= G.gap;
+    for (const s of has) {
+      if (differs || G.strong(s.m)) continue;
+      s.finish = s.finish.split(',').filter(x => x !== f).join(',') || null;
+      s.finishWhy = `${s.finishWhy}; ${f} dropped (same on every shot and mild: the light of the room, not a grade)`;
+    }
+    if (!differs && has.some(s => !G.strong(s.m))) notes.push(`${f} on ${has.length} of ${shots.length} shots, mild and even across them: read as the room's light, not a finish`);
+  }
+  return notes;
 }
 
 let _bpms = null;
@@ -156,13 +234,51 @@ function brandColours(b, titles) {
   return out.slice(0, 5);
 }
 
+// teardown.py's graphics -> Reel.md graphics. An ordinal word OCR missed is guessed from its place in the list (text~);
+// the label is whatever OCR read under or beside the tile. No icons or screenshots are carried
+// over: the remake draws placeholders until you add your own files (icon / src).
+const ORD = ['FIRST', 'SECOND', 'THIRD', 'FOURTH', 'FIFTH', 'SIXTH', 'SEVENTH', 'EIGHTH', 'NINTH', 'TENTH'];
+function mapGraphics(b, extras) {
+  const cl = (v, a, z) => Math.min(z, Math.max(a, v));
+  let last = -1;
+  const out = [];
+  for (const g of extras.graphics || []) {
+    const o = { type: g.type, start: r2(g.start), end: r2(g.end), samples: g.samples, bbox: g.type === 'ordinal-sticker' ? null : g.bbox };
+    if (g.type === 'ordinal-sticker') {
+      const k = g.text ? ORD.indexOf(g.text) : -1;
+      const idx = k >= 0 ? k : last + 1;
+      last = idx;
+      Object.assign(o, { text: g.text || ORD[idx] || 'NEXT', guess: !g.text || k < 0, cue: g.cue, layer: g.layer || 'front', color: g.color,
+        x: g.bbox && g.bbox[2] > 0.5 ? r2(cl(g.bbox[0] + g.bbox[2] / 2, 0.2, 0.8)) : 0.5,
+        // the burst is seen whole across (its width) but cut off below by the person, so its centre is one radius
+        // down from its top edge; size is the radius in pixels on a 1080-wide frame
+        y: g.bbox ? r2(cl(g.bbox[1] + g.bbox[2] * 1080 / 1920 / 2, 0.18, 0.45)) : 0.27,
+        ...(g.bbox ? { size: Math.round(cl(g.bbox[2] * 1080 / 2, 180, 460)) } : {}) });
+    } else if (g.type === 'app-label') {
+      Object.assign(o, { text: clean(g.text), cue: g.cue, tile: g.tile, x: g.bbox ? r2(cl(g.bbox[0], 0.02, 0.7)) : 0.08, y: g.bbox ? r2(cl(g.bbox[1], 0.05, 0.85)) : 0.5,
+        ...(g.bbox ? { size: Math.round(cl(g.bbox[2] * 1080, 120, 320)) } : {}) });
+    } else if (g.type === 'screen-card') {
+      Object.assign(o, { border: g.border, uiText: g.ui_text, y: g.bbox ? r2(cl(g.bbox[1] + g.bbox[3] / 2, 0.3, 0.8)) : 0.68, w: g.bbox ? r2(cl(g.bbox[2] + 0.04, 0.4, 0.92)) : 0.66 });
+    } else continue;
+    out.push(o);
+  }
+  return out;
+}
+
 function convert(b, extras = {}, opts = {}) {
   const src0 = b.source || {};
   const src = { ...src0, file: src0.file || src0.filename || (src0.path ? path.basename(src0.path) : undefined) };
   const dur = r2(src.duration || (b.summary && b.summary.duration) || (b.shots && b.shots.length ? b.shots[b.shots.length - 1].end : 0));
   const engine = b.x_engine || (b.tool ? `${b.tool.name || 'rea-video'} ${b.tool.version || ''}`.trim() : 'rea-video');
-  const titles = pickTitles(b);
-  (extras.titles || []).forEach((x, i) => { if (titles[i] && x && x.layer) { titles[i].layer = x.layer; titles[i].overlap = x.person_overlap; } });
+  const picked = pickTitles(b);
+  (extras.titles || []).forEach((x, i) => { if (picked[i] && x && x.layer) { picked[i].layer = x.layer; picked[i].overlap = x.person_overlap; } });
+  const graphics = mapGraphics(b, extras);
+  // a title that is a graphic's own word (FIRST on a sticker, the label under an icon) belongs to that graphic
+  const inBox = (bb, box) => bb && box && bb[0] + bb[2] / 2 >= box[0] && bb[0] + bb[2] / 2 <= box[0] + box[2] && bb[1] + bb[3] / 2 >= box[1] && bb[1] + bb[3] / 2 <= box[1] + box[3];
+  const owned = t => graphics.find(g => t.start < g.end + 0.3 && g.start < t.end + 0.3 && (inBox(t.bbox, g.bbox) || [g.cue, g.text].filter(Boolean).some(x => { const a = norm(x), c = norm(t.text); return a && c && (sameWord(a, c) || (c.length >= 4 && a.includes(c))); })));
+  const titles = picked.filter(t => !owned(t)).slice(0, 7);
+  titles.forEach((t, i) => { t.n = i + 1; });
+  const dropped = [...(picked.dropped || []), ...picked.filter(t => owned(t)).map(t => ({ t: t.start, text: t.text, why: `part of the ${owned(t).type} at ${owned(t).start}s` }))];
   const cs = captionStyle(b);
   const look = cs.style === 'one-word' ? 'one-word' : cs.style === 'pill' ? 'muse' : 'kinetic';
   const shots = (b.shots || []).map((s, i) => {
@@ -171,8 +287,9 @@ function convert(b, extras = {}, opts = {}) {
     const fin = finishOf(m);
     const cam = (s.aspects && s.aspects.camera && (s.aspects.camera.result || s.aspects.camera.measured)) || {};
     const move = cam.move || cam.motion;
-    return { n: i + 1, start: r2(s.start), end: r2(s.end), finish: fin.finish, finishWhy: fin.why, transitionIn: s.transition_in, move: typeof move === 'string' ? move : null, shake: (s.aspects && s.aspects.camera && s.aspects.camera.measured && s.aspects.camera.measured.shake) };
+    return { n: i + 1, m, start: r2(s.start), end: r2(s.end), finish: fin.finish, finishWhy: fin.why, transitionIn: s.transition_in, move: typeof move === 'string' ? move : null, shake: (s.aspects && s.aspects.camera && s.aspects.camera.measured && s.aspects.camera.measured.shake) };
   });
+  const ambient = gradeChoice(shots);
   // the most common finish becomes the job default; shots that differ keep their own
   const counts = {};
   shots.forEach(s => { const k = s.finish || 'none'; counts[k] = (counts[k] || 0) + 1; });
@@ -205,7 +322,7 @@ function convert(b, extras = {}, opts = {}) {
     `\`npm run reel -- --recipe ${opts.recipePath || 'teardown/' + name + '/Reel.md'} --clip inbox/your-clip.mp4\``, '',
     '## Brand kit', '- preset: aigent', '- theme: aigent', `- colors: ${colours.join(', ') || 'none'}`, '- fonts: theme', '- logo: none', '',
     '## Music', `- bed: ${hasMusic && bed ? bed.name : 'none'}`, `- bpm: ${bpm ? Math.round(bpm) : ''}`, `- beat-sync: ${hasMusic ? 'on' : 'off'}`, '',
-    '## Style', `- look: ${look}`, `- captions: ${cs.style}`, `- titles: ${titles.length ? 'on' : 'off'}`, `- title-layer: ${layerDefault}`,
+    '## Style', `- look: ${look}`, `- captions: ${cs.style}`, ...(cs.position ? [`- caption-position: ${cs.position}`] : []), ...(cs.color ? [`- caption-color: ${cs.color}`] : []), `- titles: ${titles.length ? 'on' : 'off'}`, `- title-layer: ${layerDefault}`,
     `- finish: ${jobFinish ? jobFinish.split(',').join(', ') : 'none'}`, `- transition: ${shots.some(s => /dissolve|fade|cross/.test(s.transitionIn || '')) ? 'crossfade' : 'glitch'}`,
     `- punch: ${zoomShots || jumpCuts || avgShot < 3 ? 'on' : 'off'}`, '- effects: none', '',
     '## Shots', '', '```videomd-timeline'];
@@ -228,6 +345,18 @@ function convert(b, extras = {}, opts = {}) {
     });
     L.push('```', '');
   }
+  if (graphics.length) {
+    L.push('## Graphics', '', 'Detected graphics, drawn as neutral placeholders in the remake. Add `icon <file>` to an app label or `src <file>` (an image or a screen recording) to a screen card to use your own; paths are relative to this file.', '', '```reel-graphics');
+    graphics.forEach((g, i) => {
+      const f = [`#${pad2(i + 1)} ${g.start}-${g.end}`, `type ${g.type}`];
+      if (g.text) f.push(`${g.guess ? 'text~' : 'text'} ${g.text}`);
+      if (g.layer) f.push(`layer ${g.layer}`);
+      for (const k of ['color', 'tile', 'border']) if (hexOK(g[k])) f.push(`${k} ${g[k].toLowerCase()}`);
+      for (const k of ['x', 'y', 'w', 'size']) if (g[k] != null) f.push(`${k} ${g[k]}`);
+      L.push(f.join(' | '));
+    });
+    L.push('```', '');
+  }
   if (lines.length) {
     L.push('## Script', '', 'What the reference says, for timing and structure. Your remake uses your own words.', '', '```reel-script');
     lines.slice(0, 60).forEach((l, i) => L.push(`#${pad2(i + 1)} ${r2(l.start)}-${r2(l.end)} | say ${clean(l.text)}`));
@@ -242,9 +371,11 @@ function convert(b, extras = {}, opts = {}) {
     '| What | Detected | How |', '|---|---|---|',
     `| Length, shots | ${dur}s, ${shots.length} shots (avg ${avgShot.toFixed(1)}s) | scene cuts${jumpCuts ? `, ${jumpCuts} jump cuts` : ''} |`,
     `| Captions | ${cs.style} (look ${look}) | ${cs.why} |`,
-    `| Titles | ${titles.length} | big on-screen text that is not a running caption, one at a time, up to 7 |`,
+    `| Caption place | ${cs.position || 'unknown'}${cs.color ? ', ' + cs.color : ''} | median centre of the caption boxes${cs.y != null ? ' (' + Math.round(cs.y * 100) + '% down)' : ''} and their median fill, snapped to white or black when close |`,
+    `| Titles | ${titles.length} | big on-screen text that is not a running caption or a graphic's word, one at a time, up to 7${dropped.length ? `; ${dropped.length} left out (listed below)` : ''} |`,
+    `| Graphics | ${graphics.length ? ['ordinal-sticker', 'app-label', 'screen-card'].map(k => `${graphics.filter(g => g.type === k).length} ${k}`).join(', ') : 'none found'} | ${extras.graphics ? 'frames every 0.25 s: spiky yellow shape + ordinal word, square tile + label, dark rectangle + small UI text' : 'not measured (extras did not run)'} |`,
     `| Title layer | ${titles.length ? titles.map(t => t.layer || '?').join(', ') : 'n/a'} | ${extras.mask ? 'text colour over the person vs over the background (MediaPipe mask)' : 'not estimated (no person mask available); front is the default'} |`,
-    `| Finish | ${jobFinish || 'none'} as default; ${shots.filter(s => s.finish && s.finish !== jobFinish).length} shots differ | grade stats per shot, nearest shipped finish |`,
+    `| Finish | ${jobFinish || 'none'} as default; ${shots.filter(s => s.finish && s.finish !== jobFinish).length} shots differ | grade stats per shot, nearest shipped finish; only kept when the grade changes across shots or is strong${ambient.length ? '. ' + ambient.join('; ') : ''} |`,
     `| Music | ${hasMusic ? `${bpm ? Math.round(bpm) + ' BPM' : 'present'}${bed ? `, closest bed ${bed.name} (${Math.round(bed.bpm)} BPM)` : ''}` : 'none found'} | ${beatEdit ? 'cuts land on the beat more than chance' : 'beat grid'} |`,
     `| Punch | ${zoomShots || jumpCuts || avgShot < 3 ? 'on' : 'off'} | ${zoomShots} zoom moves, ${jumpCuts} jump cuts, ${avgShot.toFixed(1)}s average shot |`,
     `| Brand colours | ${colours.join(' ') || 'none'} | saturated text colours first, then the frame palette |`,
@@ -254,16 +385,28 @@ function convert(b, extras = {}, opts = {}) {
     titles.forEach(t => R.push(`| ${t.n} | ${t.start}-${t.end}s | ${t.text} | ${t.seenAs} | ${t.entrance || 'engine picks'} | ${t.layer || 'front'}${t.overlap != null ? ` (person under ${Math.round(t.overlap * 100)}% of it)` : ''} |`));
     R.push('');
   }
+  if (dropped.length) {
+    R.push('## Left out of the titles', '', '| Time | Text | Why |', '|---|---|---|');
+    dropped.forEach(d => R.push(`| ${d.t}s | ${d.text} | ${d.why} |`));
+    R.push('');
+  }
+  if (graphics.length) {
+    R.push('## Graphics', '', '| # | Time | Type | Text | Detail |', '|---|---|---|---|---|');
+    graphics.forEach((g, i) => R.push(`| ${i + 1} | ${g.start}-${g.end}s | ${g.type} | ${g.text ? g.text + (g.guess ? ' (guessed from its place in the list)' : '') : ''} | ${g.type === 'ordinal-sticker' ? `burst ${g.color || '?'}, ${g.layer}` : g.type === 'app-label' ? `tile ${g.tile || '?'}` : `border ${g.border || 'none found'}, ${g.uiText} UI text cues inside`} |`));
+    R.push('', 'Icons and screenshots are not copied. The remake draws a generic glyph or placeholder window until you add your own `icon` or `src`.', '');
+  }
   R.push('## Shots', '', '| # | Time | Finish | Why |', '|---|---|---|---|');
   shots.forEach(s => R.push(`| ${s.n} | ${s.start}-${s.end}s | ${s.finish || 'none'} | ${s.finishWhy} |`));
   R.push('', '## How sure is this', '', '- Cuts, length, BPM and caption timing are measured and usually right.',
     '- Caption style, entrances and finishes are the nearest match from a short menu. A custom look maps to the closest shipped one.',
+    '- Graphics are found from shape and colour plus OCR. A white tile on a white shirt, or an ordinal word OCR cannot read, is missed or guessed (marked ~).',
+    '- A finish is only kept when the grade changes across shots or is strong. An even warm or cool cast on every shot is read as the room light.',
     '- Front or behind is a colour test against a person mask. It misses when the text colour matches the clothes or hair.',
     '- OCR misreads stylised or moving type. Check the title text before you remake; your remake should use your own words anyway.', '');
-  return { md, report: R.join('\n'), titles, shots, captionStyle: cs.style, jobFinish, bpm, bed };
+  return { md, report: R.join('\n'), titles, shots, captionStyle: cs.style, captionPosition: cs.position, captionColor: cs.color, graphics, dropped, jobFinish, bpm, bed };
 }
 
-module.exports = { convert, pickTitles, captionStyle, oneWordStream, finishOf, suggestBed, loadBreakdown, ENTRANCE_MAP };
+module.exports = { convert, pickTitles, mapGraphics, gradeChoice, placeOf, captionStyle, oneWordStream, finishOf, suggestBed, loadBreakdown, ENTRANCE_MAP };
 
 if (require.main === module) {
   const argv = process.argv.slice(2);
