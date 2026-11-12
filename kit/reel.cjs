@@ -17,6 +17,10 @@
 //          --finish grain[,vignette,...]  optional film look (grain, vignette, chroma, scan-lines, warm, cool, teal, crushed, mono, bleach)
 //          --preset <name>|auto  apply a brand style (npm run preset -- --list). Flags you pass win over the preset.
 //          --title-layer front|behind|auto  job default for whether titles sit in front or behind the head (default front)
+//          --recipe Reel.md  make it from a Reel.md recipe (docs/reel-md.md): brand kit, music, style, per-shot finishes and
+//            punches, title entrances and layers in order. Flags win over the recipe; the recipe wins over the preset it names.
+//            --recipe-titles also uses the recipe's title text and times instead of titles drafted from your words.
+//          --clip <file>  the video to use (same as passing the path; reads well with --recipe)
 // Writes jobs/<name>/: clips/ (clip.py output), build/ (cut.json, captions.js, theme.js, overlay frames), reel-vN.mp4.
 // Steps: clip.py (Whisper, best take per sentence, retakes flagged) -> cut.json from every "keep" clip (zoom punch on
 // every cut, big punch after the hook and into the payoff, a few sounds on the key cuts only) -> autocaption ->
@@ -29,12 +33,13 @@ const path = require('path');
 const R = require('./rules.cjs');
 const B = require('./beats.cjs');
 const P = require('./preset.cjs');
+const RM = require('./reelmd.cjs');
 
 const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer']);
+const VALUED = new Set(['recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const die = m => { console.error(m); process.exit(1); };
@@ -42,6 +47,7 @@ const VIDEO = /\.(mov|mp4|m4v|mkv|webm|avi)$/i;
 const PY = process.env.PYTHON || (process.platform === 'win32' ? 'py' : 'python3');
 
 let srcs = positional.slice();
+if (opt('clip')) srcs.unshift(opt('clip'));
 const clipsArg = opt('clips');
 if (!srcs.length && !clipsArg && !flag('rebuild')) {
   const inbox = path.join(ROOT, 'inbox');
@@ -69,6 +75,21 @@ if (presetArg === 'auto') {
   if (perrs.length) die('Invalid preset "' + presetArg + '": ' + perrs.join('; '));
   if (preset.draft) console.warn('note: preset "' + preset.name + '" is a draft from a brand guide; confirm it before you ship.');
   console.log('preset:', preset.name, '-', preset.label || '');
+}
+// --recipe Reel.md: the recipe acts as a preset on top of the preset it names (a --preset flag still picks the base)
+let recipe = null;
+if (opt('recipe')) {
+  const rf = path.resolve(opt('recipe'));
+  if (!fs.existsSync(rf)) die('No recipe at ' + rf);
+  try { recipe = RM.load(rf); } catch (e) { die('Reel.md: ' + e.message); }
+  const { errs, warn } = RM.validate(recipe);
+  warn.forEach(w => console.warn('note: ' + w));
+  if (errs.length) die('Reel.md problems:\n- ' + errs.join('\n- '));
+  const rp = RM.toPreset(recipe);
+  if (rp.bed && !R.isBed(rp.bed)) rp.bed = path.resolve(path.dirname(rf), rp.bed);
+  if (rp.logo && !opt('logo')) { const lf = path.resolve(path.dirname(rf), rp.logo); if (fs.existsSync(lf)) argv.push('--logo', lf); else console.warn('note: recipe logo not found: ' + lf); }
+  preset = preset ? { ...preset, ...rp, name: rp.name } : rp;
+  console.log(RM.summary(recipe).split('\n').map(l => 'recipe ' + l).join('\n'));
 }
 // An explicit --look wins over the preset: its caption style, its titles rule and (oneword) its font cycle come with it.
 const lookFlag = opt('look');
@@ -127,6 +148,14 @@ if (!flag('rebuild')) {
   if (bed) Object.assign(cut, { bed: require('./rules.cjs').isBed(bed) ? bed : path.resolve(bed), bedVol: 0.16, ...(opt('bed-start') != null ? { bedStart: +opt('bed-start') } : {}) });
   if (flag('no-beat-sync')) cut.beatSync = false;
   else if (flag('beat-sync') || bed) cut.beatSync = true;
+  if (recipe) {
+    const plan = RM.shotSettings(recipe);
+    plan.forEach((p, i) => { const sg = segs[i]; if (!sg) return; if (p.finish) sg.finish = p.finish; if (p.bigPunch && wantPunch) sg.bigPunch = true; if (p.transition && i) sg.transition = p.transition; });
+    if (plan.length !== segs.length) console.log(`recipe: ${plan.length} shots in the recipe, ${segs.length} segments from your clip; per-shot settings applied to the first ${Math.min(plan.length, segs.length)}`);
+    if (preset.bedStart != null && opt('bed-start') == null && cut.bed) cut.bedStart = preset.bedStart;
+    if (preset.bedVol != null && cut.bed) cut.bedVol = preset.bedVol;
+    cut.recipe = recipe.card.name;
+  }
   const finish = opt('finish') || (preset && !preset.finishPool && preset.finish) || undefined;
   if (finish) { try { B.parseFinish(finish); } catch (e) { die(e.message); } cut.finish = finish; }
   if (preset) {
@@ -150,6 +179,22 @@ if (!flag('rebuild')) {
   const logo = opt('logo');
   if (logo) fs.copyFileSync(path.resolve(logo), path.join(build, path.basename(logo)));
   sh(process.execPath, [path.join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--force', ...(cut.hits && cut.hits.length === 0 ? ['--no-glitch'] : []), ...(TITLES ? ['--titles'] : look === 'oneword' ? [] : ['--hero']), ...(look === 'oneword' ? ['--cards'] : []), '--style', STYLE, ...(FONTS ? ['--fonts', FONTS] : []), ...(logo ? ['--logo', path.basename(logo)] : [])], build);
+  if (recipe && recipe.titles.length && TITLES) {
+    const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF);
+    const rt = RM.titleFlips(recipe);
+    if (flag('recipe-titles')) {
+      const len = segs.reduce((a, s) => a + (s.out - s.in), 0);
+      caps.flips = (caps.flips || []).filter(f => f.mode !== 7).concat(rt.filter(f => f.start < len).map(f => ({ ...f, end: Math.min(f.end, len) })));
+      console.log(`recipe titles: ${rt.length} from the recipe (text and times)`);
+    } else {
+      const mine = (caps.flips || []).filter(f => f.mode === 7).sort((a, b) => a.start - b.start), used = new Set();
+      const set = new Set();
+      mine.forEach((f, i) => { const r = rt[i]; if (!r) return; if (r.entrance && !used.has(r.entrance)) { f.entrance = r.entrance; used.add(r.entrance); set.add(f); } if (r.layer) f.layer = r.layer; });
+      mine.forEach(f => { if (!set.has(f) && f.entrance && used.has(f.entrance)) delete f.entrance; }); // each entrance once; the engine fills the rest
+      console.log(`recipe titles: entrance and layer pattern applied to ${Math.min(mine.length, rt.length)} of your ${mine.length} titles (pass --recipe-titles to use the recipe's text)`);
+    }
+    fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
+  }
   if (cut.titleLayer) {
     const capF = path.join(build, 'captions.js');
     const caps = R.readCaptions(capF);

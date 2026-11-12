@@ -37,3 +37,6 @@ kit/presets/local/
 /brand-guide/
 # the example reel is the one video kept in git
 !kit/example/demo-reel/demo-reel.mp4
+
+# teardowns of reference reels (npm run teardown)
+/teardown/

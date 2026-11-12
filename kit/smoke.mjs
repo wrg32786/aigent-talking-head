@@ -314,6 +314,79 @@ try {
     const d = +run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', out]).trim();
     if (Math.abs(d - 6.7) > 0.2) fail('muse reel duration ' + d);
   });
+  step('Reel.md: shipped recipes check, compile, export round-trip, VIDEO.md package', () => {
+    const RM = createRequire(import.meta.url)('./reelmd.cjs');
+    const dir = join(dirname(KIT), 'examples', 'recipes');
+    const files = readdirSync(dir).filter(f => /\.Reel\.md$/.test(f));
+    if (files.length < 3) fail('expected 3 example recipes, got ' + files);
+    for (const f of files) {
+      const r = RM.load(join(dir, f)); const v = RM.validate(r);
+      if (v.errs.length) fail(f + ': ' + v.errs.join('; '));
+      const c = RM.compile(r);
+      if (!c.cut.shotPlan || c.cut.shotPlan.length !== r.shots.length || (c.captions.titles || []).length !== r.titles.length) fail(f + ' did not compile its shots and titles');
+    }
+    // a finished job -> Reel.md -> compile gives back the same cut and titles; export is stable
+    const cut = { preset: 'cinematic', segs: [{ file: '../clips/a.mp4', in: 0, out: 2.5, finish: 'teal' }, { file: '../clips/b.mp4', in: 1, out: 3.2, bigPunch: true, transition: 'crossfade' }, { file: '../clips/c.mp4', in: 0.4, out: 2, finish: 'mono,grain' }],
+      tail: 0.3, bed: 'cinematic-build', bedVol: 0.14, beatSync: true, titleLayer: 'auto', finish: 'vignette' };
+    const caps = { captionStyle: 'one-word', fonts: 'druk', flips: [{ start: 0.2, end: 1.4, text: 'Stop scrolling', mode: 7, entrance: 'slam', layer: 'behind' }, { start: 4.1, end: 5.5, text: 'Do this', mode: 7, entrance: 'pop-zoom', layer: 'front' }, { start: 0.5, end: 1, text: 'cap', mode: 0 }] };
+    const md = RM.exportJob(cut, caps, { name: 'smoke-roundtrip' });
+    if (/\u2014/.test(md)) fail('export wrote an em dash');
+    const r = RM.parse(md, 'roundtrip.md'); const v = RM.validate(r);
+    if (v.errs.length) fail('exported Reel.md invalid: ' + v.errs.join('; '));
+    const c = RM.compile(r);
+    const strip = x => JSON.stringify(x.map(s => ({ file: s.file, in: s.in, out: s.out, finish: s.finish, bigPunch: s.bigPunch, transition: s.transition })));
+    if (strip(c.cut.segs) !== strip(cut.segs)) fail('segs changed in the round trip:\n' + strip(c.cut.segs) + '\n' + strip(cut.segs));
+    if (c.cut.bed !== 'cinematic-build' || c.cut.bedVol !== 0.14 || c.cut.beatSync !== true || c.cut.titleLayer !== 'auto' || c.cut.finish !== 'vignette') fail('cut settings changed: ' + JSON.stringify(c.cut));
+    if (c.captions.captionStyle !== 'one-word' || c.captions.fonts !== 'druk') fail('caption settings changed: ' + JSON.stringify(c.captions));
+    const t = c.captions.titles.map(x => `${x.start}-${x.end} ${x.entrance} ${x.layer} ${x.text}`).join(' / ');
+    if (t !== '0.2-1.4 slam behind Stop scrolling / 4.1-5.5 pop-zoom front Do this') fail('titles changed: ' + t);
+    if (RM.exportJob(c.cut, { ...c.captions, flips: c.captions.titles }, { name: 'smoke-roundtrip' }) !== md) fail('export is not stable across a round trip');
+    const pkg = join(work, 'videomd-pkg'); RM.toPackage(r, pkg);
+    if (!existsSync(join(pkg, 'VIDEO.md')) || !existsSync(join(pkg, 'video', 'timeline.md')) || readdirSync(join(pkg, 'video', 'shots')).length !== 3) fail('VIDEO.md package incomplete');
+    const py = process.env.PYTHON || 'python3';
+    let has = false; try { run(py, ['-c', 'import videomd']); has = true; } catch {}
+    if (has) { const errs = run(py, ['-c', `import videomd,json;print(json.dumps(videomd.check(${JSON.stringify(pkg)})))`]).trim(); if (errs !== '[]') fail('videomd check: ' + errs); }
+  });
+  step('reel.cjs --recipe: per-shot finish, punch, transition, title pattern; flags win over the recipe', () => {
+    const recipe = join(dirname(KIT), 'examples', 'recipes', 'cinematic.Reel.md');
+    run(node, [join(KIT, 'reel.cjs'), '--clips', join(work, 'clips-muse'), '--jobs', join(work, 'jobs'), '--name', 'recipe', '--recipe', recipe, '--mask', 'mediapipe', '--draft'], work);
+    const b = join(work, 'jobs', 'recipe', 'build');
+    const cut = JSON.parse(readFileSync(join(b, 'cut.json'), 'utf8'));
+    const fin = cut.segs.map(s => s.finish || '-').join(' ');
+    if (fin !== 'teal,vignette mono,grain teal warm,grain') fail('per-shot finishes from the recipe: ' + fin);
+    if (cut.segs[1].transition !== 'crossfade' || !cut.segs[2].bigPunch) fail('recipe transition / big punch not applied: ' + JSON.stringify(cut.segs));
+    if (cut.bed !== 'cinematic-build' || cut.bedVol !== 0.14 || cut.titleLayer !== 'auto' || cut.recipe !== 'cinematic') fail('recipe music / layer: ' + JSON.stringify({ bed: cut.bed, bedVol: cut.bedVol, tl: cut.titleLayer, recipe: cut.recipe }));
+    const caps = R.readCaptions(join(b, 'captions.js'));
+    const ts = caps.flips.filter(f => f.mode === 7).sort((x, y) => x.start - y.start);
+    if (ts[0].entrance !== 'blur-rise' || ts[0].layer !== 'behind' || ts[1].entrance !== 'slide-left' || ts[1].layer !== 'front') fail('title pattern: ' + JSON.stringify(ts.map(t => [t.entrance, t.layer])));
+    const ents = ts.map(t => t.entrance).filter(Boolean); if (new Set(ents).size !== ents.length) fail('an entrance repeats: ' + ents);
+    run(node, [join(KIT, 'reel.cjs'), '--clips', join(work, 'clips-muse'), '--jobs', join(work, 'jobs'), '--name', 'recipe-flags', '--recipe', recipe, '--title-layer', 'front', '--bed', 'yeehaw', '--no-mask', '--draft', '--recipe-titles'], work);
+    const c2 = JSON.parse(readFileSync(join(work, 'jobs', 'recipe-flags', 'build', 'cut.json'), 'utf8'));
+    if (c2.titleLayer !== 'front' || c2.bed !== 'yeehaw') fail('flags should win over the recipe: ' + JSON.stringify({ tl: c2.titleLayer, bed: c2.bed }));
+    const t2 = R.readCaptions(join(work, 'jobs', 'recipe-flags', 'build', 'captions.js')).flips.filter(f => f.mode === 7).map(f => f.text).join(' / ');
+    if (t2 !== 'Ten years ago') fail('--recipe-titles should use the recipe text inside the reel length: ' + t2);
+  });
+  step('teardown (built-in fallback) on a synthetic 3-shot reel: shots, mono shot, titles, Reel.md', () => {
+    const td = join(work, 'td'); mkdirSync(td);
+    const font = join(KIT, 'fonts', 'ArchivoBlack-Regular.ttf').replace(/\\/g, '/').replace(/:/g, '\\:');
+    const shot = (n, src, extra) => run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', src, '-vf', `scale=720:1280,setsar=1${extra}`, '-t', '2', '-r', '24', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', `s${n}.mp4`], td);
+    const txt = w => `,drawtext=fontfile='${font}':text='${w}':fontsize=150:fontcolor=white:borderw=6:bordercolor=black:x=(w-tw)/2:y=h*0.3`;
+    shot(1, 'testsrc2=size=720x1280:rate=24', txt('HELLO'));
+    shot(2, 'smptebars=size=720x1280:rate=24', ',' + B.finishChain('mono'));
+    shot(3, 'mandelbrot=size=720x1280:rate=24', txt('FOLLOW'));
+    writeFileSync(join(td, 'list.txt'), 's1.mp4\ns2.mp4\ns3.mp4\n'.split('\n').filter(Boolean).map(f => `file '${f}'`).join('\n'));
+    run('ffmpeg', ['-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', 'list.txt', '-c', 'copy', 'ref.mp4'], td);
+    run(node, [join(KIT, 'teardown.mjs'), join(td, 'ref.mp4'), '--engine', 'lite', '--no-asr', '--out', join(td, 'out')], work);
+    const RM = createRequire(import.meta.url)('./reelmd.cjs');
+    const r = RM.load(join(td, 'out', 'Reel.md')); const v = RM.validate(r);
+    if (v.errs.length) fail('teardown Reel.md invalid: ' + v.errs.join('; '));
+    if (r.shots.length !== 3) fail('expected 3 shots, got ' + r.shots.length);
+    if (!/mono/.test(r.shots[1].finish || '')) fail('shot 2 should read as mono: ' + JSON.stringify(r.shots[1]));
+    if (!existsSync(join(td, 'out', 'teardown.md')) || !existsSync(join(td, 'out', 'contact.jpg'))) fail('teardown report or contact sheet missing');
+    const fb = JSON.parse(readFileSync(join(td, 'out', 'fallback.json'), 'utf8'));
+    if (!fb.packaging.note) { const words = r.titles.map(t => t.text.toUpperCase()).join(' '); if (!/HELLO/.test(words) || !/FOLLOW/.test(words)) fail('OCR titles: ' + words); }
+    try { run(node, [join(KIT, 'teardown.mjs'), 'https://example.com/reel.mp4'], work); fail('teardown accepted a URL'); } catch (e) { if (!/local files only/.test(String(e.stderr || ''))) throw e; }
+  });
   step('title entrances: mid-entrance differs from settled, all seven resolve once, flicker on hook + payoff only', () => {
     const b = join(work, 'jobs', 'muse', 'build');
     const caps = JSON.parse(readFileSync(join(b, 'captions.js'), 'utf8').replace(/^window\.CAPTIONS=/, '').replace(/;\s*$/, ''));

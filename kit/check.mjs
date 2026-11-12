@@ -6,7 +6,7 @@
 // hype words) in captions, titles or the script; a repeated or unknown title entrance; more than 7 titles; an unknown
 // transition, sound or film-finish name. Warnings: flicker on a middle title, a sound on every cut, more than 2 big punches, a possible
 // forced triad, the script shape (40-55 words, 15-20 s; over 25 s cut a middle sentence), and beat-sync on with no bed.
-import { existsSync, readFileSync, statSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { coverage, showcaseHas, sourceCatalogIds } from './menu.mjs';
 import { join, resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -117,6 +117,21 @@ if (target) {
   const self = { label: 'copy lint self-test', errs: miss.map(x => `lint missed: "${x}"`), warns: [] };
   if (R.lintCopy('Drop your clip in the inbox and ask for the reel.').errs.length) self.errs.push('lint flagged a clean line');
   results.push(self);
+
+  // example Reel.md recipes: valid, and their title copy passes the lint
+  {
+    const RM = createRequire(import.meta.url)('./reelmd.cjs');
+    const dir = join(ROOT, 'examples', 'recipes');
+    const errs = [];
+    for (const f of (existsSync(dir) ? readdirSync(dir) : []).filter(f => f.endsWith('.Reel.md'))) {
+      try {
+        const r = RM.load(join(dir, f)); const v = RM.validate(r);
+        v.errs.forEach(e => errs.push(`${f}: ${e}`));
+        r.titles.forEach(t => R.lintCopy(t.text || '').errs.forEach(e => errs.push(`${f} title #${t.n}: ${e}`)));
+      } catch (e) { errs.push(`${f}: ${e.message}`); }
+    }
+    results.push({ label: 'example recipes (Reel.md)', errs, warns: [] });
+  }
 
   const menuCov = coverage();
   results.push({

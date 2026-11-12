@@ -2,6 +2,14 @@
 
 From [The AIgent](https://theaigent.xyz). Turn one phone clip into a styled talking-head reel.
 
+Paste this into your agent:
+
+```
+Read https://raw.githubusercontent.com/wrg32786/aigent-talking-head/main/INSTALL.md and follow it to install aigent-talking-head in this agent.
+```
+
+Works with your agent: Claude Code, Codex, Cursor, Gemini CLI, OpenCode, and any agent that runs commands and reads `SKILL.md` skills (`npx skills add wrg32786/aigent-talking-head`).
+
 ![Phone clip versus the finished reel](kit/example/demo-reel/before-after.gif)
 
 Phone clip on the left, finished reel on the right. [Watch the 40-second demo](kit/example/demo-reel/demo-reel.mp4) (20 effects, with the [plan files](kit/example/demo-reel/)).
@@ -31,6 +39,39 @@ Titles sit in front by default. Set a title behind the head, or use auto for the
 ## Presets
 
 ![Brand presets](showcase/sheets/presets.jpg)
+
+## Remake a reel you like
+
+```
+npm run teardown -- reference.mp4                                       # what it is made of, as a Reel.md
+npm run reel -- --recipe teardown/reference/Reel.md --clip inbox/me.mp4  # the same style, your clip and brand
+```
+
+[rea-video](https://github.com/JuneYaooo/rea-video) breaks the reference down shot by shot; the kit maps it onto the menu above and shows you what it found before anything renders. Local files only. How accurate it is: [docs/teardown.md](docs/teardown.md).
+
+## Reel.md recipes
+
+A reel's whole style in one Markdown file you can read, edit and share. VIDEO.md compatible. Spec: [docs/reel-md.md](docs/reel-md.md). Examples: [examples/recipes/](examples/recipes/).
+
+````markdown
+## Style
+- captions: one-word
+- title-layer: front
+
+## Shots
+```videomd-timeline
+#01 0-4 | story hook | finish warm
+#02 4-12 | story proof | punch big
+#03 12-20 | story payoff | finish teal,vignette
+```
+
+## Titles
+```reel-titles
+#01 0.3-1.8 | entrance slam | layer behind | text Stop scrolling
+```
+````
+
+`npm run reel -- --recipe my.Reel.md --clip inbox/me.mp4` makes it. `npm run reelmd -- export <job>` turns any finished reel back into one.
 
 Every option, labelled, is in the [full gallery](showcase/GALLERY.md). The [HTML gallery](showcase/index.html) needs a full clone or zip of the repo; if you download only that HTML file, the images will not load. `npm run menu` prints the same list. `npm run showcase` rebuilds the stills and these sheets. Stills use an AI-generated fictional presenter.
 
@@ -107,6 +148,10 @@ npm run chrome                                  # prints the Chrome it found
 npm run smoke                                   # synthetic clips end to end, several minutes, no footage or keys needed
 npm run check                                   # copy lint self-test over the examples
 ```
+
+Skills for your agent: `npx skills add wrg32786/aigent-talking-head` (talking-head-reel, talking-head-recipe, talking-head-brand, talking-head-teardown, talking-head-ad, clip-raw-footage). Agents can do the whole install from [INSTALL.md](INSTALL.md).
+
+Optional teardown engine: `npm run teardown -- <file> --install` adds [rea-video](https://github.com/JuneYaooo/rea-video) (Apache-2.0) to the kit's Python.
 
 Chrome is found automatically in the usual Mac, Linux and Windows install paths or on PATH. Set `CHROME_PATH` to use a different one. Set `PYTHON` if your Python isn't `python3` (or `py` on Windows). `npm run smoke:whisper` also runs a tiny Whisper model.
 
@@ -185,6 +230,9 @@ Agents: start at [AGENTS.md](AGENTS.md).
 | File | Does |
 |---|---|
 | `kit/reel.cjs` | `npm run reel`: inbox clip (or several takes) to draft reel in one command (clip, cut, captions, check, render, mask, assemble), plus `--draft` and `--rebuild`. |
+| `kit/reelmd.cjs` | `npm run reelmd -- check\|compile\|export\|package`: Reel.md recipes ([spec](docs/reel-md.md)), applied by `npm run reel -- --recipe`. Examples in `examples/recipes/`. |
+| `kit/teardown.mjs`, `kit/videomd2reel.cjs`, `kit/teardown.py` | `npm run teardown -- <file>`: rea-video breakdown to Reel.md, report and contact sheet; built-in fallback analyzer and the front/behind and vignette extras ([docs](docs/teardown.md)). |
+| `INSTALL.md`, `skills/` | One-line agent install, and skills for `npx skills add wrg32786/aigent-talking-head`. |
 | `kit/autocaption.mjs` | Drafts `captions.js` from Whisper word times (`words.json` or `clips.json`), in any caption style, with `--titles`. Never overwrites without `--force`. |
 | `kit/check.mjs` | `npm run check [job]`: copy lint, titles, transitions, sounds, punches and script shape. |
 | `kit/verify.mjs` | `npm run verify -- <job>`: ffprobe, loudness, title and punch stills, contact sheet, mask alpha, copy lint. Run it before every delivery. |
@@ -247,6 +295,7 @@ Code and docs: Apache-2.0, Copyright 2026 Will Gwyn (wrg32786). See [LICENSE](LI
 - `kit/sfx/boom.wav`, `click.wav`, `typing.wav`: from [motion-pack](https://github.com/ANVEAI/motion-pack) by ANVEAI (sounds `snd.hit.deep_impact`, `snd.ui.click`, `snd.ui.typing_burst`), CC0 1.0 under its LICENSE-MEDIA.
 - `kit/sfx/{hit,riser,release,whoosh,swipe,pop,ui,glitch,camera,paper,counter,sub,shimmer}/` and `kit/sfx/sfx.json`: 31-sound cinematic pack. DAEDAL Transition / UI packs, Kenney Interface Sounds, OpenGameArt / Freesound CC0 items, and original synths dedicated CC0. Full credits in [THIRD_PARTY.md](THIRD_PARTY.md).
 - `kit/fonts/`: Google Fonts under the SIL Open Font License 1.1, each with its licence file. See [kit/fonts/README.md](kit/fonts/README.md).
+- Teardown engine (installed on request, not vendored): [rea-video](https://github.com/JuneYaooo/rea-video) by JuneYaooo, Apache-2.0. Reel.md follows the [VIDEO.md](https://github.com/videomd/videomd) card and timeline syntax (Apache-2.0). The recipe idea, the one-line agent install and skills packaging were inspired by [OpenMotion](https://github.com/nexu-io/openmotion) (Apache-2.0). No text or code copied; see [THIRD_PARTY.md](THIRD_PARTY.md).
 - Ideas adapted, no code copied: the transition name map from motion-pack (MIT), the Hormozi and karaoke caption looks from [Capite](https://github.com/muneebkhan08/Capite) (MIT), the title entrances from [motion-anything](https://github.com/nexu-io/motion-anything) (Apache-2.0, reference only). See [THIRD_PARTY.md](THIRD_PARTY.md).
 - `kit/example/skool-logo.svg`: the Skool wordmark, a trademark of Skool. It's included only to mark The AIgent's own Skool group in the Awakening example; it isn't in any theme. Don't use it for other brands.
 - `effects/vendor/claude-video-effects/`: [claude-video-effects](https://github.com/Vibha-Ramprakash/claude-video-effects) by Vibha Ramprakash, MIT. Its models (YuNet, MIT; MediaPipe Selfie Segmenter, Apache-2.0) and fonts (SIL OFL 1.1, Permanent Marker Apache-2.0) keep their own licences; see `NOTICE` and `effects/README.md`.

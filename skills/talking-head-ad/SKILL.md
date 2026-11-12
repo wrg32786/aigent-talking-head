@@ -18,7 +18,7 @@ Every version gets checked with `npm run verify` and by re-transcribing it. All 
 
 Skip this when the teammate already has a script.
 
-1. **Teardown (optional, only if the tools are installed).** If the teammate points at a reel they want to match, you can download it with [instaloader](https://github.com/instaloader/instaloader) (MIT) and break it down with [rea-video](https://github.com/JuneYaooo/rea-video) (Apache-2.0): hook, beats, cut rhythm, title moments. Neither is bundled; install them yourself, and only for public posts the teammate may use. Never post anything.
+1. **Teardown (optional).** If the teammate has a reel they want to match, ask them for the video file and run `npm run teardown -- <file>` (rea-video, Apache-2.0, does the breakdown; see `docs/teardown.md` and the talking-head-teardown skill). It writes a Reel.md with the hook, beats, cut rhythm, title moments, finishes and tempo. Only local files the teammate provides; there is no downloader. Never post anything.
 2. **Script shape.** A hook, one reveal per beat, a payoff. 40 to 55 words, 15 to 20 s spoken. If a draft runs over 25 s, cut a middle sentence, never the hook or the payoff. `npm run check -- <job>` reports the word count and length.
 3. **Copy standard (humanizer).** Write like a person talking:
    - No em or en dashes. Use a full stop or a comma.
