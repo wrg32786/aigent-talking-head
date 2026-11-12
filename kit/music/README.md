@@ -42,4 +42,6 @@ Each file gets a name from its title (lowercase, `&` becomes `and`), is matched 
 
 ## Rights
 
-These tracks are ours for The AIgent's own videos and ads. They're not covered by the repo's Apache-2.0 licence and aren't for reuse outside this project. Suno's terms tie commercial use to a paid plan at the time a song was made, so every track added here must come from a paid Suno account.
+These tracks are dedicated to the public domain under [CC0 1.0](LICENSE.md). Anyone may use them, including commercially. They were made by Will Gwyn / The AIgent with Suno, on a paid plan. They are not covered by the repo's Apache-2.0 licence; CC0 applies instead.
+
+Suno's terms tie commercial use to a paid plan at the time a song was made, so every track added here must come from a paid Suno account.

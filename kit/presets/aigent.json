@@ -21,5 +21,6 @@
   ],
   "bed": null,
   "punch": true,
-  "notes": "The default house style. Vary grain and vignette across scenes rather than one finish on everything."
+  "notes": "The default house style. Vary grain and vignette across scenes rather than one finish on everything.",
+  "titleLayer": "auto"
 }

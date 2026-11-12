@@ -27,6 +27,15 @@ const sfxHits = list => (list || []).map(h => (Array.isArray(h) ? { t: +h[0], g:
 const ENTRANCES = ['stagger-rise', 'slam', 'blur-rise', 'slide-left', 'elastic', 'flip', 'pop-zoom'];
 const TITLE_ENTER = 0.45; // seconds until a title has settled
 const TITLE_MODE = 7;
+// front (default): the whole title sits in front of the person.
+// behind: the hero word goes behind the head (partner words stay in front).
+// auto: at most two punch titles (hook and payoff when they are not neighbours) go behind; never consecutive.
+const TITLE_LAYERS = ['front', 'behind', 'auto'];
+function normalizeLayer(v, fallback) {
+  if (v == null || v === '') return fallback;
+  const n = String(v).toLowerCase();
+  return TITLE_LAYERS.includes(n) ? n : null;
+}
 
 // Zoom punch: every cut toggles a 10% punch-in; a big punch adds 12% more over 0.3 s (cut after the hook, cut into the payoff).
 const PUNCH = { zoom: 0.10, big: 0.12, bigDur: 0.3, y: 0.4 };
@@ -83,12 +92,34 @@ function readCaptions(file) {
   return g.CAPTIONS || { flips: [] };
 }
 
-// Titles in order with their entrance and flicker resolved the same way overlay.html resolves them.
-function resolveTitles(CAP) {
+// Titles in order with their entrance, flicker and layer resolved the same way overlay.html resolves them.
+// layer is always 'front' or 'behind' after this (auto is resolved). Job default: CAP.titleLayer or cut.titleLayer, else front.
+function resolveTitles(CAP, cut) {
   const ts = (CAP.flips || []).filter(f => f.mode === TITLE_MODE).sort((a, b) => a.start - b.start);
   const used = new Set(ts.map(t => t.entrance).filter(Boolean));
   const free = ENTRANCES.filter(e => !used.has(e));
-  return ts.map((t, i) => ({ ...t, entrance: t.entrance || free.shift() || ENTRANCES[i % ENTRANCES.length], flicker: (i === 0 || i === ts.length - 1) ? t.flicker !== false : false, role: i === 0 ? 'hook' : i === ts.length - 1 ? 'payoff' : 'beat' }));
+  const out = ts.map((t, i) => ({ ...t, entrance: t.entrance || free.shift() || ENTRANCES[i % ENTRANCES.length], flicker: (i === 0 || i === ts.length - 1) ? t.flicker !== false : false, role: i === 0 ? 'hook' : i === ts.length - 1 ? 'payoff' : 'beat' }));
+  const job = normalizeLayer((CAP && CAP.titleLayer) != null ? CAP.titleLayer : (cut && cut.titleLayer), 'front') || 'front';
+  const raw = out.map(t => normalizeLayer(t.layer, job) || job);
+  const behind = new Set();
+  raw.forEach((v, i) => { if (v === 'behind') behind.add(i); });
+  const autos = raw.map((v, i) => v === 'auto' ? i : -1).filter(i => i >= 0);
+  if (autos.length) {
+    const scored = autos.map(i => {
+      const t = out[i];
+      let s = 0;
+      if (t.role === 'hook' || t.role === 'payoff') s += 3;
+      if (t.entrance === 'slam') s += 2;
+      if (t.flicker) s += 1;
+      return { i, s };
+    }).sort((a, b) => b.s - a.s || a.i - b.i);
+    for (const { i } of scored) {
+      if (behind.size >= 2) break;
+      if (behind.has(i - 1) || behind.has(i + 1)) continue;
+      behind.add(i);
+    }
+  }
+  return out.map((t, i) => ({ ...t, layer: behind.has(i) ? 'behind' : 'front' }));
 }
 
 // Person-mask path and backend. cut.json may use "mask": "mask.mkv" or
@@ -115,4 +146,4 @@ const BEDS = JSON.parse(fs.readFileSync(path.join(KIT, 'music/beds.json'), 'utf8
 const isBed = b => typeof b === 'string' && Object.hasOwn(BEDS, b) && typeof (BEDS[b] || {}).file === 'string';
 const bedFile = b => (isBed(b) ? path.join(KIT, 'music', BEDS[b].file) : b);
 
-module.exports = { BEDS, isBed, bedFile, SFX, CUT_SOUNDS, sfxHits, ENTRANCES, TITLE_ENTER, TITLE_MODE, PUNCH, TRANSITIONS, xfadeMode, timeline, lintCopy, scriptShape, readCaptions, resolveTitles, maskSpec, MASK_MODELS };
+module.exports = { BEDS, isBed, bedFile, SFX, CUT_SOUNDS, sfxHits, ENTRANCES, TITLE_ENTER, TITLE_MODE, TITLE_LAYERS, normalizeLayer, PUNCH, TRANSITIONS, xfadeMode, timeline, lintCopy, scriptShape, readCaptions, resolveTitles, maskSpec, MASK_MODELS };

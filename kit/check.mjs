@@ -37,6 +37,12 @@ function checkJob(captionsFile, cutFile, label) {
   }
   const sorted = raw.slice().sort((a, b) => a.start - b.start);
   sorted.forEach((t, i) => { if (t.flicker && i > 0 && i < sorted.length - 1) warns.push(`title ${t.start}s: flicker is for the hook and payoff only; it is ignored on a middle title`); });
+  const layerOk = (v, where) => {
+    if (v == null || v === '') return;
+    if (!R.TITLE_LAYERS.includes(String(v).toLowerCase())) errs.push(`${where}: unknown title layer "${v}" (front, behind, auto)`);
+  };
+  layerOk(CAP.titleLayer, 'titleLayer');
+  for (const t of raw) layerOk(t.layer, `title ${t.start}s`);
   // font lockups: "hero" must name words that are in the phrase; "lockup" must use a known arrangement
   const ARR = ['stack', 'overlap', 'inline'];
   const words = t => String(t).replace(/\|/g, ' ').split(/\s+/).filter(Boolean).map(w => w.toLowerCase().replace(/[^a-z0-9']/g, ''));
@@ -51,6 +57,7 @@ function checkJob(captionsFile, cutFile, label) {
   if (CAP.captionStyle && !['kinetic', 'oneword', 'classic', 'pill', 'hormozi', 'karaoke', 'one-word'].includes(CAP.captionStyle)) errs.push(`captionStyle "${CAP.captionStyle}" (kinetic, oneword, classic, pill, hormozi, karaoke, one-word)`);
   if (cutFile && existsSync(cutFile)) {
     const C = JSON.parse(readFileSync(cutFile, 'utf8')), TL = R.timeline(C);
+    layerOk(C.titleLayer, 'cut.json titleLayer');
     if (C.lockup && C.lockup.arrange && !ARR.includes(C.lockup.arrange)) errs.push(`cut.json lockup arrange "${C.lockup.arrange}" (${ARR.join(', ')})`);
     for (const [k, h] of Object.entries(C.hero || {})) { const f = flips.find(x => Math.abs(x.start - +k) < 0.006 && (x.mode === 0 || x.mode === R.TITLE_MODE)); if (!f) errs.push(`cut.json hero "${k}": no caption or title starts at ${k}s`); else if (!heroOk(f, h)) errs.push(`cut.json hero "${k}": ${JSON.stringify(h)} is not in "${f.text}"`); }
     (C.segs || []).forEach((s, i) => { if (s.transition && R.xfadeMode(s.transition) === undefined) errs.push(`seg ${i}: unknown transition "${s.transition}" (kit/transitions.json)`); });
@@ -126,7 +133,7 @@ if (target) {
     const has = showcaseHas(html, ids);
     const errs = has.missing.map(x => 'showcase missing ' + x);
     // Visual kinds should also have a still under showcase/media so a new effect cannot hide.
-    const visual = ['finish', 'effect', 'transition', 'font', 'theme', 'entrance', 'look', 'captionStyle', 'preset'];
+    const visual = ['finish', 'effect', 'transition', 'font', 'theme', 'entrance', 'look', 'captionStyle', 'preset', 'titleLayer'];
     for (const kind of visual) {
       for (const id of ids[kind] || []) {
         const token = `data-id="${kind}:${id}"`;
@@ -135,6 +142,7 @@ if (target) {
         const dirs = {
           finish: 'finish', effect: 'effect', transition: 'transition', font: 'font',
           theme: 'theme', entrance: 'entrance', look: 'look', captionStyle: 'caption', preset: 'preset',
+          titleLayer: 'titleLayer',
         };
         const img = join(base, dirs[kind], id + '.jpg');
         if (!existsSync(img) || !statSync(img).size) errs.push(`showcase still missing ${kind}:${id} (${img})`);

@@ -22,5 +22,6 @@
   ],
   "bed": null,
   "punch": true,
-  "notes": "A retro video look. Vary scan-lines, chroma and grain across scenes so it does not sit on every shot the same way."
+  "notes": "A retro video look. Vary scan-lines, chroma and grain across scenes so it does not sit on every shot the same way.",
+  "titleLayer": "front"
 }

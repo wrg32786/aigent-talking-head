@@ -21,5 +21,6 @@
   ],
   "bed": null,
   "punch": true,
-  "notes": "Each spoken word fills the caption band, one at a time. Titles still sit behind the head."
+  "notes": "Each spoken word fills the caption band, one at a time. Titles sit in front by default.",
+  "titleLayer": "front"
 }

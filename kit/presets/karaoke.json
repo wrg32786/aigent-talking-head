@@ -19,5 +19,6 @@
   ],
   "bed": null,
   "punch": true,
-  "notes": "A left-to-right colour wipe follows the voice. Good for lyric-like delivery."
+  "notes": "A left-to-right colour wipe follows the voice. Good for lyric-like delivery.",
+  "titleLayer": "front"
 }

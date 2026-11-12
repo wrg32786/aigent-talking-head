@@ -31,12 +31,13 @@ Third-party files keep their own terms:
 - birefnet-general-lite weights: BiRefNet by ZhengPeng (https://github.com/ZhengPeng7/BiRefNet), MIT,
   Copyright (c) 2024 ZhengPeng. Downloaded on first use into rembg's cache from rembg's v0.0.0 release
   (BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx, md5 4fab47adc4ff364be1713e97b7e66334). Not in git.
-- kit/music/*.mp3: original tracks made by Will Gwyn with Suno (song ids in kit/music/beds.json), for The AIgent's
-  own videos only. Not covered by the Apache license.
-- kit/example/demo-reel/demo-reel.mp4 and poster.jpg: footage of Will Gwyn with our own music, for The AIgent's
-  own use only. Not covered by the Apache license.
+- kit/music/*.mp3: original tracks made by Will Gwyn / The AIgent with Suno on a paid plan
+  (song ids in kit/music/beds.json). Dedicated CC0 1.0; see kit/music/LICENSE.md.
+- kit/example/demo-reel/demo-reel.mp4 and poster.jpg: footage of Will Gwyn, for The AIgent's
+  own use only. Not covered by the Apache license. The music bed in the reel (kit/music/yeehaw.mp3)
+  is CC0 1.0.
 - kit/beats.py, kit/beats.cjs (beat grid, snap rules, and ffmpeg film-finish looks): adapted from
-  Will Gwyn's music-video project (private), relicensed Apache-2.0 by the author. No LUT or light-leak
+  Will Gwyn's music-video project, relicensed Apache-2.0 by the author. No LUT or light-leak
   assets were brought over.
 - librosa (pip): librosa by the librosa developers (https://github.com/librosa/librosa), ISC.
   Installed by pip install -r requirements.txt, not vendored.

@@ -4,8 +4,7 @@
 //   node <kit>/autocaption.mjs                 -> writes captions.draft.js (never overwrites captions.js)
 //   node <kit>/autocaption.mjs --out captions.js [--force] [--words 4] [--chars 22] [--shift 0.3] [--hero] [--logo logo.svg]
 // Every phrase is a plain caption (mode 0). --hero makes the last phrase before each seam a spray hero word (mode 1).
-// --cards adds type cards (mode 8, flat-colour cutaways; the oneword look). --titles makes it a kinetic title instead (mode 7, one per beat, up to 7, each with its own entrance; behind the
-// person when a mask is made). --style kinetic (default: every word animates in, one emphasis word per phrase)|oneword (one word at a time, the full look)|classic|pill|hormozi|karaoke|one-word (one big word, simple) sets
+// --cards adds type cards (mode 8, flat-colour cutaways; the oneword look). --titles makes it a kinetic title instead (mode 7, one per beat, up to 7, each with its own entrance; in front by default, or behind the person when layer is behind and a mask is made). --style kinetic (default: every word animates in, one emphasis word per phrase)|oneword (one word at a time, the full look)|classic|pill|hormozi|karaoke|one-word (one big word, simple) sets
 // captionStyle; pill groups 3 to 5 words. --fonts <pairing>[,<pairing>...] writes "fonts" (kit/fonts/pairings.json; several cycle).
 // Every caption carries its word times ("words") so pills, hormozi and karaoke can follow the voice.
 // Seams get glitchAt entries. --shift adds seconds to every word (Whisper often runs 0.3-0.6 s early on cinematic takes).
@@ -109,7 +108,7 @@ const flips = phrases.map((p, i) => {
 // six beats plus the payoff), so no entrance repeats. That phrase leaves the caption track (the title says it).
 if (opt('titles', false)) {
   const beats = flips.filter(f => f._beatEnd !== undefined);
-  // oneword: only the opening beat and the last one, as a single word behind the head while the words run on
+  // oneword: only the opening beat and the last one, as a single word title while the words run on
   const pick = STYLE === 'oneword' ? [...new Set([beats[0], beats[beats.length - 1]])].filter(Boolean) : beats.length > 7 ? [...beats.slice(0, 6), beats[beats.length - 1]] : beats;
   const segEnd = i => { let t = 0; for (let k = 0; k <= i; k++) t += (C.segs[k].out - C.segs[k].in) + (C.segs[k].pad || 0); return t; };
   for (const f of pick) {
@@ -118,26 +117,26 @@ if (opt('titles', false)) {
     const tEnd = +Math.min(total, f._beatEnd === C.segs.length - 1 ? 99 : segEnd(f._beatEnd)).toFixed(2);
     if (STYLE === 'oneword') { flips.push({ start: f.start, end: tEnd, text: words[heroIdx(words)].replace(/[^\w'$%-]+$/, ''), mode: 7, lockup: false }); continue; }
     flips.push({ start: f.start, end: tEnd, text: words.join(' '), hero: [heroIdx(words)], mode: 7 });
-    f._title = true; // the title says this phrase big behind the head, so the caption track skips it
+    f._title = true; // the title says this phrase big, so the caption track skips it
   }
   for (let k = flips.length - 1; k >= 0; k--) if (flips[k]._title) flips.splice(k, 1);
   flips.sort((a, b) => a.start - b.start || a.mode - b.mode);
 }
 // --cards: type cards (mode 8), the oneword look's text-only cutaways. The second phrase and every third after it cut
-// to flat colour for up to 1.6 s of the phrase (phrases under 0.9 s and phrases with a behind-head word are skipped), cycling the palette; "Step 2", "tip three" and the like
+// to flat colour for up to 1.6 s of the phrase (phrases under 0.9 s and phrases with a title are skipped), cycling the palette; "Step 2", "tip three" and the like
 // get the number behind the words.
 if (opt('cards', false)) {
   const BG = ['navy', 'paper', 'blue', 'cream'], NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
   const caps0 = flips.filter(f => f.mode === 0);
   caps0.forEach((f, i) => {
-    if (i % 3 !== 1 || f.end - f.start < 0.9 || flips.some(x => x.mode === 7 && x.start < f.end && f.start < x.end)) return; // never over a behind-head word
+    if (i % 3 !== 1 || f.end - f.start < 0.9 || flips.some(x => x.mode === 7 && x.start < f.end && f.start < x.end)) return; // never over a title
     const m = f.text.match(/\b(?:step|tip|rule|part|number|no\.?)\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/i);
     flips.push({ start: f.start, end: +Math.min(f.end, f.start + 1.6).toFixed(2), mode: 8, bg: BG[Math.floor(i / 3) % BG.length], ...(m ? { number: String(NUM[m[1].toLowerCase()] || m[1]) } : {}) }); // a cutaway, 0.9 to 1.6 s
   });
   flips.sort((a, b) => a.start - b.start || a.mode - b.mode);
 }
 flips.forEach(f => delete f._beatEnd);
-const caps = { note: `Auto-drafted by kit/autocaption.mjs from Whisper word times. Hand-tweak before shipping: modes 0 caption, 1 spray hero word, 2 sticker, 3 count-up, 4 takeover card, 5 logo plate, 6 CTA sticker, 7 kinetic title (entrance: stagger-rise|slam|blur-rise|slide-left|elastic|flip|pop-zoom, each once; flicker only on the first and last title). end 99 = hold to the end. captionStyle: kinetic|classic|pill|hormozi|karaoke|one-word; hero = word indices set big in the display face (titles and kinetic captions are two-font lockups; \"lockup\": false for one font).`, captionStyle: STYLE, ...(opt('fonts', null) && opt('fonts') !== true ? { fonts: opt('fonts') } : {}), flips, glitchAt: opt('no-glitch', false) ? [] : [0.02, ...seams], bursts: [], captionY: 1300 };
+const caps = { note: `Auto-drafted by kit/autocaption.mjs from Whisper word times. Hand-tweak before shipping: modes 0 caption, 1 spray hero word, 2 sticker, 3 count-up, 4 takeover card, 5 logo plate, 6 CTA sticker, 7 kinetic title (entrance: stagger-rise|slam|blur-rise|slide-left|elastic|flip|pop-zoom, each once; flicker only on the first and last title; layer: front|behind|auto, default front). end 99 = hold to the end. captionStyle: kinetic|classic|pill|hormozi|karaoke|one-word; hero = word indices set big in the display face (titles and kinetic captions are two-font lockups; \"lockup\": false for one font).`, captionStyle: STYLE, ...(opt('fonts', null) && opt('fonts') !== true ? { fonts: opt('fonts') } : {}), flips, glitchAt: opt('no-glitch', false) ? [] : [0.02, ...seams], bursts: [], captionY: 1300 };
 const logo = opt('logo', null); if (logo && logo !== true) caps.logo = logo;
 writeFileSync(OUT, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
 console.log(`${flips.length} captions from ${words.length} words -> ${OUT}  (seams ${JSON.stringify(seams)}, total ${total}s)`);

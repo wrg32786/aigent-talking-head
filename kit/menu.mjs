@@ -40,6 +40,11 @@ const BEAT_SYNC = [
   { id: 'no-beat-sync', flag: '--no-beat-sync  or  "beatSync": false', label: 'leave those times alone' },
   { id: 'beatWindow', flag: '"beatWindow": 0.12', label: 'max snap distance in seconds; speech cuts never move' },
 ];
+const TITLE_LAYER = [
+  { id: 'front', flag: '"layer": "front"  or  "titleLayer": "front"', label: 'the whole title sits in front of the person (default)' },
+  { id: 'behind', flag: '"layer": "behind"  or  "titleLayer": "behind"', label: 'the hero word goes behind the head; partner words stay in front. Slam still lands low and rises.' },
+  { id: 'auto', flag: '"layer": "auto"  or  "titleLayer": "auto"', label: 'only the strongest 1 or 2 punch titles go behind the head, never consecutive ones (hook and payoff when they are not neighbours)' },
+];
 
 function themeLabel(name, src) {
   if (name === 'aigent') return 'AIgent brand guide, cyan accent (default)';
@@ -64,6 +69,7 @@ export function loadMenu() {
   const looks = LOOKS.map(x => ({ kind: 'look', section: 'looks', ...x }));
   const captionStyles = CAPTION_STYLES.map(x => ({ kind: 'captionStyle', section: 'caption-styles', ...x }));
   const beatSync = BEAT_SYNC.map(x => ({ kind: 'beatSync', section: 'beat-sync', ...x }));
+  const titleLayer = TITLE_LAYER.map(x => ({ kind: 'titleLayer', section: 'title-layer', ...x }));
 
   const fontPairings = Object.keys(fonts.pairings || {}).map(id => {
     const p = fonts.pairings[id];
@@ -145,7 +151,8 @@ export function loadMenu() {
     { id: 'caption-styles', title: 'Caption styles', hint: 'Override the look with --style, or "captionStyle" in captions.js.', items: captionStyles },
     { id: 'fonts', title: 'Font pairings', hint: 'Two faces as a lockup. Your own licensed fonts go in kit/fonts/local/.', items: fontPairings },
     { id: 'themes', title: 'Themes', hint: 'Colours, default fonts, optional logo.', items: themeItems },
-    { id: 'title-entrances', title: 'Title entrances', hint: 'One kinetic title per beat, behind the head. Flicker only on the hook and the payoff.', items: titleEntrances },
+    { id: 'title-entrances', title: 'Title entrances', hint: 'One kinetic title per beat. Flicker only on the hook and the payoff. Default layer is in front of the person.', items: titleEntrances },
+    { id: 'title-layer', title: 'Title layer', hint: 'Front, behind the head, or auto, per title or for the job. Offer this per title. Agents and --preset auto use auto unless the preset says otherwise.', items: titleLayer },
     { id: 'transitions', title: 'Transitions', hint: 'Named cuts in cut.json. The glitch seam is the default.', items: transitions },
     { id: 'effects', title: 'Effects', hint: 'Optional second pass (npm run fx). 51 starter effects, grouped by moment.', items: effects, moments, effectsByMoment },
     { id: 'sfx', title: 'SFX pack', hint: '31 CC0 sounds, auto-picked on npm run fx. Locked cut set is whoosh, swipe, boom, click, typing.', items: sfx },
@@ -184,6 +191,7 @@ export function sourceCatalogIds() {
     look: LOOKS.map(x => x.id),
     captionStyle: CAPTION_STYLES.map(x => x.id),
     beatSync: BEAT_SYNC.map(x => x.id),
+    titleLayer: TITLE_LAYER.map(x => x.id),
     preset: Preset.shipped().map(p => p.name),
   };
 }

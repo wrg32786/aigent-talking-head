@@ -21,6 +21,7 @@ import { coverage, showcaseHas, sourceCatalogIds } from './menu.mjs';
 const SFXPLAN = createRequire(import.meta.url)('./sfx-plan.cjs');
 const B = createRequire(import.meta.url)('./beats.cjs');
 const P = createRequire(import.meta.url)('./preset.cjs');
+const R = createRequire(import.meta.url)('./rules.cjs');
 
 const KIT = dirname(fileURLToPath(import.meta.url));
 const keep = process.argv.includes('--keep'), whisper = process.argv.includes('--whisper');
@@ -145,7 +146,7 @@ try {
     return t => ({ titles: ink(join(dir, 'stills-titles', `t${t.toFixed(2)}.png`)), front: ink(join(dir, 'stills-front', `t${t.toFixed(2)}.png`)) });
   };
   step('titles: slam lands behind the head, rises high, partner line in front', () => {
-    const at = layered(join(work, 'slam'), { captionStyle: 'kinetic', flips: [{ start: 0, end: 2.4, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam', flicker: false }] }, [0.15, 1.4]);
+    const at = layered(join(work, 'slam'), { captionStyle: 'kinetic', flips: [{ start: 0, end: 2.4, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam', flicker: false, layer: 'behind' }] }, [0.15, 1.4]);
     const a = at(0.15), b = at(1.4);
     if (!a.titles.n || !b.titles.n) fail('slam title missing on the titles layer');
     if (a.titles.mid < 520) fail('slam should land low, behind the head (centre ' + a.titles.mid + ')');
@@ -154,13 +155,33 @@ try {
     if (a.front.n) fail('partner words should wait for the rise');
     if (!b.front.n) fail('partner words should draw on the front layer (in front of the person)');
     if (b.front.y0 < b.titles.y1 - 10) fail('partner line should hang below the hero: ' + JSON.stringify(b));
-    const still = layered(join(work, 'slam-norise'), { captionStyle: 'kinetic', titleRise: false, flips: [{ start: 0, end: 2.4, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam', flicker: false }] }, [0.4]);
+    const still = layered(join(work, 'slam-norise'), { captionStyle: 'kinetic', titleRise: false, flips: [{ start: 0, end: 2.4, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam', flicker: false, layer: 'behind' }] }, [0.4]);
     const c = still(0.4);
     if (Math.abs(c.titles.mid - b.titles.mid) > 30) fail('titleRise false should land at the resting height: ' + c.titles.mid + ' vs ' + b.titles.mid);
   });
+  step('title layer: default front, explicit behind, auto limits to 1-2 non-consecutive', () => {
+    const layers = ts => R.resolveTitles(ts).map(t => t.layer).join(',');
+    const flips = (n, extra = {}) => [...Array(n).keys()].map(i => ({ start: i, end: i + 0.8, text: 'Title ' + (i + 1), mode: 7, entrance: R.ENTRANCES[i], ...extra }));
+    if (layers({ flips: flips(2) }) !== 'front,front') fail('default layer should be front');
+    if (layers({ flips: [Object.assign(flips(2)[0], { layer: 'behind' }), flips(2)[1]] }) !== 'behind,front') fail('explicit behind should win');
+    const auto4 = layers({ titleLayer: 'auto', flips: flips(4) });
+    if (auto4 !== 'behind,front,front,behind') fail('auto should put hook and payoff behind when they are not neighbours: ' + auto4);
+    const auto2 = R.resolveTitles({ titleLayer: 'auto', flips: flips(2) });
+    const n2 = auto2.filter(t => t.layer === 'behind').length;
+    if (n2 !== 1) fail('auto with two consecutive titles should put only one behind: ' + auto2.map(t => t.layer));
+    if (auto2[0].layer === 'behind' && auto2[1].layer === 'behind') fail('auto behind titles must not be consecutive');
+    const atFront = layered(join(work, 'title-front'), { captionStyle: 'kinetic', flips: [{ start: 0, end: 2.0, text: 'Record one take', mode: 7, hero: [0], entrance: 'pop-zoom', flicker: false }] }, [0.6]);
+    const f = atFront(0.6);
+    if (f.titles.n) fail('default front: hero should not be on the titles layer');
+    if (!f.front.n) fail('default front: title should draw on the front layer');
+    const atBack = layered(join(work, 'title-behind'), { captionStyle: 'kinetic', flips: [{ start: 0, end: 2.0, text: 'Record one take', mode: 7, hero: [0], entrance: 'pop-zoom', flicker: false, layer: 'behind' }] }, [0.6]);
+    const b = atBack(0.6);
+    if (!b.titles.n) fail('explicit behind: hero should be on the titles layer');
+  });
   step('one-word: exactly one word on screen, title included', () => {
+
     const at = layered(join(work, 'one-word-title'), { captionStyle: 'one-word', flips: [
-      { start: 0, end: 0.9, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam', flicker: false },
+      { start: 0, end: 0.9, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam', flicker: false, layer: 'behind' },
       { start: 0, end: 2, text: 'Record one take', mode: 0, words: [[0, 0.6, 'Record'], [0.6, 1.2, 'one'], [1.2, 2, 'take']] }] }, [0.3, 1.5]);
     const a = at(0.3), b = at(1.5);
     if (!a.titles.n) fail('title word missing');
@@ -276,7 +297,7 @@ try {
       '-shortest', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', `clip-00${i + 1}.mp4`], clips));
     const w = txt => txt.split(' ').map((x, i) => [0.1 + i * 0.25, 0.33 + i * 0.25, x]);
     writeFileSync(join(clips, 'clips.json'), JSON.stringify({ src: 'synthetic', clips: lines.map((t, i) => ({ id: `clip-00${i + 1}`, file: `clips/clip-00${i + 1}.mp4`, dur: 1.6, status: 'keep', text: t, words: w(t) })) }));
-    run(node, [join(KIT, 'reel.cjs'), '--clips', clips, '--jobs', join(work, 'jobs'), '--name', 'muse', '--look', 'muse', '--mask', 'mediapipe'], work);
+    run(node, [join(KIT, 'reel.cjs'), '--clips', clips, '--jobs', join(work, 'jobs'), '--name', 'muse', '--look', 'muse', '--mask', 'mediapipe', '--title-layer', 'behind'], work);
     const b = join(work, 'jobs', 'muse', 'build');
     const cut = JSON.parse(readFileSync(join(b, 'cut.json'), 'utf8'));
     if (cut.punch !== 0.1 || !cut.segs[1].bigPunch || !cut.segs[3].bigPunch || cut.segs[2].bigPunch) fail('punch plan: ' + JSON.stringify(cut.segs.map(s => s.bigPunch || 0)));

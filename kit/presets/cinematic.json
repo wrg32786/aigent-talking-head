@@ -23,5 +23,6 @@
   ],
   "bed": "cinematic-build",
   "punch": true,
-  "notes": "A film look with teal shadows and warm skin, varied across scenes. Suggest cinematic-build as the bed and let the human pick by ear."
+  "notes": "A film look with teal shadows and warm skin, varied across scenes. Suggest cinematic-build as the bed and let the human pick by ear.",
+  "titleLayer": "auto"
 }
