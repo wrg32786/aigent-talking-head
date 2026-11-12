@@ -41,7 +41,7 @@ Ask what to change, and edit `teardown/<name>/Reel.md`: their preset and colours
 npm run reel -- --recipe teardown/<name>/Reel.md --clip inbox/<their-clip>.mp4 --draft
 ```
 
-Their own words stay; the recipe's title entrances and layers apply in order (`--recipe-titles` uses the reference's title text instead, only if the user wants that and the text is theirs to use). Review, offer the menu again, `npm run reel -- --rebuild --name <job>`, then `npm run verify -- <job>` must print `VERIFY PASS`.
+Their own words stay; the recipe's title entrances and layers apply in order (`--recipe-titles` uses the reference's title text instead, only if the user wants that and the text is theirs to use; a title they do not say is dropped). Review, offer the menu again, `npm run reel -- --rebuild --name <job>`, then `npm run verify -- <job>` must print `VERIFY PASS`.
 
 ## Rules
 

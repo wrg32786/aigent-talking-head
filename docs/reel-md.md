@@ -165,7 +165,9 @@ With no `icon`, `src` or captured `source` the graphic is drawn as a neutral pla
 - Brand kit, music and style apply like a preset.
 - Shot lines apply in order to the segments drafted from your clip: shot 1 to segment 1, and so on. Extra shots are ignored; extra segments keep the defaults.
 - Caption position and colour apply to your captions; graphics apply at their times (those past the end of your clip are dropped).
-- Titles apply their entrance and layer, in order, to the titles drafted from your words. Add `--recipe-titles` to use the recipe's title text and times instead.
+- Titles apply their entrance and layer, in order, to the titles drafted from your words. Add `--recipe-titles` to use the recipe's title text and times instead; a recipe title is kept only if you say its words around its time, otherwise it is dropped.
+- On-screen words come from what you say, never from the reference (`kit/spoken.cjs`). Ordinal stickers show the ordinals you say ("second" gives a SECOND sticker as you say it), styled like the recipe's stickers in turn; recipe stickers with no ordinal said are dropped. App labels stay only if you name the app, and move to when you say it. A last check drops any title, sticker or label whose text you do not say in its window, and the log lists what was dropped and why. Screen cards keep the recipe's times (your file, a confirmed source, or a placeholder).
+- App labels stay up at least 1.2 s, and the name's reveal always finishes, so the full name shows.
 - When every shot names a `src`, `npm run reelmd -- compile` writes a complete `cut.json` you can drop into `jobs/<name>/build/` and render with `--rebuild`.
 
 ## Precedence

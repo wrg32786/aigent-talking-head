@@ -33,5 +33,5 @@ If they have the reference video itself, use the talking-head-teardown skill ins
 ## Rules
 
 - Flags beat the recipe; the recipe beats its preset; after a draft, `build/cut.json` and `build/captions.js` are the source of truth.
-- Title text in a recipe is a pattern. By default the remake keeps the user's own words and applies the recipe's entrance and layer in order. `--recipe-titles` uses the recipe's text and times.
+- Title text in a recipe is a pattern. By default the remake keeps the user's own words and applies the recipe's entrance and layer in order. `--recipe-titles` uses the recipe's text and times, only where the user says that text. Ordinal stickers and app labels likewise show only words the user says (the ordinal they speak, an app they name); the reference's words never appear.
 - No em dashes in any copy you write into a recipe.

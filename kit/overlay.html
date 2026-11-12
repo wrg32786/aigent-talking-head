@@ -415,7 +415,7 @@ function appLabel(c,t){const o=c[4],dt=t-c[0],a=gxa(c),S=o.size||210,x=(o.x??.08
   else{const col=o.tile||CY,g=ctx.createLinearGradient(-S/2,-S/2,S/2,S/2);g.addColorStop(0,shade(col,.12));g.addColorStop(1,shade(col,-.38));ctx.fillStyle=g;ctx.fill();ctx.shadowColor='transparent';appGlyph(S,c[2])}
   ctx.restore()}
  const txt=String(c[2]||''),ld=dt-.14;if(!txt||ld<0)return;let fs=o.labelSize||100;ctx.font=LABELF(fs);while(ctx.measureText(txt).width>1080-x-50&&fs>44){fs-=4;ctx.font=LABELF(fs)}
- const w=ctx.measureText(txt).width,q=expo(cl(ld/.32)),ly=y+S+fs*.72;ctx.save();ctx.beginPath();ctx.rect(x-40,ly-fs,(w+80)*q,fs*2);ctx.clip();ctx.font=LABELF(fs);ctx.textAlign='left';ctx.textBaseline='middle';ctx.lineJoin='round';
+ const w=ctx.measureText(txt).width,q=expo(cl(ld/Math.min(.32,Math.max(.1,(c[1]-c[0]-.14)*.35)))),ly=y+S+fs*.72;ctx.save();ctx.beginPath();ctx.rect(x-40,ly-fs,(w+80)*q,fs*2);ctx.clip();ctx.font=LABELF(fs);ctx.textAlign='left';ctx.textBaseline='middle';ctx.lineJoin='round';
  shadow(ctx,fs*.5);ctx.lineWidth=fs*.24;ctx.strokeStyle=o.outline||'#ffffff';ctx.strokeText(txt,x,ly);ctx.shadowColor='transparent';ctx.fillStyle=o.ink||'#111111';ctx.fillText(txt,x,ly);ctx.restore()}
 // screen card, entrance card-rise: the card rises from below with a small tilt and settles; a video src plays inside
 function placeholderUI(w,h,dt,seed){const q=rng(seed+11);ctx.fillStyle='#15181e';ctx.fillRect(-w/2,-h/2,w,h);ctx.fillStyle='#23272f';ctx.fillRect(-w/2,-h/2,w,44);

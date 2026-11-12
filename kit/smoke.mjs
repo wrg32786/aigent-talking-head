@@ -22,6 +22,7 @@ const SFXPLAN = createRequire(import.meta.url)('./sfx-plan.cjs');
 const B = createRequire(import.meta.url)('./beats.cjs');
 const P = createRequire(import.meta.url)('./preset.cjs');
 const R = createRequire(import.meta.url)('./rules.cjs');
+const SP = createRequire(import.meta.url)('./spoken.cjs');
 
 const KIT = dirname(fileURLToPath(import.meta.url));
 const keep = process.argv.includes('--keep'), whisper = process.argv.includes('--whisper');
@@ -242,6 +243,13 @@ try {
     const lj = JSON.parse(readFileSync(join(work, 'clay-behind', 'layers.json'), 'utf8'));
     if (lj.captions !== 'behind') fail('layers.json: ' + JSON.stringify(lj));
     if (R.captionLayer({ captionPosition: 'top' }) !== 'behind' || R.captionLayer({}) !== 'front' || R.captionLayer({ captionPosition: 'top', captionLayer: 'front' }) !== 'front') fail('rules captionLayer');
+  });
+  step('app label: the full name shows even when the label is up briefly', () => {
+    const one = (name, end, t) => { const d = join(work, name); mkdirSync(d, { recursive: true });
+      writeFileSync(join(d, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'one-word', fonts: 'theme', flips: [{ start: 0, end, mode: 10, text: 'OmniRoute', x: 0.12, size: 286 }] }) + ';\n');
+      run(node, [join(KIT, 'render.mjs'), '0', t.toFixed(2)], d, { THEME: 'aigent', FONTS: 'theme', STILLS_LAYERS: '1' }); return ink(join(d, 'stills-front', `t${t.toFixed(2)}.png`)); };
+    const brief = one('label-brief', 0.55, 0.5), full = one('label-full', 3, 1.5);
+    if (!(brief.n > 0.95 * full.n)) fail(`a brief label is cut off: ${brief.n} vs ${full.n} pixels`);
   });
   step('graphics: ordinal sticker behind the head, app label with your icon, screen card from your video, placeholders', () => {
     const g = join(work, 'gfx'); mkdirSync(g, { recursive: true });
@@ -510,11 +518,26 @@ try {
     const ts = caps.flips.filter(f => f.mode === 7).sort((x, y) => x.start - y.start);
     if (ts[0].entrance !== 'blur-rise' || ts[0].layer !== 'behind' || ts[1].entrance !== 'slide-left' || ts[1].layer !== 'front') fail('title pattern: ' + JSON.stringify(ts.map(t => [t.entrance, t.layer])));
     const ents = ts.map(t => t.entrance).filter(Boolean); if (new Set(ents).size !== ents.length) fail('an entrance repeats: ' + ents);
-    run(node, [join(KIT, 'reel.cjs'), '--clips', join(work, 'clips-muse'), '--jobs', join(work, 'jobs'), '--name', 'recipe-flags', '--recipe', recipe, '--title-layer', 'front', '--bed', 'yeehaw', '--no-mask', '--draft', '--recipe-titles'], work);
+    // the reference's words never reach your clip: a recipe title, ordinal sticker or app label shows only if you say it
+    const r2 = join(work, 'spoken.Reel.md');
+    writeFileSync(r2, readFileSync(recipe, 'utf8').replace('#03 24.3-26.5', '#04 1.6-3.0 | entrance pop-zoom | layer front | text Record one take\n#03 24.3-26.5')
+      + '\n## Graphics\n\n```reel-graphics\n#01 0.5-1.2 | type ordinal-sticker | text FIRST | layer behind\n#02 0.6-1.0 | type app-label | text Dropbox\n#03 3.4-3.8 | type app-label | text Inbox\n```\n');
+    run(node, [join(KIT, 'reel.cjs'), '--clips', join(work, 'clips-muse'), '--jobs', join(work, 'jobs'), '--name', 'recipe-flags', '--recipe', r2, '--title-layer', 'front', '--bed', 'yeehaw', '--no-mask', '--draft', '--recipe-titles'], work);
     const c2 = JSON.parse(readFileSync(join(work, 'jobs', 'recipe-flags', 'build', 'cut.json'), 'utf8'));
     if (c2.titleLayer !== 'front' || c2.bed !== 'yeehaw') fail('flags should win over the recipe: ' + JSON.stringify({ tl: c2.titleLayer, bed: c2.bed }));
     const t2 = R.readCaptions(join(work, 'jobs', 'recipe-flags', 'build', 'captions.js')).flips.filter(f => f.mode === 7).map(f => f.text).join(' / ');
-    if (t2 !== 'Ten years ago') fail('--recipe-titles should use the recipe text inside the reel length: ' + t2);
+    if (t2 !== 'Record one take') fail('--recipe-titles should keep only recipe text you say there (Record one take): ' + t2);
+    const fb = JSON.parse(readFileSync(join(work, 'jobs', 'recipe-flags', 'build', 'cut.json'), 'utf8')), bdir = join(work, 'jobs', 'recipe-flags', 'build');
+    const said = SP.timeline(fb.segs, bdir), fl = R.readCaptions(join(bdir, 'captions.js')).flips;
+    const shown = fl.filter(f => [7, 9, 10].includes(f.mode) && f.text);
+    const bad = shown.filter(f => !SP.said(f.text, said, f.start, f.end));
+    if (bad.length) fail('on-screen text you never say: ' + bad.map(f => `${f.text}@${f.start}`).join(', '));
+    if (shown.some(f => f.mode === 9)) fail('ordinal sticker kept though no ordinal is said');
+    const lab = shown.filter(f => f.mode === 10).map(f => f.text).join(' ');
+    if (lab !== 'Inbox') fail('app labels should be only the one you name (Inbox): ' + lab);
+    // an ordinal you say becomes the sticker, with your word, when you say it
+    const fg = SP.fitGraphics([{ start: 2.5, end: 3.25, mode: 9, text: 'FIRST', layer: 'behind' }], [{ start: 2.97, end: 3.29, word: 'second,' }], 10).gfx;
+    if (fg.length !== 1 || fg[0].text !== 'SECOND' || Math.abs(fg[0].start - 2.82) > 0.01) fail('ordinal from your words: ' + JSON.stringify(fg));
   });
   step('teardown (built-in fallback) on a synthetic 3-shot reel: shots, mono shot, titles, Reel.md', () => {
     const td = join(work, 'td'); mkdirSync(td);

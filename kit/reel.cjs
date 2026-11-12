@@ -19,7 +19,8 @@
 //          --title-layer front|behind|auto  job default for whether titles sit in front or behind the head (default front)
 //          --recipe Reel.md  make it from a Reel.md recipe (docs/reel-md.md): brand kit, music, style, per-shot finishes and
 //            punches, title entrances and layers in order. Flags win over the recipe; the recipe wins over the preset it names.
-//            --recipe-titles also uses the recipe's title text and times instead of titles drafted from your words.
+//            --recipe-titles also uses the recipe's title text and times instead of titles drafted from your words, only
+//            where you say that text (kit/spoken.cjs); recipe stickers and labels show only words you say.
 //            --capture-sources captures the recipe's confirmed screen-card sources (public pages) first, see kit/capture.mjs.
 //          --clip <file>  the video to use (same as passing the path; reads well with --recipe)
 //            A recipe's graphics (ordinal stickers, app labels, screen cards) land at the recipe's times; icon and src
@@ -40,6 +41,7 @@ const R = require('./rules.cjs');
 const B = require('./beats.cjs');
 const P = require('./preset.cjs');
 const RM = require('./reelmd.cjs');
+const S = require('./spoken.cjs');
 
 const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
@@ -190,8 +192,11 @@ if (!flag('rebuild')) {
     const rt = RM.titleFlips(recipe);
     if (flag('recipe-titles')) {
       const len = segs.reduce((a, s) => a + (s.out - s.in), 0);
-      caps.flips = (caps.flips || []).filter(f => f.mode !== 7).concat(rt.filter(f => f.start < len).map(f => ({ ...f, end: Math.min(f.end, len) })));
-      console.log(`recipe titles: ${rt.length} from the recipe (text and times)`);
+      // the recipe's words only where you say them: a title whose text is not in what you say around its time is dropped
+      const said = S.timeline(segs, build), ok = rt.filter(f => f.start < len && S.said(f.text, said, f.start, f.end));
+      caps.flips = (caps.flips || []).filter(f => f.mode !== 7).concat(ok.map(f => ({ ...f, end: Math.min(f.end, len) })));
+      for (const f of rt.filter(f => !ok.includes(f))) console.log(`recipe title dropped: "${f.text}" at ${f.start}s is not in what you say there`);
+      console.log(`recipe titles: ${ok.length} of ${rt.length} from the recipe (text and times; only text you say)`);
     } else {
       const mine = (caps.flips || []).filter(f => f.mode === 7).sort((a, b) => a.start - b.start), used = new Set();
       const set = new Set();
@@ -250,16 +255,27 @@ if (!flag('rebuild')) {
         if (hw && hw.head_top) { caps.headTop = Math.round(hw.head_top * 1920); console.log(`captions behind the head: your head reaches ${(hw.head_top * 100).toFixed(0)}% down; one-word captions sit on top of it`); }
       }
       if (gfx.length) {
-        const len = segs.reduce((a, sg) => a + (sg.out - sg.in), 0), fit = gfx.filter(g => g.start < len - 0.3).map(g => ({ ...g, end: +Math.min(g.end, len).toFixed(3) }));
+        // the recipe's words never show on your clip: ordinal stickers show the ordinal you say when you say it, app
+        // labels stay only if you name the app (kit/spoken.cjs); screen cards keep the recipe's times
+        const len = segs.reduce((a, sg) => a + (sg.out - sg.in), 0), sp = S.fitGraphics(gfx, S.timeline(segs, build), len);
+        for (const d of sp.dropped) console.log('recipe graphic dropped: ' + d.why);
+        const fit = sp.gfx.filter(g => g.start < len - 0.3).map(g => ({ ...g, end: +Math.min(g.end, len).toFixed(3) }));
         caps.flips = (caps.flips || []).filter(f => !(f.mode >= 9 && f.mode <= 11)).concat(fit);
         // a sticker behind the head needs the title layer and the person mask, even with no titles
         if (fit.some(g => g.layer === 'behind') && !cut.titles) Object.assign(cut, flag('no-mask') ? { titles: 'ovlt/%04d.png' } : { titles: 'ovlt/%04d.png', mask: 'mask.mkv', ...(opt('mask') ? { maskModel: opt('mask') } : {}) });
         fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
+        for (const g of fit.filter(g => g.spoken)) console.log(`recipe graphic: ${g.mode === 9 ? 'ordinal sticker' : 'app label'} "${g.text}" at ${g.start}s (you say "${g.spoken}")`);
         console.log(`recipe graphics: ${fit.length} of ${gfx.length} fit your ${len.toFixed(1)} s (${fit.filter(g => g.icon || g.src).length} with your files, the rest drawn as placeholders)`);
       }
       if (pos || col || Object.keys(look).length) console.log(`captions: ${pos || 'default band'}${col ? ', ' + String(col).toLowerCase() : ''}${Object.entries(look).map(([k, v]) => `, ${k.replace('caption', '').toLowerCase()} ${v}`).join('')}`);
       fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
     }
+  }
+  // last check on a recipe job: every title, ordinal sticker and app label shows only words you say around its time
+  if (recipe) {
+    const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), au = S.audit(caps.flips, S.timeline(segs, build));
+    if (au.dropped.length) { caps.flips = au.flips; fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); for (const d of au.dropped) console.log('dropped, not said: ' + d.why); }
+    else console.log('on-screen words: every title, sticker and label is something you say');
   }
   // --broll <folder>: cutaways from your own clips. A phrase that isn't a type card or under a title cuts to the next
   // clip in the folder (every third phrase, 0.8 to 2.2 s), the voice running on; see "inserts" in kit/assemble.cjs.
