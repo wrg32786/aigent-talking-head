@@ -78,6 +78,9 @@ const titles = await p.evaluate(() => window.__titles || []);
 const layered = titles.length > 0 || !!(await p.evaluate(() => (window.__layered ? window.__layered() : false)));
 const gfx = await p.evaluate(() => (window.__graphics ? window.__graphics() : []));
 if (gfx.length) { writeFileSync(join(ROOT, 'graphics.json'), JSON.stringify(gfx, null, 1) + '\n'); console.log('graphics', gfx.map(g => `${g.start}s ${['ordinal-sticker', 'app-label', 'screen-card'][g.mode - 9]}${g.layer === 'behind' ? ' behind' : ''} ${g.asset}${g.asset !== 'placeholder' && !g.loaded ? ' (asset failed to load)' : ''}`).join(', ')); }
+// one-word captions: every spoken word gets its own slot, back to back (words.json, checked by npm run smoke)
+const words = await p.evaluate(() => window.__words || []);
+if (words.length) { writeFileSync(join(ROOT, 'words.json'), JSON.stringify(words) + '\n'); const short = Math.min(...words.map(w => w.end - w.start)); console.log(`one-word captions: ${words.length} words, each up ${short.toFixed(2)} s or more`); }
 if (titles.length) console.log('titles', titles.map(t => `${t.start}s ${t.entrance}${t.flicker ? '+flicker' : ''}${t.layer && t.layer !== 'front' ? ' ' + t.layer : ''}`).join(', '));
 // Font lockups (titles and kinetic lines, two faces per phrase): written out so they can be checked without pixels
 const lockups = await p.evaluate(() => (window.__lockups ? window.__lockups() : []));

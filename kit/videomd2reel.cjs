@@ -140,7 +140,28 @@ function placeOf(cs) {
     const lumi = (0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]) / 255, sat = Math.max(...m) ? (Math.max(...m) - Math.min(...m)) / Math.max(...m) : 0;
     color = sat < 0.12 && lumi > 0.82 ? '#ffffff' : sat < 0.12 && lumi < 0.15 ? '#000000' : '#' + m.map(v => v.toString(16).padStart(2, '0')).join('');
   }
-  return { position, color, y: y == null ? null : r2(y) };
+  // letter case of the words: all lower, all caps, or as said
+  const ws = cs.map(c => String(c.text).replace(/[^A-Za-z]/g, '')).filter(w => w.length >= 2);
+  const lo = ws.filter(w => w === w.toLowerCase()).length, up = ws.filter(w => w === w.toUpperCase()).length;
+  const textCase = !ws.length ? null : lo >= 0.6 * ws.length ? 'lower' : up >= 0.6 * ws.length ? 'upper' : 'as-said';
+  return { position, color, y: y == null ? null : r2(y), textCase };
+}
+
+// Outline and shadow of the caption words, from teardown.py's ring measures (caption_look samples) on the cues that
+// are the running captions: a hard dark band right at the letters is an outline (thick when it carries on into the
+// next ring), a milder darkening a soft shadow, else none. Samples on a dark background are skipped.
+function captionLook(samples, cues) {
+  const key = c => `${r2(c.t0)}|${c.text}`, want = cues ? new Set([...cues].map(key)) : null;
+  const vs = (samples || []).filter(m => !want || want.has(key(m))).map(m => {
+    if (m.far < 70) return null;
+    if (m.near < 0.45 * m.far && m.near < 90) return m.mid < 0.55 * m.far ? 'thick' : 'thin';
+    if (m.near < 0.85 * m.far || m.mid < 0.9 * m.far) return 'shadow';
+    return 'none';
+  }).filter(Boolean);
+  if (vs.length < 3) return null;
+  const outl = vs.filter(v => v === 'thin' || v === 'thick');
+  return { outline: outl.length >= 0.5 * vs.length ? (outl.filter(v => v === 'thick').length >= outl.length / 2 ? 'thick' : 'thin') : 'none',
+    shadow: vs.filter(v => v === 'shadow').length >= 0.4 * vs.length ? 'soft' : 'none', n: vs.length };
 }
 
 // One shot's grade -> a finish (or none). Calibrated on the shipped finishes applied to showcase/source/presenter.jpg,
@@ -248,19 +269,32 @@ function mapGraphics(b, extras) {
       const k = g.text ? ORD.indexOf(g.text) : -1;
       const idx = k >= 0 ? k : last + 1;
       last = idx;
+      // the burst is seen whole across (its width, when fully grown) but cut off below by the person, so its centre is
+      // one radius down from its top edge; size is the radius in pixels on a 1080-wide frame. head and head-y carry it
+      // relative to the head (width in head widths, centre below the head centre in head widths) so the remake can
+      // frame your head the same way.
+      const wid = g.width || (g.bbox && g.bbox[2]), cy = g.bbox && wid ? g.bbox[1] + wid * 1080 / 1920 / 2 : null;
       Object.assign(o, { text: g.text || ORD[idx] || 'NEXT', guess: !g.text || k < 0, cue: g.cue, layer: g.layer || 'front', color: g.color,
         x: g.bbox && g.bbox[2] > 0.5 ? r2(cl(g.bbox[0] + g.bbox[2] / 2, 0.2, 0.8)) : 0.5,
-        // the burst is seen whole across (its width) but cut off below by the person, so its centre is one radius
-        // down from its top edge; size is the radius in pixels on a 1080-wide frame
-        y: g.bbox ? r2(cl(g.bbox[1] + g.bbox[2] * 1080 / 1920 / 2, 0.18, 0.45)) : 0.27,
-        ...(g.bbox ? { size: Math.round(cl(g.bbox[2] * 1080 / 2, 180, 460)) } : {}) });
+        y: cy != null ? r2(cl(cy, 0.18, 0.5)) : 0.3,
+        ...(wid ? { size: Math.round(cl(wid * 1080 / 2, 180, 560)) } : {}),
+        ...(g.head_ratio && g.face_w && g.head_cy && cy != null ? { head: r2(g.head_ratio), headY: r2((cy - g.head_cy) * 1920 / (g.face_w * 1080)), faceW: g.face_w } : {}) });
     } else if (g.type === 'app-label') {
       Object.assign(o, { text: clean(g.text), cue: g.cue, tile: g.tile, x: g.bbox ? r2(cl(g.bbox[0], 0.02, 0.7)) : 0.08, y: g.bbox ? r2(cl(g.bbox[1], 0.05, 0.85)) : 0.5,
         ...(g.bbox ? { size: Math.round(cl(g.bbox[2] * 1080, 120, 320)) } : {}) });
     } else if (g.type === 'screen-card') {
-      Object.assign(o, { border: g.border, uiText: g.ui_text, y: g.bbox ? r2(cl(g.bbox[1] + g.bbox[3] / 2, 0.3, 0.8)) : 0.68, w: g.bbox ? r2(cl(g.bbox[2] + 0.04, 0.4, 0.92)) : 0.66 });
+      // what was shown (OCR inside the card) and any web address read in it: a suggested source to confirm
+      const shown = (g.shown || []).map(clean).filter(Boolean);
+      const url = (g.urls || [])[0];
+      Object.assign(o, { border: g.border, uiText: g.ui_text, y: g.bbox ? r2(cl(g.bbox[1] + g.bbox[3] / 2, 0.3, 0.8)) : 0.68, w: g.bbox ? r2(cl(g.bbox[2] + 0.04, 0.4, 0.92)) : 0.66,
+        shown, subject: shown[0] ? shown[0].slice(0, 60) : null, ...(url ? { sourceGuess: /^https?:/i.test(url) ? url : 'https://' + url } : {}) });
     } else continue;
     out.push(o);
+  }
+  // the tool named nearest before each screen card (an app label in the 12 s before it, or during it): what to look for
+  for (const c of out.filter(x => x.type === 'screen-card')) {
+    const near = out.filter(x => x.type === 'app-label' && x.start <= c.end && x.start >= c.start - 12).sort((a, z) => z.start - a.start)[0];
+    if (near) c.named = near.text;
   }
   return out;
 }
@@ -280,6 +314,9 @@ function convert(b, extras = {}, opts = {}) {
   titles.forEach((t, i) => { t.n = i + 1; });
   const dropped = [...(picked.dropped || []), ...picked.filter(t => owned(t)).map(t => ({ t: t.start, text: t.text, why: `part of the ${owned(t).type} at ${owned(t).start}s` }))];
   const cs = captionStyle(b);
+  const owc = oneWordStream(b);
+  const cl2 = captionLook((extras.caption_look || {}).samples, owc ? owc.cues : null);
+  if (cl2) Object.assign(cs, { outline: cl2.outline, shadow: cl2.shadow, lookN: cl2.n });
   const look = cs.style === 'one-word' ? 'one-word' : cs.style === 'pill' ? 'muse' : 'kinetic';
   const shots = (b.shots || []).map((s, i) => {
     const m = { ...((s.aspects && s.aspects.grade && s.aspects.grade.measured) || {}), ...(extras.shots && extras.shots[i] ? extras.shots[i] : {}) };
@@ -322,7 +359,7 @@ function convert(b, extras = {}, opts = {}) {
     `\`npm run reel -- --recipe ${opts.recipePath || 'teardown/' + name + '/Reel.md'} --clip inbox/your-clip.mp4\``, '',
     '## Brand kit', '- preset: aigent', '- theme: aigent', `- colors: ${colours.join(', ') || 'none'}`, '- fonts: theme', '- logo: none', '',
     '## Music', `- bed: ${hasMusic && bed ? bed.name : 'none'}`, `- bpm: ${bpm ? Math.round(bpm) : ''}`, `- beat-sync: ${hasMusic ? 'on' : 'off'}`, '',
-    '## Style', `- look: ${look}`, `- captions: ${cs.style}`, ...(cs.position ? [`- caption-position: ${cs.position}`] : []), ...(cs.color ? [`- caption-color: ${cs.color}`] : []), `- titles: ${titles.length ? 'on' : 'off'}`, `- title-layer: ${layerDefault}`,
+    '## Style', `- look: ${look}`, `- captions: ${cs.style}`, ...(cs.position ? [`- caption-position: ${cs.position}`] : []), ...(cs.color ? [`- caption-color: ${cs.color}`] : []), ...(cs.outline ? [`- caption-outline: ${cs.outline}`] : []), ...(cs.shadow ? [`- caption-shadow: ${cs.shadow}`] : []), ...(cs.textCase && cs.style === 'one-word' ? [`- caption-case: ${cs.textCase}`] : []), `- titles: ${titles.length ? 'on' : 'off'}`, `- title-layer: ${layerDefault}`,
     `- finish: ${jobFinish ? jobFinish.split(',').join(', ') : 'none'}`, `- transition: ${shots.some(s => /dissolve|fade|cross/.test(s.transitionIn || '')) ? 'crossfade' : 'glitch'}`,
     `- punch: ${zoomShots || jumpCuts || avgShot < 3 ? 'on' : 'off'}`, '- effects: none', '',
     '## Shots', '', '```videomd-timeline'];
@@ -346,13 +383,16 @@ function convert(b, extras = {}, opts = {}) {
     L.push('```', '');
   }
   if (graphics.length) {
-    L.push('## Graphics', '', 'Detected graphics, drawn as neutral placeholders in the remake. Add `icon <file>` to an app label or `src <file>` (an image or a screen recording) to a screen card to use your own; paths are relative to this file.', '', '```reel-graphics');
+    L.push('## Graphics', '', 'Detected graphics, drawn as neutral placeholders in the remake. Add `icon <file>` to an app label, and `source <url or file>` to a screen card: a public page (a repo, a site, a tool) is captured to a screenshot and a short scrolling recording with `npm run capture -- --recipe <this file>` once you confirm the URLs, or a file of your own (an image or a screen recording). `subject~` is what the reference showed in that card, `source~` a web address read in it. Paths are relative to this file.', '', '```reel-graphics');
     graphics.forEach((g, i) => {
       const f = [`#${pad2(i + 1)} ${g.start}-${g.end}`, `type ${g.type}`];
       if (g.text) f.push(`${g.guess ? 'text~' : 'text'} ${g.text}`);
       if (g.layer) f.push(`layer ${g.layer}`);
       for (const k of ['color', 'tile', 'border']) if (hexOK(g[k])) f.push(`${k} ${g[k].toLowerCase()}`);
       for (const k of ['x', 'y', 'w', 'size']) if (g[k] != null) f.push(`${k} ${g[k]}`);
+      if (g.head != null) f.push(`head ${g.head}`, `head-y ${g.headY}`);
+      if (g.subject) f.push(`subject~ ${g.subject}`);
+      if (g.sourceGuess) f.push(`source~ ${g.sourceGuess}`);
       L.push(f.join(' | '));
     });
     L.push('```', '');
@@ -372,6 +412,7 @@ function convert(b, extras = {}, opts = {}) {
     `| Length, shots | ${dur}s, ${shots.length} shots (avg ${avgShot.toFixed(1)}s) | scene cuts${jumpCuts ? `, ${jumpCuts} jump cuts` : ''} |`,
     `| Captions | ${cs.style} (look ${look}) | ${cs.why} |`,
     `| Caption place | ${cs.position || 'unknown'}${cs.color ? ', ' + cs.color : ''} | median centre of the caption boxes${cs.y != null ? ' (' + Math.round(cs.y * 100) + '% down)' : ''} and their median fill, snapped to white or black when close |`,
+    `| Caption look | outline ${cs.outline || 'not measured'}, shadow ${cs.shadow || 'not measured'}${cs.textCase ? ', ' + cs.textCase + ' case' : ''} | ${cs.lookN ? `the ring of picture just outside the letters on ${cs.lookN} caption words: a hard dark band is an outline, a milder darkening a shadow` : 'not measured (extras did not run)'}; case from the words read |`,
     `| Titles | ${titles.length} | big on-screen text that is not a running caption or a graphic's word, one at a time, up to 7${dropped.length ? `; ${dropped.length} left out (listed below)` : ''} |`,
     `| Graphics | ${graphics.length ? ['ordinal-sticker', 'app-label', 'screen-card'].map(k => `${graphics.filter(g => g.type === k).length} ${k}`).join(', ') : 'none found'} | ${extras.graphics ? 'frames every 0.25 s: spiky yellow shape + ordinal word, square tile + label, dark rectangle + small UI text' : 'not measured (extras did not run)'} |`,
     `| Title layer | ${titles.length ? titles.map(t => t.layer || '?').join(', ') : 'n/a'} | ${extras.mask ? 'text colour over the person vs over the background (MediaPipe mask)' : 'not estimated (no person mask available); front is the default'} |`,
@@ -392,8 +433,15 @@ function convert(b, extras = {}, opts = {}) {
   }
   if (graphics.length) {
     R.push('## Graphics', '', '| # | Time | Type | Text | Detail |', '|---|---|---|---|---|');
-    graphics.forEach((g, i) => R.push(`| ${i + 1} | ${g.start}-${g.end}s | ${g.type} | ${g.text ? g.text + (g.guess ? ' (guessed from its place in the list)' : '') : ''} | ${g.type === 'ordinal-sticker' ? `burst ${g.color || '?'}, ${g.layer}` : g.type === 'app-label' ? `tile ${g.tile || '?'}` : `border ${g.border || 'none found'}, ${g.uiText} UI text cues inside`} |`));
-    R.push('', 'Icons and screenshots are not copied. The remake draws a generic glyph or placeholder window until you add your own `icon` or `src`.', '');
+    graphics.forEach((g, i) => R.push(`| ${i + 1} | ${g.start}-${g.end}s | ${g.type} | ${g.text ? g.text + (g.guess ? ' (guessed from its place in the list)' : '') : ''} | ${g.type === 'ordinal-sticker' ? `burst ${g.color || '?'}, ${g.layer}${g.head ? `, ${g.head} head widths wide` : g.size ? `, radius ${g.size} px` : ''}` : g.type === 'app-label' ? `tile ${g.tile || '?'}` : `border ${g.border || 'none found'}, ${g.uiText} UI text cues inside`} |`));
+    R.push('', 'Icons and screenshots are not copied. The remake draws a generic glyph or placeholder window until you add your own `icon`, or a `source` for a card.', '');
+    const cards = graphics.filter(g => g.type === 'screen-card');
+    if (cards.length) {
+      R.push('## Screen cards: what was shown', '', 'Propose a public page for each card (the repo or site of the tool named, or the address read in it), confirm the list with the user, then add `source <url>` and run `npm run capture -- --recipe <Reel.md>`. Only public pages are captured.', '',
+        '| Time | Shown (read in the card) | Address read | Tool named before it |', '|---|---|---|---|');
+      cards.forEach(c => R.push(`| ${c.start}-${c.end}s | ${(c.shown || []).slice(0, 2).map(x => x.slice(0, 50)).join(' / ') || 'nothing legible'} | ${c.sourceGuess || 'none'} | ${c.named || 'none'} |`));
+      R.push('');
+    }
   }
   R.push('## Shots', '', '| # | Time | Finish | Why |', '|---|---|---|---|');
   shots.forEach(s => R.push(`| ${s.n} | ${s.start}-${s.end}s | ${s.finish || 'none'} | ${s.finishWhy} |`));
@@ -406,7 +454,7 @@ function convert(b, extras = {}, opts = {}) {
   return { md, report: R.join('\n'), titles, shots, captionStyle: cs.style, captionPosition: cs.position, captionColor: cs.color, graphics, dropped, jobFinish, bpm, bed };
 }
 
-module.exports = { convert, pickTitles, mapGraphics, gradeChoice, placeOf, captionStyle, oneWordStream, finishOf, suggestBed, loadBreakdown, ENTRANCE_MAP };
+module.exports = { convert, pickTitles, mapGraphics, captionLook, gradeChoice, placeOf, captionStyle, oneWordStream, finishOf, suggestBed, loadBreakdown, ENTRANCE_MAP };
 
 if (require.main === module) {
   const argv = process.argv.slice(2);

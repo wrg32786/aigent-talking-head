@@ -20,10 +20,12 @@
 //          --recipe Reel.md  make it from a Reel.md recipe (docs/reel-md.md): brand kit, music, style, per-shot finishes and
 //            punches, title entrances and layers in order. Flags win over the recipe; the recipe wins over the preset it names.
 //            --recipe-titles also uses the recipe's title text and times instead of titles drafted from your words.
+//            --capture-sources captures the recipe's confirmed screen-card sources (public pages) first, see kit/capture.mjs.
 //          --clip <file>  the video to use (same as passing the path; reads well with --recipe)
 //            A recipe's graphics (ordinal stickers, app labels, screen cards) land at the recipe's times; icon and src
 //            paths are relative to the recipe, and anything left out is drawn as a neutral placeholder.
 //          --caption-position top|middle|bottom  --caption-color #rrggbb  where the captions sit and their colour
+//          --caption-outline none|thin|thick  --caption-shadow none|soft  --caption-case upper|lower|as-said  the one-word look
 // Writes jobs/<name>/: clips/ (clip.py output), build/ (cut.json, captions.js, theme.js, overlay frames), reel-vN.mp4.
 // Steps: clip.py (Whisper, best take per sentence, retakes flagged) -> cut.json from every "keep" clip (zoom punch on
 // every cut, big punch after the hook and into the payoff, a few sounds on the key cuts only) -> autocaption ->
@@ -42,7 +44,7 @@ const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['caption-position', 'caption-color', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer']);
+const VALUED = new Set(['caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const die = m => { console.error(m); process.exit(1); };
@@ -212,11 +214,27 @@ if (!flag('rebuild')) {
     const pos = opt('caption-position') || (preset && preset.captionPosition), col = opt('caption-color') || (preset && preset.captionColor);
     if (pos && !RM.CAPTION_POSITIONS.includes(String(pos))) die('--caption-position must be ' + RM.CAPTION_POSITIONS.join(', '));
     if (col && !/^#[0-9a-f]{6}$/i.test(String(col))) die('--caption-color must be a #rrggbb colour');
+    const look = {};
+    for (const [k, [key, vals]] of Object.entries(RM.CAPTION_LOOK)) { const v = opt(k) || (preset && preset[key]); if (v == null) continue; if (!vals.includes(String(v))) die(`--${k} must be ${vals.join(', ')}`); look[key] = String(v); }
+    // --capture-sources: capture the recipe's confirmed screen-card sources (public pages) first (kit/capture.mjs)
+    if (recipe && flag('capture-sources')) { try { sh(process.execPath, [path.join(KIT, 'capture.mjs'), '--recipe', recipe.file], ROOT); } catch { console.warn('note: some sources were not captured (listed above); their cards use the placeholder'); } }
     const gfx = recipe ? RM.graphicFlips(recipe) : [];
-    if (pos || col || gfx.length) {
+    for (const g of gfx) if (g.source && !g.src) console.log(`note: screen card at ${g.start}s: source ${g.source} not captured yet; placeholder drawn (npm run capture -- --recipe ${recipe.file}, or --capture-sources, once the user confirms the URL)`);
+    // a burst sized to the head (head, head-y): measure your clip's head with the person mask and set size and y
+    if (gfx.some(g => g.head)) {
+      const fxPy = path.join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+      let hw = null;
+      if (fs.existsSync(fxPy) && segs.length) try { hw = JSON.parse(execFileSync(fxPy, [path.join(KIT, 'teardown.py'), 'headwidth', path.resolve(build, segs[0].file)], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim().split('\n').pop()); } catch {}
+      if (hw && hw.head_w) {
+        for (const g of gfx.filter(g => g.head)) { g.size = Math.round(Math.min(720, Math.max(200, g.head * hw.head_w * 1080 / 2))); g.y = +Math.min(0.6, Math.max(0.15, hw.head_cy + (g.headY || 0) * hw.head_w * 1080 / 1920)).toFixed(3); }
+        console.log(`burst sized to your head: head ${(hw.head_w * 100).toFixed(0)}% of the frame wide, centre ${(hw.head_cy * 100).toFixed(0)}% down`);
+      } else console.log('note: no person mask to measure your head (npm run effects:setup); bursts keep the recipe size');
+    }
+    if (pos || col || gfx.length || Object.keys(look).length) {
       const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF);
       if (pos) caps.captionPosition = String(pos);
       if (col) caps.captionColor = String(col).toLowerCase();
+      Object.assign(caps, look);
       if (gfx.length) {
         const len = segs.reduce((a, sg) => a + (sg.out - sg.in), 0), fit = gfx.filter(g => g.start < len - 0.3).map(g => ({ ...g, end: +Math.min(g.end, len).toFixed(3) }));
         caps.flips = (caps.flips || []).filter(f => !(f.mode >= 9 && f.mode <= 11)).concat(fit);
@@ -225,7 +243,7 @@ if (!flag('rebuild')) {
         fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
         console.log(`recipe graphics: ${fit.length} of ${gfx.length} fit your ${len.toFixed(1)} s (${fit.filter(g => g.icon || g.src).length} with your files, the rest drawn as placeholders)`);
       }
-      if (pos || col) console.log(`captions: ${pos || 'default band'}${col ? ', ' + String(col).toLowerCase() : ''}`);
+      if (pos || col || Object.keys(look).length) console.log(`captions: ${pos || 'default band'}${col ? ', ' + String(col).toLowerCase() : ''}${Object.entries(look).map(([k, v]) => `, ${k.replace('caption', '').toLowerCase()} ${v}`).join('')}`);
       fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
     }
   }

@@ -42,3 +42,6 @@ kit/presets/local/
 /teardown/
 # single posts fetched by npm run teardown -- --url (optional instaloader helper)
 /teardown-in/
+
+# screen-card sources captured by npm run capture (public pages, cached per URL)
+/assets/

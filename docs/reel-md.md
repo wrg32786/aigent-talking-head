@@ -101,6 +101,9 @@ Every section is optional except the card. Anything left out falls back to the p
 | captions | `kinetic`, `oneword`, `pill`, `hormozi`, `karaoke`, `classic`, `one-word` | `--style` |
 | caption-position | `top`, `middle`, `bottom` | `--caption-position`, the captions' band |
 | caption-color | `#rrggbb` | `--caption-color`, the caption word colour (the one-word word, classic and pill text, the hormozi highlight) |
+| caption-outline | `none`, `thin`, `thick` (default thick) | `--caption-outline`, the one-word caption's outline |
+| caption-shadow | `none`, `soft` (default soft) | `--caption-shadow`, the one-word caption's shadow |
+| caption-case | `upper`, `lower`, `as-said` (default upper) | `--caption-case`, the one-word caption's letter case |
 | titles | `on` or `off` | `--no-titles` |
 | title-layer | `front`, `behind`, `auto` | `--title-layer` |
 | finish | finish names, comma list, or `none` (on the whole reel) | `--finish` |
@@ -146,8 +149,11 @@ Every section is optional except the card. Anything left out falls back to the p
 | icon, tile | an image for the app tile (relative to the Reel.md), or leave it out for a generic glyph on a `tile` colour | `icon`, `tile` |
 | src, border, in | an image or a video for the screen card (relative to the Reel.md), its border colour, and seconds into the video | `src`, `border`, `in` |
 | x, y, w, size | position (0 to 1), card width (0 to 1), burst radius or tile side in pixels | the same keys |
+| head, head-y | ordinal sticker: burst width in head widths, and its centre below the head centre in head widths. The remake measures your head with the person mask and sets size and y from them | `size`, `y` |
+| source | screen card: a public page (`https://github.com/owner/repo`, a site, a tool's docs) or a file. A page is captured by `npm run capture -- --recipe <Reel.md>` (or `npm run reel -- --capture-sources`) to a screenshot and a short scrolling recording, cached in `assets/web/` (gitignored) | `src` |
+| subject~, source~ | written by a teardown: what the reference showed in that card, and a web address read in it. Guesses, never captured until you write `source` | not used by the render |
 
-With no `icon` or `src` the graphic is drawn as a neutral placeholder (a letter glyph, a fake code window), so a teardown never copies someone else's screenshots or logos. Graphics outside your clip's length are dropped.
+With no `icon`, `src` or captured `source` the graphic is drawn as a neutral placeholder (a letter glyph, a fake code window), so a teardown never copies someone else's screenshots or logos. Graphics outside your clip's length are dropped.
 
 **Script** (fenced `reel-script`, optional): `#NN start-end | say <words>`. Written by teardowns so you can see the reference's timing. Your remake uses your own words.
 

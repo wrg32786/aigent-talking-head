@@ -7,7 +7,7 @@
    "entrance": "burst-pop",
    "label": "list number sticker: an italic serif word (FIRST, SECOND, NEXT) over a spiky starburst; the burst can sit behind your head",
    "fields": { "text": "the word, e.g. FIRST", "color": "starburst colour (default warm yellow)", "ink": "word colour (default white)", "layer": "front or behind (the burst goes behind the person when a mask is set)", "x": "centre x, 0..1 (default 0.5)", "y": "centre y of the burst, 0..1 (default 0.27)",
-        "size": "burst radius in pixels on the 1080-wide frame (default 300)" },
+        "size": "burst radius in pixels on the 1080-wide frame (default 400)", "head": "burst width in head widths (a teardown measures it; the remake measures your head and sets size and y)", "head-y": "burst centre below the head centre, in head widths" },
    "example": { "start": 2.5, "end": 4.5, "mode": 9, "text": "FIRST", "layer": "behind" },
    "detect": "a large pale or saturated yellow region with a spiky outline (low solidity), plus a short ordinal word read on screen at the same time"
   },
@@ -25,7 +25,7 @@
    "mode": 11,
    "entrance": "card-rise",
    "label": "screen card: a rounded dark card with a coloured border, inset in the lower middle, showing your screenshot or screen recording",
-   "fields": { "src": "image or video file (a screen recording plays in the card); leave out for a generic placeholder window", "border": "border colour (default the theme accent)", "in": "seconds into a video src (default 0)", "w": "card width, 0..1 (default 0.66)", "y": "card centre y, 0..1 (default 0.68)" },
+   "fields": { "src": "image or video file (a screen recording plays in the card); leave out for a generic placeholder window", "source": "a public page (a repo, a site, a tool) captured by npm run capture to a screenshot and a short scrolling recording, or a file", "subject": "what the reference showed in the card (written by a teardown as subject~)", "border": "border colour (default the theme accent)", "in": "seconds into a video src (default 0)", "w": "card width, 0..1 (default 0.66)", "y": "card centre y, 0..1 (default 0.68)" },
    "example": { "start": 5, "end": 9, "mode": 11, "border": "#ff7a45" },
    "detect": "a rounded rectangle with a dark inside and a straight outline, wide and in the lower half, with small UI text read inside it"
   }

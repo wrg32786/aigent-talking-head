@@ -423,6 +423,98 @@ def _group(hits, step, near):
     return ev
 
 
+def head_width(mask, centre=False):
+    """Width of the head as a share of the frame width, from a person mask: the mask's median width a little below
+    the top of the head (3 to 8 percent of the frame height down). With centre, also the head's centre y as a share of
+    the frame height (a head is about 1.3 widths tall). None without a person."""
+    import numpy as np
+    if mask is None:
+        return None
+    m = np.asarray(mask).astype(bool)
+    H, W = m.shape[:2]
+    cov = m.sum(axis=1)
+    rows = np.where(cov >= 0.02 * W)[0]
+    if not len(rows):
+        return None
+    top = rows[0]
+    band = cov[top + int(0.03 * H): top + int(0.08 * H)]
+    if not len(band):
+        return None
+    w = float(np.median(band))
+    return (round(w / W, 3), round((top + 0.65 * w) / H, 3)) if centre else round(w / W, 3)
+
+
+def cmd_headwidth(a):
+    """Median head width (share of the frame width) over a few frames of a clip, for sizing a burst to the head."""
+    import numpy as np
+    seg = person_mask_fn()
+    if not seg:
+        print(json.dumps({"head_w": None, "note": "no person mask (npm run effects:setup)"})); return
+    d = probe(a.video).get("duration") or 10
+    ws = []
+    for k in range(5):
+        img = frame_at(a.video, d * (k + 0.5) / 5, 540)
+        if img is not None:
+            w = head_width(seg(img), True)
+            if w:
+                ws.append(w)
+    print(json.dumps({"head_w": round(float(np.median([w[0] for w in ws])), 3) if ws else None,
+                      "head_cy": round(float(np.median([w[1] for w in ws])), 3) if ws else None, "frames": len(ws)}))
+
+
+def caption_look(video, cues, n=60):
+    """Outline and shadow of single big words on screen (the caption candidates): for each, the letters (pixels near
+    the text fill), a thin ring just outside them and a far ring of plain background. An outline is a ring much darker
+    than the background and than a soft shadow; a shadow is a milder darkening that fades with distance."""
+    import cv2, numpy as np
+    pick = [c for c in cues if c.get("bbox") and len(str(c.get("text", "")).split()) == 1 and (c.get("line_h") or c["bbox"][3]) >= 0.04 and (c.get("conf") or 1) >= 0.8]
+    pick = pick[:: max(1, len(pick) // n)][:n]
+    out = []
+    for c in pick:
+        img = frame_at(video, (c["t0"] + c.get("t1", c["t0"] + 0.3)) / 2, 720)
+        if img is None:
+            continue
+        H, W = img.shape[:2]
+        x, y, w, h = c["bbox"]
+        px, py = int(max(0, (x - 0.04) * W)), int(max(0, (y - 0.03) * H))
+        crop = img[py:int(min(H, (y + h + 0.03) * H)), px:int(min(W, (x + w + 0.04) * W))]
+        if crop.size == 0:
+            continue
+        L = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY).astype(np.float32)
+        hh = max(8, int(h * H))
+        bright = L >= 215
+        dark = L <= 40
+        text = bright if bright.mean() > 0.04 else dark  # white words (or black ones)
+        if text.mean() < 0.03:
+            continue
+        t8 = text.astype(np.uint8)
+        k = lambda r: cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
+        r1 = max(1, round(hh * 0.05)); r2 = max(r1 + 1, round(hh * 0.12)); r3 = max(r2 + 2, round(hh * 0.3)); r4 = r3 + max(2, round(hh * 0.15))
+        d1, d2, d3, d4 = (cv2.dilate(t8, k(r)).astype(bool) for r in (r1, r2, r3, r4))
+        near, mid, far = d1 & ~text, d2 & ~d1, d4 & ~d3
+        if near.sum() < 20 or far.sum() < 20:
+            continue
+        ln, lm, lf = float(np.median(L[near])), float(np.median(L[mid])), float(np.median(L[far]))
+        out.append({"t0": c["t0"], "text": c["text"], "near": round(ln, 1), "mid": round(lm, 1), "far": round(lf, 1), "h": hh})
+    # a hard dark band right at the letters, much darker than the background: an outline (thick when it carries on
+    # into the mid ring); a milder darkening: a shadow; else none
+    def verdict(m):
+        if m["far"] < 70:
+            return None  # the background is dark already: nothing to read
+        if m["near"] < 0.45 * m["far"] and m["near"] < 90:
+            return "thick" if m["mid"] < 0.55 * m["far"] else "thin"
+        if m["near"] < 0.85 * m["far"] or m["mid"] < 0.9 * m["far"]:
+            return "shadow"
+        return "none"
+    vs = [v for v in (verdict(m) for m in out) if v]
+    res = {"samples": out, "n": len(vs)}
+    if vs:
+        outl = [v for v in vs if v in ("thin", "thick")]
+        res["outline"] = (max(set(outl), key=outl.count) if len(outl) >= 0.5 * len(vs) else "none")
+        res["shadow"] = "soft" if sum(v == "shadow" for v in vs) >= 0.4 * len(vs) else "none"
+    return res
+
+
 def detect_graphics(video, cues, seg=None, step=0.25):
     """Ordinal stickers, app labels and screen cards, from frames every `step` s plus the OCR cues for their words."""
     import cv2, numpy as np
@@ -440,6 +532,10 @@ def detect_graphics(video, cues, seg=None, step=0.25):
         mask = seg(img) if seg else None
         b = _bursts(img, hsv, mask)
         if b:
+            # the head beside it, so the burst's size can be carried relative to the head (it frames the head)
+            hw = head_width(mask, True)
+            if hw:
+                b["face_w"], b["head_cy"] = hw
             bursts.append((t, b))
         cs = _cards(img, hsv, g)
         for c in cs:
@@ -458,8 +554,16 @@ def detect_graphics(video, cues, seg=None, step=0.25):
         words = [x for x in words if x[0]]
         bb = [round(float(np.median([d["bbox"][k] for d in e["d"]])), 3) for k in range(4)]
         layers = [d["layer"] for d in e["d"] if d["layer"]]
+        # size from the fully grown burst (the widest third of the samples), and relative to the face width
+        ws = sorted(d["bbox"][2] for d in e["d"])
+        full_w = round(float(np.median(ws[-max(1, len(ws) // 3):])), 3)
+        fw = [d["face_w"] for d in e["d"] if d.get("face_w")]
+        face_w = round(float(np.median(fw)), 3) if fw else None
+        hc = [d["head_cy"] for d in e["d"] if d.get("head_cy")]
+        head_cy = round(float(np.median(hc)), 3) if hc else None
         out.append({"type": "ordinal-sticker", "start": a, "end": round(z, 2), "text": words[0][0] if words else None, "cue": words[0][1]["text"] if words else None,
-                    "bbox": bb, "color": e["d"][len(e["d"]) // 2]["color"], "layer": max(set(layers), key=layers.count) if layers else None, "samples": len(e["d"])})
+                    "bbox": bb, "width": full_w, "face_w": face_w, "head_cy": head_cy, "head_ratio": round(full_w / face_w, 2) if face_w else None,
+                    "color": e["d"][len(e["d"]) // 2]["color"], "layer": max(set(layers), key=layers.count) if layers else None, "samples": len(e["d"])})
     # screen cards: a dark rectangle for 1 s or more with small UI text read inside it
     for e in _group(cards, step, lambda a, b: close(a, b, 0.12)):
         if e["t1"] - e["t0"] < step:
@@ -470,7 +574,31 @@ def detect_graphics(video, cues, seg=None, step=0.25):
         if len(ui) < 2:
             continue
         borders = [d["border"] for d in e["d"] if d["border"]]
-        out.append({"type": "screen-card", "start": a, "end": round(z, 2), "bbox": bb, "border": max(set(borders), key=borders.count) if borders else None, "ui_text": len(ui), "samples": len(e["d"])})
+        # what was shown: the text read inside the card, top lines first, and any web address in it
+        inside = sorted([c for c in cues if at(c, a, z) and c.get("bbox") and _inside(c["bbox"], bb, 0.02)], key=lambda c: (c.get("t0", 0), c["bbox"][1]))
+        shown, seen = [], set()
+        for c in inside:
+            txt = re.sub(r"\s+", " ", str(c["text"])).strip()
+            if len(txt) >= 3 and txt.lower() not in seen:
+                seen.add(txt.lower()); shown.append(txt)
+        urls = []
+        for c in inside:
+            txt = str(c["text"])
+            # a repo (github, gitlab, hugging face; raw.githubusercontent.com points at one), a full http(s) address,
+            # or a plain site name (www.x.com, x.dev); file names and code are not addresses
+            found = [f"github.com/{m.group(1)}/{m.group(2)}" for m in re.finditer(r"raw\.githubusercontent\.com/+([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)", txt, re.I)]
+            found += [m.group(0) for m in re.finditer(r"(?:github\.com|gitlab\.com|huggingface\.co)/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", txt, re.I)]
+            found += [m.group(0) for m in re.finditer(r"https?://[A-Za-z0-9.-]+\.[a-z]{2,}(?:/[^\s|,]*)?", txt, re.I) if "githubusercontent" not in m.group(0)]
+            found += [m.group(0) for m in re.finditer(r"(?<![/\w.])(?:www\.)?[a-z][a-z0-9-]{2,}\.(?:com|io|dev|ai|so|org|net)(?![\w.])", txt, re.I) if m.group(0).lower() not in ("github.com", "gitlab.com")]
+            for u in found:
+                u = u.rstrip(".,)")
+                # placeholders and private session links are not sources
+                if re.search(r"example\.(com|org|net)|localhost|session|[A-Za-z0-9_]{20,}", u, re.I):
+                    continue
+                if u.lower() not in [x.lower() for x in urls]:
+                    urls.append(u)
+        out.append({"type": "screen-card", "start": a, "end": round(z, 2), "bbox": bb, "border": max(set(borders), key=borders.count) if borders else None, "ui_text": len(ui), "samples": len(e["d"]),
+                    "shown": shown[:6], "urls": urls[:4]})
     # app labels: a square tile with a short label read just under or beside it
     for e in _group(tiles, step, lambda a, b: close(a, b, 0.1)):
         a, z = e["t0"], e["t1"] + step
@@ -534,6 +662,10 @@ def cmd_extras(a):
         print(f"note: graphics detection failed: {e}")
         out["graphics"] = []
     gx = out["graphics"]
+    try:
+        out["caption_look"] = caption_look(a.video, cues)
+    except Exception as e:
+        print(f"note: caption outline check failed: {e}")
     json.dump(out, open(a.out, "w"), indent=1)
     sys.stdout.flush()
     print(f"graphics: {sum(g['type'] == 'ordinal-sticker' for g in gx)} ordinal stickers, {sum(g['type'] == 'app-label' for g in gx)} app labels, {sum(g['type'] == 'screen-card' for g in gx)} screen cards")
@@ -574,8 +706,9 @@ def main():
     p.add_argument("--no-ocr", action="store_true"); p.add_argument("--no-asr", action="store_true"); p.add_argument("--model", default="base.en")
     p = sub.add_parser("extras"); p.add_argument("video"); p.add_argument("--breakdown", required=True); p.add_argument("--titles")
     p.add_argument("--out", required=True); p.add_argument("--sheet")
+    p = sub.add_parser("headwidth"); p.add_argument("video")
     a = ap.parse_args()
-    {"analyze": cmd_analyze, "extras": cmd_extras}[a.cmd](a)
+    {"analyze": cmd_analyze, "extras": cmd_extras, "headwidth": cmd_headwidth}[a.cmd](a)
     sys.stdout.flush()
     os._exit(0)  # skip interpreter teardown: MediaPipe's dispatcher can raise there after the work is done
 

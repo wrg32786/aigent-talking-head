@@ -179,17 +179,39 @@ try {
     const b = atBack(0.6);
     if (!b.titles.n) fail('explicit behind: hero should be on the titles layer');
   });
-  step('one-word: exactly one word on screen, title included', () => {
-
+  step('one-word: the title is its word, every other spoken word still shows, back to back', () => {
     const at = layered(join(work, 'one-word-title'), { captionStyle: 'one-word', flips: [
       { start: 0, end: 0.9, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam', flicker: false, layer: 'behind' },
-      { start: 0, end: 2, text: 'Record one take', mode: 0, words: [[0, 0.6, 'Record'], [0.6, 1.2, 'one'], [1.2, 2, 'take']] }] }, [0.3, 1.5]);
-    const a = at(0.3), b = at(1.5);
+      { start: 0, end: 2, text: 'Record one take', mode: 0, words: [[0, 0.6, 'Record'], [0.6, 1.2, 'one'], [1.2, 2, 'take']] }] }, [0.3, 0.75, 1.5]);
+    const a = at(0.3), b = at(1.5), m = at(0.75);
     if (!a.titles.n) fail('title word missing');
-    if (a.front.n) fail('one-word: caption or partner words drawn while the title is up');
+    if (a.front.n) fail('one-word: the spoken word the title shows should not be drawn twice');
+    if (!m.front.n) fail('one-word: a spoken word under a title that is not its word must still show');
     if (a.titles.y1 - a.titles.y0 > 330) fail('one-word title should be a single word, ink height ' + (a.titles.y1 - a.titles.y0));
     if (b.titles.n || !b.front.n) fail('one-word: after the title the caption word should be the only word');
     if (b.front.y1 - b.front.y0 > 330) fail('one-word caption should be one line, ink height ' + (b.front.y1 - b.front.y0));
+  });
+  step('one-word: every transcript word gets a slot (same-start words, short words), no gaps between words', () => {
+    const dir = join(work, 'every-word'); mkdirSync(dir, { recursive: true });
+    const words = [[0, 0.21, 'Every'], [0, 0.5, 'effect'], [0.47, 0.52, 'in'], [0.52, 0.6, 'this'], [0.6, 1.1, 'reel'], [3.2, 3.6, 'lands']];
+    writeFileSync(join(dir, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'one-word', flips: [{ start: 0, end: 1.1, text: 'Every effect in this reel', mode: 0, words: words.slice(0, 5) }, { start: 3.2, end: 3.6, text: 'lands', mode: 0, words: words.slice(5) }] }) + ';\n');
+    run(node, [join(KIT, 'render.mjs'), '0', '0.05'], dir, { THEME: 'aigent', FONTS: 'theme' });
+    const ws = JSON.parse(readFileSync(join(dir, 'words.json'), 'utf8'));
+    if (ws.map(w => w.word).join(' ') !== words.map(w => w[2]).join(' ')) fail('every word should get a slot: ' + ws.map(w => w.word).join(' '));
+    if (ws.some(w => w.end - w.start < 0.119)) fail('each word should be up at least 0.12 s: ' + JSON.stringify(ws));
+    for (let i = 1; i < 5; i++) if (Math.abs(ws[i].start - ws[i - 1].end) > 0.001) fail('words should run back to back: ' + JSON.stringify(ws));
+    if (!(ws[4].end < 3.2)) fail('a long pause (over 1.5 s) should clear the screen: ' + JSON.stringify(ws[4]));
+  });
+  step('one-word look: outline none, thin, thick; shadow; lower case', () => {
+    const doc = extra => ({ captionStyle: 'one-word', fonts: 'theme', captionPosition: 'top', ...extra, flips: [{ start: 0, end: 2, text: 'Record one', mode: 0, words: [[0, 1, 'Record'], [1, 2, 'one']] }] });
+    const still = (name, d) => { const dir = join(work, name); mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(d) + ';\n');
+      run(node, [join(KIT, 'render.mjs'), '0', '0.50'], dir, { THEME: 'aigent', FONTS: 'theme' }); return readFileSync(join(dir, 'stills', 't0.50.png')); };
+    const thick = still('look-thick', doc({})), none = still('look-none', doc({ captionOutline: 'none', captionShadow: 'none' })), thin = still('look-thin', doc({ captionOutline: 'thin' })), lower = still('look-lower', doc({ captionOutline: 'none', captionShadow: 'none', captionCase: 'lower' }));
+    if (!Buffer.compare(thick, none) || !Buffer.compare(thick, thin) || !Buffer.compare(none, lower)) fail('outline, thin outline and case should each change the word');
+    // no outline and no shadow: the word is only its fill, so there are no dark pixels round it
+    const dark = png => { const raw = execFileSync('ffmpeg', ['-v', 'error', '-i', png, '-vf', 'format=rgba', '-f', 'rawvideo', '-'], { maxBuffer: 1 << 27 }); let n = 0; for (let i = 0; i < raw.length; i += 4) if (raw[i + 3] > 128 && raw[i] + raw[i + 1] + raw[i + 2] < 150) n++; return n; };
+    if (dark(join(work, 'look-none', 'stills', 't0.50.png')) > 50) fail('outline none should draw no dark edge');
+    if (dark(join(work, 'look-thick', 'stills', 't0.50.png')) < 500) fail('the default outline should draw a dark edge');
   });
   step('caption position and colour: top vs bottom band, colour changes the word', () => {
     const doc = extra => ({ captionStyle: 'one-word', fonts: 'theme', ...extra, flips: [{ start: 0, end: 2, text: 'Record one take', mode: 0, words: [[0, 1, 'Record'], [1, 2, 'one']] }] });
@@ -223,6 +245,20 @@ try {
     const kinds = rep.map(x => `${x.mode}:${x.asset}:${x.loaded}`).join(' ');
     if (kinds !== '9:placeholder:true 10:image:true 11:video:true 10:placeholder:true 11:placeholder:true') fail('graphics report: ' + kinds);
     if (!readdirSync(join(g, 'gfx')).length) fail('screen card video frames not extracted');
+    // a screen card's source: a captured public page from the cache (assets/web), or a file next to the recipe
+    const RM = createRequire(import.meta.url)('./reelmd.cjs'), SRC = createRequire(import.meta.url)('./sources.cjs');
+    process.env.ATH_ASSETS = join(work, 'assets-web');
+    const page = 'https://github.com/example-owner/example-repo';
+    mkdirSync(SRC.dirOf(page), { recursive: true }); copyFileSync(join(g, 'icon.png'), join(SRC.dirOf(page), 'shot.png'));
+    const md = '---\nvideomd: 0.1\n---\n# t\n\n## Graphics\n\n```reel-graphics\n#01 1-3 | type screen-card | source ' + page + '\n#02 3-5 | type screen-card | source screen.mp4\n#03 5-7 | type screen-card | source https://github.com/not/captured\n#04 7-9 | type screen-card | source~ https://github.com/a/guess\n```\n';
+    const rr = RM.parse(md, join(g, 'cards.Reel.md')), fl = RM.graphicFlips(rr), vv = RM.validate(rr);
+    if (fl[0].src !== join(SRC.dirOf(page), 'shot.png') || fl[1].src !== join(g, 'screen.mp4') || fl[2].src || fl[2].source !== 'https://github.com/not/captured' || fl[3].src || fl[3].source) fail('card sources: ' + JSON.stringify(fl));
+    if (!vv.warn.some(w => /not captured yet/.test(w))) fail('an uncaptured source should be flagged: ' + JSON.stringify(vv));
+    delete process.env.ATH_ASSETS;
+    // capture refuses anything that is not a public page (no network needed for these)
+    for (const u of ['http://localhost:9/', 'http://192.168.1.10/', 'http://10.0.0.1/x', 'file:///etc/hosts']) {
+      try { run(node, [join(KIT, 'capture.mjs'), u], work); fail('capture accepted ' + u); } catch (e) { if (!/only public pages|only http/.test(String(e.stderr || ''))) throw e; }
+    }
     const GX = JSON.parse(readFileSync(join(KIT, 'graphics.json'), 'utf8')).graphics;
     if (GX.map(x => x.mode).join(',') !== '9,10,11' || GX.some(x => !x.entrance || !x.detect)) fail('kit/graphics.json: modes, entrance and detect rule for each graphic');
   });
@@ -255,6 +291,18 @@ try {
     const s = gm.map(x => `${x.type}:${x.text || ''}${x.guess ? '~' : ''}`).join(' ');
     if (s !== 'ordinal-sticker:FIRST ordinal-sticker:SECOND~ app-label:My App screen-card:') fail('mapped graphics: ' + s);
     if (!(gm[0].size > 300 && gm[0].y > 0.3 && gm[3].y > 0.6)) fail('graphic geometry: ' + JSON.stringify(gm.map(x => [x.x, x.y, x.size, x.w])));
+    // burst size relative to the head; what a card showed, the address read in it and the tool named before it
+    const gh = V.mapGraphics(b, { graphics: [
+      { type: 'ordinal-sticker', start: 0.5, end: 1.5, text: 'FIRST', layer: 'behind', bbox: [0.15, 0.2, 0.7, 0.2], width: 0.7, face_w: 0.25, head_cy: 0.32, head_ratio: 2.8 },
+      { type: 'app-label', start: 4, end: 5, text: 'Caveman', tile: '#000000', bbox: [0.1, 0.5, 0.2, 0.11] },
+      { type: 'screen-card', start: 5, end: 9, border: '#d87b5b', ui_text: 6, bbox: [0.17, 0.55, 0.66, 0.3], shown: ['Caveman', 'why use many token'], urls: ['github.com/JuliusBrussee/caveman'] }] });
+    if (gh[0].head !== 2.8 || !(gh[0].headY > 0.3 && gh[0].headY < 0.9)) fail('burst relative to the head: ' + JSON.stringify(gh[0]));
+    const card = gh.find(g => g.type === 'screen-card');
+    if (card.subject !== 'Caveman' || card.sourceGuess !== 'https://github.com/JuliusBrussee/caveman' || card.named !== 'Caveman') fail('card source suggestion: ' + JSON.stringify(card));
+    // caption look from the ring measures: plain letters (ring = background) vs a dark outline
+    const plain = [0, 1, 2, 3].map(i => ({ t0: i, text: 'w' + i, near: 120, mid: 119, far: 118 })), outl = [0, 1, 2, 3].map(i => ({ t0: i, text: 'w' + i, near: 20, mid: 30, far: 120 }));
+    const lk = (x) => V.captionLook(x, null);
+    if (lk(plain).outline !== 'none' || lk(plain).shadow !== 'none' || lk(outl).outline !== 'thick') fail('caption look: ' + JSON.stringify([lk(plain), lk(outl)]));
   });
   step('render overlay frames (2 s)', () => {
  run(node, [join(KIT, 'render.mjs'), '2'], build); const n = readdirSync(join(build, 'ovl')).length; if (n !== 48) fail('frames ' + n); });
