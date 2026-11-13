@@ -22,7 +22,7 @@ const GRAPHICS = Object.fromEntries(JSON.parse(fs.readFileSync(path.join(__dirna
 const CAPTION_POSITIONS = ['top', 'middle', 'bottom'];
 const SRC = require('./sources.cjs');
 // the one-word caption's look: Reel.md key -> captions.js key and its values
-const CAPTION_LOOK = { 'caption-outline': ['captionOutline', ['none', 'thin', 'thick']], 'caption-shadow': ['captionShadow', ['none', 'soft']], 'caption-case': ['captionCase', ['upper', 'lower', 'as-said']], 'caption-layer': ['captionLayer', ['front', 'behind', 'auto']] };
+const CAPTION_LOOK = { 'caption-outline': ['captionOutline', ['none', 'thin', 'thick']], 'caption-shadow': ['captionShadow', ['none', 'soft']], 'caption-case': ['captionCase', ['upper', 'lower', 'as-said']], 'caption-layer': ['captionLayer', ['front', 'behind', 'auto']], 'panel-layer': ['panelLayer', ['front', 'behind', 'auto']] };
 const ENTRANCES = ['stagger-rise', 'slam', 'blur-rise', 'slide-left', 'elastic', 'flip', 'pop-zoom'];
 const LAYERS = ['front', 'behind', 'auto'];
 
@@ -152,7 +152,7 @@ function validate(r) {
     const type = g.type || g['type~'];
     if (!GRAPHICS[type]) errs.push(`graphics #${pad2(g.n)}: type must be ${Object.keys(GRAPHICS).join(', ')}`);
     for (const k of ['color', 'border', 'tile', 'ink']) if (g[k] && !/^#[0-9a-f]{6}$/i.test(g[k])) errs.push(`graphics #${pad2(g.n)}: ${k} must be a #rrggbb colour`);
-    if (g.layer && !['front', 'behind'].includes(g.layer)) errs.push(`graphics #${pad2(g.n)}: layer must be front or behind`);
+    if (g.layer && !(type === 'screen-card' ? ['front', 'behind', 'auto'] : ['front', 'behind']).includes(g.layer)) errs.push(`graphics #${pad2(g.n)}: layer must be front or behind${type === 'screen-card' ? ' or auto' : ''}`);
     for (const k of ['icon', 'src']) if (g[k] && !none(g[k]) && !fs.existsSync(path.resolve(path.dirname(r.file || '.'), g[k]))) warn.push(`graphics #${pad2(g.n)}: ${k} ${g[k]} not found next to the recipe; the placeholder is drawn`);
     if (g.source && !none(g.source)) {
       if (SRC.isUrl(g.source)) { const c = SRC.cached(g.source); if (!c.video && !c.image) warn.push(`graphics #${pad2(g.n)}: source ${g.source} not captured yet (npm run capture -- --recipe <this Reel.md>, after the user confirms the URLs); the placeholder is drawn`); }

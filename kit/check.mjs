@@ -42,6 +42,7 @@ function checkJob(captionsFile, cutFile, label) {
     if (!R.TITLE_LAYERS.includes(String(v).toLowerCase())) errs.push(`${where}: unknown title layer "${v}" (front, behind, auto)`);
   };
   layerOk(CAP.titleLayer, 'titleLayer');
+  if (CAP.panelLayer != null && !R.PANEL_LAYERS.includes(CAP.panelLayer)) errs.push(`panelLayer "${CAP.panelLayer}" (front, behind, auto)`);
   for (const t of raw) layerOk(t.layer, `title ${t.start}s`);
   // font lockups: "hero" must name words that are in the phrase; "lockup" must use a known arrangement
   const ARR = ['stack', 'overlap', 'inline'];
@@ -62,6 +63,7 @@ function checkJob(captionsFile, cutFile, label) {
     const file = f.mode === 10 ? f.icon : f.mode === 11 ? f.src : null;
     if (file && !existsSync(resolve(dirname(captionsFile), file))) errs.push(`graphic ${f.start}s: no file at ${file}`);
     if (f.mode === 9 && f.layer && !['front', 'behind'].includes(f.layer)) errs.push(`graphic ${f.start}s: layer "${f.layer}" (front, behind)`);
+    if (f.mode === 11 && f.layer && !R.PANEL_LAYERS.includes(f.layer)) errs.push(`screen card ${f.start}s: layer "${f.layer}" (front, behind, auto)`);
   }
   if (CAP.captionStyle && !['kinetic', 'oneword', 'classic', 'pill', 'hormozi', 'karaoke', 'one-word'].includes(CAP.captionStyle)) errs.push(`captionStyle "${CAP.captionStyle}" (kinetic, oneword, classic, pill, hormozi, karaoke, one-word)`);
   if (cutFile && existsSync(cutFile)) {

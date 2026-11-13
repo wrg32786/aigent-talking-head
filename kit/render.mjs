@@ -80,7 +80,6 @@ const gfx = await p.evaluate(() => (window.__graphics ? window.__graphics() : []
 if (gfx.length) { writeFileSync(join(ROOT, 'graphics.json'), JSON.stringify(gfx, null, 1) + '\n'); console.log('graphics', gfx.map(g => `${g.start}s ${['ordinal-sticker', 'app-label', 'screen-card'][g.mode - 9]}${g.layer === 'behind' ? ' behind' : ''} ${g.asset}${g.asset !== 'placeholder' && !g.loaded ? ' (asset failed to load)' : ''}`).join(', ')); }
 // one-word captions: every spoken word gets its own slot, back to back (words.json, checked by npm run smoke)
 const capLayer = await p.evaluate(() => window.__captionLayer || 'front');
-writeFileSync(join(ROOT, 'layers.json'), JSON.stringify({ captions: capLayer }) + '\n');
 if (capLayer === 'behind') console.log('captions: behind the person (on the title layer, under the mask)');
 const words = await p.evaluate(() => window.__words || []);
 if (words.length) { writeFileSync(join(ROOT, 'words.json'), JSON.stringify(words) + '\n'); const short = Math.min(...words.map(w => w.end - w.start)); console.log(`one-word captions: ${words.length} words, each up ${short.toFixed(2)} s or more`); }
@@ -96,10 +95,15 @@ const mix = await p.evaluate(() => (window.__pairMix ? window.__pairMix() : []))
 if (mix.length) console.log('pairing mix at', mix.map(m => m.join('/')).join(', '));
 if (lockups.length) console.log('lockups', lockups.filter(l => l.kind === 'title').length, 'titles +', lockups.filter(l => l.kind === 'kinetic').length, 'lines,', [...new Set(lockups.map(l => l.arrange))].join('/'));
 const split = !!(only && process.env.STILLS_LAYERS);
+// screen cards behind the head get a third layer, ovlp/ (assemble.cjs: picture, panels, then the head over them)
+const panels = !!(await p.evaluate(() => (window.__panels ? window.__panels() : false)));
+writeFileSync(join(ROOT, 'layers.json'), JSON.stringify({ captions: capLayer, panels: panels ? 'behind' : 'front' }) + '\n');
+if (panels) console.log('screen cards: behind the head (panel layer, under the head mask)');
 const passes = split
-  ? (layered ? [['stills-front', 'front'], ['stills-titles', 'titles']] : [['stills-front', 'all']])
-  : only ? [['stills', 'all']] : layered ? [['ovl', 'front'], ['ovlt', 'titles']] : [['ovl', 'all']];
+  ? (layered ? [['stills-front', 'front'], ['stills-titles', 'titles'], ...(panels ? [['stills-panels', 'panels']] : [])] : [['stills-front', 'all']])
+  : only ? [['stills', 'all']] : layered ? [['ovl', 'front'], ['ovlt', 'titles'], ...(panels ? [['ovlp', 'panels']] : [])] : [['ovl', 'all']];
 if (!only && !layered) rmSync(join(ROOT, 'ovlt'), { recursive: true, force: true });
+if (!only && !panels) rmSync(join(ROOT, 'ovlp'), { recursive: true, force: true });
 const list = only || [...Array(Math.round(DUR * FPS)).keys()].map(f => f / FPS);
 let i = 0;
 for (const [d, layer] of passes) {

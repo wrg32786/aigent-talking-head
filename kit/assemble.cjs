@@ -16,6 +16,8 @@
 //   "mask": "mask.mkv",                  a person mask is given (kit/mask.py), else in front of the picture
 //   "maskModel": "birefnet",             birefnet (rembg birefnet-general-lite, quality) or mediapipe (fast)
 //   "person": "person.mkv",              optional BGRA person layer from mask.py --person (edge-decontaminated)
+//   "panels": "ovlp/%04d.png",           optional screen cards behind the head (render.mjs writes it), with
+//   "headMask": "maskhead.mkv",          the head mask (kit/headmask.py) drawn over them
 //   "punch": 0.10                        zoom punch: every cut toggles a 10% punch-in (true = 0.10, false/absent = off)
 //   "beatSync": true                     snap punches, SFX, title entrances and fx hits to the bed's beat grid
 //                                        (default on when a bed is set; --no-beat-sync / false to leave times alone)
@@ -139,6 +141,14 @@ if (BASEONLY) {
 // kinetic titles sit between the picture and the person: picture -> titles -> person cut out by the mask -> captions
 const ovlOff = (process.env.OVL_OFF || '').split(',').filter(Boolean).map(w => w.split('-').map(Number)).filter(([a, b]) => b > a);
 const offEn = ovlOff.length ? `:enable='not(${ovlOff.map(([a, b]) => `between(t,${a},${b})`).join('+')})'` : '';
+// screen cards and b-roll panels behind the head (ovlp/, the panel layer in kit/overlay.html): the panels go over the
+// picture and the titles, then the presenter's head (the person mask down to the neck, kit/headmask.py) over the
+// panels, so where the head reaches into a panel the panel is behind it; the body stays under the panel
+const panelsOn = !!(C.panels && fs.existsSync(path.dirname(path.resolve(C.panels))));
+const headFile = panelsOn && C.headMask && fs.existsSync(C.headMask) ? C.headMask : null;
+if (panelsOn && !headFile) console.warn(`note: no head mask${C.headMask ? ' (' + C.headMask + ' not found)' : ''}; screen cards go in front of the presenter (kit/headmask.py)`);
+let pic = 'g';
+if (headFile) { f.push('[g]split[g0][gh]'); pic = 'g0'; }
 if (C.titles) {
   const t = inp('-framerate', '24', '-i', C.titles);
   const spec = require('./rules.cjs').maskSpec(C);
@@ -146,18 +156,28 @@ if (C.titles) {
   const maskFile = spec.file && fs.existsSync(spec.file) ? spec.file : null;
   if (personFile) {
     const p = inp('-i', personFile);
-    f.push(`[g][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gt]`,
+    f.push(`[${pic}][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gt]`,
       `[${p}:v]format=bgra,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS[pr]`,
       `[gt][pr]overlay=format=auto:eof_action=pass[gm]`);
     vcur = 'gm';
   } else if (maskFile) {
     const m = inp('-i', maskFile);
-    f.push(`[g]split[gb][gp]`, `[gb][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gt]`, `[${m}:v]format=gray,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS[mk]`,
+    f.push(`[${pic}]split[gb][gp]`, `[gb][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gt]`, `[${m}:v]format=gray,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS[mk]`,
       `[gp][mk]alphamerge[person]`, `[gt][person]overlay=format=auto:eof_action=pass[gm]`);
     vcur = 'gm';
   } else {
     if (spec.file || C.mask) console.warn(`note: mask ${spec.file || C.mask} not found; titles go in front of the picture (run kit/mask.py)`);
-    f.push(`[g][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gm]`); vcur = 'gm';
+    f.push(`[${pic}][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gm]`); vcur = 'gm';
+  }
+}
+if (vcur === 'g') vcur = pic;
+if (panelsOn) {
+  const pp = inp('-framerate', '24', '-i', C.panels);
+  f.push(`[${vcur}][${pp}:v]overlay=format=auto:eof_action=pass${offEn}[gpn]`); vcur = 'gpn';
+  if (headFile) {
+    const hm = inp('-i', headFile);
+    f.push(`[${hm}:v]format=gray,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS[hmk]`, `[gh][hmk]alphamerge[head]`, `[${vcur}][head]overlay=format=auto:eof_action=pass[gph]`);
+    vcur = 'gph';
   }
 }
 // b-roll inserts: "inserts": [{"file": "../broll/typing.mov", "at": 12.3, "dur": 1.5, "in": 0, "bw": true}] in cut.json.

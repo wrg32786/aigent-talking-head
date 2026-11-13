@@ -251,6 +251,36 @@ try {
     const brief = one('label-brief', 0.55, 0.5), full = one('label-full', 3, 1.5);
     if (!(brief.n > 0.95 * full.n)) fail(`a brief label is cut off: ${brief.n} vs ${full.n} pixels`);
   });
+  step('screen cards behind the head: panel layer by default, front on request, head over the panel, body under it', () => {
+    const flips = [{ start: 0, end: 1.5, mode: 11, border: '#d87b5b' }];
+    const lay = (name, extra) => { const d = join(work, name); mkdirSync(d, { recursive: true }); writeFileSync(join(d, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'one-word', fonts: 'theme', ...extra }) + ';\n');
+      run(node, [join(KIT, 'render.mjs'), '0', '0.80'], d, { THEME: 'aigent', FONTS: 'theme', STILLS_LAYERS: '1' });
+      const f = n => existsSync(join(d, n, 't0.80.png')) ? ink(join(d, n, 't0.80.png')) : { n: 0 };
+      return { front: f('stills-front'), panels: f('stills-panels'), lj: JSON.parse(readFileSync(join(d, 'layers.json'), 'utf8')) }; };
+    const auto = lay('panel-auto', { flips }), fr = lay('panel-front', { flips: [{ ...flips[0], layer: 'front' }] }), job = lay('panel-job-front', { panelLayer: 'front', flips });
+    if (!auto.panels.n || auto.front.n || auto.lj.panels !== 'behind') fail('auto: the card should be on the panel layer only ' + JSON.stringify(auto));
+    if (!fr.front.n || fr.panels.n || fr.lj.panels !== 'front') fail('layer front: the card should be on the front layer');
+    if (!job.front.n || job.panels.n) fail('panelLayer front for the job should put the card in front');
+    if (R.panelLayer({ mode: 11 }) !== 'behind' || R.panelLayer({ mode: 11, layer: 'front' }) !== 'front' || R.panelLayer({ mode: 11 }, { panelLayer: 'front' }) !== 'front') fail('rules panelLayer');
+    // assemble: picture, panel, then the head over the panel; below the head the panel covers the picture
+    const pt = join(work, 'panel-assemble'); mkdirSync(join(pt, 'ovlp'), { recursive: true });
+    run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=0x2040c0:s=1080x1920:r=24:d=1', '-f', 'lavfi', '-i', 'sine=d=1:sample_rate=48000', '-shortest', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', 'clip.mp4'], pt);
+    run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=0x20c040:s=800x600:r=24:d=1,format=rgba', '-f', 'lavfi', '-i', 'color=c=black@0:s=1080x1920:r=24:d=1,format=rgba', '-filter_complex', '[1][0]overlay=140:800:format=auto,format=rgba', '-start_number', '0', 'ovlp/%04d.png'], pt);
+    run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=black:s=1080x1920:r=24:d=1,drawbox=x=340:y=300:w=400:h=700:color=white:t=fill', '-c:v', 'ffv1', '-pix_fmt', 'gray', 'maskhead.mkv'], pt);
+    writeFileSync(join(pt, 'cut.json'), JSON.stringify({ segs: [{ file: 'clip.mp4', in: 0, out: 1 }], tail: 0, panels: 'ovlp/%04d.png', headMask: 'maskhead.mkv' }));
+    run(node, [join(KIT, 'assemble.cjs'), 'out.mp4'], pt);
+    const px = y => [...execFileSync('ffmpeg', ['-v', 'error', '-ss', '0.5', '-i', join(pt, 'out.mp4'), '-frames:v', '1', '-vf', `crop=2:2:540:${y},format=rgb24`, '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'])].slice(0, 3);
+    const head = px(900), body = px(1200);
+    if (!(head[2] > 120 && head[1] < 110)) fail('the head should be over the panel (picture blue there): ' + head);
+    if (!(body[1] > 150 && body[2] < 110)) fail('below the head the panel should cover the picture (green): ' + body);
+    // the head mask keeps the head and drops the body
+    if (effects) {
+      run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=black:s=1080x1920:r=24:d=0.5,drawbox=x=340:y=400:w=400:h=600:color=white:t=fill,drawbox=x=470:y=1000:w=140:h=120:color=white:t=fill,drawbox=x=140:y=1120:w=800:h=800:color=white:t=fill', '-c:v', 'ffv1', '-pix_fmt', 'gray', 'person.mkv'], pt);
+      run(fxPy, [join(KIT, 'headmask.py'), 'person.mkv', 'hm.mkv'], pt);
+      const g = y => execFileSync('ffmpeg', ['-v', 'error', '-i', join(pt, 'hm.mkv'), '-frames:v', '1', '-vf', `crop=2:2:540:${y}`, '-f', 'rawvideo', '-pix_fmt', 'gray', '-'])[0];
+      if (!(g(700) > 200 && g(1500) < 10)) fail(`head mask: head ${g(700)}, body ${g(1500)}`);
+    }
+  });
   step('graphics: ordinal sticker behind the head, app label with your icon, screen card from your video, placeholders', () => {
     const g = join(work, 'gfx'); mkdirSync(g, { recursive: true });
     run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=0x3366ff:s=128x128', '-frames:v', '1', join(g, 'icon.png')]);
@@ -258,9 +288,9 @@ try {
     const flips = [
       { start: 0, end: 1.5, mode: 9, text: 'FIRST', layer: 'behind' },
       { start: 2, end: 3.5, mode: 10, text: 'My App', icon: join(g, 'icon.png') },
-      { start: 4, end: 5.5, mode: 11, src: join(g, 'screen.mp4'), border: '#d87b5b' },
+      { start: 4, end: 5.5, mode: 11, src: join(g, 'screen.mp4'), border: '#d87b5b', layer: 'front' },
       { start: 6, end: 7.5, mode: 10, text: 'Placeholder' },
-      { start: 6, end: 7.5, mode: 11 }];
+      { start: 6, end: 7.5, mode: 11, layer: 'front' }];
     const at = layered(g, { captionStyle: 'one-word', flips }, [0.8, 2.8, 4.9, 6.9]);
     const o = at(0.8), a = at(2.8), c = at(4.9), p = at(6.9);
     if (!o.titles.n) fail('the ordinal burst should be on the behind-the-head layer');

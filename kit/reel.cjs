@@ -28,6 +28,7 @@
 //          --caption-position top|middle|bottom  --caption-color #rrggbb  where the captions sit and their colour
 //          --caption-outline none|thin|thick  --caption-shadow none|soft  --caption-case upper|lower|as-said  the one-word look
 //          --caption-layer front|behind|auto  captions under the person where they overlap the head (auto = behind at the top)
+//          --panel-layer front|behind|auto  screen cards behind the head where it reaches into them (auto = behind)
 // Writes jobs/<name>/: clips/ (clip.py output), build/ (cut.json, captions.js, theme.js, overlay frames), reel-vN.mp4.
 // Steps: clip.py (Whisper, best take per sentence, retakes flagged) -> cut.json from every "keep" clip (zoom punch on
 // every cut, big punch after the hook and into the payoff, a few sounds on the key cuts only) -> autocaption ->
@@ -47,7 +48,7 @@ const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer']);
+const VALUED = new Set(['caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const die = m => { console.error(m); process.exit(1); };
@@ -261,13 +262,13 @@ if (!flag('rebuild')) {
         for (const d of sp.dropped) console.log('recipe graphic dropped: ' + d.why);
         const fit = sp.gfx.filter(g => g.start < len - 0.3).map(g => ({ ...g, end: +Math.min(g.end, len).toFixed(3) }));
         caps.flips = (caps.flips || []).filter(f => !(f.mode >= 9 && f.mode <= 11)).concat(fit);
-        // a sticker behind the head needs the title layer and the person mask, even with no titles
-        if (fit.some(g => g.layer === 'behind') && !cut.titles) Object.assign(cut, flag('no-mask') ? { titles: 'ovlt/%04d.png' } : { titles: 'ovlt/%04d.png', mask: 'mask.mkv', ...(opt('mask') ? { maskModel: opt('mask') } : {}) });
+        // a sticker behind the head, or a screen card behind the head (the default), needs the person mask, even with no titles
+        if ((fit.some(g => g.mode === 9 && g.layer === 'behind') || R.panelsBehind(caps).length) && !cut.titles) Object.assign(cut, flag('no-mask') ? { titles: 'ovlt/%04d.png' } : { titles: 'ovlt/%04d.png', mask: 'mask.mkv', ...(opt('mask') ? { maskModel: opt('mask') } : {}) });
         fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
         for (const g of fit.filter(g => g.spoken)) console.log(`recipe graphic: ${g.mode === 9 ? 'ordinal sticker' : 'app label'} "${g.text}" at ${g.start}s (you say "${g.spoken}")`);
         console.log(`recipe graphics: ${fit.length} of ${gfx.length} fit your ${len.toFixed(1)} s (${fit.filter(g => g.icon || g.src).length} with your files, the rest drawn as placeholders)`);
       }
-      if (pos || col || Object.keys(look).length) console.log(`captions: ${pos || 'default band'}${col ? ', ' + String(col).toLowerCase() : ''}${Object.entries(look).map(([k, v]) => `, ${k.replace('caption', '').toLowerCase()} ${v}`).join('')}`);
+      if (pos || col || Object.keys(look).length) console.log(`captions: ${pos || 'default band'}${col ? ', ' + String(col).toLowerCase() : ''}${Object.entries(look).map(([k, v]) => `, ${k === 'panelLayer' ? 'screen cards' : k.replace('caption', '').toLowerCase()} ${v}`).join('')}`);
       fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
     }
   }
@@ -347,6 +348,10 @@ const LEN = cut.segs.reduce((a, s) => a + (s.out - s.in) + (s.pad || 0), 0) + (c
 // copy lint and title/sound rules: printed, not blocking (npm run check -- <name> and npm run verify fail on errors)
 try { sh(process.execPath, [path.join(KIT, 'check.mjs'), build, '--warn-only'], build); } catch {}
 sh(process.execPath, [path.join(KIT, 'render.mjs'), LEN.toFixed(2)], build);
+// screen cards behind the head render to ovlp/; assemble.cjs needs to know (with the head mask below, else in front)
+{ let lj = {}; try { lj = JSON.parse(fs.readFileSync(path.join(build, 'layers.json'), 'utf8')); } catch {}
+  const want = lj.panels === 'behind' ? 'ovlp/%04d.png' : undefined;
+  if (cut.panels !== want) { if (want) cut.panels = want; else { delete cut.panels; delete cut.headMask; } fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); } }
 // person mask only for titles that sit behind the head (needs npm run effects:setup)
 if (cut.titles && cut.mask) {
   const capsNow = R.readCaptions(path.join(build, 'captions.js'));
@@ -358,6 +363,9 @@ if (cut.titles && cut.mask) {
     for (const [a, b] of spans) { const l = merged[merged.length - 1]; if (l && a <= l[1] + 1.6) l[1] = Math.max(l[1], b + 1.5); else merged.push([a, b + 1.5]); }
     if (merged.length) { behind.push(...merged.map(([a, b]) => ({ start: a, end: Math.min(b, LEN) }))); console.log(`captions behind the person: mask over ${merged.length} caption span${merged.length > 1 ? 's' : ''}`); }
   }
+  // screen cards behind the head: mask their spans, then cut the head out of the person mask (kit/headmask.py)
+  const panels = R.panelsBehind(capsNow).map(f => ({ start: f.start, end: Math.min(f.end, LEN) }));
+  if (panels.length && cut.panels) { behind.push(...panels); console.log(`screen cards behind the head: mask over ${panels.length} card span${panels.length > 1 ? 's' : ''}`); }
   if (!behind.length) {
     console.log('title layer: all titles and stickers in front; skipping the person mask');
   } else {
@@ -369,6 +377,10 @@ if (cut.titles && cut.mask) {
       const win = behind.map(t => `${Math.max(0, t.start - 0.1).toFixed(2)}-${Math.min(LEN, t.end + 0.1).toFixed(2)}`).join(',');
       const maskArgs = [path.join(KIT, 'mask.py'), 'base.mp4', spec.file || 'mask.mkv', ...(win ? ['--windows', win] : []), ...(spec.model ? ['--model', spec.model] : []), ...(spec.person ? ['--person', spec.person] : [])];
       sh(fxPy, maskArgs, build);
+      if (panels.length && cut.panels) {
+        sh(fxPy, [path.join(KIT, 'headmask.py'), spec.file || 'mask.mkv', 'maskhead.mkv'], build);
+        if (cut.headMask !== 'maskhead.mkv') { cut.headMask = 'maskhead.mkv'; fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); }
+      }
     }
   }
 }

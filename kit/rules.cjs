@@ -130,6 +130,16 @@ function captionLayer(caps) {
   return l === 'behind' || (l === 'auto' && pos === 'top') ? 'behind' : 'front';
 }
 
+// Screen cards and b-roll panels (mode 11): behind the presenter's head (his head goes over the panel where it reaches
+// into it, his body stays under the panel) or in front of everything. Per panel "layer", else the job's panelLayer,
+// default auto, which is behind (no difference from front where the head never reaches the panel).
+const PANEL_LAYERS = ['front', 'behind', 'auto'];
+function panelLayer(f, caps) {
+  const l = PANEL_LAYERS.includes(f && f.layer) ? f.layer : PANEL_LAYERS.includes(caps && caps.panelLayer) ? caps.panelLayer : 'auto';
+  return l === 'front' ? 'front' : 'behind';
+}
+const panelsBehind = caps => ((caps && caps.flips) || []).filter(f => f.mode === 11 && panelLayer(f, caps) === 'behind');
+
 // Person-mask path and backend. cut.json may use "mask": "mask.mkv" or
 // "mask": {"file":"mask.mkv","model":"birefnet","person":"person.mkv"}, plus optional top-level "maskModel" / "person".
 const MASK_MODELS = { birefnet: 'birefnet', 'birefnet-general-lite': 'birefnet', 'birefnet-portrait': 'birefnet-portrait', mediapipe: 'mediapipe' };
@@ -154,4 +164,4 @@ const BEDS = JSON.parse(fs.readFileSync(path.join(KIT, 'music/beds.json'), 'utf8
 const isBed = b => typeof b === 'string' && Object.hasOwn(BEDS, b) && typeof (BEDS[b] || {}).file === 'string';
 const bedFile = b => (isBed(b) ? path.join(KIT, 'music', BEDS[b].file) : b);
 
-module.exports = { BEDS, isBed, bedFile, SFX, CUT_SOUNDS, sfxHits, ENTRANCES, TITLE_ENTER, TITLE_MODE, TITLE_LAYERS, normalizeLayer, PUNCH, TRANSITIONS, xfadeMode, timeline, lintCopy, scriptShape, readCaptions, resolveTitles, maskSpec, MASK_MODELS, captionLayer };
+module.exports = { BEDS, isBed, bedFile, SFX, CUT_SOUNDS, sfxHits, ENTRANCES, TITLE_ENTER, TITLE_MODE, TITLE_LAYERS, normalizeLayer, PUNCH, TRANSITIONS, xfadeMode, timeline, lintCopy, scriptShape, readCaptions, resolveTitles, maskSpec, MASK_MODELS, captionLayer, PANEL_LAYERS, panelLayer, panelsBehind };
