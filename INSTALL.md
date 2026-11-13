@@ -19,7 +19,7 @@ Report the OS and these versions. Install what is missing with the system's pack
 npm install
 ```
 
-This path does not need Git or GitHub access. To update later, download the new zip and unzip it next to the old folder. Move `inbox/`, `jobs/` and any saved presets (normally `kit/presets/local/`) across to the new folder, then repeat the installation and verification steps there.
+This path does not need Git or GitHub access. To update later, download the new zip and unzip it next to the old folder, which stays as your backup. Copy your own files across to the new folder: `inbox/`, `jobs/`, `teardown/` (your teardowns and their Reel.md recipes), saved presets in `kit/presets/local/`, your fonts and pairings in `kit/fonts/local/`, and any theme file you added to `kit/themes/` (copy only your own files; never replace the shipped ones). Then repeat the installation and verification steps there, and open one old job to check it still finds its files.
 
 **From GitHub, for people with repo access:**
 
@@ -33,18 +33,30 @@ If the cloned folder already exists, `git pull` instead, then run `npm install`.
 
 ## 3. Python packages in a venv
 
+macOS and Linux:
+
 ```
 python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt       # Windows: .venv\Scripts\python -m pip install -r requirements.txt
-export PYTHON="$PWD/.venv/bin/python"                     # Windows: set PYTHON=%CD%\.venv\Scripts\python.exe
+.venv/bin/python -m pip install -r requirements.txt
+export PYTHON="$PWD/.venv/bin/python"
 ```
+
+Windows (PowerShell):
+
+```
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+$env:PYTHON = (Resolve-Path .\.venv\Scripts\python.exe).Path
+```
+
+Windows (Command Prompt): the same first two lines, then `set PYTHON=%CD%\.venv\Scripts\python.exe`.
 
 A venv avoids "externally managed environment" errors (PEP 668). Keep `PYTHON` set for every `npm run` command, or tell the user to add it to their shell profile.
 
 Optional, ask first:
 
 - `npm run effects:setup` sets up the effects venv (51 effects, the person mask for titles behind the head). Several hundred MB.
-- `npm run teardown -- <file> --install` installs rea-video for tearing down reference reels (docs/teardown.md). About 216 MB of models on first use.
+- `npm run teardown -- <file> --install` installs rea-video for tearing down reference reels (docs/teardown.md). About 216 MB of models on first use. It needs Git on the machine (pip fetches rea-video from GitHub). Without Git, skip it: `npm run teardown -- <file>` uses the built-in analyzer, which the smoke test covers.
 
 ## 4. Verify
 
