@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Members can install from a downloaded zip without GitHub access: `INSTALL.md` starts with the unzipped folder and installs skills by copying the bundled folders. GitHub clone and skill install commands remain available to people with repo access.
+- `npm run release:zip` builds a versioned zip and SHA256 checksum from a committed ref (`HEAD` by default, or `--ref <ref>`), refuses a dirty working tree, and excludes internal agent files and repository automation from the archive.
+- Shipped recipes use LF line endings so their fenced shot lists pass `npm run check` in the members' zip and Windows checkouts.
+
 ## 1.3.0 (unreleased)
 
 - **Teardown, then remake.** `npm run teardown -- <reel.mp4>` breaks a reference reel down with [rea-video](https://github.com/JuneYaooo/rea-video) (Apache-2.0; `--install` adds it) and maps the VIDEO.md breakdown onto the talking-head menu with `kit/videomd2reel.cjs`: caption style, up to 7 titles with the nearest entrance and a front/behind hint from the person mask, a finish per shot from the grade, punches from cuts and zooms, beat sync and the closest library bed from the tempo, brand colours, and the reference's script. It writes `teardown/<name>/Reel.md`, a report of what was detected and why, and a labelled contact sheet. Then `npm run reel -- --recipe teardown/<name>/Reel.md --clip <your clip>` remakes it. Without rea-video, a lighter built-in analyzer (`kit/teardown.py`: frame-difference cuts, grade stats, rapidocr, faster-whisper, the beat grid) runs offline. Local files, plus an optional `--url <instagram post>` that fetches one named post anonymously with instaloader (MIT) when it is installed, into the gitignored `teardown-in/`; no login, no bulk. Captions shown one big word at a time are recognised as one-word even when the engine files them as labels. `--reuse` redoes only the mapping. Accuracy notes in `docs/teardown.md`.
