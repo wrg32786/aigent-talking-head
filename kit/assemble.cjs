@@ -17,7 +17,7 @@
 //   "maskModel": "birefnet",             birefnet (rembg birefnet-general-lite, quality) or mediapipe (fast)
 //   "person": "person.mkv",              optional BGRA person layer from mask.py --person (edge-decontaminated)
 //   "panels": "ovlp/%04d.png",           optional screen cards behind the head (render.mjs writes it), with
-//   "headMask": "maskhead.mkv",          the head mask (kit/headmask.py) drawn over them
+//   "headMask": "maskhead.mkv",          the crown mask (kit/headmask.py) drawn over them
 //   "punch": 0.10                        zoom punch: every cut toggles a 10% punch-in (true = 0.10, false/absent = off)
 //   "beatSync": true                     snap punches, SFX, title entrances and fx hits to the bed's beat grid
 //                                        (default on when a bed is set; --no-beat-sync / false to leave times alone)
@@ -142,7 +142,7 @@ if (BASEONLY) {
 const ovlOff = (process.env.OVL_OFF || '').split(',').filter(Boolean).map(w => w.split('-').map(Number)).filter(([a, b]) => b > a);
 const offEn = ovlOff.length ? `:enable='not(${ovlOff.map(([a, b]) => `between(t,${a},${b})`).join('+')})'` : '';
 // screen cards and b-roll panels behind the head (ovlp/, the panel layer in kit/overlay.html): the panels go over the
-// picture and the titles, then the presenter's head (the person mask down to the neck, kit/headmask.py) over the
+// picture and the titles, then the top of the presenter's head (hair and crown, kit/headmask.py) over the
 // panels, so where the head reaches into a panel the panel is behind it; the body stays under the panel
 const panelsOn = !!(C.panels && fs.existsSync(path.dirname(path.resolve(C.panels))));
 const headFile = panelsOn && C.headMask && fs.existsSync(C.headMask) ? C.headMask : null;

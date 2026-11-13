@@ -432,10 +432,10 @@ function screenCard(c,t){const o=c[4],dt=t-c[0],a=gxa(c),W=(o.w??.66)*1080,pad=1
  else placeholderUI(W-pad*2,H-pad*2,dt,Math.round(c[0]*10));
  ctx.restore();rrect(ctx,-W/2+3,-H/2+3,W-6,H-6,28);ctx.lineWidth=7;ctx.strokeStyle=o.border||CY;ctx.stroke();ctx.restore()}
 // a behind ordinal burst needs the titles layer even in a job without kinetic titles
-// screen cards and b-roll panels (mode 11) sit behind the presenter's head: layer front|behind|auto per panel, or
+// screen cards and b-roll panels (mode 11) sit behind the top of the presenter's head: layer front|behind|auto per panel, or
 // panelLayer for the job (default auto = behind; where the head never reaches the panel it looks the same as front).
-// Behind panels draw on their own layer, ovlp/, which assemble.cjs puts over the picture, then the head (the person
-// mask above the chin, kit/headmask.py) on top, so the body stays under the panel and the head goes over it.
+// Behind panels draw on their own layer, ovlp/, which assemble.cjs puts over the picture, then the top of the head (the
+// person mask above the eyes, kit/headmask.py) on top: hair over the panel, the face and body always under it.
 const PANB=c=>{const l=['front','behind','auto'].includes(c[4].layer)?c[4].layer:['front','behind','auto'].includes(CAP.panelLayer)?CAP.panelLayer:'auto';return l!=='front'};
 window.__panels=()=>flips.some(c=>c[3]===11&&PANB(c));
 window.__layered=()=>TITLES.length>0||flips.some(c=>c[3]===9&&c[4].layer==='behind')||(CAPBEH&&flips.some(c=>c[3]===0))||window.__panels();

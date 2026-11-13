@@ -98,7 +98,7 @@ const split = !!(only && process.env.STILLS_LAYERS);
 // screen cards behind the head get a third layer, ovlp/ (assemble.cjs: picture, panels, then the head over them)
 const panels = !!(await p.evaluate(() => (window.__panels ? window.__panels() : false)));
 writeFileSync(join(ROOT, 'layers.json'), JSON.stringify({ captions: capLayer, panels: panels ? 'behind' : 'front' }) + '\n');
-if (panels) console.log('screen cards: behind the head (panel layer, under the head mask)');
+if (panels) console.log('screen cards: behind the top of the head (panel layer, under the crown mask)');
 const passes = split
   ? (layered ? [['stills-front', 'front'], ['stills-titles', 'titles'], ...(panels ? [['stills-panels', 'panels']] : [])] : [['stills-front', 'all']])
   : only ? [['stills', 'all']] : layered ? [['ovl', 'front'], ['ovlt', 'titles'], ...(panels ? [['ovlp', 'panels']] : [])] : [['ovl', 'all']];

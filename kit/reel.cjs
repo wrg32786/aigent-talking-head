@@ -365,7 +365,7 @@ if (cut.titles && cut.mask) {
   }
   // screen cards behind the head: mask their spans, then cut the head out of the person mask (kit/headmask.py)
   const panels = R.panelsBehind(capsNow).map(f => ({ start: f.start, end: Math.min(f.end, LEN) }));
-  if (panels.length && cut.panels) { behind.push(...panels); console.log(`screen cards behind the head: mask over ${panels.length} card span${panels.length > 1 ? 's' : ''}`); }
+  if (panels.length && cut.panels) { behind.push(...panels); console.log(`screen cards behind the top of the head: mask over ${panels.length} card span${panels.length > 1 ? 's' : ''}`); }
   if (!behind.length) {
     console.log('title layer: all titles and stickers in front; skipping the person mask');
   } else {

@@ -251,7 +251,7 @@ try {
     const brief = one('label-brief', 0.55, 0.5), full = one('label-full', 3, 1.5);
     if (!(brief.n > 0.95 * full.n)) fail(`a brief label is cut off: ${brief.n} vs ${full.n} pixels`);
   });
-  step('screen cards behind the head: panel layer by default, front on request, head over the panel, body under it', () => {
+  step('screen cards behind the top of the head: panel layer by default, front on request, crown over the panel, face and body under it', () => {
     const flips = [{ start: 0, end: 1.5, mode: 11, border: '#d87b5b' }];
     const lay = (name, extra) => { const d = join(work, name); mkdirSync(d, { recursive: true }); writeFileSync(join(d, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'one-word', fonts: 'theme', ...extra }) + ';\n');
       run(node, [join(KIT, 'render.mjs'), '0', '0.80'], d, { THEME: 'aigent', FONTS: 'theme', STILLS_LAYERS: '1' });
@@ -271,14 +271,14 @@ try {
     run(node, [join(KIT, 'assemble.cjs'), 'out.mp4'], pt);
     const px = y => [...execFileSync('ffmpeg', ['-v', 'error', '-ss', '0.5', '-i', join(pt, 'out.mp4'), '-frames:v', '1', '-vf', `crop=2:2:540:${y},format=rgb24`, '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'])].slice(0, 3);
     const head = px(900), body = px(1200);
-    if (!(head[2] > 120 && head[1] < 110)) fail('the head should be over the panel (picture blue there): ' + head);
-    if (!(body[1] > 150 && body[2] < 110)) fail('below the head the panel should cover the picture (green): ' + body);
-    // the head mask keeps the head and drops the body
+    if (!(head[2] > 120 && head[1] < 110)) fail('the crown should be over the panel (picture blue there): ' + head);
+    if (!(body[1] > 150 && body[2] < 110)) fail('below the crown the panel should cover the picture (green): ' + body);
+    // the crown mask keeps the top of the head (hair) and drops the face, chin and body
     if (effects) {
       run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=black:s=1080x1920:r=24:d=0.5,drawbox=x=340:y=400:w=400:h=600:color=white:t=fill,drawbox=x=470:y=1000:w=140:h=120:color=white:t=fill,drawbox=x=140:y=1120:w=800:h=800:color=white:t=fill', '-c:v', 'ffv1', '-pix_fmt', 'gray', 'person.mkv'], pt);
       run(fxPy, [join(KIT, 'headmask.py'), 'person.mkv', 'hm.mkv'], pt);
       const g = y => execFileSync('ffmpeg', ['-v', 'error', '-i', join(pt, 'hm.mkv'), '-frames:v', '1', '-vf', `crop=2:2:540:${y}`, '-f', 'rawvideo', '-pix_fmt', 'gray', '-'])[0];
-      if (!(g(700) > 200 && g(1500) < 10)) fail(`head mask: head ${g(700)}, body ${g(1500)}`);
+      if (!(g(450) > 200 && g(800) < 10 && g(980) < 10 && g(1500) < 10)) fail(`crown mask: crown ${g(450)}, face ${g(800)}, chin ${g(980)}, body ${g(1500)}`);
     }
   });
   step('graphics: ordinal sticker behind the head, app label with your icon, screen card from your video, placeholders', () => {

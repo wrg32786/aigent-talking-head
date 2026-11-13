@@ -105,7 +105,7 @@ Every section is optional except the card. Anything left out falls back to the p
 | caption-shadow | `none`, `soft` (default soft) | `--caption-shadow`, the one-word caption's shadow |
 | caption-case | `upper`, `lower`, `as-said` (default upper) | `--caption-case`, the one-word caption's letter case |
 | caption-layer | `front`, `behind`, `auto` (default auto: behind for top captions, front elsewhere) | `--caption-layer`. Behind draws captions under the person mask, like a behind title: any part over the head or hair is hidden, the rest stays fully visible. The mask runs over the caption spans, and top one-word captions are lifted so they sit on the highest point the head reaches (only the bottom of the letters tucks behind the hair). The legibility check measures only the visible part |
-| panel-layer | `front`, `behind`, `auto` (default auto, which is behind) | `--panel-layer`, every screen card and b-roll panel in the reel (a card's own `layer` wins). Behind draws the panels on their own layer, then your head over them: the person mask down to just under the chin (`kit/headmask.py`), so a card on your chest stays in front of your body while your chin and head go over it. Where your head never reaches a panel it looks the same as front. The mask runs over every card span |
+| panel-layer | `front`, `behind`, `auto` (default auto, which is behind) | `--panel-layer`, every screen card and b-roll panel in the reel (a card's own `layer` wins). Behind draws the panels on their own layer, then the top of your head over them: the person mask from the top of your hair down to about half a head width (above the eyes, `kit/headmask.py --crown`). A panel that reaches into the top of your head goes behind your hair; your face, chin, neck and body never cover a panel, so a card at chest or chin level stays fully in front. Where your hair never reaches a panel it looks the same as front. The mask runs over every card span |
 | titles | `on` or `off` | `--no-titles` |
 | title-layer | `front`, `behind`, `auto` | `--title-layer` |
 | finish | finish names, comma list, or `none` (on the whole reel) | `--finish` |
@@ -146,7 +146,7 @@ Every section is optional except the card. Anything left out falls back to the p
 |---|---|---|
 | type | `ordinal-sticker` (mode 9, entrance burst-pop), `app-label` (mode 10, tile-pop), `screen-card` (mode 11, card-rise) | the flip's `mode` |
 | text | the ordinal word or the label | the flip's `text` |
-| layer | `front` or `behind` (ordinal sticker: the burst goes behind your head, with the person mask). Screen card: `front`, `behind` or `auto` (default auto, which is behind): your head goes over the card where it reaches into it, your body stays under the card | `layer` |
+| layer | `front` or `behind` (ordinal sticker: the burst goes behind your head, with the person mask). Screen card: `front`, `behind` or `auto` (default auto, which is behind): the top of your head (hair and crown) goes over the card where it reaches into it; your face and body stay under the card | `layer` |
 | color, ink | burst colour and word colour (ordinal sticker) | `color`, `ink` |
 | icon, tile | an image for the app tile (relative to the Reel.md), or leave it out for a generic glyph on a `tile` colour | `icon`, `tile` |
 | src, border, in | an image or a video for the screen card (relative to the Reel.md), its border colour, and seconds into the video | `src`, `border`, `in` |
