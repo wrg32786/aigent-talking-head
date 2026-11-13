@@ -3,6 +3,8 @@ faster-whisper>=1.0
 av<16
 # Beat grid for music beds (kit/beats.py). librosa is ISC.
 librosa>=0.10.0
+# Brand import reads colours from a swatch or a brand guide page (kit/brand-import.mjs). Pillow is MIT-CMU (HPND).
+Pillow>=10
 # Optional, for npm run teardown without rea-video: on-screen text OCR (Apache-2.0).
 # pip install rapidocr-onnxruntime   (Python 3.12 and older)   or   pip install rapidocr   (3.13+)
 # Optional, for npm run teardown -- --url <instagram post>: fetches one post anonymously (instaloader, MIT).
