@@ -19,7 +19,7 @@ Report the OS and these versions. Install what is missing with the system's pack
 npm install
 ```
 
-This path does not need Git or GitHub access. To update later, download the new zip and unzip it next to the old folder, which stays as your backup. Copy your own files across to the new folder: `inbox/`, `jobs/`, `teardown/` (your teardowns and their Reel.md recipes), saved presets in `kit/presets/local/`, your fonts and pairings in `kit/fonts/local/`, and any theme file you added to `kit/themes/` (copy only your own files; never replace the shipped ones). Then repeat the installation and verification steps there, and open one old job to check it still finds its files.
+This path does not need Git or GitHub access. To update later, download the new zip and unzip it next to the old folder, which stays as your backup. Copy your own files across to the new folder: `inbox/`, `jobs/`, `clips/`, `teardown/` (your teardowns and their Reel.md recipes), `teardown-in/` (reference reels you downloaded), `assets/web/` (your screen-card captures), saved presets in `kit/presets/local/`, your fonts and pairings in `kit/fonts/local/`, and any theme file you added to `kit/themes/` (copy only your own files; never replace the shipped ones). Then repeat the installation and verification steps there, and open one old job to check it still finds its files.
 
 **From GitHub, for people with repo access:**
 
