@@ -13,13 +13,23 @@ Report the OS and these versions. Install what is missing with the system's pack
 
 ## 2. Get the code
 
+**From the members' download:** you are already inside the unzipped `aigent-talking-head-<version>` folder. Confirm that `package.json` says `"name": "aigent-talking-head"`, then run:
+
+```
+npm install
+```
+
+This path does not need Git or GitHub access. To update later, download the new zip and unzip it next to the old folder. Move `inbox/`, `jobs/` and any saved presets (normally `kit/presets/local/`) across to the new folder, then repeat the installation and verification steps there.
+
+**From GitHub, for people with repo access:**
+
 ```
 git clone https://github.com/wrg32786/aigent-talking-head
 cd aigent-talking-head
 npm install
 ```
 
-If the folder already exists, `git pull` instead.
+If the cloned folder already exists, `git pull` instead, then run `npm install`.
 
 ## 3. Python packages in a venv
 
@@ -48,11 +58,15 @@ If something fails, fix it and run it again. Do not tell the user it is installe
 
 ## 5. Install the skills (optional)
 
+**From the members' zip:** copy the folders under this kit's `skills/` into your agent's skills folder by hand, keeping each folder's `SKILL.md` and supporting files together. For example, copy them into `.claude/skills/` for Claude Code or `~/.codex/skills/` for Codex. This uses only the files you downloaded.
+
+**For people with GitHub repo access:** you can also use:
+
 ```
 npx skills add wrg32786/aigent-talking-head
 ```
 
-That puts the talking-head skills in Claude Code, Codex, Cursor and other agents that read `SKILL.md` folders. Or copy the folders under `skills/` into the agent's skills folder by hand.
+That puts the talking-head skills in Claude Code, Codex, Cursor and other agents that read `SKILL.md` folders.
 
 ## 6. Finish
 
