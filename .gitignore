@@ -46,3 +46,6 @@ kit/presets/local/
 
 # screen-card sources captured by npm run capture (public pages, cached per URL)
 /assets/
+
+# agent briefs, build reports and run logs (maintainers only)
+.aigent/
