@@ -14,6 +14,7 @@ export function renderCatalog(cat) {
   L.push('# Effects catalog', '', `${E.length} starter effects from [claude-video-effects](${cat.source.repo}) by ${cat.source.author} (${cat.source.license}), applied as an optional second pass over a finished reel. Generated from \`catalog.json\` by \`npm run effects:catalog\`; edit the JSON, not this file.`, '');
   // one list of everything the agent can offer, so it can tell the user what exists
   const MODES = ['0 caption (styled by captionStyle)', '1 spray hero word with drips', '2 sticker', '3 count-up', '4 takeover card', '5 logo plate', '6 CTA sticker', '7 kinetic title (behind the person when masked)'];
+  const GFX = JSON.parse(readFileSync(join(HERE, '..', 'kit', 'graphics.json'), 'utf8')).graphics;
   const STYLES = ['kinetic (default: every word animates in, one emphasis word big in the display font, optional script accent)', 'classic (the original rise-in caption)', 'pill (3-5 words in a dark rounded pill, lower third)', 'hormozi (heavy caps, thick outline, spoken word highlighted)', 'karaoke (left-to-right colour wipe per word)'];
   const TN = Object.entries(KITR.TRANSITIONS.names);
   const PN = Object.entries(PAIRS).filter(([, v]) => v).map(([k, v]) => `\`${k}\` (${[v.display, v.secondary, v.script].filter(Boolean).map(r => r.family).join(' + ')})`);
@@ -21,9 +22,10 @@ export function renderCatalog(cat) {
   const PACK = SFXPLAN.loadManifest();
   const byCat = {};
   for (const s of PACK.sounds) (byCat[s.category] = byCat[s.category] || []).push(s.id);
-  const total = E.length + MODES.length + STYLES.length + KITR.ENTRANCES.length + TN.length + SND.length + PACK.sounds.length + PN.length;
+  const total = E.length + GFX.length + MODES.length + STYLES.length + KITR.ENTRANCES.length + TN.length + SND.length + PACK.sounds.length + PN.length;
   L.push('## Everything available', '', `${total} things to offer, in one list. Tell the user what fits their moment, not the whole list.`, '',
     `- **${E.length} video effects** (this catalog, \`npm run fx\`): ${E.map(e => '`' + e.name + '`').join(', ')}.`,
+    `- **${GFX.length} graphics** (\`captions.js\` flips, or a \`reel-graphics\` block in a Reel.md; \`kit/graphics.json\`): ${GFX.map(g => `\`${g.id}\` (mode ${g.mode}, entrance \`${g.entrance}\`) ${g.label}`).join('; ')}.`,
     `- **${MODES.length} overlay modes** (\`captions.js\` flips, \`mode\`): ${MODES.join('; ')}.`,
     `- **${STYLES.length} caption styles** (\`captionStyle\`, or \`style\` per flip): ${STYLES.join('; ')}.`,
     `- **${KITR.ENTRANCES.length} kinetic title entrances** (mode 7 \`entrance\`, each once per video; flicker on the hook and payoff only): ${KITR.ENTRANCES.map(x => '`' + x + '`').join(', ')}.`,

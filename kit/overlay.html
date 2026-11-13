@@ -1,5 +1,5 @@
 <!doctype html><html><head><meta charset="utf-8">
-<style>html,body{margin:0;background:transparent}canvas{display:block}</style></head><body><script src="theme.js"></script><script src="captions.js"></script><script src="fonts.js"></script><script src="fxzones.js"></script><script src="lockover.js"></script><canvas id="c" width="1080" height="1920"></canvas><script>
+<style>html,body{margin:0;background:transparent}canvas{display:block}</style></head><body><script src="theme.js"></script><script src="captions.js"></script><script src="fonts.js"></script><script src="fxzones.js"></script><script src="lockover.js"></script><script src="gfx.js"></script><canvas id="c" width="1080" height="1920"></canvas><script>
 // Talking-head ad overlay. All timing and copy come from captions.js (window.CAPTIONS); see example/captions.awakening-hero.js.
 // Colours, fonts and logo come from theme.js (window.THEME; presets in kit/themes/), then any "theme" block in captions.js.
 // No theme.js at all falls back to the neutral defaults below. Output-timeline seconds. render.mjs calls window.seek(t) per frame.
@@ -33,7 +33,8 @@ const CYC=(window.FONTSETS||[]).map(p=>{const s=mkSet(p.display||p.secondary||p.
 const ctx=document.getElementById('c').getContext('2d');
 const mk=()=>{const c=document.createElement('canvas');c.width=1080;c.height=1920;return c};const TC=mk(),MC=mk(),T=TC.getContext('2d'),M=MC.getContext('2d');
 const Y=CAP.captionY||1300; // caption band: chest, below the face box. Measure the face per take; text never covers the face.
-// mode 0 caption, 1 spray hero word, 2 sticker, 3 count-up, 4 takeover card, 5 logo plate, 6 CTA sticker (+ optional sub line), 7 kinetic title (see below)
+// mode 0 caption, 1 spray hero word, 2 sticker, 3 count-up, 4 takeover card, 5 logo plate, 6 CTA sticker (+ optional sub line), 7 kinetic title (see below),
+// 8 type card, 9 ordinal sticker, 10 app label, 11 screen card (graphics, kit/graphics.json)
 const flips=CAP.flips.map(f=>[f.start,f.end,f.text,f.mode,f]);
 // mode 7 = kinetic title (one per beat). Seven entrances, each used once per video, resolved in time order; flicker only
 // on the first title (hook) and the last (payoff). Behind-head hero words render on their own layer
@@ -57,7 +58,15 @@ const jobLayer=(()=>{const v=String((CAP.titleLayer!=null?CAP.titleLayer:((windo
  if(autos.length){const scored=autos.map(i=>{const c=TITLES[i];let s=0;if(i===0||i===TITLES.length-1)s+=3;if(c.entr==='slam')s+=2;if(c.flick)s+=1;return{i,s}}).sort((a,b)=>b.s-a.s||a.i-b.i);
   for(const {i} of scored){if(behind.size>=2)break;if(behind.has(i-1)||behind.has(i+1))continue;behind.add(i)}}
  TITLES.forEach((c,i)=>{c.layer=behind.has(i)?'behind':'front'})}
-const TY=CAP.titleY||345,TSY=CAP.titleSlamY||600,PY=CAP.pillY||1480,KY=CAP.kineticY||CAP.captionY||1320,ALTY=CAP.altY||330,CSTYLE=CAP.captionStyle||'kinetic';
+// captionPosition (top | middle | bottom) moves the caption band for every caption style; captionColor sets the word
+// colour for one-word, classic, pill and the hormozi highlight. Both come from a Reel.md's Style section or cut.json.
+const CPOS=['top','middle','bottom'].includes(CAP.captionPosition)?CAP.captionPosition:null,POSY={top:300,middle:1000,bottom:1320}[CPOS],CCOL=CAP.captionColor||null;
+// captionLayer front | behind | auto: behind draws the captions on the title layer, under the person (the mask cuts
+// out the head and hair where they overlap, the rest stays visible). auto (the default when captions sit at the top,
+// where they meet the head) = behind; otherwise front.
+const CLAY=['front','behind','auto'].includes(CAP.captionLayer)?CAP.captionLayer:(CPOS==='top'?'auto':'front'),CAPBEH=CLAY==='behind'||(CLAY==='auto'&&CPOS==='top');
+window.__captionLayer=CAPBEH?'behind':'front';
+const TY=CAP.titleY||345,TSY=CAP.titleSlamY||600,PY=CAP.pillY||POSY||1480,KY=CAP.kineticY||POSY||CAP.captionY||1320,CYB=POSY||Y,ALTY=CAP.altY||(CPOS==='top'?1320:330),CSTYLE=CAP.captionStyle||'kinetic';
 const ONEW=CSTYLE==='one-word'; // the simple one-word style; "oneword" is the full look further down
 // Slam rise: lands at titleSlamY, holds 0.5 s, then a smooth 0.35 s ease up to the resting titleY. Returns the y offset.
 const RISE={hold:.5,dur:.35};const riseOff=(c,dt)=>{if(c.entr!=='slam'||c[4].titleRise===false||CAP.titleRise===false)return 0;const d=TSY-TY;if(d<=0)return 0;const q=cl((dt-RISE.hold)/RISE.dur),e=q<.5?4*q*q*q:1-Math.pow(-2*q+2,3)/2;return d*(1-e)};
@@ -124,8 +133,8 @@ function rrect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,
 function wordsOf(c){const o=c[4];if(o.words&&o.words.length)return o.words;const ws=c[2].split(/\s+/).filter(Boolean),d=(Math.min(c[1],c[0]+3)-c[0])/Math.max(1,ws.length);return ws.map((w,i)=>[c[0]+i*d,c[0]+(i+1)*d,w])}
 function pill(c,t,yo){const dt=t-c[0],txt=c[2],o=c[4];let fs=fit([txt],S,Math.round(CSZ*.86),900);ctx.save();ctx.font=fnt(S,fs);ctx.letterSpacing='0px';const w=ctx.measureText(txt).width,ph=fs*1.55,pw=w+fs*1.1,s=.86+.14*backOut(cl(dt/.16)),y=yo||o.y||PY;
  ctx.globalAlpha*=cl(dt/.08);ctx.translate(540,y);ctx.scale(s,s);ctx.shadowColor='rgba(0,0,0,.35)';ctx.shadowBlur=24;ctx.shadowOffsetY=6;ctx.fillStyle=TH.colors.pill||'rgba(12,12,14,.82)';rrect(ctx,-pw/2,-ph/2,pw,ph,ph/2);ctx.fill();ctx.shadowColor='transparent';
- ctx.textAlign='left';ctx.textBaseline='middle';let x=-w/2;const ws=wordsOf(c);ws.forEach(([a,,wd],k)=>{const sp=k<ws.length-1?wd+' ':wd;ctx.fillStyle=t>=a?IV:'rgba(255,255,255,.55)';ctx.fillText(sp,x,fs*.04);x+=ctx.measureText(sp).width});ctx.restore()}
-function boldCap(c,t,karaoke,yo){const dt=t-c[0],o=c[4],ws=wordsOf(c).map(([a,b,w])=>[a,b,String(w).toUpperCase()]),txt=ws.map(w=>w[2]).join(' ');const fs=fit([txt],G,Math.round(CSZ*1.25),960),y=yo||o.y||PY,HL=o.highlight||CY,y0_=0;
+ ctx.textAlign='left';ctx.textBaseline='middle';let x=-w/2;const ws=wordsOf(c);ws.forEach(([a,,wd],k)=>{const sp=k<ws.length-1?wd+' ':wd;ctx.fillStyle=t>=a?(CCOL||IV):'rgba(255,255,255,.55)';ctx.fillText(sp,x,fs*.04);x+=ctx.measureText(sp).width});ctx.restore()}
+function boldCap(c,t,karaoke,yo){const dt=t-c[0],o=c[4],ws=wordsOf(c).map(([a,b,w])=>[a,b,String(w).toUpperCase()]),txt=ws.map(w=>w[2]).join(' ');const fs=fit([txt],G,Math.round(CSZ*1.25),960),y=yo||o.y||PY,HL=o.highlight||CCOL||CY,y0_=0;
  ctx.save();ctx.font=fnt(G,fs);ctx.letterSpacing='0px';ctx.textAlign='left';ctx.textBaseline='middle';ctx.lineJoin='round';ctx.miterLimit=2;const sp=ctx.measureText(' ').width,tot=ctx.measureText(txt).width;let x=540-tot/2;
  ctx.globalAlpha*=cl(dt/.06);const pop=.9+.1*backOut(cl(dt/.14));ctx.translate(540,y);ctx.scale(pop,pop);ctx.translate(-540,-y);
  ws.forEach(([a,b,w])=>{const ww=ctx.measureText(w).width,on=t>=a&&t<b+.02;ctx.save();
@@ -346,18 +355,101 @@ function oneword(c,t){const s=owAt(c,t);if(s&&s.face==='stack'&&s.txt)return dra
  ctx.restore()}
 // every word state in the job, for render.mjs (build/oneword.json) and the smoke test
 window.__oneword=()=>flips.filter(c=>c[3]===0&&(c[4].style||CSTYLE)==='oneword').flatMap(c=>{use(c.ps);return wordsOf(c).map(w=>{const s=owAt(c,w[0]+.01);return s&&{t:w[0],txt:s.txt,face:s.face,size:s.size,tail:s.tail,card:!!s.cd,ink:s.ink,onLine:!!s.base,x:Math.round(s.x||540),y:Math.round(s.y)}}).filter(Boolean)});
+// captionOutline none|thin|thick (default thick), captionShadow none|soft (default soft), captionCase upper|lower|as-said
+// (default upper): the one-word caption's look, from a Reel.md's Style (a teardown measures them) or captions.js.
+const COUT=CAP.captionOutline||'thick',CSHD=CAP.captionShadow||'soft',CCASE=CAP.captionCase||'upper';
+function oneWordDraw(c,raw,a,t,y){let txt=String(raw).replace(/^[\s.,;:!?"“”]+|[\s.,;:!?"“”]+$/g,'');if(!txt)return;txt=CCASE==='lower'?txt.toLowerCase():CCASE==='upper'?txt.toUpperCase():txt;
+ const fs=fit([txt],G,Math.round(CSZ*2.4),1000),dt=t-a,pop=.86+.14*backOut(cl(dt/.12));
+ // behind the head at the top (headTop, measured by reel.cjs): the word's middle sits a little above the highest the head goes,
+ // so the hair hides at most the bottom of the letters (and the tails), as in the reels that do this
+ if(CAPBEH&&CPOS==='top'&&CAP.headTop>0)y=Math.max(170,Math.min(y,CAP.headTop-.12*fs));
+ ctx.save();ctx.font=fnt(G,fs);ctx.textAlign='center';ctx.textBaseline='middle';ctx.letterSpacing=(TRK*fs)+'px';ctx.globalAlpha*=cl(dt/.05);ctx.translate(540,y);ctx.scale(pop,pop);
+ if(CSHD!=='none')shadow(ctx,fs);ctx.lineJoin='round';
+ if(COUT!=='none'){ctx.lineWidth=COUT==='thin'?Math.max(3,fs*.045):Math.max(8,fs*.1);ctx.strokeStyle=c[4].outline||'#000';ctx.strokeText(txt,0,0);if(CSHD!=='none')ctx.shadowColor='transparent'}
+ ctx.fillStyle=c[4].highlight||CCOL||CY;ctx.fillText(txt,0,0);ctx.restore()}
 function oneWord(c,t,yo){const ws=wordsOf(c);let cur=null;for(const w of ws){if(t+0.02>=w[0]&&t<w[1]+0.08)cur=w}if(!cur){for(let i=ws.length-1;i>=0;i--)if(t>=ws[i][0]){cur=ws[i];break}}if(!cur)return;
- const [a,b,raw]=cur;let txt=String(raw).replace(/^[\s.,;:!?]+|[\s.,;:!?]+$/g,'');if(!txt)return;txt=txt.toUpperCase();const y=yo||c[4].y||KY,fs=fit([txt],G,Math.round(CSZ*2.4),1000),dt=t-a,pop=.86+.14*backOut(cl(dt/.12));
- ctx.save();ctx.font=fnt(G,fs);ctx.textAlign='center';ctx.textBaseline='middle';ctx.letterSpacing=(TRK*fs)+'px';ctx.globalAlpha*=cl(dt/.05);ctx.translate(540,y);ctx.scale(pop,pop);shadow(ctx,fs);
- ctx.lineJoin='round';ctx.lineWidth=Math.max(8,fs*.1);ctx.strokeStyle=c[4].outline||'#000';ctx.strokeText(txt,0,0);ctx.fillStyle=c[4].highlight||CY;ctx.fillText(txt,0,0);ctx.restore()}
+ oneWordDraw(c,cur[2],cur[0],t,yo||c[4].y||KY)}
+// Every spoken word, back to back (one-word style). All one-word caption words in time order; each shows from its
+// start (pushed back so the one before stays up at least wordMin, 0.12 s, so no word is lost when Whisper gives two
+// words the same start) until the next word starts. A pause longer than 1.5 s clears the screen.
+const OWSEQ=(()=>{const ws=[];for(const c of flips)if(c[3]===0&&(c[4].style||CSTYLE)==='one-word')for(const w of wordsOf(c))if(String(w[2]).replace(/[^\p{L}\p{N}]/gu,''))ws.push({a:+w[0],z:+w[1],w:w[2],c});
+ if(!ws.length)return null;ws.sort((p,q)=>p.a-q.a);const MIN=CAP.wordMin||.12;let prev=-1e9;for(const x of ws){x.s=Math.max(x.a,prev+MIN);prev=x.s}
+ ws.forEach((x,i)=>{const nx=ws[i+1],tail=Math.max(x.z,x.s+MIN)+.25;x.e=nx?(nx.a-x.z>1.5?Math.min(nx.s,tail):nx.s):tail});return ws})();
+window.__words=OWSEQ?OWSEQ.map(x=>({start:+x.s.toFixed(3),end:+x.e.toFixed(3),word:String(x.w)})):[];
+const wnorm=w=>String(w).toLowerCase().replace(/[^a-z0-9]/g,'');
+// the word on screen now. While a title or an ordinal word is up, the spoken word that it shows is skipped (it is
+// already on screen); any other word still shows, moved clear of it when both would sit at the top.
+function oneWordSeq(t){if(!OWSEQ)return;const x=OWSEQ.find(x=>t>=x.s&&t<x.e);if(!x)return;use(x.c.ps);
+ const over=[...TITLES.filter(c=>zoneAt(t)!=='hide'&&t>=c[0]&&t<c[1]),...flips.filter(c=>c[3]===9&&t>=c[0]+.1&&t<c[1])];
+ const shows=c=>{let ws=String(c[2]).replace(/\|/g,' ').split(/\s+/).filter(Boolean);if(c[3]===7&&ONEW&&ws.length&&c[4].lockup!==false)ws=[ws[heroOf(ws.map(w=>[0,0,w]),c[4])[0]]];return ws.map(wnorm)}; // a one-word title shows only its hero word
+ if(over.some(c=>shows(c).includes(wnorm(x.w))))return;
+ const yo=zoneAt(t)==='move'?ALTY:0,y=yo||x.c[4].y||KY;
+ ctx.save();oneWordDraw(x.c,x.w,x.s,t,over.length&&y<760?150:y);ctx.restore()}
 // one-word (the simple style): while a title is up it is the one word on screen, so the caption waits
-const titleUp=t=>zoneAt(t)!=='hide'&&TITLES.some(c=>t>=c[0]&&t<c[1]);
-function caption(c,t){const st=c[4].style||CSTYLE;if(st==='one-word'&&titleUp(t))return;const yo=zoneAt(t)==='move'?ALTY:0;if(st==='kinetic')return kinetic(c,t);if(st==='oneword')return oneword(c,t);if(st==='pill')return pill(c,t,yo);if(st==='hormozi')return boldCap(c,t,false,yo);if(st==='karaoke')return boldCap(c,t,true,yo);if(st==='one-word')return oneWord(c,t,yo);glyphs(c[2],fit([c[2]],S,CSZ,980),540,yo||Y,t-c[0],IV,true)}
+const titleUp=t=>(zoneAt(t)!=='hide'&&TITLES.some(c=>t>=c[0]&&t<c[1]))||(CPOS==='top'&&flips.some(c=>c[3]===9&&t>=c[0]+.1&&t<c[1])); // a top caption also waits for an ordinal word
+function caption(c,t){const st=c[4].style||CSTYLE;if(st==='one-word'&&OWSEQ)return;if(st==='one-word'&&titleUp(t))return;const yo=zoneAt(t)==='move'?ALTY:0;if(st==='kinetic')return kinetic(c,t);if(st==='oneword')return oneword(c,t);if(st==='pill')return pill(c,t,yo);if(st==='hormozi')return boldCap(c,t,false,yo);if(st==='karaoke')return boldCap(c,t,true,yo);if(st==='one-word')return oneWord(c,t,yo);glyphs(c[2],fit([c[2]],S,CSZ,980),540,yo||CYB,t-c[0],CCOL||IV,true)}
+// Graphics (kit/graphics.json): mode 9 ordinal sticker, 10 app label, 11 screen card. Original generic designs. Your
+// icon or screen recording comes in through gfx.js (render.mjs writes it: image URLs, and a video as a frame list);
+// without one the kit draws a neutral glyph or placeholder window.
+const GX=window.GFX||{},GXA=GX.assets||{},GXF=GX.fonts||{},GIMG={},IMGP=[];
+for(const [fam,u,st] of [['ATH Gfx Serif',GXF.serif,'italic'],['ATH Gfx Label',GXF.label,'normal']])if(u){const ff=new FontFace(fam,`url("${u}")`,{style:st});document.fonts.add(ff);FACES.push(ff.load().catch(()=>console.warn('font failed',fam)))}
+const gimg=u=>{if(!u)return null;if(GIMG[u])return GIMG[u];const i=new Image();IMGP.push(new Promise(r=>{i.onload=r;i.onerror=r}));i.src=u;GIMG[u]=i;return i};
+for(const a of Object.values(GXA)){gimg(a.icon);gimg(a.src);(a.frames||[]).forEach(gimg)}
+const gxa=c=>GXA[c[3]+'@'+c[0]]||{};
+const SERIF=s=>`italic 400 ${s}px "ATH Gfx Serif", Georgia, "Times New Roman", serif`,LABELF=s=>`400 ${s}px "ATH Gfx Label", "Arial Black", Impact, sans-serif`;
+function shade(h,k){const m=/^#([0-9a-f]{6})$/i.exec(String(h||''));if(!m)return h;const n=parseInt(m[1],16),f=v=>Math.max(0,Math.min(255,Math.round(k<0?v*(1+k):v+(255-v)*k)));return'#'+[n>>16,(n>>8)&255,n&255].map(v=>f(v).toString(16).padStart(2,'0')).join('')}
+function starPath(c,R,r,n,seed){const q=rng(seed);c.beginPath();for(let i=0;i<n*2;i++){const a=i*Math.PI/n-Math.PI/2,k=i%2?r*(.86+q()*.28):R*(.8+q()*.32);c.lineTo(Math.cos(a)*k,Math.sin(a)*k)}c.closePath()}
+// ordinal sticker, entrance burst-pop: the burst springs open with a quarter turn, the word rises and its spacing settles
+const ordGeo=c=>{const o=c[4],R=o.size||400;return{x:(o.x??.5)*1080,y:(o.y??.27)*1920,R}};
+function ordBurst(c,t){const o=c[4],dt=t-c[0],{x,y,R}=ordGeo(c),p=cl(dt/.34),s=backOut(p),rot=(1-p)*-.55+Math.sin(dt*1.1)*.025;if(s<=0)return;
+ ctx.save();ctx.translate(x,y);ctx.rotate(rot);ctx.scale(s,s);ctx.fillStyle=o.color||'#ffe07a';starPath(ctx,R,R*.6,13,Math.round(c[0]*10)+5);ctx.fill();ctx.restore()}
+function ordWord(c,t){const o=c[4],dt=t-c[0]-.1,txt=String(c[2]||'').toUpperCase();if(dt<0||!txt)return;const {x,y,R}=ordGeo(c),wy=Math.max(120,y-R*.86);let fs=o.wordSize||150;ctx.font=SERIF(fs);while(ctx.measureText(txt).width>940&&fs>60){fs-=6;ctx.font=SERIF(fs)}
+ const e=expo(cl(dt/.32));ctx.save();ctx.font=SERIF(fs);ctx.textAlign='center';ctx.textBaseline='middle';ctx.letterSpacing=((.03+.28*(1-e))*fs)+'px';ctx.globalAlpha*=e;ctx.translate(x,wy+(1-e)*36);shadow(ctx,fs*.7);ctx.fillStyle=o.ink||'#ffffff';ctx.fillText(txt,0,0);ctx.restore()}
+// app label, entrance tile-pop: the tile pops in from a tilt, then the label wipes out from under it
+function appGlyph(S,txt){ctx.fillStyle='#ffffff';const ch=String(txt||'').replace(/[^A-Za-z0-9]/g,'').charAt(0).toUpperCase();
+ if(ch){ctx.font=LABELF(Math.round(S*.56));ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(ch,0,S*.03);return}
+ ctx.beginPath();for(let i=0;i<8;i++){const a=i*Math.PI/4,k=i%2?S*.09:S*.3;ctx.lineTo(Math.cos(a)*k,Math.sin(a)*k)}ctx.closePath();ctx.fill()}
+function appLabel(c,t){const o=c[4],dt=t-c[0],a=gxa(c),S=o.size||210,x=(o.x??.08)*1080,y=(o.y??.5)*1920,p=cl(dt/.28),s=backOut(p),r=S*.23;
+ if(s>0){ctx.save();ctx.translate(x+S/2,y+S/2);ctx.rotate((1-p)*-.3);ctx.scale(s,s);shadow(ctx,S*.45);rrect(ctx,-S/2,-S/2,S,S,r);const im=a.icon&&GIMG[a.icon];
+  if(im&&im.naturalWidth){ctx.fillStyle='#ffffff';ctx.fill();ctx.shadowColor='transparent';ctx.save();rrect(ctx,-S/2,-S/2,S,S,r);ctx.clip();const k=Math.max(S/im.naturalWidth,S/im.naturalHeight);ctx.drawImage(im,-im.naturalWidth*k/2,-im.naturalHeight*k/2,im.naturalWidth*k,im.naturalHeight*k);ctx.restore()}
+  else{const col=o.tile||CY,g=ctx.createLinearGradient(-S/2,-S/2,S/2,S/2);g.addColorStop(0,shade(col,.12));g.addColorStop(1,shade(col,-.38));ctx.fillStyle=g;ctx.fill();ctx.shadowColor='transparent';appGlyph(S,c[2])}
+  ctx.restore()}
+ const txt=String(c[2]||''),ld=dt-.14;if(!txt||ld<0)return;let fs=o.labelSize||100;ctx.font=LABELF(fs);while(ctx.measureText(txt).width>1080-x-50&&fs>44){fs-=4;ctx.font=LABELF(fs)}
+ const w=ctx.measureText(txt).width,q=expo(cl(ld/Math.min(.32,Math.max(.1,(c[1]-c[0]-.14)*.35)))),ly=y+S+fs*.72;ctx.save();ctx.beginPath();ctx.rect(x-40,ly-fs,(w+80)*q,fs*2);ctx.clip();ctx.font=LABELF(fs);ctx.textAlign='left';ctx.textBaseline='middle';ctx.lineJoin='round';
+ shadow(ctx,fs*.5);ctx.lineWidth=fs*.24;ctx.strokeStyle=o.outline||'#ffffff';ctx.strokeText(txt,x,ly);ctx.shadowColor='transparent';ctx.fillStyle=o.ink||'#111111';ctx.fillText(txt,x,ly);ctx.restore()}
+// screen card, entrance card-rise: the card rises from below with a small tilt and settles; a video src plays inside
+function placeholderUI(w,h,dt,seed){const q=rng(seed+11);ctx.fillStyle='#15181e';ctx.fillRect(-w/2,-h/2,w,h);ctx.fillStyle='#23272f';ctx.fillRect(-w/2,-h/2,w,44);
+ ['#ff6b5e','#f4c04e','#5fcf6d'].forEach((col,i)=>{ctx.fillStyle=col;ctx.beginPath();ctx.arc(-w/2+28+i*26,-h/2+22,8,0,7);ctx.fill()});
+ const rows=Math.max(1,Math.floor((h-84)/34)),shown=Math.min(rows,Math.floor(Math.max(0,dt)*8)+3);
+ for(let i=0;i<rows;i++){const ind=(q()*3|0)*30,len=(.22+q()*.6)*(w-90-ind);if(i>=shown)continue;ctx.fillStyle=i%5===0?'#7aa2f7':i%3===0?'#9ece6a':'#4a505c';rrect(ctx,-w/2+30+ind,-h/2+68+i*34,len,14,7);ctx.fill()}
+ if(Math.floor(dt*2.5)%2===0&&shown<rows){ctx.fillStyle='#d6dcf5';ctx.fillRect(-w/2+30,-h/2+64+shown*34,12,22)}}
+function screenCard(c,t){const o=c[4],dt=t-c[0],a=gxa(c),W=(o.w??.66)*1080,pad=16;let im=null;
+ if(a.frames&&a.frames.length)im=GIMG[a.frames[Math.min(a.frames.length-1,Math.max(0,Math.floor(dt*(a.fps||12))))]];else if(a.src)im=GIMG[a.src];
+ const ok=im&&im.naturalWidth,ar=ok?im.naturalHeight/im.naturalWidth:.6,H=Math.min((W-pad*2)*ar+pad*2,(o.maxH??.42)*1920),cy=(o.y??.68)*1920,p=cl(dt/.4),e=expo(p),s=.9+.1*backOut(p);
+ ctx.save();ctx.globalAlpha*=cl(dt/.1);ctx.translate(540,cy+(1-e)*170);ctx.rotate((1-e)*.07);ctx.scale(s,s);shadow(ctx,90);rrect(ctx,-W/2,-H/2,W,H,30);ctx.fillStyle=o.bg||'#101216';ctx.fill();ctx.shadowColor='transparent';
+ ctx.save();rrect(ctx,-W/2+pad,-H/2+pad,W-pad*2,H-pad*2,18);ctx.clip();
+ if(ok){const iw=W-pad*2,ih=H-pad*2,k=Math.max(iw/im.naturalWidth,ih/im.naturalHeight);ctx.drawImage(im,-im.naturalWidth*k/2,-im.naturalHeight*k/2,im.naturalWidth*k,im.naturalHeight*k)}
+ else placeholderUI(W-pad*2,H-pad*2,dt,Math.round(c[0]*10));
+ ctx.restore();rrect(ctx,-W/2+3,-H/2+3,W-6,H-6,28);ctx.lineWidth=7;ctx.strokeStyle=o.border||CY;ctx.stroke();ctx.restore()}
+// a behind ordinal burst needs the titles layer even in a job without kinetic titles
+// screen cards and b-roll panels (mode 11) sit behind the top of the presenter's head: layer front|behind|auto per panel, or
+// panelLayer for the job (default auto = behind; where the head never reaches the panel it looks the same as front).
+// Behind panels draw on their own layer, ovlp/, which assemble.cjs puts over the picture, then the top of the head (the
+// person mask above the eyes, kit/headmask.py) on top: hair over the panel, the face and body always under it.
+const PANB=c=>{const l=['front','behind','auto'].includes(c[4].layer)?c[4].layer:['front','behind','auto'].includes(CAP.panelLayer)?CAP.panelLayer:'auto';return l!=='front'};
+window.__panels=()=>flips.some(c=>c[3]===11&&PANB(c));
+window.__layered=()=>TITLES.length>0||flips.some(c=>c[3]===9&&c[4].layer==='behind')||(CAPBEH&&flips.some(c=>c[3]===0))||window.__panels();
+window.__graphics=()=>flips.filter(c=>c[3]>=9&&c[3]<=11).map(c=>{const a=gxa(c);return{start:c[0],end:c[1],mode:c[3],text:c[2]||'',layer:c[3]===11?(PANB(c)?'behind':'front'):(c[4].layer||'front'),asset:a.frames?'video':(a.src||a.icon)?'image':'placeholder',loaded:[a.icon,a.src,...(a.frames||[]).slice(0,1)].filter(Boolean).every(u=>GIMG[u]&&GIMG[u].naturalWidth>0)}});
 let LAYER='all';
-function flip(t){for(const c of flips){if(t<c[0]||t>=c[1])continue;use(c.ps);const dt=t-c[0],m=c[3],out=c[1]>90?1:cl((c[1]-t)/.05);ctx.save();ctx.globalAlpha=out;
-if(m===7){if(zoneAt(t)!=='hide'){const lay=c.layer||'front';if(LAYER==='titles'){if(lay==='behind')title(c,t,'hero')}else if(LAYER==='front'){title(c,t,lay==='behind'?'partner':'all')}else title(c,t,'all')}}
+function flip(t){for(const c of flips){if(t<c[0]||t>=c[1])continue;if(LAYER==='panels'&&!(c[3]===11&&PANB(c)))continue;use(c.ps);const dt=t-c[0],m=c[3],out=c[1]>90?1:cl((c[1]-t)/.05);ctx.save();ctx.globalAlpha=out;
+if(m===9){const beh=c[4].layer==='behind';if(LAYER==='titles'){if(beh)ordBurst(c,t)}else{if(!(beh&&LAYER==='front'))ordBurst(c,t);ordWord(c,t)}}
+else if(m===7){if(zoneAt(t)!=='hide'){const lay=c.layer||'front';if(LAYER==='titles'){if(lay==='behind')title(c,t,'hero')}else if(LAYER==='front'){title(c,t,lay==='behind'?'partner':'all')}else title(c,t,'all')}}
+else if(m===11&&PANB(c)){if(LAYER==='panels'||LAYER==='all')screenCard(c,t)}
+else if(m===0&&CAPBEH){if(LAYER!=='front')caption(c,t)}
 else if(LAYER==='titles'){}
 else if(m===8)typeCard(c);
+else if(m===10)appLabel(c,t);
+else if(m===11)screenCard(c,t);
 else if(m===0)caption(c,t);
 else if(m===1)spray(c[2],fit([c[2]],G,200,960),540,Y,dt,31*(Math.round(c[0]*10)+3));
 else if(m===2)sticker(c[2],fit([c[2]],F,150,860),540,Y,dt,Math.round(c[0]*10)+1,F);
@@ -365,13 +457,15 @@ else if(m===3){const cu=CAP.countUp||{to:20,suffix:''},fs=fit([cu.to+cu.suffix],
 else if(m===4)card(dt);
 else if(m===5)logoPlate(dt);
 else if(m===6){sticker(c[2],fit(c[2].split('|'),F,170,700),540,Y-20,dt,7,F);const cta=CAP.cta||{};if(cta.sub&&t>=cta.subAt)glyphs(cta.sub,62,540,Y+210,t-cta.subAt,IV,true)}
-ctx.restore()}}
+ctx.restore()}
+if(LAYER!=='panels'&&(CAPBEH?LAYER!=='front':LAYER!=='titles'))oneWordSeq(t)}
 function burst(dt,seed){if(dt<-.1||dt>.42)return;const r=rng(seed),p=(dt+.1)/.52,a=Math.sin(Math.PI*cl(p));ctx.save();ctx.translate(540,Y);ctx.lineCap='round';for(let i=0;i<54;i++){const ang=r()*6.283,sp=.6+r()*.9,len=120+r()*520,st=120+p*sp*1150;ctx.strokeStyle=i%3?CY:IV;ctx.globalAlpha=a*(.35+r()*.6);ctx.lineWidth=2+r()*7;ctx.beginPath();ctx.moveTo(Math.cos(ang)*st,Math.sin(ang)*st);ctx.lineTo(Math.cos(ang)*(st+len),Math.sin(ang)*(st+len));ctx.stroke()}ctx.restore()}
 function glitch(t){glitchAt.forEach((h,i)=>{const dt=t-h;if(dt<-.05||dt>.2)return;const r=rng(Math.floor(t*24)*97+i*13+5),a=1-Math.max(0,dt)/.2;ctx.save();for(let k=0;k<16;k++){const y=r()*1920,hh=4+r()*r()*90;ctx.globalAlpha=a*(.12+r()*.5);ctx.fillStyle=k%3===0?CY:IV;ctx.fillRect(r()*200-100,y,r()>.4?1300:200+r()*700,hh)}ctx.fillStyle=IV;for(let k=0;k<2600;k++){ctx.globalAlpha=a*r()*.55;ctx.fillRect(r()*1080,r()*1920,2+r()*3,2)}ctx.restore()})}
-// layer: 'all' (default), 'front' (captions, plus front titles and partner words) or 'titles' (behind-head hero words only)
-window.seek=(t,layer)=>{LAYER=layer||'all';ctx.clearRect(0,0,1080,1920);flip(t);if(LAYER==='titles')return;(CAP.bursts||[]).forEach((h,i)=>burst(t-h,7919*(i+3)));glitch(t)};
+// layer: 'all' (default), 'front' (captions, plus front titles and partner words), 'titles' (behind-head hero words only)
+// or 'panels' (screen cards behind the head)
+window.seek=(t,layer)=>{LAYER=layer||'all';ctx.clearRect(0,0,1080,1920);flip(t);if(LAYER==='titles'||LAYER==='panels')return;(CAP.bursts||[]).forEach((h,i)=>burst(t-h,7919*(i+3)));glitch(t)};
 window.__titles=TITLES.map(c=>({start:c[0],end:c[1],text:c[2],entrance:c.entr,flicker:c.flick,layer:c.layer||'front'}));
 // Fonts: optional web-font stylesheet from the theme, then wait for every face we draw with, then the logo.
 const css=TH.fontCss?new Promise(r=>{const l=document.createElement('link');l.rel='stylesheet';l.href=TH.fontCss;l.onload=r;l.onerror=r;document.head.appendChild(l)}):Promise.resolve();
-css.then(()=>Promise.all(FACES)).then(()=>Promise.all([...Object.values(SETS).flatMap(s=>[...(s.SCF?[document.fonts.load(fnt(s.SCF,90))]:[]),document.fonts.load(fnt(s.S,CSZ)),document.fonts.load(fnt(s.G,160)),document.fonts.load(fnt(s.F,150)),document.fonts.load(fnt(s.K,46))]),document.fonts.ready,new Promise(r=>{if(!LOGO||SK.complete)return r();SK.onload=r;SK.onerror=r})])).finally(()=>{window.__logo=LOGO?SK.naturalWidth>0:null;window.__skool=window.__logo;window.__theme=TH.name||'custom';window.__fonts=CYC.length>1?CYC.map(s=>s.name).join(','):BASE.name;window.seek(0);window.__ready=true});
+css.then(()=>Promise.all(FACES)).then(()=>Promise.all([...Object.values(SETS).flatMap(s=>[...(s.SCF?[document.fonts.load(fnt(s.SCF,90))]:[]),document.fonts.load(fnt(s.S,CSZ)),document.fonts.load(fnt(s.G,160)),document.fonts.load(fnt(s.F,150)),document.fonts.load(fnt(s.K,46))]),document.fonts.ready,new Promise(r=>{if(!LOGO||SK.complete)return r();SK.onload=r;SK.onerror=r}),...IMGP])).finally(()=>{window.__logo=LOGO?SK.naturalWidth>0:null;window.__skool=window.__logo;window.__theme=TH.name||'custom';window.__fonts=CYC.length>1?CYC.map(s=>s.name).join(','):BASE.name;window.seek(0);window.__ready=true});
 </script></body></html>

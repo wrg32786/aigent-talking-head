@@ -66,6 +66,22 @@ def main():
     every = int(sys.argv[sys.argv.index('--every') + 1]) if '--every' in sys.argv else 3
     ovl = os.path.join(build, 'ovl')
     n = len([x for x in os.listdir(ovl) if x.endswith('.png')])
+    # captions behind the person (layers.json, written by render.mjs) are on the title layer, ovlt/, and the person
+    # mask hides whatever overlaps the head: only the visible part of the letters is measured
+    behind = False
+    try: behind = json.load(open(os.path.join(build, 'layers.json'), encoding='utf-8')).get('captions') == 'behind'
+    except (OSError, ValueError): pass
+    masks = None
+    if behind:
+        ovl = os.path.join(build, 'ovlt')
+        try: cut = json.load(open(os.path.join(build, 'cut.json'), encoding='utf-8'))
+        except (OSError, ValueError): cut = {}
+        mf = cut.get('mask') if isinstance(cut.get('mask'), str) else (cut.get('mask') or {}).get('file') if isinstance(cut.get('mask'), dict) else None
+        mf = os.path.join(build, mf) if mf else None
+        if mf and os.path.exists(mf):
+            mraw = subprocess.run(['ffmpeg', '-v', 'error', '-i', mf, '-vf', f'fps=24,scale={W}:{H},format=gray', '-f', 'rawvideo', '-'], capture_output=True, check=True).stdout
+            masks = np.frombuffer(mraw, np.uint8).reshape(-1, H, W)
+        print('legibility: captions behind the person; measuring the part the person does not cover' + ('' if masks is not None else ' (no mask found: the whole word)'))
     raw = subprocess.run(['ffmpeg', '-v', 'error', '-i', reel, '-vf', f'fps=24:start_time=0,select=not(mod(n\\,{every})),scale={W}:{H}', '-vsync', 'vfr', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'], capture_output=True, check=True).stdout
     frames = np.frombuffer(raw, np.uint8).reshape(-1, H, W, 3)
     # the glitch hits on a cut (cut.json "hits", captions.js "glitchAt") scramble the picture on purpose: skip them
@@ -74,13 +90,23 @@ def main():
     except (OSError, ValueError): pass
     try: hits += [float(h) for h in json.loads(re.search(r'=\s*(\{.*\})\s*;?\s*$', open(os.path.join(build, 'captions.js'), encoding='utf-8').read(), re.S).group(1)).get('glitchAt', [])]
     except (OSError, ValueError, AttributeError): pass
+    # graphics (ordinal stickers, app labels, screen cards: modes 9 to 11) bring their own backing, and their opaque
+    # tiles and cards would be read as giant letters: skip the moments they are up
+    gfx = []
+    try: gfx = [(float(f['start']), float(f['end'])) for f in json.loads(re.search(r'=\s*(\{.*\})\s*;?\s*$', open(os.path.join(build, 'captions.js'), encoding='utf-8').read(), re.S).group(1)).get('flips', []) if 9 <= int(f.get('mode', 0)) <= 11]
+    except (OSError, ValueError, AttributeError, KeyError, TypeError): pass
     bad, seen = [], 0
     for k, fr in enumerate(frames):
         i = k * every
         if i >= n: break
         if any(-0.08 <= i / 24 - h <= 0.3 for h in hits): continue
+        if any(a - 0.05 <= i / 24 <= b + 0.05 for a, b in gfx): continue
         # the caption layer can land a frame early or late on the picture at a cut: take the best of the three
-        rs = [check(np.asarray(Image.open(os.path.join(ovl, f'{j:04d}.png')).convert('RGBA'))[..., 3].astype(np.float32) / 255, fr) for j in (i - 1, i, i + 1) if 0 <= j < n]
+        def alpha(j):
+            a = np.asarray(Image.open(os.path.join(ovl, f'{j:04d}.png')).convert('RGBA'))[..., 3].astype(np.float32) / 255
+            if masks is not None and j < len(masks): a = a * (1 - masks[j].astype(np.float32) / 255)
+            return a
+        rs = [check(alpha(j), fr) for j in (i - 1, i, i + 1) if 0 <= j < n]
         if any(x is None for x in rs): continue  # a card or a glitch on one of them: not a fair read
         r = max(rs)
         seen += 1

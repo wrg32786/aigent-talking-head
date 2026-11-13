@@ -21,6 +21,11 @@ Stills use an AI-generated fictional presenter (Apache-2.0 with the repo). Rebui
 | ![tape-label](media/effect/tape-label.jpg)<br>`tape-label` | ![select-resize](media/effect/select-resize.jpg)<br>`select-resize` | ![wave-trim](media/effect/wave-trim.jpg)<br>`wave-trim` | ![huge-strike](media/effect/huge-strike.jpg)<br>`huge-strike` | ![crayon-write](media/effect/crayon-write.jpg)<br>`crayon-write` |
 | ![fan-build](media/effect/fan-build.jpg)<br>`fan-build` |  |  |  |  |
 
+## Graphics
+
+| --- | --- | --- |
+| ![ordinal-sticker](media/graphic/ordinal-sticker.jpg)<br>`ordinal-sticker` | ![app-label](media/graphic/app-label.jpg)<br>`app-label` | ![screen-card](media/graphic/screen-card.jpg)<br>`screen-card` |
+
 ## Film finishes
 
 | --- | --- | --- | --- | --- |

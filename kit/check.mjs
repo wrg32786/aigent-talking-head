@@ -6,7 +6,7 @@
 // hype words) in captions, titles or the script; a repeated or unknown title entrance; more than 7 titles; an unknown
 // transition, sound or film-finish name. Warnings: flicker on a middle title, a sound on every cut, more than 2 big punches, a possible
 // forced triad, the script shape (40-55 words, 15-20 s; over 25 s cut a middle sentence), and beat-sync on with no bed.
-import { existsSync, readFileSync, statSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { coverage, showcaseHas, sourceCatalogIds } from './menu.mjs';
 import { join, resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -42,6 +42,7 @@ function checkJob(captionsFile, cutFile, label) {
     if (!R.TITLE_LAYERS.includes(String(v).toLowerCase())) errs.push(`${where}: unknown title layer "${v}" (front, behind, auto)`);
   };
   layerOk(CAP.titleLayer, 'titleLayer');
+  if (CAP.panelLayer != null && !R.PANEL_LAYERS.includes(CAP.panelLayer)) errs.push(`panelLayer "${CAP.panelLayer}" (front, behind, auto)`);
   for (const t of raw) layerOk(t.layer, `title ${t.start}s`);
   // font lockups: "hero" must name words that are in the phrase; "lockup" must use a known arrangement
   const ARR = ['stack', 'overlap', 'inline'];
@@ -54,6 +55,16 @@ function checkJob(captionsFile, cutFile, label) {
     if (f.lockup && typeof f.lockup === 'object' && f.lockup.arrange && !ARR.includes(f.lockup.arrange)) errs.push(`flip ${f.start}s: lockup arrange "${f.lockup.arrange}" (${ARR.join(', ')})`);
   }
   if (CAP.lockup && CAP.lockup.arrange && !ARR.includes(CAP.lockup.arrange)) errs.push(`lockup arrange "${CAP.lockup.arrange}" (${ARR.join(', ')})`);
+  if (CAP.captionPosition && !['top', 'middle', 'bottom'].includes(CAP.captionPosition)) errs.push(`captionPosition "${CAP.captionPosition}" (top, middle, bottom)`);
+  for (const [k, vals] of [['captionOutline', ['none', 'thin', 'thick']], ['captionShadow', ['none', 'soft']], ['captionCase', ['upper', 'lower', 'as-said']], ['captionLayer', ['front', 'behind', 'auto']]]) if (CAP[k] && !vals.includes(CAP[k])) errs.push(`${k} "${CAP[k]}" (${vals.join(', ')})`);
+  if (CAP.captionColor && !/^#[0-9a-f]{6}$/i.test(CAP.captionColor)) errs.push(`captionColor "${CAP.captionColor}" (a #rrggbb colour)`);
+  // graphics (kit/graphics.json): an icon or screen file that is named must exist; leaving it out draws the placeholder
+  for (const f of flips.filter(x => x.mode >= 9 && x.mode <= 11)) {
+    const file = f.mode === 10 ? f.icon : f.mode === 11 ? f.src : null;
+    if (file && !existsSync(resolve(dirname(captionsFile), file))) errs.push(`graphic ${f.start}s: no file at ${file}`);
+    if (f.mode === 9 && f.layer && !['front', 'behind'].includes(f.layer)) errs.push(`graphic ${f.start}s: layer "${f.layer}" (front, behind)`);
+    if (f.mode === 11 && f.layer && !R.PANEL_LAYERS.includes(f.layer)) errs.push(`screen card ${f.start}s: layer "${f.layer}" (front, behind, auto)`);
+  }
   if (CAP.captionStyle && !['kinetic', 'oneword', 'classic', 'pill', 'hormozi', 'karaoke', 'one-word'].includes(CAP.captionStyle)) errs.push(`captionStyle "${CAP.captionStyle}" (kinetic, oneword, classic, pill, hormozi, karaoke, one-word)`);
   if (cutFile && existsSync(cutFile)) {
     const C = JSON.parse(readFileSync(cutFile, 'utf8')), TL = R.timeline(C);
@@ -118,6 +129,21 @@ if (target) {
   if (R.lintCopy('Drop your clip in the inbox and ask for the reel.').errs.length) self.errs.push('lint flagged a clean line');
   results.push(self);
 
+  // example Reel.md recipes: valid, and their title copy passes the lint
+  {
+    const RM = createRequire(import.meta.url)('./reelmd.cjs');
+    const dir = join(ROOT, 'examples', 'recipes');
+    const errs = [];
+    for (const f of (existsSync(dir) ? readdirSync(dir) : []).filter(f => f.endsWith('.Reel.md'))) {
+      try {
+        const r = RM.load(join(dir, f)); const v = RM.validate(r);
+        v.errs.forEach(e => errs.push(`${f}: ${e}`));
+        r.titles.forEach(t => R.lintCopy(t.text || '').errs.forEach(e => errs.push(`${f} title #${t.n}: ${e}`)));
+      } catch (e) { errs.push(`${f}: ${e.message}`); }
+    }
+    results.push({ label: 'example recipes (Reel.md)', errs, warns: [] });
+  }
+
   const menuCov = coverage();
   results.push({
     label: 'menu covers catalogs',
@@ -133,14 +159,14 @@ if (target) {
     const has = showcaseHas(html, ids);
     const errs = has.missing.map(x => 'showcase missing ' + x);
     // Visual kinds should also have a still under showcase/media so a new effect cannot hide.
-    const visual = ['finish', 'effect', 'transition', 'font', 'theme', 'entrance', 'look', 'captionStyle', 'preset', 'titleLayer'];
+    const visual = ['finish', 'effect', 'graphic', 'transition', 'font', 'theme', 'entrance', 'look', 'captionStyle', 'preset', 'titleLayer'];
     for (const kind of visual) {
       for (const id of ids[kind] || []) {
         const token = `data-id="${kind}:${id}"`;
         if (!html.includes(token)) continue;
         const base = join(ROOT, 'showcase', 'media');
         const dirs = {
-          finish: 'finish', effect: 'effect', transition: 'transition', font: 'font',
+          finish: 'finish', effect: 'effect', graphic: 'graphic', transition: 'transition', font: 'font',
           theme: 'theme', entrance: 'entrance', look: 'look', captionStyle: 'caption', preset: 'preset',
           titleLayer: 'titleLayer',
         };

@@ -46,6 +46,11 @@ const TITLE_LAYER = [
   { id: 'auto', flag: '"layer": "auto"  or  "titleLayer": "auto"', label: 'only the strongest 1 or 2 punch titles go behind the head, never consecutive ones (hook and payoff when they are not neighbours)' },
 ];
 
+// Graphic overlays (kit/graphics.json): ordinal sticker, app label, screen card.
+export function loadGraphics() {
+  return JSON.parse(readFileSync(join(KIT, 'graphics.json'), 'utf8')).graphics || [];
+}
+
 function themeLabel(name, src) {
   if (name === 'aigent') return 'AIgent brand guide, cyan accent (default)';
   if (name === 'neutral') return 'unbranded, offline, system fonts, no logo';
@@ -59,6 +64,7 @@ export function loadMenu() {
   const trans = JSON.parse(readFileSync(join(KIT, 'transitions.json'), 'utf8'));
   const themes = readdirSync(join(KIT, 'themes')).filter(f => f.endsWith('.js')).map(f => f.replace(/\.js$/, '')).sort();
   const man = SFXPLAN.loadManifest();
+  const gfx = loadGraphics();
 
   const finishes = B.CANON.map(id => ({
     kind: 'finish', id, section: 'finishes',
@@ -119,6 +125,12 @@ export function loadMenu() {
     captions: e.captions,
   }));
 
+  const graphics = gfx.map(g => ({
+    kind: 'graphic', id: g.id, section: 'graphics',
+    flag: `"mode": ${g.mode}  (entrance ${g.entrance})`,
+    label: g.label, mode: g.mode, entrance: g.entrance, fields: g.fields || {}, example: g.example,
+  }));
+
   const moments = cat.moments || {};
   const effectsByMoment = {};
   for (const id of Object.keys(moments)) effectsByMoment[id] = effects.filter(e => e.moments.includes(id));
@@ -154,6 +166,7 @@ export function loadMenu() {
     { id: 'title-entrances', title: 'Title entrances', hint: 'One kinetic title per beat. Flicker only on the hook and the payoff. Default layer is in front of the person.', items: titleEntrances },
     { id: 'title-layer', title: 'Title layer', hint: 'Front, behind the head, or auto, per title or for the job. Offer this per title. Agents and --preset auto use auto unless the preset says otherwise.', items: titleLayer },
     { id: 'transitions', title: 'Transitions', hint: 'Named cuts in cut.json. The glitch seam is the default.', items: transitions },
+    { id: 'graphics', title: 'Graphics', hint: 'Original overlay graphics, each with its own entrance: captions.js flips (modes 9 to 11) or a reel-graphics block in a Reel.md. Bring your icon or screen recording, or the kit draws a neutral placeholder. Teardown maps these from a reference (kit/graphics.json).', items: graphics },
     { id: 'effects', title: 'Effects', hint: 'Optional second pass (npm run fx). 51 starter effects, grouped by moment.', items: effects, moments, effectsByMoment },
     { id: 'sfx', title: 'SFX pack', hint: '31 CC0 sounds, auto-picked on npm run fx. Locked cut set is whoosh, swipe, boom, click, typing.', items: sfx },
     { id: 'beds', title: 'Music beds', hint: 'Our own tracks, loudness-matched to -13 LUFS. Hear them with the files in kit/music/.', items: beds },
@@ -182,6 +195,7 @@ export function sourceCatalogIds() {
   return {
     finish: [...B.CANON],
     effect: cat.effects.map(e => e.name),
+    graphic: loadGraphics().map(g => g.id),
     transition: Object.keys(trans.names || {}),
     font: Object.keys(fonts.pairings || {}),
     theme: themes.sort(),

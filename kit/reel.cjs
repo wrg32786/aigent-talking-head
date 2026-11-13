@@ -17,6 +17,18 @@
 //          --finish grain[,vignette,...]  optional film look (grain, vignette, chroma, scan-lines, warm, cool, teal, crushed, mono, bleach)
 //          --preset <name>|auto  apply a brand style (npm run preset -- --list). Flags you pass win over the preset.
 //          --title-layer front|behind|auto  job default for whether titles sit in front or behind the head (default front)
+//          --recipe Reel.md  make it from a Reel.md recipe (docs/reel-md.md): brand kit, music, style, per-shot finishes and
+//            punches, title entrances and layers in order. Flags win over the recipe; the recipe wins over the preset it names.
+//            --recipe-titles also uses the recipe's title text and times instead of titles drafted from your words, only
+//            where you say that text (kit/spoken.cjs); recipe stickers and labels show only words you say.
+//            --capture-sources captures the recipe's confirmed screen-card sources (public pages) first, see kit/capture.mjs.
+//          --clip <file>  the video to use (same as passing the path; reads well with --recipe)
+//            A recipe's graphics (ordinal stickers, app labels, screen cards) land at the recipe's times; icon and src
+//            paths are relative to the recipe, and anything left out is drawn as a neutral placeholder.
+//          --caption-position top|middle|bottom  --caption-color #rrggbb  where the captions sit and their colour
+//          --caption-outline none|thin|thick  --caption-shadow none|soft  --caption-case upper|lower|as-said  the one-word look
+//          --caption-layer front|behind|auto  captions under the person where they overlap the head (auto = behind at the top)
+//          --panel-layer front|behind|auto  screen cards behind the head where it reaches into them (auto = behind)
 // Writes jobs/<name>/: clips/ (clip.py output), build/ (cut.json, captions.js, theme.js, overlay frames), reel-vN.mp4.
 // Steps: clip.py (Whisper, best take per sentence, retakes flagged) -> cut.json from every "keep" clip (zoom punch on
 // every cut, big punch after the hook and into the payoff, a few sounds on the key cuts only) -> autocaption ->
@@ -29,12 +41,14 @@ const path = require('path');
 const R = require('./rules.cjs');
 const B = require('./beats.cjs');
 const P = require('./preset.cjs');
+const RM = require('./reelmd.cjs');
+const S = require('./spoken.cjs');
 
 const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer']);
+const VALUED = new Set(['caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const die = m => { console.error(m); process.exit(1); };
@@ -42,6 +56,7 @@ const VIDEO = /\.(mov|mp4|m4v|mkv|webm|avi)$/i;
 const PY = process.env.PYTHON || (process.platform === 'win32' ? 'py' : 'python3');
 
 let srcs = positional.slice();
+if (opt('clip')) srcs.unshift(opt('clip'));
 const clipsArg = opt('clips');
 if (!srcs.length && !clipsArg && !flag('rebuild')) {
   const inbox = path.join(ROOT, 'inbox');
@@ -69,6 +84,21 @@ if (presetArg === 'auto') {
   if (perrs.length) die('Invalid preset "' + presetArg + '": ' + perrs.join('; '));
   if (preset.draft) console.warn('note: preset "' + preset.name + '" is a draft from a brand guide; confirm it before you ship.');
   console.log('preset:', preset.name, '-', preset.label || '');
+}
+// --recipe Reel.md: the recipe acts as a preset on top of the preset it names (a --preset flag still picks the base)
+let recipe = null;
+if (opt('recipe')) {
+  const rf = path.resolve(opt('recipe'));
+  if (!fs.existsSync(rf)) die('No recipe at ' + rf);
+  try { recipe = RM.load(rf); } catch (e) { die('Reel.md: ' + e.message); }
+  const { errs, warn } = RM.validate(recipe);
+  warn.forEach(w => console.warn('note: ' + w));
+  if (errs.length) die('Reel.md problems:\n- ' + errs.join('\n- '));
+  const rp = RM.toPreset(recipe);
+  if (rp.bed && !R.isBed(rp.bed)) rp.bed = path.resolve(path.dirname(rf), rp.bed);
+  if (rp.logo && !opt('logo')) { const lf = path.resolve(path.dirname(rf), rp.logo); if (fs.existsSync(lf)) argv.push('--logo', lf); else console.warn('note: recipe logo not found: ' + lf); }
+  preset = preset ? { ...preset, ...rp, name: rp.name } : rp;
+  console.log(RM.summary(recipe).split('\n').map(l => 'recipe ' + l).join('\n'));
 }
 // An explicit --look wins over the preset: its caption style, its titles rule and (oneword) its font cycle come with it.
 const lookFlag = opt('look');
@@ -127,6 +157,14 @@ if (!flag('rebuild')) {
   if (bed) Object.assign(cut, { bed: require('./rules.cjs').isBed(bed) ? bed : path.resolve(bed), bedVol: 0.16, ...(opt('bed-start') != null ? { bedStart: +opt('bed-start') } : {}) });
   if (flag('no-beat-sync')) cut.beatSync = false;
   else if (flag('beat-sync') || bed) cut.beatSync = true;
+  if (recipe) {
+    const plan = RM.shotSettings(recipe);
+    plan.forEach((p, i) => { const sg = segs[i]; if (!sg) return; if (p.finish) sg.finish = p.finish; if (p.bigPunch && wantPunch) sg.bigPunch = true; if (p.transition && i) sg.transition = p.transition; });
+    if (plan.length !== segs.length) console.log(`recipe: ${plan.length} shots in the recipe, ${segs.length} segments from your clip; per-shot settings applied to the first ${Math.min(plan.length, segs.length)}`);
+    if (preset.bedStart != null && opt('bed-start') == null && cut.bed) cut.bedStart = preset.bedStart;
+    if (preset.bedVol != null && cut.bed) cut.bedVol = preset.bedVol;
+    cut.recipe = recipe.card.name;
+  }
   const finish = opt('finish') || (preset && !preset.finishPool && preset.finish) || undefined;
   if (finish) { try { B.parseFinish(finish); } catch (e) { die(e.message); } cut.finish = finish; }
   if (preset) {
@@ -150,6 +188,25 @@ if (!flag('rebuild')) {
   const logo = opt('logo');
   if (logo) fs.copyFileSync(path.resolve(logo), path.join(build, path.basename(logo)));
   sh(process.execPath, [path.join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--force', ...(cut.hits && cut.hits.length === 0 ? ['--no-glitch'] : []), ...(TITLES ? ['--titles'] : look === 'oneword' ? [] : ['--hero']), ...(look === 'oneword' ? ['--cards'] : []), '--style', STYLE, ...(FONTS ? ['--fonts', FONTS] : []), ...(logo ? ['--logo', path.basename(logo)] : [])], build);
+  if (recipe && recipe.titles.length && TITLES) {
+    const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF);
+    const rt = RM.titleFlips(recipe);
+    if (flag('recipe-titles')) {
+      const len = segs.reduce((a, s) => a + (s.out - s.in), 0);
+      // the recipe's words only where you say them: a title whose text is not in what you say around its time is dropped
+      const said = S.timeline(segs, build), ok = rt.filter(f => f.start < len && S.said(f.text, said, f.start, f.end));
+      caps.flips = (caps.flips || []).filter(f => f.mode !== 7).concat(ok.map(f => ({ ...f, end: Math.min(f.end, len) })));
+      for (const f of rt.filter(f => !ok.includes(f))) console.log(`recipe title dropped: "${f.text}" at ${f.start}s is not in what you say there`);
+      console.log(`recipe titles: ${ok.length} of ${rt.length} from the recipe (text and times; only text you say)`);
+    } else {
+      const mine = (caps.flips || []).filter(f => f.mode === 7).sort((a, b) => a.start - b.start), used = new Set();
+      const set = new Set();
+      mine.forEach((f, i) => { const r = rt[i]; if (!r) return; if (r.entrance && !used.has(r.entrance)) { f.entrance = r.entrance; used.add(r.entrance); set.add(f); } if (r.layer) f.layer = r.layer; });
+      mine.forEach(f => { if (!set.has(f) && f.entrance && used.has(f.entrance)) delete f.entrance; }); // each entrance once; the engine fills the rest
+      console.log(`recipe titles: entrance and layer pattern applied to ${Math.min(mine.length, rt.length)} of your ${mine.length} titles (pass --recipe-titles to use the recipe's text)`);
+    }
+    fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
+  }
   if (cut.titleLayer) {
     const capF = path.join(build, 'captions.js');
     const caps = R.readCaptions(capF);
@@ -157,6 +214,69 @@ if (!flag('rebuild')) {
       caps.titleLayer = cut.titleLayer;
       fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
     }
+  }
+  // caption band and colour (--caption-position top|middle|bottom, --caption-color #rrggbb, or the recipe's Style), and
+  // the recipe's graphics (ordinal stickers, app labels, screen cards) at the recipe's times, inside your clip's length
+  {
+    const pos = opt('caption-position') || (preset && preset.captionPosition), col = opt('caption-color') || (preset && preset.captionColor);
+    if (pos && !RM.CAPTION_POSITIONS.includes(String(pos))) die('--caption-position must be ' + RM.CAPTION_POSITIONS.join(', '));
+    if (col && !/^#[0-9a-f]{6}$/i.test(String(col))) die('--caption-color must be a #rrggbb colour');
+    const look = {};
+    for (const [k, [key, vals]] of Object.entries(RM.CAPTION_LOOK)) { const v = opt(k) || (preset && preset[key]); if (v == null) continue; if (!vals.includes(String(v))) die(`--${k} must be ${vals.join(', ')}`); look[key] = String(v); }
+    // --capture-sources: capture the recipe's confirmed screen-card sources (public pages) first (kit/capture.mjs)
+    if (recipe && flag('capture-sources')) { try { sh(process.execPath, [path.join(KIT, 'capture.mjs'), '--recipe', recipe.file], ROOT); } catch { console.warn('note: some sources were not captured (listed above); their cards use the placeholder'); } }
+    const gfx = recipe ? RM.graphicFlips(recipe) : [];
+    for (const g of gfx) if (g.source && !g.src) console.log(`note: screen card at ${g.start}s: source ${g.source} not captured yet; placeholder drawn (npm run capture -- --recipe ${recipe.file}, or --capture-sources, once the user confirms the URL)`);
+    // a burst sized to the head (head, head-y): measure your clip's head with the person mask and set size and y
+    let hwMemo;
+    const measureHead = () => {
+      if (hwMemo !== undefined) return hwMemo;
+      const fxPy = path.join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+      hwMemo = null;
+      if (fs.existsSync(fxPy) && segs.length) try { hwMemo = JSON.parse(execFileSync(fxPy, [path.join(KIT, 'teardown.py'), 'headwidth', path.resolve(build, segs[0].file)], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim().split('\n').pop()); } catch {}
+      return hwMemo;
+    };
+    if (gfx.some(g => g.head)) {
+      const hw = measureHead();
+      if (hw && hw.head_w) {
+        for (const g of gfx.filter(g => g.head)) { g.size = Math.round(Math.min(720, Math.max(200, g.head * hw.head_w * 1080 / 2))); g.y = +Math.min(0.6, Math.max(0.15, hw.head_cy + (g.headY || 0) * hw.head_w * 1080 / 1920)).toFixed(3); }
+        console.log(`burst sized to your head: head ${(hw.head_w * 100).toFixed(0)}% of the frame wide, centre ${(hw.head_cy * 100).toFixed(0)}% down`);
+      } else console.log('note: no person mask to measure your head (npm run effects:setup); bursts keep the recipe size');
+    }
+    if (pos || col || gfx.length || Object.keys(look).length) {
+      const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF);
+      if (pos) caps.captionPosition = String(pos);
+      if (col) caps.captionColor = String(col).toLowerCase();
+      Object.assign(caps, look);
+      // captions behind the person need the title layer and the person mask
+      if (R.captionLayer(caps) === 'behind' && !cut.titles) { Object.assign(cut, flag('no-mask') ? { titles: 'ovlt/%04d.png' } : { titles: 'ovlt/%04d.png', mask: 'mask.mkv', ...(opt('mask') ? { maskModel: opt('mask') } : {}) }); fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); }
+      // top captions behind the head stay readable: measure the highest the head goes so the words sit on the hairline, not in the hair
+      if (R.captionLayer(caps) === 'behind' && caps.captionPosition === 'top' && caps.headTop == null) {
+        const hw = measureHead();
+        if (hw && hw.head_top) { caps.headTop = Math.round(hw.head_top * 1920); console.log(`captions behind the head: your head reaches ${(hw.head_top * 100).toFixed(0)}% down; one-word captions sit on top of it`); }
+      }
+      if (gfx.length) {
+        // the recipe's words never show on your clip: ordinal stickers show the ordinal you say when you say it, app
+        // labels stay only if you name the app (kit/spoken.cjs); screen cards keep the recipe's times
+        const len = segs.reduce((a, sg) => a + (sg.out - sg.in), 0), sp = S.fitGraphics(gfx, S.timeline(segs, build), len);
+        for (const d of sp.dropped) console.log('recipe graphic dropped: ' + d.why);
+        const fit = sp.gfx.filter(g => g.start < len - 0.3).map(g => ({ ...g, end: +Math.min(g.end, len).toFixed(3) }));
+        caps.flips = (caps.flips || []).filter(f => !(f.mode >= 9 && f.mode <= 11)).concat(fit);
+        // a sticker behind the head, or a screen card behind the head (the default), needs the person mask, even with no titles
+        if ((fit.some(g => g.mode === 9 && g.layer === 'behind') || R.panelsBehind(caps).length) && !cut.titles) Object.assign(cut, flag('no-mask') ? { titles: 'ovlt/%04d.png' } : { titles: 'ovlt/%04d.png', mask: 'mask.mkv', ...(opt('mask') ? { maskModel: opt('mask') } : {}) });
+        fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
+        for (const g of fit.filter(g => g.spoken)) console.log(`recipe graphic: ${g.mode === 9 ? 'ordinal sticker' : 'app label'} "${g.text}" at ${g.start}s (you say "${g.spoken}")`);
+        console.log(`recipe graphics: ${fit.length} of ${gfx.length} fit your ${len.toFixed(1)} s (${fit.filter(g => g.icon || g.src).length} with your files, the rest drawn as placeholders)`);
+      }
+      if (pos || col || Object.keys(look).length) console.log(`captions: ${pos || 'default band'}${col ? ', ' + String(col).toLowerCase() : ''}${Object.entries(look).map(([k, v]) => `, ${k === 'panelLayer' ? 'screen cards' : k.replace('caption', '').toLowerCase()} ${v}`).join('')}`);
+      fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
+    }
+  }
+  // last check on a recipe job: every title, ordinal sticker and app label shows only words you say around its time
+  if (recipe) {
+    const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), au = S.audit(caps.flips, S.timeline(segs, build));
+    if (au.dropped.length) { caps.flips = au.flips; fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); for (const d of au.dropped) console.log('dropped, not said: ' + d.why); }
+    else console.log('on-screen words: every title, sticker and label is something you say');
   }
   // --broll <folder>: cutaways from your own clips. A phrase that isn't a type card or under a title cuts to the next
   // clip in the folder (every third phrase, 0.8 to 2.2 s), the voice running on; see "inserts" in kit/assemble.cjs.
@@ -228,11 +348,26 @@ const LEN = cut.segs.reduce((a, s) => a + (s.out - s.in) + (s.pad || 0), 0) + (c
 // copy lint and title/sound rules: printed, not blocking (npm run check -- <name> and npm run verify fail on errors)
 try { sh(process.execPath, [path.join(KIT, 'check.mjs'), build, '--warn-only'], build); } catch {}
 sh(process.execPath, [path.join(KIT, 'render.mjs'), LEN.toFixed(2)], build);
+// screen cards behind the head render to ovlp/; assemble.cjs needs to know (with the head mask below, else in front)
+{ let lj = {}; try { lj = JSON.parse(fs.readFileSync(path.join(build, 'layers.json'), 'utf8')); } catch {}
+  const want = lj.panels === 'behind' ? 'ovlp/%04d.png' : undefined;
+  if (cut.panels !== want) { if (want) cut.panels = want; else { delete cut.panels; delete cut.headMask; } fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); } }
 // person mask only for titles that sit behind the head (needs npm run effects:setup)
 if (cut.titles && cut.mask) {
-  const behind = R.resolveTitles(R.readCaptions(path.join(build, 'captions.js')), cut).filter(t => t.layer === 'behind');
+  const capsNow = R.readCaptions(path.join(build, 'captions.js'));
+  const behind = R.resolveTitles(capsNow, cut).filter(t => t.layer === 'behind')
+    .concat((capsNow.flips || []).filter(f => f.mode === 9 && f.layer === 'behind').map(f => ({ start: f.start, end: f.end })));
+  // captions behind the person (caption-layer behind, or auto at the top): mask every caption span
+  if (R.captionLayer(capsNow) === 'behind') {
+    const spans = (capsNow.flips || []).filter(f => f.mode === 0).map(f => [f.start, Math.min(f.end, LEN)]).sort((a, b) => a[0] - b[0]), merged = [];
+    for (const [a, b] of spans) { const l = merged[merged.length - 1]; if (l && a <= l[1] + 1.6) l[1] = Math.max(l[1], b + 1.5); else merged.push([a, b + 1.5]); }
+    if (merged.length) { behind.push(...merged.map(([a, b]) => ({ start: a, end: Math.min(b, LEN) }))); console.log(`captions behind the person: mask over ${merged.length} caption span${merged.length > 1 ? 's' : ''}`); }
+  }
+  // screen cards behind the head: mask their spans, then cut the head out of the person mask (kit/headmask.py)
+  const panels = R.panelsBehind(capsNow).map(f => ({ start: f.start, end: Math.min(f.end, LEN) }));
+  if (panels.length && cut.panels) { behind.push(...panels); console.log(`screen cards behind the top of the head: mask over ${panels.length} card span${panels.length > 1 ? 's' : ''}`); }
   if (!behind.length) {
-    console.log('title layer: all titles in front; skipping the person mask');
+    console.log('title layer: all titles and stickers in front; skipping the person mask');
   } else {
     const fxPy = path.join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
     const spec = R.maskSpec(cut, { model: opt('mask') });
@@ -242,6 +377,10 @@ if (cut.titles && cut.mask) {
       const win = behind.map(t => `${Math.max(0, t.start - 0.1).toFixed(2)}-${Math.min(LEN, t.end + 0.1).toFixed(2)}`).join(',');
       const maskArgs = [path.join(KIT, 'mask.py'), 'base.mp4', spec.file || 'mask.mkv', ...(win ? ['--windows', win] : []), ...(spec.model ? ['--model', spec.model] : []), ...(spec.person ? ['--person', spec.person] : [])];
       sh(fxPy, maskArgs, build);
+      if (panels.length && cut.panels) {
+        sh(fxPy, [path.join(KIT, 'headmask.py'), spec.file || 'mask.mkv', 'maskhead.mkv'], build);
+        if (cut.headMask !== 'maskhead.mkv') { cut.headMask = 'maskhead.mkv'; fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); }
+      }
     }
   }
 }

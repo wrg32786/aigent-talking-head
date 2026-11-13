@@ -1,8 +1,9 @@
 import { chromium } from 'playwright-core';
-import { mkdirSync, rmSync, existsSync, copyFileSync, writeFileSync, readFileSync } from 'fs';
+import { mkdirSync, rmSync, existsSync, copyFileSync, writeFileSync, readFileSync, readdirSync, statSync } from 'fs';
+import { execFileSync } from 'child_process';
 import { resolveFonts } from './fonts.mjs';
 import { createRequire } from 'module';
-import { dirname, join } from 'path';
+import { dirname, join, isAbsolute } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { findChrome } from './chrome.mjs';
 // Run from the job's build/ folder (holds captions.js):  node <kit>/render.mjs <durationSec> [t1,t2,... for stills only]
@@ -40,6 +41,30 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
   { let C = {}; try { C = JSON.parse(readFileSync(join(ROOT, 'cut.json'), 'utf8')); } catch {}
     writeFileSync(join(ROOT, 'lockover.js'), 'window.LOCKOVER=' + JSON.stringify({ lockup: C.lockup || null, hero: C.hero || null, titleLayer: C.titleLayer || null, inserts: (C.inserts || []).map(s => ({ at: +s.at, dur: +s.dur, y: s.y, tint: s.tint, line: s.line, arc: s.arc })) }) + ';\n'); }
   if (!existsSync(join(ROOT, 'fxzones.js'))) writeFileSync(join(ROOT, 'fxzones.js'), 'window.FXZONES=[];\n');
+  // graphics (modes 10 and 11): icon and screen images as file URLs; a screen recording becomes a short frame list
+  // (build/gfx/, 12 fps) so the card can play it frame-accurately. Fonts for the ordinal word and the label.
+  { const assets = {}, VID = /\.(mp4|mov|m4v|webm|mkv)$/i, url = f => pathToFileURL(f).href;
+    for (const f of CAP.flips || []) {
+      if (f.mode !== 10 && f.mode !== 11) continue;
+      const key = f.mode + '@' + f.start, file = f.mode === 10 ? f.icon : f.src;
+      if (!file) continue;
+      const abs = isAbsolute(file) ? file : join(ROOT, file);
+      if (!existsSync(abs)) { console.warn(`graphic at ${f.start}s: no file ${file}, drawing the placeholder`); continue; }
+      if (f.mode === 11 && VID.test(abs)) {
+        const dur = Math.max(0.1, (+f.end >= 90 ? DUR : +f.end) - +f.start), dir = join(ROOT, 'gfx', String(f.start).replace(/[^0-9]/g, '_'));
+        const sig = JSON.stringify([abs, statSync(abs).mtimeMs, +f.in || 0, dur]);
+        if (!existsSync(join(dir, 'sig.json')) || readFileSync(join(dir, 'sig.json'), 'utf8') !== sig) {
+          rmSync(dir, { recursive: true, force: true }); mkdirSync(dir, { recursive: true });
+          execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', String(+f.in || 0), '-i', abs, '-t', String(dur), '-vf', 'fps=12,scale=720:-2', '-q:v', '4', join(dir, '%04d.jpg')]);
+          writeFileSync(join(dir, 'sig.json'), sig);
+        }
+        assets[key] = { fps: 12, frames: readdirSync(dir).filter(x => x.endsWith('.jpg')).sort().map(x => url(join(dir, x))) };
+      } else assets[key] = f.mode === 10 ? { icon: url(abs) } : { src: url(abs) };
+    }
+    const F = join(KIT, 'fonts');
+    writeFileSync(join(ROOT, 'gfx.js'), 'window.GFX=' + JSON.stringify({ fonts: { serif: url(join(F, 'InstrumentSerif-Italic.ttf')), label: url(join(F, 'ArchivoBlack-Regular.ttf')) }, assets }) + ';\n');
+    if (Object.keys(assets).length) console.log('graphics assets', Object.keys(assets).length);
+  }
 }
 const b = await chromium.launch({ executablePath: findChrome() });
 const p = await b.newPage({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: 1 });
@@ -50,6 +75,14 @@ console.log('theme', await p.evaluate(() => window.__theme));
 // Behind-head titles (mode 7, layer behind) get their own layer, ovlt/, so assemble.cjs can draw them behind the person; ovl/ then
 // holds front titles, partner words and captions. Stills always show every layer together.
 const titles = await p.evaluate(() => window.__titles || []);
+const layered = titles.length > 0 || !!(await p.evaluate(() => (window.__layered ? window.__layered() : false)));
+const gfx = await p.evaluate(() => (window.__graphics ? window.__graphics() : []));
+if (gfx.length) { writeFileSync(join(ROOT, 'graphics.json'), JSON.stringify(gfx, null, 1) + '\n'); console.log('graphics', gfx.map(g => `${g.start}s ${['ordinal-sticker', 'app-label', 'screen-card'][g.mode - 9]}${g.layer === 'behind' ? ' behind' : ''} ${g.asset}${g.asset !== 'placeholder' && !g.loaded ? ' (asset failed to load)' : ''}`).join(', ')); }
+// one-word captions: every spoken word gets its own slot, back to back (words.json, checked by npm run smoke)
+const capLayer = await p.evaluate(() => window.__captionLayer || 'front');
+if (capLayer === 'behind') console.log('captions: behind the person (on the title layer, under the mask)');
+const words = await p.evaluate(() => window.__words || []);
+if (words.length) { writeFileSync(join(ROOT, 'words.json'), JSON.stringify(words) + '\n'); const short = Math.min(...words.map(w => w.end - w.start)); console.log(`one-word captions: ${words.length} words, each up ${short.toFixed(2)} s or more`); }
 if (titles.length) console.log('titles', titles.map(t => `${t.start}s ${t.entrance}${t.flicker ? '+flicker' : ''}${t.layer && t.layer !== 'front' ? ' ' + t.layer : ''}`).join(', '));
 // Font lockups (titles and kinetic lines, two faces per phrase): written out so they can be checked without pixels
 const lockups = await p.evaluate(() => (window.__lockups ? window.__lockups() : []));
@@ -62,10 +95,15 @@ const mix = await p.evaluate(() => (window.__pairMix ? window.__pairMix() : []))
 if (mix.length) console.log('pairing mix at', mix.map(m => m.join('/')).join(', '));
 if (lockups.length) console.log('lockups', lockups.filter(l => l.kind === 'title').length, 'titles +', lockups.filter(l => l.kind === 'kinetic').length, 'lines,', [...new Set(lockups.map(l => l.arrange))].join('/'));
 const split = !!(only && process.env.STILLS_LAYERS);
+// screen cards behind the head get a third layer, ovlp/ (assemble.cjs: picture, panels, then the head over them)
+const panels = !!(await p.evaluate(() => (window.__panels ? window.__panels() : false)));
+writeFileSync(join(ROOT, 'layers.json'), JSON.stringify({ captions: capLayer, panels: panels ? 'behind' : 'front' }) + '\n');
+if (panels) console.log('screen cards: behind the top of the head (panel layer, under the crown mask)');
 const passes = split
-  ? (titles.length ? [['stills-front', 'front'], ['stills-titles', 'titles']] : [['stills-front', 'all']])
-  : only ? [['stills', 'all']] : titles.length ? [['ovl', 'front'], ['ovlt', 'titles']] : [['ovl', 'all']];
-if (!only && !titles.length) rmSync(join(ROOT, 'ovlt'), { recursive: true, force: true });
+  ? (layered ? [['stills-front', 'front'], ['stills-titles', 'titles'], ...(panels ? [['stills-panels', 'panels']] : [])] : [['stills-front', 'all']])
+  : only ? [['stills', 'all']] : layered ? [['ovl', 'front'], ['ovlt', 'titles'], ...(panels ? [['ovlp', 'panels']] : [])] : [['ovl', 'all']];
+if (!only && !layered) rmSync(join(ROOT, 'ovlt'), { recursive: true, force: true });
+if (!only && !panels) rmSync(join(ROOT, 'ovlp'), { recursive: true, force: true });
 const list = only || [...Array(Math.round(DUR * FPS)).keys()].map(f => f / FPS);
 let i = 0;
 for (const [d, layer] of passes) {

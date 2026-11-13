@@ -43,6 +43,9 @@ What this repo ships from other projects, and what it only took ideas from. Lice
 
 - **Title entrances** (`kit/overlay.html`): the seven entrance styles were written from scratch for canvas, with [nexu-io/motion-anything](https://github.com/nexu-io/motion-anything) (Apache-2.0) as a visual reference only.
 
+- **Reel.md** (`docs/reel-md.md`, `kit/reelmd.cjs`): the idea of a shareable Markdown recipe an agent reads and remakes came from [OpenMotion](https://github.com/nexu-io/openmotion)'s Motion.md, and the one-line agent install (`INSTALL.md`) and `npx skills add` packaging follow its quick start. OpenMotion is Apache-2.0. No OpenMotion text or code was copied; the format, parser and docs here are new.
+- **VIDEO.md compatibility**: a Reel.md uses the card fields and the `videomd-timeline` line syntax of [VIDEO.md](https://github.com/videomd/videomd) (spec and reference validator, Apache-2.0, Copyright the VIDEO.md authors), and `npm run reelmd -- package` writes a VIDEO.md package. The syntax was implemented from the spec; no VIDEO.md code is included.
+
 ## Installed at setup, not vendored
 
 These are fetched by `npm run effects:setup` (and the BiRefNet weights on first `kit/mask.py --model birefnet`, or `npm run effects:setup -- --birefnet`). They are not in git. Licences were checked from the primary sources on Nov 10, 2026.
@@ -54,10 +57,21 @@ These are fetched by `npm run effects:setup` (and the BiRefNet weights on first 
 | librosa (Python package) | [librosa/librosa](https://github.com/librosa/librosa), [LICENSE.md](https://github.com/librosa/librosa/blob/main/LICENSE.md) | ISC. Beat / onset / energy analysis in `kit/beats.py`. Pulled in by `pip install -r requirements.txt`, not in git. Runtime deps (numpy, scipy, soundfile, numba, and soxr for resampling) stay at install time; soxr is LGPL-2.1, same class of requirement as the ffmpeg binary already needed by the kit. |
 | birefnet-general-lite weights (`BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx`, md5 `4fab47adc4ff364be1713e97b7e66334`) | Hosted by rembg at [releases/v0.0.0](https://github.com/danielgatis/rembg/releases/download/v0.0.0/BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx). Upstream: [ZhengPeng7/BiRefNet](https://github.com/ZhengPeng7/BiRefNet), [LICENSE](https://github.com/ZhengPeng7/BiRefNet/blob/main/LICENSE). The author confirmed that the released checkpoints are also MIT ([issue 316](https://github.com/ZhengPeng7/BiRefNet/issues/316)); the [BiRefNet_lite](https://huggingface.co/ZhengPeng7/BiRefNet_lite) model card is `license: mit`. | MIT, Copyright (c) 2024 ZhengPeng. Cached by rembg (typically `~/.rembg/models/birefnet-general-lite/`), about 214 MB. |
 
+Teardown (`npm run teardown`, optional; licences checked Nov 12, 2026 from each project's metadata and repo):
+
+| What | From | Licence |
+|---|---|---|
+| rea-video (Python package, the teardown engine) | [JuneYaooo/rea-video](https://github.com/JuneYaooo/rea-video) | Apache-2.0, Copyright 2026 JuneYaooo. Installed with `npm run teardown -- <file> --install` (`pip install "rea-video[ocr] @ git+https://github.com/JuneYaooo/rea-video"`). Not vendored. |
+| rea-video's dependencies | videomd (Apache-2.0), opencv-python-headless (Apache-2.0), numpy (BSD-3-Clause), Pillow (MIT-CMU), PyYAML (MIT), onnxruntime (MIT), rapidocr-onnxruntime (Apache-2.0, with PaddleOCR models, Apache-2.0), pyclipper (MIT), shapely (BSD-3-Clause), six (MIT) | Permissive. The `[asr]` extra (sherpa-onnx with the SenseVoice model) is not installed by this kit; faster-whisper (MIT, already in requirements.txt) covers speech. |
+| Audio separation models rea-video downloads on first run into `~/.cache/rea-video/models` | UVR MDX-Net Inst HQ 3 from the [UVR model repo](https://github.com/TRvlvr/model_repo) (Ultimate Vocal Remover, MIT); BandIt v2 (Watcharasupat, Wu, Orife, arXiv 2407.07275), weights CC BY-SA 4.0 per rea-video's docs | Fetched by rea-video, not by this repo, and used only to analyse the reference. Nothing from them ships in the repo or in your reel. |
+| rapidocr-onnxruntime (optional, the built-in fallback's OCR) | [RapidAI/RapidOCR](https://github.com/RapidAI/RapidOCR) | Apache-2.0. `pip install rapidocr-onnxruntime` (Python 3.12 and older) or `rapidocr` (3.13+). Without it the fallback reads no on-screen text. |
+
+No GPL or commercial-only package is on the default teardown path.
+
 Do not use rembg's default `bria-rmbg` model with this kit: RMBG-2.0 has a separate BRIA licence that requires a paid agreement for commercial use.
 
 ## Linked, not included
 
-- [rea-video](https://github.com/JuneYaooo/rea-video) (Apache-2.0) and [instaloader](https://github.com/instaloader/instaloader) (MIT): optional tools for the reference-teardown step in the talking-head-ad skill. Install them yourself if you want that step.
+- Teardown reads local files the user provides. The one optional exception: `npm run teardown -- --url <instagram post>` uses [instaloader](https://github.com/instaloader/instaloader) (MIT) when the user has installed it (`pip install instaloader`, commented in requirements.txt, not on the default path) to fetch the single named post anonymously. No login, no profile or bulk fetching. Users must have the rights to the content and follow Instagram's terms. No other platform downloader is included.
 - Not used at all: ViralCutter (GPL), react-bits, GSAP, Robust Video Matting (RVM, GPL-3.0). RVM was tried for a one-off hero-reel mask and must stay out of the repo.
 - Commercial fonts the pairings stand in for (Druk, Helvetica, Optitimes, Sloop, Vanguard, Athelas) are not included. Put your own licensed copies in `kit/fonts/local/`, which is gitignored.

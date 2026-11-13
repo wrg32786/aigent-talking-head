@@ -45,3 +45,10 @@ Third-party files keep their own terms:
 - showcase/source/presenter.jpg: an AI-generated fictional person made for this
   project (and the derived presenter-mask.png). Not a real person's portrait.
   Licensed Apache-2.0 with this repo.
+
+- docs/reel-md.md, kit/reelmd.cjs, INSTALL.md, skills/talking-head-*: the Reel.md recipe idea, the one-line agent
+  install and the skills packaging were inspired by OpenMotion (https://github.com/nexu-io/openmotion), Apache-2.0.
+  Reel.md follows the VIDEO.md card and timeline syntax (https://github.com/videomd/videomd), Apache-2.0. No text or
+  code was copied from either.
+- npm run teardown uses rea-video (https://github.com/JuneYaooo/rea-video), Apache-2.0, Copyright 2026 JuneYaooo,
+  installed on request, not vendored.
