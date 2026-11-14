@@ -8,8 +8,6 @@ Paste this into your agent:
 Read https://raw.githubusercontent.com/wrg32786/aigent-talking-head/main/INSTALL.md and follow it to install aigent-talking-head in this agent.
 ```
 
-AIgent Academy members: download the kit from the members' page, unzip it, open the folder in your agent and paste: Read INSTALL.md in this folder and follow it to install aigent-talking-head.
-
 Works with your agent: Claude Code, Codex, Cursor, Gemini CLI, OpenCode, and any agent that runs commands and reads `SKILL.md` skills (`npx skills add wrg32786/aigent-talking-head`).
 
 ![Phone clip versus the finished reel](kit/example/demo-reel/before-after.gif)

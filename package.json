@@ -8,7 +8,6 @@
     "node": ">=18"
   },
   "scripts": {
-    "release:zip": "node scripts/release-zip.mjs",
     "reel": "node kit/reel.cjs",
     "smoke": "node kit/smoke.mjs",
     "smoke:whisper": "node kit/smoke.mjs --whisper",
