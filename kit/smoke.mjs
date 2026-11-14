@@ -246,7 +246,7 @@ try {
   });
   step('app label: the full name shows even when the label is up briefly', () => {
     const one = (name, end, t) => { const d = join(work, name); mkdirSync(d, { recursive: true });
-      writeFileSync(join(d, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'one-word', fonts: 'theme', flips: [{ start: 0, end, mode: 10, text: 'OmniRoute', x: 0.12, size: 286 }] }) + ';\n');
+      writeFileSync(join(d, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'one-word', fonts: 'theme', flips: [{ start: 0, end, mode: 10, text: 'Launchpad', x: 0.12, size: 286 }] }) + ';\n');
       run(node, [join(KIT, 'render.mjs'), '0', t.toFixed(2)], d, { THEME: 'aigent', FONTS: 'theme', STILLS_LAYERS: '1' }); return ink(join(d, 'stills-front', `t${t.toFixed(2)}.png`)); };
     const brief = one('label-brief', 0.55, 0.5), full = one('label-full', 3, 1.5);
     if (!(brief.n > 0.95 * full.n)) fail(`a brief label is cut off: ${brief.n} vs ${full.n} pixels`);
@@ -351,11 +351,11 @@ try {
     // burst size relative to the head; what a card showed, the address read in it and the tool named before it
     const gh = V.mapGraphics(b, { graphics: [
       { type: 'ordinal-sticker', start: 0.5, end: 1.5, text: 'FIRST', layer: 'behind', bbox: [0.15, 0.2, 0.7, 0.2], width: 0.7, face_w: 0.25, head_cy: 0.32, head_ratio: 2.8 },
-      { type: 'app-label', start: 4, end: 5, text: 'Caveman', tile: '#000000', bbox: [0.1, 0.5, 0.2, 0.11] },
-      { type: 'screen-card', start: 5, end: 9, border: '#d87b5b', ui_text: 6, bbox: [0.17, 0.55, 0.66, 0.3], shown: ['Caveman', 'why use many token'], urls: ['github.com/JuliusBrussee/caveman'] }] });
+      { type: 'app-label', start: 4, end: 5, text: 'Notebook', tile: '#000000', bbox: [0.1, 0.5, 0.2, 0.11] },
+      { type: 'screen-card', start: 5, end: 9, border: '#d87b5b', ui_text: 6, bbox: [0.17, 0.55, 0.66, 0.3], shown: ['Notebook', 'take notes faster'], urls: ['github.com/example-org/notebook'] }] });
     if (gh[0].head !== 2.8 || !(gh[0].headY > 0.3 && gh[0].headY < 0.9)) fail('burst relative to the head: ' + JSON.stringify(gh[0]));
     const card = gh.find(g => g.type === 'screen-card');
-    if (card.subject !== 'Caveman' || card.sourceGuess !== 'https://github.com/JuliusBrussee/caveman' || card.named !== 'Caveman') fail('card source suggestion: ' + JSON.stringify(card));
+    if (card.subject !== 'Notebook' || card.sourceGuess !== 'https://github.com/example-org/notebook' || card.named !== 'Notebook') fail('card source suggestion: ' + JSON.stringify(card));
     // caption look from the ring measures: plain letters (ring = background) vs a dark outline
     const plain = [0, 1, 2, 3].map(i => ({ t0: i, text: 'w' + i, near: 120, mid: 119, far: 118 })), outl = [0, 1, 2, 3].map(i => ({ t0: i, text: 'w' + i, near: 20, mid: 30, far: 120 }));
     const lk = (x) => V.captionLook(x, null);

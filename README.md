@@ -1,6 +1,10 @@
 # aigent-talking-head
 
-From [The AIgent](https://theaigent.xyz). Turn one phone clip into a styled talking-head reel.
+Turn one phone clip into a styled talking-head reel with your coding agent: kinetic captions, titles behind your head, 51 effects, beat-synced music and film finishes. Runs locally. Apache-2.0. From [The AIgent](https://theaigent.xyz).
+
+[Quick start](#quick-start-phone-clip-to-reel) · [Effects](#effects-optional) · [Reel.md recipes](#reelmd-recipes) · [Brand presets](#brand-presets) · [Full gallery](showcase/GALLERY.md) · [Credits](#credits-and-licences)
+
+## Get started
 
 Paste this into your agent:
 
@@ -13,6 +17,8 @@ Works with your agent: Claude Code, Codex, Cursor, Gemini CLI, OpenCode, and any
 ![Phone clip versus the finished reel](kit/example/demo-reel/before-after.gif)
 
 Phone clip on the left, finished reel on the right. [Watch the 40-second demo](kit/example/demo-reel/demo-reel.mp4) (20 effects, with the [plan files](kit/example/demo-reel/)).
+
+Prefer to run it by hand? See [Install](#install) and [Quick start](#quick-start-phone-clip-to-reel).
 
 ## Effects
 
@@ -37,6 +43,8 @@ Titles sit in front by default. Set a title behind the head, or use auto for the
 ![Title entrances](showcase/sheets/entrances.jpg)
 
 ## Captions and type
+
+Top captions tuck behind your hair where they meet it (`--caption-layer front|behind|auto`, auto by default). Screen cards and b-roll panels go behind only the top of your head, never your face (`--panel-layer`). Details in [docs/reel-md.md](docs/reel-md.md).
 
 ![Caption styles](showcase/sheets/captions.jpg)
 
