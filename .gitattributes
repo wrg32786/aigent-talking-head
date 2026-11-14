@@ -1,8 +1,6 @@
-# Internal task briefs, build reports and agent run logs are not member content.
+# Internal task briefs, build reports and agent run logs are not part of the kit.
 /.aigent export-ignore
-# Repository automation is not needed to install or run the downloaded kit.
+# Repository automation is not needed to install or run the kit.
 /.github export-ignore
-# Release tooling requires a Git checkout and is only for maintainers.
-/scripts/release-zip.mjs export-ignore
 # The recipe parser expects LF after fenced-block openers.
 /examples/recipes/*.Reel.md text eol=lf

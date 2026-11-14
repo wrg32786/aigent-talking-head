@@ -6,22 +6,13 @@ You are installing aigent-talking-head for the user in this agent. It turns a ph
 
 Report the OS and these versions. Install what is missing with the system's package manager, asking the user first if it needs admin rights.
 
+- Git: `git --version`
 - Node.js 18 or newer: `node -v`
 - ffmpeg and ffprobe: `ffmpeg -version`, `ffprobe -version`
 - Python 3.10 or newer: `python3 --version` (Windows: `py -3 --version`)
 - Chrome or Chromium (any install the kit can find, or set `CHROME_PATH`)
 
 ## 2. Get the code
-
-**From the members' download:** you are already inside the unzipped `aigent-talking-head-<version>` folder. Confirm that `package.json` says `"name": "aigent-talking-head"`, then run:
-
-```
-npm install
-```
-
-This path does not need Git or GitHub access. To update later, download the new zip and unzip it next to the old folder, which stays as your backup. Copy your own files across to the new folder: `inbox/`, `jobs/`, `clips/`, `teardown/` (your teardowns and their Reel.md recipes), `teardown-in/` (reference reels you downloaded), `assets/web/` (your screen-card captures), saved presets in `kit/presets/local/`, your fonts and pairings in `kit/fonts/local/`, and any theme file you added to `kit/themes/` (copy only your own files; never replace the shipped ones). Then repeat the installation and verification steps there, and open one old job to check it still finds its files.
-
-**From GitHub, for people with repo access:**
 
 ```
 git clone https://github.com/wrg32786/aigent-talking-head
@@ -70,15 +61,13 @@ If something fails, fix it and run it again. Do not tell the user it is installe
 
 ## 5. Install the skills (optional)
 
-**From the members' zip:** copy the folders under this kit's `skills/` into your agent's skills folder by hand, keeping each folder's `SKILL.md` and supporting files together. For example, copy them into `.claude/skills/` for Claude Code or `~/.codex/skills/` for Codex. This uses only the files you downloaded.
-
-**For people with GitHub repo access:** you can also use:
-
 ```
 npx skills add wrg32786/aigent-talking-head
 ```
 
 That puts the talking-head skills in Claude Code, Codex, Cursor and other agents that read `SKILL.md` folders.
+
+If your agent can't run that, copy the folders under this kit's `skills/` into its skills folder by hand, keeping each folder's `SKILL.md` and supporting files together: `.claude/skills/` for Claude Code, `~/.codex/skills/` for Codex.
 
 ## 6. Finish
 

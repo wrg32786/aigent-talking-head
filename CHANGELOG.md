@@ -2,9 +2,8 @@
 
 ## Unreleased
 
-- Members can install from a downloaded zip without GitHub access: `INSTALL.md` starts with the unzipped folder and installs skills by copying the bundled folders. GitHub clone and skill install commands remain available to people with repo access.
-- `npm run release:zip` builds a versioned zip and SHA256 checksum from a committed ref (`HEAD` by default, or `--ref <ref>`), refuses a dirty working tree, and excludes internal agent files and repository automation from the archive.
-- Shipped recipes use LF line endings so their fenced shot lists pass `npm run check` in the members' zip and Windows checkouts.
+- The repo is public. Install with `git clone` or the one-line agent install in the README; the members' zip and `npm run release:zip` are gone. `INSTALL.md` now checks for Git first.
+- Shipped recipes use LF line endings so their fenced shot lists pass `npm run check` in Windows checkouts.
 
 ## 1.3.0 (unreleased)
 
