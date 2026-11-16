@@ -29,7 +29,8 @@
     "fonts:examples": "node kit/fonts/examples.mjs",
     "reelmd": "node kit/reelmd.cjs",
     "teardown": "node kit/teardown.mjs",
-    "capture": "node kit/capture.mjs"
+    "capture": "node kit/capture.mjs",
+    "contract": "node kit/contract.mjs"
   },
   "dependencies": {
     "playwright-core": "^1.47.0"
