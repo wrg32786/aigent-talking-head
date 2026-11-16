@@ -2,7 +2,7 @@
 
 Turn one phone clip into a styled talking-head reel with your coding agent: kinetic captions, titles behind your head, 51 effects, beat-synced music and film finishes. Runs locally. Apache-2.0. From [The AIgent](https://theaigent.xyz).
 
-[Quick start](#quick-start-phone-clip-to-reel) · [Effects](#effects-optional) · [Reel.md recipes](#reelmd-recipes) · [Brand presets](#brand-presets) · [Full gallery](showcase/GALLERY.md) · [Credits](#credits-and-licences)
+[Quick start](#quick-start-phone-clip-to-reel) · [Agent skill](#agent-skill-claude-code-cursor-codex) · [Effects](#effects-optional) · [Reel.md recipes](#reelmd-recipes) · [Brand presets](#brand-presets) · [Full gallery](showcase/GALLERY.md) · [Credits](#credits-and-licences)
 
 ## Get started
 
@@ -163,13 +163,25 @@ npm run smoke                                   # synthetic clips end to end, se
 npm run check                                   # copy lint self-test over the examples
 ```
 
-Skills for your agent: `npx skills add wrg32786/aigent-talking-head` (talking-head-reel, talking-head-recipe, talking-head-brand, talking-head-teardown, talking-head-ad, clip-raw-footage). Agents can do the whole install from [INSTALL.md](INSTALL.md).
+Skills for your agent: `npx skills add wrg32786/aigent-talking-head` (aigent-talking-head, talking-head-reel, talking-head-recipe, talking-head-brand, talking-head-teardown, talking-head-ad, clip-raw-footage). Agents can do the whole install from [INSTALL.md](INSTALL.md).
 
 Optional teardown engine: `npm run teardown -- <file> --install` adds [rea-video](https://github.com/JuneYaooo/rea-video) (Apache-2.0) to the kit's Python.
 
 Chrome is found automatically in the usual Mac, Linux and Windows install paths or on PATH. Set `CHROME_PATH` to use a different one. Set `PYTHON` if your Python isn't `python3` (or `py` on Windows). `npm run smoke:whisper` also runs a tiny Whisper model.
 
 Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FREESOUND_API_KEY` if you search for new sounds.
+
+## Agent skill: Claude Code, Cursor, Codex
+
+[skills/aigent-talking-head/SKILL.md](skills/aigent-talking-head/SKILL.md) gives your agent the workflow, every command, its inputs and outputs, and what to do when something fails. [contract.json](contract.json) lists each command's args, types, defaults and outputs for agent frameworks, and `npm run check` fails if it drifts from the CLI.
+
+| Agent | Install the skills |
+|---|---|
+| Claude Code | `npx skills add wrg32786/aigent-talking-head -a claude-code` |
+| Cursor | `npx skills add wrg32786/aigent-talking-head -a cursor` |
+| Codex | `npx skills add wrg32786/aigent-talking-head -a codex` |
+
+Add `-g` to install for every project. By hand: copy the folders under `skills/` into `.claude/skills/` (Claude Code) or `.agents/skills/` (Cursor, Codex). The skills drive a local checkout, so the agent still needs the kit installed ([INSTALL.md](INSTALL.md)).
 
 ## Looks, caption styles and fonts
 

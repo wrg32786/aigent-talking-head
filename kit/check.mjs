@@ -8,6 +8,7 @@
 // forced triad, the script shape (40-55 words, 15-20 s; over 25 s cut a middle sentence), and beat-sync on with no bed.
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { coverage, showcaseHas, sourceCatalogIds } from './menu.mjs';
+import { checkContract } from './contract.mjs';
 import { join, resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
@@ -142,6 +143,14 @@ if (target) {
       } catch (e) { errs.push(`${f}: ${e.message}`); }
     }
     results.push({ label: 'example recipes (Reel.md)', errs, warns: [] });
+  }
+
+  // contract.json matches the real CLIs (kit/contract.mjs); the agent-facing files carry no em dashes
+  results.push({ label: 'contract.json matches the CLIs', errs: checkContract(), warns: [] });
+  {
+    const errs = [];
+    for (const f of ['skills/aigent-talking-head/SKILL.md', 'contract.json']) if (existsSync(join(ROOT, f)) && readFileSync(join(ROOT, f), 'utf8').includes('\u2014')) errs.push(`${f} has an em dash`);
+    results.push({ label: 'SKILL.md and contract.json copy', errs, warns: [] });
   }
 
   const menuCov = coverage();

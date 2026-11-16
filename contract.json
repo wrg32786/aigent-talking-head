@@ -1,0 +1,372 @@
+{
+  "contract": 1,
+  "name": "aigent-talking-head",
+  "version": "1.2.0",
+  "summary": "Turn a phone clip into a captioned, styled 9:16 talking-head reel, locally.",
+  "skill": "skills/aigent-talking-head/SKILL.md",
+  "invoke": "npm run <command> -- <args>  (from the repo root; or node <script> <args>)",
+  "types": {
+    "boolean": "a flag with no value; present means true",
+    "string": "one value after the flag",
+    "number": "a numeric value after the flag",
+    "path": "a file or folder path, relative to the current folder unless noted",
+    "enum": "one of the listed values",
+    "list": "comma-separated values, no spaces"
+  },
+  "env": [
+    { "name": "PYTHON", "description": "Python that has requirements.txt installed (default python3, or py on Windows)" },
+    { "name": "CHROME_PATH", "description": "Chrome or Chromium binary when it is not found automatically" },
+    { "name": "TX_MODEL", "description": "Whisper model clip.py uses when reel gets no --model (default large-v3)" },
+    { "name": "NOSFX", "description": "1 turns off sounds in reel and fx (same as --sfx off)" },
+    { "name": "FX_MATTE", "description": "person-mask backend for fx when no --mask is given" },
+    { "name": "MASK_MODEL", "description": "person-mask backend fallback for fx" },
+    { "name": "FX_WSL", "description": "Windows only: Python inside WSL that runs the effects" },
+    { "name": "FX_WSL_DISTRO", "description": "Windows only: the WSL distro for FX_WSL" },
+    { "name": "REA_VIDEO", "description": "path to the rea-video binary for teardown" },
+    { "name": "FREESOUND_API_KEY", "description": "only for searching new sounds; nothing else needs a key" }
+  ],
+  "commands": [
+    {
+      "name": "reel",
+      "script": "kit/reel.cjs",
+      "summary": "Phone clip (or several takes) to a draft reel: clip, cut, captions, titles, render, assemble.",
+      "positional": [
+        { "name": "videos", "type": "path", "variadic": true, "required": false, "description": "takes to use; default is every video from the newest recording session in inbox/" }
+      ],
+      "flags": [
+        { "name": "clip", "type": "path", "default": null, "description": "the video to use (same as a positional path)" },
+        { "name": "clips", "type": "path", "default": null, "description": "reuse an existing clip.py folder and skip transcription" },
+        { "name": "newest", "type": "boolean", "default": false, "description": "inbox: newest file only" },
+        { "name": "name", "type": "string", "default": "the video's file name", "description": "job name under jobs/" },
+        { "name": "jobs", "type": "path", "default": "jobs/", "description": "jobs folder" },
+        { "name": "preset", "type": "string", "default": null, "description": "a preset name from npm run preset, or auto" },
+        { "name": "recipe", "type": "path", "default": null, "description": "a Reel.md recipe (docs/reel-md.md)" },
+        { "name": "recipe-titles", "type": "boolean", "default": false, "description": "use the recipe's title text and times, only where you say that text" },
+        { "name": "capture-sources", "type": "boolean", "default": false, "description": "capture the recipe's confirmed screen-card sources first (public pages)" },
+        { "name": "theme", "type": "string", "default": "aigent", "description": "a theme in kit/themes/ (aigent, neutral, or your own)" },
+        { "name": "look", "type": "enum", "values": ["kinetic", "oneword", "muse", "classic", "one-word"], "values_from": "kit/preset.cjs LOOKS", "default": "kinetic" },
+        { "name": "style", "type": "enum", "values": ["kinetic", "oneword", "classic", "pill", "hormozi", "karaoke", "one-word"], "values_from": "kit/preset.cjs STYLES", "default": "follows --look", "description": "caption style override" },
+        { "name": "titles", "type": "boolean", "default": false, "description": "force kinetic titles on" },
+        { "name": "no-titles", "type": "boolean", "default": false, "description": "no kinetic titles" },
+        { "name": "title-layer", "type": "enum", "values": ["front", "behind", "auto"], "values_from": "kit/rules.cjs TITLE_LAYERS", "default": "front" },
+        { "name": "fonts", "type": "list", "default": null, "description": "font pairing names from kit/fonts/pairings.json or kit/fonts/local; several cycle one per title" },
+        { "name": "caption-position", "type": "enum", "values": ["top", "middle", "bottom"], "values_from": "kit/reelmd.cjs CAPTION_POSITIONS", "default": null },
+        { "name": "caption-color", "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "default": null },
+        { "name": "caption-outline", "type": "enum", "values": ["none", "thin", "thick"], "values_from": "kit/reelmd.cjs CAPTION_LOOK", "default": null },
+        { "name": "caption-shadow", "type": "enum", "values": ["none", "soft"], "values_from": "kit/reelmd.cjs CAPTION_LOOK", "default": null },
+        { "name": "caption-case", "type": "enum", "values": ["upper", "lower", "as-said"], "values_from": "kit/reelmd.cjs CAPTION_LOOK", "default": null },
+        { "name": "caption-layer", "type": "enum", "values": ["front", "behind", "auto"], "values_from": "kit/reelmd.cjs CAPTION_LOOK", "default": "auto for top captions, front otherwise", "description": "captions under the person where they overlap the head; auto puts top captions behind" },
+        { "name": "panel-layer", "type": "enum", "values": ["front", "behind", "auto"], "values_from": "kit/reelmd.cjs CAPTION_LOOK", "default": "auto", "description": "screen cards behind the head where it reaches into them; auto means behind" },
+        { "name": "mask", "type": "enum", "values": ["birefnet", "birefnet-general-lite", "birefnet-portrait", "mediapipe"], "values_from": "kit/rules.cjs MASK_MODELS", "default": "mediapipe", "description": "person-mask backend for titles behind the head" },
+        { "name": "no-mask", "type": "boolean", "default": false, "description": "skip the person mask" },
+        { "name": "no-punch", "type": "boolean", "default": false, "description": "no zoom punch on cuts" },
+        { "name": "cropx", "type": "number", "default": "0.5", "description": "horizontal crop centre, 0 to 1 (0.4 puts the face left of centre)" },
+        { "name": "model", "type": "string", "default": "large-v3 (or TX_MODEL)", "description": "Whisper model for clip.py" },
+        { "name": "hook", "type": "string", "default": null, "description": "take to use for the first sentence" },
+        { "name": "broll", "type": "path", "default": null, "description": "folder of your own cutaway clips" },
+        { "name": "bed", "type": "string", "default": null, "description": "a bed name from npm run music, or an audio file path" },
+        { "name": "bed-start", "type": "number", "default": null, "description": "seconds into the bed to start" },
+        { "name": "beat-sync", "type": "boolean", "default": false, "description": "snap punches, sounds, titles and fx hits to the bed (on by default when a bed is set)" },
+        { "name": "no-beat-sync", "type": "boolean", "default": false },
+        { "name": "finish", "type": "list", "values": ["grain", "vignette", "chroma", "scan-lines", "warm", "cool", "teal", "crushed", "mono", "bleach"], "values_from": "kit/beats.cjs FINISH", "default": null, "description": "film finishes" },
+        { "name": "logo", "type": "path", "default": null, "description": "logo file for the end card" },
+        { "name": "sfx", "type": "enum", "values": ["off"], "default": null, "description": "off skips the locked-set sounds" },
+        { "name": "no-sfx", "type": "boolean", "default": false, "description": "same as --sfx off" },
+        { "name": "draft", "type": "boolean", "default": false, "description": "stop after captions.js so it can be edited" },
+        { "name": "rebuild", "type": "boolean", "default": false, "description": "re-render and re-assemble an edited job (use with --name)" },
+        { "name": "force", "type": "boolean", "default": false, "description": "re-clip and redraft over an existing job" }
+      ],
+      "outputs": [
+        "jobs/<name>/clips/clips.json and clips.md (best take per sentence, retakes flagged)",
+        "jobs/<name>/build/cut.json, captions.js, theme.js and overlay frames",
+        "jobs/<name>/reel-vN.mp4 (a new number each run; earlier versions are kept)"
+      ],
+      "success": "prints \"Reel: <path>\" (or \"Draft ready.\" with --draft)",
+      "failures": [
+        "No video given and inbox/ has none",
+        "Not found: <file>",
+        "build/cut.json exists: use --rebuild to render edits or --force to redraft",
+        "an invalid enum value: \"--<flag> must be ...\"",
+        "Reel.md problems: ... (an invalid recipe)",
+        "No theme <path>"
+      ]
+    },
+    {
+      "name": "verify",
+      "script": "kit/verify.mjs",
+      "summary": "Check a finished reel before handing it over: ffprobe, loudness, mask, copy lint and stills.",
+      "positional": [
+        { "name": "job", "type": "string", "required": true, "description": "job name in jobs/ (or a job folder path)" }
+      ],
+      "flags": [
+        { "name": "file", "type": "path", "default": "newest reel-fx-vN.mp4 or reel-vN.mp4 in the job", "description": "the video to check" },
+        { "name": "jobs", "type": "path", "default": "jobs/" },
+        { "name": "fps", "type": "number", "default": "cut.json fps, else 24", "description": "expected frame rate" }
+      ],
+      "outputs": ["jobs/<job>/verify/: one still per check point, contact.png, report.md"],
+      "success": "prints VERIFY PASS, exit 0",
+      "failures": ["prints VERIFY FAIL and exits 1", "No <job>/build/cut.json", "No reel-vN.mp4 in <job>"]
+    },
+    {
+      "name": "check",
+      "script": "kit/check.mjs",
+      "summary": "Lint a job's captions and cut against the edit rules; with no job, self-test the repo (examples, recipes, menu, showcase, this contract).",
+      "positional": [
+        { "name": "job", "type": "string", "required": false, "description": "job name or build/ folder" }
+      ],
+      "flags": [
+        { "name": "warn-only", "type": "boolean", "default": false, "description": "print problems, never fail" }
+      ],
+      "outputs": ["stdout report"],
+      "success": "prints CHECK PASS, exit 0",
+      "failures": ["exit 1 with each error listed (em dashes, hype words, unknown entrance, transition, sound or finish, contract drift)"]
+    },
+    {
+      "name": "smoke",
+      "script": "kit/smoke.mjs",
+      "summary": "End-to-end test on synthetic clips in a temp folder. Several minutes, no footage, keys or network.",
+      "positional": [],
+      "flags": [
+        { "name": "whisper", "type": "boolean", "default": false, "description": "also run a tiny Whisper model" },
+        { "name": "effects", "type": "boolean", "default": "on when effects/.venv exists", "description": "include the effects pass" },
+        { "name": "keep", "type": "boolean", "default": false, "description": "keep the temp work folder" }
+      ],
+      "outputs": ["temp folder (deleted unless --keep)"],
+      "success": "prints SMOKE PASS, exit 0",
+      "failures": ["prints FAIL with the failing step and exits 1"]
+    },
+    {
+      "name": "contract",
+      "script": "kit/contract.mjs",
+      "summary": "Check contract.json against the real CLIs (also part of npm run check).",
+      "positional": [],
+      "flags": [],
+      "outputs": ["stdout"],
+      "success": "prints CONTRACT PASS",
+      "failures": ["exit 1 with each drift listed"]
+    },
+    { "name": "smoke:whisper", "alias": "smoke", "args": ["--whisper"] },
+    { "name": "smoke:effects", "alias": "smoke", "args": ["--effects"] },
+    {
+      "name": "fx",
+      "script": "kit/fx.cjs",
+      "summary": "Optional effects pass over a finished reel (captions stay on top), or over any video.",
+      "positional": [
+        { "name": "video", "type": "path", "required": false, "description": "direct mode: draw effects over this video (captions included)" }
+      ],
+      "flags": [
+        { "name": "name", "type": "string", "default": null, "description": "job in jobs/ (job mode)" },
+        { "name": "plan", "type": "path", "default": null, "description": "fx.json plan (required unless --list)" },
+        { "name": "list", "type": "boolean", "default": false, "description": "print the effects catalog, grouped by moment" },
+        { "name": "still", "type": "list", "default": null, "description": "seconds to render as check frames instead of a video" },
+        { "name": "out", "type": "path", "default": "<video>_fx.mp4 or <video>_check.png", "description": "direct mode output" },
+        { "name": "jobs", "type": "path", "default": "jobs/" },
+        { "name": "captions", "type": "enum", "values": ["on", "off"], "default": null, "description": "force captions on or off for every effect" },
+        { "name": "mask", "type": "enum", "values": ["birefnet", "birefnet-general-lite", "birefnet-portrait", "mediapipe"], "values_from": "kit/rules.cjs MASK_MODELS", "default": "mediapipe" },
+        { "name": "matte", "type": "enum", "values": ["birefnet", "birefnet-general-lite", "birefnet-portrait", "mediapipe"], "values_from": "kit/rules.cjs MASK_MODELS", "default": "mediapipe", "description": "same as --mask" },
+        { "name": "allow-demo-copy", "type": "boolean", "default": false, "description": "fill neutral [placeholders] for missing copy, for a quick look only" },
+        { "name": "pill", "type": "boolean", "default": false, "description": "turn on the upstream Edited by pill on glass-widgets" },
+        { "name": "sfx", "type": "enum", "values": ["off"], "default": null, "description": "no pack sounds" },
+        { "name": "no-sfx", "type": "boolean", "default": false, "description": "same as --sfx off" }
+      ],
+      "outputs": ["job mode: jobs/<job>/reel-fx-vN.mp4; with --still, frames in jobs/<job>/build/fx/", "direct mode: --out (and a .plan.json beside it)"],
+      "success": "prints \"Reel with effects: <path>\"",
+      "failures": ["Effects are not set up yet. Run: npm run effects:setup", "Pass --plan fx.json", "Fix the plan first (effects that need your own copy)", "unknown mask model"]
+    },
+    {
+      "name": "preset",
+      "script": "kit/preset.cjs",
+      "summary": "List, show or save brand presets.",
+      "positional": [],
+      "flags": [
+        { "name": "show", "type": "string", "default": null, "description": "print one preset as JSON" },
+        { "name": "save", "type": "string", "default": null, "description": "save a preset with this name (needs --from)" },
+        { "name": "from", "type": "string", "default": null, "description": "job to save the preset from" }
+      ],
+      "outputs": ["no flags: the preset list on stdout", "--save: kit/presets/local/<name>.json"],
+      "success": "exit 0",
+      "failures": ["No preset named <name>", "invalid presets: ...", "usage: --save <name> --from <job>"]
+    },
+    {
+      "name": "reelmd",
+      "script": "kit/reelmd.cjs",
+      "summary": "Check, compile, export or package a Reel.md recipe.",
+      "subcommands": [
+        { "name": "check", "positional": [{ "name": "recipe", "type": "path", "required": true }], "success": "prints REELMD PASS" },
+        { "name": "compile", "positional": [{ "name": "recipe", "type": "path", "required": true }], "outputs": ["recipe.cut.json and recipe.captions.json in --out (default: next to the recipe)"] },
+        { "name": "export", "positional": [{ "name": "job", "type": "string", "required": true, "description": "job name, build folder or cut.json" }], "outputs": ["a Reel.md at --out, or stdout"] },
+        { "name": "package", "positional": [{ "name": "recipe", "type": "path", "required": true }, { "name": "dir", "type": "path", "required": true }], "outputs": ["a VIDEO.md package in <dir>"] }
+      ],
+      "flags": [
+        { "name": "out", "type": "path", "default": "next to the recipe (compile) or stdout (export)" },
+        { "name": "name", "type": "string", "default": null, "description": "export: the recipe name" }
+      ],
+      "success": "exit 0",
+      "failures": ["REELMD FAIL with each problem listed", "No cut.json at <path>", "an unknown subcommand prints the usage and exits 1"]
+    },
+    {
+      "name": "teardown",
+      "script": "kit/teardown.mjs",
+      "summary": "Break a reference reel down into a Reel.md, a report and a contact sheet, to remake with your own clip.",
+      "positional": [
+        { "name": "video", "type": "path", "required": true, "description": "a local video you have the rights to" }
+      ],
+      "flags": [
+        { "name": "out", "type": "path", "default": "teardown/<name>/" },
+        { "name": "name", "type": "string", "default": "the video's file name" },
+        { "name": "engine", "type": "enum", "values": ["rea", "lite"], "default": "rea", "description": "rea-video, or the built-in analyzer (used automatically when rea-video is missing)" },
+        { "name": "install", "type": "boolean", "default": false, "description": "pip-install rea-video into PYTHON first (about 216 MB of models on first use)" },
+        { "name": "model", "type": "string", "default": "base.en", "description": "Whisper model for the built-in analyzer" },
+        { "name": "no-asr", "type": "boolean", "default": false, "description": "skip speech recognition" },
+        { "name": "no-ocr", "type": "boolean", "default": false, "description": "skip on-screen text recognition" },
+        { "name": "vlm", "type": "boolean", "default": false, "description": "rea-video: use its vision model pass" },
+        { "name": "reuse", "type": "boolean", "default": false, "description": "keep an earlier breakdown in the out folder and only redo the mapping" },
+        { "name": "url", "type": "string", "default": null, "description": "optional: one Instagram post or reel link instead of a file (needs instaloader; anonymous, no login, no bulk; you must have the rights)" }
+      ],
+      "outputs": ["teardown/<name>/Reel.md, teardown.md, contact.jpg, and videomd/ (rea-video) or fallback.json"],
+      "success": "exit 0; then npm run reel -- --recipe teardown/<name>/Reel.md --clip <your clip>",
+      "failures": ["Not found: <file>", "a URL as the positional argument is refused (download it yourself where you have the rights)", "rea-video not found: falls back to the built-in analyzer with a note"]
+    },
+    {
+      "name": "capture",
+      "script": "kit/capture.mjs",
+      "summary": "Capture a public web page (screenshot and short scroll recording) for a screen card.",
+      "positional": [
+        { "name": "urls", "type": "string", "variadic": true, "required": false, "description": "public http(s) pages; the user confirms the list first" }
+      ],
+      "flags": [
+        { "name": "recipe", "type": "path", "default": null, "description": "use the confirmed screen-card sources in this Reel.md" },
+        { "name": "list", "type": "boolean", "default": false, "description": "with --recipe, only print the sources" },
+        { "name": "scroll", "type": "number", "default": "8", "description": "seconds of scroll recording" },
+        { "name": "width", "type": "number", "default": "780", "description": "viewport width in px" },
+        { "name": "force", "type": "boolean", "default": false, "description": "capture again over the cache" },
+        { "name": "image-only", "type": "boolean", "default": false, "description": "screenshot only, no recording" }
+      ],
+      "outputs": ["assets/web/<page>/shot.png, scroll.mp4, meta.json"],
+      "success": "exit 0",
+      "failures": ["exit 1 when any URL was skipped (non-public address, load failure)", "usage when no URL is given"]
+    },
+    {
+      "name": "menu",
+      "script": "kit/menu.mjs",
+      "summary": "Print every option (effects, finishes, looks, fonts, themes, entrances, transitions, sounds, beds, presets).",
+      "positional": [],
+      "flags": [
+        { "name": "json", "type": "boolean", "default": false, "description": "machine-readable" }
+      ],
+      "outputs": ["stdout"],
+      "success": "exit 0",
+      "failures": ["menu is missing catalog entries (exit 1)"]
+    },
+    {
+      "name": "brand:import",
+      "script": "kit/brand-import.mjs",
+      "summary": "Draft a preset from a brand guide (PDF, image or Markdown) for a person to confirm.",
+      "positional": [
+        { "name": "file", "type": "path", "required": true }
+      ],
+      "flags": [
+        { "name": "name", "type": "string", "default": "from the file name" },
+        { "name": "out", "type": "path", "default": "kit/presets/local/<name>.json" }
+      ],
+      "outputs": ["a draft preset JSON"],
+      "success": "prints \"draft preset: <path>\"",
+      "failures": ["PDFs are refused when pdftoppm or pdftotext is missing", "exit 1 with the error"]
+    },
+    {
+      "name": "chrome",
+      "script": "kit/chrome.mjs",
+      "summary": "Print the Chrome or Chromium the kit will use.",
+      "positional": [],
+      "flags": [],
+      "outputs": ["stdout: the binary path"],
+      "success": "exit 0",
+      "failures": ["Chrome not found (set CHROME_PATH)", "CHROME_PATH is set but nothing is at <path>"]
+    },
+    {
+      "name": "music",
+      "script": "kit/music/add.mjs",
+      "summary": "List the music bed library, or add tracks to it (loudness-matched to -13 LUFS).",
+      "positional": [
+        { "name": "files", "type": "path", "variadic": true, "required": false, "description": "audio files to add; none lists the library" }
+      ],
+      "flags": [
+        { "name": "replace", "type": "boolean", "default": false, "description": "overwrite a bed of the same name" }
+      ],
+      "outputs": ["kit/music/<name>.mp3 and an entry in kit/music/beds.json"],
+      "success": "exit 0",
+      "failures": ["<name> is already in the library (use --replace)", "not found: <file>", "<name>: not added (conversion or loudness check failed)"]
+    },
+    { "name": "music:add", "alias": "music", "args": [] },
+    {
+      "name": "showcase",
+      "script": "kit/showcase.mjs",
+      "summary": "Rebuild the labelled gallery in showcase/ (maintainers).",
+      "positional": [],
+      "flags": [
+        { "name": "from-stills", "type": "boolean", "default": false, "description": "reuse committed stills" },
+        { "name": "graphics-only", "type": "boolean", "default": false, "description": "only the graphics tiles" },
+        { "name": "refresh-mask", "type": "boolean", "default": false },
+        { "name": "skip-effects", "type": "boolean", "default": false }
+      ],
+      "outputs": ["showcase/index.html, showcase/GALLERY.md, showcase/media/"],
+      "success": "exit 0",
+      "failures": ["exit 1 with the error"]
+    },
+    {
+      "name": "effects:setup",
+      "script": "effects/setup.mjs",
+      "summary": "One-time venv for the effects pass and the person mask (several hundred MB).",
+      "positional": [],
+      "flags": [
+        { "name": "birefnet", "type": "boolean", "default": false, "description": "also download the BiRefNet weights (about 214 MB)" }
+      ],
+      "outputs": ["effects/.venv"],
+      "success": "prints READY",
+      "failures": ["NEED_PYTHON: install Python 3.10 or newer, or set PYTHON", "install finished but imports fail"]
+    },
+    {
+      "name": "effects:update",
+      "script": "effects/update.mjs",
+      "summary": "Refresh the vendored claude-video-effects copy (maintainers).",
+      "positional": [],
+      "flags": [
+        { "name": "ref", "type": "string", "default": "upstream default branch", "description": "a commit or tag" },
+        { "name": "from", "type": "path", "default": null, "description": "copy from a local clone instead of cloning" }
+      ],
+      "outputs": ["effects/vendor/claude-video-effects/ and UPSTREAM.json"],
+      "success": "exit 0",
+      "failures": ["git errors; effects/check.mjs failures"]
+    },
+    {
+      "name": "effects:check",
+      "script": "effects/check.mjs",
+      "summary": "The effects catalog matches the vendored effects and the runner patches still apply.",
+      "positional": [],
+      "flags": [],
+      "outputs": ["stdout"],
+      "success": "exit 0",
+      "failures": ["exit 1 with each mismatch"]
+    },
+    {
+      "name": "effects:catalog",
+      "script": "effects/catalog.mjs",
+      "summary": "Render effects/CATALOG.md from effects/catalog.json.",
+      "positional": [],
+      "flags": [],
+      "outputs": ["effects/CATALOG.md"],
+      "success": "exit 0",
+      "failures": []
+    },
+    {
+      "name": "fonts:examples",
+      "script": "kit/fonts/examples.mjs",
+      "summary": "Rebuild kit/fonts/examples/ after changing a font pairing (maintainers).",
+      "positional": [],
+      "flags": [],
+      "outputs": ["kit/fonts/examples/"],
+      "success": "exit 0",
+      "failures": []
+    }
+  ]
+}

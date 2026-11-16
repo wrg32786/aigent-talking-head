@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Agent skill and command contract.** `skills/aigent-talking-head/SKILL.md` covers the whole workflow, every command, inputs, outputs and failure modes, and installs with the other skills (`npx skills add wrg32786/aigent-talking-head`, for Claude Code, Cursor and Codex). `contract.json` lists each command's args, types, defaults and outputs; `npm run contract` (also part of `npm run check`) fails when it drifts from the flags the scripts read.
 - The repo is public. Install with `git clone` or the one-line agent install in the README; the members' zip and `npm run release:zip` are gone. `INSTALL.md` now checks for Git first.
 - Shipped recipes use LF line endings so their fenced shot lists pass `npm run check` in Windows checkouts.
 
