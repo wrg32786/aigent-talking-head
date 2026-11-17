@@ -150,7 +150,7 @@ Every section is optional except the card. Anything left out falls back to the p
 
 | Key | Values | Maps to |
 |---|---|---|
-| type | `ordinal-sticker` (mode 9, entrance burst-pop), `app-label` (mode 10, tile-pop), `screen-card` (mode 11, card-rise), `lower-third` (12, bar-wipe), `stat-callout` (13, count-up), `checklist` (14, tick-in), `quote-card` (15, quote-unfold), `highlight` (16, draw-on), `step-counter` (17, step-tick), `versus` (18, split-slam), `icon-badge` (19, badge-spin), `sticker-pop` (20, scatter-pop), `price-tag` (21, tag-swing), `cta-card` (22, cta-rise), `code-card` (23, type-on) | the flip's `mode` |
+| type | `ordinal-sticker` (mode 9, entrance burst-pop), `app-label` (mode 10, tile-pop), `screen-card` (mode 11, card-rise), `lower-third` (12, bar-wipe), `stat-callout` (13, count-up), `checklist` (14, tick-in), `quote-card` (15, quote-unfold), `highlight` (16, draw-on), `step-counter` (17, step-tick), `versus` (18, split-slam), `icon-badge` (19, badge-spin), `sticker-pop` (20, scatter-pop), `price-tag` (21, chip-rise), `cta-card` (22, cta-rise), `code-card` (23, type-on) | the flip's `mode` |
 | text | the ordinal word, the label, the name, the number, the quote, the price, the line, or the code (`\n` for a new line; a code card keeps `/` as written, elsewhere ` / ` reads as a space) | the flip's `text` |
 | sub | the small second line: lower third, stat label, quote attribution, old price (struck through), CTA handle | `sub` |
 | items, at | checklist rows separated by `;`, and optional tick times in reel seconds (a recipe job sets them from when you say each row) | `items`, `at` |
@@ -167,7 +167,7 @@ Every section is optional except the card. Anything left out falls back to the p
 | source | screen card: a public page (`https://github.com/owner/repo`, a site, a tool's docs) or a file. A page is captured by `npm run capture -- --recipe <Reel.md>` (or `npm run reel -- --capture-sources`) to a screenshot and a short scrolling recording, cached in `assets/web/` (gitignored) | `src` |
 | subject~, source~ | written by a teardown: what the reference showed in that card, and a web address read in it. Guesses, never captured until you write `source` | not used by the render |
 
-With no `icon`, `src` or captured `source` the graphic is drawn as a neutral placeholder (a letter glyph, a fake code window), so a teardown never copies someone else's screenshots or logos. Modes 12 to 23 are drawn in code in the theme's colours and fonts (the AIgent theme keeps their cards square), and each has its own exit over its last 0.3 s. Graphics outside your clip's length are dropped. A teardown detects the first three; you add the rest.
+With no `icon`, `src` or captured `source` the graphic is drawn as a neutral placeholder (a monogram tile, a skeleton app window), so a teardown never copies someone else's screenshots or logos. Modes 12 to 23 are drawn in code in the theme's colours and fonts with Tabler icons (MIT), a shared card look (two-layer shadow, top-lit fill, fine grain, rim light), spring and emphasized easing and motion blur on fast moves (the AIgent theme keeps their cards square). Each has its own exit over its last 0.35 s. Graphics outside your clip's length are dropped. A teardown detects the first three; you add the rest.
 
 **Script** (fenced `reel-script`, optional): `#NN start-end | say <words>`. Written by teardowns so you can see the reference's timing. Your remake uses your own words.
 

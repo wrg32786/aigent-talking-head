@@ -26,9 +26,9 @@ Prefer to run it by hand? See [Install](#install) and [Quick start](#quick-start
 
 ## Graphics
 
-15 overlay graphics, each with its own entrance and exit, drawn in your theme's colours and fonts: ordinal sticker, app label, screen card, lower third, stat callout, checklist, quote card, highlight (circle, arrow, underline or box), step counter, versus card, icon badge, sticker pop, price tag, CTA end card and code card. Bring your icon or screen recording where a graphic takes one, or the kit draws a neutral placeholder.
+15 overlay graphics, each with its own entrance and exit, drawn in your theme's colours and fonts: ordinal sticker, app label, screen card, lower third, stat callout, checklist, quote card, highlight (circle, arrow, underline or box), step counter, versus card, icon badge, sticker pop, price tag, CTA end card and code card. They share one card look (soft two-layer shadow, top-lit fill, fine grain, rim light), spring and emphasized easing with motion blur on fast moves, tabular digits and Tabler icons (MIT). Bring your icon or screen recording where a graphic takes one, or the kit draws a neutral placeholder.
 
-![The 12 newest graphics in motion: lower third, stat callout, checklist, quote card, highlight, step counter, versus, icon badge, sticker pop, price tag, CTA card, code card](showcase/loops/graphics.gif)
+![All 15 graphics in motion: ordinal sticker, app label, screen card, lower third, stat callout, checklist, quote card, highlight, step counter, versus, icon badge, sticker pop, price tag, CTA card, code card](showcase/loops/graphics.gif)
 
 ![All 15 graphics](showcase/sheets/graphics.jpg)
 

@@ -75,17 +75,17 @@ Precedence when a reel is made: flags, then the recipe, then its preset, then de
 
 | Type | Mode | What it is | Main fields |
 |---|---|---|---|
-| `ordinal-sticker` | 9 | list number over a starburst | `text`, `layer front\|behind` |
+| `ordinal-sticker` | 9 | list number on a seal | `text`, `layer front\|behind` |
 | `app-label` | 10 | icon tile and label | `text`, `icon` |
 | `screen-card` | 11 | your screenshot or screen recording in a card | `src` or `source`, `border` |
 | `lower-third` | 12 | name tag | `text`, `sub` |
 | `stat-callout` | 13 | big number that counts up, with a label | `text`, `sub` |
 | `checklist` | 14 | rows that tick as you say them | `text`, `items a; b; c` |
 | `quote-card` | 15 | a quote in italic serif with attribution | `text`, `sub` |
-| `highlight` | 16 | hand-drawn circle, arrow, underline or box | `shape`, `x`, `y`, `w`, `h`, `text` |
+| `highlight` | 16 | marker circle, arrow, underline or box | `shape`, `x`, `y`, `w`, `h`, `text` |
 | `step-counter` | 17 | STEP 2 OF 5 with a progress bar | `step`, `of` |
 | `versus` | 18 | two halves and a VS badge | `left`, `right` |
-| `icon-badge` | 19 | round badge with a built-in glyph or your icon | `glyph`, `icon`, `text` |
+| `icon-badge` | 19 | round badge with a Tabler glyph or your icon | `glyph`, `icon`, `text` |
 | `sticker-pop` | 20 | a cluster of reaction stickers | `glyph a;b`, `count` |
 | `price-tag` | 21 | swinging tag, old price struck through | `text`, `sub` |
 | `cta-card` | 22 | end card with a pulsing follow button | `text`, `sub` (handle) |

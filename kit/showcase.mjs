@@ -687,7 +687,7 @@ function renderTitleLayerStills(py, work, stills, put) {
 }
 
 // Graphics (kit/graphics.json): each one after its entrance settles, on the presenter, with the neutral placeholder
-// art (no third-party icons or screenshots). The ordinal burst goes behind the head with the person mask; graphics
+// art (no third-party screenshots; icons are Tabler, MIT). The ordinal burst goes behind the head with the person mask; graphics
 // on the panel layer go under the crown mask. The others use their kit/graphics.json example.
 const GFX_DEMO = {
   'ordinal-sticker': [{ start: 0, end: 3, mode: 9, text: 'First', layer: 'behind' }],

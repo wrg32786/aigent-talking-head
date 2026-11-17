@@ -30,7 +30,7 @@ function mkSet(p){const fonts=pairFonts(p),d=fonts.display,c=fonts.caption,sc=fo
 function use(s){if(PN===s.name)return;PN=s.name;TH.fonts=s.fonts;({DF,TRK,F,G,K,S,SCF,LK}=s)}
 const SETS={},BASE=mkSet(FP);SETS[BASE.name]=BASE;use(BASE);
 const CYC=(window.FONTSETS||[]).map(p=>{const s=mkSet(p.display||p.secondary||p.script?p:null);return SETS[s.name]||(SETS[s.name]=s)});
-const ctx=document.getElementById('c').getContext('2d');
+let ctx=document.getElementById('c').getContext('2d'); // let: graphics motion blur draws sub-frames on a scratch canvas
 const mk=()=>{const c=document.createElement('canvas');c.width=1080;c.height=1920;return c};const TC=mk(),MC=mk(),T=TC.getContext('2d'),M=MC.getContext('2d');
 const Y=CAP.captionY||1300; // caption band: chest, below the face box. Measure the face per take; text never covers the face.
 // mode 0 caption, 1 spray hero word, 2 sticker, 3 count-up, 4 takeover card, 5 logo plate, 6 CTA sticker (+ optional sub line), 7 kinetic title (see below),
@@ -398,197 +398,314 @@ for(const a of Object.values(GXA)){gimg(a.icon);gimg(a.src);(a.frames||[]).forEa
 const gxa=c=>GXA[c[3]+'@'+c[0]]||{};
 const SERIF=s=>`italic 400 ${s}px "ATH Gfx Serif", Georgia, "Times New Roman", serif`,LABELF=s=>`400 ${s}px "ATH Gfx Label", "Arial Black", Impact, sans-serif`;
 function shade(h,k){const m=/^#([0-9a-f]{6})$/i.exec(String(h||''));if(!m)return h;const n=parseInt(m[1],16),f=v=>Math.max(0,Math.min(255,Math.round(k<0?v*(1+k):v+(255-v)*k)));return'#'+[n>>16,(n>>8)&255,n&255].map(v=>f(v).toString(16).padStart(2,'0')).join('')}
-function starPath(c,R,r,n,seed){const q=rng(seed);c.beginPath();for(let i=0;i<n*2;i++){const a=i*Math.PI/n-Math.PI/2,k=i%2?r*(.86+q()*.28):R*(.8+q()*.32);c.lineTo(Math.cos(a)*k,Math.sin(a)*k)}c.closePath()}
-// ordinal sticker, entrance burst-pop: the burst springs open with a quarter turn, the word rises and its spacing settles
+// ---- graphics design kit: icons, colour, easing, depth, grain, motion blur, tabular digits ----
+// Icons: Tabler Icons 3.52.0 path data (MIT, (c) Pawel Kuna; kit/icons/LICENSE-tabler.txt, THIRD_PARTY.md). 24 grid, 2px
+// stroke; "o" is the outline icon, "f" the filled one. Keys are the kit's glyph names (fire is Tabler "flame", spark is
+// "sparkles", play is "player-play") plus the icons the cards use.
+const TABLER={"check":{"o":"M5 12l5 5l10 -10","f":"M20.707 6.293a1 1 0 0 1 0 1.414l-10 10a1 1 0 0 1 -1.414 0l-5 -5a1 1 0 0 1 1.414 -1.414l4.293 4.293l9.293 -9.293a1 1 0 0 1 1.414 0"},"star":{"o":"M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1l3.086 -6.253l3.086 6.253l6.9 1l-5 4.867l1.179 6.873l-6.158 -3.245","f":"M8.243 7.34l-6.38 .925l-.113 .023a1 1 0 0 0 -.44 1.684l4.622 4.499l-1.09 6.355l-.013 .11a1 1 0 0 0 1.464 .944l5.706 -3l5.693 3l.1 .046a1 1 0 0 0 1.352 -1.1l-1.091 -6.355l4.624 -4.5l.078 -.085a1 1 0 0 0 -.633 -1.62l-6.38 -.926l-2.852 -5.78a1 1 0 0 0 -1.794 0l-2.853 5.78z"},"bolt":{"o":"M13 3l0 7l6 0l-8 11l0 -7l-6 0l8 -11","f":"M13 2l.018 .001l.016 .001l.083 .005l.011 .002h.011l.038 .009l.052 .008l.016 .006l.011 .001l.029 .011l.052 .014l.019 .009l.015 .004l.028 .014l.04 .017l.021 .012l.022 .01l.023 .015l.031 .017l.034 .024l.018 .011l.013 .012l.024 .017l.038 .034l.022 .017l.008 .01l.014 .012l.036 .041l.026 .027l.006 .009c.12 .147 .196 .322 .218 .513l.001 .012l.002 .041l.004 .064v6h5a1 1 0 0 1 .868 1.497l-.06 .091l-8 11c-.568 .783 -1.808 .38 -1.808 -.588v-6h-5a1 1 0 0 1 -.868 -1.497l.06 -.091l8 -11l.01 -.013l.018 -.024l.033 -.038l.018 -.022l.009 -.008l.013 -.014l.04 -.036l.028 -.026l.008 -.006a1 1 0 0 1 .402 -.199l.011 -.001l.027 -.005l.074 -.013l.011 -.001l.041 -.002z"},"heart":{"o":"M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572","f":"M6.979 3.074a6 6 0 0 1 4.988 1.425l.037 .033l.034 -.03a6 6 0 0 1 4.733 -1.44l.246 .036a6 6 0 0 1 3.364 10.008l-.18 .185l-.048 .041l-7.45 7.379a1 1 0 0 1 -1.313 .082l-.094 -.082l-7.493 -7.422a6 6 0 0 1 3.176 -10.215z"},"fire":{"o":"M12 10.941c2.333 -3.308 .167 -7.823 -1 -8.941c0 3.395 -2.235 5.299 -3.667 6.706c-1.43 1.408 -2.333 3.294 -2.333 5.588c0 3.704 3.134 6.706 7 6.706c3.866 0 7 -3.002 7 -6.706c0 -1.712 -1.232 -4.403 -2.333 -5.588c-2.084 3.353 -3.257 3.353 -4.667 2.235","f":"M10 2c0 -.88 1.056 -1.331 1.692 -.722c1.958 1.876 3.096 5.995 1.75 9.12l-.08 .174l.012 .003c.625 .133 1.203 -.43 2.303 -2.173l.14 -.224a1 1 0 0 1 1.582 -.153c1.334 1.435 2.601 4.377 2.601 6.27c0 4.265 -3.591 7.705 -8 7.705s-8 -3.44 -8 -7.706c0 -2.252 1.022 -4.716 2.632 -6.301l.605 -.589c.241 -.236 .434 -.43 .618 -.624c1.43 -1.512 2.145 -2.924 2.145 -4.78"},"play":{"o":"M7 4v16l13 -8l-13 -8","f":"M6 4v16a1 1 0 0 0 1.524 .852l13 -8a1 1 0 0 0 0 -1.704l-13 -8a1 1 0 0 0 -1.524 .852z"},"bell":{"o":"M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6 M9 17v1a3 3 0 0 0 6 0v-1","f":"M14.235 19c.865 0 1.322 1.024 .745 1.668a3.992 3.992 0 0 1 -2.98 1.332a3.992 3.992 0 0 1 -2.98 -1.332c-.552 -.616 -.158 -1.579 .634 -1.661l.11 -.006h4.471z M12 2c1.358 0 2.506 .903 2.875 2.141l.046 .171l.008 .043a8.013 8.013 0 0 1 4.024 6.069l.028 .287l.019 .289v2.931l.021 .136a3 3 0 0 0 1.143 1.847l.167 .117l.162 .099c.86 .487 .56 1.766 -.377 1.864l-.116 .006h-16c-1.028 0 -1.387 -1.364 -.493 -1.87a3 3 0 0 0 1.472 -2.063l.021 -.143l.001 -2.97a8 8 0 0 1 3.821 -6.454l.248 -.146l.01 -.043a3.003 3.003 0 0 1 2.562 -2.29l.182 -.017l.176 -.004z"},"spark":{"o":"M16 18a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2m0 -12a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2m-7 12a6 6 0 0 1 6 -6a6 6 0 0 1 -6 -6a6 6 0 0 1 -6 6a6 6 0 0 1 6 6","f":"M16 19a1 1 0 0 1 0 -2a1 1 0 0 0 1 -1c0 -1.333 2 -1.333 2 0a1 1 0 0 0 1 1c1.333 0 1.333 2 0 2a1 1 0 0 0 -1 1c0 1.333 -2 1.333 -2 0a1 1 0 0 0 -1 -1 M3 11a5 5 0 0 0 5 -5c0 -1.333 2 -1.333 2 0a5 5 0 0 0 5 5c1.333 0 1.333 2 0 2a5 5 0 0 0 -5 5a1 1 0 0 1 -2 0a5 5 0 0 0 -5 -5c-1.333 0 -1.333 -2 0 -2 M16 7a1 1 0 0 1 0 -2a1 1 0 0 0 1 -1c0 -1.333 2 -1.333 2 0a1 1 0 0 0 1 1c1.333 0 1.333 2 0 2a1 1 0 0 0 -1 1c0 1.333 -2 1.333 -2 0a1 1 0 0 0 -1 -1"},"plus":{"o":"M12 5l0 14 M5 12l14 0","f":"M12 4a1 1 0 0 1 1 1v6h6a1 1 0 0 1 0 2h-6v6a1 1 0 0 1 -2 0v-6h-6a1 1 0 0 1 0 -2h6v-6a1 1 0 0 1 1 -1"},"lock":{"o":"M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6 M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0 M8 11v-4a4 4 0 1 1 8 0v4","f":"M12 2a5 5 0 0 1 5 5v3a3 3 0 0 1 3 3v6a3 3 0 0 1 -3 3h-10a3 3 0 0 1 -3 -3v-6a3 3 0 0 1 3 -3v-3a5 5 0 0 1 5 -5m0 12a2 2 0 0 0 -1.995 1.85l-.005 .15a2 2 0 1 0 2 -2m0 -10a3 3 0 0 0 -3 3v3h6v-3a3 3 0 0 0 -3 -3"},"tag":{"o":"M6.5 7.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 M3 6v5.172a2 2 0 0 0 .586 1.414l7.71 7.71a2.41 2.41 0 0 0 3.408 0l5.592 -5.592a2.41 2.41 0 0 0 0 -3.408l-7.71 -7.71a2 2 0 0 0 -1.414 -.586h-5.172a3 3 0 0 0 -3 3","f":"M11.172 2a3 3 0 0 1 2.121 .879l7.71 7.71a3.41 3.41 0 0 1 0 4.822l-5.592 5.592a3.41 3.41 0 0 1 -4.822 0l-7.71 -7.71a3 3 0 0 1 -.879 -2.121v-5.172a4 4 0 0 1 4 -4zm-3.672 3.5a2 2 0 0 0 -1.995 1.85l-.005 .15a2 2 0 1 0 2 -2"},"user":{"o":"M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0 M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2","f":"M12 2a5 5 0 1 1 -5 5l.005 -.217a5 5 0 0 1 4.995 -4.783z M14 14a5 5 0 0 1 5 5v1a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-1a5 5 0 0 1 5 -5h4z"},"code":{"o":"M7 8l-4 4l4 4 M17 8l4 4l-4 4 M14 4l-4 16"},"quote":{"o":"M10 11h-4a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1h3a1 1 0 0 1 1 1v6c0 2.667 -1.333 4.333 -4 5 M19 11h-4a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1h3a1 1 0 0 1 1 1v6c0 2.667 -1.333 4.333 -4 5","f":"M9 5a2 2 0 0 1 2 2v6c0 3.13 -1.65 5.193 -4.757 5.97a1 1 0 1 1 -.486 -1.94c2.227 -.557 3.243 -1.827 3.243 -4.03v-1h-3a2 2 0 0 1 -1.995 -1.85l-.005 -.15v-3a2 2 0 0 1 2 -2z M18 5a2 2 0 0 1 2 2v6c0 3.13 -1.65 5.193 -4.757 5.97a1 1 0 1 1 -.486 -1.94c2.227 -.557 3.243 -1.827 3.243 -4.03v-1h-3a2 2 0 0 1 -1.995 -1.85l-.005 -.15v-3a2 2 0 0 1 2 -2z"},"listcheck":{"o":"M3.5 5.5l1.5 1.5l2.5 -2.5 M3.5 11.5l1.5 1.5l2.5 -2.5 M3.5 17.5l1.5 1.5l2.5 -2.5 M11 6l9 0 M11 12l9 0 M11 18l9 0","f":"M8.207 3.793a1 1 0 0 1 0 1.414l-2.5 2.5a1 1 0 0 1 -1.414 0l-1.5 -1.5a1 1 0 0 1 1.414 -1.414l.793 .793l1.793 -1.793a1 1 0 0 1 1.414 0 M8.207 9.793a1 1 0 0 1 0 1.414l-2.5 2.5a1 1 0 0 1 -1.414 0l-1.5 -1.5a1 1 0 0 1 1.414 -1.414l.793 .793l1.793 -1.793a1 1 0 0 1 1.414 0 M8.207 15.793a1 1 0 0 1 0 1.414l-2.5 2.5a1 1 0 0 1 -1.414 0l-1.5 -1.5a1 1 0 0 1 1.414 -1.414l.793 .793l1.793 -1.793a1 1 0 0 1 1.414 0 M21 6a1 1 0 0 1 -1 1h-9a1 1 0 0 1 0 -2h9a1 1 0 0 1 1 1 M21 12a1 1 0 0 1 -1 1h-9a1 1 0 0 1 0 -2h9a1 1 0 0 1 1 1 M21 18a1 1 0 0 1 -1 1h-9a1 1 0 0 1 0 -2h9a1 1 0 0 1 1 1"},"app":{"o":"M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10 M6 8h.01 M9 8h.01","f":"M19 4a3 3 0 0 1 3 3v10a3 3 0 0 1 -3 3h-14a3 3 0 0 1 -3 -3v-10a3 3 0 0 1 3 -3zm-12.99 3l-.127 .007a1 1 0 0 0 .117 1.993l.127 -.007a1 1 0 0 0 -.117 -1.993zm3 0l-.127 .007a1 1 0 0 0 .117 1.993l.127 -.007a1 1 0 0 0 -.117 -1.993z"},"circlecheck":{"o":"M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0 M9 12l2 2l4 -4","f":"M17 3.34a10 10 0 1 1 -14.995 8.984l-.005 -.324l.005 -.324a10 10 0 0 1 14.995 -8.336zm-1.293 5.953a1 1 0 0 0 -1.32 -.083l-.094 .083l-3.293 3.292l-1.293 -1.292l-.094 -.083a1 1 0 0 0 -1.403 1.403l.083 .094l2 2l.094 .083a1 1 0 0 0 1.226 0l.094 -.083l4 -4l.083 -.094a1 1 0 0 0 -.083 -1.32z"}};
+const IPATH={};
+const ipath=(n,f)=>{const ic=TABLER[n]||TABLER.check,k=n+(f&&ic.f?'#f':'#o');return IPATH[k]||(IPATH[k]=new Path2D(f&&ic.f?ic.f:ic.o))};
+// draw an icon centred at cx,cy, size px; o.filled uses the filled icon; o.width is the stroke in icon units (2 = Tabler's own);
+// o.draw 0..1 draws a stroked icon on along its length
+function icon(n,cx,cy,size,col,o={}){const f=!!(o.filled&&(TABLER[n]||{}).f),P=ipath(n,f);ctx.save();ctx.translate(cx,cy);ctx.scale(size/24,size/24);ctx.translate(-12,-12);
+ if(o.glow){ctx.shadowColor=rgba(typeof col==='string'?col:CY,o.glow);ctx.shadowBlur=size*.35}
+ if(f){ctx.fillStyle=col;ctx.fill(P)}else{ctx.lineCap='round';ctx.lineJoin='round';ctx.lineWidth=o.width||2;ctx.strokeStyle=col;if(o.draw!=null&&o.draw<1){const L=o.len||40;ctx.setLineDash([L*Math.max(0,o.draw),L*2]);}ctx.stroke(P)}
+ ctx.restore()}
+function rgbOf(c){c=String(c||'');let m=/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(c);if(m){let h=m[1];if(h.length===3)h=h.split('').map(x=>x+x).join('');const n=parseInt(h,16);return[n>>16,(n>>8)&255,n&255,1]}
+ m=/rgba?\(([^)]+)\)/i.exec(c);if(m){const v=m[1].split(',').map(s=>+s.trim());return[v[0],v[1],v[2],v[3]??1]}return[255,255,255,1]}
+const rgba=(c,a)=>{const v=rgbOf(c);return`rgba(${v[0]},${v[1]},${v[2]},${a})`};
+const mix=(a,b,k)=>{const x=rgbOf(a),y=rgbOf(b);return`rgb(${[0,1,2].map(i=>Math.round(x[i]+(y[i]-x[i])*k)).join(',')})`};
+const lum=c=>{const v=rgbOf(c);return(.2126*v[0]+.7152*v[1]+.0722*v[2])/255};
+const onCol=c=>lum(c)>.55?(lum(DK)<.3?DK:'#0b0b0c'):'#ffffff'; // readable ink on a fill
+const PBG=mix(TH.colors.cardBg||'#111111','#000000',0),PA=TH.panelAlpha??.9;
+// easing: cubic-bezier (Material 3 emphasized decelerate for entrances, emphasized accelerate for exits) and a damped spring
+function bez(x1,y1,x2,y2){const f=(t,a,b)=>3*a*t*(1-t)*(1-t)+3*b*t*t*(1-t)+t*t*t;return x=>{if(x<=0)return 0;if(x>=1)return 1;let lo=0,hi=1,t=x;for(let i=0;i<24;i++){if(f(t,x1,x2)<x)lo=t;else hi=t;t=(lo+hi)/2}return f(t,y1,y2)}}
+const EMPH=bez(.05,.7,.1,1),ACC=bez(.3,0,.8,.15),STD=bez(.2,0,0,1);
+// spring: t in seconds, f the frequency (Hz), z the damping ratio; overshoots 1 and settles
+const spring=(t,f=2.2,z=.5)=>{if(t<=0)return 0;const w=2*Math.PI*f,wd=w*Math.sqrt(1-z*z);return 1-Math.exp(-z*w*t)*(Math.cos(wd*t)+z*w/wd*Math.sin(wd*t))};
+// shadow only (the shape is drawn far off canvas, its shadow lands in place), so a translucent panel keeps its own alpha
+function dropShadow(build,blur,oy,a){ctx.save();const m=ctx.getTransform(),iv=m.inverse(),k=Math.hypot(m.a,m.b)||1;ctx.translate(iv.a*-1e4,iv.b*-1e4);build();
+ ctx.shadowColor=`rgba(0,0,0,${a})`;ctx.shadowBlur=blur*k;ctx.shadowOffsetX=1e4;ctx.shadowOffsetY=oy*k;ctx.fillStyle='#000';ctx.fill();ctx.restore()}
+// two-layer elevation: a wide soft ambient shadow and a tight key shadow
+function elev(build,l=1){dropShadow(build,64*l,26*l,.40);dropShadow(build,14*l,5*l,.30)}
+const GRAINS=new WeakMap();
+function grain(){let p=GRAINS.get(ctx);if(!p){const c=document.createElement('canvas');c.width=c.height=160;const x=c.getContext('2d'),d=x.createImageData(160,160),q=rng(77);for(let i=0;i<d.data.length;i+=4){const v=q()*255|0;d.data[i]=d.data[i+1]=d.data[i+2]=v;d.data[i+3]=255}x.putImageData(d,0,0);p=ctx.createPattern(c,'repeat');GRAINS.set(ctx,p)}return p}
+// the shared panel: elevation, a top-lit gradient fill, fine grain, a sheen on the top edge, a hairline rim and an optional
+// accent rim that fades round the card. o: fill, top, bot, alpha, accent, elev (0 = flat), grain (false = none)
+function panel(x,y,w,h,r,o={}){r=RAD(r);const P=()=>rr(ctx,x,y,w,h,r),ga=ctx.globalAlpha,base=o.fill||PBG;if(o.elev!==0)elev(P,o.elev||1);
+ P();const g=ctx.createLinearGradient(0,y,0,y+h);g.addColorStop(0,o.top||mix(base,'#ffffff',.08));g.addColorStop(1,o.bot||mix(base,'#000000',.2));ctx.globalAlpha=ga*(o.alpha??PA);ctx.fillStyle=g;ctx.fill();ctx.globalAlpha=ga;
+ ctx.save();P();ctx.clip();if(o.grain!==false){ctx.globalAlpha=ga*.07;ctx.globalCompositeOperation='overlay';ctx.fillStyle=grain();ctx.fillRect(x,y,w,h);ctx.globalCompositeOperation='source-over'}
+ ctx.globalAlpha=ga;const sh=Math.min(h,140),s=ctx.createLinearGradient(0,y,0,y+sh);s.addColorStop(0,'rgba(255,255,255,.07)');s.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=s;ctx.fillRect(x,y,w,sh);ctx.restore();
+ ctx.save();rr(ctx,x+1,y+1,w-2,h-2,Math.max(0,r-1));const e=ctx.createLinearGradient(0,y,0,y+h);e.addColorStop(0,'rgba(255,255,255,.22)');e.addColorStop(.45,'rgba(255,255,255,.07)');e.addColorStop(1,'rgba(255,255,255,.04)');ctx.lineWidth=2;ctx.strokeStyle=e;ctx.stroke();
+ if(o.accent){const a=ctx.createLinearGradient(x,y,x+w*.8,y+h);a.addColorStop(0,rgba(o.accent,.95));a.addColorStop(.5,rgba(o.accent,.22));a.addColorStop(1,rgba(o.accent,0));ctx.lineWidth=2.5;ctx.strokeStyle=a;ctx.stroke()}ctx.restore()}
+// text with a soft coloured glow under a crisp face
+function glowText(txt,x,y,fill,glow,blur){ctx.save();ctx.shadowColor=glow;ctx.shadowBlur=blur;ctx.fillStyle=fill;ctx.fillText(txt,x,y);ctx.restore();ctx.fillStyle=fill;ctx.fillText(txt,x,y)}
+// digits in equal cells (tabular figures), so a counting number never jitters; returns the width
+function tabW(s){const dw=Math.max(...'0123456789'.split('').map(d=>ctx.measureText(d).width));return[...s].reduce((a,ch)=>a+(/\d/.test(ch)?dw:ctx.measureText(ch).width),0)}
+function tabText(s,x,y,align){const dw=Math.max(...'0123456789'.split('').map(d=>ctx.measureText(d).width)),ws=[...s].map(ch=>/\d/.test(ch)?dw:ctx.measureText(ch).width),W=ws.reduce((a,b)=>a+b,0);let xx=align==='center'?x-W/2:align==='right'?x-W:x;
+ const ta=ctx.textAlign;ctx.textAlign='center';[...s].forEach((ch,i)=>{ctx.fillText(ch,xx+ws[i]/2,y);xx+=ws[i]});ctx.textAlign=ta;return W}
+// motion blur: fast entrances and exits render a few sub-frames across a 1/40 s shutter and average them
+const MBC=[0,1].map(()=>{const c=document.createElement('canvas');c.width=1080;c.height=1920;return c}),MBX=MBC.map(c=>c.getContext('2d'));
+const MBLUR=!(window.GFX&&window.GFX.motionBlur===false);
+function blurred(fn,c,t,n=5,sh=1/40){const main=ctx,A=MBX[1],B=MBX[0];A.setTransform(1,0,0,1,0,0);A.globalAlpha=1;A.clearRect(0,0,1080,1920);
+ for(let i=0;i<n;i++){const ts=Math.max(c[0]+1e-4,t-sh*i/(n-1));B.setTransform(1,0,0,1,0,0);B.globalAlpha=1;B.globalCompositeOperation='source-over';B.clearRect(0,0,1080,1920);ctx=B;try{fn(c,ts)}finally{ctx=main}A.globalAlpha=1/(i+1);A.drawImage(MBC[0],0,0)}
+ A.globalAlpha=1;ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(MBC[1],0,0);ctx.restore()}
+const FW=(w,s)=>`${w} ${s}px ${(TH.fonts&&TH.fonts.caption&&TH.fonts.caption.family)||'Arial, sans-serif'}`;
+const SAFE=54; // 5% title-safe margin
+// ordinal sticker, entrance burst-pop: a scalloped seal springs open with a quarter turn (gradient, rings, gloss), the word
+// rises and its spacing settles
 const ordGeo=c=>{const o=c[4],R=o.size||400;return{x:(o.x??.5)*1080,y:(o.y??.27)*1920,R}};
-function ordBurst(c,t){const o=c[4],dt=t-c[0],{x,y,R}=ordGeo(c),p=cl(dt/.34),s=backOut(p),rot=(1-p)*-.55+Math.sin(dt*1.1)*.025;if(s<=0)return;
- ctx.save();ctx.translate(x,y);ctx.rotate(rot);ctx.scale(s,s);ctx.fillStyle=o.color||'#ffe07a';starPath(ctx,R,R*.6,13,Math.round(c[0]*10)+5);ctx.fill();ctx.restore()}
-function ordWord(c,t){const o=c[4],dt=t-c[0]-.1,txt=String(c[2]||'').toUpperCase();if(dt<0||!txt)return;const {x,y,R}=ordGeo(c),wy=Math.max(120,y-R*.86);let fs=o.wordSize||150;ctx.font=SERIF(fs);while(ctx.measureText(txt).width>940&&fs>60){fs-=6;ctx.font=SERIF(fs)}
- const e=expo(cl(dt/.32));ctx.save();ctx.font=SERIF(fs);ctx.textAlign='center';ctx.textBaseline='middle';ctx.letterSpacing=((.03+.28*(1-e))*fs)+'px';ctx.globalAlpha*=e;ctx.translate(x,wy+(1-e)*36);shadow(ctx,fs*.7);ctx.fillStyle=o.ink||'#ffffff';ctx.fillText(txt,0,0);ctx.restore()}
-// app label, entrance tile-pop: the tile pops in from a tilt, then the label wipes out from under it
-function appGlyph(S,txt){ctx.fillStyle='#ffffff';const ch=String(txt||'').replace(/[^A-Za-z0-9]/g,'').charAt(0).toUpperCase();
- if(ch){ctx.font=LABELF(Math.round(S*.56));ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(ch,0,S*.03);return}
- ctx.beginPath();for(let i=0;i<8;i++){const a=i*Math.PI/4,k=i%2?S*.09:S*.3;ctx.lineTo(Math.cos(a)*k,Math.sin(a)*k)}ctx.closePath();ctx.fill()}
-function appLabel(c,t){const o=c[4],dt=t-c[0],a=gxa(c),S=o.size||210,x=(o.x??.08)*1080,y=(o.y??.5)*1920,p=cl(dt/.28),s=backOut(p),r=S*.23;
- if(s>0){ctx.save();ctx.translate(x+S/2,y+S/2);ctx.rotate((1-p)*-.3);ctx.scale(s,s);shadow(ctx,S*.45);rrect(ctx,-S/2,-S/2,S,S,r);const im=a.icon&&GIMG[a.icon];
-  if(im&&im.naturalWidth){ctx.fillStyle='#ffffff';ctx.fill();ctx.shadowColor='transparent';ctx.save();rrect(ctx,-S/2,-S/2,S,S,r);ctx.clip();const k=Math.max(S/im.naturalWidth,S/im.naturalHeight);ctx.drawImage(im,-im.naturalWidth*k/2,-im.naturalHeight*k/2,im.naturalWidth*k,im.naturalHeight*k);ctx.restore()}
-  else{const col=o.tile||CY,g=ctx.createLinearGradient(-S/2,-S/2,S/2,S/2);g.addColorStop(0,shade(col,.12));g.addColorStop(1,shade(col,-.38));ctx.fillStyle=g;ctx.fill();ctx.shadowColor='transparent';appGlyph(S,c[2])}
-  ctx.restore()}
- const txt=String(c[2]||''),ld=dt-.14;if(!txt||ld<0)return;let fs=o.labelSize||100;ctx.font=LABELF(fs);while(ctx.measureText(txt).width>1080-x-50&&fs>44){fs-=4;ctx.font=LABELF(fs)}
- const w=ctx.measureText(txt).width,q=expo(cl(ld/Math.min(.32,Math.max(.1,(c[1]-c[0]-.14)*.35)))),ly=y+S+fs*.72;ctx.save();ctx.beginPath();ctx.rect(x-40,ly-fs,(w+80)*q,fs*2);ctx.clip();ctx.font=LABELF(fs);ctx.textAlign='left';ctx.textBaseline='middle';ctx.lineJoin='round';
- shadow(ctx,fs*.5);ctx.lineWidth=fs*.24;ctx.strokeStyle=o.outline||'#ffffff';ctx.strokeText(txt,x,ly);ctx.shadowColor='transparent';ctx.fillStyle=o.ink||'#111111';ctx.fillText(txt,x,ly);ctx.restore()}
-// screen card, entrance card-rise: the card rises from below with a small tilt and settles; a video src plays inside
-function placeholderUI(w,h,dt,seed){const q=rng(seed+11);ctx.fillStyle='#15181e';ctx.fillRect(-w/2,-h/2,w,h);ctx.fillStyle='#23272f';ctx.fillRect(-w/2,-h/2,w,44);
- ['#ff6b5e','#f4c04e','#5fcf6d'].forEach((col,i)=>{ctx.fillStyle=col;ctx.beginPath();ctx.arc(-w/2+28+i*26,-h/2+22,8,0,7);ctx.fill()});
- const rows=Math.max(1,Math.floor((h-84)/34)),shown=Math.min(rows,Math.floor(Math.max(0,dt)*8)+3);
- for(let i=0;i<rows;i++){const ind=(q()*3|0)*30,len=(.22+q()*.6)*(w-90-ind);if(i>=shown)continue;ctx.fillStyle=i%5===0?'#7aa2f7':i%3===0?'#9ece6a':'#4a505c';rrect(ctx,-w/2+30+ind,-h/2+68+i*34,len,14,7);ctx.fill()}
- if(Math.floor(dt*2.5)%2===0&&shown<rows){ctx.fillStyle='#d6dcf5';ctx.fillRect(-w/2+30,-h/2+64+shown*34,12,22)}}
-function screenCard(c,t){const o=c[4],dt=t-c[0],a=gxa(c),W=(o.w??.66)*1080,pad=16;let im=null;
+function sealPath(R,n,d){ctx.beginPath();for(let i=0;i<=n;i++){const a=i/n*Math.PI*2-Math.PI/2,am=a-Math.PI/n,ri=R*(1-d);if(!i)ctx.moveTo(Math.cos(a)*ri,Math.sin(a)*ri);else ctx.quadraticCurveTo(Math.cos(am)*R*(1+d*.9),Math.sin(am)*R*(1+d*.9),Math.cos(a)*ri,Math.sin(a)*ri)}ctx.closePath()}
+function ordBurst(c,t){const o=c[4],dt=t-c[0],{x,y,R}=ordGeo(c),col=o.color||'#ffd84d',s=spring(dt,1.9,.5),rot=(1-Math.min(1,s))*-.55+dt*.05;if(s<=.002)return;
+ ctx.save();ctx.translate(x,y);ctx.rotate(rot);ctx.scale(s,s);const P=()=>sealPath(R,26,.06);elev(P,1.6);
+ P();const g=ctx.createRadialGradient(-R*.35,-R*.45,R*.05,0,0,R*1.08);g.addColorStop(0,mix(col,'#ffffff',.45));g.addColorStop(.5,col);g.addColorStop(1,mix(col,'#000000',.2));ctx.fillStyle=g;ctx.fill();
+ ctx.beginPath();ctx.arc(0,0,R*.8,0,7);ctx.lineWidth=R*.016;ctx.strokeStyle='rgba(255,255,255,.55)';ctx.stroke();ctx.beginPath();ctx.arc(0,0,R*.765,0,7);ctx.lineWidth=R*.01;ctx.strokeStyle='rgba(0,0,0,.14)';ctx.stroke();
+ ctx.save();P();ctx.clip();const sh=ctx.createLinearGradient(0,-R,0,R*.15);sh.addColorStop(0,'rgba(255,255,255,.38)');sh.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=sh;ctx.globalAlpha*=.6;ctx.beginPath();ctx.ellipse(-R*.12,-R*.55,R*.95,R*.5,-.18,0,7);ctx.fill();ctx.restore();
+ ctx.restore()}
+function ordWord(c,t){const o=c[4],dt=t-c[0]-.1,txt=String(c[2]||'').toUpperCase();if(dt<0||!txt)return;const {x,y,R}=ordGeo(c),col=o.color||'#ffd84d',wy=Math.max(120,y-R*.6);let fs=o.wordSize||Math.round(Math.min(150,R*.32));ctx.font=SERIF(fs);while(ctx.measureText(txt).width>Math.min(940,R*1.3)&&fs>48){fs-=4;ctx.font=SERIF(fs)}
+ const e=EMPH(cl(dt/.45)),ink=o.ink||mix(col,'#000000',.82);ctx.save();ctx.font=SERIF(fs);ctx.textAlign='center';ctx.textBaseline='middle';ctx.letterSpacing=((.03+.2*(1-e))*fs)+'px';ctx.globalAlpha*=cl(dt/.12);ctx.translate(x,wy+(1-e)*30);
+ ctx.fillStyle='rgba(255,255,255,.5)';ctx.fillText(txt,0,fs*.025);ctx.fillStyle=ink;ctx.fillText(txt,0,0);ctx.restore()}
+// app label, entrance tile-pop: the app tile springs in from a tilt (top-lit, specular, hairline rim), then the name plate
+// wipes out under it
+function appLabel(c,t){const o=c[4],dt=t-c[0],a=gxa(c),S=o.size||210,x=(o.x??.08)*1080,y=(o.y??.5)*1920,s=spring(dt,2.3,.58),r=S*.225;
+ if(s>.002){ctx.save();ctx.translate(x+S/2,y+S/2);ctx.rotate((1-Math.min(1,s))*-.28);ctx.scale(s,s);const P=()=>rr(ctx,-S/2,-S/2,S,S,r);elev(P,S/220);const im=a.icon&&GIMG[a.icon];
+  if(im&&im.naturalWidth){P();ctx.fillStyle='#ffffff';ctx.fill();ctx.save();P();ctx.clip();const k=Math.max(S/im.naturalWidth,S/im.naturalHeight);ctx.drawImage(im,-im.naturalWidth*k/2,-im.naturalHeight*k/2,im.naturalWidth*k,im.naturalHeight*k);ctx.restore()}
+  else{const col=o.tile||CY,g=ctx.createLinearGradient(-S/2,-S/2,S/2,S/2);g.addColorStop(0,mix(col,'#ffffff',.2));g.addColorStop(1,mix(col,'#000000',.38));P();ctx.fillStyle=g;ctx.fill();
+   const ch=String(c[2]||'').replace(/[^A-Za-z0-9]/g,'').charAt(0).toUpperCase(),ink=onCol(mix(col,'#000000',.1));
+   if(ch){ctx.font=FD(Math.round(S*.6));ctx.textAlign='center';ctx.textBaseline='middle';ctx.shadowColor='rgba(0,0,0,.25)';ctx.shadowBlur=S*.05;ctx.shadowOffsetY=S*.02;ctx.fillStyle=ink;ctx.fillText(ch,0,S*.04);ctx.shadowColor='transparent'}
+   else icon('app',0,0,S*.5,ink,{width:1.6})}
+  ctx.save();P();ctx.clip();const sp=ctx.createLinearGradient(0,-S/2,0,S*.05);sp.addColorStop(0,'rgba(255,255,255,.34)');sp.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=sp;ctx.fillRect(-S/2,-S/2,S,S*.55);ctx.restore();
+  rr(ctx,-S/2+1,-S/2+1,S-2,S-2,r-1);ctx.lineWidth=2;ctx.strokeStyle='rgba(255,255,255,.3)';ctx.stroke();ctx.restore()}
+ const txt=gs(c[2]),ld=dt-.14;if(!txt||ld<0)return;const fs=fitFont(txt,FD,o.labelSize||80,1080-SAFE-x-80,40);ctx.font=FD(fs);const tw=ctx.measureText(txt).width;
+ const h=Math.round(fs*1.42),w=tw+fs*1.1,px=x,py=y+S+22,q=EMPH(cl(ld/Math.min(.32,Math.max(.1,(c[1]-c[0]-.14)*.35))));
+ ctx.save();ctx.beginPath();ctx.rect(px-4,py-80,(w+8)*q,h+200);ctx.clip();ctx.translate(-(1-q)*30,0);panel(px,py,w,h,h/2,{elev:.8});
+ ctx.font=FD(fs);ctx.letterSpacing=(TRK*fs)+'px';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillStyle=o.ink&&o.ink!=='#111111'?o.ink:IV;ctx.fillText(txt,px+fs*.55,py+h/2+fs*.04);ctx.restore()}
+// screen card, entrance card-rise: a window card (title bar, address pill, accent rim with glow) rises and settles; your
+// image or video plays inside, else a neutral skeleton page with a shimmer
+function placeholderUI(X,Y,w,h,dt,seed){const q=rng(seed+11),k=(d,l=.35)=>EMPH(cl((dt-d)/l)),sb=Math.min(150,w*.2),M=22;ctx.fillStyle='#11141a';ctx.fillRect(X,Y,w,h);
+ ctx.fillStyle='#0c0f14';ctx.fillRect(X,Y,sb,h);ctx.fillStyle='rgba(255,255,255,.05)';ctx.fillRect(X+sb,Y,1,h);
+ for(let i=0;i<6;i++){const a=k(.2+i*.04);if(a<=0)continue;ctx.save();ctx.globalAlpha*=a;const yy=Y+M+i*44;if(i===1){rr(ctx,X+10,yy-8,sb-20,34,RAD(8));ctx.fillStyle=rgba(CY,.14);ctx.fill()}rr(ctx,X+20,yy+3,14,14,RAD(4));ctx.fillStyle=i===1?CY:'rgba(255,255,255,.22)';ctx.fill();rr(ctx,X+44,yy+5,sb*(.35+q()*.25),10,RAD(5));ctx.fillStyle=i===1?'rgba(255,255,255,.75)':'rgba(255,255,255,.16)';ctx.fill();ctx.restore()}
+ const cx=X+sb+M,cw=w-sb-M*2,hh=Math.min(h*.36,170),hk=k(.15,.45);ctx.save();ctx.globalAlpha*=hk;const hero=ctx.createLinearGradient(cx,Y+M,cx+cw,Y+M+hh);hero.addColorStop(0,rgba(CY,.38));hero.addColorStop(1,rgba(CY,.06));rr(ctx,cx,Y+M,cw,hh,RAD(14));ctx.fillStyle=hero;ctx.fill();
+ ctx.fillStyle='rgba(255,255,255,.92)';rr(ctx,cx+24,Y+M+hh-66,cw*.46,18,RAD(9));ctx.fill();ctx.fillStyle='rgba(255,255,255,.5)';rr(ctx,cx+24,Y+M+hh-38,cw*.3,12,RAD(6));ctx.fill();rr(ctx,cx+cw-24-104,Y+M+hh-60,104,36,RAD(18));ctx.fillStyle=CY;ctx.fill();ctx.restore();
+ const ty=Y+M*2+hh,th=h-hh-M*3;if(th>40){const n=3,gw=(cw-M*(n-1))/n;for(let i=0;i<n;i++){const a=k(.35+i*.07);if(a<=0)continue;ctx.save();ctx.globalAlpha*=a;const gx=cx+i*(gw+M),gy=ty+(1-a)*16;rr(ctx,gx,gy,gw,th,RAD(12));ctx.fillStyle='rgba(255,255,255,.045)';ctx.fill();ctx.lineWidth=1;ctx.strokeStyle='rgba(255,255,255,.07)';ctx.stroke();
+  rr(ctx,gx+16,gy+16,gw*.4,10,RAD(5));ctx.fillStyle='rgba(255,255,255,.3)';ctx.fill();if(th>80){ctx.font=FG(Math.min(46,th*.32));ctx.textAlign='left';ctx.textBaseline='alphabetic';ctx.fillStyle=i===0?CY:'rgba(255,255,255,.85)';ctx.fillText(['84%','2.4k','12'][i],gx+16,gy+16+18+Math.min(46,th*.32))}
+  const bh=Math.min(36,th*.25),bars=7;for(let b=0;b<bars;b++){const v=.25+q()*.75;ctx.fillStyle=i===0?rgba(CY,.55):'rgba(255,255,255,.14)';ctx.fillRect(gx+16+b*((gw-32)/bars),gy+th-14-bh*v*a,(gw-32)/bars-5,bh*v*a)}ctx.restore()}}}
+function screenCard(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t,.35),a=gxa(c),W=(o.w??.66)*1080,pad=14,bar=50;let im=null;
  if(a.frames&&a.frames.length)im=GIMG[a.frames[Math.min(a.frames.length-1,Math.max(0,Math.floor(dt*(a.fps||12))))]];else if(a.src)im=GIMG[a.src];
- const ok=im&&im.naturalWidth,ar=ok?im.naturalHeight/im.naturalWidth:.6,H=Math.min((W-pad*2)*ar+pad*2,(o.maxH??.42)*1920),cy=(o.y??.68)*1920,p=cl(dt/.4),e=expo(p),s=.9+.1*backOut(p);
- ctx.save();ctx.globalAlpha*=cl(dt/.1);ctx.translate(540,cy+(1-e)*170);ctx.rotate((1-e)*.07);ctx.scale(s,s);shadow(ctx,90);rrect(ctx,-W/2,-H/2,W,H,30);ctx.fillStyle=o.bg||'#101216';ctx.fill();ctx.shadowColor='transparent';
- ctx.save();rrect(ctx,-W/2+pad,-H/2+pad,W-pad*2,H-pad*2,18);ctx.clip();
- if(ok){const iw=W-pad*2,ih=H-pad*2,k=Math.max(iw/im.naturalWidth,ih/im.naturalHeight);ctx.drawImage(im,-im.naturalWidth*k/2,-im.naturalHeight*k/2,im.naturalWidth*k,im.naturalHeight*k)}
- else placeholderUI(W-pad*2,H-pad*2,dt,Math.round(c[0]*10));
- ctx.restore();rrect(ctx,-W/2+3,-H/2+3,W-6,H-6,28);ctx.lineWidth=7;ctx.strokeStyle=o.border||CY;ctx.stroke();ctx.restore()}
+ const ok=im&&im.naturalWidth,ar=ok?im.naturalHeight/im.naturalWidth:.6,H=Math.min((W-pad*2)*ar+pad*2+bar,(o.maxH??.42)*1920),cy=(o.y??.68)*1920,e=EMPH(cl(dt/.55)),s=.93+.07*Math.min(1.04,spring(dt,1.8,.6)),eo=ACC(ex),bd=o.border||CY,R=RAD(30);
+ ctx.save();ctx.globalAlpha*=cl(dt/.12)*(1-eo);ctx.translate(540,cy+(1-e)*150+eo*110);ctx.rotate((1-e)*.05);ctx.scale(s*(1-.05*eo),s*(1-.05*eo));
+ panel(-W/2,-H/2,W,H,R,{fill:o.bg||'#0e1116',alpha:1,elev:1.5});
+ const X=-W/2+pad,Y=-H/2+bar,iw=W-pad*2,ih=H-bar-pad;
+ ['#ff5f57','#febc2e','#28c840'].forEach((k,i)=>{ctx.beginPath();ctx.arc(-W/2+30+i*24,-H/2+bar/2,7,0,7);ctx.fillStyle=k;ctx.fill();ctx.lineWidth=1;ctx.strokeStyle='rgba(0,0,0,.25)';ctx.stroke()});
+ const aw=Math.min(W*.46,420);rr(ctx,-aw/2,-H/2+bar/2-14,aw,28,RAD(14));ctx.fillStyle='rgba(255,255,255,.06)';ctx.fill();icon('lock',-aw/2+20,-H/2+bar/2,15,'rgba(255,255,255,.45)',{width:2.2});rr(ctx,-aw/2+38,-H/2+bar/2-4,aw*.5,8,RAD(4));ctx.fillStyle='rgba(255,255,255,.18)';ctx.fill();
+ ctx.save();rr(ctx,X,Y,iw,ih,RAD(18));ctx.clip();
+ if(ok){const k=Math.max(iw/im.naturalWidth,ih/im.naturalHeight);ctx.drawImage(im,X+iw/2-im.naturalWidth*k/2,Y+ih/2-im.naturalHeight*k/2,im.naturalWidth*k,im.naturalHeight*k)}
+ else placeholderUI(X,Y,iw,ih,dt,Math.round(c[0]*10));
+ ctx.restore();
+ ctx.save();rr(ctx,-W/2+1.5,-H/2+1.5,W-3,H-3,Math.max(0,R-1.5));ctx.shadowColor=rgba(bd,.55);ctx.shadowBlur=28;ctx.lineWidth=3;ctx.strokeStyle=bd;ctx.stroke();ctx.restore();ctx.restore()}
 // Graphics 12 to 23 (kit/graphics.json): lower third, stat callout, checklist, quote card, highlight, step counter,
-// versus, icon badge, sticker pop, price tag, CTA card, code card. Original designs drawn in code (no third-party icons
-// or images) with the theme's accent, text, ink, muted and card colours and the pairing's display and caption faces.
-// Each has its own entrance and its own exit over the last 0.3 s. Cards follow the theme's corner radius (TH.radius;
-// the AIgent theme's cards are square).
+// versus, icon badge, sticker pop, price tag, CTA card, code card. Original designs drawn in code, with Tabler icons (MIT),
+// the theme's accent, text, ink, muted and card colours and the pairing's display and caption faces. Shared look: the
+// panel() card (two-layer shadow, top-lit fill, grain, sheen, rim), spring and emphasized easing, motion blur on fast
+// moves, tabular digits, 5% title-safe margins. Each has its own entrance and its own exit over the last 0.35 s. Cards
+// follow the theme's corner radius (TH.radius; the AIgent theme's cards are square).
 const GXD=GX.defaults||{},ABY=GX.autoBehindY??.45,PANMODES=new Set(GX.panelModes||[11]);
 const RAD=r=>TH.radius!=null?Math.min(+TH.radius,r):r;
 const rr=(c,x,y,w,h,r)=>rrect(c,x,y,w,h,Math.max(0,Math.min(r,Math.abs(w)/2,Math.abs(h)/2)));
-const gOut=(c,t,d=.3)=>c[1]>90?0:cl(1-(c[1]-t)/d); // 0 until the last d seconds of the graphic, then 0..1
+const gOut=(c,t,d=.35)=>c[1]>90?0:cl(1-(c[1]-t)/d); // 0 until the last d seconds of the graphic, then 0..1
 const gs=v=>v==null?'':String(v);
 const gd=(c,k,def)=>{const v=c[4][k];if(v!=null&&v!==''&&!isNaN(+v))return +v;const d=(GXD[c[3]]||{})[k];return d!=null?d:def};
 const MONO=s=>`400 ${s}px "ATH Gfx Mono", "DejaVu Sans Mono", Menlo, monospace`;
 const FD=s=>fnt(F,s),FS=s=>fnt(S,s),FG=s=>fnt(G,s);
-function fitFont(txt,mk,fs,max,min){ctx.font=mk(fs);while(ctx.measureText(txt).width>max&&fs>min){fs-=3;ctx.font=mk(fs)}return fs}
+function fitFont(txt,mk,fs,max,min){ctx.font=mk(fs);while(ctx.measureText(txt).width>max&&fs>min){fs-=2;ctx.font=mk(fs)}return fs}
 function wrap(txt,mk,fs,max){ctx.font=mk(fs);const L=[];let cur='';for(const w of gs(txt).split(/\s+/).filter(Boolean)){const n=cur?cur+' '+w:w;if(ctx.measureText(n).width>max&&cur){L.push(cur);cur=w}else cur=n}if(cur)L.push(cur);return L}
-// a polyline drawn from fraction a to b of its length (draw-on and erase)
-function partial(pts,a,b){let L=0;const seg=[];for(let i=1;i<pts.length;i++){const l=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]);seg.push(l);L+=l}
- const A=a*L,B=b*L;let s=0,on=false;ctx.beginPath();const at=(i,k)=>[pts[i-1][0]+(pts[i][0]-pts[i-1][0])*k,pts[i-1][1]+(pts[i][1]-pts[i-1][1])*k];
- for(let i=1;i<pts.length;i++){const l=seg[i-1]||1e-6,e=s+l;if(e>=A&&s<=B){const p0=at(i,Math.max(0,(A-s)/l)),p1=at(i,Math.min(1,(B-s)/l));if(!on){ctx.moveTo(p0[0],p0[1]);on=true}ctx.lineTo(p1[0],p1[1])}s=e}}
-// built-in glyphs, drawn in a box of radius r: check, star, bolt, heart, fire, play, bell, spark, plus, lock
+function kicker(txt,x,y,s,col,align='left'){ctx.font=FW(600,s);ctx.letterSpacing=(s*.16)+'px';ctx.textAlign=align;ctx.textBaseline='middle';ctx.fillStyle=col;ctx.fillText(txt,x+(align==='center'?s*.08:0),y);const w=ctx.measureText(txt).width;ctx.letterSpacing='0px';return w}
+const kw=(txt,s)=>{ctx.font=FW(600,s);ctx.letterSpacing=(s*.16)+'px';const w=ctx.measureText(txt).width;ctx.letterSpacing='0px';return w};
+// a polyline cut from fraction a to b of its length, as points
+function subPts(pts,a,b){let L=0;const seg=[];for(let i=1;i<pts.length;i++){const l=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]);seg.push(l);L+=l}
+ const A=a*L,B=b*L,out=[];let s=0;const at=(i,k)=>[pts[i-1][0]+(pts[i][0]-pts[i-1][0])*k,pts[i-1][1]+(pts[i][1]-pts[i-1][1])*k];
+ for(let i=1;i<pts.length;i++){const l=seg[i-1]||1e-6,e=s+l;if(e>=A&&s<=B){const k0=Math.max(0,(A-s)/l),k1=Math.min(1,(B-s)/l);if(!out.length)out.push([...at(i,k0),(s+k0*l)/L]);out.push([...at(i,k1),(s+k1*l)/L])}s=e}return out}
+function partial(pts,a,b){const p=subPts(pts,a,b);ctx.beginPath();p.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y))}
+// built-in glyphs (Tabler icons): check, star, bolt, heart, fire, play, bell, spark, plus, lock
 const GLYPHS=['check','star','bolt','heart','fire','play','bell','spark','plus','lock'];
-function glyphPath(name,r){ctx.beginPath();const P=pts=>{pts.forEach(([x,y],i)=>i?ctx.lineTo(x*r,y*r):ctx.moveTo(x*r,y*r));ctx.closePath()};
- if(name==='star'){for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,k=i%2?.43:1;ctx.lineTo(Math.cos(a)*k*r,Math.sin(a)*k*r)}ctx.closePath();return 'fill'}
- if(name==='spark'){for(let i=0;i<8;i++){const a=-Math.PI/2+i*Math.PI/4,k=i%2?.24:1;ctx.lineTo(Math.cos(a)*k*r,Math.sin(a)*k*r)}ctx.closePath();return 'fill'}
- if(name==='heart'){ctx.moveTo(0,.92*r);ctx.bezierCurveTo(-1.15*r,.08*r,-.8*r,-1*r,0,-.4*r);ctx.bezierCurveTo(.8*r,-1*r,1.15*r,.08*r,0,.92*r);ctx.closePath();return 'fill'}
- if(name==='bolt'){P([[.18,-1],[-.62,.14],[-.06,.14],[-.22,1],[.62,-.2],[.06,-.2]]);return 'fill'}
- if(name==='fire'){ctx.moveTo(.05*r,-1*r);ctx.bezierCurveTo(.5*r,-.5*r,.9*r,-.1*r,.72*r,.45*r);ctx.bezierCurveTo(.6*r,.82*r,.3*r,1*r,0,1*r);ctx.bezierCurveTo(-.45*r,1*r,-.8*r,.7*r,-.74*r,.3*r);ctx.bezierCurveTo(-.68*r,-.05*r,-.4*r,-.2*r,-.34*r,-.58*r);ctx.bezierCurveTo(-.12*r,-.42*r,-.02*r,-.3*r,.05*r,-1*r);ctx.closePath();return 'fill'}
- if(name==='play'){P([[-.42,-.72],[.78,0],[-.42,.72]]);return 'fill'}
- if(name==='plus'){P([[-.18,-.78],[.18,-.78],[.18,-.18],[.78,-.18],[.78,.18],[.18,.18],[.18,.78],[-.18,.78],[-.18,.18],[-.78,.18],[-.78,-.18],[-.18,-.18]]);return 'fill'}
- if(name==='bell'){ctx.moveTo(-.64*r,.42*r);ctx.bezierCurveTo(-.56*r,.05*r,-.66*r,-.74*r,0,-.76*r);ctx.bezierCurveTo(.66*r,-.74*r,.56*r,.05*r,.64*r,.42*r);ctx.lineTo(.8*r,.58*r);ctx.lineTo(-.8*r,.58*r);ctx.closePath();ctx.moveTo(.2*r,.72*r);ctx.arc(0,.72*r,.2*r,0,Math.PI*2);return 'fill'}
- if(name==='lock'){rrect(ctx,-.62*r,-.12*r,1.24*r,.98*r,.14*r);return 'lock'}
- ctx.moveTo(-.62*r,.02*r);ctx.lineTo(-.18*r,.46*r);ctx.lineTo(.66*r,-.5*r);return 'stroke'}
-function drawGlyph(name,r,col,outline){const k=glyphPath(GLYPHS.includes(name)?name:'check',r);ctx.lineCap='round';ctx.lineJoin='round';
- const shackle=()=>{ctx.beginPath();ctx.arc(0,-.14*r,.38*r,Math.PI,0);ctx.lineWidth=r*.2;ctx.strokeStyle=col;ctx.stroke()};
- if(outline){ctx.save();ctx.lineWidth=r*(k==='stroke'?.62:.36);ctx.strokeStyle=outline;ctx.stroke();ctx.restore();if(k==='lock'){ctx.save();ctx.beginPath();ctx.arc(0,-.14*r,.38*r,Math.PI,0);ctx.lineWidth=r*.5;ctx.strokeStyle=outline;ctx.stroke();ctx.restore()}glyphPath(GLYPHS.includes(name)?name:'check',r)}
- if(k==='stroke'){ctx.lineWidth=r*.3;ctx.strokeStyle=col;ctx.stroke()}else{ctx.fillStyle=col;ctx.fill();if(k==='lock')shackle()}}
-// lower third, entrance bar-wipe: the accent bar grows, the plate slides out from behind it; exit wipes back
-function lowerThird(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),x=gd(c,'x',.06)*1080,y=gd(c,'y',.76)*1920,name=gs(c[2]).toUpperCase(),sub=gs(o.sub);if(!name)return;
- const fs=fitFont(name,FD,o.textSize||86,860,40);ctx.font=FD(fs);const nw=ctx.measureText(name).width,ss=sub?fitFont(sub,FS,42,860,26):0,sw=sub?ctx.measureText(sub).width:0;
- const W=Math.max(nw,sw)+84,blk=fs+(sub?14+ss:0),H=blk+52,bw=16,p1=expo(cl(dt/.24)),p2=expo(cl((dt-.14)/.4)),e1=cl(ex/.6),e2=cl((ex-.45)/.55),pw=p2*(1-expo(e1));
- ctx.save();shadow(ctx,50);const bh=H*p1*(1-e2);ctx.fillStyle=o.color||CY;ctx.fillRect(x,y-bh/2,bw,bh);ctx.shadowColor='transparent';
- if(pw>.005){ctx.save();ctx.beginPath();ctx.rect(x+bw,y-H/2-30,W*pw+4,H+60);ctx.clip();ctx.translate(-(1-pw)*W*.4,0);rr(ctx,x+bw,y-H/2,W,H,RAD(14));ctx.fillStyle=TH.colors.cardBg;ctx.fill();
-  const top=y-blk/2;ctx.textAlign='left';ctx.textBaseline='middle';ctx.font=FD(fs);ctx.letterSpacing=(TRK*fs)+'px';ctx.fillStyle=IV;ctx.fillText(name,x+bw+40,top+fs/2+fs*.04);
-  if(sub){ctx.font=FS(ss);ctx.letterSpacing='0px';ctx.fillStyle=o.color||CY;ctx.fillText(sub,x+bw+40,top+fs+14+ss/2)}ctx.restore()}
- ctx.restore()}
-// stat callout, entrance count-up: the number counts from zero to its value (kept to its final width), then holds; the label rises under it
-function statCallout(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),x=gd(c,'x',.5)*1080,y=gd(c,'y',.1)*1920,raw=gs(c[2]),sub=gs(o.sub).toUpperCase();if(!raw)return;
+const glyph=n=>GLYPHS.includes(n)?n:'check';
+// lower third, entrance bar-wipe: the accent rule springs up with a glow, the name plate wipes out from it, the sub strip
+// follows on an accent tab; exit wipes them back into the rule
+function lowerThird(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t,.4),x=Math.max(SAFE,gd(c,'x',.06)*1080),y=gd(c,'y',.76)*1920,name=gs(c[2]).toUpperCase(),sub=gs(o.sub).toUpperCase(),col=o.color||CY;if(!name)return;
+ const fs=fitFont(name,FD,o.textSize||96,1080-SAFE-x-100,40);ctx.font=FD(fs);ctx.letterSpacing=(TRK*fs)+'px';const nw=ctx.measureText(name).width;ctx.letterSpacing='0px';
+ let ss=0,sw=0;if(sub){ss=30;while(kw(sub,ss)>1080-SAFE-x-80&&ss>18)ss-=1;sw=kw(sub,ss)}
+ const bw=8,px=40,H1=Math.round(fs*1.02+40),W1=nw+px*2,H2=sub?ss+30:0,W2=sub?sw+px*1.3:0,top=y-(H1+H2)/2;
+ const pb=Math.min(1,spring(dt,2.4,.75)),p1=EMPH(cl((dt-.06)/.5)),p2=EMPH(cl((dt-.2)/.45));
+ const bh=(H1+H2)*pb*(1-ACC(cl((ex-.55)/.45)));ctx.save();ctx.shadowColor=rgba(col,.7);ctx.shadowBlur=26;ctx.fillStyle=col;ctx.fillRect(x,top+(H1+H2-bh)/2,bw,bh);ctx.restore();
+ const w1=p1*(1-ACC(cl(ex/.65)));if(w1>.003){ctx.save();ctx.beginPath();ctx.rect(x+bw,top-90,W1*w1+2,H1+H2+220);ctx.clip();ctx.translate(-(1-w1)*70,0);panel(x+bw,top,W1,H1,RAD(6),{elev:1});
+  const k=EMPH(cl((dt-.16)/.4));ctx.globalAlpha*=k;ctx.font=FD(fs);ctx.letterSpacing=(TRK*fs)+'px';ctx.textAlign='left';ctx.textBaseline='middle';const g=ctx.createLinearGradient(0,top+H1/2-fs/2,0,top+H1/2+fs/2);g.addColorStop(0,IV);g.addColorStop(1,mix(IV,'#000000',.12));ctx.fillStyle=g;ctx.fillText(name,x+bw+px+(1-k)*24,top+H1/2+fs*.05);ctx.restore()}
+ if(sub){const w2=p2*(1-ACC(cl(ex/.5)));if(w2>.003){ctx.save();ctx.beginPath();ctx.rect(x+bw,top+H1,W2*w2+2,H2+90);ctx.clip();ctx.translate(-(1-w2)*40,0);panel(x+bw,top+H1,W2,H2,RAD(4),{fill:col,top:mix(col,'#ffffff',.14),bot:mix(col,'#000000',.1),alpha:1,grain:false,elev:.6});
+  kicker(sub,x+bw+px*.65,top+H1+H2/2+1,ss,onCol(col));ctx.restore()}}}
+// stat callout, entrance count-up: the number blurs in and springs up, then counts to its value in equal digit cells
+// (gradient face, glow, soft scrim behind for legibility); the label plate rises under it; exit shrinks and fades
+function statCallout(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),x=gd(c,'x',.5)*1080,y=gd(c,'y',.1)*1920,raw=gs(c[2]),sub=gs(o.sub).toUpperCase(),col=o.color||CY;if(!raw)return;
  const m=/^(\D*?)(\d[\d,]*(?:\.\d+)?)(.*)$/.exec(raw);let shown=raw;
- if(m){const num=+m[2].replace(/,/g,''),dec=(m[2].split('.')[1]||'').length,v=num*expo(cl(dt/.85));shown=m[1]+(m[2].includes(',')?v.toLocaleString('en-US',{minimumFractionDigits:dec,maximumFractionDigits:dec}):v.toFixed(dec))+m[3]}
- const fs=fitFont(raw,FG,o.size||230,960,80),pop=backOut(cl(dt/.3)),s=(.6+.4*pop)*(1-.25*expo(ex));
- ctx.save();ctx.globalAlpha*=cl(dt/.08)*(1-ex);ctx.translate(x,y);ctx.scale(s,s);ctx.font=FG(fs);ctx.letterSpacing=(TRK*fs)+'px';ctx.textAlign='center';ctx.textBaseline='middle';shadow(ctx,fs*.6);ctx.fillStyle=o.color||CY;ctx.fillText(shown,0,0);ctx.restore();
- if(sub&&dt>.25){const e=expo(cl((dt-.25)/.35)),ss=fitFont(sub,FS,54,900,28);ctx.save();ctx.globalAlpha*=e*(1-ex);ctx.font=FS(ss);ctx.letterSpacing=(ss*.18)+'px';ctx.textAlign='center';ctx.textBaseline='middle';const lw=ctx.measureText(sub).width+ss*1.4,ly=y+fs*.56+ss*.8+(1-e)*30;shadow(ctx,ss);rr(ctx,x-lw/2,ly-ss*.85,lw,ss*1.7,RAD(ss*.85));ctx.fillStyle=TH.colors.cardBg;ctx.fill();ctx.shadowColor='transparent';ctx.fillStyle=IV;ctx.fillText(sub,x+ss*.09,ly+2);ctx.restore()}}
-// checklist, entrance tick-in: the card rises, rows drop in one after another, each box ticks at its time ("at", set
-// from when you say the item; else spread over the card); exit slides the card down
+ if(m){const num=+m[2].replace(/,/g,''),dec=(m[2].split('.')[1]||'').length,v=num*EMPH(cl((dt-.05)/.95));shown=m[1]+(m[2].includes(',')?v.toLocaleString('en-US',{minimumFractionDigits:dec,maximumFractionDigits:dec}):v.toFixed(dec))+m[3]}
+ let fs=o.size||240;ctx.font=FG(fs);while(tabW(raw)>1080-SAFE*2-40&&fs>80){fs-=4;ctx.font=FG(fs)}const Wf=tabW(raw),eo=ACC(ex),al=cl(dt/.12)*(1-eo),s=(.84+.16*Math.min(1.06,spring(dt,2.1,.55)))*(1-.14*eo);
+ ctx.save();ctx.globalAlpha*=al*.8;const sy=y+fs*.3,sg=ctx.createRadialGradient(0,0,0,0,0,1);sg.addColorStop(0,'rgba(0,0,0,.42)');sg.addColorStop(.6,'rgba(0,0,0,.18)');sg.addColorStop(1,'rgba(0,0,0,0)');ctx.translate(x,sy);ctx.scale(Wf*.85+fs*.6,fs*1.25);ctx.fillStyle=sg;ctx.beginPath();ctx.arc(0,0,1,0,7);ctx.fill();ctx.restore();
+ ctx.save();ctx.globalAlpha*=al;ctx.translate(x,y);ctx.scale(s,s);const bl=(1-cl(dt/.28))*12+eo*8;if(bl>.3)ctx.filter=`blur(${bl.toFixed(1)}px)`;ctx.font=FG(fs);ctx.letterSpacing='0px';ctx.textAlign='center';ctx.textBaseline='middle';
+ const g=ctx.createLinearGradient(0,-fs*.42,0,fs*.42);g.addColorStop(0,mix(col,'#ffffff',.5));g.addColorStop(.55,col);g.addColorStop(1,mix(col,'#000000',.08));
+ ctx.save();ctx.shadowColor='rgba(0,0,0,.5)';ctx.shadowBlur=fs*.12;ctx.shadowOffsetY=fs*.04;ctx.fillStyle=g;tabText(shown,Wf/2,0,'right');ctx.restore();
+ ctx.save();ctx.shadowColor=rgba(col,.45);ctx.shadowBlur=fs*.2;ctx.fillStyle=g;tabText(shown,Wf/2,0,'right');ctx.restore();ctx.restore();
+ if(sub&&dt>.28){const e=EMPH(cl((dt-.28)/.45));let ss=34;while(kw(sub,ss)>860&&ss>20)ss-=1;const lw=kw(sub,ss)+ss*2.8+64,lh=ss+34,ly=y+fs*.56+lh/2+10+(1-e)*26;
+  ctx.save();ctx.globalAlpha*=e*(1-eo);panel(x-lw/2,ly-lh/2,lw,lh,lh/2,{elev:.7});kicker(sub,x,ly+1,ss,IV,'center');ctx.fillStyle=col;ctx.shadowColor=rgba(col,.8);ctx.shadowBlur=10;const rx=lw/2-ss*1.1-14;ctx.fillRect(x-rx-ss*.9,ly-1.5,ss*.9,3);ctx.fillRect(x+rx,ly-1.5,ss*.9,3);ctx.restore()}}
+// checklist, entrance tick-in: the card rises, rows slide in one after another, each check springs in and draws its tick
+// at its time ("at", set from when you say the item; else spread over the card); a done count ticks in the header;
+// exit slides the card down
 function checklist(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),items=(Array.isArray(o.items)?o.items:gs(o.items).split(';')).map(s=>gs(s).trim()).filter(Boolean),title=gs(c[2]).toUpperCase();if(!items.length)return;
- const W=gd(c,'w',.8)*1080,x=gd(c,'x',.5)*1080,cy=gd(c,'y',.66)*1920,rh=96,pad=44,th=title?96:0,H=pad*2+th+items.length*rh-16,col=o.color||CY,dur=c[1]>90?4:c[1]-c[0];
+ const W=gd(c,'w',.8)*1080,x=gd(c,'x',.5)*1080,cy=gd(c,'y',.66)*1920,rh=96,pad=46,th=title?112:20,H=pad*2+th+items.length*rh-46,col=o.color||CY,dur=c[1]>90?4:c[1]-c[0];
  const at=items.map((_,i)=>Array.isArray(o.at)&&o.at[i]!=null?+o.at[i]:c[0]+.5+i*Math.max(.25,(dur-.9)*.7/items.length));
- const p=expo(cl(dt/.35));ctx.save();ctx.globalAlpha*=cl(dt/.1)*(1-ex);ctx.translate(x,cy+(1-p)*60+expo(ex)*140);
- shadow(ctx,70);rr(ctx,-W/2,-H/2,W,H,RAD(28));ctx.fillStyle=TH.colors.cardBg;ctx.fill();ctx.shadowColor='transparent';ctx.lineWidth=2;ctx.strokeStyle=TH.colors.cardStroke;ctx.stroke();
- let yy=-H/2+pad;if(title){const fs=fitFont(title,FD,74,W-pad*2,36);ctx.font=FD(fs);ctx.letterSpacing=(TRK*fs)+'px';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillStyle=col;ctx.fillText(title,-W/2+pad,yy+38);ctx.letterSpacing='0px';yy+=th}
- items.forEach((it,i)=>{const ri=cl((dt-.15-i*.12)/.3),e=expo(ri);if(ri<=0)return;const ry=yy+i*rh+rh/2-8,bx=-W/2+pad,bs=56,tk=cl((t-at[i])/.28);
-  ctx.save();ctx.globalAlpha*=e;ctx.translate((1-e)*-40,0);rr(ctx,bx,ry-bs/2,bs,bs,RAD(12));
-  if(tk>0){ctx.fillStyle=col;ctx.globalAlpha*=1;ctx.save();ctx.globalAlpha*=cl(tk*3);ctx.fill();ctx.restore();ctx.save();ctx.translate(bx+bs/2,ry);partial([[-.55,.02],[-.15,.42],[.6,-.45]].map(([a,b])=>[a*bs*.5,b*bs*.5]),0,expo(tk));ctx.lineWidth=8;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=DK;ctx.stroke();ctx.restore()}
-  else{ctx.lineWidth=5;ctx.strokeStyle=MU;ctx.stroke()}
-  const fs=fitFont(it,FS,52,W-pad*2-bs-30,26);ctx.font=FS(fs);ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillStyle=tk>0?IV:MU;ctx.fillText(it,bx+bs+30,ry+2);ctx.restore()});
+ const p=EMPH(cl(dt/.5)),eo=ACC(ex);ctx.save();ctx.globalAlpha*=cl(dt/.12)*(1-eo);ctx.translate(x,cy+(1-p)*80+eo*170);
+ panel(-W/2,-H/2,W,H,28,{accent:col,elev:1.3});
+ let yy=-H/2+pad;if(title){const done=at.filter(a=>t>=a).length,cnt=`${done}/${items.length}`;ctx.font=FW(600,34);const cw=tabW(cnt);icon('listcheck',-W/2+pad+22,yy+30,46,col,{width:2,glow:.35});
+  const fs=fitFont(title,FD,72,W-pad*2-80-cw-30,34);ctx.font=FD(fs);ctx.letterSpacing=(TRK*fs)+'px';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillStyle=IV;ctx.fillText(title,-W/2+pad+66,yy+32);ctx.letterSpacing='0px';
+  ctx.font=FW(600,34);ctx.fillStyle=MU;ctx.textBaseline='middle';tabText(cnt,W/2-pad,yy+32,'right');ctx.fillStyle='rgba(255,255,255,.09)';ctx.fillRect(-W/2+pad,yy+th-36,W-pad*2,2);yy+=th}
+ items.forEach((it,i)=>{const ri=cl((dt-.18-i*.1)/.4),e=EMPH(ri);if(ri<=0)return;const ry=yy+i*rh+rh/2-12,bx=-W/2+pad+28,tt=t-at[i],tk=cl(tt/.35);
+  ctx.save();ctx.globalAlpha*=cl(ri*2.5);ctx.translate((1-e)*-44,0);
+  ctx.beginPath();ctx.arc(bx,ry,27,0,7);ctx.fillStyle='rgba(255,255,255,.04)';ctx.fill();ctx.lineWidth=3;ctx.strokeStyle=rgba(IV,.26*(1-tk));ctx.stroke();
+  if(tt>0){const sc=Math.max(0,spring(tt,3,.45));ctx.save();ctx.translate(bx,ry);ctx.scale(sc,sc);ctx.beginPath();ctx.arc(0,0,27,0,7);const g=ctx.createLinearGradient(0,-27,0,27);g.addColorStop(0,mix(col,'#ffffff',.25));g.addColorStop(1,col);ctx.shadowColor=rgba(col,.55);ctx.shadowBlur=20;ctx.fillStyle=g;ctx.fill();ctx.restore();
+   icon('check',bx,ry+1,34,onCol(col),{width:3,draw:EMPH(cl((tt-.06)/.3)),len:22})}
+  const fs=fitFont(it,s=>FW(500,s),48,W-pad*2-90,26);ctx.font=FW(500,fs);ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillStyle=tk>0?mix(MU,IV,tk):MU;ctx.fillText(it,bx+56,ry+2);ctx.restore()});
  ctx.restore()}
-// quote card, entrance quote-unfold: the quote mark pops, the line fades in word by word, the attribution last
-function quoteCard(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),txt=gs(c[2]);if(!txt)return;const W=gd(c,'w',.84)*1080,cy=gd(c,'y',.67)*1920,col=o.color||CY,pad=56,sub=gs(o.sub);
- let fs=66,lines=wrap(txt,SERIF,fs,W-pad*2);while(lines.length>4&&fs>40){fs-=4;lines=wrap(txt,SERIF,fs,W-pad*2)}
- const lh=fs*1.2,H=pad*2+78+lines.length*lh+(sub?64:0),p=expo(cl(dt/.35)),nW=txt.split(/\s+/).length,per=Math.min(.09,Math.max(.03,((c[1]>90?3:c[1]-c[0])*.45)/Math.max(1,nW)));
- ctx.save();ctx.globalAlpha*=cl(dt/.1)*(1-ex);ctx.translate(540,cy+(1-p)*50-expo(ex)*70);
- shadow(ctx,70);rr(ctx,-W/2,-H/2,W,H,RAD(28));ctx.fillStyle=TH.colors.cardBg;ctx.fill();ctx.shadowColor='transparent';ctx.fillStyle=col;ctx.fillRect(-W/2,-H/2,10,H*p);
- const mp=backOut(cl((dt-.05)/.3));if(mp>0){ctx.save();ctx.translate(-W/2+pad+34,-H/2+pad+36);ctx.scale(mp,mp);ctx.font=SERIF(280);ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=col;ctx.fillText('\u201C',0,78);ctx.restore()}
+// quote card, entrance quote-unfold: the quote mark (Tabler, filled, accent glow) springs in, the line fades up word by
+// word, the attribution last behind a short accent rule; exit rises and fades
+function quoteCard(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),txt=gs(c[2]);if(!txt)return;const W=gd(c,'w',.84)*1080,cy=gd(c,'y',.67)*1920,col=o.color||CY,pad=58,sub=gs(o.sub);
+ let fs=70,lines=wrap(txt,SERIF,fs,W-pad*2);while(lines.length>4&&fs>40){fs-=4;lines=wrap(txt,SERIF,fs,W-pad*2)}
+ const lh=fs*1.18,top=96,H=Math.round(pad*2+top+lines.length*lh+(sub?58:0)-fs*.28),p=EMPH(cl(dt/.5)),eo=ACC(ex),nW=txt.split(/\s+/).length,per=Math.min(.09,Math.max(.03,((c[1]>90?3:c[1]-c[0])*.45)/Math.max(1,nW)));
+ ctx.save();ctx.globalAlpha*=cl(dt/.12)*(1-eo);ctx.translate(540,cy+(1-p)*60-eo*80);
+ panel(-W/2,-H/2,W,H,28,{accent:col,elev:1.3});
+ const mp=Math.max(0,spring(dt-.05,2.4,.5));if(mp>0){ctx.save();ctx.translate(-W/2+pad+40,-H/2+pad+36);ctx.scale(mp,mp);const g=ctx.createLinearGradient(0,-40,0,40);g.addColorStop(0,mix(col,'#ffffff',.35));g.addColorStop(1,col);icon('quote',0,0,92,g,{filled:true});ctx.restore()}
  let wi=0;ctx.font=SERIF(fs);ctx.textAlign='left';ctx.textBaseline='alphabetic';
- lines.forEach((ln,li)=>{let xx=-W/2+pad;const yy=-H/2+pad+78+li*lh+fs*.85;for(const w of ln.split(' ')){const k=cl((dt-.2-wi*per)/.25);wi++;if(k>0){ctx.save();ctx.globalAlpha*=k;ctx.fillStyle=IV;ctx.fillText(w,xx,yy+(1-expo(k))*14);ctx.restore()}xx+=ctx.measureText(w+' ').width}});
- if(sub){const k=cl((dt-.2-wi*per)/.3);ctx.save();ctx.globalAlpha*=k;ctx.font=FS(40);ctx.letterSpacing='5px';ctx.fillStyle=col;ctx.textBaseline='middle';ctx.fillText(sub.toUpperCase(),-W/2+pad,H/2-pad-16);ctx.restore()}
+ lines.forEach((ln,li)=>{let xx=-W/2+pad;const yy=-H/2+pad+top+li*lh+fs*.82;for(const w of ln.split(' ')){const k=cl((dt-.2-wi*per)/.3);wi++;if(k>0){ctx.save();ctx.globalAlpha*=k;ctx.fillStyle=IV;ctx.shadowColor='rgba(0,0,0,.3)';ctx.shadowBlur=6;ctx.shadowOffsetY=2;ctx.fillText(w,xx,yy+(1-EMPH(k))*16);ctx.restore()}xx+=ctx.measureText(w+' ').width}});
+ if(sub){const k=EMPH(cl((dt-.25-wi*per)/.35)),ay=H/2-pad-8;ctx.save();ctx.globalAlpha*=k;ctx.fillStyle=col;ctx.shadowColor=rgba(col,.7);ctx.shadowBlur=8;ctx.fillRect(-W/2+pad,ay-1.5,40*k,3);ctx.shadowColor='transparent';let ss=30;while(kw(sub.toUpperCase(),ss)>W-pad*2-70&&ss>18)ss--;kicker(sub.toUpperCase(),-W/2+pad+58,ay+1,ss,MU);ctx.restore()}
  ctx.restore()}
-// highlight, entrance draw-on: a hand-drawn circle, arrow, underline or box draws itself on; exit erases it from the start
-function highlight(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t,.35),x=gd(c,'x',.5)*1080,y=gd(c,'y',.5)*1920,w=gd(c,'w',.5)*1080,h=gd(c,'h',.12)*1920,sh=o.shape||'circle',col=o.color||CY,q=rng(Math.round(c[0]*10)+3);
+// highlight, entrance draw-on: a tapered marker stroke (circle, arrow, underline or box) draws itself on with a glow and a
+// highlight line; the label sits on an accent plate; exit erases it from the start
+function highlight(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t,.35),x=gd(c,'x',.5)*1080,y=gd(c,'y',.5)*1920,w=gd(c,'w',.5)*1080,h=gd(c,'h',.12)*1920,sh=o.shape||'circle',col=o.color||CY,q=rng(Math.round(c[0]*10)+3),SW=o.stroke||15;
  let pts=[],tail=null;
- if(sh==='underline'){for(let i=0;i<=24;i++)pts.push([x-w/2+w*i/24,y+Math.sin(i/24*Math.PI*1.5)*7+(q()-.5)*3]);tail=[x,y-60]}
- else if(sh==='box'){const j=()=>(q()-.5)*10;pts=[[x-w/2+j(),y-h/2+j()],[x+w/2+j(),y-h/2+j()],[x+w/2+j(),y+h/2+j()],[x-w/2+j(),y+h/2+j()],[x-w/2+8,y-h/2-6]];tail=[x,y-h/2-60]}
- else if(sh==='arrow'){const tx=x-w*.6,ty=y-h*1.5,mx=(tx+x)/2+h*.5,my=(ty+y)/2-w*.12;for(let i=0;i<=30;i++){const k=i/30,a=(1-k)*(1-k),b=2*k*(1-k),d=k*k;pts.push([a*tx+b*mx+d*x,a*ty+b*my+d*y])}tail=[tx,ty-50]}
- else{const n=64;for(let i=0;i<=n*1.08;i++){const a=-2.2+i/n*Math.PI*2,wob=1+(q()-.5)*.03+.035*Math.sin(i*.27);pts.push([x+Math.cos(a)*w/2*wob,y+Math.sin(a)*h/2*wob])}tail=[x,y-h/2-60]}
- const f=cl(dt/.55),dr=f<.5?2*f*f:1-Math.pow(-2*f+2,2)/2,a0=expo(ex);
- ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.shadowColor='rgba(0,0,0,.45)';ctx.shadowBlur=10;ctx.shadowOffsetY=3;ctx.strokeStyle=col;ctx.lineWidth=o.stroke||14;
- if(dr>a0){partial(pts,a0,dr);ctx.stroke()}
- if(sh==='arrow'){const hp=cl((dr-.85)/.15)*(1-a0);if(hp>0){const [px,py]=pts[pts.length-1],[qx,qy]=pts[pts.length-4],an=Math.atan2(py-qy,px-qx),L=62*hp;ctx.beginPath();ctx.moveTo(px+Math.cos(an+2.55)*L,py+Math.sin(an+2.55)*L);ctx.lineTo(px,py);ctx.lineTo(px+Math.cos(an-2.55)*L,py+Math.sin(an-2.55)*L);ctx.stroke()}}
- const txt=gs(c[2]).toUpperCase();if(txt&&dt>.3){const e=expo(cl((dt-.3)/.3)),fs=fitFont(txt,FD,72,900,32);ctx.font=FD(fs);const tw=ctx.measureText(txt).width,tx=Math.min(1040-tw/2,Math.max(40+tw/2,tail[0]));ctx.globalAlpha*=e*(1-ex);ctx.textAlign='center';ctx.textBaseline='middle';shadow(ctx,fs*.6);ctx.fillStyle=col;ctx.fillText(txt,tx,tail[1]+(1-e)*20)}
+ if(sh==='underline'){for(let i=0;i<=40;i++){const k=i/40;pts.push([x-w/2+w*k,y+Math.sin(k*Math.PI*1.4)*6-k*6])}tail=[x,y-62]}
+ else if(sh==='box'){const j=()=>(q()-.5)*8,P=[[x-w/2+j(),y-h/2+j()],[x+w/2+j(),y-h/2+j()],[x+w/2+j(),y+h/2+j()],[x-w/2+j(),y+h/2+j()],[x-w/2+10,y-h/2-4]];for(let s=1;s<P.length;s++)for(let i=0;i<=12;i++){const k=i/12;pts.push([P[s-1][0]+(P[s][0]-P[s-1][0])*k,P[s-1][1]+(P[s][1]-P[s-1][1])*k])}tail=[x,y-h/2-62]}
+ else if(sh==='arrow'){const sd=x>=540?1:-1,tx=x+sd*w*.6,ty=y-h*1.5,mx=(tx+x)/2-sd*h*.5,my=(ty+y)/2-w*.12;for(let i=0;i<=40;i++){const k=i/40,a=(1-k)*(1-k),b=2*k*(1-k),d=k*k;pts.push([a*tx+b*mx+d*x,a*ty+b*my+d*y])}tail=[tx,ty-56]}
+ else{const n=72;for(let i=0;i<=n*1.1;i++){const a=-2.2+i/n*Math.PI*2,wob=1+(q()-.5)*.02+.03*Math.sin(i*.21);pts.push([x+Math.cos(a)*w/2*wob,y+Math.sin(a)*h/2*wob])}tail=[x,y-h/2-62]}
+ const f=cl(dt/.6),dr=STD(f),a0=EMPH(ex);
+ if(dr>a0){const sp=subPts(pts,a0,dr),taper=u=>.38+.62*Math.pow(Math.sin(Math.PI*Math.min(1,Math.max(0,u))),.45);ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.save();ctx.beginPath();sp.forEach(([px,py],i)=>i?ctx.lineTo(px,py):ctx.moveTo(px,py));ctx.shadowColor=rgba(col,.55);ctx.shadowBlur=24;ctx.lineWidth=SW*.7;ctx.strokeStyle=rgba(col,.9);ctx.stroke();ctx.shadowColor='rgba(0,0,0,.35)';ctx.shadowBlur=10;ctx.shadowOffsetY=4;ctx.stroke();ctx.restore();
+  ctx.strokeStyle=col;for(let i=1;i<sp.length;i++){ctx.beginPath();ctx.moveTo(sp[i-1][0],sp[i-1][1]);ctx.lineTo(sp[i][0],sp[i][1]);ctx.lineWidth=SW*taper(sp[i][2]);ctx.stroke()}
+  ctx.strokeStyle='rgba(255,255,255,.4)';for(let i=1;i<sp.length;i++){ctx.beginPath();ctx.moveTo(sp[i-1][0]-1.5,sp[i-1][1]-2);ctx.lineTo(sp[i][0]-1.5,sp[i][1]-2);ctx.lineWidth=SW*.16*taper(sp[i][2]);ctx.stroke()}
+  if(sh==='arrow'){const hp=EMPH(cl((dr-.86)/.14))*(1-a0);if(hp>0){const [px,py]=pts[pts.length-1],[qx,qy]=pts[pts.length-5],an=Math.atan2(py-qy,px-qx),L=58*hp;ctx.beginPath();ctx.moveTo(px+Math.cos(an)*SW*.4,py+Math.sin(an)*SW*.4);ctx.lineTo(px+Math.cos(an+2.6)*L,py+Math.sin(an+2.6)*L);ctx.lineTo(px+Math.cos(an+Math.PI)*L*.55,py+Math.sin(an+Math.PI)*L*.55);ctx.lineTo(px+Math.cos(an-2.6)*L,py+Math.sin(an-2.6)*L);ctx.closePath();ctx.lineWidth=SW*.5;ctx.strokeStyle=col;ctx.fillStyle=col;ctx.shadowColor='rgba(0,0,0,.35)';ctx.shadowBlur=10;ctx.shadowOffsetY=4;ctx.fill();ctx.stroke()}}
+  ctx.restore()}
+ const txt=gs(c[2]).toUpperCase();if(txt&&dt>.3){const e=EMPH(cl((dt-.3)/.4)),fs=fitFont(txt,FD,64,880,30);ctx.font=FD(fs);ctx.letterSpacing=(TRK*fs)+'px';const tw=ctx.measureText(txt).width,pw=tw+fs*.9,ph=fs*1.36,tx=Math.min(1080-SAFE-pw/2,Math.max(SAFE+pw/2,tail[0])),ty=tail[1]+(1-e)*20;
+  ctx.save();ctx.globalAlpha*=e*(1-EMPH(ex));panel(tx-pw/2,ty-ph/2,pw,ph,ph/2,{fill:col,top:mix(col,'#ffffff',.18),bot:mix(col,'#000000',.08),alpha:1,grain:false,elev:.8});ctx.font=FD(fs);ctx.letterSpacing=(TRK*fs)+'px';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=onCol(col);ctx.fillText(txt,tx,ty+fs*.05);ctx.restore()}}
+// step counter, entrance step-tick: the plate drops in, the number rolls over from the step before inside an accent disc,
+// the segment for this step fills with a glow; exit lifts it away
+function stepCounter(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),x=Math.max(SAFE,gd(c,'x',.06)*1080),y=Math.max(SAFE+70,gd(c,'y',.08)*1920),n=Math.max(1,Math.min(12,Math.round(+o.of||3))),k=Math.max(1,Math.min(n,Math.round(+o.step||1))),col=o.color||CY,lab=gs(c[2]||'Step').toUpperCase();
+ const p=EMPH(cl(dt/.45)),eo=ACC(ex),H=128,D=96,ks=30,line=`${lab} ${k} OF ${n}`,segW=Math.max(kw(line,ks),Math.min(300,Math.max(180,n*46))),tx=x+16+D+26,W=tx-x+segW+40;
+ ctx.save();ctx.globalAlpha*=cl(dt/.12)*(1-eo);ctx.translate(0,-(1-p)*90-eo*130);panel(x,y-H/2,W,H,H/2,{elev:1});
+ const sc=Math.min(1.08,Math.max(0,spring(dt-.05,2.6,.5))),cx=x+16+D/2;ctx.save();ctx.translate(cx,y);ctx.scale(sc,sc);ctx.beginPath();ctx.arc(0,0,D/2,0,7);const g=ctx.createLinearGradient(0,-D/2,0,D/2);g.addColorStop(0,mix(col,'#ffffff',.25));g.addColorStop(1,mix(col,'#000000',.1));ctx.shadowColor=rgba(col,.5);ctx.shadowBlur=22;ctx.fillStyle=g;ctx.fill();ctx.shadowColor='transparent';
+ ctx.clip();const tk=Math.min(1.04,Math.max(0,spring(dt-.2,2.4,.62)));ctx.font=FG(68);ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=onCol(col);if(k>1&&tk<1)ctx.fillText(String(k-1),0,4-tk*D);ctx.fillText(String(k),0,4+(1-tk)*D);ctx.restore();
+ const kp=EMPH(cl((dt-.15)/.4));ctx.save();ctx.globalAlpha*=kp;kicker(line,tx+(1-kp)*16,y-18,ks,IV);ctx.restore();
+ const gap=6,sw=(segW-gap*(n-1))/n,by=y+16;for(let i=0;i<n;i++){const fill=i<k-1?1:i===k-1?EMPH(cl((dt-.3)/.5)):0;rr(ctx,tx+i*(sw+gap),by,sw,8,RAD(4));ctx.fillStyle='rgba(255,255,255,.14)';ctx.fill();if(fill>0){ctx.save();rr(ctx,tx+i*(sw+gap),by,sw*fill,8,RAD(4));ctx.fillStyle=i===k-1?col:rgba(col,.55);if(i===k-1){ctx.shadowColor=rgba(col,.8);ctx.shadowBlur=12}ctx.fill();ctx.restore()}}
  ctx.restore()}
-// step counter, entrance step-tick: the pill drops in, the number ticks over from the step before, the bar fills to this step
-function stepCounter(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),x=gd(c,'x',.06)*1080,y=gd(c,'y',.08)*1920,n=Math.max(1,Math.min(12,Math.round(+o.of||3))),k=Math.max(1,Math.min(n,Math.round(+o.step||1))),col=o.color||CY,lab=gs(c[2]||'Step').toUpperCase();
- const p=expo(cl(dt/.3));ctx.save();ctx.globalAlpha*=cl(dt/.1)*(1-ex);ctx.translate(0,-(1-p)*80-expo(ex)*120);
- const fs=72,big=110;ctx.font=FD(fs);const lw=ctx.measureText(lab+' ').width,ow=ctx.measureText(' OF '+n).width;ctx.font=FD(big);const nw=ctx.measureText(String(k)).width,W=lw+nw+ow+72,H=142;
- shadow(ctx,50);rr(ctx,x,y-H/2,W,H,RAD(H/2));ctx.fillStyle=TH.colors.cardBg;ctx.fill();ctx.shadowColor='transparent';
- ctx.textBaseline='middle';ctx.textAlign='left';ctx.font=FD(fs);ctx.fillStyle=IV;ctx.fillText(lab+' ',x+32,y+3);
- const tk=cl((dt-.2)/.32),e=backOut(tk);ctx.save();ctx.beginPath();ctx.rect(x+26+lw,y-H/2,nw+12,H);ctx.clip();ctx.font=FD(big);ctx.fillStyle=col;if(k>1&&tk<1)ctx.fillText(String(k-1),x+32+lw,y+4-e*H);ctx.fillText(String(k),x+32+lw,y+4+(1-Math.min(1,e))*H);ctx.restore();
- ctx.font=FD(fs);ctx.fillStyle=MU;ctx.fillText(' OF '+n,x+32+lw+nw,y+3);
- const bw=Math.max(W,420),gap=12,sw=(bw-gap*(n-1))/n,by=y+H/2+24;for(let i=0;i<n;i++){const fill=i<k-1?1:i===k-1?expo(cl((dt-.3)/.4)):0;rr(ctx,x+i*(sw+gap),by,sw,18,RAD(9));ctx.fillStyle='rgba(255,255,255,.28)';ctx.fill();if(fill>0){rr(ctx,x+i*(sw+gap),by,sw*fill,18,RAD(9));ctx.fillStyle=col;ctx.fill()}}
- ctx.restore()}
-// versus, entrance split-slam: the halves slide in from either side, the VS badge slams between them; exit splits them apart
+// versus, entrance split-slam: the two cards slide in from either side with motion blur, the VS emblem (gradient ring,
+// glow) slams down between them with an impact ring; exit splits them apart
 function versus(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),cy=gd(c,'y',.66)*1920,col=o.color||CY;let L=gs(o.left),R=gs(o.right);if(!L&&!R){const sp=gs(c[2]).split(/\s+(?:vs\.?|versus)\s+/i);L=sp[0]||'';R=sp[1]||''}L=L.toUpperCase();R=R.toUpperCase();if(!L&&!R)return;
- const W=460,H=300,gap=24,pl=expo(cl(dt/.35)),pr=expo(cl((dt-.08)/.35)),eo=expo(ex);
- const side=(txt,cx,bg,ink,p,dir)=>{ctx.save();ctx.translate(cx+dir*((1-p)*700+eo*700),cy);ctx.rotate(dir*(1-p)*.08);shadow(ctx,60);rr(ctx,-W/2,-H/2,W,H,RAD(26));ctx.fillStyle=bg;ctx.fill();ctx.shadowColor='transparent';const lines=wrap(txt,FD,112,W-70).slice(0,3),fs=Math.min(...lines.map(l=>fitFont(l,FD,lines.length>1?92:112,W-70,36)));ctx.font=FD(fs);ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=ink;lines.forEach((l,i)=>ctx.fillText(l,0,4+(i-(lines.length-1)/2)*fs*.95));ctx.restore()};
- ctx.save();side(L,540-W/2-gap/2,TH.colors.cardBg,IV,pl,-1);side(R,540+W/2+gap/2,col,DK,pr,1);
- const bp=cl((dt-.32)/.3);if(bp>0){const s=(bp<1?1.9-.9*overshoot(bp,.1):1)*(1-eo);if(s>.01){ctx.save();ctx.translate(540,cy);ctx.rotate(-.12);ctx.scale(s,s);shadow(ctx,50);ctx.beginPath();ctx.arc(0,0,92,0,7);ctx.fillStyle=IV;ctx.fill();ctx.shadowColor='transparent';ctx.lineWidth=10;ctx.strokeStyle=DK;ctx.stroke();ctx.font=FD(84);ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=DK;ctx.fillText('VS',0,6);ctx.restore()}}
- ctx.restore()}
-// icon badge, entrance badge-spin: the badge spins in from a half turn while its ring draws round; your icon or a built-in glyph
-function iconBadge(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),a=gxa(c),x=gd(c,'x',.8)*1080,y=gd(c,'y',.36)*1920,D=o.size||220,R=D/2,col=o.color||CY,p=cl(dt/.45),s=backOut(cl(dt/.35))*(1-expo(ex)),rot=(1-expo(p))*-Math.PI+expo(ex)*Math.PI;
- if(s>.01){ctx.save();ctx.translate(x,y);ctx.rotate(rot);ctx.scale(s,s);shadow(ctx,D*.3);ctx.beginPath();ctx.arc(0,0,R,0,7);const g=ctx.createLinearGradient(-R,-R,R,R);g.addColorStop(0,shade(col,.12));g.addColorStop(1,shade(col,-.45));ctx.fillStyle=g;ctx.fill();ctx.shadowColor='transparent';
-  ctx.beginPath();ctx.arc(0,0,R*.8,0,7);ctx.fillStyle=TH.colors.cardBg;ctx.fill();ctx.beginPath();ctx.arc(0,0,R*.9,-Math.PI/2,-Math.PI/2+Math.PI*2*expo(p));ctx.lineWidth=R*.07;ctx.strokeStyle=IV;ctx.lineCap='round';ctx.stroke();
+ const W=470,H=310,gap=20,pl=EMPH(cl(dt/.5)),pr=EMPH(cl((dt-.07)/.5)),eo=ACC(ex);
+ const side=(txt,cx,dark,p,dir)=>{ctx.save();ctx.translate(cx+dir*((1-p)*620+eo*720),cy);ctx.rotate(dir*(1-p)*.06);
+  if(dark)panel(-W/2,-H/2,W,H,28,{elev:1.3});else panel(-W/2,-H/2,W,H,28,{fill:col,top:mix(col,'#ffffff',.2),bot:mix(col,'#000000',.18),alpha:1,elev:1.3});
+  const ink=dark?IV:onCol(col),lines=wrap(txt,FD,108,W-80).slice(0,3),fs=Math.min(...lines.map(l=>fitFont(l,FD,lines.length>1?90:108,W-80,40)));ctx.font=FD(fs);ctx.letterSpacing=(TRK*fs)+'px';ctx.textAlign='center';ctx.textBaseline='middle';
+  lines.forEach((l,i)=>{const yy=(i-(lines.length-1)/2)*fs*1.0+fs*.05;if(dark)ctx.fillStyle=ink;else{ctx.fillStyle=ink}ctx.fillText(l,0,yy)});ctx.restore()};
+ side(L,540-W/2-gap/2,true,pl,-1);side(R,540+W/2+gap/2,false,pr,1);
+ const bt=dt-.34;if(bt>0){const s=(1+.75*(1-spring(bt,2.6,.45)))*(1-eo),Rr=88;if(s>.01){ctx.save();ctx.globalAlpha*=cl(bt/.06);
+  const ip=cl((bt-.1)/.45);if(ip>0&&ip<1){ctx.beginPath();ctx.arc(540,cy,Rr*(1+EMPH(ip)*1.1),0,7);ctx.lineWidth=5*(1-ip);ctx.strokeStyle=rgba(col,(1-ip)*.8);ctx.stroke()}
+  ctx.translate(540,cy);ctx.scale(s,s);const P=()=>{ctx.beginPath();ctx.arc(0,0,Rr,0,7)};elev(P,1.1);P();const g=ctx.createRadialGradient(-Rr*.3,-Rr*.4,4,0,0,Rr);g.addColorStop(0,'#2a2e37');g.addColorStop(1,'#0a0b0e');ctx.fillStyle=g;ctx.fill();
+  const rg=ctx.createConicGradient(-Math.PI/2+bt*1.5,0,0);rg.addColorStop(0,col);rg.addColorStop(.5,mix(col,'#ffffff',.6));rg.addColorStop(1,col);ctx.beginPath();ctx.arc(0,0,Rr-4,0,7);ctx.lineWidth=7;ctx.strokeStyle=rg;ctx.shadowColor=rgba(col,.6);ctx.shadowBlur=18;ctx.stroke();ctx.shadowColor='transparent';
+  ctx.transform(1,0,-.12,1,0,0);ctx.font=FD(80);ctx.textAlign='center';ctx.textBaseline='middle';const tg=ctx.createLinearGradient(0,-34,0,34);tg.addColorStop(0,'#ffffff');tg.addColorStop(1,mix(IV,col,.25));ctx.fillStyle=tg;ctx.fillText('VS',0,5);ctx.restore()}}}
+// icon badge, entrance badge-spin: the badge springs in from a quarter turn while its conic ring draws round; your icon or a
+// Tabler glyph glows in the dark centre; the label plate rises under it; exit spins it out
+function iconBadge(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),a=gxa(c),D=o.size||220,R=D/2,x=Math.min(1080-SAFE-R,Math.max(SAFE+R,gd(c,'x',.8)*1080)),y=gd(c,'y',.36)*1920,col=o.color||CY,eo=ACC(ex),s=Math.max(0,spring(dt,2.2,.52))*(1-eo),rot=(1-Math.min(1,spring(dt,1.6,.8)))*-1.2+eo*1.6,p=EMPH(cl((dt-.05)/.7));
+ if(s>.01){ctx.save();ctx.translate(x,y);ctx.rotate(rot);ctx.scale(s,s);const P=()=>{ctx.beginPath();ctx.arc(0,0,R,0,7)};elev(P,R/110);
+  P();const bg=ctx.createRadialGradient(-R*.35,-R*.45,R*.1,0,0,R);bg.addColorStop(0,'#2b3039');bg.addColorStop(1,'#0b0c10');ctx.fillStyle=bg;ctx.fill();
+  ctx.beginPath();ctx.arc(0,0,R*.9,0,7);ctx.lineWidth=R*.08;ctx.strokeStyle='rgba(255,255,255,.07)';ctx.stroke();
+  const rg=ctx.createConicGradient(-Math.PI/2,0,0);rg.addColorStop(0,mix(col,'#ffffff',.55));rg.addColorStop(.5,col);rg.addColorStop(1,mix(col,'#ffffff',.55));ctx.beginPath();ctx.arc(0,0,R*.9,-Math.PI/2,-Math.PI/2+Math.PI*2*p);ctx.lineCap='round';ctx.lineWidth=R*.08;ctx.strokeStyle=rg;ctx.shadowColor=rgba(col,.6);ctx.shadowBlur=R*.2;ctx.stroke();ctx.shadowColor='transparent';
+  ctx.beginPath();ctx.arc(0,0,R*.78,Math.PI*1.1,Math.PI*1.9);ctx.lineWidth=2;ctx.strokeStyle='rgba(255,255,255,.18)';ctx.stroke();
   const im=a.icon&&GIMG[a.icon];if(im&&im.naturalWidth){ctx.save();ctx.beginPath();ctx.arc(0,0,R*.74,0,7);ctx.clip();const k=Math.max(R*1.48/im.naturalWidth,R*1.48/im.naturalHeight);ctx.drawImage(im,-im.naturalWidth*k/2,-im.naturalHeight*k/2,im.naturalWidth*k,im.naturalHeight*k);ctx.restore()}
-  else drawGlyph(o.glyph||'check',R*.42,col);ctx.restore()}
- const txt=gs(c[2]).toUpperCase();if(txt&&dt>.3){const e=expo(cl((dt-.3)/.3)),fs=fitFont(txt,FD,50,600,26);ctx.font=FD(fs);const w=ctx.measureText(txt).width+56,h=fs+30;ctx.save();ctx.globalAlpha*=e*(1-ex);ctx.translate(Math.min(1060-w/2,Math.max(20+w/2,x)),y+R+50+(1-e)*24);shadow(ctx,30);rr(ctx,-w/2,-h/2,w,h,RAD(h/2));ctx.fillStyle=col;ctx.fill();ctx.shadowColor='transparent';ctx.fillStyle=DK;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,0,3);ctx.restore()}}
-// sticker pop, entrance scatter-pop: a cluster of die-cut stickers pops in one after another and floats up; exit pops them out
-const STKC={heart:'#ff4d6d',star:'#ffd23f',fire:'#ff7a2f',bolt:'#ffd23f',check:'#3ddc84'};
+  else icon(glyph(o.glyph),0,0,R*.95,col,{width:1.8,glow:.6});ctx.restore()}
+ const txt=gs(c[2]).toUpperCase();if(txt&&dt>.3){const e=EMPH(cl((dt-.3)/.4)),fs=fitFont(txt,FD,52,700,26);ctx.font=FD(fs);ctx.letterSpacing=(TRK*fs)+'px';const w=ctx.measureText(txt).width+fs*1.1,h=fs*1.4,lx=Math.min(1080-SAFE-w/2,Math.max(SAFE+w/2,x)),ly=y+R+44+h/2-30+(1-e)*24;
+  ctx.save();ctx.globalAlpha*=e*(1-eo);panel(lx-w/2,ly-h/2,w,h,h/2,{elev:.8,accent:col});ctx.font=FD(fs);ctx.letterSpacing=(TRK*fs)+'px';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=IV;ctx.fillText(txt,lx,ly+fs*.05);ctx.restore()}}
+// sticker pop, entrance scatter-pop: a cluster of die-cut vinyl stickers (Tabler filled icons, white cut line, two-tone
+// gradient, gloss) springs in one after another and floats up; exit pops them out
+const STKC={heart:['#ff8aa0','#e11d48'],star:['#ffe48a','#f59e0b'],fire:['#ffc06a','#ef4a12'],bolt:['#fff38a','#f2b300'],check:['#6ff2ac','#10a050'],play:['#ff9a9a','#e5383b'],bell:['#ffdc8a','#f08c00'],lock:['#c9b8ff','#6d3ee6']};
+function sticker(name,sz){const n=glyph(name),key=n==='check'?'circlecheck':n,P=ipath(key,true),cols=STKC[n]||[mix(CY,'#ffffff',.45),mix(CY,'#000000',.15)];
+ ctx.save();ctx.scale(sz/24,sz/24);ctx.translate(-12,-12);ctx.lineJoin='round';ctx.lineCap='round';
+ ctx.shadowColor='rgba(0,0,0,.38)';ctx.shadowBlur=sz*.14;ctx.shadowOffsetY=sz*.05;ctx.lineWidth=3.4;ctx.strokeStyle='#ffffff';ctx.stroke(P);ctx.fillStyle='#ffffff';ctx.fill(P);ctx.shadowColor='transparent';
+ const g=ctx.createLinearGradient(5,2,19,22);g.addColorStop(0,cols[0]);g.addColorStop(1,cols[1]);ctx.fillStyle=g;ctx.fill(P);
+ ctx.save();ctx.clip(P);const gl=ctx.createLinearGradient(0,1,0,12);gl.addColorStop(0,'rgba(255,255,255,.6)');gl.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=gl;ctx.beginPath();ctx.ellipse(9.5,6.5,9,5,-.4,0,7);ctx.fill();ctx.restore();
+ ctx.lineWidth=.4;ctx.strokeStyle='rgba(0,0,0,.14)';ctx.stroke(P);ctx.restore()}
 function stickerPop(c,t){const o=c[4],dt=t-c[0],x=gd(c,'x',.78)*1080,y=gd(c,'y',.42)*1920,S0=o.size||150,n=Math.max(1,Math.min(12,Math.round(+o.count||5))),gl=gs(o.glyph||'heart;star;spark').split(';').map(s=>s.trim()).filter(Boolean),q=rng(Math.round(c[0]*10)+17),end=c[1]>90?Infinity:c[1];
- for(let i=0;i<n;i++){const a=q()*Math.PI*2,r=40+q()*S0*1.7,sz=S0*(.62+q()*.5),rot=(q()-.5)*.8,t0=i*.09,pi=cl((dt-t0)/.28),po=cl((t-(end-.32+i*.02))/.22);if(pi<=0||po>=1)continue;
-  const s=backOut(pi)*(po<=0?1:po<.3?1+po*.5:1.15*(1-(po-.3)/.7)),gx=x+Math.cos(a)*r,gy=y+Math.sin(a)*r*.8-(dt-t0)*26,g=gl[i%gl.length];if(s<=.01)continue;
-  ctx.save();ctx.translate(gx,gy);ctx.rotate(rot+Math.sin((dt-t0)*3+i)*.06);ctx.scale(s,s);ctx.shadowColor='rgba(0,0,0,.35)';ctx.shadowBlur=14;ctx.shadowOffsetY=5;drawGlyph(g,sz/2,STKC[g]||CY,'#ffffff');ctx.restore()}}
-// price tag, entrance tag-swing: the tag drops on its string and swings to rest on the pin; exit flips it up and away
-function priceTag(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),x=gd(c,'x',.8)*1080,y=gd(c,'y',.42)*1920,col=o.color||CY,ink=o.ink||DK,txt=gs(c[2]),old=gs(o.sub);if(!txt)return;
- const fs=fitFont(txt,FG,150,340,60);ctx.font=FG(fs);const tw=ctx.measureText(txt).width,W=Math.max(260,tw+90),H=fs*1.15+(old?70:0)+80,py=y-H/2,drop=backOut(cl(dt/.35)),eo=expo(ex);
- const swing=.42*Math.exp(-3.2*dt)*Math.cos(dt*7.5)+Math.sin(dt*1.4)*.015;
- ctx.save();ctx.globalAlpha*=cl(dt/.08)*(1-ex*.6);ctx.translate(0,-(1-drop)*500-eo*700);
- ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(x,py-170);ctx.lineTo(x,py);ctx.stroke();ctx.fillStyle=IV;ctx.beginPath();ctx.arc(x,py-170,9,0,7);ctx.fill();
- ctx.translate(x,py);ctx.rotate(swing+eo*-1.2);shadow(ctx,60);ctx.beginPath();ctx.moveTo(0,-34);ctx.lineTo(W/2,26);ctx.lineTo(W/2,H);ctx.lineTo(-W/2,H);ctx.lineTo(-W/2,26);ctx.closePath();ctx.fillStyle=col;ctx.fill();ctx.shadowColor='transparent';
- ctx.save();ctx.globalCompositeOperation='destination-out';ctx.beginPath();ctx.arc(0,4,15,0,7);ctx.fill();ctx.restore();ctx.lineWidth=4;ctx.strokeStyle=shade(col,-.35);ctx.beginPath();ctx.arc(0,4,15,0,7);ctx.stroke();
- const mid=26+(H-26)/2+(old?28:0);if(old){ctx.font=FS(50);ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=ink;ctx.globalAlpha*=.62;ctx.fillText(old,0,mid-fs*.5-38);const ow=ctx.measureText(old).width,sk=cl((dt-.45)/.25);ctx.lineWidth=6;ctx.strokeStyle=ink;ctx.beginPath();ctx.moveTo(-ow/2-8,mid-fs*.5-36);ctx.lineTo(-ow/2-8+(ow+16)*sk,mid-fs*.5-42);ctx.stroke();ctx.globalAlpha/=.62}
- ctx.font=FG(fs);ctx.letterSpacing=(TRK*fs)+'px';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=ink;ctx.fillText(txt,0,mid+fs*.04);ctx.restore()}
-// CTA card, entrance cta-rise: the card rises and settles, the button pops then pulses with a ripple; exit drops it
-function ctaCard(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),W=gd(c,'w',.82)*1080,cy=gd(c,'y',.76)*1920,col=o.color||CY,txt=gs(c[2]).toUpperCase(),hd=gs(o.sub);if(!txt&&!hd)return;
- const H=hd?290:220,pad=50,B=132,e=backOut(cl(dt/.45));ctx.save();ctx.globalAlpha*=cl(dt/.1)*(1-ex);ctx.translate(540,cy+(1-e)*240+expo(ex)*280);
- shadow(ctx,80);rr(ctx,-W/2,-H/2,W,H,RAD(36));ctx.fillStyle=TH.colors.cardBg;ctx.fill();ctx.shadowColor='transparent';ctx.lineWidth=3;ctx.strokeStyle=TH.colors.cardStroke;ctx.stroke();
- const tw=W-pad*2-B-30,fs=txt?fitFont(txt,FD,84,tw,36):0,hs=hd?fitFont(hd,FS,46,tw,24):0,blk=fs+(hd?16+hs:0),top=-blk/2;ctx.textAlign='left';ctx.textBaseline='middle';
- if(txt){ctx.font=FD(fs);ctx.letterSpacing=(TRK*fs)+'px';ctx.fillStyle=IV;ctx.fillText(txt,-W/2+pad,top+fs/2+fs*.04);ctx.letterSpacing='0px'}
- if(hd){const k=expo(cl((dt-.25)/.3));ctx.save();ctx.globalAlpha*=k;ctx.font=FS(hs);ctx.fillStyle=col;ctx.fillText(hd,-W/2+pad+(1-k)*-20,top+fs+16+hs/2);ctx.restore()}
- const bx=W/2-pad-B/2,bp=dt<.5?backOut(cl((dt-.2)/.3)):1+.05*Math.sin((dt-.5)*7);
- if(dt>.5){const rp=((dt-.5)%1.2)/1.2;ctx.save();ctx.globalAlpha*=(1-rp)*.7;ctx.beginPath();ctx.arc(bx,0,B/2*(1+rp*.55),0,7);ctx.lineWidth=6;ctx.strokeStyle=col;ctx.stroke();ctx.restore()}
- if(bp>.01){ctx.save();ctx.translate(bx,0);ctx.scale(bp,bp);ctx.beginPath();ctx.arc(0,0,B/2,0,7);ctx.fillStyle=col;ctx.fill();drawGlyph(o.glyph||'plus',B*.26,DK);ctx.restore()}
+ const out=x>=540?0:Math.PI,cx0=x+Math.cos(out)*S0*.35;for(let i=0;i<n;i++){const a=out+((i*.618034)%1-.5)*Math.PI*1.25+(q()-.5)*.3,r=i===0?0:S0*(.6+.5*Math.sqrt(i/n))+q()*S0*.2,sz=S0*(i===0?1.05:.6+q()*.35),rot0=(q()-.5)*.6,t0=i*.085,tt=dt-t0,po=cl((t-(end-.34+i*.02))/.24);if(tt<=0||po>=1)continue;
+  const s=Math.max(0,spring(tt,2.4,.42))*(po<=0?1:po<.3?1+po*.4:1.12*(1-ACC((po-.3)/.7))),g=gl[i%gl.length];if(s<=.01)continue;
+  const gx=Math.min(1080-SAFE-sz/2,Math.max(SAFE+sz/2,cx0+Math.cos(a)*r)),gy=y+Math.sin(a)*r*.8-tt*18;
+  ctx.save();ctx.translate(gx,gy);ctx.rotate(rot0+(1-Math.min(1,s))*.5+Math.sin(tt*2.6+i)*.04);ctx.scale(s,s);sticker(g,sz);ctx.restore()}}
+// price tag, entrance chip-rise: a price card rises and springs into place (tag icon, the old price struck through with an
+// accent line, the price with a raised currency sign in a gradient face, an accent foot); exit drops and fades it
+function priceTag(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),col=o.color||CY,txt=gs(c[2]),old=gs(o.sub);if(!txt)return;
+ const m=/^(\D*?)(\d.*)$/.exec(txt),cur=m?m[1].trim():'',num=m?m[2]:txt;let fs=o.size||150;ctx.font=FG(fs);let nw=tabW(num),cw=cur?(ctx.font=FG(fs*.48),ctx.measureText(cur).width+4):0;
+ while(nw+cw>520&&fs>70){fs-=4;ctx.font=FG(fs);nw=tabW(num);cw=cur?(ctx.font=FG(fs*.48),ctx.measureText(cur).width+8):0}
+ const pad=36,head=old?62:50,W=Math.max(250,nw+cw+pad*2),H=Math.round(head+fs*.84+pad*1.15),x=Math.min(1080-SAFE-W/2,Math.max(SAFE+W/2,gd(c,'x',.84)*1080)),y=gd(c,'y',.56)*1920;
+ const e=EMPH(cl(dt/.5)),s=.9+.1*Math.min(1.05,spring(dt,2.2,.55)),eo=ACC(ex);ctx.save();ctx.globalAlpha*=cl(dt/.12)*(1-eo);ctx.translate(x,y+(1-e)*80+eo*90);ctx.scale(s,s);
+ const L=-W/2,T=-H/2;panel(L,T,W,H,26,{elev:1.3,accent:col});
+ ctx.save();rr(ctx,L,T,W,H,RAD(26));ctx.clip();ctx.fillStyle=col;ctx.shadowColor=rgba(col,.8);ctx.shadowBlur=14;ctx.fillRect(L,T+H-6,W,6);ctx.restore();
+ icon('tag',L+pad+14,T+pad+8,32,col,{width:2,glow:.4});
+ if(old){ctx.font=FW(500,38);ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillStyle=MU;const ox=L+pad+44,oy=T+pad+8;tabText(old,ox,oy,'left');const ow=tabW(old),sk=EMPH(cl((dt-.4)/.3));if(sk>0){ctx.save();ctx.strokeStyle=col;ctx.lineWidth=4;ctx.lineCap='round';ctx.shadowColor=rgba(col,.6);ctx.shadowBlur=8;ctx.beginPath();ctx.moveTo(ox-4,oy+8);ctx.lineTo(ox-4+(ow+8)*sk,oy+8-14*sk);ctx.stroke();ctx.restore()}}
+ const by=T+head+fs*.42+4,g=ctx.createLinearGradient(0,by-fs*.45,0,by+fs*.45),ink=o.ink||IV;g.addColorStop(0,mix(ink,'#ffffff',.4));g.addColorStop(1,mix(ink,'#000000',.08));
+ let px=L+pad;if(cur){ctx.font=FG(fs*.48);ctx.textAlign='left';ctx.textBaseline='alphabetic';ctx.fillStyle=col;ctx.fillText(cur,px,by-fs*.08);px+=cw}
+ ctx.font=FG(fs);ctx.textAlign='left';ctx.textBaseline='middle';ctx.save();ctx.shadowColor='rgba(0,0,0,.45)';ctx.shadowBlur=fs*.1;ctx.shadowOffsetY=fs*.03;ctx.fillStyle=g;tabText(num,px,by,'left');ctx.restore();
  ctx.restore()}
-// code card, entrance type-on: the editor card rises and the code types itself on (done by 60% of the span) with a
-// blinking cursor and light syntax colour; exit tips the card down and away
-function tint(s){const out=[];for(const m of s.matchAll(/(\/\/.*$|#.*$)|("[^"]*"?|'[^']*'?|`[^`]*`?)|\b(const|let|var|function|return|if|else|for|while|import|from|export|async|await|def|class|new|npx|npm|run|git|pip|true|false|null)\b|(\b\d+(?:\.\d+)?\b)|(\s+|\w+|[^\s\w])/g))
- out.push([m[0],m[1]?MU:m[2]?'#9ece6a':m[3]?CY:m[4]?'#ff9e64':'#dfe3f0']);return out}
-function codeCard(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),W=gd(c,'w',.86)*1080,cy=gd(c,'y',.67)*1920,lines=gs(c[2]).replace(/\\n/g,'\n').split('\n').slice(0,12),fs=o.textSize||40,lh=fs*1.45,pad=34,bar=64,H=bar+pad*2+lines.length*lh,bd=o.border||CY;
- const p=cl(dt/.4),e=expo(p),s=.92+.08*backOut(p),eo=expo(ex);ctx.save();ctx.globalAlpha*=cl(dt/.1)*(1-ex);ctx.translate(540,cy+(1-e)*150+eo*220);ctx.rotate((1-e)*.05-eo*.06);ctx.scale(s,s);
- shadow(ctx,90);rr(ctx,-W/2,-H/2,W,H,RAD(26));ctx.fillStyle='#0f1117';ctx.fill();ctx.shadowColor='transparent';
- ctx.save();rr(ctx,-W/2,-H/2,W,H,RAD(26));ctx.clip();ctx.fillStyle='#1b1e27';ctx.fillRect(-W/2,-H/2,W,bar);ctx.restore();
- ['#ff6b5e','#f4c04e','#5fcf6d'].forEach((k,i)=>{ctx.fillStyle=k;ctx.beginPath();ctx.arc(-W/2+34+i*28,-H/2+bar/2,9,0,7);ctx.fill()});
- ctx.font=MONO(28);ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillStyle=MU;ctx.fillText(gs(o.title||'main'),-W/2+140,-H/2+bar/2+1);
- const total=lines.reduce((a,l)=>a+l.length,0),dur=c[1]>90?3:c[1]-c[0],cps=Math.max(18,total/Math.max(.5,dur*.6-.3));let left=Math.floor(Math.max(0,dt-.3)*cps),cur=null;
- ctx.font=MONO(fs);lines.forEach((ln,i)=>{const yy=-H/2+bar+pad+lh*i+lh/2;ctx.fillStyle='#4a5060';ctx.textAlign='right';ctx.fillText(String(i+1),-W/2+pad+36,yy);ctx.textAlign='left';const n=Math.max(0,Math.min(ln.length,left));left-=ln.length;
-  let xx=-W/2+pad+66;for(const [tk,k] of tint(ln.slice(0,n))){ctx.fillStyle=k;ctx.fillText(tk,xx,yy);xx+=ctx.measureText(tk).width}if(cur===null&&(n<ln.length||i===lines.length-1))cur=[xx,yy]});
- if(cur&&Math.floor(dt*2.5)%2===0){ctx.fillStyle=bd;ctx.fillRect(cur[0]+3,cur[1]-fs*.55,fs*.5,fs*1.1)}
- rr(ctx,-W/2+2,-H/2+2,W-4,H-4,RAD(24));ctx.lineWidth=5;ctx.strokeStyle=bd;ctx.stroke();ctx.restore()}
+// CTA card, entrance cta-rise: the card rises and springs into place (avatar with a conic accent ring, the line, your
+// handle in accent), the button pops then pulses with two ripples; exit drops it
+function ctaCard(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),W=gd(c,'w',.82)*1080,cy=gd(c,'y',.76)*1920,col=o.color||CY,txt=gs(c[2]).toUpperCase(),hd=gs(o.sub);if(!txt&&!hd)return;
+ const H=hd?250:200,pad=40,A=hd?124:108,B=118,e=EMPH(cl(dt/.55)),s=.92+.08*Math.min(1.05,spring(dt,2,.55)),eo=ACC(ex);ctx.save();ctx.globalAlpha*=cl(dt/.12)*(1-eo);ctx.translate(540,cy+(1-e)*200+eo*240);ctx.scale(s,s);
+ panel(-W/2,-H/2,W,H,H/2>60?44:H/2,{elev:1.4,accent:col});
+ const ax=-W/2+pad+A/2,ap=EMPH(cl((dt-.1)/.6));ctx.save();ctx.translate(ax,0);ctx.beginPath();ctx.arc(0,0,A/2-6,0,7);const ag=ctx.createRadialGradient(-A*.15,-A*.2,2,0,0,A/2);ag.addColorStop(0,'#2c313b');ag.addColorStop(1,'#0c0d11');ctx.fillStyle=ag;ctx.fill();
+ const rg=ctx.createConicGradient(-Math.PI/2,0,0);rg.addColorStop(0,col);rg.addColorStop(.5,mix(col,'#ffffff',.55));rg.addColorStop(1,col);ctx.beginPath();ctx.arc(0,0,A/2-3,-Math.PI/2,-Math.PI/2+Math.PI*2*ap);ctx.lineWidth=5;ctx.lineCap='round';ctx.strokeStyle=rg;ctx.stroke();
+ icon('user',0,2,A*.48,rgba(IV,.9),{width:1.7});ctx.restore();
+ const tx=ax+A/2+28,tw=W/2-pad-B-24-tx,fs=txt?fitFont(txt,FD,80,tw,34):0,hs=hd?fitFont(hd,s=>FW(600,s),40,tw,22):0,blk=fs+(hd?12+hs:0),top=-blk/2;ctx.textAlign='left';ctx.textBaseline='middle';
+ if(txt){const k=EMPH(cl((dt-.12)/.4));ctx.save();ctx.globalAlpha*=k;ctx.font=FD(fs);ctx.letterSpacing=(TRK*fs)+'px';ctx.fillStyle=IV;ctx.fillText(txt,tx+(1-k)*20,top+fs/2+fs*.05);ctx.restore()}
+ if(hd){const k=EMPH(cl((dt-.22)/.4));ctx.save();ctx.globalAlpha*=k;ctx.font=FW(600,hs);ctx.fillStyle=col;ctx.fillText(hd,tx+(1-k)*20,top+fs+12+hs/2);ctx.restore()}
+ const bx=W/2-pad-B/2,bt=dt-.22,bp=bt<=0?0:Math.min(1.1,spring(bt,2.6,.45))*(dt>.9?1+.035*Math.sin((dt-.9)*6):1);
+ if(dt>.7)for(const off of [0,.6]){const rp=(((dt-.7+off)%1.2)+1.2)%1.2/1.2;ctx.save();ctx.globalAlpha*=(1-rp)*.6;ctx.beginPath();ctx.arc(bx,0,B/2*(1+EMPH(rp)*.5),0,7);ctx.lineWidth=3;ctx.strokeStyle=col;ctx.stroke();ctx.restore()}
+ if(bp>.01){ctx.save();ctx.translate(bx,0);ctx.scale(bp,bp);ctx.beginPath();ctx.arc(0,0,B/2,0,7);const bg=ctx.createLinearGradient(0,-B/2,0,B/2);bg.addColorStop(0,mix(col,'#ffffff',.25));bg.addColorStop(1,mix(col,'#000000',.12));ctx.shadowColor=rgba(col,.55);ctx.shadowBlur=26;ctx.fillStyle=bg;ctx.fill();ctx.shadowColor='transparent';
+  ctx.beginPath();ctx.arc(0,0,B/2-1.5,Math.PI*1.1,Math.PI*1.9);ctx.lineWidth=2;ctx.strokeStyle='rgba(255,255,255,.45)';ctx.stroke();icon(glyph(o.glyph||'plus'),0,0,B*.44,onCol(col),{width:2.4});ctx.restore()}
+ ctx.restore()}
+// code card, entrance type-on: an editor card (title bar, file tab with a code icon, line numbers, current-line band) rises
+// and the code types itself on (done by 60% of the span) with syntax colours and a caret that blinks once typing ends;
+// exit tips the card down and away
+const SYN={key:'#c792ea',str:'#c3e88d',num:'#f78c6c',com:'#697098',fn:'#82aaff',flag:'#ffcb6b',path:'#89ddff',pun:'#89ddff',txt:'#e6edf3'};
+function synTok(s){const out=[];for(const m of s.matchAll(/(\/\/.*$|#.*$)|("[^"]*"?|'[^']*'?|`[^`]*`?)|\b(const|let|var|function|return|if|else|for|while|import|from|export|async|await|def|class|new|npx|npm|run|git|pip|true|false|null|sudo|cd)\b|(\s--?[A-Za-z][\w-]*)|(\b\d+(?:\.\d+)?\b)|(\w+)(?=\()|([\w.~-]*\/[\w./~@:-]*)|([{}()[\];,.=:+*<>|&!?-]+)|(\s+|\w+|[^\s\w])/g))
+ out.push([m[0],m[1]?SYN.com:m[2]?SYN.str:m[3]?SYN.key:m[4]?SYN.flag:m[5]?SYN.num:m[6]?SYN.fn:m[7]?SYN.path:m[8]?SYN.pun:(m[0]==='$'?CY:SYN.txt),!!m[1]]);return out}
+function codeCard(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),W=gd(c,'w',.86)*1080,cy=gd(c,'y',.67)*1920,lines=gs(c[2]).replace(/\\n/g,'\n').split('\n').slice(0,12),fs=o.textSize||38,lh=fs*1.6,pad=30,bar=66,H=bar+pad*2+lines.length*lh,bd=o.border||CY,R=RAD(24);
+ const e=EMPH(cl(dt/.5)),s=.94+.06*Math.min(1.04,spring(dt,2,.6)),eo=ACC(ex);ctx.save();ctx.globalAlpha*=cl(dt/.12)*(1-eo);ctx.translate(540,cy+(1-e)*140+eo*220);ctx.rotate((1-e)*.04-eo*.07);ctx.scale(s,s);
+ panel(-W/2,-H/2,W,H,R,{fill:'#0d1117',top:'#11161d',bot:'#0b0f14',alpha:1,elev:1.5});
+ ctx.save();rr(ctx,-W/2,-H/2,W,H,R);ctx.clip();ctx.fillStyle='#161b22';ctx.fillRect(-W/2,-H/2,W,bar);ctx.fillStyle='rgba(255,255,255,.06)';ctx.fillRect(-W/2,-H/2+bar-1,W,1);
+ const tw0=-W/2+124;ctx.font=MONO(26);const tl=gs(o.title||'main'),tlw=ctx.measureText(tl).width,tabw=tlw+90;ctx.fillStyle='#0d1117';ctx.fillRect(tw0,-H/2+12,tabw,bar-12);ctx.fillStyle=bd;ctx.shadowColor=rgba(bd,.7);ctx.shadowBlur=10;ctx.fillRect(tw0,-H/2+12,tabw,2);ctx.shadowColor='transparent';
+ icon('code',tw0+30,-H/2+12+(bar-12)/2,26,bd,{width:2});ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillStyle='#e6edf3';ctx.fillText(tl,tw0+54,-H/2+12+(bar-12)/2+1);
+ const tg=ctx.createLinearGradient(-W/2,0,W/2,0);tg.addColorStop(0,rgba(bd,0));tg.addColorStop(.5,rgba(bd,.8));tg.addColorStop(1,rgba(bd,0));ctx.fillStyle=tg;ctx.fillRect(-W/2,-H/2,W,1.5);ctx.restore();
+ ['#ff5f57','#febc2e','#28c840'].forEach((k,i)=>{ctx.beginPath();ctx.arc(-W/2+32+i*26,-H/2+bar/2+2,8,0,7);ctx.fillStyle=k;ctx.fill();ctx.lineWidth=1;ctx.strokeStyle='rgba(0,0,0,.3)';ctx.stroke()});
+ const total=lines.reduce((a,l)=>a+l.length,0),dur=c[1]>90?3:c[1]-c[0],cps=Math.max(18,total/Math.max(.5,dur*.6-.3));let left=Math.floor(Math.max(0,dt-.3)*cps),cur=null,curLine=0;const done=left>=total;
+ ctx.font=MONO(fs);const x0=-W/2+pad+64;lines.forEach((ln,i)=>{const n=Math.max(0,Math.min(ln.length,left));left-=ln.length;if(cur===null&&(n<ln.length||i===lines.length-1)){curLine=i}if(cur===null&&(n<ln.length||i===lines.length-1))cur=[0,-H/2+bar+pad+lh*i+lh/2,n,ln]});
+ if(cur){const yy=cur[1];ctx.fillStyle='rgba(255,255,255,.045)';ctx.fillRect(-W/2+2,yy-lh/2,W-4,lh);ctx.fillStyle=bd;ctx.fillRect(-W/2+2,yy-lh/2,3,lh)}
+ left=Math.floor(Math.max(0,dt-.3)*cps);lines.forEach((ln,i)=>{const yy=-H/2+bar+pad+lh*i+lh/2;ctx.font=MONO(fs*.8);ctx.fillStyle=i===curLine?'#c9d1d9':'#484f58';ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(String(i+1),-W/2+pad+30,yy);ctx.textAlign='left';ctx.font=MONO(fs);const n=Math.max(0,Math.min(ln.length,left));left-=ln.length;
+  let xx=x0;for(const [tk,k,it] of synTok(ln.slice(0,n))){ctx.fillStyle=k;ctx.font=it?`italic ${MONO(fs)}`:MONO(fs);ctx.fillText(tk,xx,yy);xx+=ctx.measureText(tk).width}if(i===curLine&&cur)cur[0]=xx});
+ if(cur){const bl=done?Math.max(0,Math.cos((dt-.3-total/cps)*Math.PI*2*1.1))**.6:1;if(bl>0){ctx.save();ctx.globalAlpha*=bl;ctx.fillStyle=bd;ctx.shadowColor=rgba(bd,.8);ctx.shadowBlur=10;ctx.fillRect(cur[0]+3,cur[1]-fs*.62,3.5,fs*1.24);ctx.restore()}}
+ ctx.restore()}
 const GDRAW={11:screenCard,12:lowerThird,13:statCallout,14:checklist,15:quoteCard,16:highlight,17:stepCounter,18:versus,19:iconBadge,20:stickerPop,21:priceTag,22:ctaCard,23:codeCard};
-const drawG=(c,t)=>{const f=GDRAW[c[3]];if(f)f(c,t)};
+// fast moves (the first 0.42 s and the exit) are drawn with motion blur
+const drawG=(c,t)=>{const f=GDRAW[c[3]];if(!f)return;const dt=t-c[0],left=c[1]>90?9:c[1]-t;if(MBLUR&&(dt<.42||left<.36))blurred(f,c,t);else f(c,t)};
 // a behind ordinal burst needs the titles layer even in a job without kinetic titles
 // screen cards and b-roll panels (mode 11) sit behind the top of the presenter's head: layer front|behind|auto per panel, or
 // panelLayer for the job (default auto = behind; where the head never reaches the panel it looks the same as front).

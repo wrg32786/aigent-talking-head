@@ -25,7 +25,7 @@ const SRC = require('./sources.cjs');
 const CAPTION_LOOK = { 'caption-outline': ['captionOutline', ['none', 'thin', 'thick']], 'caption-shadow': ['captionShadow', ['none', 'soft']], 'caption-case': ['captionCase', ['upper', 'lower', 'as-said']], 'caption-layer': ['captionLayer', ['front', 'behind', 'auto']], 'panel-layer': ['panelLayer', ['front', 'behind', 'auto']] };
 const ENTRANCES = ['stagger-rise', 'slam', 'blur-rise', 'slide-left', 'elastic', 'flip', 'pop-zoom'];
 const LAYERS = ['front', 'behind', 'auto'];
-// built-in glyphs for icon-badge, sticker-pop and cta-card (drawn in kit/overlay.html)
+// built-in glyphs for icon-badge, sticker-pop and cta-card (Tabler icons, drawn in kit/overlay.html)
 const GLYPHS = ['check', 'star', 'bolt', 'heart', 'fire', 'play', 'bell', 'spark', 'plus', 'lock'];
 
 // ---------- tiny YAML subset (front matter only): maps by 2-space indent, scalars, [inline, lists] ----------
