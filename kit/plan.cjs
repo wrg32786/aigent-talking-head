@@ -4,7 +4,7 @@
 //   npm run plan -- <job>                      -> writes or merges jobs/<job>/Reel.md
 //   options: --out <Reel.md> (where to write; an existing file is merged: its graphics stay, proposals fill the gaps)
 //            --base <Reel.md> (start a new plan from this recipe's brand, music and style; default the AIgent look)
-//            --max <n> (at most n graphics; default one per 5 s of reel)  --dry (print, write nothing)
+//            --max <n> (at most n graphics; default one per 3 s of reel)  --dry (print, write nothing)
 //            --fresh (propose again over lines an earlier plan wrote; lines you wrote, with no "why", always stay)
 //            --jobs <dir> (default jobs/)  --json (one JSON result line at the end)
 // The job needs a transcript: run npm run reel -- inbox/<clip> --name <job> --draft first (or any reel run).
@@ -101,8 +101,10 @@ function propose(T, opts = {}) {
     // step N
     const st = L.findIndex((w, i) => w === 'step' && (STEPN[L[i + 1]] || /^\d+$/.test(L[i + 1])));
     if (st >= 0 && new Set([...T.words.map(w => lower(w.word)).join(' ').matchAll(/\bstep (one|two|three|four|five|six|seven|eight|nine|ten|\d+)\b/g)].map(m => m[1])).size >= 2) { const n = STEPN[L[st + 1]] || +L[st + 1]; const all = [...T.words.map(w => lower(w.word)).join(' ').matchAll(/\bstep (one|two|three|four|five|six|seven|eight|nine|ten|\d+)\b/g)].map(m => STEPN[m[1]] || +m[1]);
-      const lab = upto(s.ws, st + 2);
-      add({ type: 'step-counter', pri: 3, step: n, of: Math.max(n, ...all), ...(lab.length ? { text: title(lab.join(' ')) } : {}), ...span(s, st, st + 3), why: `you say "step ${L[st + 1]}"` }); return; }
+      // the step's label as said, in sentence case: "Run the plan" (up to five words, to the first pause)
+      const lab = []; for (let i = st + 2; i < s.ws.length && lab.length < 5; i++) { const w = clean(s.ws[i].word); if (w) lab.push(w); if (/[,.;:!?]$/.test(s.ws[i].word)) break; }
+      while (lab.length && STOP.has(lab[lab.length - 1].toLowerCase())) lab.pop();
+      add({ type: 'step-counter', pri: 3, step: n, of: Math.max(n, ...all), ...(lab.length ? { text: lab.join(' ').replace(/^./, c => c.toUpperCase()) } : {}), ...span(s, st, st + 3), why: `you say "step ${L[st + 1]}"` }); return; }
     // code or terminal talk
     const ck = L.findIndex(w => /^(npm|npx|pip|git|brew|terminal|command|bash|cli|install|curl|node|python)$/.test(w));
     if (ck >= 0) { const cmd = []; for (let i = ck; i < s.ws.length && cmd.length < 5; i++) { const w = clean(s.ws[i].word); if (i > ck && STOP.has(w.toLowerCase())) break; if (w) cmd.push(w); if (/[,.;:!?]$/.test(s.ws[i].word)) break; } const run = /^(npm|npx|pip|git|brew|curl|node|python)$/.test(L[ck]) ? cmd.join(' ').toLowerCase() : null;
@@ -118,7 +120,7 @@ function propose(T, opts = {}) {
     const n = numberIn(s);
     if (n) {
       const shown = n.kind === 'money' ? `$${fmtNum(n.value)}` : n.kind === 'percent' ? `${fmtNum(n.value)}%` : n.kind === 'times' ? `${fmtNum(n.value)}x` : fmtNum(n.value);
-      const said = s.ws.slice(n.i, n.j + 2).map(w => clean(w.word)).join(' ');
+      const said = s.ws.slice(n.i, n.j + 2).map(w => w.word.trim()).join(' ').replace(/ ,/g, ',').replace(/[.!?]$/, '');
       if (n.kind === 'money') add({ type: 'price-tag', pri: 3, text: shown, ...(n.unit ? { sub: n.unit.toLowerCase() } : {}), ...span(s, n.i, n.j + 2), why: `a price ("${said}")` });
       else add({ type: 'stat-callout', pri: 3, text: shown, ...(n.unit ? { sub: n.unit.toLowerCase() } : {}), ...(n.value >= 1000 ? { style: 'odometer' } : {}), ...span(s, n.i, n.j + 2), why: `a number ("${said}")` });
       return;
@@ -141,12 +143,15 @@ function propose(T, opts = {}) {
     add({ ...g, pri: 9, start: s.ws[k].start - 0.2, end: len - 0.15, why: `your call to action ("${head.join(' ')}")` });
     break;
   }
-  // no two graphics on screen at once; at most one per 5 s (or --max), the earliest kept, then the end card
+  // no two graphics on screen at once; at most one per 3 s (or --max), the earliest kept, then the end card
   out.sort((a, b) => a.start - b.start);
   const keep = [];
   // two proposals that would share the screen: the more telling one stays (the call to action always does)
-  for (const g of out) { const p = keep[keep.length - 1]; if (p && g.start < p.end + 0.4) { if (g.pri > p.pri) keep.pop(); else continue; } keep.push(g); }
-  const max = opts.max || Math.max(2, Math.round(len / 4));
+  // when the earlier one can end early and still stay up 1.8 s, it does, and both stay
+  // (back-to-back steps hand over faster: the counter only needs 1.2 s and a 0.15 s gap)
+  for (const g of out) { const p = keep[keep.length - 1]; const steps = p && p.type === 'step-counter' && g.type === 'step-counter', gap = steps ? 0.15 : 0.4, hold = steps ? 1.2 : 1.8;
+    if (p && g.start < p.end + gap) { if (p.pri < 9 && g.start - gap - p.start >= hold) p.end = +(g.start - gap).toFixed(2); else if (g.pri > p.pri) keep.pop(); else continue; } keep.push(g); }
+  const max = opts.max || Math.max(2, Math.round(len / 3));
   // over the cap: the least telling proposal goes first (a plain comma list, then quotes and commands, then numbers and steps)
   while (keep.length > max) { let i = -1; keep.forEach((g, k) => { if (i < 0 || g.pri < keep[i].pri || (g.pri === keep[i].pri && k > i)) i = k; }); if (keep[i].pri >= 9) break; keep.splice(i, 1); }
   keep.forEach(g => delete g.pri);

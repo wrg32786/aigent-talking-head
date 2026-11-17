@@ -198,6 +198,8 @@ if (!flag('rebuild')) {
   const logo = opt('logo');
   if (logo) fs.copyFileSync(path.resolve(logo), path.join(build, path.basename(logo)));
   sh(process.execPath, [path.join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--force', ...(cut.hits && cut.hits.length === 0 ? ['--no-glitch'] : []), ...(TITLES ? ['--titles'] : look === 'oneword' ? [] : ['--hero']), ...(look === 'oneword' ? ['--cards'] : []), '--style', STYLE, ...(FONTS ? ['--fonts', FONTS] : []), ...(logo ? ['--logo', path.basename(logo)] : [])], build);
+  // captions and titles in the words you mean: the recipe's Aliases, and numbers Whisper split at the comma ("10 ,000")
+  { const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), n = S.meantFlips(caps.flips); if (n) { fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); console.log(`captions: ${n} lines in the words you mean (recipe Aliases, split numbers)`); } }
   if (recipe && recipe.titles.length && TITLES) {
     const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF);
     const rt = RM.titleFlips(recipe);

@@ -144,7 +144,7 @@
       "flags": [
         { "name": "out", "type": "path", "default": "jobs/<job>/Reel.md", "description": "where to write; an existing Reel.md is merged (its graphics stay, proposals fill the gaps)" },
         { "name": "base", "type": "path", "default": null, "description": "start a new plan from this recipe's brand, music and style" },
-        { "name": "max", "type": "number", "default": "one per 4 s of reel", "description": "at most this many graphics" },
+        { "name": "max", "type": "number", "default": "one per 3 s of reel", "description": "at most this many graphics" },
         { "name": "fresh", "type": "boolean", "default": false, "description": "propose again over lines an earlier plan wrote (they carry why); lines you wrote always stay" },
         { "name": "dry", "type": "boolean", "default": false, "description": "print the Reel.md, write nothing" },
         { "name": "jobs", "type": "path", "default": "jobs/", "description": "jobs folder" },

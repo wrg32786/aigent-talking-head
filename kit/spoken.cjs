@@ -24,10 +24,12 @@ const norm = s => String(s || '').toLowerCase().replace(/[’']/g, '').replace(/
 const tokens = s => norm(s).split(' ').filter(Boolean);
 
 // ---- near-homophones and aliases ----
+let ALIAS_RAW = []; // [wanted as written, [heard spellings]] for meantText
 let ALIAS = new Map(); // wanted token -> Set of heard tokens (one word, or several run together)
 function setAliases(list) {
   ALIAS = new Map();
-  const add = (want, heardAs) => { const w = tokens(want).join(''), h = tokens(heardAs).join(''); if (!w || !h || w === h) return; if (!ALIAS.has(w)) ALIAS.set(w, new Set()); ALIAS.get(w).add(h); };
+  ALIAS_RAW = [];
+  const add = (want, heardAs) => { const w = tokens(want).join(''), h = tokens(heardAs).join(''); if (!w || !h || w === h) return; const r = ALIAS_RAW.find(x => x[0] === String(want).trim()); if (r) r[1].push(heardAs); else ALIAS_RAW.push([String(want).trim(), [heardAs]]); if (!ALIAS.has(w)) ALIAS.set(w, new Set()); ALIAS.get(w).add(h); };
   if (Array.isArray(list)) for (const a of list) { if (a && a.want) for (const h of [].concat(a.heard || [])) add(a.want, h); }
   else if (list && typeof list === 'object') for (const [w, hs] of Object.entries(list)) for (const h of [].concat(hs).flatMap(x => String(x).split(/[,|]/))) add(w, h.trim());
   return ALIAS;
@@ -253,4 +255,22 @@ function cueFlips(flips, words, pad = 1.5) {
   return { flips: out, resolved };
 }
 
-module.exports = { setAliases, matchKind, phon, fuzzyLog, REQUIRED, cueTimes, cueFlips, listOf, norm, tokens, timeline, said, heard, numberTokens, whenSaid, ordinalsSaid, fitGraphics, audit, ORD, SPOKEN };
+// Captions and titles in the words you mean: each alias spelling heard in the transcript ("agent", "Guinn") is written as
+// the recipe's word ("aigent", "Gwyn"), keeping a leading capital, and a number Whisper split at its comma ("10 ,000")
+// is joined. Returns how many caption and title flips changed. Graphics are untouched (the plan already writes them).
+function meantText(t) {
+  let o = String(t).replace(/(\d) ,(\d{3})\b/g, '$1,$2');
+  for (const [w, hs] of ALIAS_RAW) for (const h of hs) o = o.replace(new RegExp(`(^|[^\\p{L}\\p{N}'])(${h.trim().split(/\s+/).map(x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+')})(?=[^\\p{L}\\p{N}]|$)`, 'giu'), (m, a, hit) => a + (/^\p{Lu}/u.test(hit) ? w.replace(/^./, c => c.toUpperCase()) : w));
+  return o;
+}
+function meantFlips(flips) {
+  let n = 0;
+  for (const f of flips || []) { if (f.mode !== 0 && f.mode !== 7 && f.mode != null) continue;
+    const before = JSON.stringify([f.text, f.words]);
+    if (typeof f.text === 'string') f.text = meantText(f.text);
+    if (Array.isArray(f.words)) for (let i = f.words.length - 1; i > 0; i--) { const w = f.words[i], p = f.words[i - 1]; if (Array.isArray(w) && Array.isArray(p) && /^,\d{3}/.test(String(w[2]).trim()) && /\d$/.test(String(p[2]).trim())) { f.words.splice(i - 1, 2, [p[0], w[1], String(p[2]).trim() + String(w[2]).trim()]); if (Array.isArray(f.hero)) f.hero = [...new Set(f.hero.map(h => h >= i ? h - 1 : h))]; else if (typeof f.hero === 'number' && f.hero >= i) f.hero--; } }
+    if (Array.isArray(f.words)) f.words = f.words.map(w => Array.isArray(w) ? [w[0], w[1], meantText(w[2])] : w && typeof w.word === 'string' ? { ...w, word: meantText(w.word) } : w);
+    if (JSON.stringify([f.text, f.words]) !== before) n++; }
+  return n;
+}
+module.exports = { setAliases, meantText, meantFlips, matchKind, phon, fuzzyLog, REQUIRED, cueTimes, cueFlips, listOf, norm, tokens, timeline, said, heard, numberTokens, whenSaid, ordinalsSaid, fitGraphics, audit, ORD, SPOKEN };
