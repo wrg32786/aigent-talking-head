@@ -29,7 +29,7 @@ Work inside a checkout (it has `kit/reel.cjs` and a `package.json` with `npm run
 
 ## Workflow (the recommended agent flow: draft, plan, review, render, verify)
 
-1. **Offer the menu first.** Ask: a saved preset (`npm run preset`), a recipe (`examples/recipes/*.Reel.md` or their own), customize, or let you choose (`--preset auto`). Run `npm run menu` and point them at `showcase/GALLERY.md`. Suggest 2 or 3 options per category. Ask which platform it is for (TikTok, Reels, Shorts, a 4:5 feed post, square). Offer the menu again before the final render.
+1. **Offer the menu first.** Ask: a saved preset (`npm run preset`), a recipe (`examples/recipes/*.Reel.md` or their own), customize, or let you choose (`--preset auto`). Run `npm run menu` and point them at `showcase/GALLERY.md`, and at `docs/effects.md` for transitions, title entrances, caption entrances and caption styles as looping previews. `npm run list -- transitions|titles|captions|graphics|effects --json` gives the exact names, one-liners, flags and preview paths for one kind. Suggest 2 or 3 options per category. Ask which platform it is for (TikTok, Reels, Shorts, a 4:5 feed post, square). Offer the menu again before the final render.
 2. **Draft** (transcribes and stops before rendering). The clip goes in `inbox/` or is passed by path.
    ```
    npm run reel -- inbox/<file> --name <job> --draft
@@ -52,7 +52,7 @@ Work inside a checkout (it has `kit/reel.cjs` and a `package.json` with `npm run
 
 Without a plan, `npm run reel -- inbox/<file>` still makes a reel in one command (captions and titles, no graphics).
 
-**Agents with tools.** `npm run mcp` is an MCP server with the same flow as tools (menu, draft, plan, validate, render, verify), schemas generated from `contract.json`. Setup for Claude Code, Cursor and Codex: `docs/mcp.md`. Without MCP, pass `--json` to `reel`, `plan`, `verify` and `export`: the last line printed is one JSON result.
+**Agents with tools.** `npm run mcp` is an MCP server with the same flow as tools (menu, list_effects, draft, plan, validate, render, verify), schemas generated from `contract.json`. Setup for Claude Code, Cursor and Codex: `docs/mcp.md`. Without MCP, pass `--json` to `reel`, `plan`, `verify` and `export`: the last line printed is one JSON result.
 
 ## Commands
 
@@ -73,6 +73,8 @@ Run each as `npm run <command> -- <args>` from the repo root. Full flag list wit
 | `teardown` | reference reel to a Reel.md | `<video>`, `--out`, `--name`, `--engine rea\|lite`, `--install`, `--model`, `--no-asr`, `--no-ocr`, `--vlm`, `--reuse` |
 | `capture` | public page to a screen card | `<urls...>` or `--recipe <Reel.md> [--list]`, `--scroll 8`, `--width 780`, `--force`, `--image-only` |
 | `menu` | every option | `--json` |
+| `list` | one part of the effects menu by kind (transitions, titles, captions, graphics, effects); animated previews in `docs/effects.md` | `-- <kind>`, `--json` |
+| `menu:render` | re-render the effects menu previews in `docs/menu/` and rewrite `docs/effects.md` | `--only <section>`, `--docs-only` |
 | `brand:import` | brand guide to a draft preset | `<file>`, `--name`, `--out` |
 | `music` | list or add music beds | `[files...]`, `--replace` |
 | `chrome` | print the Chrome in use | none |

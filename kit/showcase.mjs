@@ -11,7 +11,7 @@ import { dirname, join, relative } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { loadMenu, demoFields, sourceCatalogIds, showcaseHas } from './menu.mjs';
-import { writeSheetsAndGallery } from './sheets.mjs';
+import { writeSheetsAndGallery, animPreview } from './sheets.mjs';
 
 const require = createRequire(import.meta.url);
 const B = require('./beats.cjs');
@@ -137,7 +137,7 @@ function videoFromStill(png, mp4, seconds = 2) {
 function writeHtml(menu, stills) {
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const imgFor = (kind, id) => {
-    const rel = stills[`${kind}:${id}`];
+    const rel = animPreview(kind, id) || stills[`${kind}:${id}`];
     return rel ? `<img src="${esc(rel)}" alt="${esc(id)}" width="${W / 2}" height="${H / 2}" loading="lazy">` : '<div class="ph"></div>';
   };
   const card = (it) => `
@@ -489,9 +489,15 @@ Labelled contact sheets of every effect, graphic, film finish, title entrance, c
 
 ![In front versus behind the head](sheets/title-layer.jpg)
 
-![Title entrances](sheets/entrances.jpg)
+![Title entrances, animated and labelled](../docs/menu/sheets/titles.webp)
 
-![Caption styles](sheets/captions.jpg)
+![Caption entrances, animated and labelled](../docs/menu/sheets/caption-entrances.webp)
+
+![Caption styles, animated and labelled](../docs/menu/sheets/caption-styles.webp)
+
+![Transitions, animated and labelled](../docs/menu/sheets/transitions.webp)
+
+The animated grids come from the [effects menu](../docs/effects.md) (`npm run menu:render`), which lists each one with its exact name.
 
 ![Font pairings](sheets/fonts.jpg)
 
@@ -790,9 +796,15 @@ Labelled contact sheets of every effect, graphic, film finish, title entrance, c
 
 ![In front versus behind the head](sheets/title-layer.jpg)
 
-![Title entrances](sheets/entrances.jpg)
+![Title entrances, animated and labelled](../docs/menu/sheets/titles.webp)
 
-![Caption styles](sheets/captions.jpg)
+![Caption entrances, animated and labelled](../docs/menu/sheets/caption-entrances.webp)
+
+![Caption styles, animated and labelled](../docs/menu/sheets/caption-styles.webp)
+
+![Transitions, animated and labelled](../docs/menu/sheets/transitions.webp)
+
+The animated grids come from the [effects menu](../docs/effects.md) (`npm run menu:render`), which lists each one with its exact name.
 
 ![Font pairings](sheets/fonts.jpg)
 

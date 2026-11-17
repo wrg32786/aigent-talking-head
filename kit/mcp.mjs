@@ -1,7 +1,7 @@
 // MCP server (stdio) for agents: the kit's commands as tools, their input schemas generated from contract.json, so the
 // tools can never drift from the CLIs (npm run contract checks contract.json against the scripts).
 //   npm run mcp            (an MCP client starts this; see docs/mcp.md for Claude Code, Cursor and Codex)
-// Tools: menu, draft, plan, validate, render, verify. Each runs the matching npm command from the repo root with
+// Tools: menu, list_effects, draft, plan, validate, render, verify. Each runs the matching npm command from the repo root with
 // --json where the command has it and returns the log tail plus the JSON result (structuredContent).
 // Built on the official MCP TypeScript SDK (@modelcontextprotocol/sdk, MIT). Logs go to stderr; stdout is the protocol.
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -59,10 +59,13 @@ function run(script, args, timeoutMs) {
 const lastJson = s => { try { const w = JSON.parse(s); if (w && typeof w === 'object' && !Array.isArray(w)) return w; } catch {} const l = s.trim().split('\n').reverse().find(x => /^\{.*\}$/.test(x.trim())); try { return l ? JSON.parse(l) : null; } catch { return null; } };
 const tail = (s, n = 60) => s.trim().split('\n').slice(-n).join('\n');
 
-const REEL = cmd('reel'), PLAN = cmd('plan'), VERIFY = cmd('verify'), MENU = cmd('menu'), RMD = cmd('reelmd'), CHECK = cmd('check');
+const REEL = cmd('reel'), PLAN = cmd('plan'), VERIFY = cmd('verify'), MENU = cmd('menu'), LIST = cmd('list'), RMD = cmd('reelmd'), CHECK = cmd('check');
 const TOOLS = [
   { name: 'menu', description: 'Every option the kit has (looks, caption styles, titles, the 29 graphics, transitions, effects, sounds, beds, presets, exports). Offer it to the user before you draft. ' + MENU.summary,
     inputSchema: { type: 'object', properties: {}, additionalProperties: false }, call: () => ['kit/menu.mjs', [], 60e3] },
+  { name: 'list_effects', description: 'One part of the effects menu as names, one-line descriptions, the exact flag or field to use, and a looping preview path (npm run list -- <kind> --json). Kinds: transitions, titles (title entrances), captions (caption entrances and caption styles), graphics, effects, or any menu section id. Leave kind out for the list of kinds. Show the user docs/effects.md to see them animated. ' + LIST.summary,
+    inputSchema: { type: 'object', properties: { kind: { type: 'string', description: 'transitions, titles, captions, graphics, effects, or a section id from the menu tool' } }, additionalProperties: false },
+    call: a => [MENU.script, ['--list', ...(a.kind ? [String(a.kind)] : []), '--json'], 60e3] },
   { name: 'draft', description: 'Transcribe a phone clip and draft the reel without rendering (npm run reel -- <clip> --name <job> --draft): cut.json, captions.js and the transcript the plan tool reads. ' + REEL.summary,
     inputSchema: schemaOf(REEL, { omit: ['draft', 'rebuild', 'json'] }), call: a => [REEL.script, argsOf(REEL, a, ['--draft', '--json']), 60 * 60e3] },
   { name: 'plan', description: 'Propose graphics from what the presenter says (numbers, lists, steps, quotes, commands, the call to action) into jobs/<job>/Reel.md for review. Every proposed word is a word they say. ' + PLAN.summary,
@@ -77,7 +80,7 @@ const TOOLS = [
 ];
 for (const c of [REEL, PLAN, VERIFY, MENU, RMD, CHECK]) if (!existsSync(join(ROOT, c.script))) throw new Error(`${c.name}: ${c.script} is missing`);
 
-const server = new Server({ name: 'aigent-talking-head', version: PKG.version }, { capabilities: { tools: {} }, instructions: 'Talking-head reel kit. Flow: menu (offer options), draft (transcribe), plan (propose graphics from the words), review the Reel.md with the user, validate, render (with export for a platform), verify (then look at the contact sheet). Read skills/aigent-talking-head/SKILL.md for the rules: on-screen words are words the presenter says, nothing ever covers the face.' });
+const server = new Server({ name: 'aigent-talking-head', version: PKG.version }, { capabilities: { tools: {} }, instructions: 'Talking-head reel kit. Flow: menu (offer options; list_effects for transitions, title or caption entrances with preview paths, and docs/effects.md to show them animated), draft (transcribe), plan (propose graphics from the words), review the Reel.md with the user, validate, render (with export for a platform), verify (then look at the contact sheet). Read skills/aigent-talking-head/SKILL.md for the rules: on-screen words are words the presenter says, nothing ever covers the face.' });
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) }));
 server.setRequestHandler(CallToolRequestSchema, async req => {
   const t = TOOLS.find(x => x.name === req.params.name);
@@ -87,7 +90,7 @@ server.setRequestHandler(CallToolRequestSchema, async req => {
   if (!spec) return { isError: true, content: [{ type: 'text', text: 'give recipe (a Reel.md path) or job (a job name)' }] };
   const [script, args, ms] = spec;
   const r = await run(script, args, ms), json = lastJson(r.out);
-  const text = `$ npm run ${t.name === 'validate' ? (script.endsWith('reelmd.cjs') ? 'reelmd' : 'check') : t.name === 'draft' || t.name === 'render' ? 'reel' : t.name} -- ${args.join(' ')}\nexit ${r.code}\n\n${t.name === 'menu' ? r.out.trim() : tail(r.out)}${r.err.trim() ? '\n\nstderr:\n' + tail(r.err, 20) : ''}`;
+  const text = `$ npm run ${t.name === 'validate' ? (script.endsWith('reelmd.cjs') ? 'reelmd' : 'check') : t.name === 'draft' || t.name === 'render' ? 'reel' : t.name === 'list_effects' ? 'list' : t.name} -- ${(t.name === 'list_effects' ? args.slice(1) : args).join(' ')}\nexit ${r.code}\n\n${t.name === 'menu' ? r.out.trim() : tail(r.out)}${r.err.trim() ? '\n\nstderr:\n' + tail(r.err, 20) : ''}`;
   return { isError: r.code !== 0, content: [{ type: 'text', text }], ...(json ? { structuredContent: json } : {}) };
 });
 await server.connect(new StdioServerTransport());

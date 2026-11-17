@@ -1,5 +1,5 @@
 {
- "note": "Named cut transitions for cut.json (per segment: \"transition\": \"<name>\", optional \"transitionDur\" in seconds, default 0.3). Each name maps to a stock ffmpeg xfade mode, so no gltransition build is needed. Any raw xfade mode name also works. An object ({\"custom\": \"<id>\"}) is a drawn transition from kit/xfx.cjs (an xfade custom expression; checkerboard takes the theme accent). The default (no \"transition\") stays the hard cut with the glitch seam. Name list adapted from ANVEAI/motion-pack transitions/lib/xfade.js (MIT); see THIRD_PARTY.md.",
+ "note": "Named cut transitions for cut.json (per segment: \"transition\": \"<name>\", optional \"transitionDur\" in seconds, default 0.3). Each name maps to a stock ffmpeg xfade mode, so no gltransition build is needed. Any raw xfade mode name also works. An object ({\"custom\": \"<id>\"}) is a drawn transition from kit/xfx.cjs (an xfade custom expression; checkerboard takes the theme accent). The default (no \"transition\") stays the hard cut with the glitch seam. Name list adapted from ANVEAI/motion-pack transitions/lib/xfade.js (MIT); see THIRD_PARTY.md. \"about\" holds a one-line plain description of each name for npm run list and docs/effects.md.",
  "default": "glitch",
  "names": {
   "glitch": null,
@@ -52,11 +52,81 @@
   "warp": "diagbr",
   "diagonal": "diagbr",
   "distance": "distance",
-  "slats": {"custom": "slats"},
-  "checkerboard": {"custom": "checkerboard"},
-  "light-leak": {"custom": "light-leak"},
-  "zoom-blur": {"custom": "zoom-blur"},
-  "news-ribbon": {"custom": "news-ribbon"},
-  "breaking-news": {"custom": "news-ribbon"}
+  "slats": {
+   "custom": "slats"
+  },
+  "checkerboard": {
+   "custom": "checkerboard"
+  },
+  "light-leak": {
+   "custom": "light-leak"
+  },
+  "zoom-blur": {
+   "custom": "zoom-blur"
+  },
+  "news-ribbon": {
+   "custom": "news-ribbon"
+  },
+  "breaking-news": {
+   "custom": "news-ribbon"
+  }
+ },
+ "about": {
+  "glitch": "hard cut with a quick shake and colour split on the seam (the default)",
+  "cut": "plain hard cut, no blend and no shake",
+  "crossfade": "the two shots blend smoothly into each other",
+  "dissolve": "the new shot appears through a scatter of random pixels",
+  "fade-fast": "a quick crossfade",
+  "fade-slow": "a slow, soft crossfade",
+  "film": "fades through grey, like an old film cut",
+  "dip": "dips to black, then fades up on the new shot",
+  "dip-black": "dips to black, then fades up on the new shot",
+  "flash": "flashes to white, then the new shot",
+  "dip-white": "dips to white, then fades up on the new shot",
+  "whip": "the new shot pushes the old one off to the left",
+  "whip-left": "the new shot pushes the old one off to the left",
+  "whip-right": "the new shot pushes the old one off to the right",
+  "push-left": "the new shot pushes the old one off to the left",
+  "push-right": "the new shot pushes the old one off to the right",
+  "swipe-up": "the new shot pushes the old one up and out of frame",
+  "swipe-down": "the new shot pushes the old one down and out of frame",
+  "cover-left": "the new shot slides in over the old one, moving left",
+  "cover-right": "the new shot slides in over the old one, moving right",
+  "cover-up": "the new shot slides up over the old one",
+  "reveal-left": "the old shot slides away to the left, revealing the new one under it",
+  "reveal-right": "the old shot slides away to the right, revealing the new one under it",
+  "wipe": "a hard edge wipes the new shot in, moving left",
+  "wipe-left": "a hard edge wipes the new shot in, moving left",
+  "wipe-right": "a hard edge wipes the new shot in, moving right",
+  "wipe-up": "a hard edge wipes the new shot in, moving up",
+  "wipe-down": "a hard edge wipes the new shot in, moving down",
+  "luma-wipe": "a soft-edged wipe moving left",
+  "soft-wipe": "a soft-edged wipe moving left",
+  "iris": "a circle opens from the centre onto the new shot",
+  "iris-open": "a circle opens from the centre onto the new shot",
+  "iris-close": "the old shot shrinks away in a closing circle, the new one around it",
+  "circle-crop": "the old shot closes to a circle on black, then the new shot opens out of it",
+  "doorway": "the new shot opens out from a horizontal line across the middle",
+  "barn-door": "the new shot opens out from a vertical line down the middle, like barn doors",
+  "zoom": "zooms into the old shot as the new one fades in",
+  "zoom-through": "zooms into the old shot as the new one fades in",
+  "pixelate": "breaks into big pixels, then resolves on the new shot",
+  "blur": "a horizontal smear blur carries one shot into the next",
+  "blur-cross": "a horizontal smear blur carries one shot into the next",
+  "radial": "a clock-hand sweep around the centre reveals the new shot",
+  "clock": "a clock-hand sweep around the centre reveals the new shot",
+  "squeeze": "the old shot squeezes flat to a line and the new one stretches out",
+  "slice": "staggered horizontal slices sweep the new shot in",
+  "blinds": "staggered horizontal slices sweep the new shot in, like blinds",
+  "wind": "a streaky, wind-blown edge sweeps the new shot in",
+  "warp": "a diagonal edge wipes across from one corner to the other",
+  "diagonal": "a diagonal edge wipes across from one corner to the other",
+  "distance": "the old shot melts into the new one by colour difference",
+  "slats": "twelve vertical slats open one after another, left to right",
+  "checkerboard": "a grid of tiles in the theme accent flips across on a diagonal",
+  "light-leak": "a warm glow drifts across and blooms while the shots cross",
+  "zoom-blur": "zooms into the old shot and out of the new one with a radial blur",
+  "news-ribbon": "a red and white broadcast ribbon sweeps up across the frame",
+  "breaking-news": "a red and white broadcast ribbon sweeps up across the frame"
  }
 }

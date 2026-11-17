@@ -831,15 +831,17 @@ try {
     }
     if (statSync(lib).mtimeMs !== before || existsSync(join(KIT, 'music', '.mp3'))) fail('music:add wrote to the library on a refused import');
   });
-  { // the MCP server: six tools whose schemas come from contract.json; a tool call runs the real command
-    process.stdout.write('- MCP server (stdio): menu, draft, plan, validate, render, verify; validate runs reelmd check ... ');
+  { // the MCP server: seven tools whose schemas come from contract.json; a tool call runs the real command
+    process.stdout.write('- MCP server (stdio): menu, list_effects, draft, plan, validate, render, verify; validate runs reelmd check ... ');
     const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
     const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
     const cl = new Client({ name: 'smoke', version: '1' });
     await cl.connect(new StdioClientTransport({ command: node, args: [join(KIT, 'mcp.mjs')], cwd: dirname(KIT), stderr: 'ignore' }));
     try {
       const names = (await cl.listTools()).tools.map(t => t.name).join(',');
-      if (names !== 'menu,draft,plan,validate,render,verify') fail('MCP tools: ' + names);
+      if (names !== 'menu,list_effects,draft,plan,validate,render,verify') fail('MCP tools: ' + names);
+      const le = await cl.callTool({ name: 'list_effects', arguments: { kind: 'transitions' } });
+      if (le.isError || !le.structuredContent || le.structuredContent.sections[0].items.length < 50) fail('MCP list_effects: ' + JSON.stringify(le).slice(0, 300));
       const v = await cl.callTool({ name: 'validate', arguments: { recipe: 'examples/recipes/cinematic.Reel.md' } });
       if (v.isError || !/REELMD PASS/.test(v.content[0].text)) fail('MCP validate: ' + JSON.stringify(v));
       const bad = await cl.callTool({ name: 'render', arguments: { look: 'nope' } });

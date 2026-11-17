@@ -341,14 +341,34 @@
     {
       "name": "menu",
       "script": "kit/menu.mjs",
-      "summary": "Print every option (effects, finishes, looks, fonts, themes, entrances, transitions, sounds, beds, presets).",
+      "summary": "Print every option (effects, finishes, looks, fonts, themes, title and caption entrances, transitions, sounds, beds, presets). --list <kind> prints one part of the effects menu.",
       "positional": [],
       "flags": [
-        { "name": "json", "type": "boolean", "default": false, "description": "machine-readable" }
+        { "name": "json", "type": "boolean", "default": false, "description": "machine-readable" },
+        { "name": "list", "type": "string", "default": null, "description": "one part of the effects menu: transitions, titles, captions, graphics, effects, or a section id; with no value, the kinds" }
       ],
       "outputs": ["stdout"],
       "success": "exit 0",
-      "failures": ["menu is missing catalog entries (exit 1)"]
+      "failures": ["menu is missing catalog entries (exit 1)", "unknown list kind (exit 1)"]
+    },
+    {
+      "name": "list",
+      "alias": "menu",
+      "args": ["--list"],
+      "summary": "The effects menu by kind, as names and one-liners: npm run list -- transitions|titles|captions|graphics|effects [--json]. Each item carries its exact flag and, where rendered, a looping preview path. Animated previews of all of them are in docs/effects.md."
+    },
+    {
+      "name": "menu:render",
+      "script": "kit/render-menu.mjs",
+      "summary": "Render the effects menu previews (looping WebPs and contact sheets in docs/menu/) with the kit's own transitions and overlay, then rewrite docs/effects.md. Needs ffmpeg and Chrome.",
+      "positional": [],
+      "flags": [
+        { "name": "only", "type": "enum", "values": ["transitions", "titles", "caption-entrances", "caption-styles"], "default": null, "description": "render one section" },
+        { "name": "docs-only", "type": "boolean", "default": false, "description": "rewrite docs/effects.md without rendering" }
+      ],
+      "outputs": ["docs/menu/", "docs/effects.md"],
+      "success": "exit 0",
+      "failures": ["ffmpeg or Chrome missing (exit 1)"]
     },
     {
       "name": "brand:import",

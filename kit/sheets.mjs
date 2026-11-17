@@ -39,6 +39,13 @@ function stillPath(kind, id) {
   return join(OUT, 'media', dir, id + '.jpg');
 }
 
+// the looping WebP from npm run menu:render (docs/menu/), used instead of a still where there is one
+const ANIM = { entrance: 'titles', transition: 'transitions', captionStyle: 'caption-styles', captionEntrance: 'caption-entrances' };
+export function animPreview(kind, id) {
+  const dir = ANIM[kind];
+  return dir && existsSync(join(ROOT, 'docs', 'menu', dir, id + '.webp')) ? `../docs/menu/${dir}/${id}.webp` : null;
+}
+
 function sectionItems(menu, sectionId, kind) {
   const sec = menu.sections.find(s => s.id === sectionId);
   if (!sec) return [];
@@ -91,7 +98,7 @@ function mdRow(cells, perRow) {
   return lines.join('\n');
 }
 
-function writeGalleryMarkdown(menu) {
+export function writeGalleryMarkdown(menu) {
   const header = (n) => '|' + Array(n).fill('').join(' --- |') + ' --- |';
   const blocks = [];
   const groups = [
@@ -101,6 +108,7 @@ function writeGalleryMarkdown(menu) {
     ['Title layer', 'title-layer', 'titleLayer', 3],
     ['Title entrances', 'title-entrances', 'entrance', 7],
     ['Caption styles', 'caption-styles', 'captionStyle', 7],
+    ['Caption entrances', 'caption-entrances', 'captionEntrance', 5],
     ['Font pairings', 'fonts', 'font', 5],
     ['Presets', 'presets', 'preset', 5],
     ['Looks', 'looks', 'look', 5],
@@ -113,14 +121,14 @@ function writeGalleryMarkdown(menu) {
     const items = sectionItems(menu, sectionId, kind);
     if (!items.length) continue;
     const cells = items.map(it => {
-      const rel = `media/${FOLDER[it.kind] || it.kind}/${it.id}.jpg`;
+      const rel = animPreview(it.kind, it.id) || `media/${FOLDER[it.kind] || it.kind}/${it.id}.jpg`;
       return `![${it.id}](${rel})<br>\`${it.id}\``;
     });
     blocks.push(`## ${title}\n\n${header(perRow)}\n${mdRow(cells, perRow)}\n`);
   }
   const md = `# Showcase gallery
 
-Every option, labelled, from the committed stills. These images render on GitHub. The contact sheets in [\`sheets/\`](sheets/) are the same set, packed into a few montages, and are what the root README shows.
+Every option, labelled, from the committed stills. Transitions, title entrances, caption entrances and caption styles play as looping previews from the [effects menu](../docs/effects.md). These images render on GitHub. The contact sheets in [\`sheets/\`](sheets/) are the same set, packed into a few montages, and are what the root README shows.
 
 The interactive page is [index.html](index.html). Open it from a full clone or zip of the repo; if you download only that HTML file, the images will not load.
 

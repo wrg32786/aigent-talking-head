@@ -2,6 +2,8 @@
 
 The depth behind the [README](../README.md) quick start.
 
+**See every option move:** the [effects menu](effects.md) shows each transition, title entrance, caption entrance and caption style as a looping preview with its exact name. `npm run list -- <kind>` prints the same list.
+
 ## What you get
 
 Record yourself on your phone, drop the file in `inbox/`, and ask Claude (or any coding agent) to make the reel:
@@ -82,7 +84,7 @@ Words and titles stay out of the way of effects: where an effect's catalog entry
 These are defaults in `cut.json`; `npm run check -- <job>` flags anything that breaks them.
 
 - **Zoom punch.** `"punch": 0.1` scales every other segment 10% so each cut lands as a jump; `false` turns it off. `"bigPunch": true` on a segment eases in another 12% over 0.3 s; `npm run reel` puts it on the cut after the hook and the cut into the payoff. `"zoom"` and `"punchY"` per segment override the amount and the vertical centre.
-- **Transitions.** The glitch seam stays the default. `"transition": "crossfade"` on a segment (or at the top level for all of them) uses an ffmpeg xfade instead; `"transitionDur"` sets the length. The 56 names (crossfade, dip, flash, whip, iris, zoom, pixelate, ...) are in `kit/transitions.json` and `effects/CATALOG.md`. Six are drawn by the kit as xfade expressions (`kit/xfx.cjs`): `slats`, `checkerboard` (in the theme accent), `light-leak`, `zoom-blur`, `news-ribbon` and its alias `breaking-news`.
+- **Transitions.** The glitch seam stays the default. `"transition": "crossfade"` on a segment (or at the top level for all of them) uses an ffmpeg xfade instead; `"transitionDur"` sets the length. The 56 names (crossfade, dip, flash, whip, iris, zoom, pixelate, ...) are in `kit/transitions.json`, `effects/CATALOG.md` and, with an animated preview of each, the [effects menu](effects.md#transitions). Six are drawn by the kit as xfade expressions (`kit/xfx.cjs`): `slats`, `checkerboard` (in the theme accent), `light-leak`, `zoom-blur`, `news-ribbon` and its alias `breaking-news`.
 - **Sounds.** Fewer and deeper. The locked cut-seam set is `whoosh`, `swipe`, `boom`, `click`, `typing` (mono 48 kHz WAV, CC0), used as `"sfx": {"whoosh": [3.2], "boom": [[12.4, 0.55]]}`. Never a sound on every cut, and the key moment (the payoff) gets the loudest one. A 31-sound cinematic pack in `kit/sfx/` (see `kit/sfx/sfx.json`) is auto-picked on `npm run fx` for each effect hit: category mapping, no-repeat rotation, the hit point aligned to the effect, risers ending on the hit, releases after heavy hits, ducked under the voice. Override per effect with `"sfx": "01-cinematic-hit-a"` or `"sfx": false`, or turn the pack off with `--sfx off`. You still pick sounds by ear.
 - **Beat-sync.** When a bed is set, `kit/beats.py` analyses it from `bedStart` for the reel length and writes `build/beat-grid.json` (tempo, beats, onsets, energy, strong drops). `"beatSync": true` (the default with a bed; `--no-beat-sync` or `"beatSync": false` to turn it off) snaps zoom punches, SFX, fx hit points and title entrances to the nearest beat or onset within 120 ms (`"beatWindow"`), and adds a short camera shake on strong drops, at most two per shot. Speech cuts and lip sync do not move. Needs `librosa` (`pip install -r requirements.txt`).
 - **Film finish.** `"finish": "grain"` (or a list, or `{ "grain": { "intensity": 0.4 } }`) applies an ffmpeg look to the picture, before titles and captions, so the type stays clean. Names: `grain`, `vignette`, `chroma`, `scan-lines`, `warm`, `cool`, `teal`, `crushed`, `mono`, `bleach`. Set it on the whole cut or on one segment. No LUT files or light-leak overlays. `--finish grain,vignette` on `npm run reel`.
@@ -134,6 +136,7 @@ Agents: start at [AGENTS.md](../AGENTS.md).
 | `kit/teardown.mjs`, `kit/videomd2reel.cjs`, `kit/teardown.py`, `kit/ig_fetch.py` | `npm run teardown -- <file>`: rea-video breakdown to Reel.md, report and contact sheet; built-in fallback analyzer the front/behind and vignette extras, and the optional single-post Instagram fetch ([docs](teardown.md)). |
 | `INSTALL.md`, `skills/` | One-line agent install, and skills for `npx skills add wrg32786/aigent-talking-head`. |
 | `kit/autocaption.mjs` | Drafts `captions.js` from Whisper word times (`words.json` or `clips.json`), in any caption style, with `--titles`. Never overwrites without `--force`. |
+| `kit/menu.mjs`, `kit/render-menu.mjs`, `kit/effects-doc.mjs` | `npm run menu` (every option), `npm run list -- transitions\|titles\|captions\|graphics\|effects [--json]` (one part, with exact names), and `npm run menu:render` (the looping previews in `docs/menu/` and [effects.md](effects.md)). |
 | `kit/check.mjs` | `npm run check [job]`: copy lint, titles, transitions, sounds, punches and script shape. |
 | `kit/verify.mjs` | `npm run verify -- <job>`: ffprobe, loudness, title and punch stills, contact sheet, mask alpha, copy lint. Run it before every delivery. |
 | `kit/rules.cjs` | The shared edit rules: sounds, entrances, punch amounts, transitions, copy lint, script shape. |

@@ -7,7 +7,8 @@ Key facts (version 1.2.0, November 2026):
 - Flow: draft (local Whisper transcription and cut), plan (graphics proposed from the transcript), review the Reel.md, render, verify.
 - 29 overlay graphics, 56 transitions, 51 effects, 7 caption styles, 8 title entrances, 10 film finishes, 17 font pairings, 10 brand presets, 37 sound effects, 11 CC0 music beds.
 - 5 export presets with platform safe areas: tiktok, reels, shorts, feed45 (4:5), square (1:1).
-- Agent skills: `npx skills add wrg32786/aigent-talking-head` (7 skills). Local MCP server over stdio: `npm run mcp` (menu, draft, plan, validate, render, verify).
+- Agent skills: `npx skills add wrg32786/aigent-talking-head` (7 skills). Local MCP server over stdio: `npm run mcp` (menu, list_effects, draft, plan, validate, render, verify).
+- Effects menu: `npm run list -- transitions|titles|captions|graphics|effects [--json]` prints exact names and one-liners; docs/effects.md shows each transition, title entrance (8), caption entrance (9) and caption style (7) as a looping preview.
 - Rules: every word on screen is a word the presenter says; graphics and titles never cover the face; `npm run verify` fails on overlaps.
 - Runs locally on a CPU. Needs Node 18+, Python 3, FFmpeg and Chrome. English captions only.
 - Not a timeline editor and does not find clips in long videos.
@@ -16,6 +17,7 @@ Key facts (version 1.2.0, November 2026):
 
 - [README](https://github.com/wrg32786/aigent-talking-head/blob/main/README.md): overview, quick start, install, features, comparison, FAQ
 - [FAQ](https://github.com/wrg32786/aigent-talking-head/blob/main/docs/faq.md): direct answers to common questions
+- [Effects menu](https://github.com/wrg32786/aigent-talking-head/blob/main/docs/effects.md): every transition, title entrance, caption entrance and caption style with an animated preview and the exact name to use
 - [User guide](https://github.com/wrg32786/aigent-talking-head/blob/main/docs/guide.md): looks, edit rules, themes, manual steps, file map, presets
 - [Reel.md spec](https://github.com/wrg32786/aigent-talking-head/blob/main/docs/reel-md.md): the recipe format, every graphic type and field
 - [MCP setup](https://github.com/wrg32786/aigent-talking-head/blob/main/docs/mcp.md): Claude Code, Cursor and Codex configuration

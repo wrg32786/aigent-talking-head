@@ -78,19 +78,25 @@ Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FRE
 | What | How many | Where to look |
 |---|---|---|
 | Overlay graphics (stat callout, checklist, lower third, CTA, code card, data chart, terminal and more) | 29 | [Graphics](#graphics), [kit/graphics.json](kit/graphics.json) |
-| Transitions, six of them drawn by the kit | 56 | [Transitions in the guide](docs/guide.md) |
-| Effects, sorted by moment (hook, claim, list, proof, CTA) | 51 | [Effects catalog](effects/CATALOG.md) |
-| Caption styles, plus 8 letter-by-letter entrances for hero words | 7 | [Captions and type](#captions-and-type) |
-| Title entrances, in front of or behind your head | 8 | [Title entrances](#title-entrances) |
+| Transitions, six of them drawn by the kit | 56 | [Effects menu](docs/effects.md#transitions) (animated previews) |
+| Effects, sorted by moment (hook, claim, list, proof, CTA) | 51 | [Effects catalog](effects/CATALOG.md), [effects menu](docs/effects.md#effects) |
+| Caption styles, plus 8 letter-by-letter entrances for hero words | 7 | [Effects menu](docs/effects.md#caption-entrances) (animated previews) |
+| Title entrances, in front of or behind your head | 8 | [Effects menu](docs/effects.md#title-entrances) (animated previews) |
 | Film finishes | 10 | [Film finishes](#film-finishes) |
 | Font pairings (SIL OFL) | 17 | [kit/fonts](kit/fonts/README.md) |
 | Brand presets | 10 | [Presets](#presets) |
 | Sound effects and CC0 music beds, beat-synced | 37 and 11 | [Music beds](kit/music/README.md) |
 | Export presets: TikTok, Reels, Shorts, 4:5, 1:1 | 5 | [Quick start](#quick-start) |
 | Agent skills, installed with `npx skills add wrg32786/aigent-talking-head` | 7 | [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) |
-| MCP tools: menu, draft, plan, validate, render, verify | 6 | [MCP setup](docs/mcp.md) |
+| MCP tools: menu, list_effects, draft, plan, validate, render, verify | 7 | [MCP setup](docs/mcp.md) |
 
 Also: a `plan` step that proposes graphics from your transcript, a layout pass that stops overlaps, `verify` with a contact sheet, [Reel.md recipes](#reelmd-recipes) you can share, and [teardowns](#remake-a-reel-you-like) that turn a reel you like into a recipe. `npm run menu` prints every option.
+
+### Effects menu
+
+**[docs/effects.md](docs/effects.md)** is the menu of every transition, title entrance, caption entrance and caption style, each with a looping preview, its exact name and the line to paste. `npm run list -- transitions` (or `titles`, `captions`, `graphics`, `effects`) prints the same list in a terminal, and `--json` gives it to agents.
+
+<img src="docs/menu/sheets/transitions.webp" width="720" alt="Animated grid of all 56 transitions, each labelled with its name: glitch, cut, crossfade, dissolve, dip, flash, whip, push, swipe, cover, reveal, wipe, iris, doorway, barn door, zoom, pixelate, blur, radial, squeeze, slice, wind, warp, slats, checkerboard, light leak, zoom blur and news ribbon">
 
 ### Effects
 
@@ -116,13 +122,17 @@ Titles sit in front by default. Set a title behind the head, or use auto for the
 
 ![The same title placed in front of the presenter's head and behind it](showcase/sheets/title-layer.jpg)
 
-![Contact sheet of the 8 kinetic title entrances](showcase/sheets/entrances.jpg)
+<img src="docs/menu/sheets/titles.webp" width="720" alt="The 8 kinetic title entrances playing in a loop, each labelled: stagger-rise, slam, blur-rise, slide-left, elastic, flip, pop-zoom and drop">
+
+Each entrance plays in a loop above. Names, descriptions and the line to use are in the [effects menu](docs/effects.md#title-entrances).
 
 ### Captions and type
 
 Top captions tuck behind your hair where they meet it (`--caption-layer front|behind|auto`, auto by default). Kinetic hero words can come in letter by letter (`--caption-entrance unfurl|cascade|orbit|warp|crystallize|compute|levitate|undulate`, pop by default). Screen cards, b-roll panels and graphics placed high in the frame go behind only the top of your head, never your face (`--panel-layer`). Details in the [Reel.md spec](docs/reel-md.md).
 
-![Contact sheet of the caption styles, including kinetic, one-word, karaoke and pill](showcase/sheets/captions.jpg)
+<img src="docs/menu/sheets/caption-entrances.webp" width="720" alt="The 9 caption entrances playing in a loop, each labelled: pop, unfurl, cascade, orbit, warp, crystallize, compute, levitate and undulate">
+
+<img src="docs/menu/sheets/caption-styles.webp" width="720" alt="The 7 caption styles playing in a loop, each labelled: kinetic, oneword, pill, hormozi, karaoke, classic and one-word">
 
 ![Contact sheet of the font pairings](showcase/sheets/fonts.jpg)
 
@@ -233,7 +243,7 @@ The code and docs are Apache-2.0, so commercial use is fine. The bundled sounds 
 
 That installs seven skills: aigent-talking-head, talking-head-reel, talking-head-recipe, talking-head-brand, talking-head-teardown, talking-head-ad and clip-raw-footage. Add `-g` to install for every project. By hand: copy the folders under `skills/` into `.claude/skills/` (Claude Code) or `.agents/skills/` (Cursor, Codex). The skills drive a local checkout, so the agent still needs the kit installed ([agent install steps](INSTALL.md)).
 
-**MCP.** `npm run mcp` serves the same flow as MCP tools (menu, draft, plan, validate, render, verify) with schemas generated from contract.json. See the [MCP setup for Claude Code, Cursor and Codex](docs/mcp.md). For a summary written for language models, see [llms.txt](llms.txt).
+**MCP.** `npm run mcp` serves the same flow as MCP tools (menu, list_effects, draft, plan, validate, render, verify) with schemas generated from contract.json. See the [MCP setup for Claude Code, Cursor and Codex](docs/mcp.md). For a summary written for language models, see [llms.txt](llms.txt).
 
 ## Cite this
 
@@ -243,6 +253,7 @@ Machine-readable metadata is in [CITATION.cff](CITATION.cff), and GitHub shows i
 
 ## Docs
 
+- [Effects menu](docs/effects.md): every transition, title entrance, caption entrance and caption style, animated, with the exact name to use.
 - [User guide](docs/guide.md): what you get, the effects pass, looks, caption styles and fonts, edit rules, themes, manual steps, the file map and brand presets.
 - [Reel.md recipe spec](docs/reel-md.md) and [example recipes](examples/recipes/).
 - [Teardown guide and accuracy notes](docs/teardown.md).

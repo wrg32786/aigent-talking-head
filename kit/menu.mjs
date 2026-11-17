@@ -2,6 +2,7 @@
 // bed, font, theme, transition or sound cannot stay hidden.
 //   npm run menu              print every option, grouped, with a one-line label
 //   npm run menu -- --json    machine-readable
+//   npm run list -- transitions|titles|captions|graphics|effects [--json]   one part of the effects menu (docs/effects.md)
 //
 // Used by kit/showcase.mjs and npm run check (coverage: every catalog entry must
 // appear in the menu, and in showcase/index.html once that gallery is generated).
@@ -41,6 +42,32 @@ const BEAT_SYNC = [
   { id: 'no-beat-sync', flag: '--no-beat-sync  or  "beatSync": false', label: 'leave those times alone' },
   { id: 'beatWindow', flag: '"beatWindow": 0.12', label: 'max snap distance in seconds; speech cuts never move' },
 ];
+// what each kinetic title entrance does (drawn by heroEnter in kit/overlay.html; names from kit/rules.cjs ENTRANCES)
+export const ENTRANCE_ABOUT = {
+  'stagger-rise': 'letters rise into place one after another',
+  slam: 'the word slams in oversized, overshoots and shakes to a stop',
+  'blur-rise': 'the word rises from below out of a heavy blur',
+  'slide-left': 'the word slides in from the right with a slant that straightens',
+  elastic: 'the word scales up with an elastic wobble',
+  flip: 'the word flips in vertically, like a card turning over',
+  'pop-zoom': 'the word pops in from nothing with a small overshoot',
+  drop: 'each letter falls in from above with a small bounce and tilt',
+};
+// what each caption entrance does to kinetic hero words (capEnter in kit/overlay.html; names from kit/reelmd.cjs CAPTION_LOOK)
+export const CAPTION_ENTRANCE_ABOUT = {
+  pop: 'the whole word springs in with a pop (default)',
+  unfurl: 'each letter opens out from its left edge',
+  cascade: 'letters drop in one after another and settle',
+  orbit: 'letters swing in on an arc',
+  warp: 'letters stretch and wobble, then settle',
+  crystallize: 'scattered, blurred letters gather into the word',
+  compute: 'the word decodes from random characters',
+  levitate: 'letters float up into place',
+  undulate: 'letters ride a wave that calms down',
+};
+const RM = require('./reelmd.cjs');
+const CAPTION_ENTRANCES = RM.CAPTION_LOOK['caption-entrance'][1];
+
 const TITLE_LAYER = [
   { id: 'front', flag: '"layer": "front"  or  "titleLayer": "front"', label: 'the whole title sits in front of the person (default)' },
   { id: 'behind', flag: '"layer": "behind"  or  "titleLayer": "behind"', label: 'the hero word goes behind the head; partner words stay in front. Slam still lands low and rises.' },
@@ -99,16 +126,25 @@ export function loadMenu() {
 
   const titleEntrances = R.ENTRANCES.map(id => ({
     kind: 'entrance', id, section: 'title-entrances',
-    flag: `"entrance": "${id}"  on a mode 7 title`,
-    label: 'kinetic title entrance (each used at most once per video)',
+    flag: `"entrance": "${id}"  on a mode 7 title  or  Reel.md reel-titles  | entrance ${id} |`,
+    label: ENTRANCE_ABOUT[id] || 'kinetic title entrance',
   }));
 
+  const captionEntrances = CAPTION_ENTRANCES.map(id => ({
+    kind: 'captionEntrance', id, section: 'caption-entrances',
+    flag: `--caption-entrance ${id}  or  "captionEntrance": "${id}"`,
+    label: CAPTION_ENTRANCE_ABOUT[id] || 'caption entrance',
+  }));
+
+  const about = trans.about || {};
   const transitions = Object.keys(trans.names || {}).map(id => {
     const mode = trans.names[id];
+    const tech = mode == null ? (id === 'glitch' ? 'hard cut with the glitch seam (default)' : 'hard cut, no seam') : XFX.label(mode);
     return {
       kind: 'transition', id, section: 'transitions',
       flag: `"transition": "${id}"`,
-      label: mode == null ? (id === 'glitch' ? 'hard cut with the glitch seam (default)' : 'hard cut, no seam') : XFX.label(mode),
+      label: about[id] ? (mode == null ? about[id] : `${about[id]} (${tech})`) : tech,
+      engine: tech,
     };
   });
 
@@ -172,6 +208,7 @@ export function loadMenu() {
     { id: 'fonts', title: 'Font pairings', hint: 'Two faces as a lockup. Your own licensed fonts go in kit/fonts/local/.', items: fontPairings },
     { id: 'themes', title: 'Themes', hint: 'Colours, default fonts, optional logo.', items: themeItems },
     { id: 'title-entrances', title: 'Title entrances', hint: 'One kinetic title per beat. Flicker only on the hook and the payoff. Default layer is in front of the person.', items: titleEntrances },
+    { id: 'caption-entrances', title: 'Caption entrances', hint: 'How kinetic hero words come in, letter by letter. One for the job (--caption-entrance, "captionEntrance", Reel.md caption-entrance) or "entrance" on a caption flip. Applies to the kinetic caption style.', items: captionEntrances },
     { id: 'title-layer', title: 'Title layer', hint: 'Front, behind the head, or auto, per title or for the job. Offer this per title. Agents and --preset auto use auto unless the preset says otherwise.', items: titleLayer },
     { id: 'transitions', title: 'Transitions', hint: 'Named cuts in cut.json. The glitch seam is the default.', items: transitions },
     { id: 'graphics', title: 'Graphics', hint: 'Original overlay graphics drawn in the theme colours and fonts, each with its own entrance and exit: captions.js flips (modes 9 to 37) or a reel-graphics block in a Reel.md. Words on them must be words you say (kit/spoken.cjs). Layer front, behind or auto: behind tucks only the top of your head over the graphic, never your face. Bring your icon or screen recording, or the kit draws a neutral placeholder. Teardown maps the first three from a reference (kit/graphics.json).', items: graphics },
@@ -296,6 +333,7 @@ export function printMenu(menu) {
     }
     lines.push('');
   }
+  lines.push('Tip: docs/effects.md shows every transition, title entrance and caption entrance animated; npm run list -- <kind> prints one part.');
   lines.push('Tip: npm run showcase  rebuilds the labelled gallery at showcase/index.html');
   return lines.join('\n');
 }
@@ -311,10 +349,63 @@ export function showcaseHas(html, ids) {
   return { missing, ok: missing.length === 0 };
 }
 
+// npm run list -- <kind>: the effects menu (docs/effects.md) as names and one-liners. A kind is one of LIST_KINDS or
+// any section id above. The preview is the looping WebP from npm run menu:render, when there is one.
+export const LIST_KINDS = {
+  transitions: ['transitions'],
+  titles: ['title-entrances'],
+  captions: ['caption-entrances', 'caption-styles'],
+  graphics: ['graphics'],
+  effects: ['effects'],
+};
+const PREVIEW_DIR = { transitions: 'transitions', 'title-entrances': 'titles', 'caption-entrances': 'caption-entrances', 'caption-styles': 'caption-styles' };
+export function listKind(kind, menu) {
+  const m = menu || loadMenu();
+  const ids = LIST_KINDS[kind] || (m.sections.some(s => s.id === kind) ? [kind] : null);
+  if (!ids) return null;
+  const sections = ids.map(id => {
+    const s = m.sections.find(x => x.id === id);
+    return { id: s.id, title: s.title, hint: s.hint, items: s.items.map(it => {
+      const rel = PREVIEW_DIR[id] ? `docs/menu/${PREVIEW_DIR[id]}/${it.id}.webp` : null;
+      return { id: it.id, flag: it.flag, label: it.label, ...(rel && existsSync(join(ROOT, rel)) ? { preview: rel } : {}) };
+    }) };
+  });
+  return { kind, doc: 'docs/effects.md', sections };
+}
+export function printList(res) {
+  const lines = [];
+  for (const s of res.sections) {
+    lines.push(`${s.title}  (${s.items.length})`);
+    for (const it of s.items) lines.push(`  ${it.id.padEnd(24)} ${it.label}`, `  ${''.padEnd(24)} ${it.flag}`);
+    lines.push('');
+  }
+  lines.push('Animated previews of each: docs/effects.md');
+  return lines.join('\n');
+}
+function opt(name) {
+  const i = process.argv.indexOf('--' + name);
+  if (i < 0) return undefined;
+  const v = process.argv[i + 1];
+  return v && !v.startsWith('--') ? v : '';
+}
+
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (isMain) {
   const menu = loadMenu();
-  if (process.argv.includes('--json')) process.stdout.write(JSON.stringify(menu, null, 2) + '\n');
+  const json = process.argv.includes('--json');
+  const kind = opt('list');
+  if (kind !== undefined) {
+    const res = kind ? listKind(kind, menu) : null;
+    if (!res) {
+      const kinds = { kinds: Object.keys(LIST_KINDS), sections: menu.sections.map(s => s.id), usage: 'npm run list -- <kind> [--json]', doc: 'docs/effects.md' };
+      if (json) process.stdout.write(JSON.stringify(kinds, null, 2) + '\n');
+      else process.stdout.write(`${kind ? `unknown kind "${kind}". ` : ''}Usage: npm run list -- <kind> [--json]\nKinds: ${kinds.kinds.join(', ')}\nOr a section: ${kinds.sections.join(', ')}\nAnimated previews: docs/effects.md\n`);
+      process.exit(kind ? 1 : 0);
+    }
+    process.stdout.write((json ? JSON.stringify(res, null, 2) : printList(res)) + '\n');
+    process.exit(0);
+  }
+  if (json) process.stdout.write(JSON.stringify(menu, null, 2) + '\n');
   else process.stdout.write(printMenu(menu) + '\n');
   const cov = coverage(menu);
   if (!cov.ok) {
