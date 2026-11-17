@@ -1,6 +1,6 @@
 ---
 name: aigent-talking-head
-description: "Turn a phone clip into a styled 9:16 talking-head reel, locally: kinetic captions, titles in front of or behind the head, 29 overlay graphics, 51 effects, beat-synced music, film finishes, presets and Reel.md recipes. Every command, flag, output and failure is listed in contract.json. Use when someone asks to make a reel from a selfie or talking-head clip, add captions and titles to a vertical video, remake the style of a reel they like, or check a finished reel before posting."
+description: "Turn a phone clip into a styled 9:16 talking-head reel, locally: kinetic captions, titles in front of or behind the head, 29 overlay graphics planned from what the presenter says, 56 transitions, 51 effects, beat-synced music, film finishes, presets, Reel.md recipes, platform exports (TikTok, Reels, Shorts, 4:5, 1:1) and an MCP server. Every command, flag, output and failure is listed in contract.json. Use when someone asks to make a reel from a selfie or talking-head clip, add captions and titles to a vertical video, remake the style of a reel they like, or check a finished reel before posting."
 ---
 
 # aigent-talking-head
@@ -27,21 +27,32 @@ Work inside a checkout (it has `kit/reel.cjs` and a `package.json` with `npm run
 - Check: `npm run chrome` prints a path, `npm run check` prints `CHECK PASS`, `npm run smoke` prints `SMOKE PASS` (several minutes, synthetic clips, no network).
 - Optional, ask first: `npm run effects:setup` (effects pass and the person mask, several hundred MB) and `npm run teardown -- <file> --install` (rea-video, about 216 MB of models).
 
-## Workflow
+## Workflow (the recommended agent flow: draft, plan, review, render, verify)
 
-1. **Offer the menu first.** Ask: a saved preset (`npm run preset`), a recipe (`examples/recipes/*.Reel.md` or their own), customize, or let you choose (`--preset auto`). Run `npm run menu` and point them at `showcase/GALLERY.md`. Suggest 2 or 3 options per category. Offer it again before the final render.
-2. **Draft.** The clip goes in `inbox/` or is passed by path.
+1. **Offer the menu first.** Ask: a saved preset (`npm run preset`), a recipe (`examples/recipes/*.Reel.md` or their own), customize, or let you choose (`--preset auto`). Run `npm run menu` and point them at `showcase/GALLERY.md`. Suggest 2 or 3 options per category. Ask which platform it is for (TikTok, Reels, Shorts, a 4:5 feed post, square). Offer the menu again before the final render.
+2. **Draft** (transcribes and stops before rendering). The clip goes in `inbox/` or is passed by path.
    ```
-   npm run reel -- --clip inbox/<file> [--preset <name> | --recipe <Reel.md>] [--bed <name>] [--finish grain] --draft
+   npm run reel -- inbox/<file> --name <job> --draft
    ```
-3. **Review.** Read `jobs/<name>/clips/clips.md` and fix `jobs/<name>/build/captions.js` (misheard words, headline titles). `npm run check -- <name>` lints the copy.
-4. **Render.**
+   Transcription uses Whisper `small.en` by default (fast on a CPU). `--model large-v3` is the most accurate and slow (a ~3 GB download the first time; a one-line notice prints before any download).
+3. **Plan.** Propose graphics from what they say:
    ```
-   npm run reel -- --rebuild --name <name>
+   npm run plan -- <job>
    ```
-5. **Optional effects pass.** Write an `fx.json` plan (header of `kit/fx.cjs`, menu in `effects/CATALOG.md`), then `npm run fx -- --name <name> --plan fx.json`.
-6. **Verify before handing over.** `npm run verify -- <name>` must print `VERIFY PASS`. Then look at `jobs/<name>/verify/contact.png` yourself.
-7. **Hand over** the path of the newest `jobs/<name>/reel-vN.mp4` (or `reel-fx-vN.mp4`). Offer to save the look: `npm run reelmd -- export <name> --out my-style.Reel.md` or `npm run preset -- --save <name> --from <name>`.
+   It reads the transcript and writes `jobs/<job>/Reel.md` with a `reel-graphics` block: a number becomes a stat callout (an odometer for big numbers) or a price tag, a counted or comma list a checklist, "step two" a step counter, a quote a quote card, "X vs Y" a versus card, a command or terminal talk a terminal session, "I'm <name>" a lower third, and the call to action at the end a CTA card or button. Each line says `why`. Every word on a proposal is a word they say (the same spoken gate the render runs), the file passes `npm run reelmd -- check`, and no two proposals share the screen.
+4. **Review with the user.** Show them the Graphics block and the transcript (`jobs/<job>/clips/clips.md`). Fix names and brands that transcription got wrong by adding an `## Aliases` section (`- aigent: agent`, `- Gwyn: Guinn`): the plan then writes the word they mean, and the spoken gate accepts the word it heard. Run `npm run plan -- <job> --fresh` to propose again (lines without `why`, the ones you or they wrote, always stay). Add or change graphics from the table below. `npm run reelmd -- check jobs/<job>/Reel.md` must print `REELMD PASS`.
+5. **Render**, with the platform's export:
+   ```
+   npm run reel -- --recipe jobs/<job>/Reel.md --clips jobs/<job>/clips --name <job> --force --export reels
+   ```
+   The layout pass keeps captions and titles off the graphics (they move the shortest way clear, never further into the face, or hide while the graphic is up) and, with `--export`, keeps everything inside the platform's safe area. Later edits to `build/captions.js` or `build/cut.json`: `npm run reel -- --rebuild --name <job>` (the export is remembered).
+6. **Optional effects pass.** Write an `fx.json` plan (header of `kit/fx.cjs`, menu in `effects/CATALOG.md`), then `npm run fx -- --name <job> --plan fx.json`.
+7. **Verify before handing over.** `npm run verify -- <job>` (and `--export <name>` for the export) must print `VERIFY PASS`. It fails on any overlap between graphics, captions and titles (measured from pixels at the middle of every graphic's window) and on anything in the platform's UI zones. Then look at `jobs/<job>/verify/contact.png` yourself.
+8. **Hand over** the path of the newest `jobs/<job>/reel-vN.mp4` (and `reel-vN-<export>.mp4`). Offer to save the look: `npm run reelmd -- export <job> --out my-style.Reel.md` or `npm run preset -- --save <name> --from <job>`.
+
+Without a plan, `npm run reel -- inbox/<file>` still makes a reel in one command (captions and titles, no graphics).
+
+**Agents with tools.** `npm run mcp` is an MCP server with the same flow as tools (menu, draft, plan, validate, render, verify), schemas generated from `contract.json`. Setup for Claude Code, Cursor and Codex: `docs/mcp.md`. Without MCP, pass `--json` to `reel`, `plan`, `verify` and `export`: the last line printed is one JSON result.
 
 ## Commands
 
@@ -49,8 +60,11 @@ Run each as `npm run <command> -- <args>` from the repo root. Full flag list wit
 
 | Command | What it does | Key args and flags |
 |---|---|---|
-| `reel` | clip to draft, then to `reel-vN.mp4` | `[videos...]`, `--clip`, `--name`, `--preset <name>\|auto`, `--recipe`, `--recipe-titles`, `--look kinetic\|oneword\|muse\|classic\|one-word`, `--style`, `--theme aigent\|neutral`, `--title-layer front\|behind\|auto`, `--caption-position top\|middle\|bottom`, `--caption-layer`, `--caption-entrance pop\|unfurl\|cascade\|orbit\|warp\|crystallize\|compute\|levitate\|undulate`, `--panel-layer`, `--fonts`, `--finish`, `--bed`, `--bed-start`, `--beat-sync`, `--no-beat-sync`, `--mask birefnet\|mediapipe`, `--no-mask`, `--no-titles`, `--no-punch`, `--sfx off`, `--draft`, `--rebuild`, `--force` |
-| `verify` | check a finished reel | `<job>`, `--file`, `--fps`, `--jobs` |
+| `reel` | clip to draft, then to `reel-vN.mp4` | `[videos...]`, `--clip`, `--clips`, `--name`, `--model small.en\|large-v3`, `--export tiktok\|reels\|shorts\|feed45\|square`, `--json`, `--preset <name>\|auto`, `--recipe`, `--recipe-titles`, `--look kinetic\|oneword\|muse\|classic\|one-word`, `--style`, `--theme aigent\|neutral`, `--title-layer front\|behind\|auto`, `--caption-position top\|middle\|bottom`, `--caption-layer`, `--caption-entrance pop\|unfurl\|cascade\|orbit\|warp\|crystallize\|compute\|levitate\|undulate`, `--panel-layer`, `--fonts`, `--finish`, `--bed`, `--bed-start`, `--beat-sync`, `--no-beat-sync`, `--mask birefnet\|mediapipe`, `--no-mask`, `--no-titles`, `--no-punch`, `--sfx off`, `--draft`, `--rebuild`, `--force` |
+| `verify` | check a finished reel: ffprobe, loudness, overlap, safe area, mask, copy | `<job>`, `--export <name>`, `--json`, `--file`, `--fps`, `--jobs` |
+| `plan` | propose graphics from what was said into a Reel.md | `<job>`, `--out`, `--base <Reel.md>`, `--max`, `--fresh`, `--dry`, `--json` |
+| `export` | re-export a finished reel for a platform | `<job>`, `--export tiktok\|reels\|shorts\|feed45\|square`, `--file`, `--json` |
+| `mcp` | MCP server on stdio (docs/mcp.md) | none |
 | `check` | lint a job's copy and plan, or self-test the repo | `[job]`, `--warn-only` |
 | `smoke` | end-to-end test on synthetic clips | `--whisper`, `--effects`, `--keep` |
 | `fx` | effects pass over a reel or any video | `--name <job>` or `<video>`, `--plan fx.json`, `--list`, `--still 1.2,6.5`, `--out`, `--captions on\|off`, `--mask`, `--allow-demo-copy`, `--pill`, `--sfx off` |
@@ -107,9 +121,32 @@ Precedence when a reel is made: flags, then the recipe, then its preset, then de
 
 Glyphs: check, star, bolt, heart, fire, play, bell, spark, plus, lock, arrow, rocket, terminal, chart, world, cpu. Every graphic takes `x`, `y` (0 to 1) and `color`.
 
-- Words on a graphic must be words the user says in its window (the fields under `spoken` in `kit/graphics.json`). On a recipe job the kit drops any that are not said, keeps only the checklist, ticker and feature rows that are, and ticks each row as it is said. Do not write words the user never says.
+- Words on a graphic must be words the user says in its window (the fields under `spoken` in `kit/graphics.json`). On a recipe job the kit drops a graphic whose `required` field is not said, leaves off any other unsaid field and keeps the graphic (a CTA keeps its button when only the sub line is not said), keeps only the checklist, ticker and feature rows that are said, and ticks each row as it is said. A near-homophone counts ("aigent" heard as "agent", "Grok" as "grock"), and so does anything in the recipe's `## Aliases`; the log names every such match. Do not write words the user never says.
+- While a graphic is up, captions and titles that would sit on it move clear (shrinking to no less than 70% if the room is short) or hide, and never move further into the face. Two graphics should not share the screen: give them separate times (`npm run plan` does). `npm run verify` fails on any overlap.
 - `cues` (words the user says, `;` between, or seconds into the graphic) time the beats of a data chart, terminal session, feature cards, CTA button, flash cards, keyword caption or screen card pointer: each lands when its word is said. A cue that is never said is spread between its neighbours.
 - `layer front|behind|auto` on modes 11 to 37. Behind puts the graphic under the top of the head only (hair and crown), never the face or chin. Auto is behind for a screen card, and for the others behind only when the graphic sits high in the frame (y below 0.45). It needs the person mask (`npm run effects:setup`).
+
+## Transitions
+
+56 named cuts for `cut.json` segments (`"transition": "<name>"`, optional `"transitionDur"`) or a recipe shot (`| transition <name>`); the glitch seam is the default and right most of the time. The list is `kit/transitions.json`.
+
+- Stock ffmpeg xfade: cut, crossfade, dissolve, fade-fast, fade-slow, film, dip, dip-black, flash, dip-white, whip, whip-left, whip-right, push-left, push-right, swipe-up, swipe-down, cover-left, cover-right, cover-up, reveal-left, reveal-right, wipe, wipe-left, wipe-right, wipe-up, wipe-down, luma-wipe, soft-wipe, iris, iris-open, iris-close, circle-crop, doorway, barn-door, zoom, zoom-through, pixelate, blur, blur-cross, radial, clock, squeeze, slice, blinds, wind, warp, diagonal, distance.
+- Drawn (xfade expressions written for the kit in `kit/xfx.cjs`, in the theme accent): `slats`, `checkerboard`, `light-leak`, `zoom-blur`, `news-ribbon`, `breaking-news`.
+- The outgoing shot holds its last frame for the blend, so caption times never move. One or two named transitions per reel reads better than one on every cut.
+
+## Exports
+
+`--export <name>` on `reel` (or `npm run export -- <job> --export <name>` for a finished reel) writes `reel-vN-<name>.mp4` beside the reel. Presets are in `kit/exports.json`:
+
+| Name | Frame | Length cap | Safe area (top, bottom, left, right px) |
+|---|---|---|---|
+| `tiktok` | 1080x1920 | 600 s | 160, 440, 60, 140 |
+| `reels` | 1080x1920 | 180 s | 220, 420, 60, 120 |
+| `shorts` | 1080x1920 | 180 s | 160, 380, 60, 140 |
+| `feed45` | 1080x1350 (4:5 crop) | 140 s | 60, 120, 60, 60 |
+| `square` | 1080x1080 (1:1 crop) | 140 s | 50, 90, 50, 50 |
+
+Render with `--export` (not just `npm run export`) so the layout pass moves titles, captions and graphics inside the safe area. `npm run verify -- <job> --export <name>` checks the size, the length cap and the safe area, and shades the UI zones red on the stills.
 
 ## Inputs
 
@@ -121,10 +158,13 @@ Glyphs: check, star, bolt, heart, fire, play, bell, spark, plus, lock, arrow, ro
 - `jobs/<name>/clips/`: `clips.json` and `clips.md` (best take per sentence, retakes flagged).
 - `jobs/<name>/build/`: `cut.json`, `captions.js`, `theme.js` and overlay frames. These are the source of truth after a draft: edit them, then `--rebuild`.
 - `jobs/<name>/reel-vN.mp4` and `reel-fx-vN.mp4`: numbered, earlier versions kept.
-- `jobs/<name>/verify/`: stills, `contact.png`, `report.md`.
+- `jobs/<name>/reel-vN-<export>.mp4` with `--export`.
+- `jobs/<name>/Reel.md` from `npm run plan`.
+- `jobs/<name>/build/layout.json`: what the layout pass moved, hid or placed in the safe area. `build/boxes.json`: the boxes verify measured.
+- `jobs/<name>/verify/`: stills (including the middle of every graphic's window), `contact.png`, `report.md`.
 - `teardown/<name>/`: `Reel.md`, `teardown.md`, `contact.jpg`.
 
-Success lines to look for: `CHECK PASS`, `SMOKE PASS`, `VERIFY PASS`, `REELMD PASS`, `CONTRACT PASS`, `READY` (effects:setup), `Reel: <path>`.
+Success lines to look for: `CHECK PASS`, `SMOKE PASS`, `VERIFY PASS`, `REELMD PASS`, `PLAN OK`, `CONTRACT PASS`, `READY` (effects:setup), `Reel: <path>`. With `--json` the last line is a JSON result with `ok`.
 
 ## Failure modes
 
@@ -138,6 +178,11 @@ Success lines to look for: `CHECK PASS`, `SMOKE PASS`, `VERIFY PASS`, `REELMD PA
 | `Effects are not set up yet` | ask, then `npm run effects:setup` |
 | `Fix the plan first` (fx) | put the user's own copy in `fx.json`; never ship upstream demo text |
 | `VERIFY FAIL` | fix what it lists and render again; don't explain it away |
+| `VERIFY FAIL ... overlaps` | two graphics at once: move one in the Reel.md; a caption on a graphic: render again (the layout pass runs on every render) |
+| `VERIFY FAIL ... UI zone` | render with `--export <name>` so the layout keeps clear of that platform's UI |
+| `No transcript in <job>` (plan) | draft first: `npm run reel -- <clip> --name <job> --draft` |
+| `WARNING: ... person mask is not set up` | behind or auto layers stay in front; ask, then `npm run effects:setup` |
+| `spoken match: ... sounds alike` | check the word, and add it under `## Aliases` if it is right |
 | `CHECK` copy errors | rewrite the line: no em dashes, no "not X but Y", no hype words |
 | teardown says rea-video not found | it falls back to the built-in analyzer; offer `--install` |
 
