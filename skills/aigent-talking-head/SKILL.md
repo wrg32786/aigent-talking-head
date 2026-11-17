@@ -1,6 +1,6 @@
 ---
 name: aigent-talking-head
-description: "Turn a phone clip into a styled 9:16 talking-head reel, locally: kinetic captions, titles in front of or behind the head, 51 effects, beat-synced music, film finishes, presets and Reel.md recipes. Every command, flag, output and failure is listed in contract.json. Use when someone asks to make a reel from a selfie or talking-head clip, add captions and titles to a vertical video, remake the style of a reel they like, or check a finished reel before posting."
+description: "Turn a phone clip into a styled 9:16 talking-head reel, locally: kinetic captions, titles in front of or behind the head, 15 overlay graphics, 51 effects, beat-synced music, film finishes, presets and Reel.md recipes. Every command, flag, output and failure is listed in contract.json. Use when someone asks to make a reel from a selfie or talking-head clip, add captions and titles to a vertical video, remake the style of a reel they like, or check a finished reel before posting."
 ---
 
 # aigent-talking-head
@@ -68,6 +68,33 @@ Run each as `npm run <command> -- <args>` from the repo root. Full flag list wit
 Maintainer commands (`showcase`, `effects:update`, `effects:check`, `effects:catalog`, `fonts:examples`) are in the contract too.
 
 Precedence when a reel is made: flags, then the recipe, then its preset, then defaults.
+
+## Graphics
+
+15 overlay graphics, each with its own entrance and exit, drawn in the theme's colours and fonts. Add them as lines in a Reel.md `reel-graphics` block (`#01 2-5 | type stat-callout | text 10,000+ | sub readers`) or as `captions.js` flips with the mode. Fields and defaults: `kit/graphics.json` and the `graphics` section of `contract.json`. Offer them with the rest of the menu (`npm run menu`, `showcase/sheets/graphics.jpg`).
+
+| Type | Mode | What it is | Main fields |
+|---|---|---|---|
+| `ordinal-sticker` | 9 | list number over a starburst | `text`, `layer front\|behind` |
+| `app-label` | 10 | icon tile and label | `text`, `icon` |
+| `screen-card` | 11 | your screenshot or screen recording in a card | `src` or `source`, `border` |
+| `lower-third` | 12 | name tag | `text`, `sub` |
+| `stat-callout` | 13 | big number that counts up, with a label | `text`, `sub` |
+| `checklist` | 14 | rows that tick as you say them | `text`, `items a; b; c` |
+| `quote-card` | 15 | a quote in italic serif with attribution | `text`, `sub` |
+| `highlight` | 16 | hand-drawn circle, arrow, underline or box | `shape`, `x`, `y`, `w`, `h`, `text` |
+| `step-counter` | 17 | STEP 2 OF 5 with a progress bar | `step`, `of` |
+| `versus` | 18 | two halves and a VS badge | `left`, `right` |
+| `icon-badge` | 19 | round badge with a built-in glyph or your icon | `glyph`, `icon`, `text` |
+| `sticker-pop` | 20 | a cluster of reaction stickers | `glyph a;b`, `count` |
+| `price-tag` | 21 | swinging tag, old price struck through | `text`, `sub` |
+| `cta-card` | 22 | end card with a pulsing follow button | `text`, `sub` (handle) |
+| `code-card` | 23 | code typing itself on in an editor card | `text` (`\n` for a new line) |
+
+Glyphs: check, star, bolt, heart, fire, play, bell, spark, plus, lock. Every graphic takes `x`, `y` (0 to 1) and `color`.
+
+- Words on a graphic must be words the user says in its window (the fields under `spoken` in `kit/graphics.json`). On a recipe job the kit drops any that are not said, keeps only the checklist rows that are, and ticks each row as it is said. Do not write words the user never says.
+- `layer front|behind|auto` on modes 11 to 23. Behind puts the graphic under the top of the head only (hair and crown), never the face or chin. Auto is behind for a screen card, and for the others behind only when the graphic sits high in the frame (y below 0.45). It needs the person mask (`npm run effects:setup`).
 
 ## Inputs
 

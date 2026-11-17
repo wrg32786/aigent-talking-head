@@ -25,6 +25,30 @@
     { "name": "REA_VIDEO", "description": "path to the rea-video binary for teardown" },
     { "name": "FREESOUND_API_KEY", "description": "only for searching new sounds; nothing else needs a key" }
   ],
+  "graphics": {
+    "source": "kit/graphics.json",
+    "where": "a reel-graphics block in a Reel.md (one line per graphic: #NN start-end | type <id> | field value ...), or captions.js flips with the mode",
+    "layers": ["front", "behind", "auto"],
+    "glyphs": ["check", "star", "bolt", "heart", "fire", "play", "bell", "spark", "plus", "lock"],
+    "rules": ["fields under spoken must be words you say in the graphic's window; a recipe job drops the rest (kit/spoken.cjs)", "layer behind puts the graphic under the crown mask: only the top of your head goes over it, never your face or chin"],
+    "types": [
+      {"id": "ordinal-sticker", "mode": 9, "entrance": "burst-pop", "exit": "fade", "spoken": ["text"], "fields": ["text", "color", "ink", "layer", "x", "y", "size", "head", "head-y"], "summary": "list number sticker: an italic serif word (FIRST, SECOND, NEXT) over a spiky starburst; the burst can sit behind your head"},
+      {"id": "app-label", "mode": 10, "entrance": "tile-pop", "exit": "fade", "spoken": ["text"], "fields": ["text", "icon", "tile", "x", "y", "size"], "summary": "app or logo label: a square icon tile and a bold label with a white outline; your icon image, or a generic glyph"},
+      {"id": "screen-card", "mode": 11, "entrance": "card-rise", "exit": "fade", "spoken": [], "fields": ["src", "source", "subject", "border", "in", "w", "y", "layer"], "summary": "screen card: a rounded dark card with a coloured border, inset in the lower middle, showing your screenshot or screen recording"},
+      {"id": "lower-third", "mode": 12, "entrance": "bar-wipe", "exit": "wipe-back", "spoken": ["text", "sub"], "fields": ["text", "sub", "color", "x", "y", "layer"], "summary": "lower third name tag: an accent bar wipes up, then a plate slides out with your name and a small line under it"},
+      {"id": "stat-callout", "mode": 13, "entrance": "count-up", "exit": "shrink-fade", "spoken": ["text", "sub"], "fields": ["text", "sub", "color", "x", "y", "size", "layer"], "summary": "big number callout: the number counts up to its value in the accent colour, a label rises under it"},
+      {"id": "checklist", "mode": 14, "entrance": "tick-in", "exit": "slide-down", "spoken": ["text", "items"], "fields": ["text", "items", "at", "color", "x", "y", "w", "layer"], "summary": "checklist card: rows drop in, and each box ticks as you say its item"},
+      {"id": "quote-card", "mode": 15, "entrance": "quote-unfold", "exit": "fade-rise", "spoken": ["text", "sub"], "fields": ["text", "sub", "color", "y", "w", "layer"], "summary": "quote card: big quote marks pop, the line fades in word by word in an italic serif, with a small attribution under it"},
+      {"id": "highlight", "mode": 16, "entrance": "draw-on", "exit": "erase", "spoken": ["text"], "fields": ["shape", "text", "color", "x", "y", "w", "h", "layer"], "summary": "hand-drawn highlight: a circle, arrow, underline or box draws itself on, with an optional short label at its tail"},
+      {"id": "step-counter", "mode": 17, "entrance": "step-tick", "exit": "slide-up", "spoken": ["text"], "fields": ["step", "of", "text", "color", "x", "y", "layer"], "summary": "step counter: a pill with STEP 2 OF 5 and a segmented progress bar that fills to the current step"},
+      {"id": "versus", "mode": 18, "entrance": "split-slam", "exit": "split-out", "spoken": ["left", "right"], "fields": ["left", "right", "text", "color", "y", "layer"], "summary": "versus card: two halves slide in from the sides and a VS badge slams between them"},
+      {"id": "icon-badge", "mode": 19, "entrance": "badge-spin", "exit": "spin-out", "spoken": ["text"], "fields": ["glyph", "icon", "text", "color", "x", "y", "size", "layer"], "summary": "round icon badge: spins in while its ring draws round; a built-in glyph or your icon, with an optional label pill"},
+      {"id": "sticker-pop", "mode": 20, "entrance": "scatter-pop", "exit": "pop-out", "spoken": [], "fields": ["glyph", "count", "x", "y", "size", "layer"], "summary": "reaction stickers: a little cluster of die-cut stickers (hearts, stars, fire, sparks) pops in around a point and floats up"},
+      {"id": "price-tag", "mode": 21, "entrance": "tag-swing", "exit": "flip-up", "spoken": ["text", "sub"], "fields": ["text", "sub", "color", "ink", "x", "y", "layer"], "summary": "price tag: a tag drops in on a string and swings to rest, the price big on it and an old price struck through above"},
+      {"id": "cta-card", "mode": 22, "entrance": "cta-rise", "exit": "drop", "spoken": ["text", "sub"], "fields": ["text", "sub", "glyph", "color", "y", "w", "layer"], "summary": "call-to-action end card: a card rises with your line and handle, and a follow button pulses"},
+      {"id": "code-card", "mode": 23, "entrance": "type-on", "exit": "card-fall", "spoken": [], "fields": ["text", "title", "border", "y", "w", "layer"], "summary": "code snippet card: an editor window with line numbers, the code typing itself on in a monospace face with light syntax colour"}
+    ]
+  },
   "commands": [
     {
       "name": "reel",

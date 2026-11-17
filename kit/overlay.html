@@ -34,7 +34,7 @@ const ctx=document.getElementById('c').getContext('2d');
 const mk=()=>{const c=document.createElement('canvas');c.width=1080;c.height=1920;return c};const TC=mk(),MC=mk(),T=TC.getContext('2d'),M=MC.getContext('2d');
 const Y=CAP.captionY||1300; // caption band: chest, below the face box. Measure the face per take; text never covers the face.
 // mode 0 caption, 1 spray hero word, 2 sticker, 3 count-up, 4 takeover card, 5 logo plate, 6 CTA sticker (+ optional sub line), 7 kinetic title (see below),
-// 8 type card, 9 ordinal sticker, 10 app label, 11 screen card (graphics, kit/graphics.json)
+// 8 type card, 9 ordinal sticker, 10 app label, 11 screen card, 12 to 23 the other graphics (kit/graphics.json)
 const flips=CAP.flips.map(f=>[f.start,f.end,f.text,f.mode,f]);
 // mode 7 = kinetic title (one per beat). Seven entrances, each used once per video, resolved in time order; flicker only
 // on the first title (hook) and the last (payoff). Behind-head hero words render on their own layer
@@ -388,11 +388,11 @@ function oneWordSeq(t){if(!OWSEQ)return;const x=OWSEQ.find(x=>t>=x.s&&t<x.e);if(
 // one-word (the simple style): while a title is up it is the one word on screen, so the caption waits
 const titleUp=t=>(zoneAt(t)!=='hide'&&TITLES.some(c=>t>=c[0]&&t<c[1]))||(CPOS==='top'&&flips.some(c=>c[3]===9&&t>=c[0]+.1&&t<c[1])); // a top caption also waits for an ordinal word
 function caption(c,t){const st=c[4].style||CSTYLE;if(st==='one-word'&&OWSEQ)return;if(st==='one-word'&&titleUp(t))return;const yo=zoneAt(t)==='move'?ALTY:0;if(st==='kinetic')return kinetic(c,t);if(st==='oneword')return oneword(c,t);if(st==='pill')return pill(c,t,yo);if(st==='hormozi')return boldCap(c,t,false,yo);if(st==='karaoke')return boldCap(c,t,true,yo);if(st==='one-word')return oneWord(c,t,yo);glyphs(c[2],fit([c[2]],S,CSZ,980),540,yo||CYB,t-c[0],CCOL||IV,true)}
-// Graphics (kit/graphics.json): mode 9 ordinal sticker, 10 app label, 11 screen card. Original generic designs. Your
+// Graphics (kit/graphics.json): mode 9 ordinal sticker, 10 app label, 11 screen card, 12 to 23 below. Original generic designs. Your
 // icon or screen recording comes in through gfx.js (render.mjs writes it: image URLs, and a video as a frame list);
 // without one the kit draws a neutral glyph or placeholder window.
 const GX=window.GFX||{},GXA=GX.assets||{},GXF=GX.fonts||{},GIMG={},IMGP=[];
-for(const [fam,u,st] of [['ATH Gfx Serif',GXF.serif,'italic'],['ATH Gfx Label',GXF.label,'normal']])if(u){const ff=new FontFace(fam,`url("${u}")`,{style:st});document.fonts.add(ff);FACES.push(ff.load().catch(()=>console.warn('font failed',fam)))}
+for(const [fam,u,st] of [['ATH Gfx Serif',GXF.serif,'italic'],['ATH Gfx Label',GXF.label,'normal'],['ATH Gfx Mono',GXF.mono,'normal']])if(u){const ff=new FontFace(fam,`url("${u}")`,{style:st});document.fonts.add(ff);FACES.push(ff.load().catch(()=>console.warn('font failed',fam)))}
 const gimg=u=>{if(!u)return null;if(GIMG[u])return GIMG[u];const i=new Image();IMGP.push(new Promise(r=>{i.onload=r;i.onerror=r}));i.src=u;GIMG[u]=i;return i};
 for(const a of Object.values(GXA)){gimg(a.icon);gimg(a.src);(a.frames||[]).forEach(gimg)}
 const gxa=c=>GXA[c[3]+'@'+c[0]]||{};
@@ -431,25 +431,186 @@ function screenCard(c,t){const o=c[4],dt=t-c[0],a=gxa(c),W=(o.w??.66)*1080,pad=1
  if(ok){const iw=W-pad*2,ih=H-pad*2,k=Math.max(iw/im.naturalWidth,ih/im.naturalHeight);ctx.drawImage(im,-im.naturalWidth*k/2,-im.naturalHeight*k/2,im.naturalWidth*k,im.naturalHeight*k)}
  else placeholderUI(W-pad*2,H-pad*2,dt,Math.round(c[0]*10));
  ctx.restore();rrect(ctx,-W/2+3,-H/2+3,W-6,H-6,28);ctx.lineWidth=7;ctx.strokeStyle=o.border||CY;ctx.stroke();ctx.restore()}
+// Graphics 12 to 23 (kit/graphics.json): lower third, stat callout, checklist, quote card, highlight, step counter,
+// versus, icon badge, sticker pop, price tag, CTA card, code card. Original designs drawn in code (no third-party icons
+// or images) with the theme's accent, text, ink, muted and card colours and the pairing's display and caption faces.
+// Each has its own entrance and its own exit over the last 0.3 s. Cards follow the theme's corner radius (TH.radius;
+// the AIgent theme's cards are square).
+const GXD=GX.defaults||{},ABY=GX.autoBehindY??.45,PANMODES=new Set(GX.panelModes||[11]);
+const RAD=r=>TH.radius!=null?Math.min(+TH.radius,r):r;
+const rr=(c,x,y,w,h,r)=>rrect(c,x,y,w,h,Math.max(0,Math.min(r,Math.abs(w)/2,Math.abs(h)/2)));
+const gOut=(c,t,d=.3)=>c[1]>90?0:cl(1-(c[1]-t)/d); // 0 until the last d seconds of the graphic, then 0..1
+const gs=v=>v==null?'':String(v);
+const gd=(c,k,def)=>{const v=c[4][k];if(v!=null&&v!==''&&!isNaN(+v))return +v;const d=(GXD[c[3]]||{})[k];return d!=null?d:def};
+const MONO=s=>`400 ${s}px "ATH Gfx Mono", "DejaVu Sans Mono", Menlo, monospace`;
+const FD=s=>fnt(F,s),FS=s=>fnt(S,s),FG=s=>fnt(G,s);
+function fitFont(txt,mk,fs,max,min){ctx.font=mk(fs);while(ctx.measureText(txt).width>max&&fs>min){fs-=3;ctx.font=mk(fs)}return fs}
+function wrap(txt,mk,fs,max){ctx.font=mk(fs);const L=[];let cur='';for(const w of gs(txt).split(/\s+/).filter(Boolean)){const n=cur?cur+' '+w:w;if(ctx.measureText(n).width>max&&cur){L.push(cur);cur=w}else cur=n}if(cur)L.push(cur);return L}
+// a polyline drawn from fraction a to b of its length (draw-on and erase)
+function partial(pts,a,b){let L=0;const seg=[];for(let i=1;i<pts.length;i++){const l=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]);seg.push(l);L+=l}
+ const A=a*L,B=b*L;let s=0,on=false;ctx.beginPath();const at=(i,k)=>[pts[i-1][0]+(pts[i][0]-pts[i-1][0])*k,pts[i-1][1]+(pts[i][1]-pts[i-1][1])*k];
+ for(let i=1;i<pts.length;i++){const l=seg[i-1]||1e-6,e=s+l;if(e>=A&&s<=B){const p0=at(i,Math.max(0,(A-s)/l)),p1=at(i,Math.min(1,(B-s)/l));if(!on){ctx.moveTo(p0[0],p0[1]);on=true}ctx.lineTo(p1[0],p1[1])}s=e}}
+// built-in glyphs, drawn in a box of radius r: check, star, bolt, heart, fire, play, bell, spark, plus, lock
+const GLYPHS=['check','star','bolt','heart','fire','play','bell','spark','plus','lock'];
+function glyphPath(name,r){ctx.beginPath();const P=pts=>{pts.forEach(([x,y],i)=>i?ctx.lineTo(x*r,y*r):ctx.moveTo(x*r,y*r));ctx.closePath()};
+ if(name==='star'){for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,k=i%2?.43:1;ctx.lineTo(Math.cos(a)*k*r,Math.sin(a)*k*r)}ctx.closePath();return 'fill'}
+ if(name==='spark'){for(let i=0;i<8;i++){const a=-Math.PI/2+i*Math.PI/4,k=i%2?.24:1;ctx.lineTo(Math.cos(a)*k*r,Math.sin(a)*k*r)}ctx.closePath();return 'fill'}
+ if(name==='heart'){ctx.moveTo(0,.92*r);ctx.bezierCurveTo(-1.15*r,.08*r,-.8*r,-1*r,0,-.4*r);ctx.bezierCurveTo(.8*r,-1*r,1.15*r,.08*r,0,.92*r);ctx.closePath();return 'fill'}
+ if(name==='bolt'){P([[.18,-1],[-.62,.14],[-.06,.14],[-.22,1],[.62,-.2],[.06,-.2]]);return 'fill'}
+ if(name==='fire'){ctx.moveTo(.05*r,-1*r);ctx.bezierCurveTo(.5*r,-.5*r,.9*r,-.1*r,.72*r,.45*r);ctx.bezierCurveTo(.6*r,.82*r,.3*r,1*r,0,1*r);ctx.bezierCurveTo(-.45*r,1*r,-.8*r,.7*r,-.74*r,.3*r);ctx.bezierCurveTo(-.68*r,-.05*r,-.4*r,-.2*r,-.34*r,-.58*r);ctx.bezierCurveTo(-.12*r,-.42*r,-.02*r,-.3*r,.05*r,-1*r);ctx.closePath();return 'fill'}
+ if(name==='play'){P([[-.42,-.72],[.78,0],[-.42,.72]]);return 'fill'}
+ if(name==='plus'){P([[-.18,-.78],[.18,-.78],[.18,-.18],[.78,-.18],[.78,.18],[.18,.18],[.18,.78],[-.18,.78],[-.18,.18],[-.78,.18],[-.78,-.18],[-.18,-.18]]);return 'fill'}
+ if(name==='bell'){ctx.moveTo(-.64*r,.42*r);ctx.bezierCurveTo(-.56*r,.05*r,-.66*r,-.74*r,0,-.76*r);ctx.bezierCurveTo(.66*r,-.74*r,.56*r,.05*r,.64*r,.42*r);ctx.lineTo(.8*r,.58*r);ctx.lineTo(-.8*r,.58*r);ctx.closePath();ctx.moveTo(.2*r,.72*r);ctx.arc(0,.72*r,.2*r,0,Math.PI*2);return 'fill'}
+ if(name==='lock'){rrect(ctx,-.62*r,-.12*r,1.24*r,.98*r,.14*r);return 'lock'}
+ ctx.moveTo(-.62*r,.02*r);ctx.lineTo(-.18*r,.46*r);ctx.lineTo(.66*r,-.5*r);return 'stroke'}
+function drawGlyph(name,r,col,outline){const k=glyphPath(GLYPHS.includes(name)?name:'check',r);ctx.lineCap='round';ctx.lineJoin='round';
+ const shackle=()=>{ctx.beginPath();ctx.arc(0,-.14*r,.38*r,Math.PI,0);ctx.lineWidth=r*.2;ctx.strokeStyle=col;ctx.stroke()};
+ if(outline){ctx.save();ctx.lineWidth=r*(k==='stroke'?.62:.36);ctx.strokeStyle=outline;ctx.stroke();ctx.restore();if(k==='lock'){ctx.save();ctx.beginPath();ctx.arc(0,-.14*r,.38*r,Math.PI,0);ctx.lineWidth=r*.5;ctx.strokeStyle=outline;ctx.stroke();ctx.restore()}glyphPath(GLYPHS.includes(name)?name:'check',r)}
+ if(k==='stroke'){ctx.lineWidth=r*.3;ctx.strokeStyle=col;ctx.stroke()}else{ctx.fillStyle=col;ctx.fill();if(k==='lock')shackle()}}
+// lower third, entrance bar-wipe: the accent bar grows, the plate slides out from behind it; exit wipes back
+function lowerThird(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),x=gd(c,'x',.06)*1080,y=gd(c,'y',.76)*1920,name=gs(c[2]).toUpperCase(),sub=gs(o.sub);if(!name)return;
+ const fs=fitFont(name,FD,o.textSize||86,860,40);ctx.font=FD(fs);const nw=ctx.measureText(name).width,ss=sub?fitFont(sub,FS,42,860,26):0,sw=sub?ctx.measureText(sub).width:0;
+ const W=Math.max(nw,sw)+84,blk=fs+(sub?14+ss:0),H=blk+52,bw=16,p1=expo(cl(dt/.24)),p2=expo(cl((dt-.14)/.4)),e1=cl(ex/.6),e2=cl((ex-.45)/.55),pw=p2*(1-expo(e1));
+ ctx.save();shadow(ctx,50);const bh=H*p1*(1-e2);ctx.fillStyle=o.color||CY;ctx.fillRect(x,y-bh/2,bw,bh);ctx.shadowColor='transparent';
+ if(pw>.005){ctx.save();ctx.beginPath();ctx.rect(x+bw,y-H/2-30,W*pw+4,H+60);ctx.clip();ctx.translate(-(1-pw)*W*.4,0);rr(ctx,x+bw,y-H/2,W,H,RAD(14));ctx.fillStyle=TH.colors.cardBg;ctx.fill();
+  const top=y-blk/2;ctx.textAlign='left';ctx.textBaseline='middle';ctx.font=FD(fs);ctx.letterSpacing=(TRK*fs)+'px';ctx.fillStyle=IV;ctx.fillText(name,x+bw+40,top+fs/2+fs*.04);
+  if(sub){ctx.font=FS(ss);ctx.letterSpacing='0px';ctx.fillStyle=o.color||CY;ctx.fillText(sub,x+bw+40,top+fs+14+ss/2)}ctx.restore()}
+ ctx.restore()}
+// stat callout, entrance count-up: the number counts from zero to its value (kept to its final width), then holds; the label rises under it
+function statCallout(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),x=gd(c,'x',.5)*1080,y=gd(c,'y',.1)*1920,raw=gs(c[2]),sub=gs(o.sub).toUpperCase();if(!raw)return;
+ const m=/^(\D*?)(\d[\d,]*(?:\.\d+)?)(.*)$/.exec(raw);let shown=raw;
+ if(m){const num=+m[2].replace(/,/g,''),dec=(m[2].split('.')[1]||'').length,v=num*expo(cl(dt/.85));shown=m[1]+(m[2].includes(',')?v.toLocaleString('en-US',{minimumFractionDigits:dec,maximumFractionDigits:dec}):v.toFixed(dec))+m[3]}
+ const fs=fitFont(raw,FG,o.size||230,960,80),pop=backOut(cl(dt/.3)),s=(.6+.4*pop)*(1-.25*expo(ex));
+ ctx.save();ctx.globalAlpha*=cl(dt/.08)*(1-ex);ctx.translate(x,y);ctx.scale(s,s);ctx.font=FG(fs);ctx.letterSpacing=(TRK*fs)+'px';ctx.textAlign='center';ctx.textBaseline='middle';shadow(ctx,fs*.6);ctx.fillStyle=o.color||CY;ctx.fillText(shown,0,0);ctx.restore();
+ if(sub&&dt>.25){const e=expo(cl((dt-.25)/.35)),ss=fitFont(sub,FS,54,900,28);ctx.save();ctx.globalAlpha*=e*(1-ex);ctx.font=FS(ss);ctx.letterSpacing=(ss*.18)+'px';ctx.textAlign='center';ctx.textBaseline='middle';const lw=ctx.measureText(sub).width+ss*1.4,ly=y+fs*.56+ss*.8+(1-e)*30;shadow(ctx,ss);rr(ctx,x-lw/2,ly-ss*.85,lw,ss*1.7,RAD(ss*.85));ctx.fillStyle=TH.colors.cardBg;ctx.fill();ctx.shadowColor='transparent';ctx.fillStyle=IV;ctx.fillText(sub,x+ss*.09,ly+2);ctx.restore()}}
+// checklist, entrance tick-in: the card rises, rows drop in one after another, each box ticks at its time ("at", set
+// from when you say the item; else spread over the card); exit slides the card down
+function checklist(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),items=(Array.isArray(o.items)?o.items:gs(o.items).split(';')).map(s=>gs(s).trim()).filter(Boolean),title=gs(c[2]).toUpperCase();if(!items.length)return;
+ const W=gd(c,'w',.8)*1080,x=gd(c,'x',.5)*1080,cy=gd(c,'y',.66)*1920,rh=96,pad=44,th=title?96:0,H=pad*2+th+items.length*rh-16,col=o.color||CY,dur=c[1]>90?4:c[1]-c[0];
+ const at=items.map((_,i)=>Array.isArray(o.at)&&o.at[i]!=null?+o.at[i]:c[0]+.5+i*Math.max(.25,(dur-.9)*.7/items.length));
+ const p=expo(cl(dt/.35));ctx.save();ctx.globalAlpha*=cl(dt/.1)*(1-ex);ctx.translate(x,cy+(1-p)*60+expo(ex)*140);
+ shadow(ctx,70);rr(ctx,-W/2,-H/2,W,H,RAD(28));ctx.fillStyle=TH.colors.cardBg;ctx.fill();ctx.shadowColor='transparent';ctx.lineWidth=2;ctx.strokeStyle=TH.colors.cardStroke;ctx.stroke();
+ let yy=-H/2+pad;if(title){const fs=fitFont(title,FD,74,W-pad*2,36);ctx.font=FD(fs);ctx.letterSpacing=(TRK*fs)+'px';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillStyle=col;ctx.fillText(title,-W/2+pad,yy+38);ctx.letterSpacing='0px';yy+=th}
+ items.forEach((it,i)=>{const ri=cl((dt-.15-i*.12)/.3),e=expo(ri);if(ri<=0)return;const ry=yy+i*rh+rh/2-8,bx=-W/2+pad,bs=56,tk=cl((t-at[i])/.28);
+  ctx.save();ctx.globalAlpha*=e;ctx.translate((1-e)*-40,0);rr(ctx,bx,ry-bs/2,bs,bs,RAD(12));
+  if(tk>0){ctx.fillStyle=col;ctx.globalAlpha*=1;ctx.save();ctx.globalAlpha*=cl(tk*3);ctx.fill();ctx.restore();ctx.save();ctx.translate(bx+bs/2,ry);partial([[-.55,.02],[-.15,.42],[.6,-.45]].map(([a,b])=>[a*bs*.5,b*bs*.5]),0,expo(tk));ctx.lineWidth=8;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=DK;ctx.stroke();ctx.restore()}
+  else{ctx.lineWidth=5;ctx.strokeStyle=MU;ctx.stroke()}
+  const fs=fitFont(it,FS,52,W-pad*2-bs-30,26);ctx.font=FS(fs);ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillStyle=tk>0?IV:MU;ctx.fillText(it,bx+bs+30,ry+2);ctx.restore()});
+ ctx.restore()}
+// quote card, entrance quote-unfold: the quote mark pops, the line fades in word by word, the attribution last
+function quoteCard(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),txt=gs(c[2]);if(!txt)return;const W=gd(c,'w',.84)*1080,cy=gd(c,'y',.67)*1920,col=o.color||CY,pad=56,sub=gs(o.sub);
+ let fs=66,lines=wrap(txt,SERIF,fs,W-pad*2);while(lines.length>4&&fs>40){fs-=4;lines=wrap(txt,SERIF,fs,W-pad*2)}
+ const lh=fs*1.2,H=pad*2+78+lines.length*lh+(sub?64:0),p=expo(cl(dt/.35)),nW=txt.split(/\s+/).length,per=Math.min(.09,Math.max(.03,((c[1]>90?3:c[1]-c[0])*.45)/Math.max(1,nW)));
+ ctx.save();ctx.globalAlpha*=cl(dt/.1)*(1-ex);ctx.translate(540,cy+(1-p)*50-expo(ex)*70);
+ shadow(ctx,70);rr(ctx,-W/2,-H/2,W,H,RAD(28));ctx.fillStyle=TH.colors.cardBg;ctx.fill();ctx.shadowColor='transparent';ctx.fillStyle=col;ctx.fillRect(-W/2,-H/2,10,H*p);
+ const mp=backOut(cl((dt-.05)/.3));if(mp>0){ctx.save();ctx.translate(-W/2+pad+34,-H/2+pad+36);ctx.scale(mp,mp);ctx.font=SERIF(280);ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=col;ctx.fillText('\u201C',0,78);ctx.restore()}
+ let wi=0;ctx.font=SERIF(fs);ctx.textAlign='left';ctx.textBaseline='alphabetic';
+ lines.forEach((ln,li)=>{let xx=-W/2+pad;const yy=-H/2+pad+78+li*lh+fs*.85;for(const w of ln.split(' ')){const k=cl((dt-.2-wi*per)/.25);wi++;if(k>0){ctx.save();ctx.globalAlpha*=k;ctx.fillStyle=IV;ctx.fillText(w,xx,yy+(1-expo(k))*14);ctx.restore()}xx+=ctx.measureText(w+' ').width}});
+ if(sub){const k=cl((dt-.2-wi*per)/.3);ctx.save();ctx.globalAlpha*=k;ctx.font=FS(40);ctx.letterSpacing='5px';ctx.fillStyle=col;ctx.textBaseline='middle';ctx.fillText(sub.toUpperCase(),-W/2+pad,H/2-pad-16);ctx.restore()}
+ ctx.restore()}
+// highlight, entrance draw-on: a hand-drawn circle, arrow, underline or box draws itself on; exit erases it from the start
+function highlight(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t,.35),x=gd(c,'x',.5)*1080,y=gd(c,'y',.5)*1920,w=gd(c,'w',.5)*1080,h=gd(c,'h',.12)*1920,sh=o.shape||'circle',col=o.color||CY,q=rng(Math.round(c[0]*10)+3);
+ let pts=[],tail=null;
+ if(sh==='underline'){for(let i=0;i<=24;i++)pts.push([x-w/2+w*i/24,y+Math.sin(i/24*Math.PI*1.5)*7+(q()-.5)*3]);tail=[x,y-60]}
+ else if(sh==='box'){const j=()=>(q()-.5)*10;pts=[[x-w/2+j(),y-h/2+j()],[x+w/2+j(),y-h/2+j()],[x+w/2+j(),y+h/2+j()],[x-w/2+j(),y+h/2+j()],[x-w/2+8,y-h/2-6]];tail=[x,y-h/2-60]}
+ else if(sh==='arrow'){const tx=x-w*.6,ty=y-h*1.5,mx=(tx+x)/2+h*.5,my=(ty+y)/2-w*.12;for(let i=0;i<=30;i++){const k=i/30,a=(1-k)*(1-k),b=2*k*(1-k),d=k*k;pts.push([a*tx+b*mx+d*x,a*ty+b*my+d*y])}tail=[tx,ty-50]}
+ else{const n=64;for(let i=0;i<=n*1.08;i++){const a=-2.2+i/n*Math.PI*2,wob=1+(q()-.5)*.03+.035*Math.sin(i*.27);pts.push([x+Math.cos(a)*w/2*wob,y+Math.sin(a)*h/2*wob])}tail=[x,y-h/2-60]}
+ const f=cl(dt/.55),dr=f<.5?2*f*f:1-Math.pow(-2*f+2,2)/2,a0=expo(ex);
+ ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.shadowColor='rgba(0,0,0,.45)';ctx.shadowBlur=10;ctx.shadowOffsetY=3;ctx.strokeStyle=col;ctx.lineWidth=o.stroke||14;
+ if(dr>a0){partial(pts,a0,dr);ctx.stroke()}
+ if(sh==='arrow'){const hp=cl((dr-.85)/.15)*(1-a0);if(hp>0){const [px,py]=pts[pts.length-1],[qx,qy]=pts[pts.length-4],an=Math.atan2(py-qy,px-qx),L=62*hp;ctx.beginPath();ctx.moveTo(px+Math.cos(an+2.55)*L,py+Math.sin(an+2.55)*L);ctx.lineTo(px,py);ctx.lineTo(px+Math.cos(an-2.55)*L,py+Math.sin(an-2.55)*L);ctx.stroke()}}
+ const txt=gs(c[2]).toUpperCase();if(txt&&dt>.3){const e=expo(cl((dt-.3)/.3)),fs=fitFont(txt,FD,72,900,32);ctx.font=FD(fs);const tw=ctx.measureText(txt).width,tx=Math.min(1040-tw/2,Math.max(40+tw/2,tail[0]));ctx.globalAlpha*=e*(1-ex);ctx.textAlign='center';ctx.textBaseline='middle';shadow(ctx,fs*.6);ctx.fillStyle=col;ctx.fillText(txt,tx,tail[1]+(1-e)*20)}
+ ctx.restore()}
+// step counter, entrance step-tick: the pill drops in, the number ticks over from the step before, the bar fills to this step
+function stepCounter(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),x=gd(c,'x',.06)*1080,y=gd(c,'y',.08)*1920,n=Math.max(1,Math.min(12,Math.round(+o.of||3))),k=Math.max(1,Math.min(n,Math.round(+o.step||1))),col=o.color||CY,lab=gs(c[2]||'Step').toUpperCase();
+ const p=expo(cl(dt/.3));ctx.save();ctx.globalAlpha*=cl(dt/.1)*(1-ex);ctx.translate(0,-(1-p)*80-expo(ex)*120);
+ const fs=72,big=110;ctx.font=FD(fs);const lw=ctx.measureText(lab+' ').width,ow=ctx.measureText(' OF '+n).width;ctx.font=FD(big);const nw=ctx.measureText(String(k)).width,W=lw+nw+ow+72,H=142;
+ shadow(ctx,50);rr(ctx,x,y-H/2,W,H,RAD(H/2));ctx.fillStyle=TH.colors.cardBg;ctx.fill();ctx.shadowColor='transparent';
+ ctx.textBaseline='middle';ctx.textAlign='left';ctx.font=FD(fs);ctx.fillStyle=IV;ctx.fillText(lab+' ',x+32,y+3);
+ const tk=cl((dt-.2)/.32),e=backOut(tk);ctx.save();ctx.beginPath();ctx.rect(x+26+lw,y-H/2,nw+12,H);ctx.clip();ctx.font=FD(big);ctx.fillStyle=col;if(k>1&&tk<1)ctx.fillText(String(k-1),x+32+lw,y+4-e*H);ctx.fillText(String(k),x+32+lw,y+4+(1-Math.min(1,e))*H);ctx.restore();
+ ctx.font=FD(fs);ctx.fillStyle=MU;ctx.fillText(' OF '+n,x+32+lw+nw,y+3);
+ const bw=Math.max(W,420),gap=12,sw=(bw-gap*(n-1))/n,by=y+H/2+24;for(let i=0;i<n;i++){const fill=i<k-1?1:i===k-1?expo(cl((dt-.3)/.4)):0;rr(ctx,x+i*(sw+gap),by,sw,18,RAD(9));ctx.fillStyle='rgba(255,255,255,.28)';ctx.fill();if(fill>0){rr(ctx,x+i*(sw+gap),by,sw*fill,18,RAD(9));ctx.fillStyle=col;ctx.fill()}}
+ ctx.restore()}
+// versus, entrance split-slam: the halves slide in from either side, the VS badge slams between them; exit splits them apart
+function versus(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),cy=gd(c,'y',.66)*1920,col=o.color||CY;let L=gs(o.left),R=gs(o.right);if(!L&&!R){const sp=gs(c[2]).split(/\s+(?:vs\.?|versus)\s+/i);L=sp[0]||'';R=sp[1]||''}L=L.toUpperCase();R=R.toUpperCase();if(!L&&!R)return;
+ const W=460,H=300,gap=24,pl=expo(cl(dt/.35)),pr=expo(cl((dt-.08)/.35)),eo=expo(ex);
+ const side=(txt,cx,bg,ink,p,dir)=>{ctx.save();ctx.translate(cx+dir*((1-p)*700+eo*700),cy);ctx.rotate(dir*(1-p)*.08);shadow(ctx,60);rr(ctx,-W/2,-H/2,W,H,RAD(26));ctx.fillStyle=bg;ctx.fill();ctx.shadowColor='transparent';const lines=wrap(txt,FD,112,W-70).slice(0,3),fs=Math.min(...lines.map(l=>fitFont(l,FD,lines.length>1?92:112,W-70,36)));ctx.font=FD(fs);ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=ink;lines.forEach((l,i)=>ctx.fillText(l,0,4+(i-(lines.length-1)/2)*fs*.95));ctx.restore()};
+ ctx.save();side(L,540-W/2-gap/2,TH.colors.cardBg,IV,pl,-1);side(R,540+W/2+gap/2,col,DK,pr,1);
+ const bp=cl((dt-.32)/.3);if(bp>0){const s=(bp<1?1.9-.9*overshoot(bp,.1):1)*(1-eo);if(s>.01){ctx.save();ctx.translate(540,cy);ctx.rotate(-.12);ctx.scale(s,s);shadow(ctx,50);ctx.beginPath();ctx.arc(0,0,92,0,7);ctx.fillStyle=IV;ctx.fill();ctx.shadowColor='transparent';ctx.lineWidth=10;ctx.strokeStyle=DK;ctx.stroke();ctx.font=FD(84);ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=DK;ctx.fillText('VS',0,6);ctx.restore()}}
+ ctx.restore()}
+// icon badge, entrance badge-spin: the badge spins in from a half turn while its ring draws round; your icon or a built-in glyph
+function iconBadge(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),a=gxa(c),x=gd(c,'x',.8)*1080,y=gd(c,'y',.36)*1920,D=o.size||220,R=D/2,col=o.color||CY,p=cl(dt/.45),s=backOut(cl(dt/.35))*(1-expo(ex)),rot=(1-expo(p))*-Math.PI+expo(ex)*Math.PI;
+ if(s>.01){ctx.save();ctx.translate(x,y);ctx.rotate(rot);ctx.scale(s,s);shadow(ctx,D*.3);ctx.beginPath();ctx.arc(0,0,R,0,7);const g=ctx.createLinearGradient(-R,-R,R,R);g.addColorStop(0,shade(col,.12));g.addColorStop(1,shade(col,-.45));ctx.fillStyle=g;ctx.fill();ctx.shadowColor='transparent';
+  ctx.beginPath();ctx.arc(0,0,R*.8,0,7);ctx.fillStyle=TH.colors.cardBg;ctx.fill();ctx.beginPath();ctx.arc(0,0,R*.9,-Math.PI/2,-Math.PI/2+Math.PI*2*expo(p));ctx.lineWidth=R*.07;ctx.strokeStyle=IV;ctx.lineCap='round';ctx.stroke();
+  const im=a.icon&&GIMG[a.icon];if(im&&im.naturalWidth){ctx.save();ctx.beginPath();ctx.arc(0,0,R*.74,0,7);ctx.clip();const k=Math.max(R*1.48/im.naturalWidth,R*1.48/im.naturalHeight);ctx.drawImage(im,-im.naturalWidth*k/2,-im.naturalHeight*k/2,im.naturalWidth*k,im.naturalHeight*k);ctx.restore()}
+  else drawGlyph(o.glyph||'check',R*.42,col);ctx.restore()}
+ const txt=gs(c[2]).toUpperCase();if(txt&&dt>.3){const e=expo(cl((dt-.3)/.3)),fs=fitFont(txt,FD,50,600,26);ctx.font=FD(fs);const w=ctx.measureText(txt).width+56,h=fs+30;ctx.save();ctx.globalAlpha*=e*(1-ex);ctx.translate(Math.min(1060-w/2,Math.max(20+w/2,x)),y+R+50+(1-e)*24);shadow(ctx,30);rr(ctx,-w/2,-h/2,w,h,RAD(h/2));ctx.fillStyle=col;ctx.fill();ctx.shadowColor='transparent';ctx.fillStyle=DK;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,0,3);ctx.restore()}}
+// sticker pop, entrance scatter-pop: a cluster of die-cut stickers pops in one after another and floats up; exit pops them out
+const STKC={heart:'#ff4d6d',star:'#ffd23f',fire:'#ff7a2f',bolt:'#ffd23f',check:'#3ddc84'};
+function stickerPop(c,t){const o=c[4],dt=t-c[0],x=gd(c,'x',.78)*1080,y=gd(c,'y',.42)*1920,S0=o.size||150,n=Math.max(1,Math.min(12,Math.round(+o.count||5))),gl=gs(o.glyph||'heart;star;spark').split(';').map(s=>s.trim()).filter(Boolean),q=rng(Math.round(c[0]*10)+17),end=c[1]>90?Infinity:c[1];
+ for(let i=0;i<n;i++){const a=q()*Math.PI*2,r=40+q()*S0*1.7,sz=S0*(.62+q()*.5),rot=(q()-.5)*.8,t0=i*.09,pi=cl((dt-t0)/.28),po=cl((t-(end-.32+i*.02))/.22);if(pi<=0||po>=1)continue;
+  const s=backOut(pi)*(po<=0?1:po<.3?1+po*.5:1.15*(1-(po-.3)/.7)),gx=x+Math.cos(a)*r,gy=y+Math.sin(a)*r*.8-(dt-t0)*26,g=gl[i%gl.length];if(s<=.01)continue;
+  ctx.save();ctx.translate(gx,gy);ctx.rotate(rot+Math.sin((dt-t0)*3+i)*.06);ctx.scale(s,s);ctx.shadowColor='rgba(0,0,0,.35)';ctx.shadowBlur=14;ctx.shadowOffsetY=5;drawGlyph(g,sz/2,STKC[g]||CY,'#ffffff');ctx.restore()}}
+// price tag, entrance tag-swing: the tag drops on its string and swings to rest on the pin; exit flips it up and away
+function priceTag(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),x=gd(c,'x',.8)*1080,y=gd(c,'y',.42)*1920,col=o.color||CY,ink=o.ink||DK,txt=gs(c[2]),old=gs(o.sub);if(!txt)return;
+ const fs=fitFont(txt,FG,150,340,60);ctx.font=FG(fs);const tw=ctx.measureText(txt).width,W=Math.max(260,tw+90),H=fs*1.15+(old?70:0)+80,py=y-H/2,drop=backOut(cl(dt/.35)),eo=expo(ex);
+ const swing=.42*Math.exp(-3.2*dt)*Math.cos(dt*7.5)+Math.sin(dt*1.4)*.015;
+ ctx.save();ctx.globalAlpha*=cl(dt/.08)*(1-ex*.6);ctx.translate(0,-(1-drop)*500-eo*700);
+ ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(x,py-170);ctx.lineTo(x,py);ctx.stroke();ctx.fillStyle=IV;ctx.beginPath();ctx.arc(x,py-170,9,0,7);ctx.fill();
+ ctx.translate(x,py);ctx.rotate(swing+eo*-1.2);shadow(ctx,60);ctx.beginPath();ctx.moveTo(0,-34);ctx.lineTo(W/2,26);ctx.lineTo(W/2,H);ctx.lineTo(-W/2,H);ctx.lineTo(-W/2,26);ctx.closePath();ctx.fillStyle=col;ctx.fill();ctx.shadowColor='transparent';
+ ctx.save();ctx.globalCompositeOperation='destination-out';ctx.beginPath();ctx.arc(0,4,15,0,7);ctx.fill();ctx.restore();ctx.lineWidth=4;ctx.strokeStyle=shade(col,-.35);ctx.beginPath();ctx.arc(0,4,15,0,7);ctx.stroke();
+ const mid=26+(H-26)/2+(old?28:0);if(old){ctx.font=FS(50);ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=ink;ctx.globalAlpha*=.62;ctx.fillText(old,0,mid-fs*.5-38);const ow=ctx.measureText(old).width,sk=cl((dt-.45)/.25);ctx.lineWidth=6;ctx.strokeStyle=ink;ctx.beginPath();ctx.moveTo(-ow/2-8,mid-fs*.5-36);ctx.lineTo(-ow/2-8+(ow+16)*sk,mid-fs*.5-42);ctx.stroke();ctx.globalAlpha/=.62}
+ ctx.font=FG(fs);ctx.letterSpacing=(TRK*fs)+'px';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=ink;ctx.fillText(txt,0,mid+fs*.04);ctx.restore()}
+// CTA card, entrance cta-rise: the card rises and settles, the button pops then pulses with a ripple; exit drops it
+function ctaCard(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),W=gd(c,'w',.82)*1080,cy=gd(c,'y',.76)*1920,col=o.color||CY,txt=gs(c[2]).toUpperCase(),hd=gs(o.sub);if(!txt&&!hd)return;
+ const H=hd?290:220,pad=50,B=132,e=backOut(cl(dt/.45));ctx.save();ctx.globalAlpha*=cl(dt/.1)*(1-ex);ctx.translate(540,cy+(1-e)*240+expo(ex)*280);
+ shadow(ctx,80);rr(ctx,-W/2,-H/2,W,H,RAD(36));ctx.fillStyle=TH.colors.cardBg;ctx.fill();ctx.shadowColor='transparent';ctx.lineWidth=3;ctx.strokeStyle=TH.colors.cardStroke;ctx.stroke();
+ const tw=W-pad*2-B-30,fs=txt?fitFont(txt,FD,84,tw,36):0,hs=hd?fitFont(hd,FS,46,tw,24):0,blk=fs+(hd?16+hs:0),top=-blk/2;ctx.textAlign='left';ctx.textBaseline='middle';
+ if(txt){ctx.font=FD(fs);ctx.letterSpacing=(TRK*fs)+'px';ctx.fillStyle=IV;ctx.fillText(txt,-W/2+pad,top+fs/2+fs*.04);ctx.letterSpacing='0px'}
+ if(hd){const k=expo(cl((dt-.25)/.3));ctx.save();ctx.globalAlpha*=k;ctx.font=FS(hs);ctx.fillStyle=col;ctx.fillText(hd,-W/2+pad+(1-k)*-20,top+fs+16+hs/2);ctx.restore()}
+ const bx=W/2-pad-B/2,bp=dt<.5?backOut(cl((dt-.2)/.3)):1+.05*Math.sin((dt-.5)*7);
+ if(dt>.5){const rp=((dt-.5)%1.2)/1.2;ctx.save();ctx.globalAlpha*=(1-rp)*.7;ctx.beginPath();ctx.arc(bx,0,B/2*(1+rp*.55),0,7);ctx.lineWidth=6;ctx.strokeStyle=col;ctx.stroke();ctx.restore()}
+ if(bp>.01){ctx.save();ctx.translate(bx,0);ctx.scale(bp,bp);ctx.beginPath();ctx.arc(0,0,B/2,0,7);ctx.fillStyle=col;ctx.fill();drawGlyph(o.glyph||'plus',B*.26,DK);ctx.restore()}
+ ctx.restore()}
+// code card, entrance type-on: the editor card rises and the code types itself on (done by 60% of the span) with a
+// blinking cursor and light syntax colour; exit tips the card down and away
+function tint(s){const out=[];for(const m of s.matchAll(/(\/\/.*$|#.*$)|("[^"]*"?|'[^']*'?|`[^`]*`?)|\b(const|let|var|function|return|if|else|for|while|import|from|export|async|await|def|class|new|npx|npm|run|git|pip|true|false|null)\b|(\b\d+(?:\.\d+)?\b)|(\s+|\w+|[^\s\w])/g))
+ out.push([m[0],m[1]?MU:m[2]?'#9ece6a':m[3]?CY:m[4]?'#ff9e64':'#dfe3f0']);return out}
+function codeCard(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),W=gd(c,'w',.86)*1080,cy=gd(c,'y',.67)*1920,lines=gs(c[2]).replace(/\\n/g,'\n').split('\n').slice(0,12),fs=o.textSize||40,lh=fs*1.45,pad=34,bar=64,H=bar+pad*2+lines.length*lh,bd=o.border||CY;
+ const p=cl(dt/.4),e=expo(p),s=.92+.08*backOut(p),eo=expo(ex);ctx.save();ctx.globalAlpha*=cl(dt/.1)*(1-ex);ctx.translate(540,cy+(1-e)*150+eo*220);ctx.rotate((1-e)*.05-eo*.06);ctx.scale(s,s);
+ shadow(ctx,90);rr(ctx,-W/2,-H/2,W,H,RAD(26));ctx.fillStyle='#0f1117';ctx.fill();ctx.shadowColor='transparent';
+ ctx.save();rr(ctx,-W/2,-H/2,W,H,RAD(26));ctx.clip();ctx.fillStyle='#1b1e27';ctx.fillRect(-W/2,-H/2,W,bar);ctx.restore();
+ ['#ff6b5e','#f4c04e','#5fcf6d'].forEach((k,i)=>{ctx.fillStyle=k;ctx.beginPath();ctx.arc(-W/2+34+i*28,-H/2+bar/2,9,0,7);ctx.fill()});
+ ctx.font=MONO(28);ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillStyle=MU;ctx.fillText(gs(o.title||'main'),-W/2+140,-H/2+bar/2+1);
+ const total=lines.reduce((a,l)=>a+l.length,0),dur=c[1]>90?3:c[1]-c[0],cps=Math.max(18,total/Math.max(.5,dur*.6-.3));let left=Math.floor(Math.max(0,dt-.3)*cps),cur=null;
+ ctx.font=MONO(fs);lines.forEach((ln,i)=>{const yy=-H/2+bar+pad+lh*i+lh/2;ctx.fillStyle='#4a5060';ctx.textAlign='right';ctx.fillText(String(i+1),-W/2+pad+36,yy);ctx.textAlign='left';const n=Math.max(0,Math.min(ln.length,left));left-=ln.length;
+  let xx=-W/2+pad+66;for(const [tk,k] of tint(ln.slice(0,n))){ctx.fillStyle=k;ctx.fillText(tk,xx,yy);xx+=ctx.measureText(tk).width}if(cur===null&&(n<ln.length||i===lines.length-1))cur=[xx,yy]});
+ if(cur&&Math.floor(dt*2.5)%2===0){ctx.fillStyle=bd;ctx.fillRect(cur[0]+3,cur[1]-fs*.55,fs*.5,fs*1.1)}
+ rr(ctx,-W/2+2,-H/2+2,W-4,H-4,RAD(24));ctx.lineWidth=5;ctx.strokeStyle=bd;ctx.stroke();ctx.restore()}
+const GDRAW={11:screenCard,12:lowerThird,13:statCallout,14:checklist,15:quoteCard,16:highlight,17:stepCounter,18:versus,19:iconBadge,20:stickerPop,21:priceTag,22:ctaCard,23:codeCard};
+const drawG=(c,t)=>{const f=GDRAW[c[3]];if(f)f(c,t)};
 // a behind ordinal burst needs the titles layer even in a job without kinetic titles
 // screen cards and b-roll panels (mode 11) sit behind the top of the presenter's head: layer front|behind|auto per panel, or
 // panelLayer for the job (default auto = behind; where the head never reaches the panel it looks the same as front).
+// Graphics 12 to 23 take the same layer: auto is behind when the graphic sits high in the frame (y below autoBehindY,
+// kit/graphics.json), where the top of the head can reach it, and front lower down.
 // Behind panels draw on their own layer, ovlp/, which assemble.cjs puts over the picture, then the top of the head (the
 // person mask above the eyes, kit/headmask.py) on top: hair over the panel, the face and body always under it.
-const PANB=c=>{const l=['front','behind','auto'].includes(c[4].layer)?c[4].layer:['front','behind','auto'].includes(CAP.panelLayer)?CAP.panelLayer:'auto';return l!=='front'};
-window.__panels=()=>flips.some(c=>c[3]===11&&PANB(c));
+const PANM=m=>PANMODES.has(m);
+const PANB=c=>{const l=['front','behind','auto'].includes(c[4].layer)?c[4].layer:['front','behind','auto'].includes(CAP.panelLayer)?CAP.panelLayer:'auto';if(l!=='auto')return l==='behind';if(c[3]===11)return true;return gd(c,'y',1)<ABY};
+window.__panels=()=>flips.some(c=>PANM(c[3])&&PANB(c));
 window.__layered=()=>TITLES.length>0||flips.some(c=>c[3]===9&&c[4].layer==='behind')||(CAPBEH&&flips.some(c=>c[3]===0))||window.__panels();
-window.__graphics=()=>flips.filter(c=>c[3]>=9&&c[3]<=11).map(c=>{const a=gxa(c);return{start:c[0],end:c[1],mode:c[3],text:c[2]||'',layer:c[3]===11?(PANB(c)?'behind':'front'):(c[4].layer||'front'),asset:a.frames?'video':(a.src||a.icon)?'image':'placeholder',loaded:[a.icon,a.src,...(a.frames||[]).slice(0,1)].filter(Boolean).every(u=>GIMG[u]&&GIMG[u].naturalWidth>0)}});
+window.__graphics=()=>flips.filter(c=>c[3]===9||c[3]===10||PANM(c[3])).map(c=>{const a=gxa(c);return{start:c[0],end:c[1],mode:c[3],text:c[2]||'',layer:PANM(c[3])?(PANB(c)?'behind':'front'):(c[4].layer||'front'),asset:a.frames?'video':(a.src||a.icon)?'image':c[3]>=12?'drawn':'placeholder',loaded:[a.icon,a.src,...(a.frames||[]).slice(0,1)].filter(Boolean).every(u=>GIMG[u]&&GIMG[u].naturalWidth>0)}});
 let LAYER='all';
-function flip(t){for(const c of flips){if(t<c[0]||t>=c[1])continue;if(LAYER==='panels'&&!(c[3]===11&&PANB(c)))continue;use(c.ps);const dt=t-c[0],m=c[3],out=c[1]>90?1:cl((c[1]-t)/.05);ctx.save();ctx.globalAlpha=out;
+function flip(t){for(const c of flips){if(t<c[0]||t>=c[1])continue;if(LAYER==='panels'&&!(PANM(c[3])&&PANB(c)))continue;use(c.ps);const dt=t-c[0],m=c[3],out=c[1]>90?1:cl((c[1]-t)/.05);ctx.save();ctx.globalAlpha=out;
 if(m===9){const beh=c[4].layer==='behind';if(LAYER==='titles'){if(beh)ordBurst(c,t)}else{if(!(beh&&LAYER==='front'))ordBurst(c,t);ordWord(c,t)}}
 else if(m===7){if(zoneAt(t)!=='hide'){const lay=c.layer||'front';if(LAYER==='titles'){if(lay==='behind')title(c,t,'hero')}else if(LAYER==='front'){title(c,t,lay==='behind'?'partner':'all')}else title(c,t,'all')}}
-else if(m===11&&PANB(c)){if(LAYER==='panels'||LAYER==='all')screenCard(c,t)}
+else if(PANM(m)&&PANB(c)){if(LAYER==='panels'||LAYER==='all')drawG(c,t)}
 else if(m===0&&CAPBEH){if(LAYER!=='front')caption(c,t)}
 else if(LAYER==='titles'){}
 else if(m===8)typeCard(c);
 else if(m===10)appLabel(c,t);
-else if(m===11)screenCard(c,t);
+else if(PANM(m))drawG(c,t);
 else if(m===0)caption(c,t);
 else if(m===1)spray(c[2],fit([c[2]],G,200,960),540,Y,dt,31*(Math.round(c[0]*10)+3));
 else if(m===2)sticker(c[2],fit([c[2]],F,150,860),540,Y,dt,Math.round(c[0]*10)+1,F);
@@ -462,7 +623,7 @@ if(LAYER!=='panels'&&(CAPBEH?LAYER!=='front':LAYER!=='titles'))oneWordSeq(t)}
 function burst(dt,seed){if(dt<-.1||dt>.42)return;const r=rng(seed),p=(dt+.1)/.52,a=Math.sin(Math.PI*cl(p));ctx.save();ctx.translate(540,Y);ctx.lineCap='round';for(let i=0;i<54;i++){const ang=r()*6.283,sp=.6+r()*.9,len=120+r()*520,st=120+p*sp*1150;ctx.strokeStyle=i%3?CY:IV;ctx.globalAlpha=a*(.35+r()*.6);ctx.lineWidth=2+r()*7;ctx.beginPath();ctx.moveTo(Math.cos(ang)*st,Math.sin(ang)*st);ctx.lineTo(Math.cos(ang)*(st+len),Math.sin(ang)*(st+len));ctx.stroke()}ctx.restore()}
 function glitch(t){glitchAt.forEach((h,i)=>{const dt=t-h;if(dt<-.05||dt>.2)return;const r=rng(Math.floor(t*24)*97+i*13+5),a=1-Math.max(0,dt)/.2;ctx.save();for(let k=0;k<16;k++){const y=r()*1920,hh=4+r()*r()*90;ctx.globalAlpha=a*(.12+r()*.5);ctx.fillStyle=k%3===0?CY:IV;ctx.fillRect(r()*200-100,y,r()>.4?1300:200+r()*700,hh)}ctx.fillStyle=IV;for(let k=0;k<2600;k++){ctx.globalAlpha=a*r()*.55;ctx.fillRect(r()*1080,r()*1920,2+r()*3,2)}ctx.restore()})}
 // layer: 'all' (default), 'front' (captions, plus front titles and partner words), 'titles' (behind-head hero words only)
-// or 'panels' (screen cards behind the head)
+// or 'panels' (screen cards and graphics 12 to 23 behind the top of the head)
 window.seek=(t,layer)=>{LAYER=layer||'all';ctx.clearRect(0,0,1080,1920);flip(t);if(LAYER==='titles'||LAYER==='panels')return;(CAP.bursts||[]).forEach((h,i)=>burst(t-h,7919*(i+3)));glitch(t)};
 window.__titles=TITLES.map(c=>({start:c[0],end:c[1],text:c[2],entrance:c.entr,flicker:c.flick,layer:c.layer||'front'}));
 // Fonts: optional web-font stylesheet from the theme, then wait for every face we draw with, then the logo.

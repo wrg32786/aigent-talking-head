@@ -23,8 +23,10 @@ Stills use an AI-generated fictional presenter (Apache-2.0 with the repo). Rebui
 
 ## Graphics
 
-| --- | --- | --- |
-| ![ordinal-sticker](media/graphic/ordinal-sticker.jpg)<br>`ordinal-sticker` | ![app-label](media/graphic/app-label.jpg)<br>`app-label` | ![screen-card](media/graphic/screen-card.jpg)<br>`screen-card` |
+| --- | --- | --- | --- | --- |
+| ![ordinal-sticker](media/graphic/ordinal-sticker.jpg)<br>`ordinal-sticker` | ![app-label](media/graphic/app-label.jpg)<br>`app-label` | ![screen-card](media/graphic/screen-card.jpg)<br>`screen-card` | ![lower-third](media/graphic/lower-third.jpg)<br>`lower-third` | ![stat-callout](media/graphic/stat-callout.jpg)<br>`stat-callout` |
+| ![checklist](media/graphic/checklist.jpg)<br>`checklist` | ![quote-card](media/graphic/quote-card.jpg)<br>`quote-card` | ![highlight](media/graphic/highlight.jpg)<br>`highlight` | ![step-counter](media/graphic/step-counter.jpg)<br>`step-counter` | ![versus](media/graphic/versus.jpg)<br>`versus` |
+| ![icon-badge](media/graphic/icon-badge.jpg)<br>`icon-badge` | ![sticker-pop](media/graphic/sticker-pop.jpg)<br>`sticker-pop` | ![price-tag](media/graphic/price-tag.jpg)<br>`price-tag` | ![cta-card](media/graphic/cta-card.jpg)<br>`cta-card` | ![code-card](media/graphic/code-card.jpg)<br>`code-card` |
 
 ## Film finishes
 

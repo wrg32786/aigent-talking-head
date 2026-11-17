@@ -140,22 +140,34 @@ Every section is optional except the card. Anything left out falls back to the p
 #01 2.5-3.5 | type ordinal-sticker | text FIRST | layer behind | color #f2e8a0
 #02 2.8-4 | type app-label | text My App | icon my-icon.png
 #03 4-9 | type screen-card | src my-screen.mp4 | border #d87b5b
+#04 9.5-12 | type lower-third | text Will Gwyn | sub writes The AIgent
+#05 12-15 | type checklist | text Ship it | items Record; Caption; Post
+#06 15-17 | type stat-callout | text 10,000+ | sub readers
+#07 17-19 | type versus | left Manual | right Agent
+#08 19-21 | type highlight | shape arrow | text this part | x 0.62 | y 0.62
+#09 21-24 | type cta-card | text Follow for more | sub @theaigent
 ```
 
 | Key | Values | Maps to |
 |---|---|---|
-| type | `ordinal-sticker` (mode 9, entrance burst-pop), `app-label` (mode 10, tile-pop), `screen-card` (mode 11, card-rise) | the flip's `mode` |
-| text | the ordinal word or the label | the flip's `text` |
-| layer | `front` or `behind` (ordinal sticker: the burst goes behind your head, with the person mask). Screen card: `front`, `behind` or `auto` (default auto, which is behind): the top of your head (hair and crown) goes over the card where it reaches into it; your face and body stay under the card | `layer` |
-| color, ink | burst colour and word colour (ordinal sticker) | `color`, `ink` |
-| icon, tile | an image for the app tile (relative to the Reel.md), or leave it out for a generic glyph on a `tile` colour | `icon`, `tile` |
+| type | `ordinal-sticker` (mode 9, entrance burst-pop), `app-label` (mode 10, tile-pop), `screen-card` (mode 11, card-rise), `lower-third` (12, bar-wipe), `stat-callout` (13, count-up), `checklist` (14, tick-in), `quote-card` (15, quote-unfold), `highlight` (16, draw-on), `step-counter` (17, step-tick), `versus` (18, split-slam), `icon-badge` (19, badge-spin), `sticker-pop` (20, scatter-pop), `price-tag` (21, tag-swing), `cta-card` (22, cta-rise), `code-card` (23, type-on) | the flip's `mode` |
+| text | the ordinal word, the label, the name, the number, the quote, the price, the line, or the code (`\n` for a new line; a code card keeps `/` as written, elsewhere ` / ` reads as a space) | the flip's `text` |
+| sub | the small second line: lower third, stat label, quote attribution, old price (struck through), CTA handle | `sub` |
+| items, at | checklist rows separated by `;`, and optional tick times in reel seconds (a recipe job sets them from when you say each row) | `items`, `at` |
+| left, right | the two halves of a versus card (or `text A vs B`) | `left`, `right` |
+| shape | highlight: `circle`, `arrow`, `underline` or `box` (the arrow's tip sits at x, y) | `shape` |
+| glyph | icon badge, sticker pop, CTA button: `check`, `star`, `bolt`, `heart`, `fire`, `play`, `bell`, `spark`, `plus`, `lock` (sticker pop takes several: `heart;star`) | `glyph` |
+| step, of, count, h, title | step counter: this step and how many; sticker pop: how many stickers; highlight: height (0 to 1); code card: the tab name | the same keys |
+| layer | `front` or `behind` (ordinal sticker: the burst goes behind your head, with the person mask). Screen card and modes 12 to 23: `front`, `behind` or `auto`. Behind: the top of your head (hair and crown) goes over the graphic where it reaches into it; your face and body stay under it. Auto is behind for a screen card, and for the others behind when the graphic sits high in the frame (y below 0.45), else front | `layer` |
+| color, ink | the graphic's colour (default the theme accent): the burst, bar, number, ticks, strokes, tag or button; ink is the word colour on an ordinal sticker or a price tag | `color`, `ink` |
+| icon, tile | an image for the app tile or the icon badge (relative to the Reel.md), or leave it out for a generic glyph on a `tile` colour | `icon`, `tile` |
 | src, border, in | an image or a video for the screen card (relative to the Reel.md), its border colour, and seconds into the video | `src`, `border`, `in` |
 | x, y, w, size | position (0 to 1), card width (0 to 1), burst radius or tile side in pixels | the same keys |
 | head, head-y | ordinal sticker: burst width in head widths, and its centre below the head centre in head widths. The remake measures your head with the person mask and sets size and y from them | `size`, `y` |
 | source | screen card: a public page (`https://github.com/owner/repo`, a site, a tool's docs) or a file. A page is captured by `npm run capture -- --recipe <Reel.md>` (or `npm run reel -- --capture-sources`) to a screenshot and a short scrolling recording, cached in `assets/web/` (gitignored) | `src` |
 | subject~, source~ | written by a teardown: what the reference showed in that card, and a web address read in it. Guesses, never captured until you write `source` | not used by the render |
 
-With no `icon`, `src` or captured `source` the graphic is drawn as a neutral placeholder (a letter glyph, a fake code window), so a teardown never copies someone else's screenshots or logos. Graphics outside your clip's length are dropped.
+With no `icon`, `src` or captured `source` the graphic is drawn as a neutral placeholder (a letter glyph, a fake code window), so a teardown never copies someone else's screenshots or logos. Modes 12 to 23 are drawn in code in the theme's colours and fonts (the AIgent theme keeps their cards square), and each has its own exit over its last 0.3 s. Graphics outside your clip's length are dropped. A teardown detects the first three; you add the rest.
 
 **Script** (fenced `reel-script`, optional): `#NN start-end | say <words>`. Written by teardowns so you can see the reference's timing. Your remake uses your own words.
 
@@ -167,7 +179,7 @@ With no `icon`, `src` or captured `source` the graphic is drawn as a neutral pla
 - Shot lines apply in order to the segments drafted from your clip: shot 1 to segment 1, and so on. Extra shots are ignored; extra segments keep the defaults.
 - Caption position and colour apply to your captions; graphics apply at their times (those past the end of your clip are dropped).
 - Titles apply their entrance and layer, in order, to the titles drafted from your words. Add `--recipe-titles` to use the recipe's title text and times instead; a recipe title is kept only if you say its words around its time, otherwise it is dropped.
-- On-screen words come from what you say, never from the reference (`kit/spoken.cjs`). Ordinal stickers show the ordinals you say ("second" gives a SECOND sticker as you say it), styled like the recipe's stickers in turn; recipe stickers with no ordinal said are dropped. App labels stay only if you name the app, and move to when you say it. A last check drops any title, sticker or label whose text you do not say in its window, and the log lists what was dropped and why. Screen cards keep the recipe's times (your file, a confirmed source, or a placeholder).
+- On-screen words come from what you say, never from the reference (`kit/spoken.cjs`). Ordinal stickers show the ordinals you say ("second" gives a SECOND sticker as you say it), styled like the recipe's stickers in turn; recipe stickers with no ordinal said are dropped. App labels stay only if you name the app, and move to when you say it. A last check drops any title, sticker or label whose text you do not say in its window, and the log lists what was dropped and why. The same check covers the worded fields of modes 12 to 23 (`spoken` in `kit/graphics.json`): a lower third, stat, quote, price, versus or CTA card whose words you do not say is dropped; a checklist keeps the rows you say and ticks each as you say it. Numbers count when said as words ("ten thousand" for 10,000) and a handle counts when said as words run together ("the aigent" for @theaigent). A code card is your code and a sticker pop has no words, so neither is checked. Screen cards keep the recipe's times (your file, a confirmed source, or a placeholder).
 - App labels stay up at least 1.2 s, and the name's reveal always finishes, so the full name shows.
 - When every shot names a `src`, `npm run reelmd -- compile` writes a complete `cut.json` you can drop into `jobs/<name>/build/` and render with `--rebuild`.
 

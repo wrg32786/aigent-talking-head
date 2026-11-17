@@ -317,7 +317,55 @@ try {
       try { run(node, [join(KIT, 'capture.mjs'), u], work); fail('capture accepted ' + u); } catch (e) { if (!/only public pages|only http/.test(String(e.stderr || ''))) throw e; }
     }
     const GX = JSON.parse(readFileSync(join(KIT, 'graphics.json'), 'utf8')).graphics;
-    if (GX.map(x => x.mode).join(',') !== '9,10,11' || GX.some(x => !x.entrance || !x.detect)) fail('kit/graphics.json: modes, entrance and detect rule for each graphic');
+    if (GX.map(x => x.mode).join(',') !== '9,10,11,12,13,14,15,16,17,18,19,20,21,22,23' || GX.some(x => !x.entrance || !x.exit || !x.detect || !Array.isArray(x.spoken) || !x.example)) fail('kit/graphics.json: modes, entrance, exit, spoken fields, example and detect rule for each graphic');
+  });
+  step('graphics 12 to 23: each draws with an entrance and an exit, auto layer by height, behind only on the panel layer, words you say, Reel.md round trip', () => {
+    const GX = JSON.parse(readFileSync(join(KIT, 'graphics.json'), 'utf8')).graphics.filter(g => g.mode >= 12);
+    const d = join(work, 'gfx2'); mkdirSync(d, { recursive: true });
+    const flips = GX.map((g, i) => ({ ...g.example, start: i * 3, end: i * 3 + 3 }));
+    flips.push({ start: GX.length * 3, end: GX.length * 3 + 3, mode: 13, text: '3x', sub: 'faster', layer: 'front' }, { start: GX.length * 3 + 3, end: GX.length * 3 + 6, mode: 12, text: 'Up top', y: 0.1 });
+    const times = flips.flatMap(f => [f.start + 0.02, f.start + 1.5, f.end - 0.02]);
+    writeFileSync(join(d, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'one-word', fonts: 'theme', flips }) + ';\n');
+    run(node, [join(KIT, 'render.mjs'), '0', times.map(t => t.toFixed(2)).join(',')], d, { THEME: 'aigent', FONTS: 'theme', STILLS_LAYERS: '1' });
+    const at = (dir, t) => { const f = join(d, dir, `t${t.toFixed(2)}.png`); return existsSync(f) ? ink(f) : { n: 0 }; };
+    flips.forEach((f, i) => {
+      const id = (GX.find(g => g.mode === f.mode) || {}).id + '@' + f.start, want = R.panelLayer(f, {});
+      const mid = { front: at('stills-front', f.start + 1.5), panels: at('stills-panels', f.start + 1.5) }, tot = x => x.front.n + x.panels.n;
+      if (tot(mid) < 2000) fail(`${id}: nothing drawn (${tot(mid)} px)`);
+      if (want === 'behind' ? (!mid.panels.n || mid.front.n) : (!mid.front.n || mid.panels.n)) fail(`${id}: should be on the ${want === 'behind' ? 'panel' : 'front'} layer only ${JSON.stringify(mid)}`);
+      const a = at(want === 'behind' ? 'stills-panels' : 'stills-front', f.start + 0.02), z = at(want === 'behind' ? 'stills-panels' : 'stills-front', f.end - 0.02);
+      if (!(a.n < tot(mid) * 0.7)) fail(`${id}: no entrance (${a.n} px at the start vs ${tot(mid)})`);
+      if (!(z.n < tot(mid) * 0.7)) fail(`${id}: no exit (${z.n} px at the end vs ${tot(mid)})`);
+    });
+    const byMode = m => flips.find(f => f.mode === m);
+    if (R.panelLayer(byMode(13), {}) !== 'behind' || R.panelLayer(byMode(12), {}) !== 'front' || R.panelLayer(flips[flips.length - 1], {}) !== 'behind' || R.panelLayer(byMode(13), { panelLayer: 'front' }) !== 'front') fail('auto layer: high graphics behind, low ones in front, the job panelLayer wins over auto');
+    if (JSON.parse(readFileSync(join(d, 'layers.json'), 'utf8')).panels !== 'behind') fail('layers.json should report the panel layer');
+    const rep = JSON.parse(readFileSync(join(d, 'graphics.json'), 'utf8'));
+    if (rep.length !== flips.length || rep.some(x => x.asset !== 'drawn')) fail('graphics report: ' + JSON.stringify(rep.map(x => [x.mode, x.asset])));
+    // the overlay's glyphs are the ones the Reel.md check accepts
+    const RM = createRequire(import.meta.url)('./reelmd.cjs');
+    const og = (readFileSync(join(KIT, 'overlay.html'), 'utf8').match(/const GLYPHS=\[([^\]]*)\]/) || [])[1];
+    if (!og || og.replace(/'/g, '') !== RM.GLYPHS.join(',')) fail('overlay GLYPHS != reelmd GLYPHS: ' + og);
+    // words: a checklist keeps the rows you say and ticks each as you say it; numbers and handles count when said aloud
+    const W = (s, t0 = 0) => s.split(' ').map((w, i) => ({ start: t0 + i * 0.3, end: t0 + i * 0.3 + 0.28, word: w }));
+    const words = W('we hit ten thousand readers so follow the aigent first record then caption then post it costs $49 down from ninety nine');
+    const au = SP.audit([
+      { mode: 13, start: 0, end: 3, text: '10,000+', sub: 'readers' }, { mode: 22, start: 2, end: 5, text: 'Follow', sub: '@theaigent' },
+      { mode: 14, start: 2.5, end: 7, items: ['Record', 'Caption', 'Post', 'Edit'] }, { mode: 21, start: 6, end: 9, text: '$49', sub: '$99' },
+      { mode: 18, start: 0, end: 3, text: 'Manual vs Agent' }, { mode: 15, start: 0, end: 3, text: 'never said here' }, { mode: 23, start: 0, end: 2, text: 'npm run x' }, { mode: 20, start: 0, end: 2 }], words);
+    const kept = au.flips.map(f => f.mode).join(',');
+    if (kept !== '13,22,14,21,23,20') fail('audit kept ' + kept + ' ' + JSON.stringify(au.dropped.map(x => x.why)));
+    const cl = au.flips.find(f => f.mode === 14);
+    if (cl.items.join(',') !== 'Record,Caption,Post' || !cl.at || cl.at.some((t, i) => Math.abs(t - words.find(w => w.word.toLowerCase() === cl.items[i].toLowerCase()).start) > 0.01)) fail('checklist rows and tick times: ' + JSON.stringify(cl));
+    // Reel.md: every new type parses, validates and round-trips; a bad shape or glyph fails the check
+    const caps = { flips: [{ start: 1, end: 3, mode: 14, text: 'Ship it', items: ['Record', 'Caption'], at: [1.5, 2] }, { start: 3, end: 5, mode: 23, text: 'npx a/b\\n  run' },
+      { start: 5, end: 7, mode: 18, left: 'Manual', right: 'Agent', layer: 'behind' }, { start: 7, end: 9, mode: 16, shape: 'arrow', text: 'here', x: 0.6, y: 0.6 },
+      { start: 9, end: 11, mode: 17, step: 2, of: 5 }, { start: 11, end: 13, mode: 19, glyph: 'bolt', text: 'fast' }, { start: 13, end: 15, mode: 20, glyph: 'heart;star', count: 4 }] };
+    const md = RM.exportJob({ segs: [{ file: 'a.mp4', in: 0, out: 15 }] }, caps, { name: 'smoke-gfx2' }), rr = RM.parse(md, join(d, 'x.Reel.md'));
+    if (RM.validate(rr).errs.length) fail('new graphics Reel.md invalid: ' + RM.validate(rr).errs.join('; '));
+    const sig = fl => JSON.stringify(fl.map(f => Object.keys(f).sort().map(k => [k, f[k]])));
+    if (sig(RM.graphicFlips(rr)) !== sig(caps.flips)) fail('graphics round trip:\n' + sig(RM.graphicFlips(rr)) + '\n' + sig(caps.flips));
+    if (!RM.validate(RM.parse(md.replace('shape arrow', 'shape blob'), 'bad.md')).errs.length || !RM.validate(RM.parse(md.replace('glyph bolt', 'glyph logo'), 'bad.md')).errs.length) fail('a bad shape or glyph should fail the check');
   });
   step('teardown mapping: stray caption words left out of titles, room light is not a finish, graphics mapped', () => {
     const V = createRequire(import.meta.url)('./videomd2reel.cjs');

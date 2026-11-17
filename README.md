@@ -26,9 +26,13 @@ Prefer to run it by hand? See [Install](#install) and [Quick start](#quick-start
 
 ## Graphics
 
-Ordinal sticker, app label and screen card, each with its own entrance. Bring your icon or screen recording, or the kit draws a neutral placeholder (shown).
+15 overlay graphics, each with its own entrance and exit, drawn in your theme's colours and fonts: ordinal sticker, app label, screen card, lower third, stat callout, checklist, quote card, highlight (circle, arrow, underline or box), step counter, versus card, icon badge, sticker pop, price tag, CTA end card and code card. Bring your icon or screen recording where a graphic takes one, or the kit draws a neutral placeholder.
 
-![Graphics: ordinal sticker, app label, screen card](showcase/sheets/graphics.jpg)
+![The 12 newest graphics in motion: lower third, stat callout, checklist, quote card, highlight, step counter, versus, icon badge, sticker pop, price tag, CTA card, code card](showcase/loops/graphics.gif)
+
+![All 15 graphics](showcase/sheets/graphics.jpg)
+
+Add one as a line in a Reel.md (`#06 15-17 | type stat-callout | text 10,000+ | sub readers`) or a `captions.js` flip. The words on a graphic have to be words you say: on a recipe job the kit drops any you don't, and a checklist ticks each row as you say it. Set `layer behind` and only the top of your head (hair and crown) goes over the graphic, never your face. Every type, field and default is in [docs/reel-md.md](docs/reel-md.md) and [kit/graphics.json](kit/graphics.json).
 
 ## Film finishes
 
@@ -44,7 +48,7 @@ Titles sit in front by default. Set a title behind the head, or use auto for the
 
 ## Captions and type
 
-Top captions tuck behind your hair where they meet it (`--caption-layer front|behind|auto`, auto by default). Screen cards and b-roll panels go behind only the top of your head, never your face (`--panel-layer`). Details in [docs/reel-md.md](docs/reel-md.md).
+Top captions tuck behind your hair where they meet it (`--caption-layer front|behind|auto`, auto by default). Screen cards, b-roll panels and graphics placed high in the frame go behind only the top of your head, never your face (`--panel-layer`). Details in [docs/reel-md.md](docs/reel-md.md).
 
 ![Caption styles](showcase/sheets/captions.jpg)
 

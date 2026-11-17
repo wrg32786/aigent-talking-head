@@ -2,11 +2,15 @@
 // A recipe (a teardown of someone else's reel) carries their words: titles, ordinal stickers ("FIRST"), app labels.
 // On your clip those words are only kept when you say them: an ordinal sticker shows the ordinal you speak, at the
 // moment you speak it; an app label stays only if you name the app; recipe title text (--recipe-titles) only if you
-// say it in that window. Anything else is dropped, never shown.
+// say it in that window. Anything else is dropped, never shown. The other text graphics (kit/graphics.json, modes 12 to
+// 23) list their worded fields under "spoken": each must be said in the graphic's window; a checklist keeps only the
+// rows you say and ticks each one as you say it.
 'use strict';
 const fs = require('fs'), path = require('path');
 
-const norm = s => String(s || '').toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+// digits keep their thousands commas and decimal points together (10,000 is one token, 49.99 is one token); 10k is 10000
+const norm = s => String(s || '').toLowerCase().replace(/[’']/g, '').replace(/(\d),(?=\d{3}\b)/g, '$1').replace(/(\d)\.(?=\d)/g, '$1p')
+  .replace(/\b(\d+)k\b/g, (_, n) => String(+n * 1000)).replace(/\b(\d+)m\b/g, (_, n) => String(+n * 1000000)).replace(/[^a-z0-9]+/g, ' ').trim();
 const tokens = s => norm(s).split(' ').filter(Boolean);
 const ORD = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10,
   '1st': 1, '2nd': 2, '3rd': 3, '4th': 4, '5th': 5, '6th': 6, '7th': 7, '8th': 8, '9th': 9, '10th': 10 };
@@ -33,10 +37,36 @@ function timeline(segs, build) {
   return out;
 }
 
+// spoken numbers as digits: "ten thousand" -> 10000, "forty nine" -> 49 (Whisper writes most numbers as digits already)
+const NUM = { zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+  thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40,
+  fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+const SCALE = { hundred: 100, thousand: 1000, million: 1e6, billion: 1e9 };
+function numberTokens(toks) {
+  const out = []; let cur = null, tot = 0;
+  const flush = () => { if (cur !== null) out.push(String(tot + cur)); cur = null; tot = 0; };
+  for (const t of toks) {
+    if (t in NUM) cur = (cur || 0) + NUM[t];
+    else if (t in SCALE && (cur !== null || tot)) { if (SCALE[t] === 100) cur = (cur || 1) * 100; else { tot += (cur || 1) * SCALE[t]; cur = 0; } }
+    else if (t === 'and' && cur !== null) continue;
+    else flush();
+  }
+  flush();
+  return out;
+}
+// the words said between start - pad and end + pad, as a token set: each word, spoken numbers as digits, and runs of two
+// or three words joined ("the aigent" also counts as theaigent, for a handle)
+function heard(words, start, end, pad) {
+  const toks = words.filter(w => w.end >= start - pad && w.start <= end + pad).flatMap(w => tokens(w.word));
+  const set = new Set(toks);
+  numberTokens(toks).forEach(n => set.add(n));
+  for (let i = 0; i < toks.length; i++) { if (toks[i + 1]) set.add(toks[i] + toks[i + 1]); if (toks[i + 2]) set.add(toks[i] + toks[i + 1] + toks[i + 2]); }
+  return set;
+}
 // is every word of text said between start - pad and end + pad (in order not required)?
 function said(text, words, start, end, pad = 1.5) {
   const want = tokens(text); if (!want.length) return true;
-  const near = new Set(words.filter(w => w.end >= start - pad && w.start <= end + pad).flatMap(w => tokens(w.word)));
+  const near = heard(words, start, end, pad);
   return want.every(t => near.has(t));
 }
 // first time all of text is said (its first word's start), the one nearest `near`, or null
@@ -78,16 +108,44 @@ function fitGraphics(gfx, words, len, opts = {}) {
   return { gfx: out.sort((a, b) => a.start - b.start), dropped };
 }
 
-// Last check over a job's flips: titles (7), ordinal stickers (9) and app labels (10) whose text you do not say in
-// their window are dropped. Returns { flips, dropped }.
+// the worded fields of each graphic (kit/graphics.json "spoken"), by mode
+const SPOKEN = (() => { try { return Object.fromEntries(JSON.parse(fs.readFileSync(path.join(__dirname, 'graphics.json'), 'utf8')).graphics.filter(g => g.mode >= 12).map(g => [g.mode, g.spoken || []])); } catch { return {}; } })();
+const itemsOf = f => (Array.isArray(f.items) ? f.items : String(f.items || '').split(';')).map(s => String(s).trim()).filter(Boolean);
+// versus: left and right, or "A vs B" in text
+const sides = f => { if (f.left || f.right) return [f.left, f.right]; const sp = String(f.text || '').split(/\s+(?:vs\.?|versus)\s+/i); return sp.length > 1 ? sp : [f.text]; };
+
+// Last check over a job's flips: titles (7), ordinal stickers (9), app labels (10) and the worded fields of graphics 12
+// to 23 whose words you do not say in their window are dropped. A checklist keeps the rows you say, ticking each as
+// you say it ("at"), and is dropped when you say none. Returns { flips, dropped }.
 function audit(flips, words, pad = 1.5) {
-  const dropped = [];
-  const keep = (flips || []).filter(f => {
-    if (![7, 9, 10].includes(f.mode) || !f.text) return true;
-    if (said(f.text, words, f.start, f.end, pad)) return true;
-    dropped.push({ g: f, why: `"${f.text}" at ${f.start}s is not in what you say there` }); return false;
-  });
-  return { flips: keep, dropped };
+  const dropped = [], out = [];
+  for (const f of flips || []) {
+    if ([7, 9, 10].includes(f.mode)) {
+      if (!f.text || said(f.text, words, f.start, f.end, pad)) out.push(f);
+      else dropped.push({ g: f, why: `"${f.text}" at ${f.start}s is not in what you say there` });
+      continue;
+    }
+    const keys = SPOKEN[f.mode];
+    if (!keys || !keys.length) { out.push(f); continue; }
+    let g = f, bad = null;
+    if (keys.includes('items')) {
+      const its = itemsOf(f), win = words.filter(w => w.end >= f.start - pad && w.start <= f.end + pad), kept = [], at = [];
+      for (const it of its) {
+        if (!said(it, words, f.start, f.end, pad)) { dropped.push({ g: f, why: `checklist row "${it}" at ${f.start}s is not in what you say there` }); continue; }
+        const w = whenSaid(it, win, f.start);
+        kept.push(it); at.push(w ? +Math.min(Math.max(w.start, f.start + 0.3), f.end - 0.2).toFixed(3) : null);
+      }
+      if (!kept.length) bad = `checklist at ${f.start}s: you say none of its rows`;
+      else g = { ...f, items: kept, ...(at.every(a => a != null) ? { at } : {}) };
+    }
+    for (const k of keys.filter(k => k !== 'items')) {
+      if (bad) break;
+      const vals = k === 'left' || k === 'right' ? (k === 'left' ? [sides(f)[0]] : [sides(f)[1]]) : [f[k]];
+      for (const v of vals) if (v && !said(v, words, f.start, f.end, pad)) { bad = `"${v}" at ${f.start}s is not in what you say there`; break; }
+    }
+    if (bad) dropped.push({ g: f, why: bad }); else out.push(g);
+  }
+  return { flips: out, dropped };
 }
 
-module.exports = { norm, tokens, timeline, said, whenSaid, ordinalsSaid, fitGraphics, audit, ORD };
+module.exports = { norm, tokens, timeline, said, heard, numberTokens, whenSaid, ordinalsSaid, fitGraphics, audit, ORD, SPOKEN };

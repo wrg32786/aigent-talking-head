@@ -261,8 +261,8 @@ if (!flag('rebuild')) {
         const len = segs.reduce((a, sg) => a + (sg.out - sg.in), 0), sp = S.fitGraphics(gfx, S.timeline(segs, build), len);
         for (const d of sp.dropped) console.log('recipe graphic dropped: ' + d.why);
         const fit = sp.gfx.filter(g => g.start < len - 0.3).map(g => ({ ...g, end: +Math.min(g.end, len).toFixed(3) }));
-        caps.flips = (caps.flips || []).filter(f => !(f.mode >= 9 && f.mode <= 11)).concat(fit);
-        // a sticker behind the head, or a screen card behind the head (the default), needs the person mask, even with no titles
+        caps.flips = (caps.flips || []).filter(f => !Object.values(RM.GRAPHICS).includes(f.mode)).concat(fit);
+        // a sticker behind the head, or a screen card or graphic behind the top of the head, needs the person mask, even with no titles
         if ((fit.some(g => g.mode === 9 && g.layer === 'behind') || R.panelsBehind(caps).length) && !cut.titles) Object.assign(cut, flag('no-mask') ? { titles: 'ovlt/%04d.png' } : { titles: 'ovlt/%04d.png', mask: 'mask.mkv', ...(opt('mask') ? { maskModel: opt('mask') } : {}) });
         fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
         for (const g of fit.filter(g => g.spoken)) console.log(`recipe graphic: ${g.mode === 9 ? 'ordinal sticker' : 'app label'} "${g.text}" at ${g.start}s (you say "${g.spoken}")`);
@@ -272,11 +272,13 @@ if (!flag('rebuild')) {
       fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
     }
   }
-  // last check on a recipe job: every title, ordinal sticker and app label shows only words you say around its time
+  // last check on a recipe job: every title, ordinal sticker, app label and worded graphic (kit/graphics.json "spoken")
+  // shows only words you say around its time; a checklist keeps the rows you say and ticks each as you say it
   if (recipe) {
     const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), au = S.audit(caps.flips, S.timeline(segs, build));
     if (au.dropped.length) { caps.flips = au.flips; fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); for (const d of au.dropped) console.log('dropped, not said: ' + d.why); }
-    else console.log('on-screen words: every title, sticker and label is something you say');
+    else console.log('on-screen words: every title, sticker, label and graphic is something you say');
+    if (au.flips.some(f => f.mode === 14 && f.at)) { caps.flips = au.flips; fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); }
   }
   // --broll <folder>: cutaways from your own clips. A phrase that isn't a type card or under a title cuts to the next
   // clip in the folder (every third phrase, 0.8 to 2.2 s), the voice running on; see "inserts" in kit/assemble.cjs.
