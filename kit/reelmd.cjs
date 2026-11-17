@@ -124,6 +124,8 @@ function parse(text, file = 'Reel.md') {
   const body = text.slice(text.indexOf('\n', end + 1) + 1);
   const S = sections(body);
   const brand = bullets(S['brand-kit'] || S.brand), music = bullets(S.music), style = bullets(S.style);
+  // ## Aliases: "- aigent: agent, a gent" = these heard words count as saying aigent (kit/spoken.cjs)
+  const aliases = Object.fromEntries(Object.entries(bullets(S.aliases)).map(([k, v]) => [k, list(v)]).filter(([, v]) => v.length));
   const shotLines = fenced(body, SHOTS_BLOCK) || [];
   const titleLines = fenced(body, TITLES_BLOCK) || [];
   const scriptLines = fenced(body, SCRIPT_BLOCK) || [];
@@ -133,7 +135,7 @@ function parse(text, file = 'Reel.md') {
   const script = scriptLines.map(l => parseLine(l, file + ' script'));
   const graphics = graphicLines.map(l => parseLine(l, file + ' graphics'));
   const title = (body.match(/^#\s+(.+)$/m) || [])[1];
-  return { file, card, title, brand, music, style, shots, titles, script, graphics, notes: (S._intro || '').replace(/^#\s+.+$/m, '').trim() };
+  return { file, card, title, brand, music, style, aliases, shots, titles, script, graphics, notes: (S._intro || '').replace(/^#\s+.+$/m, '').trim() };
 }
 
 function validate(r) {
@@ -143,7 +145,9 @@ function validate(r) {
   if (c.videomd !== undefined && c.videomd !== 1) errs.push('card: videomd must be 1');
   if (c.name && !/^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$/.test(c.name)) errs.push('card: name must be lowercase letters, digits and hyphens');
   if (c.source && c.source.duration == null) errs.push('card: source.duration is required');
-  if (c.shots != null && c.shots !== r.shots.length) errs.push(`card says ${c.shots} shots, the Shots block has ${r.shots.length}`);
+  // the Shots block is optional: with none, every segment drafted from your clip keeps the defaults
+  if (c.shots != null && r.shots.length && c.shots !== r.shots.length) errs.push(`card says ${c.shots} shots, the Shots block has ${r.shots.length}`);
+  if (c.shots && !r.shots.length) warn.push(`card says ${c.shots} shots and there is no Shots block (optional): every segment keeps the default finish, punch and transition`);
   if (c['x-reel'] === undefined) warn.push('card: no "x-reel: 1" (this reads as a plain VIDEO.md card)');
   r.shots.forEach((s, i) => { if (s.n !== i + 1) errs.push(`shots: #${pad2(s.n)} out of order (expected #${pad2(i + 1)})`); });
   r.titles.forEach((t, i) => {
@@ -409,7 +413,8 @@ function summary(r) {
     `style: look ${p.look || 'kinetic'}, captions ${p.captionStyle || 'kinetic'}, title layer ${p.titleLayer || 'front'}, finish ${p.finishPool ? 'vary across shots: ' + p.finishPool.join('/') : p.finish || 'none'}, transition ${p.transition || 'glitch'}`,
     ...(p.captionPosition || p.captionColor || p.captionOutline ? [`captions at ${p.captionPosition || 'the default band'}${p.captionColor ? ', colour ' + p.captionColor : ''}${p.captionOutline ? ', outline ' + p.captionOutline : ''}${p.captionShadow ? ', shadow ' + p.captionShadow : ''}${p.captionCase ? ', case ' + p.captionCase : ''}`] : []),
     ...r.titles.map(t => `  title #${pad2(t.n)} ${t.start}-${t.end}s ${t.entrance || 'any entrance'}, ${t.layer || 'job layer'}: ${t.text || ''}`),
-    ...(r.graphics || []).map(g => `  graphic #${pad2(g.n)} ${g.start}-${g.end}s ${g.type || g['type~']}${(g.text || g['text~']) ? ': ' + (g.text || g['text~']) : ''}${g.icon || g.src ? ' (your file)' : g.source ? (SRC.isUrl(g.source) && !SRC.cached(g.source).image && !SRC.cached(g.source).video ? ' (source ' + g.source + ', not captured yet)' : ' (source ' + g.source + ')') : g['source~'] ? ' (suggested source ' + g['source~'] + ', confirm it)' : ' (placeholder)'}`)].join('\n');
+    ...(r.graphics || []).map(g => `  graphic #${pad2(g.n)} ${g.start}-${g.end}s ${g.type || g['type~']}${(g.text || g['text~']) ? ': ' + (g.text || g['text~']) : ''}${g.icon || g.src ? ' (your file)' : g.source ? (SRC.isUrl(g.source) && !SRC.cached(g.source).image && !SRC.cached(g.source).video ? ' (source ' + g.source + ', not captured yet)' : ' (source ' + g.source + ')') : g['source~'] ? ' (suggested source ' + g['source~'] + ', confirm it)' : GRAPHICS[g.type || g['type~']] === 11 ? ' (drawn frame; add src for your screen)' : ' (drawn)'}`),
+    ...(Object.keys(r.aliases || {}).length ? [`aliases: ${Object.entries(r.aliases).map(([w, h]) => w + ' = ' + h.join(' / ')).join('; ')}`] : [])].join('\n');
 }
 
 module.exports = { parse, load, validate, compile, toPreset, shotSettings, titleFlips, graphicFlips, GRAPHICS, CAPTION_POSITIONS, CAPTION_LOOK, exportJob, toPackage, summary, parseYaml, dumpYaml, parseLine, ENTRANCES, LAYERS, GLYPHS };

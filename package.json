@@ -30,7 +30,10 @@
     "reelmd": "node kit/reelmd.cjs",
     "teardown": "node kit/teardown.mjs",
     "capture": "node kit/capture.mjs",
-    "contract": "node kit/contract.mjs"
+    "contract": "node kit/contract.mjs",
+    "plan": "node kit/plan.cjs",
+    "export": "node kit/export.mjs",
+    "mcp": "node kit/mcp.mjs"
   },
   "dependencies": {
     "playwright-core": "^1.47.0"

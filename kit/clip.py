@@ -1,6 +1,7 @@
 # clip.py: turn raw talking-head footage into clean, transcribed clips that drop into cut.json.
 #
-#   python3 kit/clip.py raw.mp4 [--out clips] [--model large-v3] [--vertical] [--cropx 0.5] [--min 3.0]
+#   python3 kit/clip.py raw.mp4 [--out clips] [--model small.en] [--vertical] [--cropx 0.5] [--min 3.0]
+#   (default small.en: fast on a CPU, ~460 MB once. --model large-v3 is the most accurate and slow, a ~3 GB download once)
 #   python3 kit/clip.py take1.mov take2.mov take3.mov --out clips --vertical [--hook take3.mov]   (several takes)
 #
 # What it does
@@ -30,7 +31,7 @@ import sys, os, json, re, subprocess, argparse
 ap = argparse.ArgumentParser()
 ap.add_argument("src", nargs="+")
 ap.add_argument("--out", default="clips")
-ap.add_argument("--model", default=os.environ.get("TX_MODEL", "large-v3"))
+ap.add_argument("--model", default=os.environ.get("TX_MODEL", "small.en"))
 ap.add_argument("--words", default=None, help="reuse word times (tx.py words.json) instead of running Whisper")
 ap.add_argument("--hook", default=None, help="take to use for the first sentence when it has one")
 ap.add_argument("--vertical", action="store_true")
@@ -48,6 +49,22 @@ def run(cmd):
 # 1. words, per take
 model = None
 given = json.load(open(a.words, encoding="utf-8")) if a.words else None
+# one clear line before a model download (faster-whisper caches models under the Hugging Face hub folder)
+SIZES = {"tiny": "75 MB", "base": "145 MB", "small": "460 MB", "medium": "1.5 GB", "large": "3 GB", "distil": "1.5 GB", "turbo": "1.6 GB"}
+def notice_download(name):
+    if os.path.isdir(name):
+        return
+    hub = os.environ.get("HF_HUB_CACHE") or os.path.join(os.environ.get("HF_HOME") or os.path.join(os.path.expanduser("~"), ".cache", "huggingface"), "hub")
+    try:
+        cached = any(name.replace(".", "") in d.lower().replace(".", "") and "whisper" in d.lower() for d in os.listdir(hub))
+    except OSError:
+        cached = False
+    if cached:
+        return
+    size = next((v for k, v in SIZES.items() if name.startswith(k)), "a few hundred MB")
+    tip = " For a fast first run use --model small.en." if name.startswith(("large", "medium", "distil", "turbo")) else ""
+    print(f"Downloading the Whisper model {name} (about {size}) once; later runs reuse it.{tip}", flush=True)
+
 def words_of(src):
     global model
     if given is not None:
@@ -55,6 +72,7 @@ def words_of(src):
         return [{"s": w[0], "e": w[1], "w": str(w[2]).strip(), "p": (w[3] if len(w) > 3 else 0.9)} for w in ws if str(w[2]).strip()]
     if model is None:
         from faster_whisper import WhisperModel
+        notice_download(a.model)
         model = WhisperModel(a.model, device="cpu", compute_type="int8")
     segs, _ = model.transcribe(src, language="en", word_timestamps=True, vad_filter=False, condition_on_previous_text=False)
     return [{"s": w.start, "e": w.end, "w": w.word.strip(), "p": float(getattr(w, "probability", 0.9) or 0.9)} for g in segs for w in g.words if w.word.strip()]

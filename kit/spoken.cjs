@@ -8,6 +8,13 @@
 // Cues: any graphic can carry "cues" (words or seconds, separated by ;). Each word cue becomes the time you say it in
 // the graphic's window, a number is seconds into the graphic; the times land in "at", which the graphic uses for its
 // beats (a checklist tick, a chart bar, a terminal line, a feature card, a cursor click). Narration drives the motion.
+// Near-homophones: transcription often writes a brand or name as a common word ("aigent" heard as "agent", "Grok" as
+// "grock"). A wanted word also counts as said when (a) the recipe's aliases list it (setAliases, from a Reel.md
+// "## Aliases" section: "- aigent: agent, a gent"), or (b) it sounds the same: same consonant skeleton, or one or two
+// letters apart on a long word. Numbers never match fuzzily. Every fuzzy match is reported (fuzzyLog) so the log
+// says which heard word stood in for which.
+// A graphic whose optional field you do not say keeps its required fields (kit/graphics.json "required", default the
+// first "spoken" field): a CTA keeps its button when only the sub line is not said; only the failing field is dropped.
 'use strict';
 const fs = require('fs'), path = require('path');
 
@@ -15,6 +22,44 @@ const fs = require('fs'), path = require('path');
 const norm = s => String(s || '').toLowerCase().replace(/[’']/g, '').replace(/(\d),(?=\d{3}\b)/g, '$1').replace(/(\d)\.(?=\d)/g, '$1p')
   .replace(/\b(\d+)k\b/g, (_, n) => String(+n * 1000)).replace(/\b(\d+)m\b/g, (_, n) => String(+n * 1000000)).replace(/[^a-z0-9]+/g, ' ').trim();
 const tokens = s => norm(s).split(' ').filter(Boolean);
+
+// ---- near-homophones and aliases ----
+let ALIAS = new Map(); // wanted token -> Set of heard tokens (one word, or several run together)
+function setAliases(list) {
+  ALIAS = new Map();
+  const add = (want, heardAs) => { const w = tokens(want).join(''), h = tokens(heardAs).join(''); if (!w || !h || w === h) return; if (!ALIAS.has(w)) ALIAS.set(w, new Set()); ALIAS.get(w).add(h); };
+  if (Array.isArray(list)) for (const a of list) { if (a && a.want) for (const h of [].concat(a.heard || [])) add(a.want, h); }
+  else if (list && typeof list === 'object') for (const [w, hs] of Object.entries(list)) for (const h of [].concat(hs).flatMap(x => String(x).split(/[,|]/))) add(w, h.trim());
+  return ALIAS;
+}
+// a consonant skeleton: aigent and agent are both "agnt", grok and grock "grk"
+const phon = w => { let s = String(w).toLowerCase().replace(/ph/g, 'f').replace(/ck/g, 'k').replace(/q/g, 'k').replace(/x/g, 'ks').replace(/z/g, 's').replace(/c(?=[eiy])/g, 's').replace(/c/g, 'k').replace(/gh/g, 'g');
+  const first = /^[aeiouy]/.test(s) ? 'a' : s[0]; return (first + s.slice(1).replace(/[aeiouyhw]/g, '')).replace(/(.)\1+/g, '$1'); };
+function lev(a, b) { const m = a.length, n = b.length; if (Math.abs(m - n) > 2) return 9; let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) { const cur = [i]; for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = cur; } return prev[n]; }
+// does heard token h stand for wanted token w? 'exact' | 'alias' | 'sounds' | null
+function matchKind(w, h) {
+  if (w === h) return 'exact';
+  const al = ALIAS.get(w); if (al && al.has(h)) return 'alias';
+  if (/\d/.test(w) || /\d/.test(h) || w.length < 4 || h.length < 4) return null;
+  // a four-letter word only matches a one-letter-longer spelling that sounds the same (grok, grock), never post and past
+  if (w.length === 4) return Math.abs(h.length - 4) === 1 && phon(w) === phon(h) ? 'sounds' : null;
+  if (Math.abs(w.length - h.length) > 2) return null;
+  if (phon(w) === phon(h) && phon(w).length >= 3) return 'sounds';
+  const d = lev(w, h); if (d <= (Math.max(w.length, h.length) >= 9 ? 2 : w.length >= 6 ? 1 : 0)) return 'sounds';
+  return null;
+}
+const FUZZY = []; // [{ want, heard, how }] since the last fuzzyLog(true)
+function fuzzyLog(clear) { const out = FUZZY.slice(); if (clear) FUZZY.length = 0; return out; }
+// is wanted token w in the heard set (exactly, by alias, or sounding the same)?
+function inHeard(set, w) {
+  if (set.has(w)) return true;
+  let best = null;
+  for (const h of set) { const k = matchKind(w, h); if (k === 'alias') { best = { h, k }; break; } if (k === 'sounds' && !best) best = { h, k }; }
+  if (!best) return false;
+  if (!FUZZY.some(f => f.want === w && f.heard === best.h)) FUZZY.push({ want: w, heard: best.h, how: best.k === 'alias' ? 'alias' : 'sounds alike' });
+  return true;
+}
 const ORD = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10,
   '1st': 1, '2nd': 2, '3rd': 3, '4th': 4, '5th': 5, '6th': 6, '7th': 7, '8th': 8, '9th': 9, '10th': 10 };
 const ORD_WORD = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'];
@@ -70,16 +115,17 @@ function heard(words, start, end, pad) {
 function said(text, words, start, end, pad = 1.5) {
   const want = tokens(text); if (!want.length) return true;
   const near = heard(words, start, end, pad);
-  return want.every(t => near.has(t));
+  return want.every(t => inHeard(near, t));
 }
 // first time all of text is said (its first word's start), the one nearest `near`, or null
 function whenSaid(text, words, near = 0) {
   const want = tokens(text); if (!want.length) return null;
   let best = null;
   words.forEach((w, i) => {
-    if (!tokens(w.word).includes(want[0])) return;
-    const win = words.slice(i, i + want.length + 3).flatMap(x => tokens(x.word));
-    if (want.every(t => win.includes(t)) && (best === null || Math.abs(w.start - near) < Math.abs(best.start - near))) best = w;
+    const at = heard(words.slice(i, i + 2), -1e9, 1e9, 0), first = new Set([...at].filter(h => tokens(w.word).some(x => h.startsWith(x))));
+    if (!inHeard(first, want[0])) return;
+    const win = heard(words.slice(i, i + want.length + 3), -1e9, 1e9, 0);
+    if (want.every(t => inHeard(win, t)) && (best === null || Math.abs(w.start - near) < Math.abs(best.start - near))) best = w;
   });
   return best;
 }
@@ -113,6 +159,8 @@ function fitGraphics(gfx, words, len, opts = {}) {
 
 // the worded fields of each graphic (kit/graphics.json "spoken"), by mode
 const SPOKEN = (() => { try { return Object.fromEntries(JSON.parse(fs.readFileSync(path.join(__dirname, 'graphics.json'), 'utf8')).graphics.filter(g => g.mode >= 12).map(g => [g.mode, g.spoken || []])); } catch { return {}; } })();
+// the fields a graphic cannot show without (kit/graphics.json "required"; default the first worded field)
+const REQUIRED = (() => { try { return Object.fromEntries(JSON.parse(fs.readFileSync(path.join(__dirname, 'graphics.json'), 'utf8')).graphics.filter(g => g.mode >= 12).map(g => [g.mode, g.required || (g.spoken || []).slice(0, 1)])); } catch { return {}; } })();
 const KIND = (() => { try { return Object.fromEntries(JSON.parse(fs.readFileSync(path.join(__dirname, 'graphics.json'), 'utf8')).graphics.map(g => [g.mode, g.id])); } catch { return {}; } })();
 const itemsOf = f => (Array.isArray(f.items) ? f.items : String(f.items || '').split(';')).map(s => String(s).trim()).filter(Boolean);
 // versus: left and right, or "A vs B" in text
@@ -152,10 +200,15 @@ function audit(flips, words, pad = 1.5) {
       const ds = listOf(g.details).map(d => d && !said(d, words, f.start, f.end, pad) ? (dropped.push({ g: f, why: `${what} line "${d}" at ${f.start}s is not in what you say there` }), '') : d);
       g = { ...g, details: ds };
     }
+    const req = REQUIRED[f.mode] || keys.slice(0, 1);
     for (const k of keys.filter(k => k !== 'items' && k !== 'details')) {
       if (bad) break;
       const vals = k === 'left' || k === 'right' ? (k === 'left' ? [sides(f)[0]] : [sides(f)[1]]) : [f[k]];
-      for (const v of vals) if (v && !said(v, words, f.start, f.end, pad)) { bad = `"${v}" at ${f.start}s is not in what you say there`; break; }
+      for (const v of vals) if (v && !said(v, words, f.start, f.end, pad)) {
+        // an optional field you do not say is left off; the graphic stays with the fields you do say
+        if (!req.includes(k) && k !== 'left' && k !== 'right') { if (g === f) g = { ...f }; delete g[k]; dropped.push({ g: f, field: k, kept: true, why: `${what} at ${f.start}s: ${k} "${v}" is not in what you say there; the ${what} stays without it` }); break; }
+        bad = `"${v}" at ${f.start}s is not in what you say there`; break;
+      }
     }
     if (bad) dropped.push({ g: f, why: bad }); else out.push(g);
   }
@@ -200,4 +253,4 @@ function cueFlips(flips, words, pad = 1.5) {
   return { flips: out, resolved };
 }
 
-module.exports = { cueTimes, cueFlips, listOf, norm, tokens, timeline, said, heard, numberTokens, whenSaid, ordinalsSaid, fitGraphics, audit, ORD, SPOKEN };
+module.exports = { setAliases, matchKind, phon, fuzzyLog, REQUIRED, cueTimes, cueFlips, listOf, norm, tokens, timeline, said, heard, numberTokens, whenSaid, ordinalsSaid, fitGraphics, audit, ORD, SPOKEN };
