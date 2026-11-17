@@ -1,5 +1,5 @@
 {
- "note": "Named cut transitions for cut.json (per segment: \"transition\": \"<name>\", optional \"transitionDur\" in seconds, default 0.3). Each name maps to a stock ffmpeg xfade mode, so no gltransition build is needed. Any raw xfade mode name also works. The default (no \"transition\") stays the hard cut with the glitch seam. Name list adapted from ANVEAI/motion-pack transitions/lib/xfade.js (MIT); see THIRD_PARTY.md.",
+ "note": "Named cut transitions for cut.json (per segment: \"transition\": \"<name>\", optional \"transitionDur\" in seconds, default 0.3). Each name maps to a stock ffmpeg xfade mode, so no gltransition build is needed. Any raw xfade mode name also works. An object ({\"custom\": \"<id>\"}) is a drawn transition from kit/xfx.cjs (an xfade custom expression; checkerboard takes the theme accent). The default (no \"transition\") stays the hard cut with the glitch seam. Name list adapted from ANVEAI/motion-pack transitions/lib/xfade.js (MIT); see THIRD_PARTY.md.",
  "default": "glitch",
  "names": {
   "glitch": null,
@@ -51,6 +51,12 @@
   "wind": "hlwind",
   "warp": "diagbr",
   "diagonal": "diagbr",
-  "distance": "distance"
+  "distance": "distance",
+  "slats": {"custom": "slats"},
+  "checkerboard": {"custom": "checkerboard"},
+  "light-leak": {"custom": "light-leak"},
+  "zoom-blur": {"custom": "zoom-blur"},
+  "news-ribbon": {"custom": "news-ribbon"},
+  "breaking-news": {"custom": "news-ribbon"}
  }
 }

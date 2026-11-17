@@ -1,4 +1,4 @@
-// Shared edit rules: the locked sound set, the seven title entrances, named transitions, the punch defaults and
+// Shared edit rules: the locked sound set, the eight title entrances, named transitions, the punch defaults and
 // the humanizer copy lint. Used by assemble.cjs, reel.cjs, autocaption.mjs, check.mjs and verify.mjs, so every
 // script reads the same numbers. Adapted from the Muse reel workflow (Will Gwyn and Muse, Nov 2026) to this
 // repo's 1080x1920, 24 fps format.
@@ -24,7 +24,7 @@ const CUT_SOUNDS = ['whoosh', 'swipe', 'boom', 'F', 'D'];
 const sfxHits = list => (list || []).map(h => (Array.isArray(h) ? { t: +h[0], g: h[1] == null ? null : +h[1] } : { t: +h, g: null }));
 
 // Seven title entrances, each used at most once per video. Flicker only on the hook (first title) and payoff (last).
-const ENTRANCES = ['stagger-rise', 'slam', 'blur-rise', 'slide-left', 'elastic', 'flip', 'pop-zoom'];
+const ENTRANCES = ['stagger-rise', 'slam', 'blur-rise', 'slide-left', 'elastic', 'flip', 'pop-zoom', 'drop'];
 const TITLE_ENTER = 0.45; // seconds until a title has settled
 const TITLE_MODE = 7;
 // front (default): the whole title sits in front of the person.
@@ -46,6 +46,7 @@ const XFADE_MODES = new Set(['custom', 'fade', 'wipeleft', 'wiperight', 'wipeup'
 function xfadeMode(name) {
   if (name == null || name === '') return null;
   const n = String(name).toLowerCase();
+  // a string is a stock xfade mode, an object a drawn one from kit/xfx.cjs, null the hard cut
   if (n in TRANSITIONS.names) return TRANSITIONS.names[n];
   if (XFADE_MODES.has(n) && n !== 'custom') return n;
   return undefined;
@@ -133,7 +134,7 @@ function captionLayer(caps) {
 // Screen cards and b-roll panels (mode 11): behind the presenter's head (his head goes over the panel where it reaches
 // into it, his body stays under the panel) or in front of everything. Per panel "layer", else the job's panelLayer,
 // default auto, which is behind (no difference from front where the head never reaches the panel).
-// Graphics 12 to 23 (kit/graphics.json) take the same layer and the same panel layer under the crown mask; their auto
+// Graphics 12 to 37 (kit/graphics.json) take the same layer and the same panel layer under the crown mask; their auto
 // is behind only when the graphic sits high in the frame (y below autoBehindY), where the top of the head can reach it.
 const PANEL_LAYERS = ['front', 'behind', 'auto'];
 const GFXJ = JSON.parse(fs.readFileSync(path.join(KIT, 'graphics.json'), 'utf8'));

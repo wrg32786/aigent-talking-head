@@ -14,6 +14,7 @@ const require = createRequire(import.meta.url);
 const B = require('./beats.cjs');
 const R = require('./rules.cjs');
 const SFXPLAN = require('./sfx-plan.cjs');
+const XFX = require('./xfx.cjs');
 const Preset = require('./preset.cjs');
 
 const KIT = dirname(fileURLToPath(import.meta.url));
@@ -107,7 +108,7 @@ export function loadMenu() {
     return {
       kind: 'transition', id, section: 'transitions',
       flag: `"transition": "${id}"`,
-      label: mode == null ? (id === 'glitch' ? 'hard cut with the glitch seam (default)' : 'hard cut, no seam') : `ffmpeg xfade ${mode}`,
+      label: mode == null ? (id === 'glitch' ? 'hard cut with the glitch seam (default)' : 'hard cut, no seam') : XFX.label(mode),
     };
   });
 
@@ -149,6 +150,12 @@ export function loadMenu() {
     label: `${b.title} (${b.seconds}s, ${b.lufs} LUFS)`,
   }));
 
+  const exportItems = Object.entries(JSON.parse(readFileSync(join(KIT, 'exports.json'), 'utf8')).presets).map(([id, x]) => ({
+    kind: 'export', id, section: 'exports',
+    flag: `--export ${id}`,
+    label: `${x.label}: ${x.w}x${x.h}, up to ${x.maxSec} s, ${x.videoKbps} kbps; safe area top ${x.safe.top}, bottom ${x.safe.bottom}, left ${x.safe.left}, right ${x.safe.right} px`,
+  }));
+
   const presetItems = Preset.list().map(p => ({
     kind: 'preset', id: p.name, section: 'presets',
     flag: `--preset ${p.name}`,
@@ -167,10 +174,11 @@ export function loadMenu() {
     { id: 'title-entrances', title: 'Title entrances', hint: 'One kinetic title per beat. Flicker only on the hook and the payoff. Default layer is in front of the person.', items: titleEntrances },
     { id: 'title-layer', title: 'Title layer', hint: 'Front, behind the head, or auto, per title or for the job. Offer this per title. Agents and --preset auto use auto unless the preset says otherwise.', items: titleLayer },
     { id: 'transitions', title: 'Transitions', hint: 'Named cuts in cut.json. The glitch seam is the default.', items: transitions },
-    { id: 'graphics', title: 'Graphics', hint: 'Original overlay graphics drawn in the theme colours and fonts, each with its own entrance and exit: captions.js flips (modes 9 to 23) or a reel-graphics block in a Reel.md. Words on them must be words you say (kit/spoken.cjs). Layer front, behind or auto: behind tucks only the top of your head over the graphic, never your face. Bring your icon or screen recording, or the kit draws a neutral placeholder. Teardown maps the first three from a reference (kit/graphics.json).', items: graphics },
+    { id: 'graphics', title: 'Graphics', hint: 'Original overlay graphics drawn in the theme colours and fonts, each with its own entrance and exit: captions.js flips (modes 9 to 37) or a reel-graphics block in a Reel.md. Words on them must be words you say (kit/spoken.cjs). Layer front, behind or auto: behind tucks only the top of your head over the graphic, never your face. Bring your icon or screen recording, or the kit draws a neutral placeholder. Teardown maps the first three from a reference (kit/graphics.json).', items: graphics },
     { id: 'effects', title: 'Effects', hint: 'Optional second pass (npm run fx). 51 starter effects, grouped by moment.', items: effects, moments, effectsByMoment },
-    { id: 'sfx', title: 'SFX pack', hint: '31 CC0 sounds, auto-picked on npm run fx. Locked cut set is whoosh, swipe, boom, click, typing.', items: sfx },
+    { id: 'sfx', title: 'SFX pack', hint: '37 CC0 sounds, auto-picked on npm run fx. Locked cut set is whoosh, swipe, boom, click, typing.', items: sfx },
     { id: 'beds', title: 'Music beds', hint: 'Our own tracks, loudness-matched to -13 LUFS. Hear them with the files in kit/music/.', items: beds },
+    { id: 'exports', title: 'Export presets', hint: 'npm run reel -- ... --export <name> lays the reel out for that platform (titles, captions and graphics kept out of its UI) and writes reel-vN-<name>.mp4; npm run export re-exports a finished reel; npm run verify -- <job> --export <name> checks it.', items: exportItems },
     { id: 'presets', title: 'Brand presets', hint: 'A saved mix of theme, look, type, finishes and favourites. npm run reel -- --preset <name>. Flags you pass win. --preset auto picks one and prints what it chose.', items: presetItems },
   ];
 

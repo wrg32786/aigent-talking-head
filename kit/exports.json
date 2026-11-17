@@ -1,0 +1,10 @@
+{
+ "note": "Export presets for npm run reel -- --export <name> and npm run export. w and h are the delivered frame; y0 is where that frame starts inside the 1080x1920 reel (a 4:5 or 1:1 crop); safe is the platform's UI zones in pixels of the delivered frame (profile row, caption and buttons at the bottom, the action column on the right). The layout pass keeps every title, caption and graphic inside the safe rect, and npm run verify -- <job> --export <name> checks it. The zones are approximate, taken from each platform's published safe-zone guidance; check them again before a paid campaign. maxSec is the longest upload the preset allows (a longer reel is trimmed, with a warning); videoKbps caps the video bitrate.",
+ "presets": {
+  "tiktok": { "label": "TikTok (9:16)", "w": 1080, "h": 1920, "y0": 0, "safe": { "top": 160, "bottom": 440, "left": 60, "right": 140 }, "maxSec": 600, "videoKbps": 8000, "audioKbps": 192 },
+  "reels": { "label": "Instagram and Facebook Reels (9:16)", "w": 1080, "h": 1920, "y0": 0, "safe": { "top": 220, "bottom": 420, "left": 60, "right": 120 }, "maxSec": 180, "videoKbps": 5000, "audioKbps": 192 },
+  "shorts": { "label": "YouTube Shorts (9:16)", "w": 1080, "h": 1920, "y0": 0, "safe": { "top": 160, "bottom": 380, "left": 60, "right": 140 }, "maxSec": 180, "videoKbps": 8000, "audioKbps": 192 },
+  "feed45": { "label": "Feed post (4:5, Instagram, Facebook, LinkedIn, X)", "w": 1080, "h": 1350, "y0": 285, "safe": { "top": 60, "bottom": 120, "left": 60, "right": 60 }, "maxSec": 140, "videoKbps": 6000, "audioKbps": 192 },
+  "square": { "label": "Square (1:1)", "w": 1080, "h": 1080, "y0": 300, "safe": { "top": 50, "bottom": 90, "left": 50, "right": 50 }, "maxSec": 140, "videoKbps": 6000, "audioKbps": 192 }
+ }
+}

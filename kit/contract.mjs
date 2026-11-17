@@ -43,7 +43,7 @@ export function checkContract() {
   if (!existsSync(join(ROOT, C.skill || 'SKILL.md'))) errs.push(`skill file ${C.skill} is missing`);
   // graphics: every type in kit/graphics.json with its mode, entrance, exit, worded fields and field names; the glyph list
   const GJ = JSON.parse(readFileSync(join(KIT, 'graphics.json'), 'utf8')).graphics, CG = (C.graphics && C.graphics.types) || [];
-  const gsig = g => JSON.stringify([g.id, g.mode, g.entrance, g.exit || 'fade', g.spoken || [], Array.isArray(g.fields) ? g.fields : Object.keys(g.fields || {})]);
+  const gsig = g => JSON.stringify([g.id, g.mode, g.entrance, g.exit || 'fade', g.spoken || [], g.required || [], Array.isArray(g.fields) ? g.fields : Object.keys(g.fields || {})]);
   if (GJ.map(gsig).join('\n') !== CG.map(gsig).join('\n')) for (const g of GJ) { const c = CG.find(x => x.id === g.id); if (!c) errs.push(`graphic ${g.id} (kit/graphics.json) is not in contract.json graphics`); else if (gsig(c) !== gsig(g)) errs.push(`graphic ${g.id}: contract.json ${gsig(c)} != kit/graphics.json ${gsig(g)}`); }
   for (const c of CG) if (!GJ.some(g => g.id === c.id)) errs.push(`contract.json graphic ${c.id} is not in kit/graphics.json`);
   const glyphs = req(join(KIT, 'reelmd.cjs')).GLYPHS;

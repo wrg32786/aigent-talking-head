@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "Will-approved cinematic pack (01-03, 05-32; 04 reverse cymbal rejected). Auto-picked on effect hits by kit/sfx-plan.cjs. The locked cut.json set (whoosh, swipe, boom, click, typing, plus legacy F and D) stays at kit/sfx/ root and is unchanged.",
+  "note": "Will-approved cinematic pack (01-03, 05-32; 04 reverse cymbal rejected; 33-38 are CC0 Freesound UI, paper and camera sounds credited in THIRD_PARTY.md, \"auto\": false so they play only when named, e.g. sfx 33-ui-mouse-click on an effect). Auto-picked on effect hits by kit/sfx-plan.cjs. The locked cut.json set (whoosh, swipe, boom, click, typing, plus legacy F and D) stays at kit/sfx/ root and is unchanged.",
   "categories": [
     "hit",
     "riser",
@@ -815,6 +815,116 @@
       "credit": "Synthesized Dsus4-to-Dadd9 resolve (original, dedicated CC0)",
       "channels": 2,
       "sampleRate": 48000
+    },
+    {
+      "id": "33-ui-mouse-click",
+      "file": "ui/33-ui-mouse-click.mp3",
+      "category": "ui",
+      "duration": 0.36,
+      "hit": 0.16,
+      "gain": 0.5,
+      "effects": [
+        "tap",
+        "select-resize",
+        "apple-toggles"
+      ],
+      "source": "https://freesound.org/s/333575/",
+      "license": "CC0-1.0",
+      "credit": "\"Mouse Click\" by Sillyslimeball (Freesound 333575), via digitalsamba/claude-code-video-toolkit",
+      "channels": 2,
+      "sampleRate": 48000,
+      "auto": false
+    },
+    {
+      "id": "34-ui-key-press",
+      "file": "ui/34-ui-key-press.mp3",
+      "category": "ui",
+      "duration": 0.408,
+      "hit": 0.11,
+      "gain": 0.45,
+      "effects": [
+        "todo",
+        "checklist",
+        "shortcut-rain"
+      ],
+      "source": "https://freesound.org/s/378084/",
+      "license": "CC0-1.0",
+      "credit": "\"mechanical key medium\" by bigmonmulgrew (Freesound 378084), via digitalsamba/claude-code-video-toolkit",
+      "channels": 2,
+      "sampleRate": 48000,
+      "auto": false
+    },
+    {
+      "id": "35-ui-keyboard-typing",
+      "file": "ui/35-ui-keyboard-typing.mp3",
+      "category": "ui",
+      "duration": 2.424,
+      "hit": 0.05,
+      "gain": 0.35,
+      "effects": [
+        "messages",
+        "comment-box"
+      ],
+      "source": "https://freesound.org/s/539146/",
+      "license": "CC0-1.0",
+      "credit": "\"Keyboard Typing 001\" by ristooooo1 (Freesound 539146), first 2.4 s, via digitalsamba/claude-code-video-toolkit",
+      "channels": 2,
+      "sampleRate": 48000,
+      "auto": false
+    },
+    {
+      "id": "36-paper-flip",
+      "file": "paper/36-paper-flip.mp3",
+      "category": "paper",
+      "duration": 0.48,
+      "hit": 0.2,
+      "gain": 0.5,
+      "effects": [
+        "the-bill",
+        "tape-label"
+      ],
+      "source": "https://freesound.org/s/82377/",
+      "license": "CC0-1.0",
+      "credit": "\"paper flip 1\" by gynation (Freesound 82377), via digitalsamba/claude-code-video-toolkit",
+      "channels": 2,
+      "sampleRate": 48000,
+      "auto": false
+    },
+    {
+      "id": "37-camera-clapper",
+      "file": "camera/37-camera-clapper.mp3",
+      "category": "camera",
+      "duration": 0.576,
+      "hit": 0.13,
+      "gain": 0.45,
+      "effects": [
+        "reel-frame",
+        "place-in-grid"
+      ],
+      "source": "https://freesound.org/s/484323/",
+      "license": "CC0-1.0",
+      "credit": "\"JM_MOVIE_Clapperboard\" by Julien Matthey (Freesound 484323), via digitalsamba/claude-code-video-toolkit",
+      "channels": 2,
+      "sampleRate": 48000,
+      "auto": false
+    },
+    {
+      "id": "38-camera-slate",
+      "file": "camera/38-camera-slate.mp3",
+      "category": "camera",
+      "duration": 0.264,
+      "hit": 0.0,
+      "gain": 0.45,
+      "effects": [
+        "reel-frame",
+        "cover-star"
+      ],
+      "source": "https://freesound.org/s/194719/",
+      "license": "CC0-1.0",
+      "credit": "\"Film Slate Clap FX\" by chewyy56 (Freesound 194719), via digitalsamba/claude-code-video-toolkit",
+      "channels": 2,
+      "sampleRate": 48000,
+      "auto": false
     }
   ]
 }

@@ -41,12 +41,12 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
   { let C = {}; try { C = JSON.parse(readFileSync(join(ROOT, 'cut.json'), 'utf8')); } catch {}
     writeFileSync(join(ROOT, 'lockover.js'), 'window.LOCKOVER=' + JSON.stringify({ lockup: C.lockup || null, hero: C.hero || null, titleLayer: C.titleLayer || null, inserts: (C.inserts || []).map(s => ({ at: +s.at, dur: +s.dur, y: s.y, tint: s.tint, line: s.line, arc: s.arc })) }) + ';\n'); }
   if (!existsSync(join(ROOT, 'fxzones.js'))) writeFileSync(join(ROOT, 'fxzones.js'), 'window.FXZONES=[];\n');
-  // graphics (modes 10, 11 and 19): icon and screen images as file URLs; a screen recording becomes a short frame list
-  // (build/gfx/, 12 fps) so the card can play it frame-accurately. Fonts for the ordinal word, the label and the code
-  // card, and each graphic's default place and layer rule from kit/graphics.json.
+  // graphics (modes 10, 11, 19 and 26): icon and screen images as file URLs; a screen recording becomes a short frame list
+  // (build/gfx/, 12 fps) so the card can play it frame-accurately. Fonts for the ordinal word, the label, the code
+  // card, the split-flap and flash-card face (Anton) and the terminal (JetBrains Mono), and each graphic's default place and layer rule from kit/graphics.json.
   { const assets = {}, VID = /\.(mp4|mov|m4v|webm|mkv)$/i, url = f => pathToFileURL(f).href;
     for (const f of CAP.flips || []) {
-      if (f.mode !== 10 && f.mode !== 11 && f.mode !== 19) continue;
+      if (f.mode !== 10 && f.mode !== 11 && f.mode !== 19 && f.mode !== 26) continue;
       const key = f.mode + '@' + f.start, file = f.mode === 11 ? f.src : f.icon;
       if (!file) continue;
       const abs = isAbsolute(file) ? file : join(ROOT, file);
@@ -65,7 +65,7 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
     const F = join(KIT, 'fonts');
     const GJ = JSON.parse(readFileSync(join(KIT, 'graphics.json'), 'utf8'));
     const defaults = Object.fromEntries(GJ.graphics.map(g => [g.mode, g.defaults || {}])), panelModes = GJ.graphics.filter(g => g.mode >= 11).map(g => g.mode);
-    writeFileSync(join(ROOT, 'gfx.js'), 'window.GFX=' + JSON.stringify({ fonts: { serif: url(join(F, 'InstrumentSerif-Italic.ttf')), label: url(join(F, 'ArchivoBlack-Regular.ttf')), mono: url(join(F, 'RedHatMono-VF.ttf')) }, defaults, autoBehindY: GJ.autoBehindY, panelModes, assets }) + ';\n');
+    writeFileSync(join(ROOT, 'gfx.js'), 'window.GFX=' + JSON.stringify({ fonts: { serif: url(join(F, 'InstrumentSerif-Italic.ttf')), label: url(join(F, 'ArchivoBlack-Regular.ttf')), mono: url(join(F, 'RedHatMono-VF.ttf')), slam: url(join(F, 'Anton-Regular.ttf')), code: url(join(F, 'JetBrainsMono-VF.ttf')) }, defaults, autoBehindY: GJ.autoBehindY, panelModes, assets }) + ';\n');
     if (Object.keys(assets).length) console.log('graphics assets', Object.keys(assets).length);
   }
 }
@@ -75,6 +75,23 @@ await p.goto(pathToFileURL(join(ROOT, 'overlay.html')).href, { waitUntil: 'netwo
 await p.waitForFunction(() => window.__ready === true, null, { timeout: 20000 });
 if ((await p.evaluate(() => window.__logo)) === false) { console.error('logo failed to load (check "logo" in captions.js or theme.logo)'); await b.close(); process.exit(1); }
 console.log('theme', await p.evaluate(() => window.__theme));
+// layout pass (overlay.html): what moved clear of a graphic, what hid while one was up, what the export's safe area moved.
+// layout.json is read by npm run verify. BOXES_AT=t1,t2 measures every element on screen at those times into boxes.json and stops.
+{ const LAY = await p.evaluate(() => (window.__layout ? window.__layout() : null));
+  if (await p.evaluate(() => window.CAPTIONS && window.CAPTIONS.layout === false)) console.log('layout: off ("layout": false in captions.js): captions and titles are not moved off graphics, and verify will flag every overlap');
+  if (LAY) {
+    writeFileSync(join(ROOT, 'layout.json'), JSON.stringify(LAY, null, 1) + '\n');
+    const n = a => LAY.elements.filter(e => e.action === a).length, sh = n('shift'), hd = n('hide'), sa = n('safe-area');
+    if (sh || hd) console.log(`layout: ${sh} caption or title moved clear of a graphic, ${hd} hidden while a graphic is up (layout.json)`);
+    if (LAY.export) console.log(`export ${LAY.export}: safe area ${JSON.stringify(LAY.safe)}, ${sa} element${sa === 1 ? '' : 's'} placed inside it`);
+  }
+  if (process.env.BOXES_AT) {
+    const ts = process.env.BOXES_AT.split(',').map(Number).filter(x => !isNaN(x)), out = [];
+    for (const t of ts) out.push({ t, boxes: await p.evaluate(t => window.__boxesAt(t), t) });
+    writeFileSync(join(ROOT, 'boxes.json'), JSON.stringify(out, null, 1) + '\n');
+    console.log('boxes', ts.length, 'moments -> boxes.json'); await b.close(); process.exit(0);
+  }
+}
 // Behind-head titles (mode 7, layer behind) get their own layer, ovlt/, so assemble.cjs can draw them behind the person; ovl/ then
 // holds front titles, partner words and captions. Stills always show every layer together.
 const titles = await p.evaluate(() => window.__titles || []);
