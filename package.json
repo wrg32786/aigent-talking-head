@@ -30,9 +30,13 @@
     "reelmd": "node kit/reelmd.cjs",
     "teardown": "node kit/teardown.mjs",
     "capture": "node kit/capture.mjs",
-    "contract": "node kit/contract.mjs"
+    "contract": "node kit/contract.mjs",
+    "plan": "node kit/plan.cjs",
+    "export": "node kit/export.mjs",
+    "mcp": "node kit/mcp.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "playwright-core": "^1.47.0"
   },
   "license": "Apache-2.0"

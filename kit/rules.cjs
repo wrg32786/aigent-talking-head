@@ -1,4 +1,4 @@
-// Shared edit rules: the locked sound set, the seven title entrances, named transitions, the punch defaults and
+// Shared edit rules: the locked sound set, the eight title entrances, named transitions, the punch defaults and
 // the humanizer copy lint. Used by assemble.cjs, reel.cjs, autocaption.mjs, check.mjs and verify.mjs, so every
 // script reads the same numbers. Adapted from the Muse reel workflow (Will Gwyn and Muse, Nov 2026) to this
 // repo's 1080x1920, 24 fps format.
@@ -24,7 +24,7 @@ const CUT_SOUNDS = ['whoosh', 'swipe', 'boom', 'F', 'D'];
 const sfxHits = list => (list || []).map(h => (Array.isArray(h) ? { t: +h[0], g: h[1] == null ? null : +h[1] } : { t: +h, g: null }));
 
 // Seven title entrances, each used at most once per video. Flicker only on the hook (first title) and payoff (last).
-const ENTRANCES = ['stagger-rise', 'slam', 'blur-rise', 'slide-left', 'elastic', 'flip', 'pop-zoom'];
+const ENTRANCES = ['stagger-rise', 'slam', 'blur-rise', 'slide-left', 'elastic', 'flip', 'pop-zoom', 'drop'];
 const TITLE_ENTER = 0.45; // seconds until a title has settled
 const TITLE_MODE = 7;
 // front (default): the whole title sits in front of the person.
@@ -46,6 +46,7 @@ const XFADE_MODES = new Set(['custom', 'fade', 'wipeleft', 'wiperight', 'wipeup'
 function xfadeMode(name) {
   if (name == null || name === '') return null;
   const n = String(name).toLowerCase();
+  // a string is a stock xfade mode, an object a drawn one from kit/xfx.cjs, null the hard cut
   if (n in TRANSITIONS.names) return TRANSITIONS.names[n];
   if (XFADE_MODES.has(n) && n !== 'custom') return n;
   return undefined;
@@ -133,12 +134,20 @@ function captionLayer(caps) {
 // Screen cards and b-roll panels (mode 11): behind the presenter's head (his head goes over the panel where it reaches
 // into it, his body stays under the panel) or in front of everything. Per panel "layer", else the job's panelLayer,
 // default auto, which is behind (no difference from front where the head never reaches the panel).
+// Graphics 12 to 37 (kit/graphics.json) take the same layer and the same panel layer under the crown mask; their auto
+// is behind only when the graphic sits high in the frame (y below autoBehindY), where the top of the head can reach it.
 const PANEL_LAYERS = ['front', 'behind', 'auto'];
+const GFXJ = JSON.parse(fs.readFileSync(path.join(KIT, 'graphics.json'), 'utf8'));
+const PANEL_MODES = GFXJ.graphics.filter(g => g.mode >= 11).map(g => g.mode);
+const GFX_DEFAULTS = Object.fromEntries(GFXJ.graphics.map(g => [g.mode, g.defaults || {}]));
 function panelLayer(f, caps) {
   const l = PANEL_LAYERS.includes(f && f.layer) ? f.layer : PANEL_LAYERS.includes(caps && caps.panelLayer) ? caps.panelLayer : 'auto';
-  return l === 'front' ? 'front' : 'behind';
+  if (l !== 'auto') return l;
+  if (!f || f.mode == null || f.mode === 11) return 'behind';
+  const y = f.y != null && !isNaN(+f.y) ? +f.y : (GFX_DEFAULTS[f.mode] || {}).y;
+  return y != null && y < (GFXJ.autoBehindY ?? 0.45) ? 'behind' : 'front';
 }
-const panelsBehind = caps => ((caps && caps.flips) || []).filter(f => f.mode === 11 && panelLayer(f, caps) === 'behind');
+const panelsBehind = caps => ((caps && caps.flips) || []).filter(f => PANEL_MODES.includes(f.mode) && panelLayer(f, caps) === 'behind');
 
 // Person-mask path and backend. cut.json may use "mask": "mask.mkv" or
 // "mask": {"file":"mask.mkv","model":"birefnet","person":"person.mkv"}, plus optional top-level "maskModel" / "person".
@@ -164,4 +173,4 @@ const BEDS = JSON.parse(fs.readFileSync(path.join(KIT, 'music/beds.json'), 'utf8
 const isBed = b => typeof b === 'string' && Object.hasOwn(BEDS, b) && typeof (BEDS[b] || {}).file === 'string';
 const bedFile = b => (isBed(b) ? path.join(KIT, 'music', BEDS[b].file) : b);
 
-module.exports = { BEDS, isBed, bedFile, SFX, CUT_SOUNDS, sfxHits, ENTRANCES, TITLE_ENTER, TITLE_MODE, TITLE_LAYERS, normalizeLayer, PUNCH, TRANSITIONS, xfadeMode, timeline, lintCopy, scriptShape, readCaptions, resolveTitles, maskSpec, MASK_MODELS, captionLayer, PANEL_LAYERS, panelLayer, panelsBehind };
+module.exports = { BEDS, isBed, bedFile, SFX, CUT_SOUNDS, sfxHits, ENTRANCES, TITLE_ENTER, TITLE_MODE, TITLE_LAYERS, normalizeLayer, PUNCH, TRANSITIONS, xfadeMode, timeline, lintCopy, scriptShape, readCaptions, resolveTitles, maskSpec, MASK_MODELS, captionLayer, PANEL_LAYERS, PANEL_MODES, panelLayer, panelsBehind };

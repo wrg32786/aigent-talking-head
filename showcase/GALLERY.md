@@ -23,8 +23,13 @@ Stills use an AI-generated fictional presenter (Apache-2.0 with the repo). Rebui
 
 ## Graphics
 
-| --- | --- | --- |
-| ![ordinal-sticker](media/graphic/ordinal-sticker.jpg)<br>`ordinal-sticker` | ![app-label](media/graphic/app-label.jpg)<br>`app-label` | ![screen-card](media/graphic/screen-card.jpg)<br>`screen-card` |
+| --- | --- | --- | --- | --- |
+| ![ordinal-sticker](media/graphic/ordinal-sticker.jpg)<br>`ordinal-sticker` | ![app-label](media/graphic/app-label.jpg)<br>`app-label` | ![screen-card](media/graphic/screen-card.jpg)<br>`screen-card` | ![lower-third](media/graphic/lower-third.jpg)<br>`lower-third` | ![stat-callout](media/graphic/stat-callout.jpg)<br>`stat-callout` |
+| ![checklist](media/graphic/checklist.jpg)<br>`checklist` | ![quote-card](media/graphic/quote-card.jpg)<br>`quote-card` | ![highlight](media/graphic/highlight.jpg)<br>`highlight` | ![step-counter](media/graphic/step-counter.jpg)<br>`step-counter` | ![versus](media/graphic/versus.jpg)<br>`versus` |
+| ![icon-badge](media/graphic/icon-badge.jpg)<br>`icon-badge` | ![sticker-pop](media/graphic/sticker-pop.jpg)<br>`sticker-pop` | ![price-tag](media/graphic/price-tag.jpg)<br>`price-tag` | ![cta-card](media/graphic/cta-card.jpg)<br>`cta-card` | ![code-card](media/graphic/code-card.jpg)<br>`code-card` |
+| ![data-chart](media/graphic/data-chart.jpg)<br>`data-chart` | ![chapter-card](media/graphic/chapter-card.jpg)<br>`chapter-card` | ![logo-bug](media/graphic/logo-bug.jpg)<br>`logo-bug` | ![channel-bug](media/graphic/channel-bug.jpg)<br>`channel-bug` | ![terminal-session](media/graphic/terminal-session.jpg)<br>`terminal-session` |
+| ![news-strap](media/graphic/news-strap.jpg)<br>`news-strap` | ![ticker](media/graphic/ticker.jpg)<br>`ticker` | ![split-flap](media/graphic/split-flap.jpg)<br>`split-flap` | ![feature-cards](media/graphic/feature-cards.jpg)<br>`feature-cards` | ![release-pill](media/graphic/release-pill.jpg)<br>`release-pill` |
+| ![cta-button](media/graphic/cta-button.jpg)<br>`cta-button` | ![hud-callout](media/graphic/hud-callout.jpg)<br>`hud-callout` | ![flash-card](media/graphic/flash-card.jpg)<br>`flash-card` | ![keyword-caption](media/graphic/keyword-caption.jpg)<br>`keyword-caption` |  |
 
 ## Film finishes
 
@@ -41,6 +46,7 @@ Stills use an AI-generated fictional presenter (Apache-2.0 with the repo). Rebui
 
 | --- | --- | --- | --- | --- | --- | --- |
 | ![stagger-rise](media/entrance/stagger-rise.jpg)<br>`stagger-rise` | ![slam](media/entrance/slam.jpg)<br>`slam` | ![blur-rise](media/entrance/blur-rise.jpg)<br>`blur-rise` | ![slide-left](media/entrance/slide-left.jpg)<br>`slide-left` | ![elastic](media/entrance/elastic.jpg)<br>`elastic` | ![flip](media/entrance/flip.jpg)<br>`flip` | ![pop-zoom](media/entrance/pop-zoom.jpg)<br>`pop-zoom` |
+| ![drop](media/entrance/drop.jpg)<br>`drop` |  |  |  |  |  |  |
 
 ## Caption styles
 
@@ -84,6 +90,8 @@ Stills use an AI-generated fictional presenter (Apache-2.0 with the repo). Rebui
 | ![barn-door](media/transition/barn-door.jpg)<br>`barn-door` | ![zoom](media/transition/zoom.jpg)<br>`zoom` | ![zoom-through](media/transition/zoom-through.jpg)<br>`zoom-through` | ![pixelate](media/transition/pixelate.jpg)<br>`pixelate` | ![blur](media/transition/blur.jpg)<br>`blur` |
 | ![blur-cross](media/transition/blur-cross.jpg)<br>`blur-cross` | ![radial](media/transition/radial.jpg)<br>`radial` | ![clock](media/transition/clock.jpg)<br>`clock` | ![squeeze](media/transition/squeeze.jpg)<br>`squeeze` | ![slice](media/transition/slice.jpg)<br>`slice` |
 | ![blinds](media/transition/blinds.jpg)<br>`blinds` | ![wind](media/transition/wind.jpg)<br>`wind` | ![warp](media/transition/warp.jpg)<br>`warp` | ![diagonal](media/transition/diagonal.jpg)<br>`diagonal` | ![distance](media/transition/distance.jpg)<br>`distance` |
+| ![slats](media/transition/slats.jpg)<br>`slats` | ![checkerboard](media/transition/checkerboard.jpg)<br>`checkerboard` | ![light-leak](media/transition/light-leak.jpg)<br>`light-leak` | ![zoom-blur](media/transition/zoom-blur.jpg)<br>`zoom-blur` | ![news-ribbon](media/transition/news-ribbon.jpg)<br>`news-ribbon` |
+| ![breaking-news](media/transition/breaking-news.jpg)<br>`breaking-news` |  |  |  |  |
 
 ## Music beds
 
@@ -101,5 +109,6 @@ Stills use an AI-generated fictional presenter (Apache-2.0 with the repo). Rebui
 | ![17-camera-shutter](media/sfx/17-camera-shutter.jpg)<br>`17-camera-shutter` | ![18-camera-flash](media/sfx/18-camera-flash.jpg)<br>`18-camera-flash` | ![19-paper-scribble](media/sfx/19-paper-scribble.jpg)<br>`19-paper-scribble` | ![20-cha-ching](media/sfx/20-cha-ching.jpg)<br>`20-cha-ching` | ![21-counter-tickup](media/sfx/21-counter-tickup.jpg)<br>`21-counter-tickup` |
 | ![22-sub-drop](media/sfx/22-sub-drop.jpg)<br>`22-sub-drop` | ![23-shimmer-sparkle-a](media/sfx/23-shimmer-sparkle-a.jpg)<br>`23-shimmer-sparkle-a` | ![24-shimmer-sparkle-b](media/sfx/24-shimmer-sparkle-b.jpg)<br>`24-shimmer-sparkle-b` | ![25-riser-pitch-sweep](media/sfx/25-riser-pitch-sweep.jpg)<br>`25-riser-pitch-sweep` | ![26-riser-supersaw-swell](media/sfx/26-riser-supersaw-swell.jpg)<br>`26-riser-supersaw-swell` |
 | ![27-riser-pulse-accel](media/sfx/27-riser-pulse-accel.jpg)<br>`27-riser-pulse-accel` | ![28-riser-shepard](media/sfx/28-riser-shepard.jpg)<br>`28-riser-shepard` | ![29-release-downlifter](media/sfx/29-release-downlifter.jpg)<br>`29-release-downlifter` | ![30-release-pad-bloom](media/sfx/30-release-pad-bloom.jpg)<br>`30-release-pad-bloom` | ![31-release-airy-exhale](media/sfx/31-release-airy-exhale.jpg)<br>`31-release-airy-exhale` |
-| ![32-release-resolve-chord](media/sfx/32-release-resolve-chord.jpg)<br>`32-release-resolve-chord` |  |  |  |  |
+| ![32-release-resolve-chord](media/sfx/32-release-resolve-chord.jpg)<br>`32-release-resolve-chord` | ![33-ui-mouse-click](media/sfx/33-ui-mouse-click.jpg)<br>`33-ui-mouse-click` | ![34-ui-key-press](media/sfx/34-ui-key-press.jpg)<br>`34-ui-key-press` | ![35-ui-keyboard-typing](media/sfx/35-ui-keyboard-typing.jpg)<br>`35-ui-keyboard-typing` | ![36-paper-flip](media/sfx/36-paper-flip.jpg)<br>`36-paper-flip` |
+| ![37-camera-clapper](media/sfx/37-camera-clapper.jpg)<br>`37-camera-clapper` | ![38-camera-slate](media/sfx/38-camera-slate.jpg)<br>`38-camera-slate` |  |  |  |
 

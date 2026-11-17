@@ -349,7 +349,7 @@
         <span>unbranded, offline, system fonts, no logo</span>
       </figcaption>
     </figure></div></section>
-<section id="title-entrances"><h2>Title entrances <small>7</small></h2><p class="hint">One kinetic title per beat. Flicker only on the hook and the payoff. Default layer is in front of the person.</p><div class="grid">
+<section id="title-entrances"><h2>Title entrances <small>8</small></h2><p class="hint">One kinetic title per beat. Flicker only on the hook and the payoff. Default layer is in front of the person.</p><div class="grid">
     <figure class="tile" data-id="entrance:stagger-rise" id="entrance-stagger-rise">
       <img src="media/entrance/stagger-rise.jpg" alt="stagger-rise" width="270" height="480" loading="lazy">
       <figcaption>
@@ -398,6 +398,13 @@
         <code>&quot;entrance&quot;: &quot;pop-zoom&quot;  on a mode 7 title</code>
         <span>kinetic title entrance (each used at most once per video)</span>
       </figcaption>
+    </figure>
+    <figure class="tile" data-id="entrance:drop" id="entrance-drop">
+      <img src="media/entrance/drop.jpg" alt="drop" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;entrance&quot;: &quot;drop&quot;  on a mode 7 title</code>
+        <span>kinetic title entrance (each used at most once per video)</span>
+      </figcaption>
     </figure></div></section>
 <section id="title-layer"><h2>Title layer <small>3</small></h2><p class="hint">Front, behind the head, or auto, per title or for the job. Offer this per title. Agents and --preset auto use auto unless the preset says otherwise.</p><div class="grid">
     <figure class="tile" data-id="titleLayer:front" id="titleLayer-front">
@@ -421,7 +428,7 @@
         <span>only the strongest 1 or 2 punch titles go behind the head, never consecutive ones (hook and payoff when they are not neighbours)</span>
       </figcaption>
     </figure></div></section>
-<section id="transitions"><h2>Transitions <small>50</small></h2><p class="hint">Named cuts in cut.json. The glitch seam is the default.</p><div class="grid">
+<section id="transitions"><h2>Transitions <small>56</small></h2><p class="hint">Named cuts in cut.json. The glitch seam is the default.</p><div class="grid">
     <figure class="tile" data-id="transition:glitch" id="transition-glitch">
       <img src="media/transition/glitch.jpg" alt="glitch" width="270" height="480" loading="lazy">
       <figcaption>
@@ -771,27 +778,251 @@
         <code>&quot;transition&quot;: &quot;distance&quot;</code>
         <span>ffmpeg xfade distance</span>
       </figcaption>
+    </figure>
+    <figure class="tile" data-id="transition:slats" id="transition-slats">
+      <img src="media/transition/slats.jpg" alt="slats" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;transition&quot;: &quot;slats&quot;</code>
+        <span>drawn slats (xfade custom expression, kit/xfx.cjs)</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="transition:checkerboard" id="transition-checkerboard">
+      <img src="media/transition/checkerboard.jpg" alt="checkerboard" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;transition&quot;: &quot;checkerboard&quot;</code>
+        <span>drawn checkerboard (xfade custom expression, kit/xfx.cjs)</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="transition:light-leak" id="transition-light-leak">
+      <img src="media/transition/light-leak.jpg" alt="light-leak" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;transition&quot;: &quot;light-leak&quot;</code>
+        <span>drawn light-leak (xfade custom expression, kit/xfx.cjs)</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="transition:zoom-blur" id="transition-zoom-blur">
+      <img src="media/transition/zoom-blur.jpg" alt="zoom-blur" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;transition&quot;: &quot;zoom-blur&quot;</code>
+        <span>drawn zoom-blur (xfade custom expression, kit/xfx.cjs)</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="transition:news-ribbon" id="transition-news-ribbon">
+      <img src="media/transition/news-ribbon.jpg" alt="news-ribbon" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;transition&quot;: &quot;news-ribbon&quot;</code>
+        <span>drawn news-ribbon (xfade custom expression, kit/xfx.cjs)</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="transition:breaking-news" id="transition-breaking-news">
+      <img src="media/transition/breaking-news.jpg" alt="breaking-news" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;transition&quot;: &quot;breaking-news&quot;</code>
+        <span>drawn news-ribbon (xfade custom expression, kit/xfx.cjs)</span>
+      </figcaption>
     </figure></div></section>
-<section id="graphics"><h2>Graphics <small>3</small></h2><p class="hint">Original overlay graphics, each with its own entrance: captions.js flips (modes 9 to 11) or a reel-graphics block in a Reel.md. Bring your icon or screen recording, or the kit draws a neutral placeholder. Teardown maps these from a reference (kit/graphics.json).</p><div class="grid">
+<section id="graphics"><h2>Graphics <small>29</small></h2><p class="hint">Original overlay graphics drawn in the theme colours and fonts, each with its own entrance and exit: captions.js flips (modes 9 to 37) or a reel-graphics block in a Reel.md. Words on them must be words you say (kit/spoken.cjs). Layer front, behind or auto: behind tucks only the top of your head over the graphic, never your face. Bring your icon or screen recording, or the kit draws a neutral placeholder. Teardown maps the first three from a reference (kit/graphics.json).</p><div class="grid">
     <figure class="tile" data-id="graphic:ordinal-sticker" id="graphic-ordinal-sticker">
       <img src="media/graphic/ordinal-sticker.jpg" alt="ordinal-sticker" width="270" height="480" loading="lazy">
       <figcaption>
         <code>&quot;mode&quot;: 9  (entrance burst-pop)</code>
-        <span>list number sticker: an italic serif word (FIRST, SECOND, NEXT) over a spiky starburst; the burst can sit behind your head</span>
+        <span>list number sticker: an italic serif word (FIRST, SECOND, NEXT) set on a flat seal in the theme accent; the seal can sit behind your head</span>
       </figcaption>
     </figure>
     <figure class="tile" data-id="graphic:app-label" id="graphic-app-label">
       <img src="media/graphic/app-label.jpg" alt="app-label" width="270" height="480" loading="lazy">
       <figcaption>
         <code>&quot;mode&quot;: 10  (entrance tile-pop)</code>
-        <span>app or logo label: a square icon tile and a bold label with a white outline; your icon image, or a generic glyph</span>
+        <span>app or logo label: a top-lit icon tile springs in and a name plate wipes out under it; your icon image, or a monogram of the name</span>
       </figcaption>
     </figure>
     <figure class="tile" data-id="graphic:screen-card" id="graphic-screen-card">
       <img src="media/graphic/screen-card.jpg" alt="screen-card" width="270" height="480" loading="lazy">
       <figcaption>
         <code>&quot;mode&quot;: 11  (entrance card-rise)</code>
-        <span>screen card: a rounded dark card with a coloured border, inset in the lower middle, showing your screenshot or screen recording</span>
+        <span>screen card: a dark window card (title bar, address pill, accent rim with a glow), inset in the lower middle, showing your screenshot or screen recording; optional pointer clicks and pan and zoom keyframes on beats you say</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:lower-third" id="graphic-lower-third">
+      <img src="media/graphic/lower-third.jpg" alt="lower-third" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 12  (entrance bar-wipe)</code>
+        <span>lower third name tag: an accent rule springs up, a name plate wipes out from it and a small line follows on an accent tab</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:stat-callout" id="graphic-stat-callout">
+      <img src="media/graphic/stat-callout.jpg" alt="stat-callout" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 13  (entrance count-up)</code>
+        <span>big number callout: the number blurs in and counts up to its value in equal digit cells, accent gradient and glow, a label plate rises under it</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:checklist" id="graphic-checklist">
+      <img src="media/graphic/checklist.jpg" alt="checklist" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 14  (entrance tick-in)</code>
+        <span>checklist card: rows slide in, and each check springs in and draws its tick as you say its item; a done count in the header</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:quote-card" id="graphic-quote-card">
+      <img src="media/graphic/quote-card.jpg" alt="quote-card" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 15  (entrance quote-unfold)</code>
+        <span>quote card: a quote mark springs in, the line fades up word by word in an italic serif, with a small attribution under it</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:highlight" id="graphic-highlight">
+      <img src="media/graphic/highlight.jpg" alt="highlight" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 16  (entrance draw-on)</code>
+        <span>highlight: a tapered marker circle, arrow, underline or box draws itself on with a glow, with an optional short label on an accent plate</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:step-counter" id="graphic-step-counter">
+      <img src="media/graphic/step-counter.jpg" alt="step-counter" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 17  (entrance step-tick)</code>
+        <span>step counter: a plate with the step number rolling over in an accent disc, STEP 2 OF 5 beside it and a segmented bar that fills to the current step</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:versus" id="graphic-versus">
+      <img src="media/graphic/versus.jpg" alt="versus" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 18  (entrance split-slam)</code>
+        <span>versus card: two halves slide in from the sides and a VS badge slams between them</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:icon-badge" id="graphic-icon-badge">
+      <img src="media/graphic/icon-badge.jpg" alt="icon-badge" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 19  (entrance badge-spin)</code>
+        <span>round icon badge: springs in while its conic ring draws round; a built-in glyph (Tabler icon) or your icon, with an optional label plate</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:sticker-pop" id="graphic-sticker-pop">
+      <img src="media/graphic/sticker-pop.jpg" alt="sticker-pop" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 20  (entrance scatter-pop)</code>
+        <span>reaction stickers: a little cluster of die-cut vinyl stickers (hearts, stars, fire, sparks) springs in around a point and floats up</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:price-tag" id="graphic-price-tag">
+      <img src="media/graphic/price-tag.jpg" alt="price-tag" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 21  (entrance chip-rise)</code>
+        <span>price tag: a price card rises and springs into place, the price big with a raised currency sign and an old price struck through above</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:cta-card" id="graphic-cta-card">
+      <img src="media/graphic/cta-card.jpg" alt="cta-card" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 22  (entrance cta-rise)</code>
+        <span>call-to-action end card: a card rises with an avatar ring, your line and handle, and a follow button pulses with ripples</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:code-card" id="graphic-code-card">
+      <img src="media/graphic/code-card.jpg" alt="code-card" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 23  (entrance type-on)</code>
+        <span>code snippet card: an editor window with a file tab, line numbers and a current-line band, the code typing itself on with syntax colour and a caret; the card widens or the type steps down so no line is clipped</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:data-chart" id="graphic-data-chart">
+      <img src="media/graphic/data-chart.jpg" alt="data-chart" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 24  (entrance bars-grow)</code>
+        <span>data chart card: gridlines draw, then each bar (or each point of a line) grows on its beat with a spring while its value counts up; the top value glows in the accent</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:chapter-card" id="graphic-chapter-card">
+      <img src="media/graphic/chapter-card.jpg" alt="chapter-card" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 25  (entrance chapter-wipe)</code>
+        <span>chapter card: a soft scrim and accent rule, CHAPTER 02 and the title rising out of a mask line by line, a ghost numeral behind and progress ticks</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:logo-bug" id="graphic-logo-bug">
+      <img src="media/graphic/logo-bug.jpg" alt="logo-bug" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 26  (entrance bug-in)</code>
+        <span>logo bug: your mark (an icon file, else a monogram tile in the accent) springs into a corner with its name on a dark plate; a slow sheen passes now and then</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:channel-bug" id="graphic-channel-bug">
+      <img src="media/graphic/channel-bug.jpg" alt="channel-bug" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 27  (entrance bug-in)</code>
+        <span>channel bug: a red LIVE pill with a breathing dot, a running clock in tabular digits and the channel name, on dark plates in a corner</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:terminal-session" id="graphic-terminal-session">
+      <img src="media/graphic/terminal-session.jpg" alt="terminal-session" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 28  (entrance term-rise)</code>
+        <span>terminal session: a terminal window rises; each $ command types on its beat with a spinner, then its output lands line by line (ticks green, errors red); a block cursor blinks</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:news-strap" id="graphic-news-strap">
+      <img src="media/graphic/news-strap.jpg" alt="news-strap" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 29  (entrance strap-wipe)</code>
+        <span>news strap: a broadcast lower third; a light plate wipes out from an accent bar with the headline, a tag tab drops onto its top edge and the sub line slides in on a dark strip</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:ticker" id="graphic-ticker">
+      <img src="media/graphic/ticker.jpg" alt="ticker" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 30  (entrance ticker-slide)</code>
+        <span>ticker: a full-width band rises from the bottom edge with a slanted accent label block; the items you say scroll right to left between accent diamonds</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:split-flap" id="graphic-split-flap">
+      <img src="media/graphic/split-flap.jpg" alt="split-flap" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 31  (entrance flap-in)</code>
+        <span>split-flap board: hinged departure-board tiles flip through letters and land on your words left to right in Anton; a second row in the accent</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:feature-cards" id="graphic-feature-cards">
+      <img src="media/graphic/feature-cards.jpg" alt="feature-cards" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 32  (entrance cards-deal)</code>
+        <span>feature cards: two to four cards deal in side by side as you say each feature, with an icon tile in the accent, a number, the feature and a short line; the newest card glows</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:release-pill" id="graphic-release-pill">
+      <img src="media/graphic/release-pill.jpg" alt="release-pill" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 33  (entrance pill-pop)</code>
+        <span>release pill: a glass pill springs in with an accent NEW chip (its dot pulsing a ring), your line and an arrow; a sheen sweeps across once</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:cta-button" id="graphic-cta-button">
+      <img src="media/graphic/cta-button.jpg" alt="cta-button" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 34  (entrance button-press)</code>
+        <span>CTA button: a lit accent button rises, a pointer glides in and clicks it (the button squashes and flashes, a ripple rings out); a sub line under it</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:hud-callout" id="graphic-hud-callout">
+      <img src="media/graphic/hud-callout.jpg" alt="hud-callout" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 35  (entrance lock-on)</code>
+        <span>HUD callout: corner brackets spin in and lock onto a region (a flash, centre ticks, a scan line), a leader line draws out with an elbow to a label that decodes into place</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:flash-card" id="graphic-flash-card">
+      <img src="media/graphic/flash-card.jpg" alt="flash-card" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 36  (entrance flash-cut)</code>
+        <span>flash cards: full-bleed type cards, one word each in Anton, hard cut on each beat with a punch-in, alternating accent and ink grounds; covers the frame</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="graphic:keyword-caption" id="graphic-keyword-caption">
+      <img src="media/graphic/keyword-caption.jpg" alt="keyword-caption" width="270" height="480" loading="lazy">
+      <figcaption>
+        <code>&quot;mode&quot;: 37  (entrance block-in)</code>
+        <span>keyword caption: a caption line rises word by word, then a solid accent block wipes in behind the keyword and its letters flip to ink on it; an optional tag above</span>
       </figcaption>
     </figure></div></section>
 <section id="effects"><h2>Effects <small>51</small></h2><p class="hint">Optional second pass (npm run fx). 51 starter effects, grouped by moment.</p>
@@ -1540,7 +1771,7 @@
         <span>A dark panel above your head shows your voice; the silent ends collapse until only your words are left.</span>
       </figcaption>
     </figure></div></section>
-<section id="sfx"><h2>SFX pack <small>31</small></h2><p class="hint">31 CC0 sounds, auto-picked on npm run fx. Locked cut set is whoosh, swipe, boom, click, typing.</p><div class="grid">
+<section id="sfx"><h2>SFX pack <small>37</small></h2><p class="hint">37 CC0 sounds, auto-picked on npm run fx. Locked cut set is whoosh, swipe, boom, click, typing.</p><div class="grid">
     <figure class="tile" data-id="sfx:01-cinematic-hit-a" id="sfx-01-cinematic-hit-a">
       <img src="media/sfx/01-cinematic-hit-a.jpg" alt="01-cinematic-hit-a" width="270" height="480" loading="lazy">
       <figcaption>
@@ -1756,6 +1987,48 @@
       <figcaption>
         <code>&quot;sfx&quot;: &quot;32-release-resolve-chord&quot;  or  sfxHits id</code>
         <span>release pack sound (2.424s, hit at 0.17s)</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="sfx:33-ui-mouse-click" id="sfx-33-ui-mouse-click">
+      <div class="ph"></div>
+      <figcaption>
+        <code>&quot;sfx&quot;: &quot;33-ui-mouse-click&quot;  or  sfxHits id</code>
+        <span>ui pack sound (0.36s, hit at 0.16s)</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="sfx:34-ui-key-press" id="sfx-34-ui-key-press">
+      <div class="ph"></div>
+      <figcaption>
+        <code>&quot;sfx&quot;: &quot;34-ui-key-press&quot;  or  sfxHits id</code>
+        <span>ui pack sound (0.408s, hit at 0.11s)</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="sfx:35-ui-keyboard-typing" id="sfx-35-ui-keyboard-typing">
+      <div class="ph"></div>
+      <figcaption>
+        <code>&quot;sfx&quot;: &quot;35-ui-keyboard-typing&quot;  or  sfxHits id</code>
+        <span>ui pack sound (2.424s, hit at 0.05s)</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="sfx:36-paper-flip" id="sfx-36-paper-flip">
+      <div class="ph"></div>
+      <figcaption>
+        <code>&quot;sfx&quot;: &quot;36-paper-flip&quot;  or  sfxHits id</code>
+        <span>paper pack sound (0.48s, hit at 0.2s)</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="sfx:37-camera-clapper" id="sfx-37-camera-clapper">
+      <div class="ph"></div>
+      <figcaption>
+        <code>&quot;sfx&quot;: &quot;37-camera-clapper&quot;  or  sfxHits id</code>
+        <span>camera pack sound (0.576s, hit at 0.13s)</span>
+      </figcaption>
+    </figure>
+    <figure class="tile" data-id="sfx:38-camera-slate" id="sfx-38-camera-slate">
+      <div class="ph"></div>
+      <figcaption>
+        <code>&quot;sfx&quot;: &quot;38-camera-slate&quot;  or  sfxHits id</code>
+        <span>camera pack sound (0.264s, hit at 0s)</span>
       </figcaption>
     </figure></div></section>
 <section id="beds"><h2>Music beds <small>11</small></h2><p class="hint">Our own tracks, loudness-matched to -13 LUFS. Hear them with the files in kit/music/.</p><div class="grid">

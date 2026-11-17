@@ -16,6 +16,7 @@ import { writeSheetsAndGallery } from './sheets.mjs';
 const require = createRequire(import.meta.url);
 const B = require('./beats.cjs');
 const Preset = require('./preset.cjs');
+const XFX = require('./xfx.cjs');
 const KIT = dirname(fileURLToPath(import.meta.url));
 // fx.cjs fills these before the runner sees a plan; calling the runner directly must do the same, or the upstream
 // author's name and handle (its defaults) show in the stills
@@ -211,7 +212,9 @@ function pickLayerStill(dir, t) {
 }
 
 // Titles go behind the person (mask), captions and other overlay sit in front.
-function composeOverPerson(person, mask, titles, front, dest) {
+// picture, titles behind the person, panels (screen cards and graphics behind the top of the head) under the crown
+// mask, then the front layer
+function composeOverPerson(person, mask, titles, front, dest, panels) {
   const tmp = dest.replace(/\.jpg$/i, '') + '.compose.png';
   mkdirSync(dirname(dest), { recursive: true });
   const inputs = ['-i', person];
@@ -228,9 +231,18 @@ function composeOverPerson(person, mask, titles, front, dest) {
     filters.push('[0:v]format=rgba[mid]');
   }
   let last = 'mid';
+  if (panels && existsSync(panels)) {
+    inputs.push('-i', panels);
+    if (CROWN && existsSync(CROWN)) {
+      inputs.push('-i', CROWN);
+      filters.push(`[${n}:v]format=rgba[pn];[${n + 1}:v]format=gray[cm];[${last}][pn]overlay=0:0:format=auto[mp];[0:v]format=rgba[pc];[pc][cm]alphamerge[crn];[mp][crn]overlay=0:0:format=auto[mid2]`);
+      n += 2;
+    } else { filters.push(`[${n}:v]format=rgba[pn];[${last}][pn]overlay=0:0:format=auto[mid2]`); n += 1; }
+    last = 'mid2';
+  }
   if (front && existsSync(front)) {
     inputs.push('-i', front);
-    filters.push(`[${n}:v]format=rgba[fr];[mid][fr]overlay=0:0:format=auto[outv]`);
+    filters.push(`[${n}:v]format=rgba[fr];[${last}][fr]overlay=0:0:format=auto[outv]`);
     last = 'outv';
   }
   sh('ffmpeg', ['-v', 'error', '-y', ...inputs, '-filter_complex', filters.join(';'), '-map', `[${last}]`,
@@ -239,10 +251,23 @@ function composeOverPerson(person, mask, titles, front, dest) {
   try { rmSync(tmp); } catch {}
 }
 
-let PERSON = null, MASK = null;
+let PERSON = null, MASK = null, CROWN = null;
+
+// the crown mask of the presenter (kit/headmask.py on the person mask): graphics behind the top of the head draw under it
+function crownMask(py, work) {
+  if (!MASK || !existsSync(MASK)) return null;
+  const mkv = join(work, 'crown-src.mkv'), hm = join(work, 'crown.mkv'), png = join(work, 'crown.png');
+  if (existsSync(png)) return png;
+  try {
+    sh('ffmpeg', ['-v', 'error', '-y', '-i', MASK, '-frames:v', '1', '-c:v', 'ffv1', '-pix_fmt', 'gray', mkv]);
+    sh(py, [join(KIT, 'headmask.py'), mkv, hm], work);
+    sh('ffmpeg', ['-v', 'error', '-y', '-i', hm, '-frames:v', '1', '-update', '1', png]);
+    return png;
+  } catch (e) { console.warn('crown mask failed; behind graphics drawn in front: ' + String(e.message || e).split('\n')[0]); return null; }
+}
 
 function typeStill(build, t, env, outFile) {
-  for (const d of ['stills', 'stills-front', 'stills-titles']) {
+  for (const d of ['stills', 'stills-front', 'stills-titles', 'stills-panels']) {
     if (existsSync(join(build, d))) rmSync(join(build, d), { recursive: true, force: true });
   }
   if (env && env.THEME) {
@@ -251,7 +276,8 @@ function typeStill(build, t, env, outFile) {
   sh(node, [join(KIT, 'render.mjs'), '0', String(t)], build, { ...env, STILLS_LAYERS: '1' });
   const front = pickLayerStill(join(build, 'stills-front'), t);
   const titles = pickLayerStill(join(build, 'stills-titles'), t);
-  if (PERSON && (front || titles)) composeOverPerson(PERSON, MASK, titles, front, outFile);
+  const panels = pickLayerStill(join(build, 'stills-panels'), t);
+  if (PERSON && (front || titles || panels)) composeOverPerson(PERSON, MASK, titles, front, outFile, panels);
   else {
     const fallback = front || titles || pickLayerStill(join(build, 'stills'), t);
     if (!fallback) throw new Error('render wrote no still at ' + t);
@@ -364,34 +390,7 @@ async function main() {
   }
 
   console.log('transitions');
-  const transJson = JSON.parse(readFileSync(join(KIT, 'transitions.json'), 'utf8'));
-  const aCol = join(work, 'ta.png'), bCol = join(work, 'tb.png');
-  sh('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=0x5cf9e2:s=1080x1920:d=1', '-frames:v', '1', aCol]);
-  sh('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=0x2a1810:s=1080x1920:d=1', '-i', person,
-    '-filter_complex', '[0][1]overlay=0:0', '-frames:v', '1', bCol]);
-  videoFromStill(aCol, join(work, 'ta.mp4'), 1);
-  videoFromStill(bCol, join(work, 'tb.mp4'), 1);
-  for (const it of menu.sections.find(s => s.id === 'transitions').items) {
-    const mode = transJson.names[it.id];
-    const tmp = join(work, 'tx-' + it.id + '.png');
-    const out = join(OUT, 'media', 'transition', it.id + '.jpg');
-    try {
-      if (mode) {
-        sh('ffmpeg', ['-v', 'error', '-y', '-i', join(work, 'ta.mp4'), '-i', join(work, 'tb.mp4'),
-          '-filter_complex', `[0][1]xfade=transition=${mode}:duration=0.4:offset=0.3,format=yuv420p`,
-          '-ss', '0.48', '-frames:v', '1', tmp]);
-      } else if (it.id === 'glitch') {
-        sh('ffmpeg', ['-v', 'error', '-y', '-i', bCol, '-vf', 'format=rgba,rgbashift=rh=18:bh=-18,noise=c0s=30:c0f=t+u', tmp]);
-      } else {
-        copyFileSync(bCol, tmp);
-      }
-      jpg(tmp, out);
-    } catch (e) {
-      console.warn('transition ' + it.id + ' failed, using plate: ' + e.message.split('\n')[0]);
-      jpg(bCol, out);
-    }
-    put('transition', it.id, out);
-  }
+  renderTransitionStills(work, person, put, menu);
 
   console.log('type stills');
   refreshTypeStills(py, work, stills, put, menu);
@@ -662,27 +661,63 @@ function renderTitleLayerStills(py, work, stills, put) {
 }
 
 // Graphics (kit/graphics.json): each one after its entrance settles, on the presenter, with the neutral placeholder
-// art (no third-party icons or screenshots). The ordinal burst goes behind the head with the person mask.
+// art (no third-party screenshots; icons are Tabler, MIT). The ordinal burst goes behind the head with the person mask; graphics
+// on the panel layer go under the crown mask. The others use their kit/graphics.json example.
 const GFX_DEMO = {
   'ordinal-sticker': [{ start: 0, end: 3, mode: 9, text: 'First', layer: 'behind' }],
   'app-label': [{ start: 0, end: 3, mode: 10, text: 'Your App', y: 0.52 }],
   'screen-card': [{ start: 0, end: 3, mode: 11, border: '#ff7a45' }],
 };
+// when each tile is taken: after the entrance, with a checklist half ticked, a quote fully in and the code typed
+const GFX_AT = { checklist: 1.3, 'quote-card': 1.8, 'price-tag': 1.4, 'code-card': 2.0 };
+// one still per transition, mid-blend from an accent plate to the presenter (only: limit to some ids)
+function renderTransitionStills(work, person, put, menu, only) {
+  const transJson = JSON.parse(readFileSync(join(KIT, 'transitions.json'), 'utf8'));
+  const aCol = join(work, 'ta.png'), bCol = join(work, 'tb.png');
+  sh('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=0x5cf9e2:s=1080x1920:d=1', '-frames:v', '1', aCol]);
+  sh('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=0x2a1810:s=1080x1920:d=1', '-i', person,
+    '-filter_complex', '[0][1]overlay=0:0', '-frames:v', '1', bCol]);
+  videoFromStill(aCol, join(work, 'ta.mp4'), 1);
+  videoFromStill(bCol, join(work, 'tb.mp4'), 1);
+  for (const it of menu.sections.find(s => s.id === 'transitions').items.filter(it => !only || only(it.id))) {
+    const mode = transJson.names[it.id];
+    const tmp = join(work, 'tx-' + it.id + '.png');
+    const out = join(OUT, 'media', 'transition', it.id + '.jpg');
+    try {
+      if (mode) {
+        sh('ffmpeg', ['-v', 'error', '-y', '-i', join(work, 'ta.mp4'), '-i', join(work, 'tb.mp4'),
+          '-filter_complex', `[0][1]xfade=${XFX.xfadeOpts(mode, { color: '#5cf9e2' })}:duration=0.4:offset=0.3,format=yuv420p`,
+          '-ss', '0.48', '-frames:v', '1', tmp]);
+      } else if (it.id === 'glitch') {
+        sh('ffmpeg', ['-v', 'error', '-y', '-i', bCol, '-vf', 'format=rgba,rgbashift=rh=18:bh=-18,noise=c0s=30:c0f=t+u', tmp]);
+      } else {
+        copyFileSync(bCol, tmp);
+      }
+      jpg(tmp, out);
+    } catch (e) {
+      console.warn('transition ' + it.id + ' failed, using plate: ' + e.message.split('\n')[0]);
+      jpg(bCol, out);
+    }
+    put('transition', it.id, out);
+  }
+}
+
 function renderGraphicStills(work, put, menu) {
   PERSON = presenterPath();
   MASK = existsSync(PRESENTER_MASK) ? PRESENTER_MASK : null;
+  CROWN = crownMask(whichPy(), work);
   const build = join(work, 'graphics-build');
   mkdirSync(build, { recursive: true });
   for (const it of menu.sections.find(s => s.id === 'graphics').items) {
     const flips = GFX_DEMO[it.id] || [{ ...(it.example || {}), start: 0, end: 3 }];
     writeFileSync(join(build, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'kinetic', flips }) + ';\n');
     const out = join(OUT, 'media', 'graphic', it.id + '.jpg');
-    typeStill(build, 1.2, { THEME: 'aigent', FONTS: 'theme' }, out);
+    typeStill(build, GFX_AT[it.id] || 1.2, { THEME: 'aigent', FONTS: 'theme' }, out);
     put('graphic', it.id, out);
   }
 }
 
-function refreshEntranceStills(work, stills, put, menu) {
+function refreshEntranceStills(work, stills, put, menu, only) {
   PERSON = presenterPath();
   MASK = existsSync(PRESENTER_MASK) ? PRESENTER_MASK : null;
   const ents = menu.sections.find(s => s.id === 'title-entrances').items;
@@ -696,6 +731,7 @@ function refreshEntranceStills(work, stills, put, menu) {
   }
   sh(node, [join(KIT, 'render.mjs'), '0', entTimes.join(',')], build, { THEME: 'aigent', FONTS: 'theme', STILLS_LAYERS: '1' });
   ents.forEach((it, i) => {
+    if (only && !only(it.id)) return;
     const t = +entTimes[i];
     const out = join(OUT, 'media', 'entrance', it.id + '.jpg');
     const front = pickLayerStill(join(build, 'stills-front'), t);
@@ -726,6 +762,14 @@ async function rebuildFromStills() {
   console.log('title entrances (front)');
   try { refreshEntranceStills(work, stills, put, menu); }
   catch (e) { console.warn('entrances refresh failed: ' + (e.message || e).toString().split('\n')[0]); }
+  } else {
+    // new transitions and entrances since the last full run get their stills too
+    const missing = kind => id => !existsSync(join(OUT, 'media', kind, id + '.jpg'));
+    console.log('missing transition and entrance stills');
+    PERSON = presenterPath();
+    renderTransitionStills(work, PERSON, put, menu, missing('transition'));
+    try { refreshEntranceStills(work, stills, put, menu, missing('entrance')); }
+    catch (e) { console.warn('entrances refresh failed: ' + (e.message || e).toString().split('\n')[0]); }
   }
   console.log('graphics');
   renderGraphicStills(work, put, menu);

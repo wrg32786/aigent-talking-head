@@ -2,8 +2,14 @@
 //   npm run verify -- <job>                 -> newest reel in jobs/<job>/ (reel-fx-vN.mp4 or reel-vN.mp4)
 //   npm run verify -- <job> --file x.mp4    -> that file, against the job's cut.json and captions.js
 //   options: --jobs <dir>, --fps 24 (expected frame rate; default cut.json "fps" or 24, this kit's format)
+//   --export tiktok|reels|shorts|feed45|square  check that export (reel-vN-<name>.mp4): its size, length cap, and that every
+//     title, caption and graphic sits inside the platform's safe area (the stills show the UI zones in red)
+//   --json  print one JSON result line at the end ({ ok, file, fails, notes, stills, contact })
 // Writes jobs/<job>/verify/: one still per check point and contact.png (all of them), plus report.md.
-//   Check points: every kinetic title mid-entrance and settled, the payoff, both big-punch frames, and the first caption.
+//   Check points: every kinetic title mid-entrance and settled, the payoff, both big-punch frames, the first caption, and
+//   the middle of every graphic's window.
+//   Overlap: every element on screen at those moments is measured from its own pixels (render.mjs BOXES_AT); a graphic,
+//   caption or title that sits on another one fails (the layout pass in overlay.html moves or hides captions and titles).
 //   ffprobe: 1080x1920, the frame rate, H.264 + AAC at 48 kHz, duration = the cut's length.
 //   Loudness: integrated LUFS and true peak (target -14 LUFS, peak <= -1 dBTP).
 //   Mask (when cut.json has one): alpha measured from the mask file at each title, never judged by eye.
@@ -16,10 +22,14 @@ import { join, resolve, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 const R = createRequire(import.meta.url)('./rules.cjs');
+const X = createRequire(import.meta.url)('./exports.cjs');
 const KIT = dirname(fileURLToPath(import.meta.url)), ROOT = dirname(KIT);
 const argv = process.argv.slice(2);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['file', 'jobs', 'fps']);
+const VALUED = new Set(['file', 'jobs', 'fps', 'export']);
+const JSON_OUT = argv.includes('--json');
+const EXN = opt('export') ? String(opt('export')).toLowerCase() : null, EXP = EXN ? X.get(EXN) : null;
+if (EXN && !EXP) { console.error('--export must be ' + X.NAMES.join(', ')); process.exit(1); }
 const name = argv.find((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 if (!name) { console.error('Usage: npm run verify -- <job> [--file reel.mp4]'); process.exit(1); }
 let job = resolve(opt('jobs', join(ROOT, 'jobs')), name);
@@ -31,8 +41,8 @@ const stderrOf = (c, a) => String(spawnSync(c, a, { encoding: 'utf8', maxBuffer:
 
 let file = opt('file');
 if (!file) {
-  const reels = readdirSync(job).filter(f => /^reel(-fx)?-v\d+\.mp4$/.test(f)).map(f => join(job, f)).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
-  if (!reels.length) { console.error('No reel-vN.mp4 in ' + job); process.exit(1); }
+  const reels = readdirSync(job).filter(f => (EXN ? new RegExp(`^reel(-fx)?-v\\d+-${EXN}\\.mp4$`) : /^reel(-fx)?-v\d+\.mp4$/).test(f)).map(f => join(job, f)).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+  if (!reels.length) { console.error(EXN ? `No reel-vN-${EXN}.mp4 in ${job} (npm run export -- ${name} --export ${EXN})` : 'No reel-vN.mp4 in ' + job); process.exit(1); }
   file = reels[0];
 }
 file = resolve(file);
@@ -46,12 +56,13 @@ const ok = (cond, msg) => { lines.push((cond ? 'ok    ' : 'FAIL  ') + msg); retu
 const j = JSON.parse(sh('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,codec_name,width,height,r_frame_rate,sample_rate,channels:format=duration', '-of', 'json', file]));
 const v = j.streams.find(s => s.codec_type === 'video'), a = j.streams.find(s => s.codec_type === 'audio');
 const fr = v ? v.r_frame_rate.split('/').reduce((x, y) => x / y) : 0, dur = +j.format.duration;
-ok(v && v.width === 1080 && v.height === 1920, `video ${v ? v.width + 'x' + v.height : 'missing'} (1080x1920)`);
+const WANT = EXP ? [EXP.w, EXP.h] : [1080, 1920], TOTAL = EXP ? Math.min(TL.total, EXP.maxSec) : TL.total;
+ok(v && v.width === WANT[0] && v.height === WANT[1], `video ${v ? v.width + 'x' + v.height : 'missing'} (${WANT.join('x')}${EXP ? ', ' + EXP.label : ''})`);
 ok(v && Math.abs(fr - FPS) < 0.01, `frame rate ${fr.toFixed(3)} (${FPS})`);
 ok(v && v.codec_name === 'h264', `video codec ${v && v.codec_name} (h264)`);
 ok(a && a.codec_name === 'aac', `audio codec ${a ? a.codec_name : 'missing'} (aac)`);
 ok(a && +a.sample_rate === 48000, `audio ${a ? a.sample_rate : '-'} Hz (48000; some players refuse 96 kHz)`);
-ok(Math.abs(dur - TL.total) < 0.15, `duration ${dur.toFixed(2)} s (cut.json says ${TL.total.toFixed(2)} s)`);
+ok(Math.abs(dur - TOTAL) < 0.15, `duration ${dur.toFixed(2)} s (cut.json says ${TL.total.toFixed(2)} s${EXP && TL.total > EXP.maxSec ? ', capped at ' + EXP.maxSec + ' s' : ''})`);
 
 // 2. loudness
 const ebOut = stderrOf('ffmpeg', ['-hide_banner', '-nostats', '-i', file, '-filter_complex', 'ebur128=peak=true', '-f', 'null', '-']);
@@ -79,25 +90,74 @@ if (!titles.length) {
   const last = (CAP.flips || []).slice().sort((x, y) => y.start - x.start)[0];
   pts.push([last ? Math.min(TL.total - 0.1, last.start + 0.6) : TL.total - 0.5, 'payoff']);
 }
+// the middle of every graphic's window: the moment it is fully up, where overlap would show
+const GNAME = Object.fromEntries(JSON.parse(readFileSync(join(KIT, 'graphics.json'), 'utf8')).graphics.map(g => [g.mode, g.id]));
+const GRAPHIC = f => f.mode !== 0 && f.mode !== 7;
+const gfxPts = (CAP.flips || []).filter(GRAPHIC).map(f => { const e = Math.min(f.end > 90 ? f.start + 4 : f.end, TL.total - 0.05); return [(f.start + e) / 2, `graphic ${GNAME[f.mode] || 'mode ' + f.mode} mid`]; }).filter(p => p[0] < TL.total);
+pts.push(...gfxPts);
 TL.segs.forEach(s => { if (s.s.bigPunch) pts.push([s.start + R.PUNCH.bigDur + 0.05, `big punch seg ${s.i}`]); }); // pushed in, past the glitch seam
 if (!TL.segs.some(s => s.s.bigPunch) && TL.seams.length) pts.push([TL.seams[0] + 0.1, 'first cut']);
 pts.sort((x, y) => x[0] - y[0]);
+const inFile = t => t < dur - 0.02;
+for (let k = pts.length - 1; k >= 0; k--) if (!inFile(pts[k][0])) { notes.push(`${pts[k][1]} at ${pts[k][0].toFixed(2)} s is past the end of this file (length cap)`); pts.splice(k, 1); }
+// stills are 360 wide; an export's UI zones are shaded red on them
+const SW = 360, SH = Math.round(360 * WANT[1] / WANT[0]) & ~1, k3 = SW / WANT[0];
+const zones = EXP ? [[0, 0, WANT[0], EXP.safe.top], [0, WANT[1] - EXP.safe.bottom, WANT[0], EXP.safe.bottom], [0, 0, EXP.safe.left, WANT[1]], [WANT[0] - EXP.safe.right, 0, EXP.safe.right, WANT[1]]]
+  .map(([x, y, w, h]) => `drawbox=x=${Math.round(x * k3)}:y=${Math.round(y * k3)}:w=${Math.round(w * k3)}:h=${Math.round(h * k3)}:color=red@0.18:t=fill`).join(',') : '';
 const vdir = join(job, 'verify'); rmSync(vdir, { recursive: true, force: true }); mkdirSync(vdir, { recursive: true });
 const stills = [];
 pts.forEach(([t, label], k) => {
   t = Math.max(0, Math.min(dur - 3 / FPS, Math.round(t * FPS) / FPS)); // snap to a frame so -ss lands on it
   const p = join(vdir, `${String(k + 1).padStart(2, '0')}-${t.toFixed(2)}s-${label.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.png`);
   const lab = `${t.toFixed(2)}s ${label}`.replace(/[:'\\]/g, ' ');
-  try { sh('ffmpeg', ['-v', 'error', '-y', '-ss', Math.max(0, t - 0.005).toFixed(3), '-i', file, '-frames:v', '1', '-vf', `scale=360:640,drawtext=text='${lab}':x=10:y=10:fontsize=18:fontcolor=white:box=1:boxcolor=black@0.6`, p]); }
-  catch { sh('ffmpeg', ['-v', 'error', '-y', '-ss', Math.max(0, t - 0.005).toFixed(3), '-i', file, '-frames:v', '1', '-vf', 'scale=360:640', p]); }
+  try { sh('ffmpeg', ['-v', 'error', '-y', '-ss', Math.max(0, t - 0.005).toFixed(3), '-i', file, '-frames:v', '1', '-vf', `scale=${SW}:${SH}${zones ? ',' + zones : ''},drawtext=text='${lab}':x=10:y=10:fontsize=18:fontcolor=white:box=1:boxcolor=black@0.6`, p]); }
+  catch { sh('ffmpeg', ['-v', 'error', '-y', '-ss', Math.max(0, t - 0.005).toFixed(3), '-i', file, '-frames:v', '1', '-vf', `scale=${SW}:${SH}`, p]); }
   if (existsSync(p)) stills.push({ t, label, file: p }); else notes.push(`no frame at ${t.toFixed(2)} s (${label})`);
 });
 if (stills.length) {
   const cols = Math.min(4, stills.length), rows = Math.ceil(stills.length / cols);
   const ins = stills.flatMap(s => ['-i', s.file]);
-  const layout = stills.map((_, k) => `${(k % cols) * 360}_${Math.floor(k / cols) * 640}`).join('|');
+  const layout = stills.map((_, k) => `${(k % cols) * SW}_${Math.floor(k / cols) * SH}`).join('|');
   sh('ffmpeg', ['-v', 'error', '-y', ...ins, '-filter_complex', stills.length > 1 ? `xstack=inputs=${stills.length}:layout=${layout}:fill=black` : 'null', join(vdir, 'contact.png')]);
   lines.push(`ok    ${stills.length} stills + contact.png (${cols}x${rows}) in ${vdir}`);
+}
+
+// 3b. overlap and safe area, measured from pixels: every element on screen at each check point, drawn alone with the
+// layout pass applied (render.mjs BOXES_AT). Graphic on graphic, caption or title on a graphic, caption on a title: FAIL.
+// A full-frame takeover (a type card, a flash card) owns the frame, so a graphic under it is only a note.
+{
+  const FR = CAP.exportFrame || null;
+  if (EXN && (!FR || FR.name !== EXN)) ok(false, `layout made for ${EXN} (captions.js exportFrame is ${FR ? FR.name : 'none'}; npm run reel -- --rebuild --name ${name} --export ${EXN})`);
+  const SAFE = EXN ? X.safeRect(EXN) : (FR && FR.name ? X.safeRect(FR.name) : null);
+  const times = [...new Set(pts.map(p => +p[0].toFixed(2)))];
+  let BX = null;
+  if (times.length) try {
+    execFileSync(process.execPath, [join(KIT, 'render.mjs'), TL.total.toFixed(2)], { cwd: build, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, BOXES_AT: times.join(',') } });
+    BX = JSON.parse(readFileSync(join(build, 'boxes.json'), 'utf8'));
+  } catch (e) { ok(false, 'measure element boxes (render.mjs BOXES_AT): ' + String(e.stderr || e.message).split('\n')[0]); }
+  if (BX) {
+    const ia = (a, b) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
+    const ar = b => (b.x1 - b.x0) * (b.y1 - b.y0), nm = e => e.kind === 'graphic' ? (GNAME[e.mode] || 'mode ' + e.mode) : `${e.kind} "${e.text}"`;
+    const clash = [], seen = new Set(), outside = [];
+    for (const { t, boxes } of BX) {
+      for (let i = 0; i < boxes.length; i++) for (let k = i + 1; k < boxes.length; k++) {
+        const a = boxes[i], b = boxes[k];
+        if (a.kind === 'caption' && b.kind === 'caption') continue;
+        if (a.kind === 'title' && b.kind === 'title') continue;
+        const x = ia(a.box, b.box); if (x <= Math.max(900, 0.03 * Math.min(ar(a.box), ar(b.box)))) continue;
+        const key = [nm(a), a.start, nm(b), b.start].join('|'); if (seen.has(key)) continue; seen.add(key);
+        if (a.takeover || b.takeover) { notes.push(`${t.toFixed(2)} s: ${nm(a)} and ${nm(b)} overlap under a full-frame graphic`); continue; }
+        clash.push(`${t.toFixed(2)} s: ${nm(a)} overlaps ${nm(b)} (${Math.round(x)} px²)`);
+      }
+      // safe area: settled elements only (an entrance or exit may pass through a UI zone on its way in or out)
+      if (SAFE) for (const e of boxes) { if (e.takeover || t - e.start < 0.6 || (e.end < 90 && e.end - t < 0.45)) continue; const b = e.box, d = 6;
+        if (b.x0 < SAFE.x0 - d || b.x1 > SAFE.x1 + d || b.y0 < SAFE.y0 - d || b.y1 > SAFE.y1 + d) { const key = 'safe|' + nm(e) + e.start; if (!seen.has(key)) { seen.add(key); outside.push(`${t.toFixed(2)} s: ${nm(e)} reaches into the ${EXN || FR.name} UI zone (box ${b.x0},${b.y0} to ${b.x1},${b.y1}; safe ${SAFE.x0},${SAFE.y0} to ${SAFE.x1},${SAFE.y1})`); } } }
+    }
+    ok(!clash.length, `no overlap between graphics, captions and titles at ${BX.length} moments${clash.length ? ':' : ''}`);
+    clash.forEach(c => lines.push('      ' + c));
+    if (SAFE) { ok(!outside.length, `everything inside the ${EXN || FR.name} safe area${outside.length ? ':' : ''}`); outside.forEach(c => lines.push('      ' + c)); }
+    try { const L = JSON.parse(readFileSync(join(build, 'layout.json'), 'utf8')).elements || []; const sh = L.filter(e => e.action === 'shift').length, hd = L.filter(e => e.action === 'hide').length; if (sh || hd) lines.push(`ok    layout pass: ${sh} moved clear of a graphic, ${hd} hidden while one is up`); } catch {}
+  }
 }
 
 // 4. mask, measured
@@ -134,4 +194,5 @@ writeFileSync(join(vdir, 'report.md'), report.join('\n'));
 console.log(report.join('\n'));
 const nf = lines.filter(l => l.startsWith('FAIL')).length;
 console.log(nf ? `VERIFY FAIL (${nf})` : `VERIFY PASS  ${join(vdir, 'contact.png')}`);
+if (JSON_OUT) console.log(JSON.stringify({ ok: !nf, file, export: EXN, fails: lines.filter(l => l.startsWith('FAIL')).map(l => l.slice(6)), notes, stills: stills.map(s => ({ t: s.t, label: s.label, file: s.file })), contact: join(vdir, 'contact.png'), report: join(vdir, 'report.md') }));
 process.exitCode = nf ? 1 : 0;

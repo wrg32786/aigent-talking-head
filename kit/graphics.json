@@ -1,33 +1,1013 @@
 {
- "note": "Graphic overlays drawn by kit/overlay.html as captions.js flips (mode 9, 10, 11). Original generic designs; bring your own icon or screen recording, or the kit draws a neutral placeholder. Listed in npm run menu, the showcase and the teardown mapping (kit/videomd2reel.cjs).",
+ "note": "Graphic overlays drawn by kit/overlay.html as captions.js flips (modes 9 to 37). Original generic designs, drawn in code with the theme's colours and fonts; icons are Tabler (MIT) path data; techniques from the MIT repos in THIRD_PARTY.md are redrawn, no code copied. \"cues\" on any graphic are beat words or seconds that kit/spoken.cjs turns into \"at\" times from when you say them. Bring your own icon, image or screen recording where a graphic takes one, or the kit draws a neutral placeholder. \"required\" lists the worded fields a graphic cannot show without (kit/spoken.cjs keeps the graphic and leaves off any other worded field you do not say). Listed in npm run menu, the showcase, contract.json and the teardown mapping (kit/videomd2reel.cjs). Words on screen follow kit/spoken.cjs: the fields under \"spoken\" must be words you say in the graphic's window, or a recipe job drops them. \"layer\" on modes 11 to 37 is front, behind or auto: behind draws on the panel layer under the crown mask (kit/headmask.py), so only the top of your head (hair and crown) goes over the graphic, never your face or chin. auto is behind for a screen card, and for the others behind when the graphic sits in the top part of the frame (its y below \"autoBehindY\").",
  "graphics": [
   {
    "id": "ordinal-sticker",
    "mode": 9,
    "entrance": "burst-pop",
-   "label": "list number sticker: an italic serif word (FIRST, SECOND, NEXT) over a spiky starburst; the burst can sit behind your head",
-   "fields": { "text": "the word, e.g. FIRST", "color": "starburst colour (default warm yellow)", "ink": "word colour (default white)", "layer": "front or behind (the burst goes behind the person when a mask is set)", "x": "centre x, 0..1 (default 0.5)", "y": "centre y of the burst, 0..1 (default 0.27)",
-        "size": "burst radius in pixels on the 1080-wide frame (default 400)", "head": "burst width in head widths (a teardown measures it; the remake measures your head and sets size and y)", "head-y": "burst centre below the head centre, in head widths" },
-   "example": { "start": 2.5, "end": 4.5, "mode": 9, "text": "FIRST", "layer": "behind" },
-   "detect": "a large pale or saturated yellow region with a spiky outline (low solidity), plus a short ordinal word read on screen at the same time"
+   "label": "list number sticker: an italic serif word (FIRST, SECOND, NEXT) set on a flat seal in the theme accent; the seal can sit behind your head",
+   "fields": {
+    "text": "the word, e.g. FIRST",
+    "color": "seal colour (default the theme accent)",
+    "ink": "word colour (default a dark or white ink that reads on the seal)",
+    "layer": "front or behind (the burst goes behind the person when a mask is set)",
+    "x": "centre x, 0..1 (default 0.5)",
+    "y": "centre y of the burst, 0..1 (default 0.27)",
+    "size": "seal radius in pixels on the 1080-wide frame (default 400)",
+    "head": "burst width in head widths (a teardown measures it; the remake measures your head and sets size and y)",
+    "head-y": "burst centre below the head centre, in head widths"
+   },
+   "example": {
+    "start": 2.5,
+    "end": 4.5,
+    "mode": 9,
+    "text": "FIRST",
+    "layer": "behind"
+   },
+   "detect": "a large pale or saturated yellow region with a spiky outline (low solidity), plus a short ordinal word read on screen at the same time",
+   "exit": "fade",
+   "spoken": [
+    "text"
+   ]
   },
   {
    "id": "app-label",
    "mode": 10,
    "entrance": "tile-pop",
-   "label": "app or logo label: a square icon tile and a bold label with a white outline; your icon image, or a generic glyph",
-   "fields": { "text": "the label", "icon": "image file (png, jpg, svg) relative to build/ or absolute; leave out for a generic glyph", "tile": "tile colour for the generic glyph (default the theme accent)", "x": "left edge of the tile, 0..1 (default 0.08)", "y": "top of the tile, 0..1 (default 0.5)", "size": "tile side in pixels on the 1080-wide frame (default 210)" },
-   "example": { "start": 3, "end": 5, "mode": 10, "text": "Your App" },
-   "detect": "a small square tile (rectangular outline, distinct colour) with a short label read just below or beside it"
+   "label": "app or logo label: a top-lit icon tile springs in and a name plate wipes out under it; your icon image, or a monogram of the name",
+   "fields": {
+    "text": "the label",
+    "icon": "image file (png, jpg, svg) relative to build/ or absolute; leave out for a generic glyph",
+    "tile": "tile colour for the generic glyph (default the theme accent)",
+    "x": "left edge of the tile, 0..1 (default 0.08)",
+    "y": "top of the tile, 0..1 (default 0.5)",
+    "size": "tile side in pixels on the 1080-wide frame (default 210)"
+   },
+   "example": {
+    "start": 3,
+    "end": 5,
+    "mode": 10,
+    "text": "Your App"
+   },
+   "detect": "a small square tile (rectangular outline, distinct colour) with a short label read just below or beside it",
+   "exit": "fade",
+   "spoken": [
+    "text"
+   ]
   },
   {
    "id": "screen-card",
    "mode": 11,
    "entrance": "card-rise",
-   "label": "screen card: a rounded dark card with a coloured border, inset in the lower middle, showing your screenshot or screen recording",
-   "fields": { "src": "image or video file (a screen recording plays in the card); leave out for a generic placeholder window", "source": "a public page (a repo, a site, a tool) captured by npm run capture to a screenshot and a short scrolling recording, or a file", "subject": "what the reference showed in the card (written by a teardown as subject~)", "border": "border colour (default the theme accent)", "in": "seconds into a video src (default 0)", "w": "card width, 0..1 (default 0.66)", "y": "card centre y, 0..1 (default 0.68)" },
-   "example": { "start": 5, "end": 9, "mode": 11, "border": "#ff7a45" },
-   "detect": "a rounded rectangle with a dark inside and a straight outline, wide and in the lower half, with small UI text read inside it"
+   "label": "screen card: a dark window card (title bar, address pill, accent rim with a glow), inset in the lower middle, showing your screenshot or screen recording; optional pointer clicks and pan and zoom keyframes on beats you say",
+   "fields": {
+    "src": "image or video file (a screen recording plays in the card); leave out for a generic placeholder window",
+    "source": "a public page (a repo, a site, a tool) captured by npm run capture to a screenshot and a short scrolling recording, or a file",
+    "subject": "what the reference showed in the card (written by a teardown as subject~)",
+    "border": "border colour (default the theme accent)",
+    "in": "seconds into a video src (default 0)",
+    "w": "card width, 0..1 (default 0.66)",
+    "y": "card centre y, 0..1 (default 0.68)",
+    "cursor": "pointer stops on the screen, \"x y\" pairs 0..1 separated by ; (the pointer glides in from the lower right, lands on each stop on its beat and clicks with a ripple)",
+    "cam": "camera keyframes, \"zoom x y\" separated by ; (zoom 1 to 4 on the point x y of the screen, 0..1); the camera eases so it lands on each beat",
+    "cues": "one beat per stop or keyframe, words or seconds separated by ; (each becomes the time you say it, written to at)",
+    "at": "beat times in reel seconds (else spread over the card)",
+    "layer": "front, behind or auto (default auto, which is behind: the top of your head goes over the card where it reaches into it; your face and body stay under it)"
+   },
+   "example": {
+    "start": 5,
+    "end": 9,
+    "mode": 11,
+    "border": "#ff7a45",
+    "cursor": "0.2 0.3; 0.68 0.62",
+    "cam": "1.6 0.25 0.3; 1 0.5 0.5"
+   },
+   "detect": "a rounded rectangle with a dark inside and a straight outline, wide and in the lower half, with small UI text read inside it",
+   "exit": "fade",
+   "spoken": [],
+   "defaults": {
+    "x": 0.5,
+    "y": 0.68
+   }
+  },
+  {
+   "id": "lower-third",
+   "mode": 12,
+   "entrance": "bar-wipe",
+   "exit": "wipe-back",
+   "label": "lower third name tag: an accent rule springs up, a name plate wipes out from it and a small line follows on an accent tab",
+   "fields": {
+    "text": "the name, e.g. Will Gwyn",
+    "sub": "the small line, e.g. what you do (optional)",
+    "color": "rule and tab colour (default the theme accent)",
+    "x": "left edge, 0..1 (default 0.06)",
+    "y": "centre y, 0..1 (default 0.76)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text",
+    "sub"
+   ],
+   "required": [
+    "text"
+   ],
+   "defaults": {
+    "x": 0.06,
+    "y": 0.76
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 12,
+    "text": "Will Gwyn",
+    "sub": "writes The AIgent"
+   },
+   "detect": "a short horizontal plate in the lower third with a coloured bar at its left edge and one or two lines of text"
+  },
+  {
+   "id": "stat-callout",
+   "mode": 13,
+   "entrance": "count-up",
+   "exit": "shrink-fade",
+   "label": "big number callout: the number blurs in and counts up to its value in equal digit cells, accent gradient and glow, a label plate rises under it",
+   "fields": {
+    "text": "the number as you want it shown, e.g. 10,000+ or 3x or 40%",
+    "sub": "the label under it, e.g. readers",
+    "color": "number colour (default the theme accent)",
+    "x": "centre x, 0..1 (default 0.5)",
+    "y": "centre y of the number, 0..1 (default 0.1)",
+    "size": "number size in pixels (default 230)",
+    "style": "count (default: counts up) or odometer (each digit spins like a reel and lands on its value)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text",
+    "sub"
+   ],
+   "required": [
+    "text"
+   ],
+   "defaults": {
+    "x": 0.5,
+    "y": 0.1
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 13,
+    "text": "10,000+",
+    "sub": "readers"
+   },
+   "detect": "one very large number on its own, with a short label under it"
+  },
+  {
+   "id": "checklist",
+   "mode": 14,
+   "entrance": "tick-in",
+   "exit": "slide-down",
+   "label": "checklist card: rows slide in, and each check springs in and draws its tick as you say its item; a done count in the header",
+   "fields": {
+    "text": "the card title (optional)",
+    "items": "the rows, separated by ; (each ticks when you say it; a recipe job drops rows you never say)",
+    "at": "tick times in reel seconds, one per row (a recipe job sets them from your words; else spread over the card)",
+    "color": "check colour (default the theme accent)",
+    "x": "centre x, 0..1 (default 0.5)",
+    "y": "centre y, 0..1 (default 0.66)",
+    "w": "card width, 0..1 (default 0.8)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text",
+    "items"
+   ],
+   "required": [
+    "items"
+   ],
+   "defaults": {
+    "x": 0.5,
+    "y": 0.66
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 14,
+    "text": "Ship it",
+    "items": [
+     "Record",
+     "Caption",
+     "Post"
+    ]
+   },
+   "detect": "a card with two or more short rows, each with a square or round box at its left"
+  },
+  {
+   "id": "quote-card",
+   "mode": 15,
+   "entrance": "quote-unfold",
+   "exit": "fade-rise",
+   "label": "quote card: a quote mark springs in, the line fades up word by word in an italic serif, with a small attribution under it",
+   "fields": {
+    "text": "the quote",
+    "sub": "who said it (optional)",
+    "color": "quote mark and rule colour (default the theme accent)",
+    "y": "centre y, 0..1 (default 0.67)",
+    "w": "card width, 0..1 (default 0.84)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text",
+    "sub"
+   ],
+   "required": [
+    "text"
+   ],
+   "defaults": {
+    "x": 0.5,
+    "y": 0.67
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 15,
+    "text": "Record one take and let the kit do the rest",
+    "sub": "The AIgent"
+   },
+   "detect": "a few lines of serif or italic text with large quotation marks"
+  },
+  {
+   "id": "highlight",
+   "mode": 16,
+   "entrance": "draw-on",
+   "exit": "erase",
+   "label": "highlight: a tapered marker circle, arrow, underline or box draws itself on with a glow, with an optional short label on an accent plate",
+   "fields": {
+    "shape": "circle, arrow, underline or box (default circle)",
+    "text": "a short label on a plate at the arrow's tail or above the shape (optional)",
+    "color": "stroke colour (default the theme accent)",
+    "x": "centre x of the shape (or the arrow's tip; the arrow comes in from the nearer side), 0..1 (default 0.5)",
+    "y": "centre y, 0..1 (default 0.5)",
+    "w": "width, 0..1 (default 0.5)",
+    "h": "height, 0..1 (default 0.12)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text"
+   ],
+   "required": [
+    "text"
+   ],
+   "defaults": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 16,
+    "shape": "arrow",
+    "text": "this part",
+    "x": 0.56,
+    "y": 0.74
+   },
+   "detect": "a thin hand-drawn stroke (circle, arrow or underline) over the picture"
+  },
+  {
+   "id": "step-counter",
+   "mode": 17,
+   "entrance": "step-tick",
+   "exit": "slide-up",
+   "label": "step counter: a plate with the step number rolling over in an accent disc, STEP 2 OF 5 beside it and a segmented bar that fills to the current step",
+   "fields": {
+    "step": "the current step, a number (default 1)",
+    "of": "how many steps (default 3)",
+    "text": "the word before the number (default Step; the numbers are layout, a word you set is checked against what you say)",
+    "color": "filled segment colour (default the theme accent)",
+    "x": "left edge, 0..1 (default 0.06)",
+    "y": "centre y, 0..1 (default 0.08)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text"
+   ],
+   "required": [
+    "text"
+   ],
+   "defaults": {
+    "x": 0.06,
+    "y": 0.08
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 17,
+    "step": 2,
+    "of": 5
+   },
+   "detect": "a small pill near the top with a word and a number, often over a row of short bars"
+  },
+  {
+   "id": "versus",
+   "mode": 18,
+   "entrance": "split-slam",
+   "exit": "split-out",
+   "label": "versus card: two halves slide in from the sides and a VS badge slams between them",
+   "fields": {
+    "left": "the left side, e.g. Manual",
+    "right": "the right side, e.g. Agent",
+    "text": "or both at once: Manual vs Agent",
+    "color": "right card and emblem ring colour (default the theme accent)",
+    "y": "centre y, 0..1 (default 0.66)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "left",
+    "right"
+   ],
+   "required": [
+    "left",
+    "right"
+   ],
+   "defaults": {
+    "x": 0.5,
+    "y": 0.66
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 18,
+    "left": "Manual",
+    "right": "Agent"
+   },
+   "detect": "two side-by-side panels of different colour with a small VS between them"
+  },
+  {
+   "id": "icon-badge",
+   "mode": 19,
+   "entrance": "badge-spin",
+   "exit": "spin-out",
+   "label": "round icon badge: springs in while its conic ring draws round; a built-in glyph (Tabler icon) or your icon, with an optional label plate",
+   "fields": {
+    "glyph": "built-in glyph: check, star, bolt, heart, fire, play, bell, spark, plus or lock (default check)",
+    "icon": "your image (png, jpg, svg) instead of the glyph",
+    "text": "a short label pill under the badge (optional)",
+    "color": "ring colour (default the theme accent)",
+    "x": "centre x, 0..1 (default 0.8)",
+    "y": "centre y, 0..1 (default 0.36)",
+    "size": "badge diameter in pixels (default 220)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text"
+   ],
+   "required": [
+    "text"
+   ],
+   "defaults": {
+    "x": 0.8,
+    "y": 0.36
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 19,
+    "glyph": "bolt",
+    "text": "fast"
+   },
+   "detect": "a round badge with a ring and a single symbol inside"
+  },
+  {
+   "id": "sticker-pop",
+   "mode": 20,
+   "entrance": "scatter-pop",
+   "exit": "pop-out",
+   "label": "reaction stickers: a little cluster of die-cut vinyl stickers (hearts, stars, fire, sparks) springs in around a point and floats up",
+   "fields": {
+    "glyph": "heart, star, fire, spark, check, bolt, or several separated by ; (default heart;star;spark)",
+    "count": "how many stickers (default 5)",
+    "x": "centre x, 0..1 (default 0.78)",
+    "y": "centre y, 0..1 (default 0.42)",
+    "size": "sticker size in pixels (default 150)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [],
+   "defaults": {
+    "x": 0.78,
+    "y": 0.42
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 20,
+    "glyph": "heart;fire;star"
+   },
+   "detect": "several small white-outlined stickers or emoji scattered in a cluster"
+  },
+  {
+   "id": "price-tag",
+   "mode": 21,
+   "entrance": "chip-rise",
+   "exit": "chip-drop",
+   "label": "price tag: a price card rises and springs into place, the price big with a raised currency sign and an old price struck through above",
+   "fields": {
+    "text": "the price, e.g. $49",
+    "sub": "the old price, struck through (optional)",
+    "color": "accent colour: tag icon, strike line and foot (default the theme accent)",
+    "ink": "price colour (default the theme text)",
+    "x": "centre x, 0..1 (default 0.84)",
+    "y": "centre y of the card, 0..1 (default 0.56)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text",
+    "sub"
+   ],
+   "required": [
+    "text"
+   ],
+   "defaults": {
+    "x": 0.84,
+    "y": 0.56
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 21,
+    "text": "$49",
+    "sub": "$99"
+   },
+   "detect": "a tag-shaped plate with a hole at one end and a price on it"
+  },
+  {
+   "id": "cta-card",
+   "mode": 22,
+   "entrance": "cta-rise",
+   "exit": "drop",
+   "label": "call-to-action end card: a card rises with an avatar ring, your line and handle, and a follow button pulses with ripples",
+   "fields": {
+    "text": "the line, e.g. Follow for more",
+    "sub": "your handle, e.g. @theaigent (checked against what you say, run together: the aigent counts)",
+    "glyph": "the button glyph: plus, bell or play (default plus)",
+    "color": "button colour (default the theme accent)",
+    "y": "centre y, 0..1 (default 0.76)",
+    "w": "card width, 0..1 (default 0.82)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text",
+    "sub"
+   ],
+   "required": [
+    "text"
+   ],
+   "defaults": {
+    "x": 0.5,
+    "y": 0.76
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 22,
+    "text": "Follow for more",
+    "sub": "@theaigent"
+   },
+   "detect": "a card near the end with a short line, a handle and a button shape"
+  },
+  {
+   "id": "code-card",
+   "mode": 23,
+   "entrance": "type-on",
+   "exit": "card-fall",
+   "label": "code snippet card: an editor window with a file tab, line numbers and a current-line band, the code typing itself on with syntax colour and a caret; the card widens or the type steps down so no line is clipped",
+   "fields": {
+    "text": "the code; \\n starts a new line (it is your code, like a screen card's screen, so it is not checked against what you say)",
+    "title": "the tab name (default the language-neutral main)",
+    "border": "border colour (default the theme accent)",
+    "y": "centre y, 0..1 (default 0.67)",
+    "w": "card width, 0..1 (default 0.86)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [],
+   "defaults": {
+    "x": 0.5,
+    "y": 0.67
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 23,
+    "text": "npx skills add\\n  wrg32786/aigent-talking-head"
+   },
+   "detect": "a dark rounded card with monospace text and line numbers"
+  },
+  {
+   "id": "data-chart",
+   "mode": 24,
+   "entrance": "bars-grow",
+   "exit": "fold-down",
+   "label": "data chart card: gridlines draw, then each bar (or each point of a line) grows on its beat with a spring while its value counts up; the top value glows in the accent",
+   "fields": {
+    "text": "the chart title (optional)",
+    "sub": "a small kicker over the title (optional)",
+    "values": "the numbers, separated by ; (2 to 8; a value may carry a unit, 40% or $2.4M)",
+    "labels": "a label under each value, separated by ; (axis labels, shown as written)",
+    "kind": "bar (default) or line",
+    "cues": "beat words or seconds, separated by ; (each becomes the time you say it in the window, written to at by kit/spoken.cjs)",
+    "at": "beat times in reel seconds, one per value (else spread over the card)",
+    "color": "accent colour (default the theme accent)",
+    "y": "centre y, 0..1 (default 0.7)",
+    "w": "card width, 0..1 (default 0.84)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text",
+    "sub"
+   ],
+   "required": [
+    "text"
+   ],
+   "defaults": {
+    "x": 0.5,
+    "y": 0.7
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 24,
+    "text": "Weekly users",
+    "values": "1.2k;3.8k;7.5k;12k",
+    "labels": "Jan;Feb;Mar;Apr"
+   },
+   "detect": "a card with three or more bars or a rising line and numbers over them"
+  },
+  {
+   "id": "chapter-card",
+   "mode": 25,
+   "entrance": "chapter-wipe",
+   "exit": "wipe-left",
+   "label": "chapter card: a soft scrim and accent rule, CHAPTER 02 and the title rising out of a mask line by line, a ghost numeral behind and progress ticks",
+   "fields": {
+    "text": "the chapter title",
+    "sub": "a line under the title (optional)",
+    "step": "this chapter number (default 1)",
+    "of": "how many chapters (optional, draws progress ticks)",
+    "color": "accent colour (default the theme accent)",
+    "y": "centre y, 0..1 (default 0.74)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text",
+    "sub"
+   ],
+   "required": [
+    "text"
+   ],
+   "defaults": {
+    "x": 0.06,
+    "y": 0.74
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 25,
+    "text": "The setup",
+    "step": 2,
+    "of": 4
+   },
+   "detect": "a big left-aligned title with a small CHAPTER or PART label and a number"
+  },
+  {
+   "id": "logo-bug",
+   "mode": 26,
+   "entrance": "bug-in",
+   "exit": "fade",
+   "label": "logo bug: your mark (an icon file, else a monogram tile in the accent) springs into a corner with its name on a dark plate; a slow sheen passes now and then",
+   "fields": {
+    "text": "the name beside the mark (optional; its first letter is the monogram)",
+    "icon": "your logo image file (optional)",
+    "corner": "tl, tr (default), bl or br",
+    "size": "mark size in px (default 96)",
+    "opacity": "0..1 (default 0.94)",
+    "tile": "monogram tile colour (default the theme accent)",
+    "y": "centre y, 0..1 (default 0.055 at the top, 0.9 at the bottom)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text"
+   ],
+   "required": [
+    "text"
+   ],
+   "defaults": {
+    "x": 0.9,
+    "y": 0.055
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 26,
+    "text": "AIgent"
+   },
+   "detect": "a small logo or wordmark held in a corner for many seconds"
+  },
+  {
+   "id": "channel-bug",
+   "mode": 27,
+   "entrance": "bug-in",
+   "exit": "fade",
+   "label": "channel bug: a red LIVE pill with a breathing dot, a running clock in tabular digits and the channel name, on dark plates in a corner",
+   "fields": {
+    "text": "the channel name (optional)",
+    "live": "the pill word (default LIVE)",
+    "clock": "a start time to tick from (21:04 or 21:04:30), or none; default counts up from the start of the graphic",
+    "corner": "tl, tr (default), bl or br",
+    "y": "centre y, 0..1 (default 0.055 at the top)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text"
+   ],
+   "required": [
+    "text"
+   ],
+   "defaults": {
+    "x": 0.9,
+    "y": 0.055
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 27,
+    "text": "AIgent"
+   },
+   "detect": "a small red LIVE label with a dot, often next to a clock, in a top corner"
+  },
+  {
+   "id": "terminal-session",
+   "mode": 28,
+   "entrance": "term-rise",
+   "exit": "tip-away",
+   "label": "terminal session: a terminal window rises; each $ command types on its beat with a spinner, then its output lands line by line (ticks green, errors red); a block cursor blinks",
+   "fields": {
+    "text": "the session, one line per \\n: lines starting \"$ \" are commands you type, the rest is output (a line starting with a tick is green, with an x or error red)",
+    "title": "window title (default zsh)",
+    "cues": "one beat per command, words or seconds separated by ; (written to at)",
+    "at": "command start times in reel seconds (else back to back)",
+    "border": "accent colour (default the theme accent)",
+    "y": "centre y, 0..1 (default 0.67)",
+    "w": "minimum width, 0..1 (default 0.86; it widens to fit the longest line)",
+    "textSize": "type size in px (default 34; steps down to fit)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [],
+   "defaults": {
+    "x": 0.5,
+    "y": 0.67
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 28,
+    "text": "$ npx aigent init\\n✓ project ready\\n$ npm run reel\\n→ rendering 24 fps\\n✓ done in 41 s",
+    "title": "zsh"
+   },
+   "detect": "a dark terminal window with a prompt and lines of command output"
+  },
+  {
+   "id": "news-strap",
+   "mode": 29,
+   "entrance": "strap-wipe",
+   "exit": "wipe-out",
+   "label": "news strap: a broadcast lower third; a light plate wipes out from an accent bar with the headline, a tag tab drops onto its top edge and the sub line slides in on a dark strip",
+   "fields": {
+    "text": "the headline",
+    "sub": "the line under it (optional)",
+    "tag": "a short tab label over the strap (BREAKING, LIVE, NEW; optional)",
+    "color": "bar and tag colour (default the theme accent)",
+    "y": "centre y, 0..1 (default 0.8)",
+    "textSize": "headline size in px (default 84; steps down to fit)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text",
+    "sub"
+   ],
+   "required": [
+    "text"
+   ],
+   "defaults": {
+    "x": 0.05,
+    "y": 0.8
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 29,
+    "text": "Agents ship the edit",
+    "sub": "A talking head cut in one command",
+    "tag": "Breaking"
+   },
+   "detect": "a full-width light bar low in the frame with a dark headline and a small coloured tab on top"
+  },
+  {
+   "id": "ticker",
+   "mode": 30,
+   "entrance": "ticker-slide",
+   "exit": "drop-away",
+   "label": "ticker: a full-width band rises from the bottom edge with a slanted accent label block; the items you say scroll right to left between accent diamonds",
+   "fields": {
+    "text": "the label block (optional, e.g. HEADLINES)",
+    "items": "the items, separated by ; (a recipe job drops items you never say)",
+    "speed": "scroll speed in px per second (default 150)",
+    "color": "label and diamond colour (default the theme accent)",
+    "y": "centre y, 0..1 (default 0.9)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "items"
+   ],
+   "required": [
+    "items"
+   ],
+   "defaults": {
+    "x": 0.5,
+    "y": 0.9
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 30,
+    "text": "Today",
+    "items": [
+     "Record once",
+     "Cut on the beat",
+     "Post everywhere"
+    ]
+   },
+   "detect": "a full-width band at the bottom with text scrolling sideways"
+  },
+  {
+   "id": "split-flap",
+   "mode": 31,
+   "entrance": "flap-in",
+   "exit": "flap-out",
+   "label": "split-flap board: hinged departure-board tiles flip through letters and land on your words left to right in Anton; a second row in the accent",
+   "fields": {
+    "text": "the first row (up to 14 letters)",
+    "sub": "a second row in the accent (optional)",
+    "color": "second-row colour (default the theme accent)",
+    "y": "centre y, 0..1 (default 0.11)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text",
+    "sub"
+   ],
+   "required": [
+    "text"
+   ],
+   "defaults": {
+    "x": 0.5,
+    "y": 0.11
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 31,
+    "text": "Now boarding",
+    "sub": "Agents"
+   },
+   "detect": "a row of dark tiles, one letter each, with a line across the middle of every tile"
+  },
+  {
+   "id": "feature-cards",
+   "mode": 32,
+   "entrance": "cards-deal",
+   "exit": "cards-drop",
+   "label": "feature cards: two to four cards deal in side by side as you say each feature, with an icon tile in the accent, a number, the feature and a short line; the newest card glows",
+   "fields": {
+    "text": "a title over the cards (optional)",
+    "items": "the features, separated by ; (2 to 4; each deals in when you say it, a recipe job drops the ones you never say)",
+    "details": "a short line under each feature, separated by ; (optional; one you never say is left blank)",
+    "glyph": "icons, separated by ; (check, star, bolt, heart, fire, play, bell, spark, plus, lock)",
+    "cues": "beat words or seconds, separated by ; (each becomes the time you say it in the window, written to at by kit/spoken.cjs)",
+    "at": "deal times in reel seconds, one per card",
+    "color": "accent colour (default the theme accent)",
+    "y": "centre y, 0..1 (default 0.72)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text",
+    "items",
+    "details"
+   ],
+   "required": [
+    "items"
+   ],
+   "defaults": {
+    "x": 0.5,
+    "y": 0.72
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 32,
+    "items": [
+     "Record",
+     "Cut",
+     "Post"
+    ],
+    "details": [
+     "One take",
+     "On the beat",
+     "Everywhere"
+    ],
+    "glyph": "play;bolt;star"
+   },
+   "detect": "two to four equal cards side by side, each with an icon at the top and a short heading"
+  },
+  {
+   "id": "release-pill",
+   "mode": 33,
+   "entrance": "pill-pop",
+   "exit": "shrink-up",
+   "label": "release pill: a glass pill springs in with an accent NEW chip (its dot pulsing a ring), your line and an arrow; a sheen sweeps across once",
+   "fields": {
+    "text": "the line (v2 is live)",
+    "tag": "the chip word (default NEW)",
+    "sub": "a line under the pill (optional)",
+    "color": "chip colour (default the theme accent)",
+    "x": "centre x, 0..1 (default 0.5)",
+    "y": "centre y, 0..1 (default 0.2)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text",
+    "sub"
+   ],
+   "required": [
+    "text"
+   ],
+   "defaults": {
+    "x": 0.5,
+    "y": 0.2
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 33,
+    "text": "Version 2 is live",
+    "tag": "New"
+   },
+   "detect": "a small rounded pill with a coloured NEW chip at its left and one line of text"
+  },
+  {
+   "id": "cta-button",
+   "mode": 34,
+   "entrance": "button-press",
+   "exit": "fade-down",
+   "label": "CTA button: a lit accent button rises, a pointer glides in and clicks it (the button squashes and flashes, a ripple rings out); a sub line under it",
+   "fields": {
+    "text": "the button label",
+    "sub": "a line under the button (optional)",
+    "cues": "the click beat, a word or seconds (written to at)",
+    "at": "click time in reel seconds (default about 1 s in)",
+    "color": "button colour (default the theme accent)",
+    "x": "centre x, 0..1 (default 0.5)",
+    "y": "centre y, 0..1 (default 0.74)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text",
+    "sub"
+   ],
+   "required": [
+    "text"
+   ],
+   "defaults": {
+    "x": 0.5,
+    "y": 0.74
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 34,
+    "text": "Get started",
+    "sub": "Free while in beta"
+   },
+   "detect": "a single filled button with an arrow, often clicked by a mouse pointer"
+  },
+  {
+   "id": "hud-callout",
+   "mode": 35,
+   "entrance": "lock-on",
+   "exit": "release",
+   "label": "HUD callout: corner brackets spin in and lock onto a region (a flash, centre ticks, a scan line), a leader line draws out with an elbow to a label that decodes into place",
+   "fields": {
+    "text": "the label",
+    "sub": "a small line under it (optional)",
+    "x": "target centre x, 0..1 (default 0.5)",
+    "y": "target centre y, 0..1 (default 0.8)",
+    "w": "target width, 0..1 of the frame width (default 0.34)",
+    "h": "target height, 0..1 of the frame height (default 0.1)",
+    "color": "bracket colour (default the theme accent)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text",
+    "sub"
+   ],
+   "required": [
+    "text"
+   ],
+   "defaults": {
+    "x": 0.5,
+    "y": 0.8
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 35,
+    "text": "Mic",
+    "sub": "Lav, 48 kHz",
+    "x": 0.5,
+    "y": 0.84,
+    "w": 0.3,
+    "h": 0.08
+   },
+   "detect": "four corner brackets around something with a thin line out to a small label"
+  },
+  {
+   "id": "flash-card",
+   "mode": 36,
+   "entrance": "flash-cut",
+   "exit": "slats-out",
+   "label": "flash cards: full-bleed type cards, one word each in Anton, hard cut on each beat with a punch-in, alternating accent and ink grounds; covers the frame",
+   "fields": {
+    "text": "the words, one card each (spaces or | between cards, up to 10)",
+    "cues": "one beat per word, words or seconds separated by ; (written to at)",
+    "at": "cut times in reel seconds, one per word (else spread)",
+    "bg": "one ground colour for every card (optional)",
+    "color": "accent ground (default the theme accent)",
+    "size": "type size in px (default 520; steps down to fit)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text"
+   ],
+   "required": [
+    "text"
+   ],
+   "defaults": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 36,
+    "text": "Record Cut Post"
+   },
+   "detect": "whole-frame solid colour cards with one huge word each, changing every few frames"
+  },
+  {
+   "id": "keyword-caption",
+   "mode": 37,
+   "entrance": "block-in",
+   "exit": "drop-away",
+   "label": "keyword caption: a caption line rises word by word, then a solid accent block wipes in behind the keyword and its letters flip to ink on it; an optional tag above",
+   "fields": {
+    "text": "the caption line",
+    "keyword": "the word in the line that gets the block",
+    "tag": "a small label above (optional)",
+    "cues": "the block beat, a word or seconds (written to at)",
+    "at": "block time in reel seconds (default 0.42 s in)",
+    "case": "upper (default) or as-said",
+    "color": "block colour (default the theme accent)",
+    "y": "centre y, 0..1 (default 0.74)",
+    "textSize": "type size in px (default 96; steps down to fit two lines)",
+    "layer": "front, behind or auto (default auto: behind when y is below 0.45, so the top of your head can tuck over it; your face and chin never cover it)"
+   },
+   "spoken": [
+    "text",
+    "keyword"
+   ],
+   "required": [
+    "text",
+    "keyword"
+   ],
+   "defaults": {
+    "x": 0.5,
+    "y": 0.74
+   },
+   "example": {
+    "start": 0,
+    "end": 3,
+    "mode": 37,
+    "text": "Cut it in one take",
+    "keyword": "one"
+   },
+   "detect": "a caption line where one word sits on a solid coloured block"
   }
- ]
+ ],
+ "autoBehindY": 0.45
 }

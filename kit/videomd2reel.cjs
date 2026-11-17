@@ -1,6 +1,6 @@
 // VIDEO.md (a rea-video breakdown) -> Reel.md. Maps what a teardown measured onto the talking-head menu:
 //   captions        -> caption style (one-word, pill, karaoke, hormozi, kinetic), look, caption position and colour
-//   big on-screen text -> titles, with the nearest of the seven entrances and a front/behind hint (a word the speaker
+//   big on-screen text -> titles, with the nearest of the eight entrances and a front/behind hint (a word the speaker
 //                      is saying, styled like the captions, is a caption word and is left out)
 //   graphics        -> ordinal stickers, app labels, screen cards (kit/teardown.py extras finds them)
 //   colour grade    -> nearest film finish per shot, only when the grade changes across shots or is strong
@@ -20,7 +20,7 @@ const KIT = __dirname, ROOT = path.dirname(KIT);
 const r2 = x => Math.round(x * 100) / 100;
 const pad2 = n => String(n).padStart(2, '0');
 
-// rea-video's entrance kinds -> our seven title entrances
+// rea-video's entrance kinds -> our title entrances
 const ENTRANCE_MAP = { cut: 'slam', pop: 'pop-zoom', reveal: 'stagger-rise', typewriter: 'stagger-rise', fade: 'blur-rise', slide: 'slide-left', slide_in: 'slide-left', zoom: 'pop-zoom', scale: 'pop-zoom', bounce: 'elastic', flip: 'flip', rotate: 'flip', blur: 'blur-rise' };
 
 function loadBreakdown(p) {

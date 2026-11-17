@@ -106,6 +106,7 @@ Every section is optional except the card. Anything left out falls back to the p
 | caption-case | `upper`, `lower`, `as-said` (default upper) | `--caption-case`, the one-word caption's letter case |
 | caption-layer | `front`, `behind`, `auto` (default auto: behind for top captions, front elsewhere) | `--caption-layer`. Behind draws captions under the person mask, like a behind title: any part over the head or hair is hidden, the rest stays fully visible. The mask runs over the caption spans, and top one-word captions are lifted so they sit on the highest point the head reaches (only the bottom of the letters tucks behind the hair). The legibility check measures only the visible part |
 | panel-layer | `front`, `behind`, `auto` (default auto, which is behind) | `--panel-layer`, every screen card and b-roll panel in the reel (a card's own `layer` wins). Behind draws the panels on their own layer, then the top of your head over them: the person mask from the top of your hair down to about half a head width (above the eyes, `kit/headmask.py --crown`). A panel that reaches into the top of your head goes behind your hair; your face, chin, neck and body never cover a panel, so a card at chest or chin level stays fully in front. Where your hair never reaches a panel it looks the same as front. The mask runs over every card span |
+| caption-entrance | `pop`, `unfurl`, `cascade`, `orbit`, `warp`, `crystallize`, `compute`, `levitate`, `undulate` (default pop) | `--caption-entrance`, how kinetic hero words come in: pop springs the whole word; the others move letter by letter (unfurl opens each letter from its left edge, cascade drops them in, orbit swings them in on an arc, warp stretches and settles, crystallize gathers scattered blurred letters, compute decodes from random characters, levitate floats them up, undulate rides a wave that calms). A caption flip's own `entrance` wins |
 | titles | `on` or `off` | `--no-titles` |
 | title-layer | `front`, `behind`, `auto` | `--title-layer` |
 | finish | finish names, comma list, or `none` (on the whole reel) | `--finish` |
@@ -114,7 +115,7 @@ Every section is optional except the card. Anything left out falls back to the p
 | punch | `on` or `off` | `--no-punch` |
 | effects | effect ids for the optional `npm run fx` pass | the preset's `effectsFavourites` |
 
-**Shots** (fenced `videomd-timeline`): one line per shot, in order, times in seconds on the reel clock.
+**Shots** (fenced `videomd-timeline`, optional): one line per shot, in order, times in seconds on the reel clock. Leave the block out and every segment keeps the default finish, punch and transition; `shots:` in the card then only describes the reference (the check warns, it does not fail).
 
 | Key | Values | Maps to |
 |---|---|---|
@@ -129,7 +130,7 @@ Every section is optional except the card. Anything left out falls back to the p
 
 | Key | Values | Maps to |
 |---|---|---|
-| entrance | `stagger-rise`, `slam`, `blur-rise`, `slide-left`, `elastic`, `flip`, `pop-zoom` (each once per reel) | the title's `entrance` |
+| entrance | `stagger-rise`, `slam`, `blur-rise`, `slide-left`, `elastic`, `flip`, `pop-zoom`, `drop` (each once per reel; drop lets each letter fall in from above with a small bounce) | the title's `entrance` |
 | layer | `front`, `behind`, `auto` | the title's `layer` |
 | hero | word indexes, comma list | the title's `hero` |
 | text | the words | the title's `text` |
@@ -140,24 +141,57 @@ Every section is optional except the card. Anything left out falls back to the p
 #01 2.5-3.5 | type ordinal-sticker | text FIRST | layer behind | color #f2e8a0
 #02 2.8-4 | type app-label | text My App | icon my-icon.png
 #03 4-9 | type screen-card | src my-screen.mp4 | border #d87b5b
+#04 9.5-12 | type lower-third | text Will Gwyn | sub writes The AIgent
+#05 12-15 | type checklist | text Ship it | items Record; Caption; Post
+#06 15-17 | type stat-callout | text 10,000+ | sub readers
+#07 17-19 | type versus | left Manual | right Agent
+#08 19-21 | type highlight | shape arrow | text this part | x 0.62 | y 0.62
+#09 21-24 | type cta-card | text Follow for more | sub @theaigent
 ```
 
 | Key | Values | Maps to |
 |---|---|---|
-| type | `ordinal-sticker` (mode 9, entrance burst-pop), `app-label` (mode 10, tile-pop), `screen-card` (mode 11, card-rise) | the flip's `mode` |
-| text | the ordinal word or the label | the flip's `text` |
-| layer | `front` or `behind` (ordinal sticker: the burst goes behind your head, with the person mask). Screen card: `front`, `behind` or `auto` (default auto, which is behind): the top of your head (hair and crown) goes over the card where it reaches into it; your face and body stay under the card | `layer` |
-| color, ink | burst colour and word colour (ordinal sticker) | `color`, `ink` |
-| icon, tile | an image for the app tile (relative to the Reel.md), or leave it out for a generic glyph on a `tile` colour | `icon`, `tile` |
+| type | `ordinal-sticker` (mode 9, entrance burst-pop), `app-label` (mode 10, tile-pop), `screen-card` (mode 11, card-rise), `lower-third` (12, bar-wipe), `stat-callout` (13, count-up), `checklist` (14, tick-in), `quote-card` (15, quote-unfold), `highlight` (16, draw-on), `step-counter` (17, step-tick), `versus` (18, split-slam), `icon-badge` (19, badge-spin), `sticker-pop` (20, scatter-pop), `price-tag` (21, chip-rise), `cta-card` (22, cta-rise), `code-card` (23, type-on), `data-chart` (24, bars-grow), `chapter-card` (25, chapter-wipe), `logo-bug` (26, bug-in), `channel-bug` (27, bug-in), `terminal-session` (28, term-rise), `news-strap` (29, strap-wipe), `ticker` (30, ticker-slide), `split-flap` (31, flap-in), `feature-cards` (32, cards-deal), `release-pill` (33, pill-pop), `cta-button` (34, button-press), `hud-callout` (35, lock-on), `flash-card` (36, flash-cut), `keyword-caption` (37, block-in) | the flip's `mode` |
+| text | the ordinal word, the label, the name, the number, the quote, the price, the line, or the code (`\n` for a new line; a code card keeps `/` as written, elsewhere ` / ` reads as a space) | the flip's `text` |
+| sub | the small second line: lower third, stat label, quote attribution, old price (struck through), CTA handle | `sub` |
+| items, at | checklist rows separated by `;`, and optional tick times in reel seconds (a recipe job sets them from when you say each row) | `items`, `at` |
+| cues | words you say, separated by `;`, or seconds into the graphic: each beat lands when its word is said (chart bars, terminal commands, feature cards, the CTA button click, flash cards, the keyword caption, the screen card pointer). Repeated words land in order; a cue you never say is spread between its neighbours. A recipe job turns them into `at` times | `cues`, `at` |
+| values, labels, kind | data chart: the numbers (`1.2k; 3.8k; 9k`, the format is kept as they count up), the label under each, and `bar` or `line` | the same keys |
+| details | feature cards: a short line under each item, `;` between, in the same order (a line you never say is left blank) | `details` |
+| tag, keyword, case | news strap, release pill, keyword caption: the small tag (BREAKING, NEW); the keyword caption's word on the accent block and `upper` or `as-said` | the same keys |
+| corner, opacity, live, clock | logo bug and channel bug: `tl`, `tr`, `bl` or `br`; the bug's opacity (0 to 1); the LIVE pill word (default LIVE) and a clock start (`21:04` or `21:04:30`, `none` hides it; default counts up from the start) | the same keys |
+| speed, bg | ticker scroll speed in px per second; flash cards: one ground colour (`#rrggbb`) for every card, else they alternate the accent and ink | the same keys |
+| cursor, cam, style | screen card: pointer stops `x y; x y` (0 to 1 of the card, it clicks at each) and camera keys `zoom x y; zoom x y`; stat callout: `style odometer` rolls the digits instead of counting | the same keys |
+| left, right | the two halves of a versus card (or `text A vs B`) | `left`, `right` |
+| shape | highlight: `circle`, `arrow`, `underline` or `box` (the arrow's tip sits at x, y) | `shape` |
+| glyph | icon badge, sticker pop, CTA card, feature cards: `check`, `star`, `bolt`, `heart`, `fire`, `play`, `bell`, `spark`, `plus`, `lock`, and outline only (not sticker pop) `arrow`, `rocket`, `terminal`, `chart`, `world`, `cpu`. Sticker pop and feature cards take several: `heart;star` | `glyph` |
+| step, of, count, h, title | step counter: this step and how many; sticker pop: how many stickers; highlight: height (0 to 1); code card: the tab name | the same keys |
+| layer | `front` or `behind` (ordinal sticker: the burst goes behind your head, with the person mask). Screen card and modes 12 to 37: `front`, `behind` or `auto`. Behind: the top of your head (hair and crown) goes over the graphic where it reaches into it; your face and body stay under it. Auto is behind for a screen card, and for the others behind when the graphic sits high in the frame (y below 0.45), else front | `layer` |
+| color, ink | the graphic's colour (default the theme accent): the burst, bar, number, ticks, strokes, tag or button; ink is the word colour on an ordinal sticker or a price tag | `color`, `ink` |
+| icon, tile | an image for the app tile or the icon badge (relative to the Reel.md), or leave it out for a generic glyph on a `tile` colour | `icon`, `tile` |
 | src, border, in | an image or a video for the screen card (relative to the Reel.md), its border colour, and seconds into the video | `src`, `border`, `in` |
 | x, y, w, size | position (0 to 1), card width (0 to 1), burst radius or tile side in pixels | the same keys |
 | head, head-y | ordinal sticker: burst width in head widths, and its centre below the head centre in head widths. The remake measures your head with the person mask and sets size and y from them | `size`, `y` |
 | source | screen card: a public page (`https://github.com/owner/repo`, a site, a tool's docs) or a file. A page is captured by `npm run capture -- --recipe <Reel.md>` (or `npm run reel -- --capture-sources`) to a screenshot and a short scrolling recording, cached in `assets/web/` (gitignored) | `src` |
 | subject~, source~ | written by a teardown: what the reference showed in that card, and a web address read in it. Guesses, never captured until you write `source` | not used by the render |
 
-With no `icon`, `src` or captured `source` the graphic is drawn as a neutral placeholder (a letter glyph, a fake code window), so a teardown never copies someone else's screenshots or logos. Graphics outside your clip's length are dropped.
+With no `icon`, `src` or captured `source` the graphic is drawn as a neutral placeholder (a monogram tile, a skeleton app window), so a teardown never copies someone else's screenshots or logos. Modes 12 to 37 are drawn in code in the theme's colours and fonts with Tabler icons (MIT), a shared card look (two-layer shadow, top-lit fill, fine grain, rim light), spring and emphasized easing and motion blur on fast moves (the AIgent theme keeps their cards square). Each has its own exit over its last 0.35 s. Graphics outside your clip's length are dropped. A teardown detects the first three; you add the rest.
+
+**Aliases** (`## Aliases`, optional): how transcription hears names and brands you say, one bullet per word, `;` or `,` between spellings.
+
+```
+## Aliases
+- aigent: agent, a gent
+- Gwyn: Guinn, Gwen
+```
+
+The spoken check counts any listed spelling as the word, and `npm run plan` writes the word you mean (aigent) where the transcript has the heard one (agent).
 
 **Script** (fenced `reel-script`, optional): `#NN start-end | say <words>`. Written by teardowns so you can see the reference's timing. Your remake uses your own words.
+
+## Planned recipes
+
+`npm run plan -- <job>` writes a recipe for a drafted job from what you said: a Graphics block of proposals (each with a `why` field) and, if you pass `--base <Reel.md>`, that recipe's style, music and shots. Run it again with `--fresh` to replace its own proposals; lines without `why` are yours and always stay. Render it with `npm run reel -- --recipe jobs/<job>/Reel.md --clips jobs/<job>/clips --name <job> --force`.
 
 ## How a recipe is applied
 
@@ -167,7 +201,7 @@ With no `icon`, `src` or captured `source` the graphic is drawn as a neutral pla
 - Shot lines apply in order to the segments drafted from your clip: shot 1 to segment 1, and so on. Extra shots are ignored; extra segments keep the defaults.
 - Caption position and colour apply to your captions; graphics apply at their times (those past the end of your clip are dropped).
 - Titles apply their entrance and layer, in order, to the titles drafted from your words. Add `--recipe-titles` to use the recipe's title text and times instead; a recipe title is kept only if you say its words around its time, otherwise it is dropped.
-- On-screen words come from what you say, never from the reference (`kit/spoken.cjs`). Ordinal stickers show the ordinals you say ("second" gives a SECOND sticker as you say it), styled like the recipe's stickers in turn; recipe stickers with no ordinal said are dropped. App labels stay only if you name the app, and move to when you say it. A last check drops any title, sticker or label whose text you do not say in its window, and the log lists what was dropped and why. Screen cards keep the recipe's times (your file, a confirmed source, or a placeholder).
+- On-screen words come from what you say, never from the reference (`kit/spoken.cjs`). Ordinal stickers show the ordinals you say ("second" gives a SECOND sticker as you say it), styled like the recipe's stickers in turn; recipe stickers with no ordinal said are dropped. App labels stay only if you name the app, and move to when you say it. A last check drops any title, sticker or label whose text you do not say in its window, and the log lists what was dropped and why. The same check covers the worded fields of modes 12 to 37 (`spoken` in `kit/graphics.json`). A graphic whose `required` field you do not say is dropped (a lower third without the name, a stat without the number); any other field you do not say is left off and the graphic kept (a CTA button keeps its button when you never say the sub line, a lower third keeps the name without the title). A checklist, ticker or feature cards keep the rows you say and tick each as you say it. A word heard as a near-homophone counts ("aigent" heard as "agent", "Grok" as "grock": same consonants, one letter apart); numbers never match loosely. The log lists every drop, every field left off and every loose match. Numbers count when said as words ("ten thousand" for 10,000) and a handle counts when said as words run together ("the aigent" for @theaigent). A code card is your code and a sticker pop has no words, so neither is checked. Screen cards keep the recipe's times (your file, a confirmed source, or a placeholder).
 - App labels stay up at least 1.2 s, and the name's reveal always finishes, so the full name shows.
 - When every shot names a `src`, `npm run reelmd -- compile` writes a complete `cut.json` you can drop into `jobs/<name>/build/` and render with `--rebuild`.
 
