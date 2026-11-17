@@ -278,7 +278,7 @@ if (!flag('rebuild')) {
         if ((fit.some(g => g.mode === 9 && g.layer === 'behind') || R.panelsBehind(caps).length) && !cut.titles) Object.assign(cut, flag('no-mask') ? { titles: 'ovlt/%04d.png' } : { titles: 'ovlt/%04d.png', mask: 'mask.mkv', ...(opt('mask') ? { maskModel: opt('mask') } : {}) });
         fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
         for (const g of fit.filter(g => g.spoken)) console.log(`recipe graphic: ${g.mode === 9 ? 'ordinal sticker' : 'app label'} "${g.text}" at ${g.start}s (you say "${g.spoken}")`);
-        console.log(`recipe graphics: ${fit.length} of ${gfx.length} fit your ${len.toFixed(1)} s (${fit.filter(g => g.icon || g.src).length} with your files, the rest drawn as placeholders)`);
+        console.log(`recipe graphics: ${fit.length} of ${gfx.length} fit your ${len.toFixed(1)} s (${fit.filter(g => g.icon || g.src).length} with your files, the rest drawn)`);
       }
       // the face zone the layout pass keeps moved captions and titles out of (kit/overlay.html), from your head
       if (gfx.length && caps.faceTop == null) { const hw = measureHead(); if (hw && hw.head_w && hw.head_cy != null) { caps.faceTop = Math.round(Math.max(0, (hw.head_top != null ? hw.head_top : hw.head_cy - hw.head_w * 0.6)) * 1920); caps.faceBottom = Math.round(Math.min(1920, hw.head_cy * 1920 + hw.head_w * 1080 * 0.9)); console.log(`face zone for the layout: ${caps.faceTop} to ${caps.faceBottom} px down (moved captions stay out of it)`); } }

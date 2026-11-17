@@ -78,6 +78,7 @@ console.log('theme', await p.evaluate(() => window.__theme));
 // layout pass (overlay.html): what moved clear of a graphic, what hid while one was up, what the export's safe area moved.
 // layout.json is read by npm run verify. BOXES_AT=t1,t2 measures every element on screen at those times into boxes.json and stops.
 { const LAY = await p.evaluate(() => (window.__layout ? window.__layout() : null));
+  if (await p.evaluate(() => window.CAPTIONS && window.CAPTIONS.layout === false)) console.log('layout: off ("layout": false in captions.js): captions and titles are not moved off graphics, and verify will flag every overlap');
   if (LAY) {
     writeFileSync(join(ROOT, 'layout.json'), JSON.stringify(LAY, null, 1) + '\n');
     const n = a => LAY.elements.filter(e => e.action === a).length, sh = n('shift'), hd = n('hide'), sa = n('safe-area');
