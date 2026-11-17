@@ -1,6 +1,6 @@
 # Showcase gallery
 
-Every option, labelled, from the committed stills. These images render on GitHub. The contact sheets in [`sheets/`](sheets/) are the same set, packed into a few montages, and are what the root README shows.
+Every option, labelled, from the committed stills. Transitions, title entrances, caption entrances and caption styles play as looping previews from the [effects menu](../docs/effects.md). These images render on GitHub. The contact sheets in [`sheets/`](sheets/) are the same set, packed into a few montages, and are what the root README shows.
 
 The interactive page is [index.html](index.html). Open it from a full clone or zip of the repo; if you download only that HTML file, the images will not load.
 
@@ -45,13 +45,19 @@ Stills use an AI-generated fictional presenter (Apache-2.0 with the repo). Rebui
 ## Title entrances
 
 | --- | --- | --- | --- | --- | --- | --- |
-| ![stagger-rise](media/entrance/stagger-rise.jpg)<br>`stagger-rise` | ![slam](media/entrance/slam.jpg)<br>`slam` | ![blur-rise](media/entrance/blur-rise.jpg)<br>`blur-rise` | ![slide-left](media/entrance/slide-left.jpg)<br>`slide-left` | ![elastic](media/entrance/elastic.jpg)<br>`elastic` | ![flip](media/entrance/flip.jpg)<br>`flip` | ![pop-zoom](media/entrance/pop-zoom.jpg)<br>`pop-zoom` |
-| ![drop](media/entrance/drop.jpg)<br>`drop` |  |  |  |  |  |  |
+| ![stagger-rise](../docs/menu/titles/stagger-rise.webp)<br>`stagger-rise` | ![slam](../docs/menu/titles/slam.webp)<br>`slam` | ![blur-rise](../docs/menu/titles/blur-rise.webp)<br>`blur-rise` | ![slide-left](../docs/menu/titles/slide-left.webp)<br>`slide-left` | ![elastic](../docs/menu/titles/elastic.webp)<br>`elastic` | ![flip](../docs/menu/titles/flip.webp)<br>`flip` | ![pop-zoom](../docs/menu/titles/pop-zoom.webp)<br>`pop-zoom` |
+| ![drop](../docs/menu/titles/drop.webp)<br>`drop` |  |  |  |  |  |  |
 
 ## Caption styles
 
 | --- | --- | --- | --- | --- | --- | --- |
-| ![kinetic](media/caption/kinetic.jpg)<br>`kinetic` | ![oneword](media/caption/oneword.jpg)<br>`oneword` | ![pill](media/caption/pill.jpg)<br>`pill` | ![hormozi](media/caption/hormozi.jpg)<br>`hormozi` | ![karaoke](media/caption/karaoke.jpg)<br>`karaoke` | ![classic](media/caption/classic.jpg)<br>`classic` | ![one-word](media/caption/one-word.jpg)<br>`one-word` |
+| ![kinetic](../docs/menu/caption-styles/kinetic.webp)<br>`kinetic` | ![oneword](../docs/menu/caption-styles/oneword.webp)<br>`oneword` | ![pill](../docs/menu/caption-styles/pill.webp)<br>`pill` | ![hormozi](../docs/menu/caption-styles/hormozi.webp)<br>`hormozi` | ![karaoke](../docs/menu/caption-styles/karaoke.webp)<br>`karaoke` | ![classic](../docs/menu/caption-styles/classic.webp)<br>`classic` | ![one-word](../docs/menu/caption-styles/one-word.webp)<br>`one-word` |
+
+## Caption entrances
+
+| --- | --- | --- | --- | --- |
+| ![pop](../docs/menu/caption-entrances/pop.webp)<br>`pop` | ![unfurl](../docs/menu/caption-entrances/unfurl.webp)<br>`unfurl` | ![cascade](../docs/menu/caption-entrances/cascade.webp)<br>`cascade` | ![orbit](../docs/menu/caption-entrances/orbit.webp)<br>`orbit` | ![warp](../docs/menu/caption-entrances/warp.webp)<br>`warp` |
+| ![crystallize](../docs/menu/caption-entrances/crystallize.webp)<br>`crystallize` | ![compute](../docs/menu/caption-entrances/compute.webp)<br>`compute` | ![levitate](../docs/menu/caption-entrances/levitate.webp)<br>`levitate` | ![undulate](../docs/menu/caption-entrances/undulate.webp)<br>`undulate` |  |
 
 ## Font pairings
 
@@ -80,18 +86,18 @@ Stills use an AI-generated fictional presenter (Apache-2.0 with the repo). Rebui
 ## Transitions
 
 | --- | --- | --- | --- | --- |
-| ![glitch](media/transition/glitch.jpg)<br>`glitch` | ![cut](media/transition/cut.jpg)<br>`cut` | ![crossfade](media/transition/crossfade.jpg)<br>`crossfade` | ![dissolve](media/transition/dissolve.jpg)<br>`dissolve` | ![fade-fast](media/transition/fade-fast.jpg)<br>`fade-fast` |
-| ![fade-slow](media/transition/fade-slow.jpg)<br>`fade-slow` | ![film](media/transition/film.jpg)<br>`film` | ![dip](media/transition/dip.jpg)<br>`dip` | ![dip-black](media/transition/dip-black.jpg)<br>`dip-black` | ![flash](media/transition/flash.jpg)<br>`flash` |
-| ![dip-white](media/transition/dip-white.jpg)<br>`dip-white` | ![whip](media/transition/whip.jpg)<br>`whip` | ![whip-left](media/transition/whip-left.jpg)<br>`whip-left` | ![whip-right](media/transition/whip-right.jpg)<br>`whip-right` | ![push-left](media/transition/push-left.jpg)<br>`push-left` |
-| ![push-right](media/transition/push-right.jpg)<br>`push-right` | ![swipe-up](media/transition/swipe-up.jpg)<br>`swipe-up` | ![swipe-down](media/transition/swipe-down.jpg)<br>`swipe-down` | ![cover-left](media/transition/cover-left.jpg)<br>`cover-left` | ![cover-right](media/transition/cover-right.jpg)<br>`cover-right` |
-| ![cover-up](media/transition/cover-up.jpg)<br>`cover-up` | ![reveal-left](media/transition/reveal-left.jpg)<br>`reveal-left` | ![reveal-right](media/transition/reveal-right.jpg)<br>`reveal-right` | ![wipe](media/transition/wipe.jpg)<br>`wipe` | ![wipe-left](media/transition/wipe-left.jpg)<br>`wipe-left` |
-| ![wipe-right](media/transition/wipe-right.jpg)<br>`wipe-right` | ![wipe-up](media/transition/wipe-up.jpg)<br>`wipe-up` | ![wipe-down](media/transition/wipe-down.jpg)<br>`wipe-down` | ![luma-wipe](media/transition/luma-wipe.jpg)<br>`luma-wipe` | ![soft-wipe](media/transition/soft-wipe.jpg)<br>`soft-wipe` |
-| ![iris](media/transition/iris.jpg)<br>`iris` | ![iris-open](media/transition/iris-open.jpg)<br>`iris-open` | ![iris-close](media/transition/iris-close.jpg)<br>`iris-close` | ![circle-crop](media/transition/circle-crop.jpg)<br>`circle-crop` | ![doorway](media/transition/doorway.jpg)<br>`doorway` |
-| ![barn-door](media/transition/barn-door.jpg)<br>`barn-door` | ![zoom](media/transition/zoom.jpg)<br>`zoom` | ![zoom-through](media/transition/zoom-through.jpg)<br>`zoom-through` | ![pixelate](media/transition/pixelate.jpg)<br>`pixelate` | ![blur](media/transition/blur.jpg)<br>`blur` |
-| ![blur-cross](media/transition/blur-cross.jpg)<br>`blur-cross` | ![radial](media/transition/radial.jpg)<br>`radial` | ![clock](media/transition/clock.jpg)<br>`clock` | ![squeeze](media/transition/squeeze.jpg)<br>`squeeze` | ![slice](media/transition/slice.jpg)<br>`slice` |
-| ![blinds](media/transition/blinds.jpg)<br>`blinds` | ![wind](media/transition/wind.jpg)<br>`wind` | ![warp](media/transition/warp.jpg)<br>`warp` | ![diagonal](media/transition/diagonal.jpg)<br>`diagonal` | ![distance](media/transition/distance.jpg)<br>`distance` |
-| ![slats](media/transition/slats.jpg)<br>`slats` | ![checkerboard](media/transition/checkerboard.jpg)<br>`checkerboard` | ![light-leak](media/transition/light-leak.jpg)<br>`light-leak` | ![zoom-blur](media/transition/zoom-blur.jpg)<br>`zoom-blur` | ![news-ribbon](media/transition/news-ribbon.jpg)<br>`news-ribbon` |
-| ![breaking-news](media/transition/breaking-news.jpg)<br>`breaking-news` |  |  |  |  |
+| ![glitch](../docs/menu/transitions/glitch.webp)<br>`glitch` | ![cut](../docs/menu/transitions/cut.webp)<br>`cut` | ![crossfade](../docs/menu/transitions/crossfade.webp)<br>`crossfade` | ![dissolve](../docs/menu/transitions/dissolve.webp)<br>`dissolve` | ![fade-fast](../docs/menu/transitions/fade-fast.webp)<br>`fade-fast` |
+| ![fade-slow](../docs/menu/transitions/fade-slow.webp)<br>`fade-slow` | ![film](../docs/menu/transitions/film.webp)<br>`film` | ![dip](../docs/menu/transitions/dip.webp)<br>`dip` | ![dip-black](../docs/menu/transitions/dip-black.webp)<br>`dip-black` | ![flash](../docs/menu/transitions/flash.webp)<br>`flash` |
+| ![dip-white](../docs/menu/transitions/dip-white.webp)<br>`dip-white` | ![whip](../docs/menu/transitions/whip.webp)<br>`whip` | ![whip-left](../docs/menu/transitions/whip-left.webp)<br>`whip-left` | ![whip-right](../docs/menu/transitions/whip-right.webp)<br>`whip-right` | ![push-left](../docs/menu/transitions/push-left.webp)<br>`push-left` |
+| ![push-right](../docs/menu/transitions/push-right.webp)<br>`push-right` | ![swipe-up](../docs/menu/transitions/swipe-up.webp)<br>`swipe-up` | ![swipe-down](../docs/menu/transitions/swipe-down.webp)<br>`swipe-down` | ![cover-left](../docs/menu/transitions/cover-left.webp)<br>`cover-left` | ![cover-right](../docs/menu/transitions/cover-right.webp)<br>`cover-right` |
+| ![cover-up](../docs/menu/transitions/cover-up.webp)<br>`cover-up` | ![reveal-left](../docs/menu/transitions/reveal-left.webp)<br>`reveal-left` | ![reveal-right](../docs/menu/transitions/reveal-right.webp)<br>`reveal-right` | ![wipe](../docs/menu/transitions/wipe.webp)<br>`wipe` | ![wipe-left](../docs/menu/transitions/wipe-left.webp)<br>`wipe-left` |
+| ![wipe-right](../docs/menu/transitions/wipe-right.webp)<br>`wipe-right` | ![wipe-up](../docs/menu/transitions/wipe-up.webp)<br>`wipe-up` | ![wipe-down](../docs/menu/transitions/wipe-down.webp)<br>`wipe-down` | ![luma-wipe](../docs/menu/transitions/luma-wipe.webp)<br>`luma-wipe` | ![soft-wipe](../docs/menu/transitions/soft-wipe.webp)<br>`soft-wipe` |
+| ![iris](../docs/menu/transitions/iris.webp)<br>`iris` | ![iris-open](../docs/menu/transitions/iris-open.webp)<br>`iris-open` | ![iris-close](../docs/menu/transitions/iris-close.webp)<br>`iris-close` | ![circle-crop](../docs/menu/transitions/circle-crop.webp)<br>`circle-crop` | ![doorway](../docs/menu/transitions/doorway.webp)<br>`doorway` |
+| ![barn-door](../docs/menu/transitions/barn-door.webp)<br>`barn-door` | ![zoom](../docs/menu/transitions/zoom.webp)<br>`zoom` | ![zoom-through](../docs/menu/transitions/zoom-through.webp)<br>`zoom-through` | ![pixelate](../docs/menu/transitions/pixelate.webp)<br>`pixelate` | ![blur](../docs/menu/transitions/blur.webp)<br>`blur` |
+| ![blur-cross](../docs/menu/transitions/blur-cross.webp)<br>`blur-cross` | ![radial](../docs/menu/transitions/radial.webp)<br>`radial` | ![clock](../docs/menu/transitions/clock.webp)<br>`clock` | ![squeeze](../docs/menu/transitions/squeeze.webp)<br>`squeeze` | ![slice](../docs/menu/transitions/slice.webp)<br>`slice` |
+| ![blinds](../docs/menu/transitions/blinds.webp)<br>`blinds` | ![wind](../docs/menu/transitions/wind.webp)<br>`wind` | ![warp](../docs/menu/transitions/warp.webp)<br>`warp` | ![diagonal](../docs/menu/transitions/diagonal.webp)<br>`diagonal` | ![distance](../docs/menu/transitions/distance.webp)<br>`distance` |
+| ![slats](../docs/menu/transitions/slats.webp)<br>`slats` | ![checkerboard](../docs/menu/transitions/checkerboard.webp)<br>`checkerboard` | ![light-leak](../docs/menu/transitions/light-leak.webp)<br>`light-leak` | ![zoom-blur](../docs/menu/transitions/zoom-blur.webp)<br>`zoom-blur` | ![news-ribbon](../docs/menu/transitions/news-ribbon.webp)<br>`news-ribbon` |
+| ![breaking-news](../docs/menu/transitions/breaking-news.webp)<br>`breaking-news` |  |  |  |  |
 
 ## Music beds
 

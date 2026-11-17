@@ -20,7 +20,7 @@ Before you draft, and again before the final render. The options are easy to mis
    - a recipe (`examples/recipes/*.Reel.md`, their own Reel.md, or one from a teardown; see the talking-head-recipe and talking-head-teardown skills),
    - customize from the menu,
    - or let you choose (`--preset auto`, then say what you picked and why).
-2. Run `npm run menu` and point them at `showcase/GALLERY.md` (labelled stills of every option).
+2. Run `npm run menu` and point them at `showcase/GALLERY.md` (labelled stills of every option) and `docs/effects.md` (every transition, title entrance, caption entrance and caption style as a looping preview). `npm run list -- <kind>` prints one kind.
 3. Suggest 2 or 3 options per category that fit this reel: presets, film finishes (vary them across shots), beat sync, looks and caption styles (including one-word), font pairings, themes, title entrances, title layer (front, behind the head, or auto, per title), transitions, the 51 effects, the SFX pack, music beds.
 
 ## 2. Make it

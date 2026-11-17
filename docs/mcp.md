@@ -5,6 +5,7 @@
 | Tool | Runs | Use it to |
 |---|---|---|
 | `menu` | `npm run menu` | show the user every option before drafting |
+| `list_effects` | `npm run list -- <kind> --json` | get exact names, one-liners and preview paths for one kind (`transitions`, `titles`, `captions`, `graphics`, `effects`); point the user at `docs/effects.md` to see them animated |
 | `draft` | `npm run reel -- ... --draft --json` | transcribe and cut a clip into `jobs/<name>/` |
 | `plan` | `npm run plan -- <job> --json` | propose graphics from what was said into `jobs/<job>/Reel.md` |
 | `validate` | `npm run reelmd -- check <recipe>` or `npm run check -- <job>` | check a Reel.md, or lint a job's copy and plan |
@@ -59,7 +60,7 @@ Or `codex mcp add aigent-talking-head --env PYTHON=/path/to/aigent-talking-head/
 
 ## The flow
 
-1. `menu`, and ask the user what they want (and which platform: `tiktok`, `reels`, `shorts`, `feed45`, `square`).
+1. `menu` (and `list_effects` for transitions, title entrances or caption entrances), and ask the user what they want (and which platform: `tiktok`, `reels`, `shorts`, `feed45`, `square`).
 2. `draft` with `videos: ["inbox/take.mov"]` and `name`.
 3. `plan` with `job`. Show the user the proposed lines in `jobs/<job>/Reel.md` and change them together. Misheard names go in its `## Aliases` section.
 4. `validate` with `recipe: "jobs/<job>/Reel.md"`.

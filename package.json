@@ -13,6 +13,8 @@
     "smoke:whisper": "node kit/smoke.mjs --whisper",
     "check": "node kit/check.mjs",
     "menu": "node kit/menu.mjs",
+    "list": "node kit/menu.mjs --list",
+    "menu:render": "node kit/render-menu.mjs",
     "showcase": "node kit/showcase.mjs",
     "preset": "node kit/preset.cjs",
     "brand:import": "node kit/brand-import.mjs",

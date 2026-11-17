@@ -7,7 +7,7 @@
 // transition, sound or film-finish name. Warnings: flicker on a middle title, a sound on every cut, more than 2 big punches, a possible
 // forced triad, the script shape (40-55 words, 15-20 s; over 25 s cut a middle sentence), and beat-sync on with no bed.
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
-import { coverage, showcaseHas, sourceCatalogIds } from './menu.mjs';
+import { coverage, loadMenu, showcaseHas, sourceCatalogIds } from './menu.mjs';
 import { checkContract } from './contract.mjs';
 import { join, resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -164,6 +164,28 @@ if (target) {
     errs: menuCov.missing.map(x => 'menu missing ' + x),
     warns: menuCov.extra.map(x => 'menu extra ' + x),
   });
+  // docs/effects.md (npm run menu:render) must list every transition, title entrance, caption entrance and caption
+  // style, each with its looping preview, and every graphic and effect by name
+  {
+    const errs = [], doc = join(ROOT, 'docs', 'effects.md');
+    if (!existsSync(doc)) errs.push('docs/effects.md is missing; run npm run menu:render');
+    else {
+      const md = readFileSync(doc, 'utf8'), menu = loadMenu();
+      const prev = { transitions: 'transitions', 'title-entrances': 'titles', 'caption-entrances': 'caption-entrances', 'caption-styles': 'caption-styles' };
+      for (const s of menu.sections.filter(x => prev[x.id] || x.id === 'graphics' || x.id === 'effects')) {
+        for (const it of s.items) {
+          if (!md.includes('`' + it.id + '`')) errs.push(`docs/effects.md is missing ${s.id}:${it.id}`);
+          if (prev[s.id]) {
+            const rel = `menu/${prev[s.id]}/${it.id}.webp`;
+            if (!md.includes(rel)) errs.push(`docs/effects.md has no preview for ${s.id}:${it.id}`);
+            else if (!existsSync(join(ROOT, 'docs', rel))) errs.push(`preview missing: docs/${rel} (npm run menu:render)`);
+          }
+        }
+      }
+      if (md.includes('\u2014')) errs.push('docs/effects.md has an em dash');
+    }
+    results.push({ label: 'docs/effects.md covers transitions, entrances, caption styles, graphics and effects', errs, warns: [] });
+  }
   const htmlPath = join(ROOT, 'showcase', 'index.html');
   if (!existsSync(htmlPath)) {
     results.push({ label: 'showcase/index.html covers catalogs', errs: ['showcase/index.html is missing; run npm run showcase'], warns: [] });
