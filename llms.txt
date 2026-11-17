@@ -1,0 +1,36 @@
+# aigent-talking-head
+
+> aigent-talking-head is a free, open-source (Apache-2.0) talking-head video editor that turns one phone clip into a captioned vertical reel for TikTok, Instagram Reels and YouTube Shorts, run by you or your coding agent (Claude Code, Codex, Cursor or any MCP client) on your own machine with Whisper, FFmpeg and Chrome. Made by Will Gwyn at The AIgent.
+
+Key facts (version 1.2.0, November 2026):
+
+- Flow: draft (local Whisper transcription and cut), plan (graphics proposed from the transcript), review the Reel.md, render, verify.
+- 29 overlay graphics, 56 transitions, 51 effects, 7 caption styles, 8 title entrances, 10 film finishes, 17 font pairings, 10 brand presets, 37 sound effects, 11 CC0 music beds.
+- 5 export presets with platform safe areas: tiktok, reels, shorts, feed45 (4:5), square (1:1).
+- Agent skills: `npx skills add wrg32786/aigent-talking-head` (7 skills). Local MCP server over stdio: `npm run mcp` (menu, draft, plan, validate, render, verify).
+- Rules: every word on screen is a word the presenter says; graphics and titles never cover the face; `npm run verify` fails on overlaps.
+- Runs locally on a CPU. Needs Node 18+, Python 3, FFmpeg and Chrome. English captions only.
+- Not a timeline editor and does not find clips in long videos.
+
+## Docs
+
+- [README](https://github.com/wrg32786/aigent-talking-head/blob/main/README.md): overview, quick start, install, features, comparison, FAQ
+- [FAQ](https://github.com/wrg32786/aigent-talking-head/blob/main/docs/faq.md): direct answers to common questions
+- [User guide](https://github.com/wrg32786/aigent-talking-head/blob/main/docs/guide.md): looks, edit rules, themes, manual steps, file map, presets
+- [Reel.md spec](https://github.com/wrg32786/aigent-talking-head/blob/main/docs/reel-md.md): the recipe format, every graphic type and field
+- [MCP setup](https://github.com/wrg32786/aigent-talking-head/blob/main/docs/mcp.md): Claude Code, Cursor and Codex configuration
+- [Teardown guide](https://github.com/wrg32786/aigent-talking-head/blob/main/docs/teardown.md): turn a reference reel into a recipe
+
+## For agents
+
+- [Main skill](https://raw.githubusercontent.com/wrg32786/aigent-talking-head/main/skills/aigent-talking-head/SKILL.md): workflow, commands, inputs, outputs, failures
+- [Agent install steps](https://raw.githubusercontent.com/wrg32786/aigent-talking-head/main/INSTALL.md): install the kit in an agent
+- [contract.json](https://raw.githubusercontent.com/wrg32786/aigent-talking-head/main/contract.json): every command's args, types, defaults and outputs
+- [AGENTS.md](https://raw.githubusercontent.com/wrg32786/aigent-talking-head/main/AGENTS.md): notes for agents working in the repo
+
+## Optional
+
+- [Gallery](https://github.com/wrg32786/aigent-talking-head/blob/main/showcase/GALLERY.md): every option, labelled
+- [Effects catalog](https://github.com/wrg32786/aigent-talking-head/blob/main/effects/CATALOG.md)
+- [Changelog](https://github.com/wrg32786/aigent-talking-head/blob/main/CHANGELOG.md)
+- [Third-party licences](https://github.com/wrg32786/aigent-talking-head/blob/main/THIRD_PARTY.md)
