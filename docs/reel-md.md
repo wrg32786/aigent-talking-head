@@ -115,7 +115,7 @@ Every section is optional except the card. Anything left out falls back to the p
 | punch | `on` or `off` | `--no-punch` |
 | effects | effect ids for the optional `npm run fx` pass | the preset's `effectsFavourites` |
 
-**Shots** (fenced `videomd-timeline`): one line per shot, in order, times in seconds on the reel clock.
+**Shots** (fenced `videomd-timeline`, optional): one line per shot, in order, times in seconds on the reel clock. Leave the block out and every segment keeps the default finish, punch and transition; `shots:` in the card then only describes the reference (the check warns, it does not fail).
 
 | Key | Values | Maps to |
 |---|---|---|
@@ -175,9 +175,23 @@ Every section is optional except the card. Anything left out falls back to the p
 | source | screen card: a public page (`https://github.com/owner/repo`, a site, a tool's docs) or a file. A page is captured by `npm run capture -- --recipe <Reel.md>` (or `npm run reel -- --capture-sources`) to a screenshot and a short scrolling recording, cached in `assets/web/` (gitignored) | `src` |
 | subject~, source~ | written by a teardown: what the reference showed in that card, and a web address read in it. Guesses, never captured until you write `source` | not used by the render |
 
-With no `icon`, `src` or captured `source` the graphic is drawn as a neutral placeholder (a monogram tile, a skeleton app window), so a teardown never copies someone else's screenshots or logos. Modes 12 to 23 are drawn in code in the theme's colours and fonts with Tabler icons (MIT), a shared card look (two-layer shadow, top-lit fill, fine grain, rim light), spring and emphasized easing and motion blur on fast moves (the AIgent theme keeps their cards square). Each has its own exit over its last 0.35 s. Graphics outside your clip's length are dropped. A teardown detects the first three; you add the rest.
+With no `icon`, `src` or captured `source` the graphic is drawn as a neutral placeholder (a monogram tile, a skeleton app window), so a teardown never copies someone else's screenshots or logos. Modes 12 to 37 are drawn in code in the theme's colours and fonts with Tabler icons (MIT), a shared card look (two-layer shadow, top-lit fill, fine grain, rim light), spring and emphasized easing and motion blur on fast moves (the AIgent theme keeps their cards square). Each has its own exit over its last 0.35 s. Graphics outside your clip's length are dropped. A teardown detects the first three; you add the rest.
+
+**Aliases** (`## Aliases`, optional): how transcription hears names and brands you say, one bullet per word, `;` or `,` between spellings.
+
+```
+## Aliases
+- aigent: agent, a gent
+- Gwyn: Guinn, Gwen
+```
+
+The spoken check counts any listed spelling as the word, and `npm run plan` writes the word you mean (aigent) where the transcript has the heard one (agent).
 
 **Script** (fenced `reel-script`, optional): `#NN start-end | say <words>`. Written by teardowns so you can see the reference's timing. Your remake uses your own words.
+
+## Planned recipes
+
+`npm run plan -- <job>` writes a recipe for a drafted job from what you said: a Graphics block of proposals (each with a `why` field) and, if you pass `--base <Reel.md>`, that recipe's style, music and shots. Run it again with `--fresh` to replace its own proposals; lines without `why` are yours and always stay. Render it with `npm run reel -- --recipe jobs/<job>/Reel.md --clips jobs/<job>/clips --name <job> --force`.
 
 ## How a recipe is applied
 
@@ -187,7 +201,7 @@ With no `icon`, `src` or captured `source` the graphic is drawn as a neutral pla
 - Shot lines apply in order to the segments drafted from your clip: shot 1 to segment 1, and so on. Extra shots are ignored; extra segments keep the defaults.
 - Caption position and colour apply to your captions; graphics apply at their times (those past the end of your clip are dropped).
 - Titles apply their entrance and layer, in order, to the titles drafted from your words. Add `--recipe-titles` to use the recipe's title text and times instead; a recipe title is kept only if you say its words around its time, otherwise it is dropped.
-- On-screen words come from what you say, never from the reference (`kit/spoken.cjs`). Ordinal stickers show the ordinals you say ("second" gives a SECOND sticker as you say it), styled like the recipe's stickers in turn; recipe stickers with no ordinal said are dropped. App labels stay only if you name the app, and move to when you say it. A last check drops any title, sticker or label whose text you do not say in its window, and the log lists what was dropped and why. The same check covers the worded fields of modes 12 to 23 (`spoken` in `kit/graphics.json`): a lower third, stat, quote, price, versus or CTA card whose words you do not say is dropped; a checklist keeps the rows you say and ticks each as you say it. Numbers count when said as words ("ten thousand" for 10,000) and a handle counts when said as words run together ("the aigent" for @theaigent). A code card is your code and a sticker pop has no words, so neither is checked. Screen cards keep the recipe's times (your file, a confirmed source, or a placeholder).
+- On-screen words come from what you say, never from the reference (`kit/spoken.cjs`). Ordinal stickers show the ordinals you say ("second" gives a SECOND sticker as you say it), styled like the recipe's stickers in turn; recipe stickers with no ordinal said are dropped. App labels stay only if you name the app, and move to when you say it. A last check drops any title, sticker or label whose text you do not say in its window, and the log lists what was dropped and why. The same check covers the worded fields of modes 12 to 37 (`spoken` in `kit/graphics.json`). A graphic whose `required` field you do not say is dropped (a lower third without the name, a stat without the number); any other field you do not say is left off and the graphic kept (a CTA button keeps its button when you never say the sub line, a lower third keeps the name without the title). A checklist, ticker or feature cards keep the rows you say and tick each as you say it. A word heard as a near-homophone counts ("aigent" heard as "agent", "Grok" as "grock": same consonants, one letter apart); numbers never match loosely. The log lists every drop, every field left off and every loose match. Numbers count when said as words ("ten thousand" for 10,000) and a handle counts when said as words run together ("the aigent" for @theaigent). A code card is your code and a sticker pop has no words, so neither is checked. Screen cards keep the recipe's times (your file, a confirmed source, or a placeholder).
 - App labels stay up at least 1.2 s, and the name's reveal always finishes, so the full name shows.
 - When every shot names a `src`, `npm run reelmd -- compile` writes a complete `cut.json` you can drop into `jobs/<name>/build/` and render with `--rebuild`.
 

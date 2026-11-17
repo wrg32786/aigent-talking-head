@@ -16,7 +16,7 @@
   "env": [
     { "name": "PYTHON", "description": "Python that has requirements.txt installed (default python3, or py on Windows)" },
     { "name": "CHROME_PATH", "description": "Chrome or Chromium binary when it is not found automatically" },
-    { "name": "TX_MODEL", "description": "Whisper model clip.py uses when reel gets no --model (default large-v3)" },
+    { "name": "TX_MODEL", "description": "Whisper model clip.py uses when reel gets no --model (default small.en; large-v3 is the slow, most accurate opt-in)" },
     { "name": "NOSFX", "description": "1 turns off sounds in reel and fx (same as --sfx off)" },
     { "name": "FX_MATTE", "description": "person-mask backend for fx when no --mask is given" },
     { "name": "MASK_MODEL", "description": "person-mask backend fallback for fx" },
@@ -30,37 +30,37 @@
     "where": "a reel-graphics block in a Reel.md (one line per graphic: #NN start-end | type <id> | field value ...), or captions.js flips with the mode",
     "layers": ["front", "behind", "auto"],
     "glyphs": ["check", "star", "bolt", "heart", "fire", "play", "bell", "spark", "plus", "lock", "arrow", "rocket", "terminal", "chart", "world", "cpu"],
-    "rules": ["fields under spoken must be words you say in the graphic's window; a recipe job drops the rest (kit/spoken.cjs)", "layer behind puts the graphic under the crown mask: only the top of your head goes over it, never your face or chin"],
+    "rules": ["fields under spoken must be words you say in the graphic's window (near-homophones and the recipe's Aliases count); a recipe job drops a graphic only when a field under required is not said, and otherwise leaves off just the unsaid field (kit/spoken.cjs)", "while a graphic is up, captions and titles that would sit on it move clear or hide (the layout pass in kit/overlay.html); npm run verify fails on any overlap", "layer behind puts the graphic under the crown mask: only the top of your head goes over it, never your face or chin"],
     "types": [
       {"id": "ordinal-sticker", "mode": 9, "entrance": "burst-pop", "exit": "fade", "spoken": ["text"], "fields": ["text", "color", "ink", "layer", "x", "y", "size", "head", "head-y"], "summary": "list number sticker: an italic serif word (FIRST, SECOND, NEXT) set on a flat seal in the theme accent; the seal can sit behind your head"},
       {"id": "app-label", "mode": 10, "entrance": "tile-pop", "exit": "fade", "spoken": ["text"], "fields": ["text", "icon", "tile", "x", "y", "size"], "summary": "app or logo label: a top-lit icon tile springs in and a name plate wipes out under it; your icon image, or a monogram of the name"},
       {"id": "screen-card", "mode": 11, "entrance": "card-rise", "exit": "fade", "spoken": [], "fields": ["src", "source", "subject", "border", "in", "w", "y", "cursor", "cam", "cues", "at", "layer"], "summary": "screen card: a dark window card (title bar, address pill, accent rim with a glow), inset in the lower middle, showing your screenshot or screen recording; optional pointer clicks and pan and zoom keyframes on beats you say"},
-      {"id": "lower-third", "mode": 12, "entrance": "bar-wipe", "exit": "wipe-back", "spoken": ["text", "sub"], "fields": ["text", "sub", "color", "x", "y", "layer"], "summary": "lower third name tag: an accent rule springs up, a name plate wipes out from it and a small line follows on an accent tab"},
-      {"id": "stat-callout", "mode": 13, "entrance": "count-up", "exit": "shrink-fade", "spoken": ["text", "sub"], "fields": ["text", "sub", "color", "x", "y", "size", "style", "layer"], "summary": "big number callout: the number blurs in and counts up to its value in equal digit cells, accent gradient and glow, a label plate rises under it"},
-      {"id": "checklist", "mode": 14, "entrance": "tick-in", "exit": "slide-down", "spoken": ["text", "items"], "fields": ["text", "items", "at", "color", "x", "y", "w", "layer"], "summary": "checklist card: rows slide in, and each check springs in and draws its tick as you say its item; a done count in the header"},
-      {"id": "quote-card", "mode": 15, "entrance": "quote-unfold", "exit": "fade-rise", "spoken": ["text", "sub"], "fields": ["text", "sub", "color", "y", "w", "layer"], "summary": "quote card: a quote mark springs in, the line fades up word by word in an italic serif, with a small attribution under it"},
-      {"id": "highlight", "mode": 16, "entrance": "draw-on", "exit": "erase", "spoken": ["text"], "fields": ["shape", "text", "color", "x", "y", "w", "h", "layer"], "summary": "highlight: a tapered marker circle, arrow, underline or box draws itself on with a glow, with an optional short label on an accent plate"},
-      {"id": "step-counter", "mode": 17, "entrance": "step-tick", "exit": "slide-up", "spoken": ["text"], "fields": ["step", "of", "text", "color", "x", "y", "layer"], "summary": "step counter: a plate with the step number rolling over in an accent disc, STEP 2 OF 5 beside it and a segmented bar that fills to the current step"},
-      {"id": "versus", "mode": 18, "entrance": "split-slam", "exit": "split-out", "spoken": ["left", "right"], "fields": ["left", "right", "text", "color", "y", "layer"], "summary": "versus card: two halves slide in from the sides and a VS badge slams between them"},
-      {"id": "icon-badge", "mode": 19, "entrance": "badge-spin", "exit": "spin-out", "spoken": ["text"], "fields": ["glyph", "icon", "text", "color", "x", "y", "size", "layer"], "summary": "round icon badge: springs in while its conic ring draws round; a built-in glyph (Tabler icon) or your icon, with an optional label plate"},
+      {"id": "lower-third", "mode": 12, "entrance": "bar-wipe", "exit": "wipe-back", "spoken": ["text", "sub"], "required": ["text"], "fields": ["text", "sub", "color", "x", "y", "layer"], "summary": "lower third name tag: an accent rule springs up, a name plate wipes out from it and a small line follows on an accent tab"},
+      {"id": "stat-callout", "mode": 13, "entrance": "count-up", "exit": "shrink-fade", "spoken": ["text", "sub"], "required": ["text"], "fields": ["text", "sub", "color", "x", "y", "size", "style", "layer"], "summary": "big number callout: the number blurs in and counts up to its value in equal digit cells, accent gradient and glow, a label plate rises under it"},
+      {"id": "checklist", "mode": 14, "entrance": "tick-in", "exit": "slide-down", "spoken": ["text", "items"], "required": ["items"], "fields": ["text", "items", "at", "color", "x", "y", "w", "layer"], "summary": "checklist card: rows slide in, and each check springs in and draws its tick as you say its item; a done count in the header"},
+      {"id": "quote-card", "mode": 15, "entrance": "quote-unfold", "exit": "fade-rise", "spoken": ["text", "sub"], "required": ["text"], "fields": ["text", "sub", "color", "y", "w", "layer"], "summary": "quote card: a quote mark springs in, the line fades up word by word in an italic serif, with a small attribution under it"},
+      {"id": "highlight", "mode": 16, "entrance": "draw-on", "exit": "erase", "spoken": ["text"], "required": ["text"], "fields": ["shape", "text", "color", "x", "y", "w", "h", "layer"], "summary": "highlight: a tapered marker circle, arrow, underline or box draws itself on with a glow, with an optional short label on an accent plate"},
+      {"id": "step-counter", "mode": 17, "entrance": "step-tick", "exit": "slide-up", "spoken": ["text"], "required": ["text"], "fields": ["step", "of", "text", "color", "x", "y", "layer"], "summary": "step counter: a plate with the step number rolling over in an accent disc, STEP 2 OF 5 beside it and a segmented bar that fills to the current step"},
+      {"id": "versus", "mode": 18, "entrance": "split-slam", "exit": "split-out", "spoken": ["left", "right"], "required": ["left", "right"], "fields": ["left", "right", "text", "color", "y", "layer"], "summary": "versus card: two halves slide in from the sides and a VS badge slams between them"},
+      {"id": "icon-badge", "mode": 19, "entrance": "badge-spin", "exit": "spin-out", "spoken": ["text"], "required": ["text"], "fields": ["glyph", "icon", "text", "color", "x", "y", "size", "layer"], "summary": "round icon badge: springs in while its conic ring draws round; a built-in glyph (Tabler icon) or your icon, with an optional label plate"},
       {"id": "sticker-pop", "mode": 20, "entrance": "scatter-pop", "exit": "pop-out", "spoken": [], "fields": ["glyph", "count", "x", "y", "size", "layer"], "summary": "reaction stickers: a little cluster of die-cut vinyl stickers (hearts, stars, fire, sparks) springs in around a point and floats up"},
-      {"id": "price-tag", "mode": 21, "entrance": "chip-rise", "exit": "chip-drop", "spoken": ["text", "sub"], "fields": ["text", "sub", "color", "ink", "x", "y", "layer"], "summary": "price tag: a price card rises and springs into place, the price big with a raised currency sign and an old price struck through above"},
-      {"id": "cta-card", "mode": 22, "entrance": "cta-rise", "exit": "drop", "spoken": ["text", "sub"], "fields": ["text", "sub", "glyph", "color", "y", "w", "layer"], "summary": "call-to-action end card: a card rises with an avatar ring, your line and handle, and a follow button pulses with ripples"},
+      {"id": "price-tag", "mode": 21, "entrance": "chip-rise", "exit": "chip-drop", "spoken": ["text", "sub"], "required": ["text"], "fields": ["text", "sub", "color", "ink", "x", "y", "layer"], "summary": "price tag: a price card rises and springs into place, the price big with a raised currency sign and an old price struck through above"},
+      {"id": "cta-card", "mode": 22, "entrance": "cta-rise", "exit": "drop", "spoken": ["text", "sub"], "required": ["text"], "fields": ["text", "sub", "glyph", "color", "y", "w", "layer"], "summary": "call-to-action end card: a card rises with an avatar ring, your line and handle, and a follow button pulses with ripples"},
       {"id": "code-card", "mode": 23, "entrance": "type-on", "exit": "card-fall", "spoken": [], "fields": ["text", "title", "border", "y", "w", "layer"], "summary": "code snippet card: an editor window with a file tab, line numbers and a current-line band, the code typing itself on with syntax colour and a caret; the card widens or the type steps down so no line is clipped"},
-      {"id": "data-chart", "mode": 24, "entrance": "bars-grow", "exit": "fold-down", "spoken": ["text", "sub"], "fields": ["text", "sub", "values", "labels", "kind", "cues", "at", "color", "y", "w", "layer"], "summary": "data chart card: gridlines draw, then each bar (or each point of a line) grows on its beat with a spring while its value counts up; the top value glows in the accent"},
-      {"id": "chapter-card", "mode": 25, "entrance": "chapter-wipe", "exit": "wipe-left", "spoken": ["text", "sub"], "fields": ["text", "sub", "step", "of", "color", "y", "layer"], "summary": "chapter card: a soft scrim and accent rule, CHAPTER 02 and the title rising out of a mask line by line, a ghost numeral behind and progress ticks"},
-      {"id": "logo-bug", "mode": 26, "entrance": "bug-in", "exit": "fade", "spoken": ["text"], "fields": ["text", "icon", "corner", "size", "opacity", "tile", "y", "layer"], "summary": "logo bug: your mark (an icon file, else a monogram tile in the accent) springs into a corner with its name on a dark plate; a slow sheen passes now and then"},
-      {"id": "channel-bug", "mode": 27, "entrance": "bug-in", "exit": "fade", "spoken": ["text"], "fields": ["text", "live", "clock", "corner", "y", "layer"], "summary": "channel bug: a red LIVE pill with a breathing dot, a running clock in tabular digits and the channel name, on dark plates in a corner"},
+      {"id": "data-chart", "mode": 24, "entrance": "bars-grow", "exit": "fold-down", "spoken": ["text", "sub"], "required": ["text"], "fields": ["text", "sub", "values", "labels", "kind", "cues", "at", "color", "y", "w", "layer"], "summary": "data chart card: gridlines draw, then each bar (or each point of a line) grows on its beat with a spring while its value counts up; the top value glows in the accent"},
+      {"id": "chapter-card", "mode": 25, "entrance": "chapter-wipe", "exit": "wipe-left", "spoken": ["text", "sub"], "required": ["text"], "fields": ["text", "sub", "step", "of", "color", "y", "layer"], "summary": "chapter card: a soft scrim and accent rule, CHAPTER 02 and the title rising out of a mask line by line, a ghost numeral behind and progress ticks"},
+      {"id": "logo-bug", "mode": 26, "entrance": "bug-in", "exit": "fade", "spoken": ["text"], "required": ["text"], "fields": ["text", "icon", "corner", "size", "opacity", "tile", "y", "layer"], "summary": "logo bug: your mark (an icon file, else a monogram tile in the accent) springs into a corner with its name on a dark plate; a slow sheen passes now and then"},
+      {"id": "channel-bug", "mode": 27, "entrance": "bug-in", "exit": "fade", "spoken": ["text"], "required": ["text"], "fields": ["text", "live", "clock", "corner", "y", "layer"], "summary": "channel bug: a red LIVE pill with a breathing dot, a running clock in tabular digits and the channel name, on dark plates in a corner"},
       {"id": "terminal-session", "mode": 28, "entrance": "term-rise", "exit": "tip-away", "spoken": [], "fields": ["text", "title", "cues", "at", "border", "y", "w", "textSize", "layer"], "summary": "terminal session: a terminal window rises; each $ command types on its beat with a spinner, then its output lands line by line (ticks green, errors red); a block cursor blinks"},
-      {"id": "news-strap", "mode": 29, "entrance": "strap-wipe", "exit": "wipe-out", "spoken": ["text", "sub"], "fields": ["text", "sub", "tag", "color", "y", "textSize", "layer"], "summary": "news strap: a broadcast lower third; a light plate wipes out from an accent bar with the headline, a tag tab drops onto its top edge and the sub line slides in on a dark strip"},
-      {"id": "ticker", "mode": 30, "entrance": "ticker-slide", "exit": "drop-away", "spoken": ["items"], "fields": ["text", "items", "speed", "color", "y", "layer"], "summary": "ticker: a full-width band rises from the bottom edge with a slanted accent label block; the items you say scroll right to left between accent diamonds"},
-      {"id": "split-flap", "mode": 31, "entrance": "flap-in", "exit": "flap-out", "spoken": ["text", "sub"], "fields": ["text", "sub", "color", "y", "layer"], "summary": "split-flap board: hinged departure-board tiles flip through letters and land on your words left to right in Anton; a second row in the accent"},
-      {"id": "feature-cards", "mode": 32, "entrance": "cards-deal", "exit": "cards-drop", "spoken": ["text", "items", "details"], "fields": ["text", "items", "details", "glyph", "cues", "at", "color", "y", "layer"], "summary": "feature cards: two to four cards deal in side by side as you say each feature, with an icon tile in the accent, a number, the feature and a short line; the newest card glows"},
-      {"id": "release-pill", "mode": 33, "entrance": "pill-pop", "exit": "shrink-up", "spoken": ["text", "sub"], "fields": ["text", "tag", "sub", "color", "x", "y", "layer"], "summary": "release pill: a glass pill springs in with an accent NEW chip (its dot pulsing a ring), your line and an arrow; a sheen sweeps across once"},
-      {"id": "cta-button", "mode": 34, "entrance": "button-press", "exit": "fade-down", "spoken": ["text", "sub"], "fields": ["text", "sub", "cues", "at", "color", "x", "y", "layer"], "summary": "CTA button: a lit accent button rises, a pointer glides in and clicks it (the button squashes and flashes, a ripple rings out); a sub line under it"},
-      {"id": "hud-callout", "mode": 35, "entrance": "lock-on", "exit": "release", "spoken": ["text", "sub"], "fields": ["text", "sub", "x", "y", "w", "h", "color", "layer"], "summary": "HUD callout: corner brackets spin in and lock onto a region (a flash, centre ticks, a scan line), a leader line draws out with an elbow to a label that decodes into place"},
-      {"id": "flash-card", "mode": 36, "entrance": "flash-cut", "exit": "slats-out", "spoken": ["text"], "fields": ["text", "cues", "at", "bg", "color", "size", "layer"], "summary": "flash cards: full-bleed type cards, one word each in Anton, hard cut on each beat with a punch-in, alternating accent and ink grounds; covers the frame"},
-      {"id": "keyword-caption", "mode": 37, "entrance": "block-in", "exit": "drop-away", "spoken": ["text", "keyword"], "fields": ["text", "keyword", "tag", "cues", "at", "case", "color", "y", "textSize", "layer"], "summary": "keyword caption: a caption line rises word by word, then a solid accent block wipes in behind the keyword and its letters flip to ink on it; an optional tag above"}
+      {"id": "news-strap", "mode": 29, "entrance": "strap-wipe", "exit": "wipe-out", "spoken": ["text", "sub"], "required": ["text"], "fields": ["text", "sub", "tag", "color", "y", "textSize", "layer"], "summary": "news strap: a broadcast lower third; a light plate wipes out from an accent bar with the headline, a tag tab drops onto its top edge and the sub line slides in on a dark strip"},
+      {"id": "ticker", "mode": 30, "entrance": "ticker-slide", "exit": "drop-away", "spoken": ["items"], "required": ["items"], "fields": ["text", "items", "speed", "color", "y", "layer"], "summary": "ticker: a full-width band rises from the bottom edge with a slanted accent label block; the items you say scroll right to left between accent diamonds"},
+      {"id": "split-flap", "mode": 31, "entrance": "flap-in", "exit": "flap-out", "spoken": ["text", "sub"], "required": ["text"], "fields": ["text", "sub", "color", "y", "layer"], "summary": "split-flap board: hinged departure-board tiles flip through letters and land on your words left to right in Anton; a second row in the accent"},
+      {"id": "feature-cards", "mode": 32, "entrance": "cards-deal", "exit": "cards-drop", "spoken": ["text", "items", "details"], "required": ["items"], "fields": ["text", "items", "details", "glyph", "cues", "at", "color", "y", "layer"], "summary": "feature cards: two to four cards deal in side by side as you say each feature, with an icon tile in the accent, a number, the feature and a short line; the newest card glows"},
+      {"id": "release-pill", "mode": 33, "entrance": "pill-pop", "exit": "shrink-up", "spoken": ["text", "sub"], "required": ["text"], "fields": ["text", "tag", "sub", "color", "x", "y", "layer"], "summary": "release pill: a glass pill springs in with an accent NEW chip (its dot pulsing a ring), your line and an arrow; a sheen sweeps across once"},
+      {"id": "cta-button", "mode": 34, "entrance": "button-press", "exit": "fade-down", "spoken": ["text", "sub"], "required": ["text"], "fields": ["text", "sub", "cues", "at", "color", "x", "y", "layer"], "summary": "CTA button: a lit accent button rises, a pointer glides in and clicks it (the button squashes and flashes, a ripple rings out); a sub line under it"},
+      {"id": "hud-callout", "mode": 35, "entrance": "lock-on", "exit": "release", "spoken": ["text", "sub"], "required": ["text"], "fields": ["text", "sub", "x", "y", "w", "h", "color", "layer"], "summary": "HUD callout: corner brackets spin in and lock onto a region (a flash, centre ticks, a scan line), a leader line draws out with an elbow to a label that decodes into place"},
+      {"id": "flash-card", "mode": 36, "entrance": "flash-cut", "exit": "slats-out", "spoken": ["text"], "required": ["text"], "fields": ["text", "cues", "at", "bg", "color", "size", "layer"], "summary": "flash cards: full-bleed type cards, one word each in Anton, hard cut on each beat with a punch-in, alternating accent and ink grounds; covers the frame"},
+      {"id": "keyword-caption", "mode": 37, "entrance": "block-in", "exit": "drop-away", "spoken": ["text", "keyword"], "required": ["text", "keyword"], "fields": ["text", "keyword", "tag", "cues", "at", "case", "color", "y", "textSize", "layer"], "summary": "keyword caption: a caption line rises word by word, then a solid accent block wipes in behind the keyword and its letters flip to ink on it; an optional tag above"}
     ]
   },
   "commands": [
@@ -100,7 +100,7 @@
         { "name": "no-mask", "type": "boolean", "default": false, "description": "skip the person mask" },
         { "name": "no-punch", "type": "boolean", "default": false, "description": "no zoom punch on cuts" },
         { "name": "cropx", "type": "number", "default": "0.5", "description": "horizontal crop centre, 0 to 1 (0.4 puts the face left of centre)" },
-        { "name": "model", "type": "string", "default": "large-v3 (or TX_MODEL)", "description": "Whisper model for clip.py" },
+        { "name": "model", "type": "string", "default": "small.en (or TX_MODEL)", "description": "Whisper model for clip.py: small.en is fast on a CPU; large-v3 is the most accurate and slow, a ~3 GB download the first time (a notice prints before any download)" },
         { "name": "hook", "type": "string", "default": null, "description": "take to use for the first sentence" },
         { "name": "broll", "type": "path", "default": null, "description": "folder of your own cutaway clips" },
         { "name": "bed", "type": "string", "default": null, "description": "a bed name from npm run music, or an audio file path" },
@@ -113,14 +113,18 @@
         { "name": "no-sfx", "type": "boolean", "default": false, "description": "same as --sfx off" },
         { "name": "draft", "type": "boolean", "default": false, "description": "stop after captions.js so it can be edited" },
         { "name": "rebuild", "type": "boolean", "default": false, "description": "re-render and re-assemble an edited job (use with --name)" },
-        { "name": "force", "type": "boolean", "default": false, "description": "re-clip and redraft over an existing job" }
+        { "name": "force", "type": "boolean", "default": false, "description": "re-clip and redraft over an existing job" },
+        { "name": "export", "type": "enum", "values": ["tiktok", "reels", "shorts", "feed45", "square"], "values_from": "kit/exports.cjs NAMES", "default": null, "description": "lay the reel out for that platform's safe area and also write reel-vN-<name>.mp4 (crop, length and bitrate caps in kit/exports.json); kept in cut.json for later --rebuild runs" },
+        { "name": "json", "type": "boolean", "default": false, "description": "print one JSON result line at the end: { ok, job, dir, reel, export, exportPreset, seconds, layout: { moved, hidden, safeArea }, verify } (or { ok: false, error })" }
       ],
       "outputs": [
         "jobs/<name>/clips/clips.json and clips.md (best take per sentence, retakes flagged)",
         "jobs/<name>/build/cut.json, captions.js, theme.js and overlay frames",
-        "jobs/<name>/reel-vN.mp4 (a new number each run; earlier versions are kept)"
+        "jobs/<name>/reel-vN.mp4 (a new number each run; earlier versions are kept)",
+        "jobs/<name>/reel-vN-<export>.mp4 with --export",
+        "jobs/<name>/build/layout.json: what the layout pass moved clear of a graphic, hid while one was up, or placed inside the export's safe area"
       ],
-      "success": "prints \"Reel: <path>\" (or \"Draft ready.\" with --draft)",
+      "success": "prints \"Reel: <path>\" (or \"Draft ready.\" with --draft); with --json the last line is the JSON result",
       "failures": [
         "No video given and inbox/ has none",
         "Not found: <file>",
@@ -131,18 +135,67 @@
       ]
     },
     {
+      "name": "plan",
+      "script": "kit/plan.cjs",
+      "summary": "Propose graphics from what you say (numbers, lists, steps, quotes, commands, the call to action) into a Reel.md to review before rendering.",
+      "positional": [
+        { "name": "job", "type": "string", "required": true, "description": "job name in jobs/ (or a job folder) with a transcript: run npm run reel -- <clip> --name <job> --draft first" }
+      ],
+      "flags": [
+        { "name": "out", "type": "path", "default": "jobs/<job>/Reel.md", "description": "where to write; an existing Reel.md is merged (its graphics stay, proposals fill the gaps)" },
+        { "name": "base", "type": "path", "default": null, "description": "start a new plan from this recipe's brand, music and style" },
+        { "name": "max", "type": "number", "default": "one per 3 s of reel", "description": "at most this many graphics" },
+        { "name": "fresh", "type": "boolean", "default": false, "description": "propose again over lines an earlier plan wrote (they carry why); lines you wrote always stay" },
+        { "name": "dry", "type": "boolean", "default": false, "description": "print the Reel.md, write nothing" },
+        { "name": "jobs", "type": "path", "default": "jobs/", "description": "jobs folder" },
+        { "name": "json", "type": "boolean", "default": false, "description": "print one JSON result line at the end: { ok, recipe, seconds, proposed, kept, dropped, fuzzy, next }" }
+      ],
+      "outputs": ["jobs/<job>/Reel.md with a reel-graphics block; each proposed line carries why it was proposed"],
+      "success": "prints PLAN OK and the reel command to run next",
+      "failures": ["No job at <path>", "No transcript in <job> (draft first)", "<Reel.md>: fix it first (an existing recipe with errors)"]
+    },
+    {
+      "name": "export",
+      "script": "kit/export.mjs",
+      "summary": "Export a finished reel for one platform: 9:16, 4:5 or 1:1, with its length cap, bitrate cap and faststart.",
+      "positional": [
+        { "name": "job", "type": "string", "required": true, "description": "job name in jobs/ (or a job folder)" }
+      ],
+      "flags": [
+        { "name": "export", "type": "enum", "values": ["tiktok", "reels", "shorts", "feed45", "square"], "values_from": "kit/exports.cjs NAMES", "default": null, "description": "the platform preset (kit/exports.json)" },
+        { "name": "file", "type": "path", "default": "newest reel-vN.mp4 in the job", "description": "the reel to export" },
+        { "name": "jobs", "type": "path", "default": "jobs/", "description": "jobs folder" },
+        { "name": "json", "type": "boolean", "default": false, "description": "print one JSON result line at the end" }
+      ],
+      "outputs": ["jobs/<job>/reel-vN-<export>.mp4"],
+      "success": "prints the export path and the verify command",
+      "failures": ["No reel-vN.mp4 in <job>", "--export must be ...", "a note when the reel was not laid out for that export (rebuild with --export)"]
+    },
+    {
+      "name": "mcp",
+      "script": "kit/mcp.mjs",
+      "summary": "MCP server on stdio: menu, draft, plan, validate, render and verify as tools, with input schemas generated from this contract (docs/mcp.md).",
+      "positional": [],
+      "flags": [],
+      "outputs": ["the MCP protocol on stdout; logs on stderr"],
+      "success": "runs until the client closes it",
+      "failures": ["a tool returns isError with the command's log tail"]
+    },
+    {
       "name": "verify",
       "script": "kit/verify.mjs",
-      "summary": "Check a finished reel before handing it over: ffprobe, loudness, mask, copy lint and stills.",
+      "summary": "Check a finished reel before handing it over: ffprobe, loudness, overlap between graphics, captions and titles (measured from pixels), the export safe area, mask, copy lint and stills.",
       "positional": [
         { "name": "job", "type": "string", "required": true, "description": "job name in jobs/ (or a job folder path)" }
       ],
       "flags": [
         { "name": "file", "type": "path", "default": "newest reel-fx-vN.mp4 or reel-vN.mp4 in the job", "description": "the video to check" },
         { "name": "jobs", "type": "path", "default": "jobs/" },
-        { "name": "fps", "type": "number", "default": "cut.json fps, else 24", "description": "expected frame rate" }
+        { "name": "fps", "type": "number", "default": "cut.json fps, else 24", "description": "expected frame rate" },
+        { "name": "export", "type": "enum", "values": ["tiktok", "reels", "shorts", "feed45", "square"], "values_from": "kit/exports.cjs NAMES", "default": null, "description": "check that export (newest reel-vN-<name>.mp4): its size and length cap, and that every title, caption and graphic sits inside the platform's safe area; stills shade the UI zones red" },
+        { "name": "json", "type": "boolean", "default": false, "description": "print one JSON result line at the end: { ok, file, export, fails, notes, stills, contact, report }" }
       ],
-      "outputs": ["jobs/<job>/verify/: one still per check point, contact.png, report.md"],
+      "outputs": ["jobs/<job>/verify/: one still per check point (including the middle of every graphic's window), contact.png, report.md", "jobs/<job>/build/boxes.json: every element's measured box at each check point"],
       "success": "prints VERIFY PASS, exit 0",
       "failures": ["prints VERIFY FAIL and exits 1", "No <job>/build/cut.json", "No reel-vN.mp4 in <job>"]
     },

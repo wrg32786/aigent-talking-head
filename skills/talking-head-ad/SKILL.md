@@ -43,7 +43,7 @@ Do this before you draft, and again before the final render. The menu of effects
    - themes (`aigent` default, `neutral` unbranded)
    - title entrances (8, each used at most once)
    - title layer: front (default), behind the head, or auto (only the strongest 1 or 2 punch titles behind, never consecutive). Offer this per title. `"layer": "front"|"behind"|"auto"` on a title, or `"titleLayer"` for the job.
-   - transitions (50 names in `kit/transitions.json`; glitch seam is the default)
+   - transitions (56 names in `kit/transitions.json`: 50 stock ffmpeg xfades and 6 drawn ones, slats, checkerboard, light-leak, zoom-blur, news-ribbon and breaking-news; glitch seam is the default)
    - the 51 effects, grouped by moment (see also [effects/CATALOG.md](../../effects/CATALOG.md))
    - the SFX pack (`kit/sfx/sfx.json`)
    - music beds (`npm run music`, or the beds section of the menu)
@@ -55,7 +55,7 @@ Do this before you draft, and again before the final render. The menu of effects
 2. The default theme is AIgent. Use it unless they ask for another look: `--theme neutral` (unbranded, offline) or their own `kit/themes/<name>.js`. Don't use the Skool mark for another brand. **Offer the menu** (section above) if you have not already: finishes with per-scene variety, beat-sync, looks and caption styles, font pairings, themes, title entrances and transitions, plus beds. Suggest two or three that fit the reel's energy and let the human pick by ear, or use their own file.
 3. Draft it: `npm run reel -- inbox/<file> [inbox/<take2> ...] --theme <name> [--fonts druk] [--hook <take>] [--bed <library name>|music.wav] [--bed-start 0] [--cropx 0.4] --draft`
    - `--cropx` moves the 9:16 crop for a sideways clip (0 left, 0.5 centre, 1 right). Read `jobs/<name>/clips/clips-sheet.png` to check the face is in frame.
-   - `--model medium.en` is faster than the default large-v3 for a first pass.
+   - The default model is `small.en` (fast on a CPU). `--model large-v3` is the most accurate and much slower (a ~3 GB download the first time, announced before it starts).
    - With a bed, beat-sync is on by default: punches, SFX and title entrances snap to the bed (speech cuts stay put). Pass `--no-beat-sync` to leave the times alone, or `--finish grain,vignette` for a film look on the picture.
 4. Read `jobs/<name>/clips/clips.md`. `npm run reel` already dropped every `retake` row. Remove slates and asides ("Okay, take two...") from `build/cut.json`, and trim the `out` of clips that end mid-move.
 5. Edit `build/captions.js`. It's a draft with every phrase in the caption style (`kinetic` by default, key words in `emph`), and one title per beat as a mode 7 flip. Fix misheard words against what the teammate said, rewrite titles that don't read as a headline, and add a count-up, card or CTA if wanted (see step 4 below).
@@ -130,7 +130,7 @@ Use this when mixing sources or when you need finer control. Work in a job folde
 - `node ../../kit/timeline.mjs` prints every segment and word on the output clock. Use `--cuts` to print just the seams.
 - Schema and examples: `kit/assemble.cjs` header, `kit/example/cut.*.json`.
 - **Zoom punch.** `"punch": 0.1` (the `npm run reel` default) scales every other segment 10% so each cut reads as a jump. `"bigPunch": true` on a segment eases in 12% more over 0.3 s: use it on the cut right after the hook and the cut into the payoff, no more than two. `"zoom"` and `"punchY"` per segment override it; `"punch": false` turns it off.
-- **Transitions.** The glitch seam is the default and the right choice most of the time. `"transition": "<name>"` on a segment (or top level) swaps in an ffmpeg xfade; names are in `kit/transitions.json` (crossfade, dip, flash, whip, iris, zoom, pixelate, ...). The outgoing shot holds its last frame for the blend, so caption times don't move.
+- **Transitions.** The glitch seam is the default and the right choice most of the time. `"transition": "<name>"` on a segment (or top level) swaps in an ffmpeg xfade; names are in `kit/transitions.json` (crossfade, dip, flash, whip, iris, zoom, pixelate, ..., and the drawn slats, checkerboard, light-leak, zoom-blur, news-ribbon and breaking-news in the theme accent). The outgoing shot holds its last frame for the blend, so caption times don't move.
 
 ## 4. Captions (`build/captions.js`, then `node ../../kit/render.mjs <seconds>` from `build/`)
 

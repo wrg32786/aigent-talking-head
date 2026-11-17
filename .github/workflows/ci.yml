@@ -1,0 +1,70 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: check, contract, recipes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Self-test and copy lint
+        run: npm run check
+      - name: contract.json matches the CLIs
+        run: npm run contract
+      - name: Shipped recipes
+        run: |
+          for f in examples/recipes/*.Reel.md; do
+            echo "== $f"
+            node kit/reelmd.cjs check "$f" > out.txt || { cat out.txt; exit 1; }
+            tail -1 out.txt
+          done
+
+  smoke:
+    name: smoke (CPU, synthetic clips, tiny Whisper)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHON: python
+      HF_HUB_DISABLE_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - run: npm ci
+      - run: python -m pip install -r requirements.txt
+      - name: Chrome
+        run: npm run chrome
+      - name: Whisper model cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: whisper-tiny-en-v1
+      - name: Smoke test (synthetic clips end to end, with the tiny Whisper model)
+        timeout-minutes: 15
+        run: npm run smoke:whisper

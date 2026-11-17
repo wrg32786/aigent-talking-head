@@ -92,6 +92,15 @@ No GPL or commercial-only package is on the default teardown path.
 
 Do not use rembg's default `bria-rmbg` model with this kit: RMBG-2.0 has a separate BRIA licence that requires a paid agreement for commercial use.
 
+## npm dependencies (installed by `npm install`, not vendored)
+
+| What | From | Licence |
+|---|---|---|
+| `@modelcontextprotocol/sdk` 1.32.2 (the MCP server in `kit/mcp.mjs`) | [modelcontextprotocol/typescript-sdk](https://github.com/modelcontextprotocol/typescript-sdk), [LICENSE](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/LICENSE) | MIT, Copyright (c) 2024 Anthropic, PBC. Its own dependencies are MIT, ISC, BSD-2-Clause and BSD-3-Clause (checked from each package's `license` field, Nov 16, 2026). |
+| `playwright-core` (drives Chrome to render the overlay) | [microsoft/playwright](https://github.com/microsoft/playwright) | Apache-2.0, Copyright (c) Microsoft Corporation. |
+
+Whisper `small.en` (the default transcription model, about 0.5 GB) and `large-v3` (opt-in) are downloaded by faster-whisper (MIT) from Hugging Face on first use: OpenAI Whisper weights, MIT, converted to CTranslate2 by Systran (MIT). Nothing from them ships in the repo.
+
 ## Linked, not included
 
 - Teardown reads local files the user provides. The one optional exception: `npm run teardown -- --url <instagram post>` uses [instaloader](https://github.com/instaloader/instaloader) (MIT) when the user has installed it (`pip install instaloader`, commented in requirements.txt, not on the default path) to fetch the single named post anonymously. No login, no profile or bulk fetching. Users must have the rights to the content and follow Instagram's terms. No other platform downloader is included.

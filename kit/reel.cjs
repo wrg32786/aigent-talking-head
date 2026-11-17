@@ -1,7 +1,12 @@
 // One command from a phone clip (or several takes) to a draft reel.
 //   npm run reel                        -> the takes in inbox/ (every video from the newest recording session; one file is fine)
 //   npm run reel -- inbox/my-take.mov   -> that file;  npm run reel -- inbox/a.mov inbox/b.mov  -> those takes
-// Options: --theme aigent|neutral (default aigent)  --cropx 0.4 (face left of centre)  --model medium.en
+// Options: --theme aigent|neutral (default aigent)  --cropx 0.4 (face left of centre)
+//          --model small.en (Whisper model for transcription; default small.en, fast on a CPU; large-v3 is the slow, most
+//            accurate opt-in, a ~3 GB download the first time)
+//          --export tiktok|reels|shorts|feed45|square  lay the reel out for that platform's safe area and write
+//            reel-vN-<name>.mp4 too (crop, length and bitrate caps: kit/exports.json)
+//          --json  print one JSON result line at the end ({ ok, job, reel, export, layout, verify }), for agents and the MCP server
 //          --name <job>  --clips <dir> (reuse an existing clip.py folder, skips transcription)  --newest (inbox: newest file only)
 //          --hook <take> (first sentence from this take: your most extreme angle)
 //          --look kinetic|oneword|muse|classic|one-word (default kinetic: every word animated + one kinetic title per beat, in front of the person by default;
@@ -48,10 +53,14 @@ const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer']);
+const VALUED = new Set(['export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
-const die = m => { console.error(m); process.exit(1); };
+const JSON_OUT = flag('json');
+const die = m => { if (JSON_OUT) console.log(JSON.stringify({ ok: false, error: m })); console.error(m); process.exit(1); };
+const X = require('./exports.cjs');
+const EXPORT = opt('export') ? String(opt('export')).toLowerCase() : null;
+if (EXPORT && !X.get(EXPORT)) die('--export must be ' + X.NAMES.join(', '));
 const VIDEO = /\.(mov|mp4|m4v|mkv|webm|avi)$/i;
 const PY = process.env.PYTHON || (process.platform === 'win32' ? 'py' : 'python3');
 
@@ -92,6 +101,7 @@ if (opt('recipe')) {
   if (!fs.existsSync(rf)) die('No recipe at ' + rf);
   try { recipe = RM.load(rf); } catch (e) { die('Reel.md: ' + e.message); }
   const { errs, warn } = RM.validate(recipe);
+  if (recipe.aliases && Object.keys(recipe.aliases).length) { S.setAliases(recipe.aliases); console.log('recipe aliases: ' + Object.entries(recipe.aliases).map(([w, h]) => `${w} = ${[].concat(h).join(' / ')}`).join('; ')); }
   warn.forEach(w => console.warn('note: ' + w));
   if (errs.length) die('Reel.md problems:\n- ' + errs.join('\n- '));
   const rp = RM.toPreset(recipe);
@@ -188,6 +198,8 @@ if (!flag('rebuild')) {
   const logo = opt('logo');
   if (logo) fs.copyFileSync(path.resolve(logo), path.join(build, path.basename(logo)));
   sh(process.execPath, [path.join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--force', ...(cut.hits && cut.hits.length === 0 ? ['--no-glitch'] : []), ...(TITLES ? ['--titles'] : look === 'oneword' ? [] : ['--hero']), ...(look === 'oneword' ? ['--cards'] : []), '--style', STYLE, ...(FONTS ? ['--fonts', FONTS] : []), ...(logo ? ['--logo', path.basename(logo)] : [])], build);
+  // captions and titles in the words you mean: the recipe's Aliases, and numbers Whisper split at the comma ("10 ,000")
+  { const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), n = S.meantFlips(caps.flips); if (n) { fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); console.log(`captions: ${n} lines in the words you mean (recipe Aliases, split numbers)`); } }
   if (recipe && recipe.titles.length && TITLES) {
     const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF);
     const rt = RM.titleFlips(recipe);
@@ -266,8 +278,10 @@ if (!flag('rebuild')) {
         if ((fit.some(g => g.mode === 9 && g.layer === 'behind') || R.panelsBehind(caps).length) && !cut.titles) Object.assign(cut, flag('no-mask') ? { titles: 'ovlt/%04d.png' } : { titles: 'ovlt/%04d.png', mask: 'mask.mkv', ...(opt('mask') ? { maskModel: opt('mask') } : {}) });
         fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
         for (const g of fit.filter(g => g.spoken)) console.log(`recipe graphic: ${g.mode === 9 ? 'ordinal sticker' : 'app label'} "${g.text}" at ${g.start}s (you say "${g.spoken}")`);
-        console.log(`recipe graphics: ${fit.length} of ${gfx.length} fit your ${len.toFixed(1)} s (${fit.filter(g => g.icon || g.src).length} with your files, the rest drawn as placeholders)`);
+        console.log(`recipe graphics: ${fit.length} of ${gfx.length} fit your ${len.toFixed(1)} s (${fit.filter(g => g.icon || g.src).length} with your files, the rest drawn)`);
       }
+      // the face zone the layout pass keeps moved captions and titles out of (kit/overlay.html), from your head
+      if (gfx.length && caps.faceTop == null) { const hw = measureHead(); if (hw && hw.head_w && hw.head_cy != null) { caps.faceTop = Math.round(Math.max(0, (hw.head_top != null ? hw.head_top : hw.head_cy - hw.head_w * 0.6)) * 1920); caps.faceBottom = Math.round(Math.min(1920, hw.head_cy * 1920 + hw.head_w * 1080 * 0.9)); console.log(`face zone for the layout: ${caps.faceTop} to ${caps.faceBottom} px down (moved captions stay out of it)`); } }
       if (pos || col || Object.keys(look).length) console.log(`captions: ${pos || 'default band'}${col ? ', ' + String(col).toLowerCase() : ''}${Object.entries(look).map(([k, v]) => `, ${k === 'panelLayer' ? 'screen cards' : k.replace('caption', '').toLowerCase()} ${v}`).join('')}`);
       fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
     }
@@ -276,8 +290,9 @@ if (!flag('rebuild')) {
   // shows only words you say around its time; a checklist keeps the rows you say and ticks each as you say it
   if (recipe) {
     const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), au = S.audit(caps.flips, S.timeline(segs, build));
-    if (au.dropped.length) { caps.flips = au.flips; fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); for (const d of au.dropped) console.log('dropped, not said: ' + d.why); }
+    if (au.dropped.length) { caps.flips = au.flips; fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); for (const d of au.dropped) console.log((d.kept ? 'field left off, graphic kept: ' : 'dropped, not said: ') + d.why); }
     else console.log('on-screen words: every title, sticker, label and graphic is something you say');
+    for (const z of S.fuzzyLog(true)) console.log(`spoken match: "${z.want}" counted as said (heard "${z.heard}", ${z.how})${z.how === 'alias' ? '' : `; add "- ${z.want}: ${z.heard}" to the recipe's Aliases to make it explicit`}`);
     if (au.flips.some(f => f.at || f.details)) { caps.flips = au.flips; fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); }
   }
   // cues: a graphic's "cues" (words or seconds) become its beat times ("at") from when you say them (kit/spoken.cjs)
@@ -357,6 +372,14 @@ if (B.wantBeatSync(cut) && cut.bed) {
   fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
 }
 const LEN = cut.segs.reduce((a, s) => a + (s.out - s.in) + (s.pad || 0), 0) + (cut.tail ?? 0.3);
+// --export <name>: the layout pass keeps everything inside that platform's safe area (captions.js exportFrame); the
+// name stays in cut.json so a later --rebuild exports again
+{ const capF = path.join(build, 'captions.js');
+  if (EXPORT && fs.existsSync(capF)) {
+    const caps = R.readCaptions(capF); caps.exportFrame = X.frameOf(EXPORT); fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
+    if (cut.export !== EXPORT) { cut.export = EXPORT; fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); }
+    console.log(`export ${EXPORT}: ${X.get(EXPORT).label}, everything kept inside its safe area`);
+  } }
 // copy lint and title/sound rules: printed, not blocking (npm run check -- <name> and npm run verify fail on errors)
 try { sh(process.execPath, [path.join(KIT, 'check.mjs'), build, '--warn-only'], build); } catch {}
 sh(process.execPath, [path.join(KIT, 'render.mjs'), LEN.toFixed(2)], build);
@@ -383,7 +406,7 @@ if (cut.titles && cut.mask) {
   } else {
     const fxPy = path.join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
     const spec = R.maskSpec(cut, { model: opt('mask') });
-    if (!fs.existsSync(fxPy)) console.warn('note: no person mask (npm run effects:setup to put titles behind the speaker); titles go in front');
+    if (!fs.existsSync(fxPy)) { console.warn('WARNING: some titles, captions or graphics are set to sit behind your head (behind, or auto), but the person mask is not set up, so they stay in front. Set it up once with: npm run effects:setup'); process.env.MASK_WARNED = '1'; }
     else {
       sh(process.execPath, [path.join(KIT, 'assemble.cjs'), 'base.mp4'], build, { BASEONLY: '1' }); // BASEONLY already drops sfx and bed
       const win = behind.map(t => `${Math.max(0, t.start - 0.1).toFixed(2)}-${Math.min(LEN, t.end + 0.1).toFixed(2)}`).join(',');
@@ -402,4 +425,14 @@ sh(process.execPath, [path.join(KIT, 'assemble.cjs'), out], build, (flag('no-sfx
 // is every caption word readable against what's behind it (kit/legibility.py)? Printed, not blocking
 { const py = path.join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
   if (cut.overlay && fs.existsSync(py)) try { execFileSync(py, [path.join(KIT, 'legibility.py'), build, out], { stdio: 'inherit', env: { ...process.env, PYTHONUTF8: '1' } }); } catch { console.warn('note: some caption moments read under 3:1 against the picture (listed above). Move the word, change its colour or pick another shot.'); } }
-console.log(`\nReel: ${out}\nCheck it: npm run verify -- ${name} (contact sheet, ffprobe, loudness, mask), watch it, read clips/clips.md for skipped retakes, then edit build/captions.js or build/cut.json and run: npm run reel -- --rebuild --name ${name}`);
+let exported = null;
+if (cut.export && X.get(cut.export)) {
+  exported = X.outName(out, cut.export);
+  if (LEN > X.get(cut.export).maxSec) console.warn(`note: the reel is ${LEN.toFixed(1)} s, longer than ${X.get(cut.export).label} allows (${X.get(cut.export).maxSec} s); the export is trimmed`);
+  execFileSync('ffmpeg', X.ffmpegArgs(cut.export, out, exported, LEN), { stdio: 'inherit' });
+  console.log(`export ${cut.export}: ${exported}`);
+}
+let LAY = null; try { LAY = JSON.parse(fs.readFileSync(path.join(build, 'layout.json'), 'utf8')); } catch {}
+const lay = LAY ? { moved: LAY.elements.filter(e => e.action === 'shift').length, hidden: LAY.elements.filter(e => e.action === 'hide').length, safeArea: LAY.elements.filter(e => e.action === 'safe-area').length } : null;
+console.log(`\nReel: ${out}${exported ? '\nExport: ' + exported : ''}\nCheck it: npm run verify -- ${name}${cut.export ? ' --export ' + cut.export : ''} (contact sheet, ffprobe, loudness, mask, overlap${cut.export ? ', safe area' : ''}), watch it, read clips/clips.md for skipped retakes, then edit build/captions.js or build/cut.json and run: npm run reel -- --rebuild --name ${name}`);
+if (JSON_OUT) console.log(JSON.stringify({ ok: true, job: name, dir: job, reel: out, export: exported, exportPreset: cut.export || null, seconds: +LEN.toFixed(2), layout: lay, verify: `npm run verify -- ${name}${cut.export ? ' --export ' + cut.export : ''} --json` }));

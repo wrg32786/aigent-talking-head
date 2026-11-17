@@ -18,7 +18,7 @@ description: "Cut raw talking-head footage (phone, camera, Zoom) into clean, tra
 ```
 python3 kit/clip.py inbox/raw.mov --out clips --vertical            # center crop to 1080x1920
 python3 kit/clip.py inbox/raw.mov --out clips --vertical --cropx 0.4 # face left of center
-python3 kit/clip.py inbox/raw.mov --model medium.en                  # faster; large-v3 is the default
+python3 kit/clip.py inbox/raw.mov --model large-v3                   # most accurate; small.en is the default
 python3 kit/clip.py inbox/take1.mov inbox/take2.mov --vertical --hook take2.mov   # several takes, best sentence of each
 python3 kit/clip.py take1.mov take2.mov --words words.json           # reuse tx.py word times, skips Whisper
 ```

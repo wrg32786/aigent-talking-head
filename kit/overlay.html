@@ -402,12 +402,12 @@ window.__words=OWSEQ?OWSEQ.map(x=>({start:+x.s.toFixed(3),end:+x.e.toFixed(3),wo
 const wnorm=w=>String(w).toLowerCase().replace(/[^a-z0-9]/g,'');
 // the word on screen now. While a title or an ordinal word is up, the spoken word that it shows is skipped (it is
 // already on screen); any other word still shows, moved clear of it when both would sit at the top.
-function oneWordSeq(t){if(!OWSEQ)return;const x=OWSEQ.find(x=>t>=x.s&&t<x.e);if(!x)return;use(x.c.ps);
+function oneWordSeq(t,only){if(!OWSEQ)return;const x=OWSEQ.find(x=>t>=x.s&&t<x.e);if(!x||(only&&!only.includes(x.c)))return;use(x.c.ps);
  const over=[...TITLES.filter(c=>zoneAt(t)!=='hide'&&t>=c[0]&&t<c[1]),...flips.filter(c=>c[3]===9&&t>=c[0]+.1&&t<c[1])];
  const shows=c=>{let ws=String(c[2]).replace(/\|/g,' ').split(/\s+/).filter(Boolean);if(c[3]===7&&ONEW&&ws.length&&c[4].lockup!==false)ws=[ws[heroOf(ws.map(w=>[0,0,w]),c[4])[0]]];return ws.map(wnorm)}; // a one-word title shows only its hero word
  if(over.some(c=>shows(c).includes(wnorm(x.w))))return;
  const yo=zoneAt(t)==='move'?ALTY:0,y=yo||x.c[4].y||KY;
- ctx.save();oneWordDraw(x.c,x.w,x.s,t,over.length&&y<760?150:y);ctx.restore()}
+ ctx.save();{const k=LXF(x.c,t);if(k===0){ctx.restore();return}if(k)xfApply(k)}oneWordDraw(x.c,x.w,x.s,t,over.length&&y<760?150:y);ctx.restore()}
 // one-word (the simple style): while a title is up it is the one word on screen, so the caption waits
 const titleUp=t=>(zoneAt(t)!=='hide'&&TITLES.some(c=>t>=c[0]&&t<c[1]))||(CPOS==='top'&&flips.some(c=>c[3]===9&&t>=c[0]+.1&&t<c[1])); // a top caption also waits for an ordinal word
 function caption(c,t){const st=c[4].style||CSTYLE;if(st==='one-word'&&OWSEQ)return;if(st==='one-word'&&titleUp(t))return;const yo=zoneAt(t)==='move'?ALTY:0;if(st==='kinetic')return kinetic(c,t);if(st==='oneword')return oneword(c,t);if(st==='pill')return pill(c,t,yo);if(st==='hormozi')return boldCap(c,t,false,yo);if(st==='karaoke')return boldCap(c,t,true,yo);if(st==='one-word')return oneWord(c,t,yo);glyphs(c[2],fit([c[2]],S,CSZ,980),540,yo||CYB,t-c[0],CCOL||IV,true)}
@@ -471,7 +471,7 @@ function tabText(s,x,y,align){const dw=Math.max(...'0123456789'.split('').map(d=
 const MBC=[0,1].map(()=>{const c=document.createElement('canvas');c.width=1080;c.height=1920;return c}),MBX=MBC.map(c=>c.getContext('2d'));
 const MBLUR=!(window.GFX&&window.GFX.motionBlur===false);
 function blurred(fn,c,t,n=5,sh=1/40){const main=ctx,A=MBX[1],B=MBX[0];A.setTransform(1,0,0,1,0,0);A.globalAlpha=1;A.clearRect(0,0,1080,1920);
- for(let i=0;i<n;i++){const ts=Math.max(c[0]+1e-4,t-sh*i/(n-1));B.setTransform(1,0,0,1,0,0);B.globalAlpha=1;B.globalCompositeOperation='source-over';B.clearRect(0,0,1080,1920);ctx=B;try{fn(c,ts)}finally{ctx=main}A.globalAlpha=1/(i+1);A.drawImage(MBC[0],0,0)}
+ for(let i=0;i<n;i++){const ts=Math.max(c[0]+1e-4,t-sh*i/(n-1));B.setTransform(main.getTransform());B.globalAlpha=1;B.globalCompositeOperation='source-over';B.save();B.setTransform(1,0,0,1,0,0);B.clearRect(0,0,1080,1920);B.restore();ctx=B;try{fn(c,ts)}finally{ctx=main}A.globalAlpha=1/(i+1);A.drawImage(MBC[0],0,0)}
  A.globalAlpha=1;ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(MBC[1],0,0);ctx.restore()}
 const FW=(w,s)=>`${w} ${s}px ${(TH.fonts&&TH.fonts.caption&&TH.fonts.caption.family)||'Arial, sans-serif'}`;
 const SAFE=54; // 5% title-safe margin
@@ -1037,7 +1037,79 @@ window.__panels=()=>flips.some(c=>PANM(c[3])&&PANB(c));
 window.__layered=()=>TITLES.length>0||flips.some(c=>c[3]===9&&c[4].layer==='behind')||(CAPBEH&&flips.some(c=>c[3]===0))||window.__panels();
 window.__graphics=()=>flips.filter(c=>c[3]===9||c[3]===10||PANM(c[3])).map(c=>{const a=gxa(c);return{start:c[0],end:c[1],mode:c[3],text:c[2]||'',layer:PANM(c[3])?(PANB(c)?'behind':'front'):(c[4].layer||'front'),asset:a.frames?'video':(a.src||a.icon)?'image':c[3]>=12?'drawn':'placeholder',loaded:[a.icon,a.src,...(a.frames||[]).slice(0,1)].filter(Boolean).every(u=>GIMG[u]&&GIMG[u].naturalWidth>0)}});
 let LAYER='all';
-function flip(t){for(const c of flips){if(t<c[0]||t>=c[1])continue;if(LAYER==='panels'&&!(PANM(c[3])&&PANB(c)))continue;use(c.ps);const dt=t-c[0],m=c[3],out=c[1]>90?1:cl((c[1]-t)/.05);ctx.save();ctx.globalAlpha=out;
+// Layout pass (runs once, after the fonts load). Every element's box is measured from its own pixels (drawn alone on a
+// quarter-size scratch canvas at a few settled moments), then:
+// 1. export frame (captions.js "exportFrame", from kit/exports.json via reel --export): every element moves (and, if it
+//    is too big, shrinks to no less than 60%) the least it must to sit inside the platform's safe area: inside the 4:5
+//    or 1:1 crop window and clear of the platform's UI;
+// 2. overlap avoidance: a title or caption that would sit on a graphic while it is up (or a caption on a title) moves
+//    the shortest way clear of it, never further into the face zone than it already was; if nothing fits it hides,
+//    with a short fade, only while that graphic is up. Graphics keep their place (they are the point of the moment).
+// window.__layout() reports what moved or hid; window.__boxesAt(t) measures every element on screen at t (npm run verify).
+const LAYOUT=new Map();let RAW=false;
+const MSC=document.createElement('canvas');MSC.width=270;MSC.height=480;const MSX=MSC.getContext('2d',{willReadFrequently:true});
+const EXPF=CAP.exportFrame&&typeof CAP.exportFrame==='object'?CAP.exportFrame:null;
+// the face zone a moved caption or title never moves further into: from the hairline to below the chin on a typical
+// 9:16 talking head (reel.cjs measures yours into faceTop and faceBottom when the person mask is set up)
+const FACEZ={x0:200,x1:880,y0:CAP.faceTop||400,y1:CAP.faceBottom||1180};
+const kindOf=c=>c[3]===0?'caption':c[3]===7?'title':'graphic';
+function boxNow(cs,t,raw){const keep=ctx,L=LAYER,R0=RAW;MSX.setTransform(1,0,0,1,0,0);MSX.globalAlpha=1;MSX.clearRect(0,0,270,480);MSX.setTransform(.25,0,0,.25,0,0);ctx=MSX;LAYER='all';RAW=!!raw;
+ try{flip(t,cs)}catch(e){}finally{ctx=keep;LAYER=L;RAW=R0}
+ const d=MSX.getImageData(0,0,270,480).data;let x0=1e9,y0=1e9,x1=-1,y1=-1;
+ for(let y=0;y<480;y++){const r=y*1080;for(let x=0;x<270;x++)if(d[r+x*4+3]>56){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}}
+ return x1<0?null:{x0:x0*4,y0:y0*4,x1:x1*4+4,y1:y1*4+4}}
+const uni=(a,b)=>!a?b:!b?a:{x0:Math.min(a.x0,b.x0),y0:Math.min(a.y0,b.y0),x1:Math.max(a.x1,b.x1),y1:Math.max(a.y1,b.y1)};
+const area=b=>b?Math.max(0,b.x1-b.x0)*Math.max(0,b.y1-b.y0):0;
+const inter=(a,b,m=0)=>!!a&&!!b&&a.x0<b.x1+m&&b.x0<a.x1+m&&a.y0<b.y1+m&&b.y0<a.y1+m;
+const interA=(a,b)=>(!a||!b)?0:Math.max(0,Math.min(a.x1,b.x1)-Math.max(a.x0,b.x0))*Math.max(0,Math.min(a.y1,b.y1)-Math.max(a.y0,b.y0));
+const endOf=c=>c[1]>90?1e9:c[1];
+// the moments an element is measured at: settled, past its entrance and before its exit
+function sampleTimes(c){const s=c[0],e=c[1]>90?s+4:c[1],d=Math.max(.05,e-s),k=kindOf(c);
+ const fr=k==='caption'?[.3,.5,.7,.9]:k==='title'?[.55,.85]:[.5,.75];
+ return fr.map(f=>Math.min(e-.02,Math.max(s+.02,k==='graphic'?Math.max(s+Math.min(.5,d*.4),s+d*f):s+d*f)))}
+function rawBox(c){let b=null;for(const t of sampleTimes(c))b=uni(b,boxNow([c],t,true));return b}
+// transform {cx,cy,dx,dy,s,a}: scale about the box centre, then move
+function xfApply(k){if(k.a!=null&&k.a<1)ctx.globalAlpha*=k.a;if(!k.dx&&!k.dy&&(!k.s||k.s===1))return;ctx.translate(k.cx+(k.dx||0),k.cy+(k.dy||0));if(k.s&&k.s!==1)ctx.scale(k.s,k.s);ctx.translate(-k.cx,-k.cy)}
+const xfBox=(b,k)=>{if(!b||!k)return b;const s=k.s||1,cx=k.cx,cy=k.cy;return{x0:cx+(b.x0-cx)*s+(k.dx||0),x1:cx+(b.x1-cx)*s+(k.dx||0),y0:cy+(b.y0-cy)*s+(k.dy||0),y1:cy+(b.y1-cy)*s+(k.dy||0)}};
+function LXF(c,t){if(RAW)return null;const L=LAYOUT.get(c);if(!L)return null;let a=1;
+ for(const [h0,h1] of L.hide){const f=.12;if(t>=h0-f&&t<=h1+f)a=Math.min(a,t<h0?(h0-t)/f:t>h1?(t-h1)/f:0)}
+ if(a<=.001)return 0;if(!L.xf&&a>=1)return null;return{...(L.xf||{cx:540,cy:960}),a}}
+// the safe rect: the export's (crop window less the platform's UI zones), else the frame less the 5% title-safe margin
+function safeRect(){if(!EXPF)return{x0:24,x1:1056,y0:24,y1:1896};const sf=EXPF.safe||{},y0=+EXPF.y0||0,h=+EXPF.h||1920;
+ return{x0:+sf.left||0,x1:1080-(+sf.right||0),y0:y0+(+sf.top||0),y1:y0+h-(+sf.bottom||0)}}
+function fitInto(b,R){const cx=(b.x0+b.x1)/2,cy=(b.y0+b.y1)/2,w=b.x1-b.x0,h=b.y1-b.y0;let s=Math.min(1,(R.x1-R.x0)/w,(R.y1-R.y0)/h);s=Math.max(.6,s);
+ let dy=0,dx=0;
+ const B=xfBox(b,{cx,cy,dx,dy,s});if(B.y0<R.y0)dy+=R.y0-B.y0;else if(B.y1>R.y1)dy-=B.y1-R.y1;if(B.x0<R.x0)dx+=R.x0-B.x0;else if(B.x1>R.x1)dx-=B.x1-R.x1;
+ return(Math.abs(dx)<.5&&Math.abs(dy)<.5&&s===1)?null:{cx,cy,dx:Math.round(dx),dy:Math.round(dy),s:+s.toFixed(3)}}
+const REPORT=[];
+function layoutPass(){LAYOUT.clear();REPORT.length=0;const R=safeRect(),M=18;
+ const els=flips.map(c=>({c,kind:kindOf(c),s:c[0],e:endOf(c),raw:rawBox(c)})).filter(x=>x.raw);
+ for(const x of els){x.takeover=area(x.raw)>1080*1920*.55;x.xf=null;x.box=x.raw;x.hide=[];x.action='none'}
+ const live=(a,b)=>a.s<b.e-.04&&b.s<a.e-.04;
+ // 1. export frame and safe areas, every element but a full-frame takeover
+ if(EXPF)for(const x of els){if(x.takeover)continue;const k=fitInto(x.raw,R);if(k){x.xf=k;x.box=xfBox(x.raw,k);x.action='safe-area'}}
+ // 2. titles clear of graphics, then captions clear of graphics and titles
+ const G=els.filter(x=>x.kind==='graphic');
+ const place=(x,obs)=>{const hit=obs.filter(o=>live(o,x)&&inter(o.box,x.box,M));if(!hit.length)return;
+  if(hit.some(o=>o.takeover)){x.hide=hit.map(o=>[Math.max(o.s,x.s),Math.min(o.e,x.e)]);x.action='hide';return}
+  // candidates: just below or just above each graphic it meets, shrunk to no less than 70% when the room is short
+  const H=x.box.y1-x.box.y0,fz0=interA(x.box,FACEZ),near=obs.filter(o=>live(o,x)),cand=[];
+  for(const o of hit){let sc=Math.min(1,(R.y1-(o.box.y1+M))/H);cand.push({top:o.box.y1+M,s:sc});sc=Math.min(1,((o.box.y0-M)-R.y0)/H);cand.push({top:o.box.y0-M-H*sc,s:sc})}
+  let best=null;
+  for(const c of cand){if(!(c.s>=.7))continue;const w=(x.box.x1-x.box.x0)*c.s,cx=(x.box.x0+x.box.x1)/2,B={x0:cx-w/2,x1:cx+w/2,y0:c.top,y1:c.top+H*c.s};
+   if(B.y0<R.y0-1||B.y1>R.y1+1)continue;if(near.some(o=>inter(o.box,B,M-2)))continue;if(interA(B,FACEZ)>fz0+area(B)*.04)continue;
+   const cost=Math.abs(B.y0-x.box.y0)+(1-c.s)*500;if(!best||cost<best.cost)best={B,s:c.s,cost}}
+  if(best){const k0=x.xf||{cx:(x.raw.x0+x.raw.x1)/2,cy:(x.raw.y0+x.raw.y1)/2,dx:0,dy:0,s:1},s2=+((k0.s||1)*best.s).toFixed(3),rh=x.raw.y1-x.raw.y0;
+   const k={cx:k0.cx,cy:k0.cy,dx:k0.dx||0,s:s2,dy:Math.round(best.B.y0+rh*s2/2-k0.cy)};x.xf=k;x.box=xfBox(x.raw,k);x.action='shift';return}
+  x.hide=hit.map(o=>[Math.max(o.s,x.s),Math.min(o.e,x.e)]);x.action='hide'};
+ const T=els.filter(x=>x.kind==='title');for(const x of T)place(x,G);
+ const C=els.filter(x=>x.kind==='caption');for(const x of C)place(x,G.concat(T.filter(t=>t.action!=='hide')));
+ for(const x of els){if(x.xf||x.hide.length)LAYOUT.set(x.c,{xf:x.xf,hide:x.hide});
+  REPORT.push({kind:x.kind,mode:x.c[3],start:x.s,end:x.c[1],text:String(x.c[2]||'').slice(0,40),action:x.action,takeover:x.takeover,box:x.raw,final:x.box,hide:x.hide,...(x.xf?{move:{dx:x.xf.dx,dy:x.xf.dy,s:x.xf.s}}:{})})}}
+window.__layout=()=>({export:EXPF?EXPF.name||'custom':null,safe:safeRect(),face:FACEZ,elements:REPORT});
+// every element on screen at t, each measured alone with its layout applied (hidden ones report no box)
+window.__boxesAt=t=>flips.filter(c=>t>=c[0]&&t<c[1]).map(c=>({kind:kindOf(c),mode:c[3],start:c[0],end:c[1],text:String(c[2]||'').slice(0,40),box:boxNow([c],t,false),takeover:(REPORT.find(r=>r.start===c[0]&&r.mode===c[3])||{}).takeover||false})).filter(x=>x.box);
+function flip(t,only){for(const c of (only||flips)){if(t<c[0]||t>=c[1])continue;if(LAYER==='panels'&&!(PANM(c[3])&&PANB(c)))continue;use(c.ps);const dt=t-c[0],m=c[3],out=c[1]>90?1:cl((c[1]-t)/.05);ctx.save();ctx.globalAlpha=out;{const k=LXF(c,t);if(k===0){ctx.restore();continue}if(k)xfApply(k)}
 if(m===9){const beh=c[4].layer==='behind';if(LAYER==='titles'){if(beh)ordBurst(c,t)}else{if(!(beh&&LAYER==='front'))ordBurst(c,t);ordWord(c,t)}}
 else if(m===7){if(zoneAt(t)!=='hide'){const lay=c.layer||'front';if(LAYER==='titles'){if(lay==='behind')title(c,t,'hero')}else if(LAYER==='front'){title(c,t,lay==='behind'?'partner':'all')}else title(c,t,'all')}}
 else if(PANM(m)&&PANB(c)){if(LAYER==='panels'||LAYER==='all')drawG(c,t)}
@@ -1054,7 +1126,7 @@ else if(m===4)card(dt);
 else if(m===5)logoPlate(dt);
 else if(m===6){sticker(c[2],fit(c[2].split('|'),F,170,700),540,Y-20,dt,7,F);const cta=CAP.cta||{};if(cta.sub&&t>=cta.subAt)glyphs(cta.sub,62,540,Y+210,t-cta.subAt,IV,true)}
 ctx.restore()}
-if(LAYER!=='panels'&&(CAPBEH?LAYER!=='front':LAYER!=='titles'))oneWordSeq(t)}
+if(LAYER!=='panels'&&(CAPBEH?LAYER!=='front':LAYER!=='titles')&&(!only||only.some(c=>c[3]===0)))oneWordSeq(t,only)}
 function burst(dt,seed){if(dt<-.1||dt>.42)return;const r=rng(seed),p=(dt+.1)/.52,a=Math.sin(Math.PI*cl(p));ctx.save();ctx.translate(540,Y);ctx.lineCap='round';for(let i=0;i<54;i++){const ang=r()*6.283,sp=.6+r()*.9,len=120+r()*520,st=120+p*sp*1150;ctx.strokeStyle=i%3?CY:IV;ctx.globalAlpha=a*(.35+r()*.6);ctx.lineWidth=2+r()*7;ctx.beginPath();ctx.moveTo(Math.cos(ang)*st,Math.sin(ang)*st);ctx.lineTo(Math.cos(ang)*(st+len),Math.sin(ang)*(st+len));ctx.stroke()}ctx.restore()}
 function glitch(t){glitchAt.forEach((h,i)=>{const dt=t-h;if(dt<-.05||dt>.2)return;const r=rng(Math.floor(t*24)*97+i*13+5),a=1-Math.max(0,dt)/.2;ctx.save();for(let k=0;k<16;k++){const y=r()*1920,hh=4+r()*r()*90;ctx.globalAlpha=a*(.12+r()*.5);ctx.fillStyle=k%3===0?CY:IV;ctx.fillRect(r()*200-100,y,r()>.4?1300:200+r()*700,hh)}ctx.fillStyle=IV;for(let k=0;k<2600;k++){ctx.globalAlpha=a*r()*.55;ctx.fillRect(r()*1080,r()*1920,2+r()*3,2)}ctx.restore()})}
 // layer: 'all' (default), 'front' (captions, plus front titles and partner words), 'titles' (behind-head hero words only)
@@ -1063,5 +1135,5 @@ window.seek=(t,layer)=>{LAYER=layer||'all';ctx.clearRect(0,0,1080,1920);flip(t);
 window.__titles=TITLES.map(c=>({start:c[0],end:c[1],text:c[2],entrance:c.entr,flicker:c.flick,layer:c.layer||'front'}));
 // Fonts: optional web-font stylesheet from the theme, then wait for every face we draw with, then the logo.
 const css=TH.fontCss?new Promise(r=>{const l=document.createElement('link');l.rel='stylesheet';l.href=TH.fontCss;l.onload=r;l.onerror=r;document.head.appendChild(l)}):Promise.resolve();
-css.then(()=>Promise.all(FACES)).then(()=>Promise.all([...Object.values(SETS).flatMap(s=>[...(s.SCF?[document.fonts.load(fnt(s.SCF,90))]:[]),document.fonts.load(fnt(s.S,CSZ)),document.fonts.load(fnt(s.G,160)),document.fonts.load(fnt(s.F,150)),document.fonts.load(fnt(s.K,46))]),document.fonts.ready,new Promise(r=>{if(!LOGO||SK.complete)return r();SK.onload=r;SK.onerror=r}),...IMGP])).finally(()=>{window.__logo=LOGO?SK.naturalWidth>0:null;window.__skool=window.__logo;window.__theme=TH.name||'custom';window.__fonts=CYC.length>1?CYC.map(s=>s.name).join(','):BASE.name;window.seek(0);window.__ready=true});
+css.then(()=>Promise.all(FACES)).then(()=>Promise.all([...Object.values(SETS).flatMap(s=>[...(s.SCF?[document.fonts.load(fnt(s.SCF,90))]:[]),document.fonts.load(fnt(s.S,CSZ)),document.fonts.load(fnt(s.G,160)),document.fonts.load(fnt(s.F,150)),document.fonts.load(fnt(s.K,46))]),document.fonts.ready,new Promise(r=>{if(!LOGO||SK.complete)return r();SK.onload=r;SK.onerror=r}),...IMGP])).finally(()=>{window.__logo=LOGO?SK.naturalWidth>0:null;window.__skool=window.__logo;window.__theme=TH.name||'custom';window.__fonts=CYC.length>1?CYC.map(s=>s.name).join(','):BASE.name;try{if(CAP.layout!==false)layoutPass()}catch(e){console.warn('layout pass failed',e);LAYOUT.clear()}window.seek(0);window.__ready=true});
 </script></body></html>

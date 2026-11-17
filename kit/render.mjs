@@ -75,6 +75,23 @@ await p.goto(pathToFileURL(join(ROOT, 'overlay.html')).href, { waitUntil: 'netwo
 await p.waitForFunction(() => window.__ready === true, null, { timeout: 20000 });
 if ((await p.evaluate(() => window.__logo)) === false) { console.error('logo failed to load (check "logo" in captions.js or theme.logo)'); await b.close(); process.exit(1); }
 console.log('theme', await p.evaluate(() => window.__theme));
+// layout pass (overlay.html): what moved clear of a graphic, what hid while one was up, what the export's safe area moved.
+// layout.json is read by npm run verify. BOXES_AT=t1,t2 measures every element on screen at those times into boxes.json and stops.
+{ const LAY = await p.evaluate(() => (window.__layout ? window.__layout() : null));
+  if (await p.evaluate(() => window.CAPTIONS && window.CAPTIONS.layout === false)) console.log('layout: off ("layout": false in captions.js): captions and titles are not moved off graphics, and verify will flag every overlap');
+  if (LAY) {
+    writeFileSync(join(ROOT, 'layout.json'), JSON.stringify(LAY, null, 1) + '\n');
+    const n = a => LAY.elements.filter(e => e.action === a).length, sh = n('shift'), hd = n('hide'), sa = n('safe-area');
+    if (sh || hd) console.log(`layout: ${sh} caption or title moved clear of a graphic, ${hd} hidden while a graphic is up (layout.json)`);
+    if (LAY.export) console.log(`export ${LAY.export}: safe area ${JSON.stringify(LAY.safe)}, ${sa} element${sa === 1 ? '' : 's'} placed inside it`);
+  }
+  if (process.env.BOXES_AT) {
+    const ts = process.env.BOXES_AT.split(',').map(Number).filter(x => !isNaN(x)), out = [];
+    for (const t of ts) out.push({ t, boxes: await p.evaluate(t => window.__boxesAt(t), t) });
+    writeFileSync(join(ROOT, 'boxes.json'), JSON.stringify(out, null, 1) + '\n');
+    console.log('boxes', ts.length, 'moments -> boxes.json'); await b.close(); process.exit(0);
+  }
+}
 // Behind-head titles (mode 7, layer behind) get their own layer, ovlt/, so assemble.cjs can draw them behind the person; ovl/ then
 // holds front titles, partner words and captions. Stills always show every layer together.
 const titles = await p.evaluate(() => window.__titles || []);

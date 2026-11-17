@@ -382,6 +382,68 @@ try {
     if (sig(RM.graphicFlips(rr)) !== sig(caps.flips)) fail('graphics round trip:\n' + sig(RM.graphicFlips(rr)) + '\n' + sig(caps.flips));
     if (!RM.validate(RM.parse(md.replace('shape arrow', 'shape blob'), 'bad.md')).errs.length || !RM.validate(RM.parse(md.replace('glyph bolt', 'glyph logo'), 'bad.md')).errs.length) fail('a bad shape or glyph should fail the check');
   });
+  step('layout pass: captions and titles move clear of a graphic or hide; export safe area; boxes measured from pixels', () => {
+    const d = join(work, 'layout'); mkdirSync(d, { recursive: true });
+    const wd = (t, t0) => t.split(' ').map((w, i) => [+(t0 + i * 0.3).toFixed(2), +(t0 + i * 0.3 + 0.28).toFixed(2), w]);
+    const flips = [{ start: 0.2, end: 2, text: 'we hit ten thousand readers', mode: 0, words: wd('we hit ten thousand readers', 0.2) },
+      { start: 2, end: 4, text: 'so follow the aigent today', mode: 0, words: wd('so follow the aigent today', 2) },
+      { start: 0.3, end: 3.8, mode: 12, text: 'Will Gwyn', sub: 'Founder' }, { start: 2.2, end: 3.9, mode: 13, text: '10,000', sub: 'readers' }, { start: 2.3, end: 3.8, mode: 7, text: 'Ten thousand' }];
+    writeFileSync(join(d, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'kinetic', fonts: 'theme', flips }) + ';\n');
+    const env = { THEME: 'aigent', FONTS: 'theme' };
+    run(node, [join(KIT, 'render.mjs'), '4', '1.0'], d, { ...env, BOXES_AT: '1.0,3.0' });
+    const L = JSON.parse(readFileSync(join(d, 'layout.json'), 'utf8')).elements, B = JSON.parse(readFileSync(join(d, 'boxes.json'), 'utf8'));
+    const cap1 = L.find(e => e.kind === 'caption' && e.start === 0.2), tt = L.find(e => e.kind === 'title');
+    if (!cap1 || cap1.action !== 'shift') fail('the caption under the lower third should move clear of it: ' + JSON.stringify(cap1));
+    if (!tt || !['shift', 'hide'].includes(tt.action)) fail('the title on the stat callout should move or hide: ' + JSON.stringify(tt));
+    const ia = (a, b) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
+    for (const { t, boxes } of B) for (const g of boxes.filter(x => x.kind === 'graphic')) for (const x of boxes.filter(x => x.kind !== 'graphic')) if (ia(g.box, x.box) > 900) fail(`overlap at ${t}s: ${x.kind} "${x.text}" on mode ${g.mode}`);
+    // the same job laid out for Reels: everything inside its safe area once settled
+    const X = createRequire(import.meta.url)('./exports.cjs');
+    writeFileSync(join(d, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'kinetic', fonts: 'theme', flips, exportFrame: X.frameOf('reels') }) + ';\n');
+    run(node, [join(KIT, 'render.mjs'), '4', '1.0'], d, { ...env, BOXES_AT: '1.5,3.5' });
+    const SR = X.safeRect('reels'), B2 = JSON.parse(readFileSync(join(d, 'boxes.json'), 'utf8'));
+    for (const { t, boxes } of B2) for (const x of boxes) { if (t - x.start < 0.6 || x.end - t < 0.45) continue; const b = x.box; if (b.x0 < SR.x0 - 6 || b.x1 > SR.x1 + 6 || b.y0 < SR.y0 - 6 || b.y1 > SR.y1 + 6) fail(`reels safe area at ${t}s: ${x.kind} mode ${x.mode} ${JSON.stringify(b)}`); }
+    if (!JSON.parse(readFileSync(join(d, 'layout.json'), 'utf8')).elements.some(e => e.action === 'safe-area')) fail('nothing placed inside the reels safe area');
+  });
+  step('spoken gate: near-homophones and aliases count, an unsaid optional field is left off and the graphic kept', () => {
+    const W = (s, t0 = 0) => s.split(' ').map((w, i) => ({ start: t0 + i * 0.3, end: t0 + i * 0.3 + 0.28, word: w }));
+    const w = W('follow the agent and try grock it costs 49 dollars past it');
+    if (!SP.said('aigent', w, 0, 3) || !SP.said('Grok', w, 0, 3)) fail('near-homophones should count (aigent/agent, grok/grock)');
+    if (SP.said('post', w, 0, 3) || SP.said('99', w, 0, 3)) fail('post is not past, and numbers never match loosely');
+    SP.fuzzyLog(true);
+    const au = SP.audit([{ mode: 34, start: 0, end: 3, text: 'Follow the aigent', sub: 'link in bio' }, { mode: 22, start: 0, end: 3, text: 'Never said', sub: 'agent' }], w);
+    const btn = au.flips.find(f => f.mode === 34);
+    if (!btn || btn.sub || btn.text !== 'Follow the aigent') fail('CTA button should stay without its unsaid sub line: ' + JSON.stringify(au.flips));
+    if (au.flips.some(f => f.mode === 22) || !au.dropped.some(x => x.kept && x.field === 'sub')) fail('a graphic whose required text is unsaid drops; the field drop is logged: ' + JSON.stringify(au.dropped));
+    SP.setAliases({ Gwyn: ['guinn'] });
+    if (!SP.said('Will Gwyn', W('I am Will Guinn'), 0, 2) || !SP.fuzzyLog(true).some(z => z.how === 'alias')) fail('a recipe alias should count and be logged');
+    SP.setAliases({});
+    const RM = createRequire(import.meta.url)('./reelmd.cjs');
+    const r = RM.parse('---\nvideomd: 1\nname: x\ndescription: d\nsource:\n  duration: 10\nshots: 3\nlang: en\nx-reel: 1\n---\n\n# X\n\n## Aliases\n- aigent: agent, a gent\n', 'x.Reel.md');
+    const v = RM.validate(r);
+    if (v.errs.length || !v.warn.some(x => /no Shots block/.test(x))) fail('Shots is optional: ' + JSON.stringify(v));
+    if ((r.aliases.aigent || []).join('|') !== 'agent|a gent') fail('aliases section: ' + JSON.stringify(r.aliases));
+  });
+  step('plan: numbers, steps, a command and the CTA from what you say; passes the check; merge keeps your lines', () => {
+    const pj = join(work, 'jobs', 'planned', 'clips'); mkdirSync(pj, { recursive: true });
+    const lines = ['Hi, I am Will Gwyn and I build agents.', 'We hit ten thousand readers last month.', 'Step one, record a take.', 'Step two, run the plan.', 'Run npx skills add in the terminal.', 'It costs 49 dollars a month.', 'Follow the agent for more reels like this.'];
+    const clips = lines.map((t, i) => { const ws = t.split(' ').map((x, k) => [+(0.1 + k * 0.32).toFixed(2), +(0.38 + k * 0.32).toFixed(2), x]); return { id: 'clip-00' + (i + 1), file: `clips/clip-00${i + 1}.mp4`, dur: +(ws[ws.length - 1][1] + 0.4).toFixed(2), status: 'keep', text: t, words: ws }; });
+    writeFileSync(join(pj, 'clips.json'), JSON.stringify({ clips }));
+    const o = run(node, [join(KIT, 'plan.cjs'), 'planned', '--jobs', join(work, 'jobs'), '--json'], work);
+    const res = JSON.parse(o.trim().split('\n').pop());
+    const types = res.proposed.map(g => g.type);
+    for (const t of ['lower-third', 'stat-callout', 'cta-card']) if (!types.includes(t)) fail(`plan should propose ${t}: ${types}`);
+    if (!/PLAN OK/.test(o)) fail('plan output:\n' + o);
+    const md = join(work, 'jobs', 'planned', 'Reel.md');
+    if (!/REELMD PASS/.test(run(node, [join(KIT, 'reelmd.cjs'), 'check', md], work))) fail('planned Reel.md should pass the check');
+    for (let i = 1; i < res.proposed.length; i++) if (res.proposed[i].start < res.proposed[i - 1].end) fail('planned graphics overlap in time');
+    writeFileSync(md, readFileSync(md, 'utf8').replace(/^```reel-graphics\n/m, '```reel-graphics\n#00 0.4-1.9 | type highlight | shape underline | text Will\n').replace('## Aliases\n', '## Aliases\n- aigent: agent\n'));
+    const o2 = JSON.parse(run(node, [join(KIT, 'plan.cjs'), 'planned', '--jobs', join(work, 'jobs'), '--json', '--fresh'], work).trim().split('\n').pop());
+    const md2 = readFileSync(md, 'utf8');
+    if (!/type highlight \| shape underline/.test(md2)) fail('your own graphics line should stay');
+    if (o2.proposed.some(g => g.start < 1.9 && g.end > 0.4)) fail('a proposal should not share the screen with your line');
+    if (!/Follow the aigent/.test(md2)) fail('an alias should turn the heard word into the one you mean in the proposal:\n' + md2);
+  });
   step('teardown mapping: stray caption words left out of titles, room light is not a finish, graphics mapped', () => {
     const V = createRequire(import.meta.url)('./videomd2reel.cjs');
     const cue = (t0, t1, text, extra = {}) => ({ t0, t1, text, kind: 'label', band: 'top', conf: 0.95, line_h: 0.07, bbox: [0.3, 0.15, 0.4, 0.07], style: { fill: '#ffffff' }, ...extra });
@@ -556,12 +618,14 @@ try {
     const RM = createRequire(import.meta.url)('./reelmd.cjs');
     const dir = join(dirname(KIT), 'examples', 'recipes');
     const files = readdirSync(dir).filter(f => /\.Reel\.md$/.test(f));
-    if (files.length < 3) fail('expected 3 example recipes, got ' + files);
+    if (files.length < 4) fail('expected 4 example recipes, got ' + files);
+    if (!files.includes('launch-day.Reel.md')) fail('the launch-day recipe (modes 24 to 37) is missing');
     for (const f of files) {
       const r = RM.load(join(dir, f)); const v = RM.validate(r);
       if (v.errs.length) fail(f + ': ' + v.errs.join('; '));
       const c = RM.compile(r);
-      if (!c.cut.shotPlan || c.cut.shotPlan.length !== r.shots.length || (c.captions.titles || []).length !== r.titles.length) fail(f + ' did not compile its shots and titles');
+      if ((r.shots.length && (!c.cut.shotPlan || c.cut.shotPlan.length !== r.shots.length)) || (c.captions.titles || []).length !== r.titles.length) fail(f + ' did not compile its shots and titles');
+      if ((c.captions.graphics || c.captions.flips || []).length < (r.graphics || []).length) fail(f + ' did not compile its graphics');
     }
     // a finished job -> Reel.md -> compile gives back the same cut and titles; export is stable
     const cut = { preset: 'cinematic', segs: [{ file: '../clips/a.mp4', in: 0, out: 2.5, finish: 'teal' }, { file: '../clips/b.mp4', in: 1, out: 3.2, bigPunch: true, transition: 'crossfade' }, { file: '../clips/c.mp4', in: 0.4, out: 2, finish: 'mono,grain' }],
@@ -767,6 +831,22 @@ try {
     }
     if (statSync(lib).mtimeMs !== before || existsSync(join(KIT, 'music', '.mp3'))) fail('music:add wrote to the library on a refused import');
   });
+  { // the MCP server: six tools whose schemas come from contract.json; a tool call runs the real command
+    process.stdout.write('- MCP server (stdio): menu, draft, plan, validate, render, verify; validate runs reelmd check ... ');
+    const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+    const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
+    const cl = new Client({ name: 'smoke', version: '1' });
+    await cl.connect(new StdioClientTransport({ command: node, args: [join(KIT, 'mcp.mjs')], cwd: dirname(KIT), stderr: 'ignore' }));
+    try {
+      const names = (await cl.listTools()).tools.map(t => t.name).join(',');
+      if (names !== 'menu,draft,plan,validate,render,verify') fail('MCP tools: ' + names);
+      const v = await cl.callTool({ name: 'validate', arguments: { recipe: 'examples/recipes/cinematic.Reel.md' } });
+      if (v.isError || !/REELMD PASS/.test(v.content[0].text)) fail('MCP validate: ' + JSON.stringify(v));
+      const bad = await cl.callTool({ name: 'render', arguments: { look: 'nope' } });
+      if (!bad.isError) fail('MCP render should refuse a value the contract does not list');
+    } finally { await cl.close(); }
+    console.log('ok');
+  }
   step('check.mjs flags em dashes and banned phrases in captions', () => {
     const b = join(work, 'jobs', 'muse', 'build');
     const caps = { captionStyle: 'pill', flips: [{ start: 0, end: 1, text: 'This is not a tool but a team', mode: 0 }, { start: 1, end: 2, text: 'Fast \u2014 really fast', mode: 0 }] };
@@ -788,11 +868,17 @@ try {
     if (diff(frame('plain.mp4', 0.8), frame('tx.mp4', 0.8)) > 2) fail('segment 0 should not be punched');
     writeFileSync(join(b, 'cut.json'), JSON.stringify(cut));
   });
-  step('verify.mjs: ffprobe, loudness, stills + contact sheet, mask alpha, copy lint', () => {
+  step('verify.mjs: ffprobe, loudness, stills + contact sheet, mask alpha, copy lint, overlap, --json; square export', () => {
     const b = join(work, 'jobs', 'muse', 'build');
     rmSync(join(b, 'captions.js')); run(node, [join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--titles', '--style', 'pill'], b);
-    const o = run(node, [join(KIT, 'verify.mjs'), 'muse', '--jobs', join(work, 'jobs')], work);
+    const o = run(node, [join(KIT, 'verify.mjs'), 'muse', '--jobs', join(work, 'jobs'), '--json'], work);
     if (!/VERIFY PASS/.test(o)) fail('verify:\n' + o);
+    const vj = JSON.parse(o.trim().split('\n').pop());
+    if (!vj.ok || !existsSync(vj.contact) || !/no overlap between graphics, captions and titles/.test(o)) fail('verify --json / overlap check:\n' + o);
+    // export presets: a square export of the same reel is 1080x1080 and checks against its own size
+    const ex = JSON.parse(run(node, [join(KIT, 'export.mjs'), 'muse', '--jobs', join(work, 'jobs'), '--export', 'square', '--json'], work).trim().split('\n').pop());
+    const wh = run('ffprobe', ['-v', 'error', '-select_streams', 'v', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', ex.file]).trim();
+    if (wh !== '1080,1080' || ex.laidOut) fail('square export: ' + wh + ' ' + JSON.stringify(ex));
     const v = join(work, 'jobs', 'muse', 'verify');
     if (!existsSync(join(v, 'contact.png'))) fail('no contact sheet');
     if (readdirSync(v).filter(f => /title-mid/.test(f)).length !== 4 || readdirSync(v).filter(f => /big-punch/.test(f)).length !== 2) fail('verify stills: ' + readdirSync(v));
