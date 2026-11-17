@@ -41,12 +41,12 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
   { let C = {}; try { C = JSON.parse(readFileSync(join(ROOT, 'cut.json'), 'utf8')); } catch {}
     writeFileSync(join(ROOT, 'lockover.js'), 'window.LOCKOVER=' + JSON.stringify({ lockup: C.lockup || null, hero: C.hero || null, titleLayer: C.titleLayer || null, inserts: (C.inserts || []).map(s => ({ at: +s.at, dur: +s.dur, y: s.y, tint: s.tint, line: s.line, arc: s.arc })) }) + ';\n'); }
   if (!existsSync(join(ROOT, 'fxzones.js'))) writeFileSync(join(ROOT, 'fxzones.js'), 'window.FXZONES=[];\n');
-  // graphics (modes 10, 11 and 19): icon and screen images as file URLs; a screen recording becomes a short frame list
-  // (build/gfx/, 12 fps) so the card can play it frame-accurately. Fonts for the ordinal word, the label and the code
-  // card, and each graphic's default place and layer rule from kit/graphics.json.
+  // graphics (modes 10, 11, 19 and 26): icon and screen images as file URLs; a screen recording becomes a short frame list
+  // (build/gfx/, 12 fps) so the card can play it frame-accurately. Fonts for the ordinal word, the label, the code
+  // card, the split-flap and flash-card face (Anton) and the terminal (JetBrains Mono), and each graphic's default place and layer rule from kit/graphics.json.
   { const assets = {}, VID = /\.(mp4|mov|m4v|webm|mkv)$/i, url = f => pathToFileURL(f).href;
     for (const f of CAP.flips || []) {
-      if (f.mode !== 10 && f.mode !== 11 && f.mode !== 19) continue;
+      if (f.mode !== 10 && f.mode !== 11 && f.mode !== 19 && f.mode !== 26) continue;
       const key = f.mode + '@' + f.start, file = f.mode === 11 ? f.src : f.icon;
       if (!file) continue;
       const abs = isAbsolute(file) ? file : join(ROOT, file);
@@ -65,7 +65,7 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
     const F = join(KIT, 'fonts');
     const GJ = JSON.parse(readFileSync(join(KIT, 'graphics.json'), 'utf8'));
     const defaults = Object.fromEntries(GJ.graphics.map(g => [g.mode, g.defaults || {}])), panelModes = GJ.graphics.filter(g => g.mode >= 11).map(g => g.mode);
-    writeFileSync(join(ROOT, 'gfx.js'), 'window.GFX=' + JSON.stringify({ fonts: { serif: url(join(F, 'InstrumentSerif-Italic.ttf')), label: url(join(F, 'ArchivoBlack-Regular.ttf')), mono: url(join(F, 'RedHatMono-VF.ttf')) }, defaults, autoBehindY: GJ.autoBehindY, panelModes, assets }) + ';\n');
+    writeFileSync(join(ROOT, 'gfx.js'), 'window.GFX=' + JSON.stringify({ fonts: { serif: url(join(F, 'InstrumentSerif-Italic.ttf')), label: url(join(F, 'ArchivoBlack-Regular.ttf')), mono: url(join(F, 'RedHatMono-VF.ttf')), slam: url(join(F, 'Anton-Regular.ttf')), code: url(join(F, 'JetBrainsMono-VF.ttf')) }, defaults, autoBehindY: GJ.autoBehindY, panelModes, assets }) + ';\n');
     if (Object.keys(assets).length) console.log('graphics assets', Object.keys(assets).length);
   }
 }

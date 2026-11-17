@@ -5,6 +5,9 @@
 // say it in that window. Anything else is dropped, never shown. The other text graphics (kit/graphics.json, modes 12 to
 // 23) list their worded fields under "spoken": each must be said in the graphic's window; a checklist keeps only the
 // rows you say and ticks each one as you say it.
+// Cues: any graphic can carry "cues" (words or seconds, separated by ;). Each word cue becomes the time you say it in
+// the graphic's window, a number is seconds into the graphic; the times land in "at", which the graphic uses for its
+// beats (a checklist tick, a chart bar, a terminal line, a feature card, a cursor click). Narration drives the motion.
 'use strict';
 const fs = require('fs'), path = require('path');
 
@@ -110,6 +113,7 @@ function fitGraphics(gfx, words, len, opts = {}) {
 
 // the worded fields of each graphic (kit/graphics.json "spoken"), by mode
 const SPOKEN = (() => { try { return Object.fromEntries(JSON.parse(fs.readFileSync(path.join(__dirname, 'graphics.json'), 'utf8')).graphics.filter(g => g.mode >= 12).map(g => [g.mode, g.spoken || []])); } catch { return {}; } })();
+const KIND = (() => { try { return Object.fromEntries(JSON.parse(fs.readFileSync(path.join(__dirname, 'graphics.json'), 'utf8')).graphics.map(g => [g.mode, g.id])); } catch { return {}; } })();
 const itemsOf = f => (Array.isArray(f.items) ? f.items : String(f.items || '').split(';')).map(s => String(s).trim()).filter(Boolean);
 // versus: left and right, or "A vs B" in text
 const sides = f => { if (f.left || f.right) return [f.left, f.right]; const sp = String(f.text || '').split(/\s+(?:vs\.?|versus)\s+/i); return sp.length > 1 ? sp : [f.text]; };
@@ -128,24 +132,72 @@ function audit(flips, words, pad = 1.5) {
     const keys = SPOKEN[f.mode];
     if (!keys || !keys.length) { out.push(f); continue; }
     let g = f, bad = null;
+    const what = KIND[f.mode] || 'graphic';
     if (keys.includes('items')) {
-      const its = itemsOf(f), win = words.filter(w => w.end >= f.start - pad && w.start <= f.end + pad), kept = [], at = [];
-      for (const it of its) {
-        if (!said(it, words, f.start, f.end, pad)) { dropped.push({ g: f, why: `checklist row "${it}" at ${f.start}s is not in what you say there` }); continue; }
+      const its = itemsOf(f), win = words.filter(w => w.end >= f.start - pad && w.start <= f.end + pad), kept = [], at = [], det = [];
+      const dets = listOf(f.details);
+      its.forEach((it, i) => {
+        if (!said(it, words, f.start, f.end, pad)) { dropped.push({ g: f, why: `${what} row "${it}" at ${f.start}s is not in what you say there` }); return; }
         const w = whenSaid(it, win, f.start);
-        kept.push(it); at.push(w ? +Math.min(Math.max(w.start, f.start + 0.3), f.end - 0.2).toFixed(3) : null);
+        kept.push(it); det.push(dets[i] || ''); at.push(w ? +Math.min(Math.max(w.start, f.start + 0.3), f.end - 0.2).toFixed(3) : null);
+      });
+      if (!kept.length) bad = `${what} at ${f.start}s: you say none of its rows`;
+      else {
+        g = { ...f, items: kept, ...(!f.cues && at.every(a => a != null) ? { at } : {}) };
+        if (dets.length) g.details = det;
       }
-      if (!kept.length) bad = `checklist at ${f.start}s: you say none of its rows`;
-      else g = { ...f, items: kept, ...(at.every(a => a != null) ? { at } : {}) };
     }
-    for (const k of keys.filter(k => k !== 'items')) {
+    // a list of sub lines (feature card details): each one you do not say is left blank
+    if (!bad && keys.includes('details') && g.details) {
+      const ds = listOf(g.details).map(d => d && !said(d, words, f.start, f.end, pad) ? (dropped.push({ g: f, why: `${what} line "${d}" at ${f.start}s is not in what you say there` }), '') : d);
+      g = { ...g, details: ds };
+    }
+    for (const k of keys.filter(k => k !== 'items' && k !== 'details')) {
       if (bad) break;
       const vals = k === 'left' || k === 'right' ? (k === 'left' ? [sides(f)[0]] : [sides(f)[1]]) : [f[k]];
       for (const v of vals) if (v && !said(v, words, f.start, f.end, pad)) { bad = `"${v}" at ${f.start}s is not in what you say there`; break; }
     }
     if (bad) dropped.push({ g: f, why: bad }); else out.push(g);
   }
-  return { flips: out, dropped };
+  return { flips: cueFlips(out, words, pad).flips, dropped };
 }
 
-module.exports = { norm, tokens, timeline, said, heard, numberTokens, whenSaid, ordinalsSaid, fitGraphics, audit, ORD, SPOKEN };
+// a ; list or an array, trimmed (empty entries kept in place so a list stays aligned with its items)
+const listOf = v => v == null ? [] : (Array.isArray(v) ? v : String(v).split(';')).map(s => String(s).trim());
+// Cue times: "cues" (words or seconds, ;) to "at" in reel time. A word cue is the time you say it nearest the graphic's
+// start (inside its window, padded); a number is seconds into the graphic. A cue you never say, or one outside the
+// window, is spread between its neighbours. Returns { flips, resolved: [{ start, cue, at, said }] }.
+function cueTimes(f, words, pad = 1.5) {
+  const cs = listOf(f.cues).filter(Boolean), end = f.end > 90 ? f.start + 6 : f.end, lo = f.start + 0.15, hi = Math.max(lo, end - 0.25);
+  if (!cs.length) return null;
+  const win = words.filter(w => w.end >= f.start - pad && w.start <= end + pad), log = [];
+  let prev = f.start;
+  const at = cs.map(c => {
+    if (/^\d+(\.\d+)?s?$/.test(c)) { const t = f.start + parseFloat(c); log.push({ cue: c, said: false }); return t >= f.start && t <= end ? t : null; }
+    // the next time you say it after the previous cue (repeated words land in order)
+    const w = whenSaid(c, win.filter(x => x.start >= prev), prev) || whenSaid(c, win, prev); log.push({ cue: c, said: !!w });
+    const t = w && w.start >= f.start - 0.2 && w.start <= end ? Math.max(lo, w.start) : null; if (t != null) prev = t + 0.05; return t;
+  });
+  // fill gaps: unsaid cues sit evenly between the known times either side
+  for (let i = 0; i < at.length; i++) if (at[i] == null) {
+    let j = i; while (j < at.length && at[j] == null) j++;
+    const a = i ? at[i - 1] : lo, b = j < at.length ? at[j] : hi;
+    for (let k = i; k < j; k++) at[k] = a + (b - a) * (k - i + 1) / (j - i + 1);
+    i = j - 1;
+  }
+  const out = at.map(t => +Math.min(hi, Math.max(lo, t)).toFixed(3));
+  for (let i = 1; i < out.length; i++) if (out[i] < out[i - 1]) out[i] = out[i - 1];
+  return { at: out, log: log.map((l, i) => ({ ...l, at: out[i] })) };
+}
+function cueFlips(flips, words, pad = 1.5) {
+  const resolved = [];
+  const out = (flips || []).map(f => {
+    if (!f.cues) return f;
+    const r = cueTimes(f, words, pad); if (!r) return f;
+    for (const l of r.log) resolved.push({ start: f.start, mode: f.mode, ...l });
+    return { ...f, at: r.at };
+  });
+  return { flips: out, resolved };
+}
+
+module.exports = { cueTimes, cueFlips, listOf, norm, tokens, timeline, said, heard, numberTokens, whenSaid, ordinalsSaid, fitGraphics, audit, ORD, SPOKEN };

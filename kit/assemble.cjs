@@ -49,6 +49,7 @@ const KIT = __dirname;
 const R = require('./rules.cjs');
 const SFXPLAN = require('./sfx-plan.cjs');
 const B = require('./beats.cjs');
+const XFX = require('./xfx.cjs');
 const A = 'aresample=48000,aformat=channel_layouts=stereo,asetpts=PTS-STARTPTS';
 // the trailing fps=24 matters: after setpts the link loses its frame rate and tpad then silently adds nothing
 const V = 'fps=24,format=yuv420p,setsar=1,settb=AVTB,setpts=PTS-STARTPTS,fps=24';
@@ -120,7 +121,7 @@ if (BASE) {
     segs.forEach((s, i) => {
       if (!i) return;
       const tr = trans[i], o = `x${i}`;
-      if (tr) f.push(`[${cur}]tpad=stop_duration=${tr.d}:stop_mode=clone,fps=24,settb=AVTB[p${i}]`, `[v${i}]fps=24,settb=AVTB[q${i}]`, `[p${i}][q${i}]xfade=transition=${tr.m}:duration=${tr.d}:offset=${TL.segs[i].start.toFixed(3)}[${o}]`);
+      if (tr) f.push(`[${cur}]tpad=stop_duration=${tr.d}:stop_mode=clone,fps=24,settb=AVTB[p${i}]`, `[v${i}]fps=24,settb=AVTB[q${i}]`, `[p${i}][q${i}]xfade=${XFX.xfadeOpts(tr.m)}:duration=${tr.d}:offset=${TL.segs[i].start.toFixed(3)}[${o}]`);
       else f.push(`[${cur}][v${i}]concat=n=2:v=1:a=0,fps=24,settb=AVTB[${o}]`);
       cur = o;
     });

@@ -68,7 +68,8 @@ function planHits(effects, opts = {}) {
   if (opts.off) return [];
   const pool = M.sounds || [];
   const byCat = {};
-  for (const s of pool) (byCat[s.category] = byCat[s.category] || []).push(s);
+  // a sound marked "auto": false plays only when an effect names it (sfx: id)
+  for (const s of pool) if (s.auto !== false) (byCat[s.category] = byCat[s.category] || []).push(s);
   const rot = {}, used = new Set();
   function pick(cat, prefer) {
     const list = byCat[cat] || [];

@@ -22,11 +22,11 @@ const GRAPHICS = Object.fromEntries(JSON.parse(fs.readFileSync(path.join(__dirna
 const CAPTION_POSITIONS = ['top', 'middle', 'bottom'];
 const SRC = require('./sources.cjs');
 // the one-word caption's look: Reel.md key -> captions.js key and its values
-const CAPTION_LOOK = { 'caption-outline': ['captionOutline', ['none', 'thin', 'thick']], 'caption-shadow': ['captionShadow', ['none', 'soft']], 'caption-case': ['captionCase', ['upper', 'lower', 'as-said']], 'caption-layer': ['captionLayer', ['front', 'behind', 'auto']], 'panel-layer': ['panelLayer', ['front', 'behind', 'auto']] };
-const ENTRANCES = ['stagger-rise', 'slam', 'blur-rise', 'slide-left', 'elastic', 'flip', 'pop-zoom'];
+const CAPTION_LOOK = { 'caption-outline': ['captionOutline', ['none', 'thin', 'thick']], 'caption-shadow': ['captionShadow', ['none', 'soft']], 'caption-case': ['captionCase', ['upper', 'lower', 'as-said']], 'caption-layer': ['captionLayer', ['front', 'behind', 'auto']], 'panel-layer': ['panelLayer', ['front', 'behind', 'auto']], 'caption-entrance': ['captionEntrance', ['pop', 'unfurl', 'cascade', 'orbit', 'warp', 'crystallize', 'compute', 'levitate', 'undulate']] };
+const ENTRANCES = ['stagger-rise', 'slam', 'blur-rise', 'slide-left', 'elastic', 'flip', 'pop-zoom', 'drop'];
 const LAYERS = ['front', 'behind', 'auto'];
 // built-in glyphs for icon-badge, sticker-pop and cta-card (Tabler icons, drawn in kit/overlay.html)
-const GLYPHS = ['check', 'star', 'bolt', 'heart', 'fire', 'play', 'bell', 'spark', 'plus', 'lock'];
+const GLYPHS = ['check', 'star', 'bolt', 'heart', 'fire', 'play', 'bell', 'spark', 'plus', 'lock', 'arrow', 'rocket', 'terminal', 'chart', 'world', 'cpu'];
 
 // ---------- tiny YAML subset (front matter only): maps by 2-space indent, scalars, [inline, lists] ----------
 function scalar(v) {
@@ -160,6 +160,11 @@ function validate(r) {
     if (g.glyph) for (const x of String(g.glyph).split(';').map(s => s.trim()).filter(Boolean)) if (!GLYPHS.includes(x)) errs.push(`graphics #${pad2(g.n)}: glyph "${x}" must be one of ${GLYPHS.join(', ')}`);
     for (const k of ['step', 'of', 'count', 'h']) if (g[k] != null && g[k] !== '' && isNaN(+g[k])) errs.push(`graphics #${pad2(g.n)}: ${k} must be a number`);
     if (type === 'checklist' && !String(g.items || g['items~'] || '').trim()) errs.push(`graphics #${pad2(g.n)}: a checklist needs items (rows separated by ;)`);
+    for (const t of ['ticker', 'feature-cards']) if (type === t && !String(g.items || g['items~'] || '').trim()) errs.push(`graphics #${pad2(g.n)}: ${t === 'ticker' ? 'a ticker' : 'feature cards'} needs items (separated by ;)`);
+    if (type === 'data-chart' && !String(g.values || '').split(';').some(x => /\d/.test(x))) errs.push(`graphics #${pad2(g.n)}: a data chart needs values (numbers separated by ;)`);
+    for (const [k, vals] of [['kind', ['bar', 'line']], ['corner', ['tl', 'tr', 'bl', 'br']], ['style', ['count', 'odometer']], ['case', ['upper', 'as-said']]]) if (g[k] && !vals.includes(String(g[k]))) errs.push(`graphics #${pad2(g.n)}: ${k} must be ${vals.join(', ')}`);
+    for (const k of ['speed', 'opacity']) if (g[k] != null && g[k] !== '' && isNaN(+g[k])) errs.push(`graphics #${pad2(g.n)}: ${k} must be a number`);
+    if (g.bg && !/^#[0-9a-f]{6}$/i.test(g.bg)) errs.push(`graphics #${pad2(g.n)}: bg must be a #rrggbb colour`);
     for (const k of ['icon', 'src']) if (g[k] && !none(g[k]) && !fs.existsSync(path.resolve(path.dirname(r.file || '.'), g[k]))) warn.push(`graphics #${pad2(g.n)}: ${k} ${g[k]} not found next to the recipe; the placeholder is drawn`);
     if (g.source && !none(g.source)) {
       if (SRC.isUrl(g.source)) { const c = SRC.cached(g.source); if (!c.video && !c.image) warn.push(`graphics #${pad2(g.n)}: source ${g.source} not captured yet (npm run capture -- --recipe <this Reel.md>, after the user confirms the URLs); the placeholder is drawn`); }
@@ -237,18 +242,19 @@ function titleFlips(r) {
   });
 }
 
-// Graphics as captions.js flips (mode 9 ordinal sticker, 10 app label, 11 screen card, 12 to 23 the rest, kit/graphics.json). icon and src are resolved
+// Graphics as captions.js flips (mode 9 ordinal sticker, 10 app label, 11 screen card, 12 to 37 the rest, kit/graphics.json). icon and src are resolved
 // against the recipe's folder; "~" fields (a teardown's guesses) count the same as plain ones.
 function graphicFlips(r) {
   const dir = path.dirname(path.resolve(r.file || 'Reel.md'));
   const v = (g, k) => g[k] !== undefined ? g[k] : g[k + '~'];
   return (r.graphics || []).filter(g => GRAPHICS[v(g, 'type')]).map(g => {
     const f = { start: +g.start, end: +g.end, mode: GRAPHICS[v(g, 'type')] };
-    // a code card keeps its text as written (\n for a new line); elsewhere " / " is a line break, shown as a space
-    const text = v(g, 'text'); if (text != null && !none(text)) f.text = f.mode === 23 ? String(text) : String(text).replace(/\s*\/\s*/g, ' ');
-    for (const k of ['layer', 'color', 'ink', 'border', 'tile', 'sub', 'left', 'right', 'shape', 'glyph', 'title']) { const x = v(g, k); if (x != null && !none(x)) f[k] = String(x); }
-    for (const k of ['x', 'y', 'w', 'h', 'in', 'size', 'step', 'of', 'count']) { const x = v(g, k); if (x != null && x !== '' && !isNaN(+x)) f[k] = +x; }
+    // a code card and a terminal session keep their text as written (\n for a new line); elsewhere " / " is a line break, shown as a space
+    const text = v(g, 'text'); if (text != null && !none(text)) f.text = f.mode === 23 || f.mode === 28 ? String(text) : String(text).replace(/\s*\/\s*/g, ' ');
+    for (const k of ['layer', 'color', 'ink', 'border', 'tile', 'sub', 'left', 'right', 'shape', 'glyph', 'title', 'values', 'labels', 'kind', 'tag', 'keyword', 'corner', 'live', 'clock', 'cues', 'cam', 'cursor', 'style', 'case', 'bg']) { const x = v(g, k); if (x != null && !none(x)) f[k] = String(x); }
+    for (const k of ['x', 'y', 'w', 'h', 'in', 'size', 'step', 'of', 'count', 'speed', 'opacity']) { const x = v(g, k); if (x != null && x !== '' && !isNaN(+x)) f[k] = +x; }
     { const x = v(g, 'items'); if (x != null && !none(x)) f.items = String(x).split(';').map(s => s.trim()).filter(Boolean); }
+    { const x = v(g, 'details'); if (x != null && !none(x)) f.details = String(x).split(';').map(s => s.trim()); }
     { const x = v(g, 'at'); if (x != null && !none(x)) f.at = String(x).split(/[;,]/).map(s => +s.trim()).filter(n => !isNaN(n)); }
     // head: the burst's width in head widths, head-y: its centre below the head centre in head widths (reel.cjs turns
     // them into size and y for your clip's head)
@@ -364,7 +370,8 @@ function exportJob(cut, caps, opts = {}) {
     gfx.forEach((g, i) => {
       const f = [`#${pad2(i + 1)} ${fmtT(g.start)}-${fmtT(g.end >= 99 ? dur : g.end)}`, `type ${TYPE[g.mode]}`];
       if (g.text) f.push(`text ${String(g.text).replace(/\n/g, ' ')}`);
-      for (const k of ['sub', 'left', 'right', 'shape', 'glyph', 'title', 'step', 'of', 'count', 'layer', 'color', 'ink', 'border', 'tile', 'x', 'y', 'w', 'h', 'in', 'size']) if (g[k] != null) f.push(`${k} ${g[k]}`);
+      for (const k of ['sub', 'left', 'right', 'shape', 'glyph', 'title', 'step', 'of', 'count', 'values', 'labels', 'kind', 'tag', 'keyword', 'corner', 'live', 'clock', 'cues', 'cam', 'cursor', 'style', 'case', 'bg', 'speed', 'opacity', 'layer', 'color', 'ink', 'border', 'tile', 'x', 'y', 'w', 'h', 'in', 'size']) if (g[k] != null) f.push(`${k} ${g[k]}`);
+      if (Array.isArray(g.details) && g.details.length) f.push(`details ${g.details.join('; ')}`);
       if (Array.isArray(g.items) && g.items.length) f.push(`items ${g.items.join('; ')}`);
       if (Array.isArray(g.at) && g.at.length) f.push(`at ${g.at.join('; ')}`);
       if (g.head != null) f.push(`head ${g.head}`);

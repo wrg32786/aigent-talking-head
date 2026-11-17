@@ -1,6 +1,6 @@
 ---
 name: aigent-talking-head
-description: "Turn a phone clip into a styled 9:16 talking-head reel, locally: kinetic captions, titles in front of or behind the head, 15 overlay graphics, 51 effects, beat-synced music, film finishes, presets and Reel.md recipes. Every command, flag, output and failure is listed in contract.json. Use when someone asks to make a reel from a selfie or talking-head clip, add captions and titles to a vertical video, remake the style of a reel they like, or check a finished reel before posting."
+description: "Turn a phone clip into a styled 9:16 talking-head reel, locally: kinetic captions, titles in front of or behind the head, 29 overlay graphics, 51 effects, beat-synced music, film finishes, presets and Reel.md recipes. Every command, flag, output and failure is listed in contract.json. Use when someone asks to make a reel from a selfie or talking-head clip, add captions and titles to a vertical video, remake the style of a reel they like, or check a finished reel before posting."
 ---
 
 # aigent-talking-head
@@ -49,7 +49,7 @@ Run each as `npm run <command> -- <args>` from the repo root. Full flag list wit
 
 | Command | What it does | Key args and flags |
 |---|---|---|
-| `reel` | clip to draft, then to `reel-vN.mp4` | `[videos...]`, `--clip`, `--name`, `--preset <name>\|auto`, `--recipe`, `--recipe-titles`, `--look kinetic\|oneword\|muse\|classic\|one-word`, `--style`, `--theme aigent\|neutral`, `--title-layer front\|behind\|auto`, `--caption-position top\|middle\|bottom`, `--caption-layer`, `--panel-layer`, `--fonts`, `--finish`, `--bed`, `--bed-start`, `--beat-sync`, `--no-beat-sync`, `--mask birefnet\|mediapipe`, `--no-mask`, `--no-titles`, `--no-punch`, `--sfx off`, `--draft`, `--rebuild`, `--force` |
+| `reel` | clip to draft, then to `reel-vN.mp4` | `[videos...]`, `--clip`, `--name`, `--preset <name>\|auto`, `--recipe`, `--recipe-titles`, `--look kinetic\|oneword\|muse\|classic\|one-word`, `--style`, `--theme aigent\|neutral`, `--title-layer front\|behind\|auto`, `--caption-position top\|middle\|bottom`, `--caption-layer`, `--caption-entrance pop\|unfurl\|cascade\|orbit\|warp\|crystallize\|compute\|levitate\|undulate`, `--panel-layer`, `--fonts`, `--finish`, `--bed`, `--bed-start`, `--beat-sync`, `--no-beat-sync`, `--mask birefnet\|mediapipe`, `--no-mask`, `--no-titles`, `--no-punch`, `--sfx off`, `--draft`, `--rebuild`, `--force` |
 | `verify` | check a finished reel | `<job>`, `--file`, `--fps`, `--jobs` |
 | `check` | lint a job's copy and plan, or self-test the repo | `[job]`, `--warn-only` |
 | `smoke` | end-to-end test on synthetic clips | `--whisper`, `--effects`, `--keep` |
@@ -71,15 +71,15 @@ Precedence when a reel is made: flags, then the recipe, then its preset, then de
 
 ## Graphics
 
-15 overlay graphics, each with its own entrance and exit, drawn in the theme's colours and fonts. Add them as lines in a Reel.md `reel-graphics` block (`#01 2-5 | type stat-callout | text 10,000+ | sub readers`) or as `captions.js` flips with the mode. Fields and defaults: `kit/graphics.json` and the `graphics` section of `contract.json`. Offer them with the rest of the menu (`npm run menu`, `showcase/sheets/graphics.jpg`).
+29 overlay graphics, each with its own entrance and exit, drawn in the theme's colours and fonts. Add them as lines in a Reel.md `reel-graphics` block (`#01 2-5 | type stat-callout | text 10,000+ | sub readers`) or as `captions.js` flips with the mode. Fields and defaults: `kit/graphics.json` and the `graphics` section of `contract.json`. Offer them with the rest of the menu (`npm run menu`, `showcase/sheets/graphics.jpg`).
 
 | Type | Mode | What it is | Main fields |
 |---|---|---|---|
 | `ordinal-sticker` | 9 | list number on a flat accent seal | `text`, `layer front\|behind` |
 | `app-label` | 10 | icon tile and label | `text`, `icon` |
-| `screen-card` | 11 | your screenshot or screen recording in a card | `src` or `source`, `border` |
+| `screen-card` | 11 | your screenshot or screen recording in a card, with an optional pointer and camera | `src` or `source`, `border`, `cursor x y; x y`, `cam z x y; z x y` |
 | `lower-third` | 12 | name tag | `text`, `sub` |
-| `stat-callout` | 13 | big number that counts up, with a label | `text`, `sub` |
+| `stat-callout` | 13 | big number that counts up (or rolls, `style odometer`), with a label | `text`, `sub`, `style` |
 | `checklist` | 14 | rows that tick as you say them | `text`, `items a; b; c` |
 | `quote-card` | 15 | a quote in italic serif with attribution | `text`, `sub` |
 | `highlight` | 16 | marker circle, arrow, underline or box | `shape`, `x`, `y`, `w`, `h`, `text` |
@@ -90,11 +90,26 @@ Precedence when a reel is made: flags, then the recipe, then its preset, then de
 | `price-tag` | 21 | swinging tag, old price struck through | `text`, `sub` |
 | `cta-card` | 22 | end card with a pulsing follow button | `text`, `sub` (handle) |
 | `code-card` | 23 | code typing itself on in an editor card | `text` (`\n` for a new line) |
+| `data-chart` | 24 | bars or a line that grow on their beats while values count up | `text`, `sub`, `values 1.2k; 3.8k`, `labels`, `kind bar\|line`, `cues` |
+| `chapter-card` | 25 | CHAPTER 02 and a title rising out of a mask | `text`, `sub`, `step`, `of` |
+| `logo-bug` | 26 | your mark in a corner with its name | `text`, `icon`, `corner tl\|tr\|bl\|br`, `opacity` |
+| `channel-bug` | 27 | LIVE pill, running clock and channel name | `text`, `live`, `clock`, `corner` |
+| `terminal-session` | 28 | `$` commands type on, then their output lands | `text` (`\n` for a new line), `title`, `cues` |
+| `news-strap` | 29 | broadcast lower third with a tag tab | `text`, `sub`, `tag` |
+| `ticker` | 30 | a band whose items scroll by | `text` (label), `items a; b; c`, `speed` |
+| `split-flap` | 31 | departure-board tiles flip to your words | `text`, `sub` |
+| `feature-cards` | 32 | two to four cards deal in as you say each feature | `items`, `details`, `glyph a;b`, `cues` |
+| `release-pill` | 33 | glass pill with a NEW chip | `text`, `tag`, `sub` |
+| `cta-button` | 34 | a pointer clicks a lit button | `text`, `sub`, `cues` |
+| `hud-callout` | 35 | brackets lock onto a region, a leader draws to a label | `text`, `sub`, `x`, `y`, `w`, `h` |
+| `flash-card` | 36 | full-frame one-word cards, hard cut on each beat | `text` (one word per card), `cues`, `bg` |
+| `keyword-caption` | 37 | a caption line with an accent block behind the keyword | `text`, `keyword`, `tag`, `case` |
 
-Glyphs: check, star, bolt, heart, fire, play, bell, spark, plus, lock. Every graphic takes `x`, `y` (0 to 1) and `color`.
+Glyphs: check, star, bolt, heart, fire, play, bell, spark, plus, lock, arrow, rocket, terminal, chart, world, cpu. Every graphic takes `x`, `y` (0 to 1) and `color`.
 
-- Words on a graphic must be words the user says in its window (the fields under `spoken` in `kit/graphics.json`). On a recipe job the kit drops any that are not said, keeps only the checklist rows that are, and ticks each row as it is said. Do not write words the user never says.
-- `layer front|behind|auto` on modes 11 to 23. Behind puts the graphic under the top of the head only (hair and crown), never the face or chin. Auto is behind for a screen card, and for the others behind only when the graphic sits high in the frame (y below 0.45). It needs the person mask (`npm run effects:setup`).
+- Words on a graphic must be words the user says in its window (the fields under `spoken` in `kit/graphics.json`). On a recipe job the kit drops any that are not said, keeps only the checklist, ticker and feature rows that are, and ticks each row as it is said. Do not write words the user never says.
+- `cues` (words the user says, `;` between, or seconds into the graphic) time the beats of a data chart, terminal session, feature cards, CTA button, flash cards, keyword caption or screen card pointer: each lands when its word is said. A cue that is never said is spread between its neighbours.
+- `layer front|behind|auto` on modes 11 to 37. Behind puts the graphic under the top of the head only (hair and crown), never the face or chin. Auto is behind for a screen card, and for the others behind only when the graphic sits high in the frame (y below 0.45). It needs the person mask (`npm run effects:setup`).
 
 ## Inputs
 

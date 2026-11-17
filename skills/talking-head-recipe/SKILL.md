@@ -23,7 +23,7 @@ When the user describes a reel they like ("fast cuts, one word at a time, black 
 
 1. Start from the closest example in `examples/recipes/`, or the closest preset.
 2. Map each thing they said to a field: caption style, place and colour, look, caption layer (front, or behind the head: words over the hair are hidden by it), screen-card layer (behind the top of the head by default: hair goes over a card it reaches into, the face never does), titles (entrance, layer, text), graphics in a `reel-graphics` block (ordinal stickers, app labels and screen cards, with their own icon and screen files or a confirmed public page as a card's `source`; and lower thirds, stat callouts, checklists, quote cards, highlights, step counters, versus cards, icon badges, sticker pops, price tags, CTA cards and code cards, whose words must be words the user says; `kit/graphics.json`), the one-word caption look (`caption-outline`, `caption-shadow`, `caption-case`), finish per shot, punch, transition, bed and beat sync, colours, fonts. Use only names from `npm run menu`.
-3. Write the shot list in story order (hook, beats, payoff) with times that fit their clip length. Keep entrances unique (seven exist, each once).
+3. Write the shot list in story order (hook, beats, payoff) with times that fit their clip length. Keep entrances unique (eight exist, each once).
 4. Run `npm run reelmd -- check` and fix every error.
 5. Show the user the summary it prints and the parts you guessed. Let them change it.
 6. Offer the menu for anything they did not specify (see the talking-head-reel skill), then make the reel with `--recipe`.

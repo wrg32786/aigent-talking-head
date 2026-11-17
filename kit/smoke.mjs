@@ -135,7 +135,7 @@ try {
   });
   // alpha ink of a layer still: rows with any pixel over half opaque -> { n, y0, y1, mid }
   const ink = png => {
-    const raw = execFileSync('ffmpeg', ['-v', 'error', '-i', png, '-vf', 'alphaextract', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], { maxBuffer: 1 << 26 });
+    const raw = execFileSync('ffmpeg', ['-v', 'error', '-i', png, '-vf', 'format=rgba,alphaextract', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], { maxBuffer: 1 << 26 });
     let n = 0, y0 = -1, y1 = -1;
     for (let y = 0; y < 1920; y++) { let row = 0; for (let x = 0; x < 1080; x++) if (raw[y * 1080 + x] > 128) row++; if (row) { n += row; if (y0 < 0) y0 = y; y1 = y; } }
     return { n, y0, y1, mid: (y0 + y1) / 2 };
@@ -317,9 +317,9 @@ try {
       try { run(node, [join(KIT, 'capture.mjs'), u], work); fail('capture accepted ' + u); } catch (e) { if (!/only public pages|only http/.test(String(e.stderr || ''))) throw e; }
     }
     const GX = JSON.parse(readFileSync(join(KIT, 'graphics.json'), 'utf8')).graphics;
-    if (GX.map(x => x.mode).join(',') !== '9,10,11,12,13,14,15,16,17,18,19,20,21,22,23' || GX.some(x => !x.entrance || !x.exit || !x.detect || !Array.isArray(x.spoken) || !x.example)) fail('kit/graphics.json: modes, entrance, exit, spoken fields, example and detect rule for each graphic');
+    if (GX.map(x => x.mode).join(',') !== Array.from({ length: 29 }, (_, i) => i + 9).join(',') || GX.some(x => !x.entrance || !x.exit || !x.detect || !Array.isArray(x.spoken) || !x.example)) fail('kit/graphics.json: modes, entrance, exit, spoken fields, example and detect rule for each graphic');
   });
-  step('graphics 12 to 23: each draws with an entrance and an exit, auto layer by height, behind only on the panel layer, words you say, Reel.md round trip', () => {
+  step('graphics 12 to 37: each draws with an entrance and an exit, auto layer by height, behind only on the panel layer, words you say, Reel.md round trip', () => {
     const GX = JSON.parse(readFileSync(join(KIT, 'graphics.json'), 'utf8')).graphics.filter(g => g.mode >= 12);
     const d = join(work, 'gfx2'); mkdirSync(d, { recursive: true });
     const flips = GX.map((g, i) => ({ ...g.example, start: i * 3, end: i * 3 + 3 }));
@@ -355,13 +355,28 @@ try {
       { mode: 18, start: 0, end: 3, text: 'Manual vs Agent' }, { mode: 15, start: 0, end: 3, text: 'never said here' }, { mode: 23, start: 0, end: 2, text: 'npm run x' }, { mode: 20, start: 0, end: 2 }], words);
     const kept = au.flips.map(f => f.mode).join(',');
     if (kept !== '13,22,14,21,23,20') fail('audit kept ' + kept + ' ' + JSON.stringify(au.dropped.map(x => x.why)));
+    // ticker items and feature cards keep what you say; a feature line you never say is left blank; cues land when said
+    const au2 = SP.audit([
+      { mode: 30, start: 0, end: 6, text: 'Today', items: ['Record', 'Edit', 'Post'] },
+      { mode: 32, start: 0, end: 6, items: ['Record', 'Caption', 'Juggle'], details: ['first record', 'never said line', 'x'] },
+      { mode: 24, start: 0, end: 6, text: 'readers', values: '1;2;3', cues: 'first;caption;99;5' },
+      { mode: 37, start: 0, end: 4, text: 'follow the aigent', keyword: 'aigent' }, { mode: 37, start: 0, end: 4, text: 'follow the aigent', keyword: 'robot' }], words);
+    const tk = au2.flips.find(f => f.mode === 30), fc = au2.flips.find(f => f.mode === 32), dc = au2.flips.find(f => f.mode === 24);
+    if (!tk || tk.items.join(',') !== 'Record,Post') fail('ticker items: ' + JSON.stringify(tk));
+    if (!fc || fc.items.join(',') !== 'Record,Caption' || fc.details.join('|') !== 'first record|') fail('feature cards: ' + JSON.stringify(fc));
+    const wAt = w => words.find(x => x.word === w).start;
+    if (!dc || !dc.at || Math.abs(dc.at[0] - wAt('first')) > 0.01 || Math.abs(dc.at[1] - wAt('caption')) > 0.01 || !(dc.at[2] >= dc.at[1] && dc.at[2] <= dc.at[3]) || Math.abs(dc.at[3] - 5) > 0.01) fail('cue times: ' + JSON.stringify(dc && dc.at));
+    if (au2.flips.filter(f => f.mode === 37).length !== 1) fail('keyword caption with an unsaid keyword should drop');
     const cl = au.flips.find(f => f.mode === 14);
     if (cl.items.join(',') !== 'Record,Caption,Post' || !cl.at || cl.at.some((t, i) => Math.abs(t - words.find(w => w.word.toLowerCase() === cl.items[i].toLowerCase()).start) > 0.01)) fail('checklist rows and tick times: ' + JSON.stringify(cl));
     // Reel.md: every new type parses, validates and round-trips; a bad shape or glyph fails the check
     const caps = { flips: [{ start: 1, end: 3, mode: 14, text: 'Ship it', items: ['Record', 'Caption'], at: [1.5, 2] }, { start: 3, end: 5, mode: 23, text: 'npx a/b\\n  run' },
       { start: 5, end: 7, mode: 18, left: 'Manual', right: 'Agent', layer: 'behind' }, { start: 7, end: 9, mode: 16, shape: 'arrow', text: 'here', x: 0.6, y: 0.6 },
-      { start: 9, end: 11, mode: 17, step: 2, of: 5 }, { start: 11, end: 13, mode: 19, glyph: 'bolt', text: 'fast' }, { start: 13, end: 15, mode: 20, glyph: 'heart;star', count: 4 }] };
-    const md = RM.exportJob({ segs: [{ file: 'a.mp4', in: 0, out: 15 }] }, caps, { name: 'smoke-gfx2' }), rr = RM.parse(md, join(d, 'x.Reel.md'));
+      { start: 9, end: 11, mode: 17, step: 2, of: 5 }, { start: 11, end: 13, mode: 19, glyph: 'bolt', text: 'fast' }, { start: 13, end: 15, mode: 20, glyph: 'heart;star', count: 4 },
+      { start: 15, end: 17, mode: 24, text: 'Users', values: '1.2k;3.8k', labels: 'Jan;Feb', kind: 'line', cues: 'users;grew' }, { start: 17, end: 19, mode: 28, text: '$ npm run reel\\n✓ done', title: 'zsh' },
+      { start: 19, end: 21, mode: 32, items: ['Record', 'Post'], details: ['One take', ''], glyph: 'play;star' }, { start: 21, end: 23, mode: 26, text: 'AIgent', corner: 'tl', opacity: 0.9 },
+      { start: 23, end: 25, mode: 11, cursor: '0.2 0.3; 0.6 0.6', cam: '1.6 0.25 0.3; 1 0.5 0.5' }, { start: 25, end: 27, mode: 13, text: '10,000', style: 'odometer' }] };
+    const md = RM.exportJob({ segs: [{ file: 'a.mp4', in: 0, out: 27 }] }, caps, { name: 'smoke-gfx2' }), rr = RM.parse(md, join(d, 'x.Reel.md'));
     if (RM.validate(rr).errs.length) fail('new graphics Reel.md invalid: ' + RM.validate(rr).errs.join('; '));
     const sig = fl => JSON.stringify(fl.map(f => Object.keys(f).sort().map(k => [k, f[k]])));
     if (sig(RM.graphicFlips(rr)) !== sig(caps.flips)) fail('graphics round trip:\n' + sig(RM.graphicFlips(rr)) + '\n' + sig(caps.flips));
@@ -419,7 +434,8 @@ try {
     const v = SFXPLAN.validateManifest();
     if (v.errs.length) fail('sfx.json: ' + v.errs.join('; '));
     const man = SFXPLAN.loadManifest();
-    if (man.sounds.length !== 31) fail('expected 31 pack sounds, got ' + man.sounds.length);
+    if (man.sounds.length !== 37) fail('expected 37 pack sounds, got ' + man.sounds.length);
+    if (man.sounds.filter(x => x.auto === false).map(x => x.id.slice(0, 2)).join(',') !== '33,34,35,36,37,38') fail('the six named-only sounds should be auto false');
     const hits = SFXPLAN.planHits([
       { fx: 'locked-on', start: 0.0, end: 1.0 },
       { fx: 'rabbit-hole', start: 1.2, end: 2.4 },
