@@ -278,6 +278,8 @@ if (!flag('rebuild')) {
         for (const g of fit.filter(g => g.spoken)) console.log(`recipe graphic: ${g.mode === 9 ? 'ordinal sticker' : 'app label'} "${g.text}" at ${g.start}s (you say "${g.spoken}")`);
         console.log(`recipe graphics: ${fit.length} of ${gfx.length} fit your ${len.toFixed(1)} s (${fit.filter(g => g.icon || g.src).length} with your files, the rest drawn as placeholders)`);
       }
+      // the face zone the layout pass keeps moved captions and titles out of (kit/overlay.html), from your head
+      if (gfx.length && caps.faceTop == null) { const hw = measureHead(); if (hw && hw.head_w && hw.head_cy != null) { caps.faceTop = Math.round(Math.max(0, (hw.head_top != null ? hw.head_top : hw.head_cy - hw.head_w * 0.6)) * 1920); caps.faceBottom = Math.round(Math.min(1920, hw.head_cy * 1920 + hw.head_w * 1080 * 0.9)); console.log(`face zone for the layout: ${caps.faceTop} to ${caps.faceBottom} px down (moved captions stay out of it)`); } }
       if (pos || col || Object.keys(look).length) console.log(`captions: ${pos || 'default band'}${col ? ', ' + String(col).toLowerCase() : ''}${Object.entries(look).map(([k, v]) => `, ${k === 'panelLayer' ? 'screen cards' : k.replace('caption', '').toLowerCase()} ${v}`).join('')}`);
       fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
     }
@@ -288,7 +290,7 @@ if (!flag('rebuild')) {
     const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), au = S.audit(caps.flips, S.timeline(segs, build));
     if (au.dropped.length) { caps.flips = au.flips; fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); for (const d of au.dropped) console.log((d.kept ? 'field left off, graphic kept: ' : 'dropped, not said: ') + d.why); }
     else console.log('on-screen words: every title, sticker, label and graphic is something you say');
-    for (const z of S.fuzzyLog(true)) console.log(`spoken match: "${z.want}" counted as said (heard "${z.heard}", ${z.how}); add it to the recipe's Aliases to make it explicit`);
+    for (const z of S.fuzzyLog(true)) console.log(`spoken match: "${z.want}" counted as said (heard "${z.heard}", ${z.how})${z.how === 'alias' ? '' : `; add "- ${z.want}: ${z.heard}" to the recipe's Aliases to make it explicit`}`);
     if (au.flips.some(f => f.at || f.details)) { caps.flips = au.flips; fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); }
   }
   // cues: a graphic's "cues" (words or seconds) become its beat times ("at") from when you say them (kit/spoken.cjs)
@@ -402,7 +404,7 @@ if (cut.titles && cut.mask) {
   } else {
     const fxPy = path.join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
     const spec = R.maskSpec(cut, { model: opt('mask') });
-    if (!fs.existsSync(fxPy)) console.warn('WARNING: "behind" was asked for (titles, captions or graphics behind your head) but the person mask is not set up, so they stay in front. Set it up once with: npm run effects:setup');
+    if (!fs.existsSync(fxPy)) { console.warn('WARNING: some titles, captions or graphics are set to sit behind your head (behind, or auto), but the person mask is not set up, so they stay in front. Set it up once with: npm run effects:setup'); process.env.MASK_WARNED = '1'; }
     else {
       sh(process.execPath, [path.join(KIT, 'assemble.cjs'), 'base.mp4'], build, { BASEONLY: '1' }); // BASEONLY already drops sfx and bed
       const win = behind.map(t => `${Math.max(0, t.start - 0.1).toFixed(2)}-${Math.min(LEN, t.end + 0.1).toFixed(2)}`).join(',');

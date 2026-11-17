@@ -17,7 +17,7 @@ const VALUED = new Set(['export', 'file', 'jobs']);
 const JSON_OUT = flag('json');
 const die = m => { if (JSON_OUT) console.log(JSON.stringify({ ok: false, error: m })); else console.error(m); process.exit(1); };
 const name = argv.find((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
-const ex = String(opt('export', '') || '').toLowerCase();
+const ex = String(opt('export') || '').toLowerCase();
 if (!name || !ex) die('Usage: npm run export -- <job> --export ' + X.NAMES.join('|'));
 if (!X.get(ex)) die(`--export must be ${X.NAMES.join(', ')}`);
 let job = resolve(opt('jobs', join(ROOT, 'jobs')), name);

@@ -150,6 +150,12 @@ export function loadMenu() {
     label: `${b.title} (${b.seconds}s, ${b.lufs} LUFS)`,
   }));
 
+  const exportItems = Object.entries(JSON.parse(readFileSync(join(KIT, 'exports.json'), 'utf8')).presets).map(([id, x]) => ({
+    kind: 'export', id, section: 'exports',
+    flag: `--export ${id}`,
+    label: `${x.label}: ${x.w}x${x.h}, up to ${x.maxSec} s, ${x.videoKbps} kbps; safe area top ${x.safe.top}, bottom ${x.safe.bottom}, left ${x.safe.left}, right ${x.safe.right} px`,
+  }));
+
   const presetItems = Preset.list().map(p => ({
     kind: 'preset', id: p.name, section: 'presets',
     flag: `--preset ${p.name}`,
@@ -172,6 +178,7 @@ export function loadMenu() {
     { id: 'effects', title: 'Effects', hint: 'Optional second pass (npm run fx). 51 starter effects, grouped by moment.', items: effects, moments, effectsByMoment },
     { id: 'sfx', title: 'SFX pack', hint: '37 CC0 sounds, auto-picked on npm run fx. Locked cut set is whoosh, swipe, boom, click, typing.', items: sfx },
     { id: 'beds', title: 'Music beds', hint: 'Our own tracks, loudness-matched to -13 LUFS. Hear them with the files in kit/music/.', items: beds },
+    { id: 'exports', title: 'Export presets', hint: 'npm run reel -- ... --export <name> lays the reel out for that platform (titles, captions and graphics kept out of its UI) and writes reel-vN-<name>.mp4; npm run export re-exports a finished reel; npm run verify -- <job> --export <name> checks it.', items: exportItems },
     { id: 'presets', title: 'Brand presets', hint: 'A saved mix of theme, look, type, finishes and favourites. npm run reel -- --preset <name>. Flags you pass win. --preset auto picks one and prints what it chose.', items: presetItems },
   ];
 

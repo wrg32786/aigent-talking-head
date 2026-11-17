@@ -103,7 +103,7 @@ for (let k = pts.length - 1; k >= 0; k--) if (!inFile(pts[k][0])) { notes.push(`
 // stills are 360 wide; an export's UI zones are shaded red on them
 const SW = 360, SH = Math.round(360 * WANT[1] / WANT[0]) & ~1, k3 = SW / WANT[0];
 const zones = EXP ? [[0, 0, WANT[0], EXP.safe.top], [0, WANT[1] - EXP.safe.bottom, WANT[0], EXP.safe.bottom], [0, 0, EXP.safe.left, WANT[1]], [WANT[0] - EXP.safe.right, 0, EXP.safe.right, WANT[1]]]
-  .map(([x, y, w, h]) => `drawbox=x=${Math.round(x * k3)}:y=${Math.round(y * k3)}:w=${Math.round(w * k3)}:h=${Math.round(h * k3)}:color=red@0.28:t=fill`).join(',') : '';
+  .map(([x, y, w, h]) => `drawbox=x=${Math.round(x * k3)}:y=${Math.round(y * k3)}:w=${Math.round(w * k3)}:h=${Math.round(h * k3)}:color=red@0.18:t=fill`).join(',') : '';
 const vdir = join(job, 'verify'); rmSync(vdir, { recursive: true, force: true }); mkdirSync(vdir, { recursive: true });
 const stills = [];
 pts.forEach(([t, label], k) => {
@@ -149,7 +149,8 @@ if (stills.length) {
         if (a.takeover || b.takeover) { notes.push(`${t.toFixed(2)} s: ${nm(a)} and ${nm(b)} overlap under a full-frame graphic`); continue; }
         clash.push(`${t.toFixed(2)} s: ${nm(a)} overlaps ${nm(b)} (${Math.round(x)} px²)`);
       }
-      if (SAFE) for (const e of boxes) { if (e.takeover) continue; const b = e.box, d = 6;
+      // safe area: settled elements only (an entrance or exit may pass through a UI zone on its way in or out)
+      if (SAFE) for (const e of boxes) { if (e.takeover || t - e.start < 0.6 || (e.end < 90 && e.end - t < 0.45)) continue; const b = e.box, d = 6;
         if (b.x0 < SAFE.x0 - d || b.x1 > SAFE.x1 + d || b.y0 < SAFE.y0 - d || b.y1 > SAFE.y1 + d) { const key = 'safe|' + nm(e) + e.start; if (!seen.has(key)) { seen.add(key); outside.push(`${t.toFixed(2)} s: ${nm(e)} reaches into the ${EXN || FR.name} UI zone (box ${b.x0},${b.y0} to ${b.x1},${b.y1}; safe ${SAFE.x0},${SAFE.y0} to ${SAFE.x1},${SAFE.y1})`); } } }
     }
     ok(!clash.length, `no overlap between graphics, captions and titles at ${BX.length} moments${clash.length ? ':' : ''}`);

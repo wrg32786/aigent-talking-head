@@ -1049,7 +1049,9 @@ let LAYER='all';
 const LAYOUT=new Map();let RAW=false;
 const MSC=document.createElement('canvas');MSC.width=270;MSC.height=480;const MSX=MSC.getContext('2d',{willReadFrequently:true});
 const EXPF=CAP.exportFrame&&typeof CAP.exportFrame==='object'?CAP.exportFrame:null;
-const FACEZ={x0:220,x1:860,y0:CAP.faceTop||460,y1:CAP.faceBottom||940};
+// the face zone a moved caption or title never moves further into: from the hairline to below the chin on a typical
+// 9:16 talking head (reel.cjs measures yours into faceTop and faceBottom when the person mask is set up)
+const FACEZ={x0:200,x1:880,y0:CAP.faceTop||400,y1:CAP.faceBottom||1180};
 const kindOf=c=>c[3]===0?'caption':c[3]===7?'title':'graphic';
 function boxNow(cs,t,raw){const keep=ctx,L=LAYER,R0=RAW;MSX.setTransform(1,0,0,1,0,0);MSX.globalAlpha=1;MSX.clearRect(0,0,270,480);MSX.setTransform(.25,0,0,.25,0,0);ctx=MSX;LAYER='all';RAW=!!raw;
  try{flip(t,cs)}catch(e){}finally{ctx=keep;LAYER=L;RAW=R0}
@@ -1089,12 +1091,16 @@ function layoutPass(){LAYOUT.clear();REPORT.length=0;const R=safeRect(),M=18;
  // 2. titles clear of graphics, then captions clear of graphics and titles
  const G=els.filter(x=>x.kind==='graphic');
  const place=(x,obs)=>{const hit=obs.filter(o=>live(o,x)&&inter(o.box,x.box,M));if(!hit.length)return;
-  if(hit.some(o=>o.takeover)){x.hide=hit.map(o=>[o.s,o.e]);x.action='hide';return}
-  const cand=[0];for(const o of hit){cand.push(o.box.y1+M-x.box.y0,o.box.y0-M-x.box.y1)}
-  const fz0=interA(x.box,FACEZ),near=obs.filter(o=>live(o,x));let best=null;
-  for(const dy of cand.filter(v=>v!==0).sort((a,b)=>Math.abs(a)-Math.abs(b))){const B={...x.box,y0:x.box.y0+dy,y1:x.box.y1+dy};
-   if(B.y0<R.y0||B.y1>R.y1)continue;if(near.some(o=>inter(o.box,B,M)))continue;if(interA(B,FACEZ)>fz0+area(B)*.04)continue;best=dy;break}
-  if(best!=null){const k=x.xf?{...x.xf}:{cx:(x.raw.x0+x.raw.x1)/2,cy:(x.raw.y0+x.raw.y1)/2,dx:0,dy:0,s:1};k.dy=Math.round((k.dy||0)+best);x.xf=k;x.box=xfBox(x.raw,k);x.action='shift';return}
+  if(hit.some(o=>o.takeover)){x.hide=hit.map(o=>[Math.max(o.s,x.s),Math.min(o.e,x.e)]);x.action='hide';return}
+  // candidates: just below or just above each graphic it meets, shrunk to no less than 70% when the room is short
+  const H=x.box.y1-x.box.y0,fz0=interA(x.box,FACEZ),near=obs.filter(o=>live(o,x)),cand=[];
+  for(const o of hit){let sc=Math.min(1,(R.y1-(o.box.y1+M))/H);cand.push({top:o.box.y1+M,s:sc});sc=Math.min(1,((o.box.y0-M)-R.y0)/H);cand.push({top:o.box.y0-M-H*sc,s:sc})}
+  let best=null;
+  for(const c of cand){if(!(c.s>=.7))continue;const w=(x.box.x1-x.box.x0)*c.s,cx=(x.box.x0+x.box.x1)/2,B={x0:cx-w/2,x1:cx+w/2,y0:c.top,y1:c.top+H*c.s};
+   if(B.y0<R.y0-1||B.y1>R.y1+1)continue;if(near.some(o=>inter(o.box,B,M-2)))continue;if(interA(B,FACEZ)>fz0+area(B)*.04)continue;
+   const cost=Math.abs(B.y0-x.box.y0)+(1-c.s)*500;if(!best||cost<best.cost)best={B,s:c.s,cost}}
+  if(best){const k0=x.xf||{cx:(x.raw.x0+x.raw.x1)/2,cy:(x.raw.y0+x.raw.y1)/2,dx:0,dy:0,s:1},s2=+((k0.s||1)*best.s).toFixed(3),rh=x.raw.y1-x.raw.y0;
+   const k={cx:k0.cx,cy:k0.cy,dx:k0.dx||0,s:s2,dy:Math.round(best.B.y0+rh*s2/2-k0.cy)};x.xf=k;x.box=xfBox(x.raw,k);x.action='shift';return}
   x.hide=hit.map(o=>[Math.max(o.s,x.s),Math.min(o.e,x.e)]);x.action='hide'};
  const T=els.filter(x=>x.kind==='title');for(const x of T)place(x,G);
  const C=els.filter(x=>x.kind==='caption');for(const x of C)place(x,G.concat(T.filter(t=>t.action!=='hide')));

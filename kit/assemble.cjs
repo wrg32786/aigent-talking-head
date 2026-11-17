@@ -147,7 +147,7 @@ const offEn = ovlOff.length ? `:enable='not(${ovlOff.map(([a, b]) => `between(t,
 // panels, so where the head reaches into a panel the panel is behind it; the body stays under the panel
 const panelsOn = !!(C.panels && fs.existsSync(path.dirname(path.resolve(C.panels))));
 const headFile = panelsOn && C.headMask && fs.existsSync(C.headMask) ? C.headMask : null;
-if (panelsOn && !headFile) console.warn(`note: no head mask${C.headMask ? ' (' + C.headMask + ' not found)' : ''}; screen cards go in front of the presenter (kit/headmask.py)`);
+if (panelsOn && !headFile && !process.env.MASK_WARNED) console.warn(`note: no head mask${C.headMask ? ' (' + C.headMask + ' not found)' : ''}; screen cards go in front of the presenter (kit/headmask.py)`);
 let pic = 'g';
 if (headFile) { f.push('[g]split[g0][gh]'); pic = 'g0'; }
 if (C.titles) {
@@ -167,7 +167,7 @@ if (C.titles) {
       `[gp][mk]alphamerge[person]`, `[gt][person]overlay=format=auto:eof_action=pass[gm]`);
     vcur = 'gm';
   } else {
-    if (spec.file || C.mask) console.warn(`note: mask ${spec.file || C.mask} not found; titles go in front of the picture (run kit/mask.py)`);
+    if ((spec.file || C.mask) && !process.env.MASK_WARNED) console.warn(`note: mask ${spec.file || C.mask} not found; titles go in front of the picture (run kit/mask.py)`);
     f.push(`[${pic}][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gm]`); vcur = 'gm';
   }
 }

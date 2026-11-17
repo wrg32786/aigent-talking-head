@@ -44,7 +44,7 @@ function sentences(words) {
   return out.map(ws => ({ ws, start: ws[0].start, end: ws[ws.length - 1].end, text: ws.map(w => w.word).join(' ') }));
 }
 const clean = w => String(w).replace(/^[^\p{L}\p{N}$@#]+|[^\p{L}\p{N}%+]+$/gu, '');
-const lower = w => clean(w).toLowerCase();
+const lower = w => clean(w).toLowerCase().replace(/['’]/g, '');
 const STOP = new Set(['the', 'a', 'an', 'and', 'or', 'to', 'of', 'in', 'on', 'for', 'with', 'is', 'it', 'that', 'this', 'we', 'you', 'i', 'so', 'just', 'then', 'now', 'our', 'your', 'my', 'its', 'are', 'be', 'was', 'at', 'by', 'as', 'up', 'do']);
 const title = s => s.replace(/(^|\s)(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
 const NUMW = new Set(['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety', 'hundred', 'thousand', 'million', 'billion', 'and']);
@@ -56,8 +56,9 @@ const fmtNum = n => n >= 1000 ? n.toLocaleString('en-US') : String(n);
 function numberIn(s) {
   const ws = s.ws, L = ws.map(w => lower(w.word));
   for (let i = 0; i < ws.length; i++) {
-    const raw = clean(ws[i].word);
-    let j = i, value = null;
+    let raw = clean(ws[i].word), j = i, value = null;
+    // Whisper sometimes splits a number at its thousands comma ("10" ",000")
+    while (/^\d/.test(raw) && ws[j + 1] && /^,\d{3}\b/.test(ws[j + 1].word.trim())) { raw += ws[j + 1].word.trim(); j++; }
     if (/\d/.test(raw)) { const m = raw.replace(/,/g, '').match(/^\$?(\d+(?:\.\d+)?)([kKmM]?)(%|x|X|\+)?$/); if (!m) continue; value = +m[1] * (/k/i.test(m[2]) ? 1e3 : /m/i.test(m[2]) ? 1e6 : 1); }
     else if (NUMW.has(L[i]) && L[i] !== 'and' && L[i] !== 'one') { while (j + 1 < ws.length && NUMW.has(L[j + 1])) j++; const n = S.numberTokens(L.slice(i, j + 1)); if (!n.length) continue; value = +n[0]; }
     else continue;
