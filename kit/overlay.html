@@ -452,19 +452,18 @@ function blurred(fn,c,t,n=5,sh=1/40){const main=ctx,A=MBX[1],B=MBX[0];A.setTrans
  A.globalAlpha=1;ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(MBC[1],0,0);ctx.restore()}
 const FW=(w,s)=>`${w} ${s}px ${(TH.fonts&&TH.fonts.caption&&TH.fonts.caption.family)||'Arial, sans-serif'}`;
 const SAFE=54; // 5% title-safe margin
-// ordinal sticker, entrance burst-pop: a scalloped seal springs open with a quarter turn (gradient, rings, gloss), the word
+// ordinal sticker, entrance burst-pop: a flat accent seal (fine scallops, a hairline ring) springs open with a slight turn, the word
 // rises and its spacing settles
 const ordGeo=c=>{const o=c[4],R=o.size||400;return{x:(o.x??.5)*1080,y:(o.y??.27)*1920,R}};
 function sealPath(R,n,d){ctx.beginPath();for(let i=0;i<=n;i++){const a=i/n*Math.PI*2-Math.PI/2,am=a-Math.PI/n,ri=R*(1-d);if(!i)ctx.moveTo(Math.cos(a)*ri,Math.sin(a)*ri);else ctx.quadraticCurveTo(Math.cos(am)*R*(1+d*.9),Math.sin(am)*R*(1+d*.9),Math.cos(a)*ri,Math.sin(a)*ri)}ctx.closePath()}
-function ordBurst(c,t){const o=c[4],dt=t-c[0],{x,y,R}=ordGeo(c),col=o.color||'#ffd84d',s=spring(dt,1.9,.5),rot=(1-Math.min(1,s))*-.55+dt*.05;if(s<=.002)return;
- ctx.save();ctx.translate(x,y);ctx.rotate(rot);ctx.scale(s,s);const P=()=>sealPath(R,26,.06);elev(P,1.6);
- P();const g=ctx.createRadialGradient(-R*.35,-R*.45,R*.05,0,0,R*1.08);g.addColorStop(0,mix(col,'#ffffff',.45));g.addColorStop(.5,col);g.addColorStop(1,mix(col,'#000000',.2));ctx.fillStyle=g;ctx.fill();
- ctx.beginPath();ctx.arc(0,0,R*.8,0,7);ctx.lineWidth=R*.016;ctx.strokeStyle='rgba(255,255,255,.55)';ctx.stroke();ctx.beginPath();ctx.arc(0,0,R*.765,0,7);ctx.lineWidth=R*.01;ctx.strokeStyle='rgba(0,0,0,.14)';ctx.stroke();
- ctx.save();P();ctx.clip();const sh=ctx.createLinearGradient(0,-R,0,R*.15);sh.addColorStop(0,'rgba(255,255,255,.38)');sh.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=sh;ctx.globalAlpha*=.6;ctx.beginPath();ctx.ellipse(-R*.12,-R*.55,R*.95,R*.5,-.18,0,7);ctx.fill();ctx.restore();
+function ordBurst(c,t){const o=c[4],dt=t-c[0],{x,y,R}=ordGeo(c),col=o.color||CY,s=spring(dt,1.9,.55),rot=(1-Math.min(1,s))*-.45+dt*.04;if(s<=.002)return;
+ ctx.save();ctx.translate(x,y);ctx.rotate(rot);ctx.scale(s,s);const P=()=>sealPath(R,36,.028);elev(P,.9);
+ P();const g=ctx.createLinearGradient(0,-R,0,R);g.addColorStop(0,mix(col,'#ffffff',.08));g.addColorStop(1,mix(col,'#000000',.08));ctx.fillStyle=g;ctx.fill();
+ ctx.beginPath();ctx.arc(0,0,R*.86,0,7);ctx.lineWidth=Math.max(2,R*.008);ctx.strokeStyle=rgba(onCol(col),.22);ctx.stroke();
  ctx.restore()}
-function ordWord(c,t){const o=c[4],dt=t-c[0]-.1,txt=String(c[2]||'').toUpperCase();if(dt<0||!txt)return;const {x,y,R}=ordGeo(c),col=o.color||'#ffd84d',wy=Math.max(120,y-R*.6);let fs=o.wordSize||Math.round(Math.min(150,R*.32));ctx.font=SERIF(fs);while(ctx.measureText(txt).width>Math.min(940,R*1.3)&&fs>48){fs-=4;ctx.font=SERIF(fs)}
- const e=EMPH(cl(dt/.45)),ink=o.ink||mix(col,'#000000',.82);ctx.save();ctx.font=SERIF(fs);ctx.textAlign='center';ctx.textBaseline='middle';ctx.letterSpacing=((.03+.2*(1-e))*fs)+'px';ctx.globalAlpha*=cl(dt/.12);ctx.translate(x,wy+(1-e)*30);
- ctx.fillStyle='rgba(255,255,255,.5)';ctx.fillText(txt,0,fs*.025);ctx.fillStyle=ink;ctx.fillText(txt,0,0);ctx.restore()}
+function ordWord(c,t){const o=c[4],dt=t-c[0]-.1,txt=String(c[2]||'').toUpperCase();if(dt<0||!txt)return;const {x,y,R}=ordGeo(c),col=o.color||CY,wy=Math.max(120,y-R*.6);let fs=o.wordSize||Math.round(Math.min(150,R*.32));ctx.font=SERIF(fs);while(ctx.measureText(txt).width>Math.min(940,R*1.3)&&fs>48){fs-=4;ctx.font=SERIF(fs)}
+ const e=EMPH(cl(dt/.45)),ink=o.ink||onCol(col);ctx.save();ctx.font=SERIF(fs);ctx.textAlign='center';ctx.textBaseline='middle';ctx.letterSpacing=((.03+.2*(1-e))*fs)+'px';ctx.globalAlpha*=cl(dt/.12);ctx.translate(x,wy+(1-e)*30);
+ ctx.fillStyle=ink;ctx.fillText(txt,0,0);ctx.restore()}
 // app label, entrance tile-pop: the app tile springs in from a tilt (top-lit, specular, hairline rim), then the name plate
 // wipes out under it
 function appLabel(c,t){const o=c[4],dt=t-c[0],a=gxa(c),S=o.size||210,x=(o.x??.08)*1080,y=(o.y??.5)*1920,s=spring(dt,2.3,.58),r=S*.225;
@@ -683,12 +682,15 @@ function ctaCard(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),W=gd(c,'w',.82)*1080,c
   ctx.beginPath();ctx.arc(0,0,B/2-1.5,Math.PI*1.1,Math.PI*1.9);ctx.lineWidth=2;ctx.strokeStyle='rgba(255,255,255,.45)';ctx.stroke();icon(glyph(o.glyph||'plus'),0,0,B*.44,onCol(col),{width:2.4});ctx.restore()}
  ctx.restore()}
 // code card, entrance type-on: an editor card (title bar, file tab with a code icon, line numbers, current-line band) rises
-// and the code types itself on (done by 60% of the span) with syntax colours and a caret that blinks once typing ends;
+// and the code types itself on (done by 45% of the span; the card widens, then the type steps down, so no line is clipped) with syntax colours and a caret that blinks once typing ends;
 // exit tips the card down and away
 const SYN={key:'#c792ea',str:'#c3e88d',num:'#f78c6c',com:'#697098',fn:'#82aaff',flag:'#ffcb6b',path:'#89ddff',pun:'#89ddff',txt:'#e6edf3'};
 function synTok(s){const out=[];for(const m of s.matchAll(/(\/\/.*$|#.*$)|("[^"]*"?|'[^']*'?|`[^`]*`?)|\b(const|let|var|function|return|if|else|for|while|import|from|export|async|await|def|class|new|npx|npm|run|git|pip|true|false|null|sudo|cd)\b|(\s--?[A-Za-z][\w-]*)|(\b\d+(?:\.\d+)?\b)|(\w+)(?=\()|([\w.~-]*\/[\w./~@:-]*)|([{}()[\];,.=:+*<>|&!?-]+)|(\s+|\w+|[^\s\w])/g))
  out.push([m[0],m[1]?SYN.com:m[2]?SYN.str:m[3]?SYN.key:m[4]?SYN.flag:m[5]?SYN.num:m[6]?SYN.fn:m[7]?SYN.path:m[8]?SYN.pun:(m[0]==='$'?CY:SYN.txt),!!m[1]]);return out}
-function codeCard(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),W=gd(c,'w',.86)*1080,cy=gd(c,'y',.67)*1920,lines=gs(c[2]).replace(/\\n/g,'\n').split('\n').slice(0,12),fs=o.textSize||38,lh=fs*1.6,pad=30,bar=66,H=bar+pad*2+lines.length*lh,bd=o.border||CY,R=RAD(24);
+function codeCard(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),cy=gd(c,'y',.67)*1920,lines=gs(c[2]).replace(/\\n/g,'\n').split('\n').slice(0,12),pad=30,gut=64,cw=18;let W=gd(c,'w',.86)*1080,fs=o.textSize||38;
+ // no line is ever clipped: the card widens to fit its longest line (up to the title-safe width), then the type steps down
+ ctx.font=MONO(fs);const need=f=>(ctx.font=MONO(f),Math.max(...lines.map(l=>ctx.measureText(l).width)))+pad*2+gut+cw;W=Math.min(1080-SAFE*2,Math.max(W,need(fs)));while(need(fs)>W&&fs>18)fs-=1;
+ const lh=fs*1.6,bar=66,H=bar+pad*2+lines.length*lh,bd=o.border||CY,R=RAD(24);
  const e=EMPH(cl(dt/.5)),s=.94+.06*Math.min(1.04,spring(dt,2,.6)),eo=ACC(ex);ctx.save();ctx.globalAlpha*=cl(dt/.12)*(1-eo);ctx.translate(540,cy+(1-e)*140+eo*220);ctx.rotate((1-e)*.04-eo*.07);ctx.scale(s,s);
  panel(-W/2,-H/2,W,H,R,{fill:'#0d1117',top:'#11161d',bot:'#0b0f14',alpha:1,elev:1.5});
  ctx.save();rr(ctx,-W/2,-H/2,W,H,R);ctx.clip();ctx.fillStyle='#161b22';ctx.fillRect(-W/2,-H/2,W,bar);ctx.fillStyle='rgba(255,255,255,.06)';ctx.fillRect(-W/2,-H/2+bar-1,W,1);
@@ -696,8 +698,8 @@ function codeCard(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),W=gd(c,'w',.86)*1080,
  icon('code',tw0+30,-H/2+12+(bar-12)/2,26,bd,{width:2});ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillStyle='#e6edf3';ctx.fillText(tl,tw0+54,-H/2+12+(bar-12)/2+1);
  const tg=ctx.createLinearGradient(-W/2,0,W/2,0);tg.addColorStop(0,rgba(bd,0));tg.addColorStop(.5,rgba(bd,.8));tg.addColorStop(1,rgba(bd,0));ctx.fillStyle=tg;ctx.fillRect(-W/2,-H/2,W,1.5);ctx.restore();
  ['#ff5f57','#febc2e','#28c840'].forEach((k,i)=>{ctx.beginPath();ctx.arc(-W/2+32+i*26,-H/2+bar/2+2,8,0,7);ctx.fillStyle=k;ctx.fill();ctx.lineWidth=1;ctx.strokeStyle='rgba(0,0,0,.3)';ctx.stroke()});
- const total=lines.reduce((a,l)=>a+l.length,0),dur=c[1]>90?3:c[1]-c[0],cps=Math.max(18,total/Math.max(.5,dur*.6-.3));let left=Math.floor(Math.max(0,dt-.3)*cps),cur=null,curLine=0;const done=left>=total;
- ctx.font=MONO(fs);const x0=-W/2+pad+64;lines.forEach((ln,i)=>{const n=Math.max(0,Math.min(ln.length,left));left-=ln.length;if(cur===null&&(n<ln.length||i===lines.length-1)){curLine=i}if(cur===null&&(n<ln.length||i===lines.length-1))cur=[0,-H/2+bar+pad+lh*i+lh/2,n,ln]});
+ const total=lines.reduce((a,l)=>a+l.length,0),dur=c[1]>90?3:c[1]-c[0],cps=Math.max(18,total/Math.max(.5,dur*.45-.3));let left=Math.floor(Math.max(0,dt-.3)*cps),cur=null,curLine=0;const done=left>=total;
+ ctx.font=MONO(fs);const x0=-W/2+pad+gut;lines.forEach((ln,i)=>{const n=Math.max(0,Math.min(ln.length,left));left-=ln.length;if(cur===null&&(n<ln.length||i===lines.length-1)){curLine=i}if(cur===null&&(n<ln.length||i===lines.length-1))cur=[0,-H/2+bar+pad+lh*i+lh/2,n,ln]});
  if(cur){const yy=cur[1];ctx.fillStyle='rgba(255,255,255,.045)';ctx.fillRect(-W/2+2,yy-lh/2,W-4,lh);ctx.fillStyle=bd;ctx.fillRect(-W/2+2,yy-lh/2,3,lh)}
  left=Math.floor(Math.max(0,dt-.3)*cps);lines.forEach((ln,i)=>{const yy=-H/2+bar+pad+lh*i+lh/2;ctx.font=MONO(fs*.8);ctx.fillStyle=i===curLine?'#c9d1d9':'#484f58';ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(String(i+1),-W/2+pad+30,yy);ctx.textAlign='left';ctx.font=MONO(fs);const n=Math.max(0,Math.min(ln.length,left));left-=ln.length;
   let xx=x0;for(const [tk,k,it] of synTok(ln.slice(0,n))){ctx.fillStyle=k;ctx.font=it?`italic ${MONO(fs)}`:MONO(fs);ctx.fillText(tk,xx,yy);xx+=ctx.measureText(tk).width}if(i===curLine&&cur)cur[0]=xx});

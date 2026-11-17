@@ -75,7 +75,7 @@ Precedence when a reel is made: flags, then the recipe, then its preset, then de
 
 | Type | Mode | What it is | Main fields |
 |---|---|---|---|
-| `ordinal-sticker` | 9 | list number on a seal | `text`, `layer front\|behind` |
+| `ordinal-sticker` | 9 | list number on a flat accent seal | `text`, `layer front\|behind` |
 | `app-label` | 10 | icon tile and label | `text`, `icon` |
 | `screen-card` | 11 | your screenshot or screen recording in a card | `src` or `source`, `border` |
 | `lower-third` | 12 | name tag | `text`, `sub` |
