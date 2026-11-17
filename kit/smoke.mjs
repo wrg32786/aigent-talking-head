@@ -658,22 +658,25 @@ try {
     try { run(node, [join(KIT, 'teardown.mjs'), '--url', 'https://www.instagram.com/someprofile/'], work); fail('teardown --url accepted a profile URL'); } catch (e) { if (!/Profiles, hashtags/.test(String(e.stderr || ''))) throw e; }
     try { run(node, [join(KIT, 'teardown.mjs'), '--url', 'https://www.instagram.com/reel/ABCdef12345/'], work, { PYTHON: join(work, 'no-python-here') }); fail('teardown --url ran without instaloader'); } catch (e) { if (!/needs instaloader/.test(String(e.stderr || ''))) throw e; }
   });
-  step('title entrances: mid-entrance differs from settled, all seven resolve once, flicker on hook + payoff only', () => {
+  step('title entrances: mid-entrance differs from settled, all eight resolve once, flicker on hook + payoff only', () => {
     const b = join(work, 'jobs', 'muse', 'build');
     const caps = JSON.parse(readFileSync(join(b, 'captions.js'), 'utf8').replace(/^window\.CAPTIONS=/, '').replace(/;\s*$/, ''));
     caps.flips = caps.flips.filter(f => f.mode !== 7);
-    ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN'].forEach((t, i) => caps.flips.push({ start: i * 0.9, end: i * 0.9 + 0.85, text: t, mode: 7 }));
+    ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT'].forEach((t, i) => caps.flips.push({ start: i * 0.9, end: i * 0.9 + 0.85, text: t, mode: 7 }));
     writeFileSync(join(b, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(caps) + ';\n');
     const o = run(node, [join(KIT, 'render.mjs'), '0', '0.1,0.7'], b);
     const m = o.match(/titles (.*)/); if (!m) fail('render did not report titles');
     const ent = m[1].split(', ').map(x => x.split(' ')[1].replace('+flicker', ''));
-    if (new Set(ent).size !== 7) fail('entrances repeat: ' + m[1]);
-    const fl = m[1].split(', ').map(x => /\+flicker/.test(x)); if (!fl[0] || !fl[6] || fl.slice(1, 6).some(Boolean)) fail('flicker placement: ' + m[1]);
+    if (new Set(ent).size !== 8) fail('entrances repeat: ' + m[1]);
+    const fl = m[1].split(', ').map(x => /\+flicker/.test(x)); if (!fl[0] || !fl[7] || fl.slice(1, 7).some(Boolean)) fail('flicker placement: ' + m[1]);
     const a = readFileSync(join(b, 'stills', 't0.10.png')), z = readFileSync(join(b, 'stills', 't0.70.png'));
     if (a.equals(z)) fail('title did not move between mid-entrance and settled');
-    caps.flips.push({ start: 6.3, end: 6.5, text: 'EIGHT', mode: 7, entrance: 'slam' });
+    caps.flips.push({ start: 7.3, end: 7.5, text: 'NINE', mode: 7 });
     writeFileSync(join(b, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(caps) + ';\n');
-    try { run(node, [join(KIT, 'check.mjs'), b], work); fail('check passed 8 titles with a repeated entrance'); } catch (e) { if (!/entrance "slam" already used|8 titles/.test(String(e.stdout || ''))) throw e; }
+    try { run(node, [join(KIT, 'check.mjs'), b], work); fail('check passed 9 titles'); } catch (e) { if (!/9 titles/.test(String(e.stdout || ''))) throw e; }
+    caps.flips = caps.flips.filter(f => f.text !== 'NINE' && f.text !== 'EIGHT').concat([{ start: 6.3, end: 6.5, text: 'EIGHT', mode: 7, entrance: 'slam' }, { start: 7.3, end: 7.5, text: 'NINE', mode: 7, entrance: 'slam' }]).filter(f => f.text !== 'SEVEN');
+    writeFileSync(join(b, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(caps) + ';\n');
+    try { run(node, [join(KIT, 'check.mjs'), b], work); fail('check passed a repeated entrance'); } catch (e) { if (!/entrance "slam" already used/.test(String(e.stdout || ''))) throw e; }
   });
   step('font pairings: all 15 load and render as two-font lockups; a list cycles them as whole pairs; unknown pairing refused', () => {
     const b = join(work, 'jobs', 'muse', 'build'), capF = join(b, 'captions.js'), keep = readFileSync(capF, 'utf8');
