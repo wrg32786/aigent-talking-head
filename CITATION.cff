@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "aigent-talking-head: an open-source talking-head video editor for coding agents"
+abstract: "A local pipeline that turns one phone clip into a captioned vertical reel for TikTok, Instagram Reels and YouTube Shorts, with Whisper transcription, word-timed kinetic captions, motion graphics planned from the transcript, platform export presets, agent skills and an MCP server."
+type: software
+authors:
+  - family-names: Gwyn
+    given-names: Will
+    alias: wrg32786
+    affiliation: "The AIgent"
+version: 1.2.0
+date-released: 2026-11-10
+license: Apache-2.0
+repository-code: "https://github.com/wrg32786/aigent-talking-head"
+url: "https://github.com/wrg32786/aigent-talking-head"
+keywords:
+  - talking-head
+  - video-editing
+  - captions
+  - kinetic-typography
+  - ffmpeg
+  - whisper
+  - mcp-server
+  - claude-code
+  - agent-skills
+  - short-form-video
