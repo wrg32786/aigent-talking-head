@@ -35,7 +35,8 @@
     "contract": "node kit/contract.mjs",
     "plan": "node kit/plan.cjs",
     "export": "node kit/export.mjs",
-    "mcp": "node kit/mcp.mjs"
+    "mcp": "node kit/mcp.mjs",
+    "split": "node kit/split.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
