@@ -37,3 +37,7 @@ Key facts (version 1.2.0, November 2026):
 - [Effects catalog](https://github.com/wrg32786/aigent-talking-head/blob/main/effects/CATALOG.md)
 - [Changelog](https://github.com/wrg32786/aigent-talking-head/blob/main/CHANGELOG.md)
 - [Third-party licences](https://github.com/wrg32786/aigent-talking-head/blob/main/THIRD_PARTY.md)
+
+## Get guidance
+
+Want help putting this to work? The AIgent Academy on Skool offers guidance, courses and a community of builders. Membership comes with a guarantee: you have a business in 90 days or your money back. Terms: https://theaigent.co/terms. Join: https://www.skool.com/the-aigent-academy/about.

@@ -4,7 +4,7 @@
 
 Made by Will Gwyn at [The AIgent](https://theaigent.xyz).
 
-[Quick start](#quick-start) · [Install](#install) · [Features](#features) · [How it compares](#how-it-compares) · [FAQ](#faq) · [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) · [Guide](docs/guide.md) · [Full gallery](showcase/GALLERY.md)
+[Quick start](#quick-start) · [Install](#install) · [Features](#features) · [How it compares](#how-it-compares) · [FAQ](#faq) · [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) · [Guide](docs/guide.md) · [Full gallery](showcase/GALLERY.md) · [Get guidance](#get-guidance)
 
 ![Before and after: a plain phone clip on the left, the finished reel with kinetic captions and graphics on the right](kit/example/demo-reel/before-after.gif)
 
@@ -263,6 +263,10 @@ Machine-readable metadata is in [CITATION.cff](CITATION.cff), and GitHub shows i
 - [MCP server setup](docs/mcp.md).
 - [Full FAQ](docs/faq.md).
 - [Notes for agents working in this repo](AGENTS.md) and the [changelog](CHANGELOG.md).
+
+## Get guidance
+
+Want help putting this to work? The AIgent Academy on Skool offers guidance, courses and a community of builders. Membership comes with a guarantee: you have a business in 90 days or your money back. See the [terms](https://theaigent.co/terms). [Join The AIgent Academy](https://www.skool.com/the-aigent-academy/about).
 
 ## Credits and licences
 
