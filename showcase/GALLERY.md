@@ -29,7 +29,7 @@ Stills use an AI-generated fictional presenter (Apache-2.0 with the repo). Rebui
 | ![icon-badge](media/graphic/icon-badge.jpg)<br>`icon-badge` | ![sticker-pop](media/graphic/sticker-pop.jpg)<br>`sticker-pop` | ![price-tag](media/graphic/price-tag.jpg)<br>`price-tag` | ![cta-card](media/graphic/cta-card.jpg)<br>`cta-card` | ![code-card](media/graphic/code-card.jpg)<br>`code-card` |
 | ![data-chart](media/graphic/data-chart.jpg)<br>`data-chart` | ![chapter-card](media/graphic/chapter-card.jpg)<br>`chapter-card` | ![logo-bug](media/graphic/logo-bug.jpg)<br>`logo-bug` | ![channel-bug](media/graphic/channel-bug.jpg)<br>`channel-bug` | ![terminal-session](media/graphic/terminal-session.jpg)<br>`terminal-session` |
 | ![news-strap](media/graphic/news-strap.jpg)<br>`news-strap` | ![ticker](media/graphic/ticker.jpg)<br>`ticker` | ![split-flap](media/graphic/split-flap.jpg)<br>`split-flap` | ![feature-cards](media/graphic/feature-cards.jpg)<br>`feature-cards` | ![release-pill](media/graphic/release-pill.jpg)<br>`release-pill` |
-| ![cta-button](media/graphic/cta-button.jpg)<br>`cta-button` | ![hud-callout](media/graphic/hud-callout.jpg)<br>`hud-callout` | ![flash-card](media/graphic/flash-card.jpg)<br>`flash-card` | ![keyword-caption](media/graphic/keyword-caption.jpg)<br>`keyword-caption` |  |
+| ![cta-button](media/graphic/cta-button.jpg)<br>`cta-button` | ![hud-callout](media/graphic/hud-callout.jpg)<br>`hud-callout` | ![flash-card](media/graphic/flash-card.jpg)<br>`flash-card` | ![keyword-caption](media/graphic/keyword-caption.jpg)<br>`keyword-caption` | ![number-pop](media/graphic/number-pop.jpg)<br>`number-pop` |
 
 ## Film finishes
 
@@ -46,7 +46,7 @@ Stills use an AI-generated fictional presenter (Apache-2.0 with the repo). Rebui
 
 | --- | --- | --- | --- | --- | --- | --- |
 | ![stagger-rise](../docs/menu/titles/stagger-rise.webp)<br>`stagger-rise` | ![slam](../docs/menu/titles/slam.webp)<br>`slam` | ![blur-rise](../docs/menu/titles/blur-rise.webp)<br>`blur-rise` | ![slide-left](../docs/menu/titles/slide-left.webp)<br>`slide-left` | ![elastic](../docs/menu/titles/elastic.webp)<br>`elastic` | ![flip](../docs/menu/titles/flip.webp)<br>`flip` | ![pop-zoom](../docs/menu/titles/pop-zoom.webp)<br>`pop-zoom` |
-| ![drop](../docs/menu/titles/drop.webp)<br>`drop` |  |  |  |  |  |  |
+| ![drop](../docs/menu/titles/drop.webp)<br>`drop` | ![typewriter](../docs/menu/titles/typewriter.webp)<br>`typewriter` |  |  |  |  |  |
 
 ## Caption styles
 
@@ -57,7 +57,7 @@ Stills use an AI-generated fictional presenter (Apache-2.0 with the repo). Rebui
 
 | --- | --- | --- | --- | --- |
 | ![pop](../docs/menu/caption-entrances/pop.webp)<br>`pop` | ![unfurl](../docs/menu/caption-entrances/unfurl.webp)<br>`unfurl` | ![cascade](../docs/menu/caption-entrances/cascade.webp)<br>`cascade` | ![orbit](../docs/menu/caption-entrances/orbit.webp)<br>`orbit` | ![warp](../docs/menu/caption-entrances/warp.webp)<br>`warp` |
-| ![crystallize](../docs/menu/caption-entrances/crystallize.webp)<br>`crystallize` | ![compute](../docs/menu/caption-entrances/compute.webp)<br>`compute` | ![levitate](../docs/menu/caption-entrances/levitate.webp)<br>`levitate` | ![undulate](../docs/menu/caption-entrances/undulate.webp)<br>`undulate` |  |
+| ![crystallize](../docs/menu/caption-entrances/crystallize.webp)<br>`crystallize` | ![compute](../docs/menu/caption-entrances/compute.webp)<br>`compute` | ![levitate](../docs/menu/caption-entrances/levitate.webp)<br>`levitate` | ![undulate](../docs/menu/caption-entrances/undulate.webp)<br>`undulate` | ![typewriter](../docs/menu/caption-entrances/typewriter.webp)<br>`typewriter` |
 
 ## Font pairings
 
@@ -65,13 +65,14 @@ Stills use an AI-generated fictional presenter (Apache-2.0 with the repo). Rebui
 | ![theme](media/font/theme.jpg)<br>`theme` | ![modern](media/font/modern.jpg)<br>`modern` | ![druk](media/font/druk.jpg)<br>`druk` | ![elegant](media/font/elegant.jpg)<br>`elegant` | ![editorial](media/font/editorial.jpg)<br>`editorial` |
 | ![literata](media/font/literata.jpg)<br>`literata` | ![bricolage](media/font/bricolage.jpg)<br>`bricolage` | ![pirata](media/font/pirata.jpg)<br>`pirata` | ![michroma](media/font/michroma.jpg)<br>`michroma` | ![redhat](media/font/redhat.jpg)<br>`redhat` |
 | ![jakarta](media/font/jakarta.jpg)<br>`jakarta` | ![grotesk-times](media/font/grotesk-times.jpg)<br>`grotesk-times` | ![avantgarde](media/font/avantgarde.jpg)<br>`avantgarde` | ![recoleta](media/font/recoleta.jpg)<br>`recoleta` | ![haas](media/font/haas.jpg)<br>`haas` |
-| ![wabbit](media/font/wabbit.jpg)<br>`wabbit` | ![instrument](media/font/instrument.jpg)<br>`instrument` |  |  |  |
+| ![wabbit](media/font/wabbit.jpg)<br>`wabbit` | ![instrument](media/font/instrument.jpg)<br>`instrument` | ![playfair](media/font/playfair.jpg)<br>`playfair` | ![dmserif](media/font/dmserif.jpg)<br>`dmserif` |  |
 
 ## Presets
 
 | --- | --- | --- | --- | --- |
 | ![aigent](media/preset/aigent.jpg)<br>`aigent` | ![cinematic](media/preset/cinematic.jpg)<br>`cinematic` | ![editorial](media/preset/editorial.jpg)<br>`editorial` | ![hormozi-bold](media/preset/hormozi-bold.jpg)<br>`hormozi-bold` | ![karaoke](media/preset/karaoke.jpg)<br>`karaoke` |
-| ![minimal-clean](media/preset/minimal-clean.jpg)<br>`minimal-clean` | ![muse-pill](media/preset/muse-pill.jpg)<br>`muse-pill` | ![neutral](media/preset/neutral.jpg)<br>`neutral` | ![one-word](media/preset/one-word.jpg)<br>`one-word` | ![retro-scan-lines](media/preset/retro-scan-lines.jpg)<br>`retro-scan-lines` |
+| ![magazine](media/preset/magazine.jpg)<br>`magazine` | ![minimal-clean](media/preset/minimal-clean.jpg)<br>`minimal-clean` | ![muse-pill](media/preset/muse-pill.jpg)<br>`muse-pill` | ![neutral](media/preset/neutral.jpg)<br>`neutral` | ![one-word](media/preset/one-word.jpg)<br>`one-word` |
+| ![retro-scan-lines](media/preset/retro-scan-lines.jpg)<br>`retro-scan-lines` |  |  |  |  |
 
 ## Looks
 
@@ -81,7 +82,8 @@ Stills use an AI-generated fictional presenter (Apache-2.0 with the repo). Rebui
 ## Themes
 
 | --- | --- |
-| ![aigent](media/theme/aigent.jpg)<br>`aigent` | ![neutral](media/theme/neutral.jpg)<br>`neutral` |
+| ![aigent](media/theme/aigent.jpg)<br>`aigent` | ![magazine](media/theme/magazine.jpg)<br>`magazine` |
+| ![neutral](media/theme/neutral.jpg)<br>`neutral` |  |
 
 ## Transitions
 

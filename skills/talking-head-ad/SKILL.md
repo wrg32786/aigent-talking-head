@@ -35,13 +35,14 @@ Do this before you draft, and again before the final render. The menu of effects
 1. First ask how they want to pick the look: use a saved brand preset (`npm run preset -- --list`; `npm run reel -- --preset <name>`), customize from the menu, or let you choose (`--preset auto`, then tell them what you picked and why). If they have no preset, offer to import a brand guide they drop in `brand-guide/` or pass as a file: `npm run brand:import -- <pdf|image|markdown>`. That writes a draft under `kit/presets/local/` for them to confirm. Presets work without a guide. Any flag or `cut.json` field they set wins over the preset.
 2. Run `npm run menu` (every option, grouped, with a one-line label) and point the user at [showcase/index.html](../../showcase/index.html). Rebuild the gallery with `npm run showcase` if it is missing.
 3. Show short labels and suggest 2 or 3 options per category that fit this reel:
-   - brand presets (`aigent`, `one-word`, `hormozi-bold`, `karaoke`, `minimal-clean`, `cinematic`, `editorial`, `muse-pill`, `retro-scan-lines`, `neutral`)
+   - brand presets (`aigent`, `one-word`, `hormozi-bold`, `karaoke`, `minimal-clean`, `cinematic`, `editorial`, `magazine`, `muse-pill`, `retro-scan-lines`, `neutral`); `magazine` turns on every editing principle (docs/guide.md "Editing principles built in")
    - film finishes (grain, vignette, chroma, scan-lines, warm, cool, teal, crushed, mono, bleach), including per-scene variety on `cut.json` segments; do not use one finish on every shot
    - beat-sync (on by default when a bed is set; `--no-beat-sync` to leave times alone)
    - looks (`kinetic`, `oneword`, `muse`, `classic`, `one-word`) and caption styles (`kinetic`, `oneword`, `pill`, `hormozi`, `karaoke`, `classic`, `one-word`); `oneword` is the strongest caption look here (one word at a time, type cards; kit/looks/oneword.md), and `--broll <folder>` with shots of the work itself (hands typing, the screen) adds cutaways
-   - font pairings (`theme`, `modern`, `druk`, `elegant`, `editorial`)
+   - font pairings (`theme`, `modern`, `druk`, `elegant`, `editorial`, and `playfair` or `dmserif` for a serif numeral, an italic serif word and sans in one phrase)
    - themes (`aigent` default, `neutral` unbranded)
-   - title entrances (8, each used at most once)
+   - title entrances (9, each used at most once) and title places (`left`, `right`, `above`, `chest`, `face`)
+   - colour and chapter cards (`--cards auto`, or a `reel-cards` block), music by energy (`--music-energy`), no dead air (`--tighten 0.3`)
    - title layer: front (default), behind the head, or auto (only the strongest 1 or 2 punch titles behind, never consecutive). Offer this per title. `"layer": "front"|"behind"|"auto"` on a title, or `"titleLayer"` for the job.
    - transitions (56 names in `kit/transitions.json`: 50 stock ffmpeg xfades and 6 drawn ones, slats, checkerboard, light-leak, zoom-blur, news-ribbon and breaking-news; glitch seam is the default)
    - the 51 effects, grouped by moment (see also [effects/CATALOG.md](../../effects/CATALOG.md))

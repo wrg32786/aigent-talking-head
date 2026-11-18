@@ -461,6 +461,74 @@
     "heroColor": "text",
     "partnerColor": "text"
    }
+  },
+  "playfair": {
+   "about": "Playfair Display + Inter Tight, with Playfair Display Italic as the accent: three faces in one phrase (a serif hero or numeral, one italic serif word, sans for the rest). The magazine preset's first pairing",
+   "display": {
+    "family": "Playfair Display",
+    "file": "PlayfairDisplay-VF.ttf",
+    "weight": 700,
+    "tracking": -0.015
+   },
+   "secondary": {
+    "family": "Inter Tight",
+    "file": "InterTight-VF.ttf",
+    "weight": 500
+   },
+   "script": {
+    "family": "Playfair Display",
+    "file": "PlayfairDisplay-Italic-VF.ttf",
+    "weight": 500,
+    "style": "italic",
+    "scale": 1.0
+   },
+   "lockup": {
+    "arrange": "stack",
+    "partner": "secondary",
+    "scale": 0.4,
+    "heroUpper": false,
+    "partnerUpper": false,
+    "partnerTracking": 0,
+    "justify": false,
+    "heroColor": "text",
+    "partnerColor": "text",
+    "accent": "script",
+    "accentScale": 1.3
+   }
+  },
+  "dmserif": {
+   "about": "DM Serif Display + Manrope, with DM Serif Display Italic as the accent: a high-contrast serif hero or numeral, one italic serif word, a rounded sans for the rest",
+   "display": {
+    "family": "DM Serif Display",
+    "file": "DMSerifDisplay-Regular.ttf",
+    "weight": 400,
+    "tracking": -0.01
+   },
+   "secondary": {
+    "family": "Manrope",
+    "file": "Manrope-VF.ttf",
+    "weight": 600
+   },
+   "script": {
+    "family": "DM Serif Display",
+    "file": "DMSerifDisplay-Italic.ttf",
+    "weight": 400,
+    "style": "italic",
+    "scale": 1.0
+   },
+   "lockup": {
+    "arrange": "stack",
+    "partner": "secondary",
+    "scale": 0.4,
+    "heroUpper": false,
+    "partnerUpper": false,
+    "partnerTracking": 0,
+    "justify": false,
+    "heroColor": "text",
+    "partnerColor": "text",
+    "accent": "script",
+    "accentScale": 1.3
+   }
   }
  }
 }

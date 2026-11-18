@@ -6,7 +6,8 @@
   "lufs": -12.9,
   "source": "Suno",
   "suno_id": "5e84bc12-e56e-4a8c-aa33-55835c6815ae",
-  "made": "2026-11-09T02:30:14Z"
+  "made": "2026-11-09T02:30:14Z",
+  "energy": "high"
  },
  "chopped-and-screwed-east": {
   "title": "Chopped & Screwed East",
@@ -15,7 +16,8 @@
   "lufs": -13,
   "source": "Suno",
   "suno_id": "f016ba01-719c-4b22-b90b-9d9631dd44b5",
-  "made": "2026-11-10T22:59:34Z"
+  "made": "2026-11-10T22:59:34Z",
+  "energy": "mid"
  },
  "cinematic-build": {
   "title": "Cinematic Build",
@@ -24,7 +26,8 @@
   "lufs": -13,
   "source": "Suno",
   "suno_id": "43787ff8-8eda-436d-8d25-104b49b85ae4",
-  "made": "2026-11-10T23:13:56Z"
+  "made": "2026-11-10T23:13:56Z",
+  "energy": "mid"
  },
  "distorted-silk-road": {
   "title": "Distorted Silk Road",
@@ -33,7 +36,8 @@
   "lufs": -13,
   "source": "Suno",
   "suno_id": "19698cf7-2dbf-4e55-acf3-36393f9b0d23",
-  "made": "2026-11-10T23:01:31Z"
+  "made": "2026-11-10T23:01:31Z",
+  "energy": "mid"
  },
  "granular-stabs": {
   "title": "Granular Stabs",
@@ -42,7 +46,8 @@
   "lufs": -13,
   "source": "Suno",
   "suno_id": "2ffa978c-4123-438d-afcd-ff96ae62160a",
-  "made": "2026-11-10T23:26:15Z"
+  "made": "2026-11-10T23:26:15Z",
+  "energy": "high"
  },
  "houston-drumline": {
   "title": "Houston Drumline",
@@ -51,7 +56,8 @@
   "lufs": -12.9,
   "source": "Suno",
   "suno_id": "8b27e9a2-f7c1-4549-afe8-e629c001070a",
-  "made": "2026-11-10T23:08:49Z"
+  "made": "2026-11-10T23:08:49Z",
+  "energy": "mid"
  },
  "rise-with-the-bass": {
   "title": "Rise with the Bass",
@@ -60,7 +66,8 @@
   "lufs": -12.9,
   "source": "Suno",
   "suno_id": "14691ef6-c93a-418e-8f54-e38913a3e056",
-  "made": "2026-11-10T23:16:15Z"
+  "made": "2026-11-10T23:16:15Z",
+  "energy": "low"
  },
  "rise-with-the-beat": {
   "title": "Rise with the Beat",
@@ -69,7 +76,8 @@
   "lufs": -12.9,
   "source": "Suno",
   "suno_id": "b9170ac8-c215-422f-9044-4ac3f50653cb",
-  "made": "2026-11-10T23:18:00Z"
+  "made": "2026-11-10T23:18:00Z",
+  "energy": "high"
  },
  "vinyl-sunrise": {
   "title": "Vinyl Sunrise",
@@ -78,7 +86,8 @@
   "lufs": -12.8,
   "source": "Suno",
   "suno_id": "2499c257-b54b-4077-8183-288326a5dbcd",
-  "made": "2026-11-10T23:28:13Z"
+  "made": "2026-11-10T23:28:13Z",
+  "energy": "low"
  },
  "vinyl-velocity": {
   "title": "Vinyl Velocity",
@@ -87,7 +96,8 @@
   "lufs": -13,
   "source": "Suno",
   "suno_id": "f15b3c96-a336-48e5-b57f-4fb5b15b2325",
-  "made": "2026-11-10T23:21:33Z"
+  "made": "2026-11-10T23:21:33Z",
+  "energy": "low"
  },
  "yeehaw": {
   "title": "YEEHAW",
@@ -96,6 +106,7 @@
   "lufs": -13,
   "source": "Suno",
   "suno_id": "6a30aa5d-f1ca-452e-9b92-8d5d733fec3f",
-  "made": "2026-11-10T23:20:29Z"
+  "made": "2026-11-10T23:20:29Z",
+  "energy": "high"
  }
 }

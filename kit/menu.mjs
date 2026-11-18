@@ -52,6 +52,7 @@ export const ENTRANCE_ABOUT = {
   flip: 'the word flips in vertically, like a card turning over',
   'pop-zoom': 'the word pops in from nothing with a small overshoot',
   drop: 'each letter falls in from above with a small bounce and tilt',
+  typewriter: 'the letters type on one at a time from the left behind a blinking caret',
 };
 // what each caption entrance does to kinetic hero words (capEnter in kit/overlay.html; names from kit/reelmd.cjs CAPTION_LOOK)
 export const CAPTION_ENTRANCE_ABOUT = {
@@ -64,7 +65,28 @@ export const CAPTION_ENTRANCE_ABOUT = {
   compute: 'the word decodes from random characters',
   levitate: 'letters float up into place',
   undulate: 'letters ride a wave that calms down',
+  typewriter: 'the word types on letter by letter behind a blinking caret',
 };
+// the editing principles built in (docs/guide.md "Editing principles built in"): each one on its own, and all of them
+// together as the magazine preset (--preset magazine, or "- preset: magazine" in a Reel.md)
+export const EDITING = [
+  { id: 'magazine', flag: '--preset magazine  or  Reel.md  - preset: magazine', label: 'every principle below at once: serif and sans mixed, placed titles, colour and chapter cards, energy-matched music, mapped and capped sounds, 12% punch-ins, typewriter and crossfades, no dead air' },
+  { id: 'accent-script', flag: '"lockup": { "accent": "script" }  or  Reel.md title  | accent script |', label: 'three faces in one phrase: a serif numeral or hero word, one italic serif word, sans for the rest (pairings playfair and dmserif do it by default)' },
+  { id: 'place-left', flag: '"place": "left"  on a title or caption  or  Reel.md  | place left |', label: 'the words sit left of your head at eye level' },
+  { id: 'place-right', flag: '"place": "right"  or  | place right |', label: 'the words sit right of your head at eye level' },
+  { id: 'place-above', flag: '"place": "above"  or  | place above |', label: 'the words sit above your head' },
+  { id: 'place-chest', flag: '"place": "chest"  or  | place chest |', label: 'the words sit across your chest' },
+  { id: 'place-face', flag: '"place": "face"  or  | place face |', label: 'big over your face, behind your head while it covers under 22% of the letters, else above it (a title goes in front with layer front)' },
+  { id: 'title-places', flag: '"titlePlaces": ["left","face","right","chest"]  in a preset  or  Reel.md  - title-places: left, face, right', label: 'drafted titles take these places in turn' },
+  { id: 'colour-card', flag: '{ "mode": 8, "bg": "olive" }  or  Reel.md reel-cards  #01 4.2-5.4 | bg olive', label: 'the frame cuts to a flat colour for a beat and your caption words carry it in the card ink (olive, ivory, sage, clay, blush, forest, navy, cream, paper, blue, ink)' },
+  { id: 'chapter-card', flag: '{ "mode": 8, "bg": "ivory", "chapter": "2" }  or  reel-cards  | bg ivory | chapter 2', label: 'a colour card with a big serif numeral, one per list item' },
+  { id: 'cards-auto', flag: '--cards auto  or  "cards": "auto"  or  Reel.md  - cards: auto', label: 'chapter cards when you count off a list, colour cards on short lines to land, and the number-pop intro; npm run plan -- <job> --cards writes them to the Reel.md first' },
+  { id: 'music-energy', flag: '--music-energy low|mid|high|auto  or  Reel.md Music  - energy: auto  (- bed: auto)', label: 'a library bed picked by energy; auto reads how fast you talk' },
+  { id: 'sfx-map', flag: '"sfxMap": true  or  Reel.md  - sfx-map: on', label: 'a whoosh on named transitions, a swipe on cards, a pop on titles, graphics and list numbers, typing under a typewriter title, a click on a big punch-in' },
+  { id: 'sfx-cap', flag: '"sfxCap": { "minGap": 0.25, "per10": 6 }  or  --no-sfx-cap  or  Reel.md  - sfx-cap: 0.4/4', label: 'the sound density cap, on by default: sounds stay apart and sparse, the bigger move wins' },
+  { id: 'punch', flag: '"punch": 0.12  in cut.json or a preset  or  Reel.md  - punch: 0.12', label: 'every other cut punches in by this much (10% by default; 10 to 15% reads best)' },
+  { id: 'tighten', flag: '--tighten 0.3  or  "tighten": 0.3  or  Reel.md  - tighten: 0.3   (--no-tighten)', label: 'no dead air: a pause inside a line longer than this cuts to a jump, keeping a breath' },
+];
 const RM = require('./reelmd.cjs');
 const CAPTION_ENTRANCES = RM.CAPTION_LOOK['caption-entrance'][1];
 
@@ -183,7 +205,7 @@ export function loadMenu() {
   const beds = Object.entries(R.BEDS).filter(([, v]) => v && typeof v.file === 'string').map(([id, b]) => ({
     kind: 'bed', id, section: 'beds',
     flag: `--bed ${id}  or  "bed": "${id}"`,
-    label: `${b.title} (${b.seconds}s, ${b.lufs} LUFS)`,
+    label: `${b.title} (${b.seconds}s, ${b.lufs} LUFS${b.energy ? ', ' + b.energy + ' energy' : ''})`,
   }));
 
   const exportItems = Object.entries(JSON.parse(readFileSync(join(KIT, 'exports.json'), 'utf8')).presets).map(([id, x]) => ({
@@ -211,11 +233,12 @@ export function loadMenu() {
     { id: 'caption-entrances', title: 'Caption entrances', hint: 'How kinetic hero words come in, letter by letter. One for the job (--caption-entrance, "captionEntrance", Reel.md caption-entrance) or "entrance" on a caption flip. Applies to the kinetic caption style.', items: captionEntrances },
     { id: 'title-layer', title: 'Title layer', hint: 'Front, behind the head, or auto, per title or for the job. Offer this per title. Agents and --preset auto use auto unless the preset says otherwise.', items: titleLayer },
     { id: 'transitions', title: 'Transitions', hint: 'Named cuts in cut.json. The glitch seam is the default.', items: transitions },
-    { id: 'graphics', title: 'Graphics', hint: 'Original overlay graphics drawn in the theme colours and fonts, each with its own entrance and exit: captions.js flips (modes 9 to 37) or a reel-graphics block in a Reel.md. Words on them must be words you say (kit/spoken.cjs). Layer front, behind or auto: behind tucks only the top of your head over the graphic, never your face. Bring your icon or screen recording, or the kit draws a neutral placeholder. Teardown maps the first three from a reference (kit/graphics.json).', items: graphics },
+    { id: 'graphics', title: 'Graphics', hint: 'Original overlay graphics drawn in the theme colours and fonts, each with its own entrance and exit: captions.js flips (modes 9 to 38) or a reel-graphics block in a Reel.md. Words on them must be words you say (kit/spoken.cjs). Layer front, behind or auto: behind tucks only the top of your head over the graphic, never your face. Bring your icon or screen recording, or the kit draws a neutral placeholder. Teardown maps the first three from a reference (kit/graphics.json).', items: graphics },
     { id: 'effects', title: 'Effects', hint: 'Optional second pass (npm run fx). 51 starter effects, grouped by moment.', items: effects, moments, effectsByMoment },
     { id: 'sfx', title: 'SFX pack', hint: '37 CC0 sounds, auto-picked on npm run fx. Locked cut set is whoosh, swipe, boom, click, typing.', items: sfx },
     { id: 'beds', title: 'Music beds', hint: 'Our own tracks, loudness-matched to -13 LUFS. Hear them with the files in kit/music/.', items: beds },
     { id: 'exports', title: 'Export presets', hint: 'npm run reel -- ... --export <name> lays the reel out for that platform (titles, captions and graphics kept out of its UI) and writes reel-vN-<name>.mp4; npm run export re-exports a finished reel; npm run verify -- <job> --export <name> checks it.', items: exportItems },
+    { id: 'editing', title: 'Editing principles', hint: 'Common short-form editing advice built into the engine, each usable on its own; --preset magazine (or "- preset: magazine" in a Reel.md) turns them all on. Plain words: docs/guide.md "Editing principles built in".', items: EDITING.map(x => ({ kind: 'editing', section: 'editing', ...x })) },
     { id: 'presets', title: 'Brand presets', hint: 'A saved mix of theme, look, type, finishes and favourites. npm run reel -- --preset <name>. Flags you pass win. --preset auto picks one and prints what it chose.', items: presetItems },
   ];
 
@@ -357,6 +380,7 @@ export const LIST_KINDS = {
   captions: ['caption-entrances', 'caption-styles'],
   graphics: ['graphics'],
   effects: ['effects'],
+  editing: ['editing'],
 };
 const PREVIEW_DIR = { transitions: 'transitions', 'title-entrances': 'titles', 'caption-entrances': 'caption-entrances', 'caption-styles': 'caption-styles' };
 export function listKind(kind, menu) {

@@ -16,14 +16,17 @@ const fs = require('fs');
 const path = require('path');
 
 const KIT = __dirname, ROOT = path.dirname(KIT);
-const SHOTS_BLOCK = 'videomd-timeline', TITLES_BLOCK = 'reel-titles', SCRIPT_BLOCK = 'reel-script', GRAPHICS_BLOCK = 'reel-graphics';
+const SHOTS_BLOCK = 'videomd-timeline', TITLES_BLOCK = 'reel-titles', SCRIPT_BLOCK = 'reel-script', GRAPHICS_BLOCK = 'reel-graphics', CARDS_BLOCK = 'reel-cards';
+const CARDS = require('./cards.cjs');
+// where a title or caption can sit around the head (kit/overlay.html placeSpec); center is the default band
+const PLACES = ['left', 'right', 'above', 'chest', 'face', 'center'];
 // graphic overlays (kit/graphics.json): type -> captions.js mode
 const GRAPHICS = Object.fromEntries(JSON.parse(fs.readFileSync(path.join(__dirname, 'graphics.json'), 'utf8')).graphics.map(g => [g.id, g.mode]));
 const CAPTION_POSITIONS = ['top', 'middle', 'bottom'];
 const SRC = require('./sources.cjs');
 // the one-word caption's look: Reel.md key -> captions.js key and its values
-const CAPTION_LOOK = { 'caption-outline': ['captionOutline', ['none', 'thin', 'thick']], 'caption-shadow': ['captionShadow', ['none', 'soft']], 'caption-case': ['captionCase', ['upper', 'lower', 'as-said']], 'caption-layer': ['captionLayer', ['front', 'behind', 'auto']], 'panel-layer': ['panelLayer', ['front', 'behind', 'auto']], 'caption-entrance': ['captionEntrance', ['pop', 'unfurl', 'cascade', 'orbit', 'warp', 'crystallize', 'compute', 'levitate', 'undulate']] };
-const ENTRANCES = ['stagger-rise', 'slam', 'blur-rise', 'slide-left', 'elastic', 'flip', 'pop-zoom', 'drop'];
+const CAPTION_LOOK = { 'caption-outline': ['captionOutline', ['none', 'thin', 'thick']], 'caption-shadow': ['captionShadow', ['none', 'soft']], 'caption-case': ['captionCase', ['upper', 'lower', 'as-said']], 'caption-layer': ['captionLayer', ['front', 'behind', 'auto']], 'panel-layer': ['panelLayer', ['front', 'behind', 'auto']], 'caption-entrance': ['captionEntrance', ['pop', 'unfurl', 'cascade', 'orbit', 'warp', 'crystallize', 'compute', 'levitate', 'undulate', 'typewriter']] };
+const ENTRANCES = ['stagger-rise', 'slam', 'blur-rise', 'slide-left', 'elastic', 'flip', 'pop-zoom', 'drop', 'typewriter'];
 const LAYERS = ['front', 'behind', 'auto'];
 // built-in glyphs for icon-badge, sticker-pop and cta-card (Tabler icons, drawn in kit/overlay.html)
 const GLYPHS = ['check', 'star', 'bolt', 'heart', 'fire', 'play', 'bell', 'spark', 'plus', 'lock', 'arrow', 'rocket', 'terminal', 'chart', 'world', 'cpu'];
@@ -130,12 +133,14 @@ function parse(text, file = 'Reel.md') {
   const titleLines = fenced(body, TITLES_BLOCK) || [];
   const scriptLines = fenced(body, SCRIPT_BLOCK) || [];
   const graphicLines = fenced(body, GRAPHICS_BLOCK) || [];
+  const cardLines = fenced(body, CARDS_BLOCK) || [];
   const shots = shotLines.map(l => parseLine(l, file + ' shots'));
   const titles = titleLines.map(l => parseLine(l, file + ' titles'));
   const script = scriptLines.map(l => parseLine(l, file + ' script'));
   const graphics = graphicLines.map(l => parseLine(l, file + ' graphics'));
+  const cards = cardLines.map(l => parseLine(l, file + ' cards'));
   const title = (body.match(/^#\s+(.+)$/m) || [])[1];
-  return { file, card, title, brand, music, style, aliases, shots, titles, script, graphics, notes: (S._intro || '').replace(/^#\s+.+$/m, '').trim() };
+  return { file, card, title, brand, music, style, aliases, shots, titles, script, graphics, cards, notes: (S._intro || '').replace(/^#\s+.+$/m, '').trim() };
 }
 
 function validate(r) {
@@ -153,7 +158,10 @@ function validate(r) {
   r.titles.forEach((t, i) => {
     if (t.entrance && !ENTRANCES.includes(t.entrance)) errs.push(`titles #${pad2(t.n)}: unknown entrance "${t.entrance}" (${ENTRANCES.join(', ')})`);
     if (t.layer && !LAYERS.includes(t.layer)) errs.push(`titles #${pad2(t.n)}: layer must be front, behind or auto`);
+    if (t.place && !PLACES.includes(t.place)) errs.push(`titles #${pad2(t.n)}: place must be ${PLACES.join(', ')}`);
+    if (t.accent != null && t.accent !== true && t.accent !== 'script' && isNaN(+t.accent)) errs.push(`titles #${pad2(t.n)}: accent must be script or a word index`);
   });
+  (r.cards || []).forEach(c => { for (const e of CARDS.validateCard(c)) errs.push(`cards #${pad2(c.n)}: ${e}`); });
   (r.graphics || []).forEach(g => {
     const type = g.type || g['type~'];
     if (!GRAPHICS[type]) errs.push(`graphics #${pad2(g.n)}: type must be ${Object.keys(GRAPHICS).join(', ')}`);
@@ -180,11 +188,15 @@ function validate(r) {
   if (st['caption-position'] && !none(st['caption-position']) && !CAPTION_POSITIONS.includes(st['caption-position'])) errs.push(`style: caption-position must be ${CAPTION_POSITIONS.join(', ')}`);
   for (const [k, [, vals]] of Object.entries(CAPTION_LOOK)) if (st[k] && !vals.includes(String(st[k]).toLowerCase())) errs.push(`style: ${k} must be ${vals.join(', ')}`);
   if (st['caption-color'] && !none(st['caption-color']) && !/^#[0-9a-f]{6}$/i.test(st['caption-color'])) errs.push('style: caption-color must be a #rrggbb colour');
+  if (st['sfx-cap'] && onOff(st['sfx-cap']) !== false && !/^\d+(\.\d+)?\s*\/\s*\d+$/.test(st['sfx-cap'])) errs.push('style: sfx-cap must be off or "min gap / per 10 s", for example 0.4/4');
+  if (st['title-places']) for (const pl of list(st['title-places'])) if (!PLACES.includes(pl)) errs.push(`style: title-places "${pl}" must be ${PLACES.join(', ')}`);
+  const mu = r.music || {};
+  if (mu.energy && !none(mu.energy) && !['auto', 'low', 'mid', 'high'].includes(String(mu.energy).toLowerCase())) errs.push('music: energy must be low, mid, high or auto');
   const P = require('./preset.cjs');
   const pre = toPreset(r);
   const perrs = P.validate({ ...pre, bed: pre.bed && !require('./rules.cjs').isBed(pre.bed) ? undefined : pre.bed });
   errs.push(...perrs.filter(e => !/missing name/.test(e)));
-  if (pre.bed && !require('./rules.cjs').isBed(pre.bed) && !fs.existsSync(path.resolve(path.dirname(r.file || '.'), pre.bed))) warn.push(`music: bed "${pre.bed}" is not a library name or a file next to the recipe`);
+  if (pre.bed && pre.bed !== 'auto' && !require('./rules.cjs').isBed(pre.bed) && !fs.existsSync(path.resolve(path.dirname(r.file || '.'), pre.bed))) warn.push(`music: bed "${pre.bed}" is not a library name or a file next to the recipe`);
   const B = require('./beats.cjs');
   r.shots.forEach(s => { if (s.finish && !none(s.finish)) try { B.parseFinish(s.finish); } catch (e) { errs.push(`shots #${pad2(s.n)}: ${e.message}`); } });
   if (r.brand.preset && !none(r.brand.preset) && r.brand.preset !== 'auto' && !P.load(r.brand.preset)) errs.push(`brand: unknown preset "${r.brand.preset}" (npm run preset -- --list)`);
@@ -213,6 +225,16 @@ function toPreset(r) {
   if (s['finish-pool'] !== undefined) { const f = list(s['finish-pool']); if (f.length) { out.finishPool = f; delete out.finish; } else delete out.finishPool; }
   if (!none(s.transition)) out.transition = s.transition;
   if (onOff(s.punch) !== undefined) out.punch = onOff(s.punch);
+  else if (s.punch != null && /^0?\.\d+$/.test(String(s.punch))) out.punch = +s.punch; // a punch-in zoom: 0.12 is 12%
+  // the editing-principles keys (docs/guide.md "Editing principles built in")
+  if (s.tighten != null && s.tighten !== '') out.tighten = onOff(s.tighten) === false ? false : onOff(s.tighten) === true ? 0.3 : +s.tighten;
+  if (s.cards != null && s.cards !== '') out.cards = onOff(s.cards) === false ? 'off' : String(s.cards).toLowerCase();
+  if (s['card-palette'] !== undefined) out.cardPalette = list(s['card-palette']);
+  if (onOff(s['sfx-map']) !== undefined) out.sfxMap = onOff(s['sfx-map']);
+  if (s['sfx-cap'] != null && s['sfx-cap'] !== '') { const m = String(s['sfx-cap']).match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+)$/); out.sfxCap = onOff(s['sfx-cap']) === false ? false : m ? { minGap: +m[1], per10: +m[2] } : out.sfxCap; }
+  if (s['title-places'] !== undefined) out.titlePlaces = list(s['title-places']);
+  if (onOff(s.glitch) !== undefined) out.glitch = onOff(s.glitch);
+  if (m.energy != null && !none(m.energy)) out.musicEnergy = String(m.energy).toLowerCase();
   if (s.effects !== undefined) out.effectsFavourites = list(s.effects);
   if (m.bed !== undefined) out.bed = none(m.bed) ? null : m.bed;
   if (onOff(m['beat-sync']) !== undefined) out.beatSync = onOff(m['beat-sync']);
@@ -240,13 +262,16 @@ function titleFlips(r) {
     const f = { start: +t.start, end: +t.end, text: t.text || '', mode: 7 };
     if (t.entrance) f.entrance = t.entrance;
     if (t.layer) f.layer = t.layer;
+    if (t.place && t.place !== 'center') f.place = t.place;
+    if (t.accent != null) f.accent = isNaN(+t.accent) ? undefined : +t.accent;
+    if (t.accent != null && f.accent === undefined) { delete f.accent; f.lockup = { accent: 'script' }; }
     if (t.hero != null) f.hero = String(t.hero).split(',').map(Number);
     if (t.flicker != null) f.flicker = onOff(t.flicker);
     return f;
   });
 }
 
-// Graphics as captions.js flips (mode 9 ordinal sticker, 10 app label, 11 screen card, 12 to 37 the rest, kit/graphics.json). icon and src are resolved
+// Graphics as captions.js flips (mode 9 ordinal sticker, 10 app label, 11 screen card, 12 to 38 the rest, kit/graphics.json). icon and src are resolved
 // against the recipe's folder; "~" fields (a teardown's guesses) count the same as plain ones.
 function graphicFlips(r) {
   const dir = path.dirname(path.resolve(r.file || 'Reel.md'));
@@ -274,6 +299,9 @@ function graphicFlips(r) {
   });
 }
 
+// Cards as captions.js flips (mode 8 colour cards; "chapter N" draws the numeral). kit/cards.cjs.
+function cardFlips(r) { return (r.cards || []).map(c => CARDS.cardFlip(c)); }
+
 // Reel.md -> { cut, captions }. cut.segs is complete only when every shot names a src; otherwise the shot list is a
 // per-shot plan (shotPlan) that reel.cjs lays over the segments it drafts from your clip.
 function compile(r) {
@@ -290,7 +318,7 @@ function compile(r) {
   } else if (plan.length) cut.shotPlan = plan;
   if (pre.finish) cut.finish = pre.finish;
   if (pre.finishPool) cut.finishPool = pre.finishPool;
-  if (pre.bed) { cut.bed = pre.bed; cut.bedVol = pre.bedVol ?? 0.16; if (pre.bedStart != null) cut.bedStart = pre.bedStart; }
+  if (pre.bed && pre.bed !== 'auto') { cut.bed = pre.bed; cut.bedVol = pre.bedVol ?? 0.16; if (pre.bedStart != null) cut.bedStart = pre.bedStart; }
   if (pre.beatSync !== undefined) cut.beatSync = pre.beatSync;
   if (pre.titleLayer) cut.titleLayer = pre.titleLayer;
   if (pre.punch === false) cut.punch = false;
@@ -304,6 +332,9 @@ function compile(r) {
   if (pre.titleLayer) captions.titleLayer = pre.titleLayer;
   if (r.titles.length) captions.titles = titleFlips(r);
   if ((r.graphics || []).length) captions.graphics = graphicFlips(r);
+  if ((r.cards || []).length) captions.cards = cardFlips(r);
+  for (const k of ['tighten', 'sfxMap', 'sfxCap', 'musicEnergy']) if (pre[k] !== undefined) cut[k] = pre[k];
+  if (typeof pre.punch === 'number') cut.punch = pre.punch;
   return { cut, captions, preset: pre };
 }
 
@@ -360,10 +391,17 @@ function exportJob(cut, caps, opts = {}) {
       const f = [`#${pad2(i + 1)} ${fmtT(x.start)}-${fmtT(x.end >= 99 ? dur : x.end)}`];
       if (x.entrance) f.push(`entrance ${x.entrance}`);
       if (x.layer) f.push(`layer ${x.layer}`);
+      if (x.place) f.push(`place ${x.place}`);
       if (Array.isArray(x.hero)) f.push(`hero ${x.hero.join(',')}`);
       f.push(`text ${String(x.text || '').replace(/\s*\|\s*/g, ' / ').replace(/\n/g, ' ')}`);
       L.push(f.join(' | '));
     });
+    L.push('```', '');
+  }
+  const cardsOut = ((caps && caps.flips) || []).filter(f => f.mode === 8).sort((a, b) => a.start - b.start);
+  if (cardsOut.length) {
+    L.push('## Cards', '', '```' + CARDS_BLOCK);
+    cardsOut.forEach((c, i) => L.push(CARDS.cardLine({ ...c, end: c.end >= 99 ? dur : c.end, bg: c.bg || 'olive' }, i + 1)));
     L.push('```', '');
   }
   const GMODES = new Set(Object.values(GRAPHICS));
@@ -413,11 +451,15 @@ function summary(r) {
     `style: look ${p.look || 'kinetic'}, captions ${p.captionStyle || 'kinetic'}, title layer ${p.titleLayer || 'front'}, finish ${p.finishPool ? 'vary across shots: ' + p.finishPool.join('/') : p.finish || 'none'}, transition ${p.transition || 'glitch'}`,
     ...(p.captionPosition || p.captionColor || p.captionOutline ? [`captions at ${p.captionPosition || 'the default band'}${p.captionColor ? ', colour ' + p.captionColor : ''}${p.captionOutline ? ', outline ' + p.captionOutline : ''}${p.captionShadow ? ', shadow ' + p.captionShadow : ''}${p.captionCase ? ', case ' + p.captionCase : ''}`] : []),
     ...r.titles.map(t => `  title #${pad2(t.n)} ${t.start}-${t.end}s ${t.entrance || 'any entrance'}, ${t.layer || 'job layer'}: ${t.text || ''}`),
+    ...(r.cards || []).map(c => `  card #${pad2(c.n)} ${c.start}-${c.end}s ${c.bg || 'olive'}${c.chapter != null ? ', chapter ' + c.chapter : ''}`),
+    ...(p.tighten ? [`no dead air: pauses over ${p.tighten}s cut to a jump`] : []),
+    ...(p.cards === 'auto' ? ['cards: auto (chapter cards on a list, colour cards on short lines to land)'] : []),
+    ...(p.musicEnergy ? [`music energy: ${p.musicEnergy}`] : []),
     ...(r.graphics || []).map(g => `  graphic #${pad2(g.n)} ${g.start}-${g.end}s ${g.type || g['type~']}${(g.text || g['text~']) ? ': ' + (g.text || g['text~']) : ''}${g.icon || g.src ? ' (your file)' : g.source ? (SRC.isUrl(g.source) && !SRC.cached(g.source).image && !SRC.cached(g.source).video ? ' (source ' + g.source + ', not captured yet)' : ' (source ' + g.source + ')') : g['source~'] ? ' (suggested source ' + g['source~'] + ', confirm it)' : GRAPHICS[g.type || g['type~']] === 11 ? ' (drawn frame; add src for your screen)' : ' (drawn)'}`),
     ...(Object.keys(r.aliases || {}).length ? [`aliases: ${Object.entries(r.aliases).map(([w, h]) => w + ' = ' + h.join(' / ')).join('; ')}`] : [])].join('\n');
 }
 
-module.exports = { parse, load, validate, compile, toPreset, shotSettings, titleFlips, graphicFlips, GRAPHICS, CAPTION_POSITIONS, CAPTION_LOOK, exportJob, toPackage, summary, parseYaml, dumpYaml, parseLine, ENTRANCES, LAYERS, GLYPHS };
+module.exports = { parse, load, validate, compile, toPreset, shotSettings, titleFlips, graphicFlips, cardFlips, PLACES, CARDS_BLOCK, GRAPHICS, CAPTION_POSITIONS, CAPTION_LOOK, exportJob, toPackage, summary, parseYaml, dumpYaml, parseLine, ENTRANCES, LAYERS, GLYPHS };
 
 if (require.main === module) {
   const argv = process.argv.slice(2), cmd = argv[0];

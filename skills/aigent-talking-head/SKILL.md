@@ -1,6 +1,6 @@
 ---
 name: aigent-talking-head
-description: "Turn a phone clip into a styled 9:16 talking-head reel, locally: kinetic captions, titles in front of or behind the head, 29 overlay graphics planned from what the presenter says, 56 transitions, 51 effects, beat-synced music, film finishes, presets, Reel.md recipes, platform exports (TikTok, Reels, Shorts, 4:5, 1:1) and an MCP server. Every command, flag, output and failure is listed in contract.json. Use when someone asks to make a reel from a selfie or talking-head clip, add captions and titles to a vertical video, remake the style of a reel they like, or check a finished reel before posting."
+description: "Turn a phone clip into a styled 9:16 talking-head reel, locally: kinetic captions, titles in front of or behind the head, 30 overlay graphics planned from what the presenter says, editing principles built in (the magazine preset), 56 transitions, 51 effects, beat-synced music, film finishes, presets, Reel.md recipes, platform exports (TikTok, Reels, Shorts, 4:5, 1:1) and an MCP server. Every command, flag, output and failure is listed in contract.json. Use when someone asks to make a reel from a selfie or talking-head clip, add captions and titles to a vertical video, remake the style of a reel they like, or check a finished reel before posting."
 ---
 
 # aigent-talking-head
@@ -60,9 +60,9 @@ Run each as `npm run <command> -- <args>` from the repo root. Full flag list wit
 
 | Command | What it does | Key args and flags |
 |---|---|---|
-| `reel` | clip to draft, then to `reel-vN.mp4` | `[videos...]`, `--clip`, `--clips`, `--name`, `--model small.en\|large-v3`, `--export tiktok\|reels\|shorts\|feed45\|square`, `--json`, `--preset <name>\|auto`, `--recipe`, `--recipe-titles`, `--look kinetic\|oneword\|muse\|classic\|one-word`, `--style`, `--theme aigent\|neutral`, `--title-layer front\|behind\|auto`, `--caption-position top\|middle\|bottom`, `--caption-layer`, `--caption-entrance pop\|unfurl\|cascade\|orbit\|warp\|crystallize\|compute\|levitate\|undulate`, `--panel-layer`, `--fonts`, `--finish`, `--bed`, `--bed-start`, `--beat-sync`, `--no-beat-sync`, `--mask birefnet\|mediapipe`, `--no-mask`, `--no-titles`, `--no-punch`, `--sfx off`, `--draft`, `--rebuild`, `--force` |
+| `reel` | clip to draft, then to `reel-vN.mp4` | `[videos...]`, `--clip`, `--clips`, `--name`, `--model small.en\|large-v3`, `--export tiktok\|reels\|shorts\|feed45\|square`, `--json`, `--preset <name>\|auto`, `--recipe`, `--recipe-titles`, `--tighten <s>`, `--no-tighten`, `--cards auto\|off`, `--music-energy low\|mid\|high\|auto`, `--no-sfx-cap`, `--aliases "Gwyn: Guinn"`, `--no-boost`, `--look kinetic\|oneword\|muse\|classic\|one-word`, `--style`, `--theme aigent\|neutral`, `--title-layer front\|behind\|auto`, `--caption-position top\|middle\|bottom`, `--caption-layer`, `--caption-entrance pop\|unfurl\|cascade\|orbit\|warp\|crystallize\|compute\|levitate\|undulate`, `--panel-layer`, `--fonts`, `--finish`, `--bed`, `--bed-start`, `--beat-sync`, `--no-beat-sync`, `--mask birefnet\|mediapipe`, `--no-mask`, `--no-titles`, `--no-punch`, `--sfx off`, `--draft`, `--rebuild`, `--force` |
 | `verify` | check a finished reel: ffprobe, loudness, overlap, safe area, mask, copy | `<job>`, `--export <name>`, `--json`, `--file`, `--fps`, `--jobs` |
-| `plan` | propose graphics from what was said into a Reel.md | `<job>`, `--out`, `--base <Reel.md>`, `--max`, `--fresh`, `--dry`, `--json` |
+| `plan` | propose graphics (and, with cards on, colour and chapter cards) from what was said into a Reel.md | `<job>`, `--out`, `--base <Reel.md>`, `--max`, `--fresh`, `--cards`, `--no-cards`, `--dry`, `--json` |
 | `export` | re-export a finished reel for a platform | `<job>`, `--export tiktok\|reels\|shorts\|feed45\|square`, `--file`, `--json` |
 | `mcp` | MCP server on stdio (docs/mcp.md) | none |
 | `check` | lint a job's copy and plan, or self-test the repo | `[job]`, `--warn-only` |
@@ -73,7 +73,7 @@ Run each as `npm run <command> -- <args>` from the repo root. Full flag list wit
 | `teardown` | reference reel to a Reel.md | `<video>`, `--out`, `--name`, `--engine rea\|lite`, `--install`, `--model`, `--no-asr`, `--no-ocr`, `--vlm`, `--reuse` |
 | `capture` | public page to a screen card | `<urls...>` or `--recipe <Reel.md> [--list]`, `--scroll 8`, `--width 780`, `--force`, `--image-only` |
 | `menu` | every option | `--json` |
-| `list` | one part of the effects menu by kind (transitions, titles, captions, graphics, effects); animated previews in `docs/effects.md` | `-- <kind>`, `--json` |
+| `list` | one part of the effects menu by kind (transitions, titles, captions, graphics, effects, editing); animated previews in `docs/effects.md` | `-- <kind>`, `--json` |
 | `menu:render` | re-render the effects menu previews in `docs/menu/` and rewrite `docs/effects.md` | `--only <section>`, `--docs-only` |
 | `brand:import` | brand guide to a draft preset | `<file>`, `--name`, `--out` |
 | `music` | list or add music beds | `[files...]`, `--replace` |
@@ -87,7 +87,7 @@ Precedence when a reel is made: flags, then the recipe, then its preset, then de
 
 ## Graphics
 
-29 overlay graphics, each with its own entrance and exit, drawn in the theme's colours and fonts. Add them as lines in a Reel.md `reel-graphics` block (`#01 2-5 | type stat-callout | text 10,000+ | sub readers`) or as `captions.js` flips with the mode. Fields and defaults: `kit/graphics.json` and the `graphics` section of `contract.json`. Offer them with the rest of the menu (`npm run menu`, `showcase/sheets/graphics.jpg`).
+30 overlay graphics, each with its own entrance and exit, drawn in the theme's colours and fonts. Add them as lines in a Reel.md `reel-graphics` block (`#01 2-5 | type stat-callout | text 10,000+ | sub readers`) or as `captions.js` flips with the mode. Fields and defaults: `kit/graphics.json` and the `graphics` section of `contract.json`. Offer them with the rest of the menu (`npm run menu`, `showcase/sheets/graphics.jpg`).
 
 | Type | Mode | What it is | Main fields |
 |---|---|---|---|
@@ -120,13 +120,26 @@ Precedence when a reel is made: flags, then the recipe, then its preset, then de
 | `hud-callout` | 35 | brackets lock onto a region, a leader draws to a label | `text`, `sub`, `x`, `y`, `w`, `h` |
 | `flash-card` | 36 | full-frame one-word cards, hard cut on each beat | `text` (one word per card), `cues`, `bg` |
 | `keyword-caption` | 37 | a caption line with an accent block behind the keyword | `text`, `keyword`, `tag`, `case` |
+| `number-pop` | 38 | list intro: the numbers 1 to N pop in on tiles around the head | `count`, `cues`, `color` |
 
 Glyphs: check, star, bolt, heart, fire, play, bell, spark, plus, lock, arrow, rocket, terminal, chart, world, cpu. Every graphic takes `x`, `y` (0 to 1) and `color`.
 
 - Words on a graphic must be words the user says in its window (the fields under `spoken` in `kit/graphics.json`). On a recipe job the kit drops a graphic whose `required` field is not said, leaves off any other unsaid field and keeps the graphic (a CTA keeps its button when only the sub line is not said), keeps only the checklist, ticker and feature rows that are said, and ticks each row as it is said. A near-homophone counts ("aigent" heard as "agent", "Grok" as "grock"), and so does anything in the recipe's `## Aliases`; the log names every such match. Do not write words the user never says.
 - While a graphic is up, captions and titles that would sit on it move clear (shrinking to no less than 70% if the room is short) or hide, and never move further into the face. Two graphics should not share the screen: give them separate times (`npm run plan` does). `npm run verify` fails on any overlap. `"layout": false` in `build/captions.js` turns the pass off (only to compare before and after).
 - `cues` (words the user says, `;` between, or seconds into the graphic) time the beats of a data chart, terminal session, feature cards, CTA button, flash cards, keyword caption or screen card pointer: each lands when its word is said. A cue that is never said is spread between its neighbours.
-- `layer front|behind|auto` on modes 11 to 37. Behind puts the graphic under the top of the head only (hair and crown), never the face or chin. Auto is behind for a screen card, and for the others behind only when the graphic sits high in the frame (y below 0.45). It needs the person mask (`npm run effects:setup`).
+- `layer front|behind|auto` on modes 11 to 38. Behind puts the graphic under the top of the head only (hair and crown), never the face or chin. Auto is behind for a screen card, and for the others behind only when the graphic sits high in the frame (y below 0.45). It needs the person mask (`npm run effects:setup`).
+
+## Editing principles (the magazine preset)
+
+Common short-form editing advice built in as options; `--preset magazine` or `- preset: magazine` (Brand kit) turns on all of them, and the AIgent look stays the default. `npm run list -- editing` lists the names; `docs/guide.md` "Editing principles built in" explains each in plain words; `examples/recipes/magazine.Reel.md` shows every line.
+
+- Fonts: pairings `playfair` and `dmserif` set three faces per phrase (serif numeral or hero, one italic serif word, sans). `"lockup": {"accent": "script"}` or `| accent script |` on any pairing with a script role.
+- Placement: `"place": "left|right|above|chest|face"` on a title or caption, `| place face |` in `reel-titles`, preset `titlePlaces` for drafted titles. Face sits behind the head (titles: unless `layer front`; over 22% of the letters covered by the mask, it moves above the head), so it needs the person mask.
+- Cards: `reel-cards` block (`#01 4.2-5.4 | bg olive | chapter 1`), mode 8 flips with `bg` and `chapter`, or `--cards auto` / `- cards: auto`. `npm run plan -- <job> --cards` writes proposals (chapter cards on a counted list, colour cards on short lines to land, a `number-pop` intro).
+- Music: `--music-energy low|mid|high|auto`, Music `- energy:` and `- bed: auto`. `--bed` wins.
+- Sound: `"sfxMap": true` (whoosh on transitions, swipe on cards, pop on text and numbers, typing under typewriter, click on big punches). The density cap `"sfxCap": {"minGap": 0.25, "per10": 6}` is on by default; `--no-sfx-cap` or `"sfxCap": false` turns it off.
+- Effects: `"punch": 0.12` (10 to 15%), the `typewriter` title and caption entrance, soft transitions with `glitch: off`.
+- No dead air: `--tighten 0.3` / `- tighten: 0.3` cuts pauses inside a line to jumps; `--no-tighten` keeps them.
 
 ## Transitions
 

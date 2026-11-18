@@ -497,7 +497,7 @@ Labelled contact sheets of every effect, graphic, film finish, title entrance, c
 
 ![Transitions, animated and labelled](../docs/menu/sheets/transitions.webp)
 
-The animated grids come from the [effects menu](../docs/effects.md) (`npm run menu:render`), which lists each one with its exact name.
+The animated grids come from the [effects menu](../docs/effects.md) (\`npm run menu:render\`), which lists each one with its exact name.
 
 ![Font pairings](sheets/fonts.jpg)
 
@@ -804,7 +804,7 @@ Labelled contact sheets of every effect, graphic, film finish, title entrance, c
 
 ![Transitions, animated and labelled](../docs/menu/sheets/transitions.webp)
 
-The animated grids come from the [effects menu](../docs/effects.md) (`npm run menu:render`), which lists each one with its exact name.
+The animated grids come from the [effects menu](../docs/effects.md) (\`npm run menu:render\`), which lists each one with its exact name.
 
 ![Font pairings](sheets/fonts.jpg)
 

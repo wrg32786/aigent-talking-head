@@ -6,7 +6,7 @@
 //            --base <Reel.md> (start a new plan from this recipe's brand, music and style; default the AIgent look)
 //            --max <n> (at most n graphics; default one per 3 s of reel)  --dry (print, write nothing)
 //            --fresh (propose again over lines an earlier plan wrote; lines you wrote, with no "why", always stay)
-//            --jobs <dir> (default jobs/)  --json (one JSON result line at the end)
+//            --cards / --no-cards (colour and chapter cards; default on when the recipe uses them)  --jobs <dir> (default jobs/)  --json (one JSON result line at the end)
 // The job needs a transcript: run npm run reel -- inbox/<clip> --name <job> --draft first (or any reel run).
 // What it proposes, from what you say:
 //   a number (49 dollars, 40 percent, ten thousand readers) -> price-tag, stat-callout, or an odometer stat for big numbers
@@ -14,11 +14,14 @@
 //   "step two" -> step-counter          a quote ("she said ...", "quote ...") -> quote-card
 //   "X versus Y", "X vs Y" -> versus    code or terminal talk (npm, git, a command, the terminal) -> terminal-session
 //   "I'm <Name>" at the start -> lower-third        the end (follow, subscribe, link, try, join...) -> cta-card or cta-button
+//   a short line to land -> a colour card; a counted list (first, second, number three...) -> numbered chapter cards and
+//   a number-pop intro (kit/cards.cjs), written to a reel-cards block. On with --cards, or when the recipe uses cards
+//   (the magazine preset, or "cards: auto" in its Style); --no-cards leaves them out
 // Then: review the Graphics block (each line says why it was proposed), and make the reel with
 //   npm run reel -- --recipe jobs/<job>/Reel.md --clips jobs/<job>/clips --name <job> --force
 'use strict';
 const fs = require('fs'), path = require('path');
-const RM = require('./reelmd.cjs'), S = require('./spoken.cjs');
+const RM = require('./reelmd.cjs'), S = require('./spoken.cjs'), CARDS = require('./cards.cjs');
 const KIT = __dirname, ROOT = path.dirname(KIT);
 
 // ---------- transcript in reel time ----------
@@ -159,7 +162,7 @@ function propose(T, opts = {}) {
 }
 
 // ---------- Reel.md ----------
-const FIELDS = ['type', 'text', 'sub', 'left', 'right', 'items', 'step', 'of', 'style', 'title', 'why'];
+const FIELDS = ['type', 'text', 'sub', 'left', 'right', 'items', 'step', 'of', 'count', 'style', 'title', 'why'];
 const lineOf = (g, n) => [`#${String(n).padStart(2, '0')} ${+g.start.toFixed(2)}-${+g.end.toFixed(2)}`, ...FIELDS.filter(k => g[k] != null && g[k] !== '').map(k => `${k} ${Array.isArray(g[k]) ? g[k].join('; ') : String(g[k]).replace(/\|/g, '/')}`)].join(' | ');
 function newRecipe(job, T, base) {
   const name = path.basename(job).toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || 'plan';
@@ -169,6 +172,12 @@ function newRecipe(job, T, base) {
       .replace(/^## Shots[\s\S]*?(?=^## )/m, '').replace(/^## Titles[\s\S]*?(?=^## |(?![\s\S]))/m, '').replace(/^## Graphics[\s\S]*?(?=^## |(?![\s\S]))/m, '');
   }
   return `---\nvideomd: 1\nname: ${name}\ndescription: Planned from what you say by npm run plan. Review the Graphics block, then render.\nsource:\n  file: clips\n  duration: ${+T.len.toFixed(2)}\nshots: 0\nlang: en\ngenerator:\n  name: aigent-talking-head\nx-reel: 1\n---\n\n# ${name}\n\nKinetic captions and titles in the AIgent look, with graphics proposed from your words.\n\n## Brand kit\n- preset: aigent\n\n## Style\n- look: kinetic\n- titles: on\n- title-layer: front\n\n## Aliases\n\n`;
+}
+function withCards(md, lines) {
+  const block = '## Cards\n\n```' + RM.CARDS_BLOCK + '\n' + lines.join('\n') + '\n```\n';
+  const re = new RegExp('^## Cards[\\s\\S]*?^```' + RM.CARDS_BLOCK + '[\\s\\S]*?^```[ \\t]*\\n?', 'm');
+  if (re.test(md)) return md.replace(re, block);
+  return md.replace(/\s*$/, '\n\n') + block;
 }
 function withGraphics(md, lines) {
   const block = '## Graphics\n\n```reel-graphics\n' + lines.join('\n') + '\n```\n';
@@ -185,6 +194,14 @@ function plan(job, opts = {}) {
   S.setAliases(existing ? existing.aliases : {});
   // propose, then run the same spoken gate the render runs: whatever you do not say is dropped here, not at render time
   let props = propose(T, opts);
+  // cards (kit/cards.cjs): colour cards on short lines to land, chapter cards and the number-pop intro on a counted list
+  // on when asked (--cards), or when the recipe uses them (the magazine preset, or "cards: auto" in its Style)
+  const baseR = existing || (opts.base ? RM.load(opts.base) : null), bp = baseR ? RM.toPreset(baseR) : {};
+  const cardsOn = opts.cards === true || (opts.cards !== false && bp.cards === 'auto');
+  const pc = cardsOn ? CARDS.proposeCards(T.words, { len: T.len, palette: bp.cardPalette }) : { cards: [], numberPop: null, chapters: [] };
+  // a counted list becomes chapter cards, so the checklist over the same list steps aside
+  if (pc.cards.some(c => c.chapter != null)) props = props.filter(g => !(g.type === 'checklist' && /count through a list/.test(g.why || '')));
+  if (pc.numberPop && !props.some(g => g.start < pc.numberPop.end && pc.numberPop.start < g.end)) props.push({ type: 'number-pop', ...pc.numberPop });
   // the recipe's aliases also work backwards here: a brand heard as a common word ("agent") is written as you mean it ("aigent")
   const back = new Map(); for (const [w, hs] of Object.entries((existing && existing.aliases) || opts.aliases || {})) for (const h of [].concat(hs)) back.set(S.tokens(h).join(' '), w);
   if (back.size) for (const g of props) for (const k of ['text', 'sub', 'left', 'right', 'items']) { if (g[k] == null) continue;
@@ -203,11 +220,15 @@ function plan(job, opts = {}) {
   const free = props.filter(p => !mine.some(m => p.start < +m.end && +m.start < p.end));
   const lines = [...mine.map(m => ({ m })), ...free.map(g => ({ g }))].sort((a, b) => (a.m ? +a.m.start : a.g.start) - (b.m ? +b.m.start : b.g.start))
     .map((x, i) => x.m ? existingLine(x.m, i + 1) : lineOf(x.g, i + 1));
-  const md = withGraphics(existing ? fs.readFileSync(out, 'utf8') : newRecipe(job, T, opts.base), lines);
+  let md = withGraphics(existing ? fs.readFileSync(out, 'utf8') : newRecipe(job, T, opts.base), lines);
+  // your own cards stay; else the proposed ones that do not share the screen with a graphic
+  const busy = [...mine, ...free].map(g => [+g.start, +g.end]);
+  const cards = existing && existing.cards && existing.cards.length ? [] : pc.cards.filter(c => !busy.some(([a, b]) => c.start < b && a < c.end));
+  if (cards.length) md = withCards(md, cards.map((c, i) => CARDS.cardLine(c, i + 1)));
   const r = RM.parse(md, out), v = RM.validate(r);
   if (v.errs.length) throw new Error('the planned Reel.md does not pass the check:\n- ' + v.errs.join('\n- '));
   if (!opts.dry) fs.writeFileSync(out, md);
-  return { out, from: T.from, seconds: +T.len.toFixed(2), proposed: free, kept: mine.length, skippedForYours: props.length - free.length, dropped, fuzzy, md, warn: v.warn };
+  return { out, from: T.from, seconds: +T.len.toFixed(2), proposed: free, cards, kept: mine.length, skippedForYours: props.length - free.length, dropped, fuzzy, md, warn: v.warn };
 }
 // an existing graphics line, written back as it was parsed
 function existingLine(g, n) {
@@ -232,9 +253,10 @@ if (require.main === module) {
   const base = opt('base') ? path.resolve(opt('base')) : null;
   if (base && !fs.existsSync(base)) die('No recipe at ' + base);
   try {
-    const r = plan(job, { out: opt('out'), base, max: opt('max') ? +opt('max') : undefined, dry: flag('dry'), fresh: flag('fresh') });
+    const r = plan(job, { out: opt('out'), base, max: opt('max') ? +opt('max') : undefined, dry: flag('dry'), fresh: flag('fresh'), cards: flag('no-cards') ? false : flag('cards') ? true : undefined });
     if (flag('dry')) console.log(r.md);
     console.log(`plan: ${r.proposed.length} graphic${r.proposed.length === 1 ? '' : 's'} proposed from ${r.seconds} s of what you say (${r.from})${r.kept ? `, ${r.kept} of yours kept` : ''}${r.skippedForYours ? `, ${r.skippedForYours} left out where yours already are` : ''}`);
+    for (const c of r.cards) console.log(`  ${c.start}-${c.end}s card ${c.bg}${c.chapter != null ? ' chapter ' + c.chapter : ''}  (${c.why})`);
     for (const g of r.proposed) console.log(`  ${g.start}-${g.end}s ${g.type}${g.text ? ': ' + g.text : ''}${g.items ? ': ' + g.items.join(' / ') : ''}  (${g.why})`);
     for (const d of r.dropped) console.log(`  left out ${d.type} at ${d.at}s: ${d.why}`);
     for (const z of r.fuzzy) console.log(`  spoken match: "${z.want}" counted as said (heard "${z.heard}", ${z.how})`);

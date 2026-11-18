@@ -19,6 +19,8 @@
 | `haas` | Inter Tight 800, white | Inter Tight 400, white | `stack` | Neue Haas Grotesk Display + Helvetica Neue |
 | `wabbit` | Archivo Black caps, white | Chewy, accent | `overlap`: a brush tail under the hero's right corner | Archivo Black + Wascally Wabbit |
 | `instrument` | Instrument Serif Italic, white | Inter Tight 600, white | `stack` | the real pair; the `--look oneword` default |
+| `playfair` | Playfair Display 700, white | Inter Tight 500, white, with one word in Playfair Display Italic | `stack`, `accent: script` | the real pair; the `magazine` preset's pairing: a serif numeral, an italic serif word and sans in one phrase |
+| `dmserif` | DM Serif Display, white | Manrope 600, white, with one word in DM Serif Display Italic | `stack`, `accent: script` | the real pair: a high-contrast serif with a rounded sans |
 
 ## Examples
 
@@ -43,7 +45,7 @@ Change it per phrase in `captions.js`:
 {"start": 7.3, "end": 9.0, "text": "THE REEL", "mode": 7, "lockup": false}                        // one font, as before
 ```
 
-Or for the whole job: `"lockup": {...}` at the top of `captions.js`, or in `build/cut.json` (`"lockup": {...}` and `"hero": {"4.0": "editing"}`, keyed by the phrase's start time). `npm run check` flags a hero that isn't in the phrase. Lockup fields: `arrange` (stack, overlap, inline), `partner` (script, secondary), `scale`, `scriptBoost`, `kineticScale`, `kineticScriptScale`, `partnerUpper`, `partnerTracking` (em), `justify`, `heroUpper`, `anchor` (right, center), `rotate` (degrees), `drop`, `heroColor` and `partnerColor` (accent, text or a hex colour).
+Or for the whole job: `"lockup": {...}` at the top of `captions.js`, or in `build/cut.json` (`"lockup": {...}` and `"hero": {"4.0": "editing"}`, keyed by the phrase's start time). `npm run check` flags a hero that isn't in the phrase. Lockup fields: `arrange` (stack, overlap, inline), `partner` (script, secondary), `accent` (`script`: one partner word, the longest that is not a small word, or the flip's `"accent"` word index, set in the pairing's script face at `accentScale`, default 1.3, so a phrase carries three faces), `scale`, `scriptBoost`, `kineticScale`, `kineticScriptScale`, `partnerUpper`, `partnerTracking` (em), `justify`, `heroUpper`, `anchor` (right, center), `rotate` (degrees), `drop`, `heroColor` and `partnerColor` (accent, text or a hex colour).
 
 Use: `npm run reel -- inbox/take.mov --fonts druk`, or `FONTS=elegant node kit/render.mjs ...`, or `"fonts": "editorial"` in `captions.js`.
 

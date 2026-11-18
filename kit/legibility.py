@@ -1,6 +1,6 @@
 """Is every caption word readable against what's behind it? Measures the finished reel, not the plan.
 
-    python kit/legibility.py <build dir> <reel.mp4> [--min 3.0] [--every 3]
+    python kit/legibility.py <build dir> <reel.mp4> [--min 3.0] [--every 3] [--json out.json]
 
 For each sampled frame, the caption layer (build/ovl/NNNN.png) says where the letters are. The script compares the
 letters' brightness in the finished reel with a ring of picture just outside them (WCAG contrast ratio, the measure for
@@ -118,6 +118,9 @@ def main():
         else: spans.append([t, t, r])
     print(f'legibility: {seen} caption frames checked, {len(bad)} under {lim}:1')
     for a, b, r in spans: print(f'  {a:6.2f}-{b:6.2f} s  worst {r:.2f}:1')
+    if '--json' in sys.argv:
+        with open(sys.argv[sys.argv.index('--json') + 1], 'w', encoding='utf-8') as fh:
+            json.dump({'checked': seen, 'under': len(bad), 'min': lim, 'spans': [[round(x, 2), round(y, 2), round(r, 2)] for x, y, r in spans]}, fh)
     sys.exit(1 if spans else 0)
 
 

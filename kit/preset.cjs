@@ -116,7 +116,17 @@ function validate(p) {
     try { B.parseFinish(f); } catch (e) { errs.push('finishPool: ' + e.message); }
   }
   if (p.transition && !transitionNames().includes(p.transition)) errs.push(`unknown transition "${p.transition}"`);
-  if (p.bed && !R.isBed(p.bed)) errs.push(`unknown bed "${p.bed}" (library names only in a shipped preset)`);
+  if (p.bed && p.bed !== 'auto' && !R.isBed(p.bed)) errs.push(`unknown bed "${p.bed}" (library names or auto only in a shipped preset)`);
+  // the editing-principles keys (the magazine preset; docs/guide.md "Editing principles built in")
+  if (p.musicEnergy != null && !['auto', ...R.ENERGIES].includes(p.musicEnergy)) errs.push(`unknown musicEnergy "${p.musicEnergy}" (auto, ${R.ENERGIES.join(', ')})`);
+  if (p.punch != null && typeof p.punch !== 'boolean' && !(+p.punch >= 0.02 && +p.punch <= 0.3)) errs.push(`punch "${p.punch}" (true, false, or a zoom from 0.02 to 0.3)`);
+  if (p.tighten != null && p.tighten !== false && !(+p.tighten >= 0.15 && +p.tighten <= 2)) errs.push(`tighten "${p.tighten}" (false, or the longest pause to keep in seconds, 0.15 to 2)`);
+  if (p.cards != null && !['auto', 'off', false].includes(p.cards)) errs.push(`cards "${p.cards}" (auto or off)`);
+  for (const c of p.cardPalette || []) if (!['olive', 'ivory', 'sage', 'clay', 'blush', 'forest', 'navy', 'cream', 'paper', 'blue', 'ink'].includes(c) && !/^#[0-9a-f]{6}$/i.test(c)) errs.push(`cardPalette "${c}"`);
+  if (p.sfxCap != null && p.sfxCap !== false && !(p.sfxCap && +p.sfxCap.minGap >= 0 && +p.sfxCap.per10 >= 1)) errs.push('sfxCap must be false or { "minGap": seconds, "per10": n }');
+  for (const pl of p.titlePlaces || []) if (!['left', 'right', 'above', 'chest', 'face', 'center'].includes(pl)) errs.push(`titlePlaces "${pl}" (left, right, above, chest, face, center)`);
+  for (const k of ['glitch', 'sfxMap']) if (p[k] != null && typeof p[k] !== 'boolean') errs.push(`${k} must be true or false`);
+  for (const e of p.entranceOrder || []) if (!R.ENTRANCES.includes(e)) errs.push(`entranceOrder "${e}" (${R.ENTRANCES.join(', ')})`);
   if (p.titleLayer && !R.TITLE_LAYERS.includes(String(p.titleLayer).toLowerCase())) errs.push(`unknown titleLayer "${p.titleLayer}" (front, behind, auto)`);
   return errs;
 }
@@ -154,15 +164,16 @@ function apply(preset, dest, overrides = {}) {
 
   if (cut && typeof cut === 'object') {
     cut.preset = preset.name;
-    if (bed && !has('bed')) {
+    if (bed && bed !== 'auto' && !has('bed')) {
       cut.bed = R.isBed(bed) ? bed : bed;
       if (cut.bedVol == null) cut.bedVol = 0.16;
     }
     if (beatSync !== undefined && !has('beatSync')) cut.beatSync = beatSync;
     if (titleLayer !== undefined && !has('titleLayer') && cut.titleLayer == null) cut.titleLayer = titleLayer;
     if (punch === false && !has('punch')) cut.punch = false;
+    else if (typeof punch === 'number' && !has('punch') && cut.punch !== false) cut.punch = punch;
     if (transition && !has('transition') && Array.isArray(cut.segs)) {
-      cut.segs.forEach((s, i) => { if (!s.transition) s.transition = transition; });
+      cut.segs.forEach((s, i) => { if (!s.transition && !s.jump) s.transition = transition; }); // a tightened pause (jump) stays a hard cut
       // "cut" is a hard cut with no seam: no glitch hits on the picture (captions drop theirs via autocaption --no-glitch)
       if (transition === 'cut') { cut.hits = []; applied.noGlitch = true; }
     }
@@ -199,6 +210,7 @@ function pickAuto(hints = {}) {
     karaoke: 'karaoke', lyric: 'karaoke',
     quiet: 'minimal-clean', clean: 'minimal-clean', minimal: 'minimal-clean',
     film: 'cinematic', cinematic: 'cinematic', moody: 'cinematic',
+    magazine: 'magazine', listicle: 'magazine', chapters: 'magazine',
     editorial: 'editorial', serif: 'editorial',
     muse: 'muse-pill', pill: 'muse-pill',
     retro: 'retro-scan-lines', 'scan-lines': 'retro-scan-lines', crt: 'retro-scan-lines',
