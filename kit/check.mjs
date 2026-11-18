@@ -154,8 +154,12 @@ if (target) {
   results.push({ label: 'contract.json matches the CLIs', errs: checkContract(), warns: [] });
   {
     const errs = [];
-    for (const f of ['skills/aigent-talking-head/SKILL.md', 'contract.json']) if (existsSync(join(ROOT, f)) && readFileSync(join(ROOT, f), 'utf8').includes('\u2014')) errs.push(`${f} has an em dash`);
+    for (const f of ['skills/aigent-talking-head/SKILL.md', 'contract.json', 'CONTRIBUTING.md']) if (existsSync(join(ROOT, f)) && readFileSync(join(ROOT, f), 'utf8').includes('\u2014')) errs.push(`${f} has an em dash`);
     results.push({ label: 'SKILL.md and contract.json copy', errs, warns: [] });
+  }
+  {
+    const star = createRequire(import.meta.url)('./star.cjs');
+    results.push({ label: 'star reminder self-test', errs: star.selfTest(), warns: [] });
   }
 
   const menuCov = coverage();
