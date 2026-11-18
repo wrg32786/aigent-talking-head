@@ -873,6 +873,18 @@ try {
     run(node, [join(KIT, 'render.mjs'), '0', '0.9,1.9,2.75,3.9'], b);
     const st = x => readFileSync(join(b, 'stills', `t${x}.png`));
     if (st('1.90').equals(st('0.90')) || st('2.75').equals(st('3.90'))) fail('card or typewriter did not draw');
+    // a long word in a side slot keeps a 6.5% margin from the frame edge (shrinks to fit); a boost span thickens the halo
+    writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify({ ...caps, flips: base.concat([{ start: 0, end: 2, mode: 7, text: 'Extraordinarily', place: 'left', entrance: 'drop' }, { start: 0, end: 2, mode: 7, text: 'Unbelievably', place: 'right', entrance: 'blur-rise' }]) }) + ';\n');
+    run(node, [join(KIT, 'render.mjs'), '0', '1.5'], b);
+    const plain = st('1.50');
+    if (effects) { const o = run(fxPy, ['-c', `from PIL import Image\nimport numpy as np\na=np.asarray(Image.open(${JSON.stringify(join(b, 'stills', 't1.50.png'))}).convert('RGBA'))[...,3]\nc=np.where((a[100:1000]>128).any(0))[0]\nprint(int(c.min()),int(c.max()))`]).trim().split(' ').map(Number);
+      if (o[0] < 70 || o[1] > 1080 - 70) fail('side titles touch the frame edge: x ' + o.join(' to ')); }
+    const capsB = JSON.parse(readFileSync(capF, 'utf8').replace(/^window\.CAPTIONS=/, '').replace(/;\s*$/, '')); capsB.boost = [[0, 2]];
+    writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(capsB) + ';\n');
+    run(node, [join(KIT, 'render.mjs'), '0', '1.5'], b);
+    if (st('1.50').equals(plain)) fail('a boost span did not change the halo');
+    // the behind-the-head cover check measures letters under the mask (selftest inside)
+    if (effects) run(fxPy, ['-c', `import sys; sys.path.insert(0, ${JSON.stringify(KIT)}); import cover; cover.selftest()`]);
     writeFileSync(capF, keepC);
   });
   { // the MCP server: seven tools whose schemas come from contract.json; a tool call runs the real command
