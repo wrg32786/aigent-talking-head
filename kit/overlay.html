@@ -79,7 +79,11 @@ const glitchAt=CAP.glitchAt||[];
 const rng=s=>()=>(s=(s*16807)%2147483647)/2147483647;
 const backOut=x=>{const c=2.4;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2)};const expo=x=>x>=1?1:1-Math.pow(2,-10*x);const cl=x=>Math.max(0,Math.min(1,x));
 let FLAT=false; // true while drawing on a colour card: flat ink, no shadow
-function shadow(c,fs){if(FLAT){c.shadowColor='transparent';c.shadowBlur=0;return}c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=fs*.16;c.shadowOffsetX=fs*.03;c.shadowOffsetY=fs*.05}
+// BOOST: the reel's legibility pass found this moment under 3:1 (captions.js "boost": [[start, end], ...], written by
+// kit/reel.cjs): the halo turns dense and tight, dark behind light ink and light behind dark ink
+let BOOST=false;
+const inkLight=c=>{const m=/^#([0-9a-f]{6})$/i.exec(String(c.fillStyle||''));if(!m)return true;const n=parseInt(m[1],16);return((n>>16)*.299+((n>>8)&255)*.587+(n&255)*.114)>140};
+function shadow(c,fs){if(FLAT){c.shadowColor='transparent';c.shadowBlur=0;return}if(BOOST){c.shadowColor=inkLight(c)?'rgba(0,0,0,.92)':'rgba(255,255,255,.92)';c.shadowBlur=Math.max(6,fs*.09);c.shadowOffsetX=0;c.shadowOffsetY=Math.max(1,fs*.012);return}c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=fs*.16;c.shadowOffsetX=fs*.03;c.shadowOffsetY=fs*.05}
 function glyphs(txt,fs,cx,cy,p,fill,sh,fam=S){ctx.font=fnt(fam,fs);ctx.letterSpacing=fam===S?'0px':(TRK*fs)+'px';ctx.textAlign='left';ctx.textBaseline='middle';const tot=ctx.measureText(txt).width;let x=cx-tot/2;for(let i=0;i<txt.length;i++){const w=ctx.measureText(txt.slice(0,i+1)).width-ctx.measureText(txt.slice(0,i)).width,e=expo(cl((p-i*.035)/.3));ctx.save();ctx.globalAlpha*=e;ctx.translate(x,cy+(1-e)*fs*.42);if(sh)shadow(ctx,fs);ctx.fillStyle=fill;ctx.fillText(txt[i],0,0);ctx.restore();x+=w}}
 function fit(lines,fam,fs,max){const long=lines.reduce((a,b)=>a.length>b.length?a:b);ctx.font=fnt(fam,fs);while(ctx.measureText(long).width>max){fs-=4;ctx.font=fnt(fam,fs)}return fs}
 // Drips start at measured letter bottoms (Will 11-08: paint must line up with the letters). Scanned once per word from the
@@ -268,19 +272,26 @@ const PLACES=['left','right','above','chest','face'];
 const placeOf=o=>o&&PLACES.includes(o.place)?o.place:null;
 const HEADB=()=>({x0:CAP.headX0||330,x1:CAP.headX1||750,y0:CAP.faceTop||400,y1:CAP.faceBottom||1180});
 function placeSpec(pl,P,kind){const H=HEADB(),T=kind==='T',eye=Math.round(H.y0+(H.y1-H.y0)*.36);
- if(pl==='left'||pl==='right'){const room=Math.max(300,(pl==='left'?H.x0:1080-H.x1)-SAFE+60);return{P:{...P,maxW:room,target:room*.9,max:T?270:Math.round(CSZ*1.7),min:T?72:44,pmin:34},y:eye}}
+ if(pl==='left'||pl==='right'){const room=Math.round(Math.max(220,(pl==='left'?H.x0:1080-H.x1)+24-Math.round(1080*.065))/1.06);return{P:{...P,maxW:room,target:room*.9,max:T?270:Math.round(CSZ*1.7),min:T?72:44,pmin:34},y:eye}}
  if(pl==='above')return{P:{...P,maxW:900,target:T?720:560,max:T?260:P.max},y:Math.max(230,H.y0-120)};
  if(pl==='chest')return{P,y:Math.min(1560,H.y1+170)};
  if(pl==='face')return{P:{...P,maxW:1000,target:980,max:T?440:Math.round(CSZ*3.3)},y:Math.round(H.y0+(H.y1-H.y0)*.45)};
  return{P,y:null}}
-// the sideways shift that sets a left or right lockup beside the head instead of centred (box from lockup())
-function placeDx(pl,box){const H=HEADB(),w=box[2]-box[0];if(pl==='left')return Math.max(SAFE+w,H.x0+24)-box[2];if(pl==='right')return Math.min(1080-SAFE-w,H.x1-24)-box[0];return 0}
+// a left or right lockup beside the head instead of centred (box from lockup()): it keeps a side margin of at least 6.5%
+// of the width (SIDEM, wider than the 5% title-safe margin, with room for italic overhang) and shrinks to fit the space
+// between that margin and the head when it is wider, so a side word never touches or clips the frame edge
+const SIDEM=Math.round(1080*.065);
+function placeXf(pl,box){if(pl!=='left'&&pl!=='right')return;const H=HEADB(),bw=box[2]-box[0],pad=bw*.03,w=bw+2*pad;
+ const room=pl==='left'?Math.max(220,H.x0+24-SIDEM):Math.max(220,1080-SIDEM-(H.x1-24)),s=Math.min(1,room/w),ws=w*s;
+ const x0=pl==='left'?Math.max(SIDEM,H.x0+24-ws):Math.max(SIDEM,Math.min(1080-SIDEM-ws,H.x1-24)),cy=(box[1]+box[3])/2;
+ ctx.translate(x0+pad*s,cy);ctx.scale(s,s);ctx.translate(-box[0],-cy)}
+window.__placeFit=(pl,box)=>{const H=HEADB(),bw=box[2]-box[0],pad=bw*.03,w=bw+2*pad,room=pl==='left'?Math.max(220,H.x0+24-SIDEM):Math.max(220,1080-SIDEM-(H.x1-24)),s=Math.min(1,room/w),ws=w*s,x0=pl==='left'?Math.max(SIDEM,H.x0+24-ws):Math.max(SIDEM,Math.min(1080-SIDEM-ws,H.x1-24));return{x0:Math.round(x0),x1:Math.round(x0+ws),scale:+s.toFixed(3)}};
 function title(c,t,part='all'){const o=c[4];if(o.lockup===false)return part==='partner'?null:titleSolo(c,t);const dt=t-c[0];if(c.flick&&dt<.55){const fr=Math.floor(dt*24);if([2,4,5,9,11].includes(fr))return}
  let ws=c[2].replace(/\|/g,' ').split(/\s+/).filter(Boolean).map(w=>[0,0,w]),oo=o;
  if(ONEW&&ws.length){ws=[ws[heroOf(ws,o)[0]]];oo={...o,hero:[0]}}
  const cd=cardAt(t),pl=cd?null:placeOf(o),P0=o.size?{...LKP.T,target:1e4,max:o.size}:LKP.T,ps=pl?placeSpec(pl,P0,'T'):null;
  const R=lockup(ws,oo,o.y||(ps&&ps.y)||TY,ps?ps.P:P0),hc=cd?cd.ink:R.hc,pc=cd?cd.ink:R.pc;
- const ex=c[1]>90?1:cl((c[1]-t)/.08),dy=riseOff(c,dt),late=riseEnd(c);ctx.save();ctx.globalAlpha*=ex;ctx.textBaseline='alphabetic';if(pl){const dx=placeDx(pl,R.box);if(dx)ctx.translate(dx,0)}FLAT=!!cd;
+ const ex=c[1]>90?1:cl((c[1]-t)/.08),dy=riseOff(c,dt),late=riseEnd(c);ctx.save();ctx.globalAlpha*=ex;ctx.textBaseline='alphabetic';if(pl)placeXf(pl,R.box);FLAT=!!cd;
  if(part!=='partner'){ctx.save();ctx.translate(0,dy);R.heroes.forEach((h,li)=>{ctx.save();ctx.font=h.font;ctx.letterSpacing=h.track+'px';ctx.fillStyle=hc;shadow(ctx,h.size);heroEnter(c.entr,h,li,dt);ctx.restore()});ctx.restore()}
  if(part!=='hero')R.parts.forEach((p,pi)=>partnerDraw({...p,outline:!cd},pc,(k,i)=>dt-late-.24-pi*.06-i*.07));FLAT=false;ctx.restore()}
 // Caption entrances for kinetic hero words (captionEntrance for the job, or "entrance" on a caption flip). Letter by
@@ -306,7 +317,7 @@ function capEnter(m,h,dt,seed){const txt=h.txt,n=txt.length,s=h.size,W=ctx.measu
 function kinetic(c,t){const o=c[4];if(o.lockup===false)return kineticSolo(c,t);const cd=cardAt(t),pl=cd?null:placeOf(o),ps=pl?placeSpec(pl,LKP.K,'K'):null;
  // on a colour card the words sit mid-card (under the numeral on a chapter card) in the card's ink, flat
  const y=cd?(cd[4].chapter!=null?1290:960):zoneAt(t)==='move'?ALTY:(o.y||(ps&&ps.y)||KY);
- const R0=lockup(wordsOf(c),o,y,ps?ps.P:LKP.K),R=cd?{...R0,hc:cd.ink,pc:cd.ink,parts:R0.parts.map(p=>({...p,outline:false}))}:R0;ctx.save();ctx.textBaseline='alphabetic';if(pl){const dx=placeDx(pl,R.box);if(dx)ctx.translate(dx,0)}FLAT=!!cd;
+ const R0=lockup(wordsOf(c),o,y,ps?ps.P:LKP.K),R=cd?{...R0,hc:cd.ink,pc:cd.ink,parts:R0.parts.map(p=>({...p,outline:false}))}:R0;ctx.save();ctx.textBaseline='alphabetic';if(pl)placeXf(pl,R.box);FLAT=!!cd;
  const ce=CENTR.includes(o.entrance)?o.entrance:CENTR.includes(CAP.captionEntrance)?CAP.captionEntrance:'pop';
  R.heroes.forEach(h=>{const dt=t-h.a+.04;if(dt<0)return;if(ce!=='pop'){ctx.save();ctx.font=h.font;ctx.letterSpacing=h.track+'px';ctx.fillStyle=R.hc;shadow(ctx,h.size);capEnter(ce,h,dt,Math.round(h.a*100));ctx.restore();return}const q=cl(dt/.22),s=q<1?1.5-.5*overshoot(q,.2):1;ctx.save();ctx.font=h.font;ctx.letterSpacing=h.track+'px';ctx.textAlign='center';ctx.fillStyle=R.hc;shadow(ctx,h.size);ctx.globalAlpha*=cl(dt/.05);ctx.translate(h.x,h.y-h.asc/2);ctx.scale(s,s);ctx.fillText(h.txt,0,h.asc/2);ctx.restore()});
  R.parts.forEach(p=>partnerDraw(p,R.pc,k=>t-k.a+.04));FLAT=false;ctx.restore()}
@@ -1182,7 +1193,7 @@ function burst(dt,seed){if(dt<-.1||dt>.42)return;const r=rng(seed),p=(dt+.1)/.52
 function glitch(t){glitchAt.forEach((h,i)=>{const dt=t-h;if(dt<-.05||dt>.2)return;const r=rng(Math.floor(t*24)*97+i*13+5),a=1-Math.max(0,dt)/.2;ctx.save();for(let k=0;k<16;k++){const y=r()*1920,hh=4+r()*r()*90;ctx.globalAlpha=a*(.12+r()*.5);ctx.fillStyle=k%3===0?CY:IV;ctx.fillRect(r()*200-100,y,r()>.4?1300:200+r()*700,hh)}ctx.fillStyle=IV;for(let k=0;k<2600;k++){ctx.globalAlpha=a*r()*.55;ctx.fillRect(r()*1080,r()*1920,2+r()*3,2)}ctx.restore()})}
 // layer: 'all' (default), 'front' (captions, plus front titles and partner words), 'titles' (behind-head hero words only)
 // or 'panels' (screen cards and graphics 12 to 38 behind the top of the head)
-window.seek=(t,layer)=>{LAYER=layer||'all';ctx.clearRect(0,0,1080,1920);flip(t);if(LAYER==='titles'||LAYER==='panels')return;(CAP.bursts||[]).forEach((h,i)=>burst(t-h,7919*(i+3)));glitch(t)};
+window.seek=(t,layer)=>{LAYER=layer||'all';BOOST=(CAP.boost||[]).some(b=>t>=b[0]&&t<=b[1]);ctx.clearRect(0,0,1080,1920);flip(t);if(LAYER==='titles'||LAYER==='panels')return;(CAP.bursts||[]).forEach((h,i)=>burst(t-h,7919*(i+3)));glitch(t)};
 window.__titles=TITLES.map(c=>({start:c[0],end:c[1],text:c[2],entrance:c.entr,flicker:c.flick,layer:c.layer||'front'}));
 // Fonts: optional web-font stylesheet from the theme, then wait for every face we draw with, then the logo.
 const css=TH.fontCss?new Promise(r=>{const l=document.createElement('link');l.rel='stylesheet';l.href=TH.fontCss;l.onload=r;l.onerror=r;document.head.appendChild(l)}):Promise.resolve();

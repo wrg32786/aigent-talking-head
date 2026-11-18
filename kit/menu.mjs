@@ -76,7 +76,7 @@ export const EDITING = [
   { id: 'place-right', flag: '"place": "right"  or  | place right |', label: 'the words sit right of your head at eye level' },
   { id: 'place-above', flag: '"place": "above"  or  | place above |', label: 'the words sit above your head' },
   { id: 'place-chest', flag: '"place": "chest"  or  | place chest |', label: 'the words sit across your chest' },
-  { id: 'place-face', flag: '"place": "face"  or  | place face |', label: 'big over your face, behind your head (a title goes in front with layer front)' },
+  { id: 'place-face', flag: '"place": "face"  or  | place face |', label: 'big over your face, behind your head while it covers under 22% of the letters, else above it (a title goes in front with layer front)' },
   { id: 'title-places', flag: '"titlePlaces": ["left","face","right","chest"]  in a preset  or  Reel.md  - title-places: left, face, right', label: 'drafted titles take these places in turn' },
   { id: 'colour-card', flag: '{ "mode": 8, "bg": "olive" }  or  Reel.md reel-cards  #01 4.2-5.4 | bg olive', label: 'the frame cuts to a flat colour for a beat and your caption words carry it in the card ink (olive, ivory, sage, clay, blush, forest, navy, cream, paper, blue, ink)' },
   { id: 'chapter-card', flag: '{ "mode": 8, "bg": "ivory", "chapter": "2" }  or  reel-cards  | bg ivory | chapter 2', label: 'a colour card with a big serif numeral, one per list item' },

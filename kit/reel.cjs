@@ -40,6 +40,11 @@
 //          --cards auto|off  colour cards on short lines to land and numbered chapter cards on a list (kit/cards.cjs),
 //            plus the number-pop intro on a list. Auto in the magazine preset.
 //          --no-sfx-cap  turn off the sound density cap (on by default: kit/sfx-map.cjs)
+//          --aliases "Gwyn: Guinn, Gwin; aigent: agent"  names Whisper mishears, written your way in captions and titles
+//            (adds to a recipe's ## Aliases)
+//          --no-boost  skip the legibility pass (on by default: a caption moment under 3:1 gets a denser halo and is drawn again)
+// A title behind the head moves in front when the person mask covers more than 22% of its letters (cut.json "behindMax";
+// kit/cover.py); a face title moves to the slot above the head. Left and right titles keep a 6.5% side margin and shrink to fit.
 // Writes jobs/<name>/: clips/ (clip.py output), build/ (cut.json, captions.js, theme.js, overlay frames), reel-vN.mp4.
 // Steps: clip.py (Whisper, best take per sentence, retakes flagged) -> cut.json from every "keep" clip (zoom punch on
 // every cut, big punch after the hook and into the payoff, a few sounds on the key cuts only) -> autocaption ->
@@ -61,7 +66,7 @@ const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards']);
+const VALUED = new Set(['aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const JSON_OUT = flag('json');
@@ -102,6 +107,16 @@ if (presetArg === 'auto') {
   if (preset.draft) console.warn('note: preset "' + preset.name + '" is a draft from a brand guide; confirm it before you ship.');
   console.log('preset:', preset.name, '-', preset.label || '');
 }
+// names and words Whisper mishears, written the way you mean them in captions and titles and counted as said by the
+// spoken check: the recipe's "## Aliases" plus --aliases "Gwyn: Guinn, Gwin; aigent: agent" (the flag adds to the recipe's)
+function aliasesFlag(v) { const o = {}; for (const part of String(v || '').split(';')) { const m = /^\s*([^:]+?)\s*:\s*(.+)$/.exec(part); if (m) o[m[1]] = m[2].split(',').map(x => x.trim()).filter(Boolean); } return o; }
+function setJobAliases(rec) {
+  const all = {};
+  for (const src of [rec && rec.aliases, aliasesFlag(opt('aliases'))]) for (const [w, h] of Object.entries(src || {})) all[w] = [...new Set([].concat(all[w] || [], [].concat(h).flatMap(x => String(x).split(/[,|]/)).map(x => x.trim()).filter(Boolean)))];
+  if (!Object.keys(all).length) return;
+  S.setAliases(all);
+  console.log('aliases: ' + Object.entries(all).map(([w, h]) => `${w} = ${h.join(' / ')}`).join('; '));
+}
 // --recipe Reel.md: the recipe acts as a preset on top of the preset it names (a --preset flag still picks the base)
 let recipe = null;
 if (opt('recipe')) {
@@ -109,7 +124,6 @@ if (opt('recipe')) {
   if (!fs.existsSync(rf)) die('No recipe at ' + rf);
   try { recipe = RM.load(rf); } catch (e) { die('Reel.md: ' + e.message); }
   const { errs, warn } = RM.validate(recipe);
-  if (recipe.aliases && Object.keys(recipe.aliases).length) { S.setAliases(recipe.aliases); console.log('recipe aliases: ' + Object.entries(recipe.aliases).map(([w, h]) => `${w} = ${[].concat(h).join(' / ')}`).join('; ')); }
   warn.forEach(w => console.warn('note: ' + w));
   if (errs.length) die('Reel.md problems:\n- ' + errs.join('\n- '));
   const rp = RM.toPreset(recipe);
@@ -118,6 +132,7 @@ if (opt('recipe')) {
   preset = preset ? { ...preset, ...rp, name: rp.name } : rp;
   console.log(RM.summary(recipe).split('\n').map(l => 'recipe ' + l).join('\n'));
 }
+setJobAliases(recipe);
 // An explicit --look wins over the preset: its caption style, its titles rule and (oneword) its font cycle come with it.
 const lookFlag = opt('look');
 const look = lookFlag || (preset && preset.look) || 'kinetic';
@@ -237,7 +252,7 @@ if (!flag('rebuild')) {
   if (logo) fs.copyFileSync(path.resolve(logo), path.join(build, path.basename(logo)));
   sh(process.execPath, [path.join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--force', ...(cut.hits && cut.hits.length === 0 ? ['--no-glitch'] : []), ...(TITLES ? ['--titles'] : look === 'oneword' ? [] : ['--hero']), ...(look === 'oneword' ? ['--cards'] : []), '--style', STYLE, ...(FONTS ? ['--fonts', FONTS] : []), ...(logo ? ['--logo', path.basename(logo)] : [])], build);
   // captions and titles in the words you mean: the recipe's Aliases, and numbers Whisper split at the comma ("10 ,000")
-  { const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), n = S.meantFlips(caps.flips); if (n) { fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); console.log(`captions: ${n} lines in the words you mean (recipe Aliases, split numbers)`); } }
+  { const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), n = S.meantFlips(caps.flips); if (n) { fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); console.log(`captions: ${n} lines in the words you mean (aliases, split numbers)`); } }
   if (recipe && recipe.titles.length && TITLES) {
     const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF);
     const rt = RM.titleFlips(recipe);
@@ -507,6 +522,25 @@ if (cut.titles && cut.mask) {
       const win = behind.map(t => `${Math.max(0, t.start - 0.1).toFixed(2)}-${Math.min(LEN, t.end + 0.1).toFixed(2)}`).join(',');
       const maskArgs = [path.join(KIT, 'mask.py'), 'base.mp4', spec.file || 'mask.mkv', ...(win ? ['--windows', win] : []), ...(spec.model ? ['--model', spec.model] : []), ...(spec.person ? ['--person', spec.person] : [])];
       sh(fxPy, maskArgs, build);
+      // a title behind the head stays readable: measure from the mask how much of its letters the head covers
+      // (kit/cover.py); over cut.json "behindMax" (default 0.22) it moves in front, a face title to the slot above
+      // the head, and the overlay is drawn again
+      { const tb = R.resolveTitles(capsNow, cut).filter(t => t.layer === 'behind');
+        if (tb.length) {
+          let cov = []; try { cov = JSON.parse(execFileSync(fxPy, [path.join(KIT, 'cover.py'), build, JSON.stringify(tb.map(t => [t.start, Math.min(t.end, LEN)]))], { cwd: build }).toString().trim().split('\n').pop()); } catch (e) { console.warn('note: behind-the-head cover check skipped: ' + String(e.message).split('\n')[0]); }
+          const max = typeof cut.behindMax === 'number' ? cut.behindMax : 0.22, capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF);
+          let moved = 0;
+          tb.forEach((t, k) => {
+            const r = cov[k]; if (r == null) return;
+            const f = (caps.flips || []).find(x => x.mode === 7 && Math.abs(x.start - t.start) < 0.005 && x.text === t.text);
+            if (!f) return;
+            if (r <= max) { console.log(`behind the head: "${t.text}" ${Math.round(r * 100)}% covered, stays behind`); return; }
+            const wasFace = f.place === 'face';
+            f.layer = 'front'; if (wasFace) f.place = 'above'; moved++;
+            console.log(`behind the head: "${t.text}" ${Math.round(r * 100)}% covered (over ${Math.round(max * 100)}%), moved in front${wasFace ? ', above the head' : ''}`);
+          });
+          if (moved) { fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); sh(process.execPath, [path.join(KIT, 'render.mjs'), LEN.toFixed(2)], build); }
+        } }
       if (panels.length && cut.panels) {
         sh(fxPy, [path.join(KIT, 'headmask.py'), spec.file || 'mask.mkv', 'maskhead.mkv'], build);
         if (cut.headMask !== 'maskhead.mkv') { cut.headMask = 'maskhead.mkv'; fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); }
@@ -517,9 +551,28 @@ if (cut.titles && cut.mask) {
 let v = 1; while (fs.existsSync(path.join(job, `reel-v${v}.mp4`))) v++;
 const out = path.join(job, `reel-v${v}.mp4`);
 sh(process.execPath, [path.join(KIT, 'assemble.cjs'), out], build, (flag('no-sfx') || opt('sfx') === 'off') ? { NOSFX: '1' } : {});
-// is every caption word readable against what's behind it (kit/legibility.py)? Printed, not blocking
+// is every caption word readable against what's behind it (kit/legibility.py)? Under 3:1 the moment gets a dense
+// tight halo (captions.js "boost", kit/overlay.html shadow) and the reel is drawn and assembled once more, then measured
+// again. Printed, not blocking
 { const py = path.join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
-  if (cut.overlay && fs.existsSync(py)) try { execFileSync(py, [path.join(KIT, 'legibility.py'), build, out], { stdio: 'inherit', env: { ...process.env, PYTHONUTF8: '1' } }); } catch { console.warn('note: some caption moments read under 3:1 against the picture (listed above). Move the word, change its colour or pick another shot.'); } }
+  const legib = () => { const jf = path.join(build, 'legibility.json'); try { execFileSync(py, [path.join(KIT, 'legibility.py'), build, out, '--json', jf], { stdio: 'inherit', env: { ...process.env, PYTHONUTF8: '1' } }); return []; } catch { try { return JSON.parse(fs.readFileSync(jf, 'utf8')).spans || []; } catch { return []; } } };
+  if (cut.overlay && fs.existsSync(py)) {
+    let spans = legib();
+    const capF = path.join(build, 'captions.js');
+    if (spans.length && !flag('no-boost') && fs.existsSync(capF)) {
+      const caps = R.readCaptions(capF), have = caps.boost || [];
+      const add = spans.map(([a, b]) => [+Math.max(0, a - 0.3).toFixed(2), +Math.min(LEN, b + 0.3).toFixed(2)]).filter(([a, b]) => !have.some(h => h[0] <= a && h[1] >= b));
+      if (add.length) {
+        caps.boost = have.concat(add).sort((x, y) => x[0] - y[0]);
+        fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
+        console.log(`legibility: denser halo on ${add.length} low-contrast moment${add.length > 1 ? 's' : ''} (${add.map(x => x.join('-')).join(', ')} s), drawing again`);
+        sh(process.execPath, [path.join(KIT, 'render.mjs'), LEN.toFixed(2)], build);
+        sh(process.execPath, [path.join(KIT, 'assemble.cjs'), out], build, (flag('no-sfx') || opt('sfx') === 'off') ? { NOSFX: '1' } : {});
+        spans = legib();
+      }
+    }
+    if (spans.length) console.warn('note: some caption moments read under 3:1 against the picture (listed above). Move the word, change its colour or pick another shot.');
+  } }
 let exported = null;
 if (cut.export && X.get(cut.export)) {
   exported = X.outName(out, cut.export);

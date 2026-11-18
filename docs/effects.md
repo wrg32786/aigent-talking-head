@@ -242,7 +242,7 @@ Common short-form editing advice, built into the engine. Each one works on its o
 | `place-right` | The words sit right of your head at eye level. | `"place": "right"  or  \| place right \|` |
 | `place-above` | The words sit above your head. | `"place": "above"  or  \| place above \|` |
 | `place-chest` | The words sit across your chest. | `"place": "chest"  or  \| place chest \|` |
-| `place-face` | Big over your face, behind your head (a title goes in front with layer front). | `"place": "face"  or  \| place face \|` |
+| `place-face` | Big over your face, behind your head while it covers under 22% of the letters, else above it (a title goes in front with layer front). | `"place": "face"  or  \| place face \|` |
 | `title-places` | Drafted titles take these places in turn. | `"titlePlaces": ["left","face","right","chest"]  in a preset  or  Reel.md  - title-places: left, face, right` |
 | `colour-card` | The frame cuts to a flat colour for a beat and your caption words carry it in the card ink (olive, ivory, sage, clay, blush, forest, navy, cream, paper, blue, ink). | `{ "mode": 8, "bg": "olive" }  or  Reel.md reel-cards  #01 4.2-5.4 \| bg olive` |
 | `chapter-card` | A colour card with a big serif numeral, one per list item. | `{ "mode": 8, "bg": "ivory", "chapter": "2" }  or  reel-cards  \| bg ivory \| chapter 2` |

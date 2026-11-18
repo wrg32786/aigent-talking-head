@@ -139,7 +139,7 @@ Every section is optional except the card. Anything left out falls back to the p
 | Key | Values | Maps to |
 |---|---|---|
 | entrance | `stagger-rise`, `slam`, `blur-rise`, `slide-left`, `elastic`, `flip`, `pop-zoom`, `drop`, `typewriter` (each once per reel; drop lets each letter fall in from above with a small bounce; typewriter types the letters on behind a blinking caret) | the title's `entrance` |
-| place | `left`, `right`, `above`, `chest`, `face`, `center` (default center) | the title's `place`: beside your head at eye level, above it, across your chest, or big over your face. `face` sits behind your head unless `layer front`. Your head is measured with the person mask |
+| place | `left`, `right`, `above`, `chest`, `face`, `center` (default center) | the title's `place`: beside your head at eye level, above it, across your chest, or big over your face. `face` sits behind your head unless `layer front`, and moves above your head when the head would cover more than 22% of its letters. Your head is measured with the person mask |
 | accent | `script`, or a word index | three faces in one phrase: one partner word in the pairing's italic serif (the `playfair` and `dmserif` pairings do this on every phrase) |
 | layer | `front`, `behind`, `auto` | the title's `layer` |
 | hero | word indexes, comma list | the title's `hero` |
@@ -203,7 +203,7 @@ A card is at most 4 s. Titles that would start on a card are left off (the card 
 
 With no `icon`, `src` or captured `source` the graphic is drawn as a neutral placeholder (a monogram tile, a skeleton app window), so a teardown never copies someone else's screenshots or logos. Modes 12 to 38 are drawn in code in the theme's colours and fonts with Tabler icons (MIT), a shared card look (two-layer shadow, top-lit fill, fine grain, rim light), spring and emphasized easing and motion blur on fast moves (the AIgent theme keeps their cards square). Each has its own exit over its last 0.35 s. Graphics outside your clip's length are dropped. A teardown detects the first three; you add the rest.
 
-**Aliases** (`## Aliases`, optional): how transcription hears names and brands you say, one bullet per word, `;` or `,` between spellings.
+**Aliases** (`## Aliases`, optional): how transcription hears names and brands you say, one bullet per word, `;` or `,` between spellings. Captions and titles are written the way you spell the word. Without a recipe, `npm run reel -- --aliases "Gwyn: Guinn, Gwin"` does the same (and adds to a recipe's list).
 
 ```
 ## Aliases

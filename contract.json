@@ -103,6 +103,8 @@
         { "name": "tighten", "type": "number", "default": "off (0.3 in the magazine preset)", "description": "no dead air: cut every pause inside a line longer than this many seconds to a jump (0.15 to 2)" },
         { "name": "no-tighten", "type": "boolean", "default": false, "description": "keep every pause, even when the preset tightens" },
         { "name": "cards", "type": "enum", "values": ["auto", "off"], "default": "off (auto in the magazine preset)", "description": "colour cards on short lines to land, numbered chapter cards and a number-pop intro on a counted list" },
+        { "name": "aliases", "type": "string", "default": null, "description": "names Whisper mishears, written your way in captions and titles: \"Gwyn: Guinn, Gwin; aigent: agent\" (adds to a recipe's Aliases)" },
+        { "name": "no-boost", "type": "boolean", "default": false, "description": "skip the legibility pass that gives a low-contrast caption moment a denser halo" },
         { "name": "music-energy", "type": "enum", "values": ["low", "mid", "high", "auto"], "default": null, "description": "pick a library bed by energy; auto reads your pace; --bed still wins" },
         { "name": "cropx", "type": "number", "default": "0.5", "description": "horizontal crop centre, 0 to 1 (0.4 puts the face left of centre)" },
         { "name": "model", "type": "string", "default": "small.en (or TX_MODEL)", "description": "Whisper model for clip.py: small.en is fast on a CPU; large-v3 is the most accurate and slow, a ~3 GB download the first time (a notice prints before any download)" },
