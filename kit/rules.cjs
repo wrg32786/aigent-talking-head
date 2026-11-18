@@ -23,8 +23,8 @@ const CUT_SOUNDS = ['whoosh', 'swipe', 'boom', 'F', 'D'];
 // an sfx entry is a time or [time, gain]
 const sfxHits = list => (list || []).map(h => (Array.isArray(h) ? { t: +h[0], g: h[1] == null ? null : +h[1] } : { t: +h, g: null }));
 
-// Seven title entrances, each used at most once per video. Flicker only on the hook (first title) and payoff (last).
-const ENTRANCES = ['stagger-rise', 'slam', 'blur-rise', 'slide-left', 'elastic', 'flip', 'pop-zoom', 'drop'];
+// Nine title entrances, each used at most once per video. Flicker only on the hook (first title) and payoff (last).
+const ENTRANCES = ['stagger-rise', 'slam', 'blur-rise', 'slide-left', 'elastic', 'flip', 'pop-zoom', 'drop', 'typewriter'];
 const TITLE_ENTER = 0.45; // seconds until a title has settled
 const TITLE_MODE = 7;
 // front (default): the whole title sits in front of the person.
@@ -99,7 +99,7 @@ function resolveTitles(CAP, cut) {
   const ts = (CAP.flips || []).filter(f => f.mode === TITLE_MODE).sort((a, b) => a.start - b.start);
   const used = new Set(ts.map(t => t.entrance).filter(Boolean));
   const free = ENTRANCES.filter(e => !used.has(e));
-  const out = ts.map((t, i) => ({ ...t, entrance: t.entrance || free.shift() || ENTRANCES[i % ENTRANCES.length], flicker: (i === 0 || i === ts.length - 1) ? t.flicker !== false : false, role: i === 0 ? 'hook' : i === ts.length - 1 ? 'payoff' : 'beat' }));
+  const out = ts.map((t, i) => { const entrance = t.entrance || free.shift() || ENTRANCES[i % ENTRANCES.length]; return { ...t, entrance, flicker: (i === 0 || i === ts.length - 1) && entrance !== 'typewriter' ? t.flicker !== false : false, role: i === 0 ? 'hook' : i === ts.length - 1 ? 'payoff' : 'beat' }; });
   const job = normalizeLayer((CAP && CAP.titleLayer) != null ? CAP.titleLayer : (cut && cut.titleLayer), 'front') || 'front';
   const raw = out.map(t => normalizeLayer(t.layer, job) || job);
   const behind = new Set();
@@ -134,7 +134,7 @@ function captionLayer(caps) {
 // Screen cards and b-roll panels (mode 11): behind the presenter's head (his head goes over the panel where it reaches
 // into it, his body stays under the panel) or in front of everything. Per panel "layer", else the job's panelLayer,
 // default auto, which is behind (no difference from front where the head never reaches the panel).
-// Graphics 12 to 37 (kit/graphics.json) take the same layer and the same panel layer under the crown mask; their auto
+// Graphics 12 to 38 (kit/graphics.json) take the same layer and the same panel layer under the crown mask; their auto
 // is behind only when the graphic sits high in the frame (y below autoBehindY), where the top of the head can reach it.
 const PANEL_LAYERS = ['front', 'behind', 'auto'];
 const GFXJ = JSON.parse(fs.readFileSync(path.join(KIT, 'graphics.json'), 'utf8'));
@@ -172,5 +172,23 @@ const BEDS = JSON.parse(fs.readFileSync(path.join(KIT, 'music/beds.json'), 'utf8
 // own keys only ("constructor" is not a bed), and only entries that name their file
 const isBed = b => typeof b === 'string' && Object.hasOwn(BEDS, b) && typeof (BEDS[b] || {}).file === 'string';
 const bedFile = b => (isBed(b) ? path.join(KIT, 'music', BEDS[b].file) : b);
+// Music matched to energy: every library bed is tagged low, mid or high (beds.json "energy", measured tempo and
+// onset density). A calm explainer gets a low bed, a fast list gets a high one. scriptEnergy reads the pace of what
+// you say (words per second over the speech): 3.2 or more is high, 2.3 or less is low, mid between.
+const ENERGIES = ['low', 'mid', 'high'];
+const bedsByEnergy = e => Object.keys(BEDS).filter(k => isBed(k) && BEDS[k].energy === e).sort();
+function scriptEnergy(words) {
+  const ws = (words || []).filter(w => w && w.length >= 2);
+  if (ws.length < 4) return 'mid';
+  const span = ws[ws.length - 1][1] - ws[0][0], wps = span > 0 ? ws.length / span : 0;
+  return wps >= 3.2 ? 'high' : wps <= 2.3 ? 'low' : 'mid';
+}
+// one bed for an energy, stable per job name (so a rebuild keeps the same track)
+function pickBed(energy, seed = '') {
+  const l = bedsByEnergy(ENERGIES.includes(energy) ? energy : 'mid');
+  if (!l.length) return null;
+  let h = 0; for (const c of String(seed)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return l[h % l.length];
+}
 
-module.exports = { BEDS, isBed, bedFile, SFX, CUT_SOUNDS, sfxHits, ENTRANCES, TITLE_ENTER, TITLE_MODE, TITLE_LAYERS, normalizeLayer, PUNCH, TRANSITIONS, xfadeMode, timeline, lintCopy, scriptShape, readCaptions, resolveTitles, maskSpec, MASK_MODELS, captionLayer, PANEL_LAYERS, PANEL_MODES, panelLayer, panelsBehind };
+module.exports = { BEDS, isBed, bedFile, ENERGIES, bedsByEnergy, scriptEnergy, pickBed, SFX, CUT_SOUNDS, sfxHits, ENTRANCES, TITLE_ENTER, TITLE_MODE, TITLE_LAYERS, normalizeLayer, PUNCH, TRANSITIONS, xfadeMode, timeline, lintCopy, scriptShape, readCaptions, resolveTitles, maskSpec, MASK_MODELS, captionLayer, PANEL_LAYERS, PANEL_MODES, panelLayer, panelsBehind };

@@ -77,14 +77,15 @@ Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FRE
 
 | What | How many | Where to look |
 |---|---|---|
-| Overlay graphics (stat callout, checklist, lower third, CTA, code card, data chart, terminal and more) | 29 | [Graphics](#graphics), [kit/graphics.json](kit/graphics.json) |
+| Overlay graphics (stat callout, checklist, lower third, CTA, code card, data chart, terminal, number pop and more) | 30 | [Graphics](#graphics), [kit/graphics.json](kit/graphics.json) |
 | Transitions, six of them drawn by the kit | 56 | [Effects menu](docs/effects.md#transitions) (animated previews) |
 | Effects, sorted by moment (hook, claim, list, proof, CTA) | 51 | [Effects catalog](effects/CATALOG.md), [effects menu](docs/effects.md#effects) |
-| Caption styles, plus 8 letter-by-letter entrances for hero words | 7 | [Effects menu](docs/effects.md#caption-entrances) (animated previews) |
-| Title entrances, in front of or behind your head | 8 | [Effects menu](docs/effects.md#title-entrances) (animated previews) |
+| Caption styles, plus 9 letter-by-letter entrances for hero words | 7 | [Effects menu](docs/effects.md#caption-entrances) (animated previews) |
+| Title entrances, in front of or behind your head | 9 | [Effects menu](docs/effects.md#title-entrances) (animated previews) |
 | Film finishes | 10 | [Film finishes](#film-finishes) |
-| Font pairings (SIL OFL) | 17 | [kit/fonts](kit/fonts/README.md) |
-| Brand presets | 10 | [Presets](#presets) |
+| Font pairings (SIL OFL) | 19 | [kit/fonts](kit/fonts/README.md) |
+| Brand presets | 11 | [Presets](#presets) |
+| Editing principles built in: mixed serif and sans, titles placed around the head, colour and chapter cards, music by energy, mapped and capped sounds, punch-ins, no dead air | 7, all in `--preset magazine` | [Guide](docs/guide.md#editing-principles-built-in), [effects menu](docs/effects.md#editing-principles) |
 | Sound effects and CC0 music beds, beat-synced | 37 and 11 | [Music beds](kit/music/README.md) |
 | Export presets: TikTok, Reels, Shorts, 4:5, 1:1 | 5 | [Quick start](#quick-start) |
 | Agent skills, installed with `npx skills add wrg32786/aigent-talking-head` | 7 | [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) |
@@ -94,7 +95,7 @@ Also: a `plan` step that proposes graphics from your transcript, a layout pass t
 
 ### Effects menu
 
-**[docs/effects.md](docs/effects.md)** is the menu of every transition, title entrance, caption entrance and caption style, each with a looping preview, its exact name and the line to paste. `npm run list -- transitions` (or `titles`, `captions`, `graphics`, `effects`) prints the same list in a terminal, and `--json` gives it to agents.
+**[docs/effects.md](docs/effects.md)** is the menu of every transition, title entrance, caption entrance and caption style, each with a looping preview, its exact name and the line to paste. `npm run list -- transitions` (or `titles`, `captions`, `graphics`, `effects`, `editing`) prints the same list in a terminal, and `--json` gives it to agents.
 
 <img src="docs/menu/sheets/transitions.webp" width="720" alt="Animated grid of all 56 transitions, each labelled with its name: glitch, cut, crossfade, dissolve, dip, flash, whip, push, swipe, cover, reveal, wipe, iris, doorway, barn door, zoom, pixelate, blur, radial, squeeze, slice, wind, warp, slats, checkerboard, light leak, zoom blur and news ribbon">
 
@@ -104,11 +105,11 @@ Also: a `plan` step that proposes graphics from your transcript, a layout pass t
 
 ### Graphics
 
-29 overlay graphics, each with its own entrance and exit, drawn in your theme's colours and fonts: ordinal sticker, app label, screen card (with an optional pointer that clicks and a camera that zooms and pans), lower third, stat callout (counts up, or rolls like an odometer), checklist, quote card, highlight (circle, arrow, underline or box), step counter, versus card, icon badge, sticker pop, price tag, CTA end card, code card, data chart (bars or a line), chapter card, logo bug, channel bug (LIVE and a clock), terminal session, news strap, ticker, split-flap board, feature cards, release pill, CTA button (a pointer clicks it), HUD callout, flash cards and keyword caption. They share one card look (soft two-layer shadow, top-lit fill, fine grain, rim light), spring and emphasized easing with motion blur on fast moves, tabular digits and Tabler icons (MIT). Bring your icon or screen recording where a graphic takes one, or the kit draws a neutral placeholder.
+30 overlay graphics, each with its own entrance and exit, drawn in your theme's colours and fonts: ordinal sticker, app label, screen card (with an optional pointer that clicks and a camera that zooms and pans), lower third, stat callout (counts up, or rolls like an odometer), checklist, quote card, highlight (circle, arrow, underline or box), step counter, versus card, icon badge, sticker pop, price tag, CTA end card, code card, data chart (bars or a line), chapter card, logo bug, channel bug (LIVE and a clock), terminal session, news strap, ticker, split-flap board, feature cards, release pill, CTA button (a pointer clicks it), HUD callout, flash cards, keyword caption and number pop (the numbers 1 to N popping in around your head for a list intro). They share one card look (soft two-layer shadow, top-lit fill, fine grain, rim light), spring and emphasized easing with motion blur on fast moves, tabular digits and Tabler icons (MIT). Bring your icon or screen recording where a graphic takes one, or the kit draws a neutral placeholder.
 
 ![All 29 graphics in motion: ordinal sticker, app label, screen card, lower third, stat callout, checklist, quote card, highlight, step counter, versus, icon badge, sticker pop, price tag, CTA card, code card, data chart, chapter card, logo bug, channel bug, terminal session, news strap, ticker, split-flap board, feature cards, release pill, CTA button, HUD callout, flash cards, keyword caption](showcase/loops/graphics.gif)
 
-![Contact sheet of all 29 overlay graphics on the AI presenter](showcase/sheets/graphics.jpg)
+![Contact sheet of all 30 overlay graphics on the AI presenter](showcase/sheets/graphics.jpg)
 
 Add one as a line in a Reel.md (`#06 15-17 | type stat-callout | text 10,000+ | sub readers`) or a `captions.js` flip. The words on a graphic have to be words you say: on a recipe job the kit drops any you don't, and a checklist ticks each row as you say it. Add `cues` (words you say, or seconds) and a chart bar, a terminal command, a feature card or a flash card lands on the word. Set `layer behind` and only the top of your head (hair and crown) goes over the graphic, never your face. Every type, field and default is in the [Reel.md spec](docs/reel-md.md) and [kit/graphics.json](kit/graphics.json).
 
@@ -122,15 +123,15 @@ Titles sit in front by default. Set a title behind the head, or use auto for the
 
 ![The same title placed in front of the presenter's head and behind it](showcase/sheets/title-layer.jpg)
 
-<img src="docs/menu/sheets/titles.webp" width="720" alt="The 8 kinetic title entrances playing in a loop, each labelled: stagger-rise, slam, blur-rise, slide-left, elastic, flip, pop-zoom and drop">
+<img src="docs/menu/sheets/titles.webp" width="720" alt="The 9 kinetic title entrances playing in a loop, each labelled: stagger-rise, slam, blur-rise, slide-left, elastic, flip, pop-zoom, drop and typewriter">
 
 Each entrance plays in a loop above. Names, descriptions and the line to use are in the [effects menu](docs/effects.md#title-entrances).
 
 ### Captions and type
 
-Top captions tuck behind your hair where they meet it (`--caption-layer front|behind|auto`, auto by default). Kinetic hero words can come in letter by letter (`--caption-entrance unfurl|cascade|orbit|warp|crystallize|compute|levitate|undulate`, pop by default). Screen cards, b-roll panels and graphics placed high in the frame go behind only the top of your head, never your face (`--panel-layer`). Details in the [Reel.md spec](docs/reel-md.md).
+Top captions tuck behind your hair where they meet it (`--caption-layer front|behind|auto`, auto by default). Kinetic hero words can come in letter by letter (`--caption-entrance unfurl|cascade|orbit|warp|crystallize|compute|levitate|undulate|typewriter`, pop by default). Screen cards, b-roll panels and graphics placed high in the frame go behind only the top of your head, never your face (`--panel-layer`). Details in the [Reel.md spec](docs/reel-md.md).
 
-<img src="docs/menu/sheets/caption-entrances.webp" width="720" alt="The 9 caption entrances playing in a loop, each labelled: pop, unfurl, cascade, orbit, warp, crystallize, compute, levitate and undulate">
+<img src="docs/menu/sheets/caption-entrances.webp" width="720" alt="The 10 caption entrances playing in a loop, each labelled: pop, unfurl, cascade, orbit, warp, crystallize, compute, levitate, undulate and typewriter">
 
 <img src="docs/menu/sheets/caption-styles.webp" width="720" alt="The 7 caption styles playing in a loop, each labelled: kinetic, oneword, pill, hormozi, karaoke, classic and one-word">
 
@@ -138,7 +139,9 @@ Top captions tuck behind your hair where they meet it (`--caption-layer front|be
 
 ### Presets
 
-![Contact sheet of the 10 brand presets](showcase/sheets/presets.jpg)
+![Contact sheet of the 11 brand presets](showcase/sheets/presets.jpg)
+
+`--preset magazine` (or `- preset: magazine` in a Reel.md) turns on the [editing principles built in](docs/guide.md#editing-principles-built-in): a serif numeral, an italic serif word and sans text in one phrase; titles beside your head, across your chest or big over your face and behind your head; olive and cream cards and numbered chapter cards with a number-pop intro; a bed picked by the energy of what you say; a whoosh on transitions, a pop on text and a click on key moves, capped so they stay sparse; 12% punch-ins, a typewriter entrance and soft crossfades; and no pauses over 0.3 s. Each one also works on its own.
 
 ### Remake a reel you like
 

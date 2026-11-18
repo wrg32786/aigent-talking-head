@@ -441,7 +441,12 @@ def head_width(mask, centre=False):
     if not len(band):
         return None
     w = float(np.median(band))
-    return (round(w / W, 3), round((top + 0.65 * w) / H, 3), round(top / H, 3)) if centre else round(w / W, 3)
+    if not centre:
+        return round(w / W, 3)
+    # the head's centre x: the middle of the mask's columns over the same band (for text set beside the head)
+    cols = np.where(m[top + int(0.03 * H): top + int(0.08 * H)].any(axis=0))[0]
+    cx = float((cols[0] + cols[-1]) / 2) / W if len(cols) else 0.5
+    return (round(w / W, 3), round((top + 0.65 * w) / H, 3), round(top / H, 3), round(cx, 3))
 
 
 def cmd_headwidth(a):
@@ -461,7 +466,8 @@ def cmd_headwidth(a):
                 ws.append(w)
     print(json.dumps({"head_w": round(float(np.median([w[0] for w in ws])), 3) if ws else None,
                       "head_cy": round(float(np.median([w[1] for w in ws])), 3) if ws else None,
-                      "head_top": round(float(min(w[2] for w in ws)), 3) if ws else None, "frames": len(ws)}))
+                      "head_top": round(float(min(w[2] for w in ws)), 3) if ws else None,
+                      "head_cx": round(float(np.median([w[3] for w in ws])), 3) if ws else None, "frames": len(ws)}))
 
 
 def caption_look(video, cues, n=60):
@@ -571,7 +577,7 @@ def detect_graphics(video, cues, seg=None, step=0.25):
             # the head beside it, so the burst's size can be carried relative to the head (it frames the head)
             hw = head_width(mask, True)
             if hw:
-                b["face_w"], b["head_cy"] = hw
+                b["face_w"], b["head_cy"] = hw[0], hw[1]
             bursts.append((t, b))
         cs = _cards(img, hsv, g)
         for c in cs:

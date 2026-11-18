@@ -34,15 +34,15 @@ let ctx=document.getElementById('c').getContext('2d'); // let: graphics motion b
 const mk=()=>{const c=document.createElement('canvas');c.width=1080;c.height=1920;return c};const TC=mk(),MC=mk(),T=TC.getContext('2d'),M=MC.getContext('2d');
 const Y=CAP.captionY||1300; // caption band: chest, below the face box. Measure the face per take; text never covers the face.
 // mode 0 caption, 1 spray hero word, 2 sticker, 3 count-up, 4 takeover card, 5 logo plate, 6 CTA sticker (+ optional sub line), 7 kinetic title (see below),
-// 8 type card, 9 ordinal sticker, 10 app label, 11 screen card, 12 to 37 the other graphics (kit/graphics.json)
+// 8 type card, 9 ordinal sticker, 10 app label, 11 screen card, 12 to 38 the other graphics (kit/graphics.json)
 const flips=CAP.flips.map(f=>[f.start,f.end,f.text,f.mode,f]);
 // mode 7 = kinetic title (one per beat). Seven entrances, each used once per video, resolved in time order; flicker only
 // on the first title (hook) and the last (payoff). Behind-head hero words render on their own layer
 // (render.mjs LAYER=titles) so assemble.cjs can put them behind the person mask. Front titles stay on the front layer.
 // Same rules as kit/rules.cjs resolveTitles().
-const ENTR=['stagger-rise','slam','blur-rise','slide-left','elastic','flip','pop-zoom','drop'];
+const ENTR=['stagger-rise','slam','blur-rise','slide-left','elastic','flip','pop-zoom','drop','typewriter'];
 const TITLES=flips.filter(c=>c[3]===7).sort((a,b)=>a[0]-b[0]);
-{const used=new Set(TITLES.map(c=>c[4].entrance).filter(Boolean)),free=ENTR.filter(e=>!used.has(e));TITLES.forEach((c,i)=>{c.entr=c[4].entrance||free.shift()||ENTR[i%ENTR.length];c.flick=(i===0||i===TITLES.length-1)&&c[4].flicker!==false})}
+{const used=new Set(TITLES.map(c=>c[4].entrance).filter(Boolean)),free=ENTR.filter(e=>!used.has(e));TITLES.forEach((c,i)=>{c.entr=c[4].entrance||free.shift()||ENTR[i%ENTR.length];c.flick=(i===0||i===TITLES.length-1)&&c[4].flicker!==false&&c.entr!=='typewriter'})} // a typewriter title has its caret instead of the flicker
 // Title layer: front (default, whole title in front of the person), behind (hero word behind the head), or auto
 // (at most two punch titles behind, never consecutive). Same as kit/rules.cjs resolveTitles(). cut.json titleLayer
 // can arrive via LOCKOVER.titleLayer. Partner words of a behind title still draw in front of the person.
@@ -52,7 +52,7 @@ const TITLES=flips.filter(c=>c[3]===7).sort((a,b)=>a[0]-b[0]);
 // whole job, lands it at titleY). Slam rise runs for behind and front titles.
 const LAYERS=['front','behind','auto'];
 const jobLayer=(()=>{const v=String((CAP.titleLayer!=null?CAP.titleLayer:((window.LOCKOVER||{}).titleLayer))||'front').toLowerCase();return LAYERS.includes(v)?v:'front'})();
-{const raw=TITLES.map(c=>{const v=String((c[4].layer!=null?c[4].layer:jobLayer)).toLowerCase();return LAYERS.includes(v)?v:jobLayer});
+{const raw=TITLES.map(c=>{const v=String((c[4].layer!=null?c[4].layer:(c[4].place==='face'?'behind':jobLayer))).toLowerCase();return LAYERS.includes(v)?v:jobLayer}); // a title set big over the face sits behind the head unless its layer says front
  const behind=new Set();raw.forEach((v,i)=>{if(v==='behind')behind.add(i)});
  const autos=raw.map((v,i)=>v==='auto'?i:-1).filter(i=>i>=0);
  if(autos.length){const scored=autos.map(i=>{const c=TITLES[i];let s=0;if(i===0||i===TITLES.length-1)s+=3;if(c.entr==='slam')s+=2;if(c.flick)s+=1;return{i,s}}).sort((a,b)=>b.s-a.s||a.i-b.i);
@@ -69,7 +69,7 @@ window.__captionLayer=CAPBEH?'behind':'front';
 const TY=CAP.titleY||345,TSY=CAP.titleSlamY||600,PY=CAP.pillY||POSY||1480,KY=CAP.kineticY||POSY||CAP.captionY||1320,CYB=POSY||Y,ALTY=CAP.altY||(CPOS==='top'?1320:330),CSTYLE=CAP.captionStyle||'kinetic';
 const ONEW=CSTYLE==='one-word'; // the simple one-word style; "oneword" is the full look further down
 // Slam rise: lands at titleSlamY, holds 0.5 s, then a smooth 0.35 s ease up to the resting titleY. Returns the y offset.
-const RISE={hold:.5,dur:.35};const riseOff=(c,dt)=>{if(c.entr!=='slam'||c[4].titleRise===false||CAP.titleRise===false)return 0;const d=TSY-TY;if(d<=0)return 0;const q=cl((dt-RISE.hold)/RISE.dur),e=q<.5?4*q*q*q:1-Math.pow(-2*q+2,3)/2;return d*(1-e)};
+const RISE={hold:.5,dur:.35};const riseOff=(c,dt)=>{if(c.entr!=='slam'||c[4].titleRise===false||CAP.titleRise===false||PLACES.includes(c[4].place))return 0;const d=TSY-TY;if(d<=0)return 0;const q=cl((dt-RISE.hold)/RISE.dur),e=q<.5?4*q*q*q:1-Math.pow(-2*q+2,3)/2;return d*(1-e)};
 const riseEnd=c=>riseOff(c,0)?RISE.hold+RISE.dur*.6-.24:0; // partners start as the rise settles
 // Pairing per flip. With a cycle the titles take the pairings in turn, and every other flip takes the pairing of the
 // title beat it sits in, so one combo is on screen at a time. No cycle (or no titles) = the base pairing throughout.
@@ -78,7 +78,8 @@ for(const c of flips)if(!c.ps){let b=null;for(const tt of TITLES)if(tt[0]<=c[0]+
 const glitchAt=CAP.glitchAt||[];
 const rng=s=>()=>(s=(s*16807)%2147483647)/2147483647;
 const backOut=x=>{const c=2.4;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2)};const expo=x=>x>=1?1:1-Math.pow(2,-10*x);const cl=x=>Math.max(0,Math.min(1,x));
-function shadow(c,fs){c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=fs*.16;c.shadowOffsetX=fs*.03;c.shadowOffsetY=fs*.05}
+let FLAT=false; // true while drawing on a colour card: flat ink, no shadow
+function shadow(c,fs){if(FLAT){c.shadowColor='transparent';c.shadowBlur=0;return}c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=fs*.16;c.shadowOffsetX=fs*.03;c.shadowOffsetY=fs*.05}
 function glyphs(txt,fs,cx,cy,p,fill,sh,fam=S){ctx.font=fnt(fam,fs);ctx.letterSpacing=fam===S?'0px':(TRK*fs)+'px';ctx.textAlign='left';ctx.textBaseline='middle';const tot=ctx.measureText(txt).width;let x=cx-tot/2;for(let i=0;i<txt.length;i++){const w=ctx.measureText(txt.slice(0,i+1)).width-ctx.measureText(txt.slice(0,i)).width,e=expo(cl((p-i*.035)/.3));ctx.save();ctx.globalAlpha*=e;ctx.translate(x,cy+(1-e)*fs*.42);if(sh)shadow(ctx,fs);ctx.fillStyle=fill;ctx.fillText(txt[i],0,0);ctx.restore();x+=w}}
 function fit(lines,fam,fs,max){const long=lines.reduce((a,b)=>a.length>b.length?a:b);ctx.font=fnt(fam,fs);while(ctx.measureText(long).width>max){fs-=4;ctx.font=fnt(fam,fs)}return fs}
 // Drips start at measured letter bottoms (Will 11-08: paint must line up with the letters). Scanned once per word from the
@@ -122,6 +123,7 @@ function titleSolo(c,t){const dt=t-c[0],txt=ONEW?String(c[2]).split(/[\s|]+/).fi
  else if(e==='slide-left'){lines.forEach((l,li)=>{const q=expo(cl((dt-li*.06)/.4));line(l,li,y=>{ctx.globalAlpha*=cl(q*3);ctx.translate(540+(1-q)*900,y);ctx.transform(1,0,-(1-q)*.35,1,0,0);shadow(ctx,fs0)})})}
  else if(e==='elastic'){const sc=elastic(cl(dt/.7));lines.forEach((l,li)=>line(l,li,y=>{ctx.globalAlpha*=cl(dt/.08);ctx.translate(540,y);ctx.scale(sc,sc);shadow(ctx,fs0)}))}
  else if(e==='flip'){lines.forEach((l,li)=>{const q=cl((dt-li*.08)/.4),a=(1-overshoot(q,.12))*Math.PI/2;line(l,li,y=>{ctx.globalAlpha*=cl(q*4);ctx.translate(540,y);ctx.scale(1,Math.max(.02,Math.cos(a)));shadow(ctx,fs0)})})}
+ else if(e==='typewriter'){let off=0;lines.forEach((l,li)=>{const w=ctx.measureText(l).width;shadow(ctx,fs0);typeOn(l,540-w/2,y0+li*lh,fs0,dt-off,li===lines.length-1);off+=l.length*TYPE.per+.08});ctx.textAlign='center'}
  else{const sc=overshoot(cl(dt/.32),.19);lines.forEach((l,li)=>line(l,li,y=>{ctx.globalAlpha*=cl(dt/.05);ctx.translate(540,y);ctx.scale(Math.max(.01,sc),Math.max(.01,sc));shadow(ctx,fs0)}))}
  ctx.restore()}
 // Caption styles for mode 0 (captions.js "captionStyle", or "style" per flip): classic (the original rise-in glyphs),
@@ -185,18 +187,25 @@ function heroOf(ws,o){const n=ws.length;let h=o.hero!==undefined?o.hero:o.emph;
  let b=0,bl=-1;ws.forEach(([, ,w],i)=>{const x=normW(w),l=/\d/.test(x)?99:STOP.has(x)?x.length/10:x.length;if(l>bl){bl=l;b=i}});return[b,b]}
 function meas(f,size,track,txt){ctx.font=fnt(f,size);ctx.letterSpacing=track+'px';const m=ctx.measureText(txt);return{w:m.width-(txt.length?track:0),asc:m.actualBoundingBoxAscent,desc:m.actualBoundingBoxDescent}}
 const lkCache={};
-function lockup(ws,o,Y0,P){const key=PN+'|'+P.kind+'|'+ws.map(w=>w[0]+':'+w[2]).join(' ')+'|'+Y0+'|'+JSON.stringify([o.hero,o.emph,o.lockup,o.size]);if(lkCache[key])return lkCache[key];
+function lockup(ws,o,Y0,P){const key=PN+'|'+P.kind+'|'+P.maxW+','+P.target+','+P.max+'|'+ws.map(w=>w[0]+':'+w[2]).join(' ')+'|'+Y0+'|'+JSON.stringify([o.hero,o.emph,o.lockup,o.size,o.accent]);if(lkCache[key])return lkCache[key];
  const L={...LK,...(o.lockup&&typeof o.lockup==='object'?o.lockup:{})},script=L.partner==='script'&&!!SCF,pf=script?SCF:S;
  if(!script&&L.partner==='script'){L.partnerUpper=false;L.partnerTracking=0;L.justify=false}
  const nz=a=>a.filter(w=>cleanW(w[2]));const caps=allCaps(ws.map(w=>w[2]).join(' '));const [h0,h1]=heroOf(ws,o);
  const ht=w=>{w=cleanW(w);return DF.upper||L.heroUpper?w.toUpperCase():(caps?w.toLowerCase():w).replace(/^./,c=>c.toUpperCase())};
  const pt=w=>{w=cleanW(w);return L.partnerUpper?w.toUpperCase():caps?w.toLowerCase():w};
  const hw=nz(ws.slice(h0,h1+1)).length?nz(ws.slice(h0,h1+1)):nz(ws).slice(0,1),line=l=>l.map(w=>ht(w[2])).join(' ');
+ // three faces in one phrase (lockup "accent": "script", the serif pairings): the hero in the display serif, the rest in
+ // the sans, and one key partner word in the italic serif (the pairing's script role). "accent" on the flip picks it
+ // (a word index); else the longest partner word that is not a small word. A number is the hero (heroOf), so "5 easy
+ // edits" reads: a serif 5, an italic "easy", a sans "edits".
+ const accW=(()=>{if(L.accent!=='script'||!SCF||script)return null;const out=ws.filter((w,i)=>(i<h0||i>h1)&&cleanW(w[2]));if(!out.length)return null;
+  if(Number.isInteger(o.accent)&&ws[o.accent]&&out.includes(ws[o.accent]))return ws[o.accent];let b=null,bl=2;for(const w of out){const x=normW(w[2]);if(STOP.has(x))continue;if(x.length>bl){bl=x.length;b=w}}return b})();
  const fitS=txt=>Math.min(P.max,Math.floor(P.max*P.target/Math.max(1,meas(G,P.max,TRK*P.max,txt).w)));
  let hl=[hw],s0=fitS(line(hw));if(s0<P.min&&hw.length>1){const k=Math.ceil(hw.length/2);hl=[hw.slice(0,k),hw.slice(k)];s0=Math.min(...hl.map(l=>fitS(line(l))))}
  const make=(s,arr)=>{const heroes=hl.map((l,i)=>{const txt=line(l),m=meas(G,s,TRK*s,txt);return{txt,a:l[0][0],size:s,font:fnt(G,s),track:TRK*s,w:m.w,asc:m.asc,desc:m.desc,x:540,y:i*s*.98}});
   const Wh=Math.max(...heroes.map(h=>h.w)),top=heroes[0].y-heroes[0].asc,bot=heroes[heroes.length-1].y+heroes[heroes.length-1].desc;
-  const build=(arrW,ps,tr)=>{const sp=meas(pf,ps,tr,' ').w+tr;let x=0;const toks=arrW.map(([a,,w])=>{const txt=pt(w),m=meas(pf,ps,tr,txt),t={txt,a,dx:x,w:m.w};x+=m.w+sp;return t});const full=meas(pf,ps,tr,toks.map(t=>t.txt).join(' '));return{toks,w:x-sp,asc:full.asc,desc:full.desc,size:ps,track:tr,font:fnt(pf,ps),script,rot:0}};
+  const build=(arrW,ps,tr)=>{const sp=meas(pf,ps,tr,' ').w+tr;let x=0,asc=0,desc=0;const toks=arrW.map(W=>{const [a,,w]=W;if(W===accW){const z=Math.round(ps*(L.accentScale||1.3)),txt=cleanW(w),m=meas(SCF,z,0,txt),t={txt,a,dx:x,w:m.w,font:fnt(SCF,z),track:0,acc:true};asc=Math.max(asc,m.asc);desc=Math.max(desc,m.desc);x+=m.w+sp;return t}
+   const txt=pt(w),m=meas(pf,ps,tr,txt),t={txt,a,dx:x,w:m.w};x+=m.w+sp;return t});const full=meas(pf,ps,tr,toks.filter(t=>!t.acc).map(t=>t.txt).join(' ')||'x');return{toks,w:x-sp,asc:Math.max(asc,full.asc),desc:Math.max(desc,full.desc),size:ps,track:tr,font:fnt(pf,ps),script,rot:0}};
   // caption lines (kind K) are read at speed: the partner runs 55-65% of the hero (scripts ~85-90% by font size, since
   // their x-height is small) and never below a legible floor (46 px sans, 60 px script at 1080 wide); tracking gives
   // way before size when a line is too wide
@@ -224,11 +233,18 @@ function lockup(ws,o,Y0,P){const key=PN+'|'+P.kind+'|'+ws.map(w=>w[0]+':'+w[2]).
  R.hc=o.color||colOf(o.accent===false?'text':L.heroColor);R.pc=colOf(L.partnerColor);R.box=[x0+dx,y0+dy,x1+dx,y1+dy];return lkCache[key]=R}
 // partner words: script writes on (a left-to-right wipe), sans and serif rise in; each word on its own time
 function partnerDraw(p,col,dtOf){ctx.save();ctx.font=p.font;ctx.letterSpacing=p.track+'px';ctx.textAlign='left';ctx.textBaseline='alphabetic';ctx.fillStyle=col;shadow(ctx,p.size*1.4);ctx.translate(p.x+p.w/2,p.y);if(p.rot)ctx.rotate(p.rot);ctx.translate(-p.w/2,0);
- p.toks.forEach((k,i)=>{const dt=dtOf(k,i);if(dt<0)return;ctx.save();
+ p.toks.forEach((k,i)=>{const dt=dtOf(k,i);if(dt<0)return;ctx.save();if(k.font){ctx.font=k.font;ctx.letterSpacing=k.track+'px'}
   const ol=(x,y)=>{if(!p.outline)return;ctx.save();ctx.shadowColor='transparent';ctx.lineJoin='round';ctx.strokeStyle='rgba(0,0,0,.55)';ctx.lineWidth=Math.max(3,p.size*(p.script?.05:.07));ctx.strokeText(k.txt,x,y);ctx.restore()};
   if(p.script){const q=expo(cl(dt/.42));ctx.beginPath();ctx.rect(k.dx-p.size*.3,-p.size*1.4,(k.w+p.size*.6)*q,p.size*2.6);ctx.clip();ol(k.dx,0);ctx.fillText(k.txt,k.dx,0)}
   else{const q=expo(cl(dt/.26)),yy=(1-q)*p.size*.5;ctx.globalAlpha*=q;ol(k.dx,yy);ctx.fillText(k.txt,k.dx,yy)}
   ctx.restore()});ctx.restore()}
+// typewriter: the letters appear one at a time from the left, no motion, with a block caret that blinks a few times
+// once the word is typed, then goes. TYPE.per is the time per letter (fast enough that a short title is typed in under
+// half a second). Used by the typewriter title entrance and the typewriter caption entrance.
+const TYPE={per:.045,hold:.7};
+function typeOn(txt,x,y,s,dt,caret=true){if(dt<0)return;const n=txt.length,k=Math.min(n,Math.floor(dt/TYPE.per)+1),vis=txt.slice(0,k),al=ctx.textAlign,bl=ctx.textBaseline;ctx.textAlign='left';
+ ctx.fillText(vis,x,y);const done=n*TYPE.per;if(caret&&dt<done+TYPE.hold&&(dt<done||Math.floor((dt-done)/.18)%2===0)){const w=ctx.measureText(vis).width,mid=bl==='middle',h=s*.78;ctx.save();ctx.shadowColor='transparent';ctx.globalAlpha*=.9;ctx.fillRect(x+w+s*.05,mid?y-h/2:y-h,Math.max(4,s*.07),h);ctx.restore()}
+ ctx.textAlign=al}
 function heroEnter(e,h,li,dt){const s=h.size,py=h.y-h.asc/2,ty=h.asc/2,draw=()=>ctx.fillText(h.txt,0,ty);ctx.save();ctx.textAlign='center';
  if(e==='stagger-rise'){ctx.textAlign='left';let x=h.x-h.w/2;for(let k=0;k<h.txt.length;k++){const cw=ctx.measureText(h.txt.slice(0,k+1)).width-ctx.measureText(h.txt.slice(0,k)).width,q=expo(cl((dt-k*.03-li*.08)/.32));ctx.save();ctx.globalAlpha*=q;ctx.translate(x,h.y+(1-q)*s*.55);ctx.fillText(h.txt[k],0,0);ctx.restore();x+=cw}}
  else if(e==='slam'){const q=cl(dt/.35),sc=q<1?1.7-.7*overshoot(q,.08):1,sh=dt<.5?Math.exp(-12*dt)*Math.sin(dt*70)*14:0;ctx.globalAlpha*=cl(dt/.06);ctx.translate(h.x+sh,py);ctx.scale(sc,sc);draw()}
@@ -236,6 +252,7 @@ function heroEnter(e,h,li,dt){const s=h.size,py=h.y-h.asc/2,ty=h.asc/2,draw=()=>
  else if(e==='slide-left'){const q=expo(cl((dt-li*.06)/.4));ctx.globalAlpha*=cl(q*3);ctx.translate(h.x+(1-q)*900,py);ctx.transform(1,0,-(1-q)*.35,1,0,0);draw()}
  else if(e==='elastic'){const sc=elastic(cl(dt/.7));ctx.globalAlpha*=cl(dt/.08);ctx.translate(h.x,py);ctx.scale(sc,sc);draw()}
  else if(e==='flip'){const q=cl((dt-li*.08)/.4),a=(1-overshoot(q,.12))*Math.PI/2;ctx.globalAlpha*=cl(q*4);ctx.translate(h.x,py);ctx.scale(1,Math.max(.02,Math.cos(a)));draw()}
+ else if(e==='typewriter'){typeOn(h.txt,h.x-h.w/2,h.y,s,dt-li*(h.txt.length*TYPE.per+.08))}
  else if(e==='drop'){ctx.textAlign='left';let x=h.x-h.w/2;for(let k=0;k<h.txt.length;k++){const cw=ctx.measureText(h.txt.slice(0,k+1)).width-ctx.measureText(h.txt.slice(0,k)).width,tk=dt-k*.035-li*.08,q=Math.min(1.06,spring(tk,2.4,.42));if(tk<=0){x+=cw;continue}
   // drop: each letter falls in from above with a little bounce and settles its tilt (the kinetic-reel dropWord idea, redrawn)
   ctx.save();ctx.globalAlpha*=cl(tk/.08);ctx.translate(x+cw/2,h.y-(1-q)*s*1.25);ctx.rotate((1-Math.min(1,q))*(k%2?.32:-.32));ctx.fillText(h.txt[k],-cw/2,0);ctx.restore();x+=cw}}
@@ -243,19 +260,36 @@ function heroEnter(e,h,li,dt){const s=h.size,py=h.y-h.asc/2,ty=h.asc/2,draw=()=>
  ctx.restore()}
 // part: 'hero' (titles layer, behind the person), 'partner' (front layer, readable over the person) or 'all'.
 // one-word style: the title is its hero word alone, no partner line, so one word is on screen at a time.
+// Text set around the head as a graphic ("place" on a title or caption, Reel.md "| place left"): left or right of the
+// head at eye level, above it, across the chest, or big over the face. The head box comes from reel.cjs (headX0, headX1,
+// faceTop, faceBottom, measured with the person mask), else a typical 9:16 talking head. A title over the face sits
+// behind the head unless its layer says front; a caption over the face always draws behind the person.
+const PLACES=['left','right','above','chest','face'];
+const placeOf=o=>o&&PLACES.includes(o.place)?o.place:null;
+const HEADB=()=>({x0:CAP.headX0||330,x1:CAP.headX1||750,y0:CAP.faceTop||400,y1:CAP.faceBottom||1180});
+function placeSpec(pl,P,kind){const H=HEADB(),T=kind==='T',eye=Math.round(H.y0+(H.y1-H.y0)*.36);
+ if(pl==='left'||pl==='right'){const room=Math.max(300,(pl==='left'?H.x0:1080-H.x1)-SAFE+60);return{P:{...P,maxW:room,target:room*.9,max:T?270:Math.round(CSZ*1.7),min:T?72:44,pmin:34},y:eye}}
+ if(pl==='above')return{P:{...P,maxW:900,target:T?720:560,max:T?260:P.max},y:Math.max(230,H.y0-120)};
+ if(pl==='chest')return{P,y:Math.min(1560,H.y1+170)};
+ if(pl==='face')return{P:{...P,maxW:1000,target:980,max:T?440:Math.round(CSZ*3.3)},y:Math.round(H.y0+(H.y1-H.y0)*.45)};
+ return{P,y:null}}
+// the sideways shift that sets a left or right lockup beside the head instead of centred (box from lockup())
+function placeDx(pl,box){const H=HEADB(),w=box[2]-box[0];if(pl==='left')return Math.max(SAFE+w,H.x0+24)-box[2];if(pl==='right')return Math.min(1080-SAFE-w,H.x1-24)-box[0];return 0}
 function title(c,t,part='all'){const o=c[4];if(o.lockup===false)return part==='partner'?null:titleSolo(c,t);const dt=t-c[0];if(c.flick&&dt<.55){const fr=Math.floor(dt*24);if([2,4,5,9,11].includes(fr))return}
  let ws=c[2].replace(/\|/g,' ').split(/\s+/).filter(Boolean).map(w=>[0,0,w]),oo=o;
  if(ONEW&&ws.length){ws=[ws[heroOf(ws,o)[0]]];oo={...o,hero:[0]}}
- const R=lockup(ws,oo,o.y||TY,o.size?{...LKP.T,target:1e4,max:o.size}:LKP.T);
- const ex=c[1]>90?1:cl((c[1]-t)/.08),dy=riseOff(c,dt),late=riseEnd(c);ctx.save();ctx.globalAlpha*=ex;ctx.textBaseline='alphabetic';
- if(part!=='partner'){ctx.save();ctx.translate(0,dy);R.heroes.forEach((h,li)=>{ctx.save();ctx.font=h.font;ctx.letterSpacing=h.track+'px';ctx.fillStyle=R.hc;shadow(ctx,h.size);heroEnter(c.entr,h,li,dt);ctx.restore()});ctx.restore()}
- if(part!=='hero')R.parts.forEach((p,pi)=>partnerDraw({...p,outline:true},R.pc,(k,i)=>dt-late-.24-pi*.06-i*.07));ctx.restore()}
+ const cd=cardAt(t),pl=cd?null:placeOf(o),P0=o.size?{...LKP.T,target:1e4,max:o.size}:LKP.T,ps=pl?placeSpec(pl,P0,'T'):null;
+ const R=lockup(ws,oo,o.y||(ps&&ps.y)||TY,ps?ps.P:P0),hc=cd?cd.ink:R.hc,pc=cd?cd.ink:R.pc;
+ const ex=c[1]>90?1:cl((c[1]-t)/.08),dy=riseOff(c,dt),late=riseEnd(c);ctx.save();ctx.globalAlpha*=ex;ctx.textBaseline='alphabetic';if(pl){const dx=placeDx(pl,R.box);if(dx)ctx.translate(dx,0)}FLAT=!!cd;
+ if(part!=='partner'){ctx.save();ctx.translate(0,dy);R.heroes.forEach((h,li)=>{ctx.save();ctx.font=h.font;ctx.letterSpacing=h.track+'px';ctx.fillStyle=hc;shadow(ctx,h.size);heroEnter(c.entr,h,li,dt);ctx.restore()});ctx.restore()}
+ if(part!=='hero')R.parts.forEach((p,pi)=>partnerDraw({...p,outline:!cd},pc,(k,i)=>dt-late-.24-pi*.06-i*.07));FLAT=false;ctx.restore()}
 // Caption entrances for kinetic hero words (captionEntrance for the job, or "entrance" on a caption flip). Letter by
 // letter motions rewritten for canvas from the SwiftUI Agent Thinking Text Animations catalog (MIT, amosgyamfi;
 // THIRD_PARTY.md): unfurl, cascade, orbit, warp, crystallize, compute, levitate, undulate. pop is the default pop-in.
-const CENTR=['pop','unfurl','cascade','orbit','warp','crystallize','compute','levitate','undulate'];
+const CENTR=['pop','unfurl','cascade','orbit','warp','crystallize','compute','levitate','undulate','typewriter'];
 const SCR='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 function capEnter(m,h,dt,seed){const txt=h.txt,n=txt.length,s=h.size,W=ctx.measureText(txt).width;let x=h.x-W/2;ctx.textAlign='left';ctx.textBaseline='alphabetic';
+ if(m==='typewriter')return typeOn(txt,x,h.y,s,dt);
  for(let k=0;k<n;k++){const cw=ctx.measureText(txt.slice(0,k+1)).width-ctx.measureText(txt.slice(0,k)).width,ch=txt[k],cx=x+cw/2;x+=cw;if(ch===' ')continue;
   const st=k/Math.max(1,n-1);let a=1,dx=0,dy=0,r=0,sx=1,sy=1,bl=0,g=ch;
   if(m==='unfurl'){const q=EMPH(cl((dt-k*.025)/.3));a=cl(q*3);sx=Math.max(.02,q);dx=-(1-q)*cw*.5;r=-(1-q)*.25}
@@ -269,11 +303,13 @@ function capEnter(m,h,dt,seed){const txt=h.txt,n=txt.length,s=h.size,W=ctx.measu
   if(a<=0){if(m==='compute'&&dt<.08+k*.03)ctx.restore();continue}
   ctx.save();ctx.globalAlpha*=a;if(bl>.3)ctx.filter=`blur(${bl.toFixed(1)}px)`;ctx.translate(cx+dx,h.y+dy);ctx.rotate(r);ctx.scale(sx,sy);ctx.fillText(g,-ctx.measureText(g).width/2,0);ctx.restore();
   if(m==='compute'&&dt<.08+k*.03)ctx.restore()}}
-function kinetic(c,t){const o=c[4];if(o.lockup===false)return kineticSolo(c,t);const y=zoneAt(t)==='move'?ALTY:(o.y||KY);
- const R=lockup(wordsOf(c),o,y,LKP.K);ctx.save();ctx.textBaseline='alphabetic';
+function kinetic(c,t){const o=c[4];if(o.lockup===false)return kineticSolo(c,t);const cd=cardAt(t),pl=cd?null:placeOf(o),ps=pl?placeSpec(pl,LKP.K,'K'):null;
+ // on a colour card the words sit mid-card (under the numeral on a chapter card) in the card's ink, flat
+ const y=cd?(cd[4].chapter!=null?1290:960):zoneAt(t)==='move'?ALTY:(o.y||(ps&&ps.y)||KY);
+ const R0=lockup(wordsOf(c),o,y,ps?ps.P:LKP.K),R=cd?{...R0,hc:cd.ink,pc:cd.ink,parts:R0.parts.map(p=>({...p,outline:false}))}:R0;ctx.save();ctx.textBaseline='alphabetic';if(pl){const dx=placeDx(pl,R.box);if(dx)ctx.translate(dx,0)}FLAT=!!cd;
  const ce=CENTR.includes(o.entrance)?o.entrance:CENTR.includes(CAP.captionEntrance)?CAP.captionEntrance:'pop';
  R.heroes.forEach(h=>{const dt=t-h.a+.04;if(dt<0)return;if(ce!=='pop'){ctx.save();ctx.font=h.font;ctx.letterSpacing=h.track+'px';ctx.fillStyle=R.hc;shadow(ctx,h.size);capEnter(ce,h,dt,Math.round(h.a*100));ctx.restore();return}const q=cl(dt/.22),s=q<1?1.5-.5*overshoot(q,.2):1;ctx.save();ctx.font=h.font;ctx.letterSpacing=h.track+'px';ctx.textAlign='center';ctx.fillStyle=R.hc;shadow(ctx,h.size);ctx.globalAlpha*=cl(dt/.05);ctx.translate(h.x,h.y-h.asc/2);ctx.scale(s,s);ctx.fillText(h.txt,0,h.asc/2);ctx.restore()});
- R.parts.forEach(p=>partnerDraw(p,R.pc,k=>t-k.a+.04));ctx.restore()}
+ R.parts.forEach(p=>partnerDraw(p,R.pc,k=>t-k.a+.04));FLAT=false;ctx.restore()}
 const LKP={T:{kind:'T',maxW:960,target:880,max:360,min:150,pmin:56},K:{kind:'K',maxW:940,target:620,max:Math.round(CSZ*2.3),min:Math.round(CSZ*1.1),pmin:Math.round(CSZ*.66)}};
 // every lockup in the job, for render.mjs (build/lockups.json) and the smoke test
 window.__lockups=()=>flips.filter(c=>c[4].lockup!==false&&(c[3]===7||(c[3]===0&&(c[4].style||CSTYLE)==='kinetic'))).map(c=>{use(c.ps);const T=c[3]===7,o=c[4],ws=T?c[2].replace(/\|/g,' ').split(/\s+/).filter(Boolean).map(w=>[0,0,w]):wordsOf(c),R=lockup(ws,o,T?(o.y||TY):(o.y||KY),T&&o.size?{...LKP.T,target:1e4,max:o.size}:LKP[T?'T':'K']);
@@ -283,11 +319,15 @@ window.__lockup=(text,o={},kind='T')=>{use(BASE);const ws=String(text).replace(/
 // {"start":4.2,"end":6.0,"mode":8,"bg":"navy"}; bg is navy|cream|paper|blue|ink, or {"bg":"#hex","ink":"#hex"}.
 // "number":"1" sets a giant faded numeral in the display face behind the words. While a card is up the caption
 // words sit mid-frame in the card's ink.
-const CARDS={navy:['#0e1a33','#efe6cf'],cream:['#ebe3c3','#17161a'],paper:['#f1f1ee','#16161a'],blue:['#2b2cf0','#ffffff'],ink:['#111214','#f1f1ee']};
+// olive, ivory, sage, clay, blush and forest are the muted magazine palette (olive and ivory pair: each is the other's ink)
+const CARDS={navy:['#0e1a33','#efe6cf'],cream:['#ebe3c3','#17161a'],paper:['#f1f1ee','#16161a'],blue:['#2b2cf0','#ffffff'],ink:['#111214','#f1f1ee'],olive:['#4b5a3a','#f4edd4'],ivory:['#f4edd4','#4b5a3a'],sage:['#a9b69b','#26301f'],clay:['#b0583d','#f8f0e5'],blush:['#ead0c5','#5b2e26'],forest:['#22362a','#efe6cf']};
 flips.forEach(c=>{if(c[3]!==8)return;const k=CARDS[c[4].bg]||[c[4].bg||CARDS.navy[0],CARDS.navy[1]];c.bg=k[0];c.ink=c[4].ink||k[1]});
 flips.sort((a,b)=>(b[3]===8)-(a[3]===8)); // cards draw first, so the words land on them
 const cardAt=t=>flips.find(c=>c[3]===8&&t>=c[0]&&t<c[1]);
-function typeCard(c){ctx.save();ctx.globalAlpha=1;ctx.fillStyle=c.bg;ctx.fillRect(0,0,1080,1920);
+// "chapter": N makes it a numbered chapter card for a listicle: a big solid numeral in the display face springs in above
+// the middle and the words you say sit under it ("1" then "font pairing and placement").
+function typeCard(c,t){ctx.save();ctx.globalAlpha=1;ctx.fillStyle=c.bg;ctx.fillRect(0,0,1080,1920);
+ if(c[4].chapter!=null){const dt=(t??c[0])-c[0],q=Math.min(1.04,spring(dt,2.3,.55)),fs=c[4].numberSize||560;ctx.save();ctx.font=fnt(G,fs);ctx.letterSpacing='0px';ctx.textAlign='center';ctx.textBaseline='alphabetic';ctx.fillStyle=c.ink;ctx.globalAlpha=cl(dt/.08);ctx.translate(540,990);ctx.scale(.85+.15*q,.85+.15*q);ctx.translate(0,(1-Math.min(1,q))*40);ctx.fillText(String(c[4].chapter),0,0);ctx.restore()}
  if(c[4].number!=null){ctx.font=fnt(G,1150);ctx.letterSpacing='0px';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=c.ink;ctx.globalAlpha=.2;ctx.fillText(String(c[4].number),540,990)}
  ctx.restore()}
 // One word at a time (captionStyle "oneword", the look in kit/looks/oneword.md). Every spoken word replaces the last
@@ -411,7 +451,7 @@ function oneWordSeq(t,only){if(!OWSEQ)return;const x=OWSEQ.find(x=>t>=x.s&&t<x.e
 // one-word (the simple style): while a title is up it is the one word on screen, so the caption waits
 const titleUp=t=>(zoneAt(t)!=='hide'&&TITLES.some(c=>t>=c[0]&&t<c[1]))||(CPOS==='top'&&flips.some(c=>c[3]===9&&t>=c[0]+.1&&t<c[1])); // a top caption also waits for an ordinal word
 function caption(c,t){const st=c[4].style||CSTYLE;if(st==='one-word'&&OWSEQ)return;if(st==='one-word'&&titleUp(t))return;const yo=zoneAt(t)==='move'?ALTY:0;if(st==='kinetic')return kinetic(c,t);if(st==='oneword')return oneword(c,t);if(st==='pill')return pill(c,t,yo);if(st==='hormozi')return boldCap(c,t,false,yo);if(st==='karaoke')return boldCap(c,t,true,yo);if(st==='one-word')return oneWord(c,t,yo);glyphs(c[2],fit([c[2]],S,CSZ,980),540,yo||CYB,t-c[0],CCOL||IV,true)}
-// Graphics (kit/graphics.json): mode 9 ordinal sticker, 10 app label, 11 screen card, 12 to 37 below. Original generic designs. Your
+// Graphics (kit/graphics.json): mode 9 ordinal sticker, 10 app label, 11 screen card, 12 to 38 below. Original generic designs. Your
 // icon or screen recording comes in through gfx.js (render.mjs writes it: image URLs, and a video as a frame list);
 // without one the kit draws a neutral glyph or placeholder window.
 const GX=window.GFX||{},GXA=GX.assets||{},GXF=GX.fonts||{},GIMG={},IMGP=[];
@@ -1020,21 +1060,31 @@ function keywordCaption(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t),txt=gs(c[2]),kw
    else{ctx.shadowColor='rgba(0,0,0,.55)';ctx.shadowBlur=fs*.14;ctx.shadowOffsetY=fs*.04;ctx.fillStyle=IV;ctx.fillText(w,x,yy+fs*.04)}
    ctx.restore();x+=ww+ly.sp})});
  ctx.restore()}
+// number pop, entrance num-pop: a listicle intro. The numbers 1 to N pop in one by one around the head (alternating
+// sides, top to bottom, never over the face), each a solid tile with the numeral in the display face; they hold, then
+// pop out together. "at" (or "cues") lands each number; else they come in over the first 60% of the graphic.
+function numberPop(c,t){const o=c[4],dt=t-c[0],n=Math.max(2,Math.min(10,Math.round(+o.count||5))),H=HEADB(),cx=(H.x0+H.x1)/2,cy=H.y0+(H.y1-H.y0)*.46,rw=(H.x1-H.x0)/2+150,rh=(H.y1-H.y0)*.5+40,col=o.color||CY,ink=o.ink||onCol(col),S0=o.size||132,end=c[1]>90?Infinity:c[1],d=gdur(c),R=TH.radius!=null?Math.min(S0*.2,TH.radius):S0*.18;
+ const at=[...Array(n)].map((_,i)=>Array.isArray(o.at)&&o.at[i]!=null?+o.at[i]:c[0]+.08+i*Math.min(.42,d*.6/n)),rows=Math.ceil(n/2);
+ for(let i=0;i<n;i++){const tt=t-at[i];if(tt<=0)continue;const side=i%2?1:-1,row=Math.floor(i/2),a=(-.62+1.2*(rows>1?row/(rows-1):.5))*Math.PI/2,po=cl((t-(end-.3))/.24);if(po>=1)continue;
+  const s=Math.max(0,spring(tt,2.5,.42))*(po<=0?1:1-ACC(po));if(s<=.01)continue;
+  const x=Math.min(1080-SAFE-S0/2,Math.max(SAFE+S0/2,cx+side*rw*Math.cos(a))),y=Math.max(SAFE+S0/2,cy+rh*Math.sin(a))+Math.sin(tt*2.2+i)*4;
+  ctx.save();ctx.translate(x,y);ctx.rotate((side*.06+(1-Math.min(1,s))*side*.4));ctx.scale(s,s);ctx.shadowColor='rgba(0,0,0,.35)';ctx.shadowBlur=22;ctx.shadowOffsetY=8;ctx.fillStyle=col;rrect(ctx,-S0/2,-S0/2,S0,S0,R);ctx.fill();ctx.shadowColor='transparent';
+  const fs=Math.round(S0*.78);ctx.font=fnt(G,fs);ctx.letterSpacing='0px';ctx.textAlign='center';ctx.textBaseline='alphabetic';ctx.fillStyle=ink;const m=ctx.measureText(String(i+1)),hh=m.actualBoundingBoxAscent-m.actualBoundingBoxDescent;ctx.fillText(String(i+1),0,hh/2);ctx.restore()}}
 const GDRAW={11:screenCard,12:lowerThird,13:statCallout,14:checklist,15:quoteCard,16:highlight,17:stepCounter,18:versus,19:iconBadge,20:stickerPop,21:priceTag,22:ctaCard,23:codeCard,
- 24:dataChart,25:chapterCard,26:logoBug,27:channelBug,28:terminalSession,29:newsStrap,30:ticker,31:splitFlap,32:featureCards,33:releasePill,34:ctaButton,35:hudCallout,36:flashCard,37:keywordCaption};
+ 24:dataChart,25:chapterCard,26:logoBug,27:channelBug,28:terminalSession,29:newsStrap,30:ticker,31:splitFlap,32:featureCards,33:releasePill,34:ctaButton,35:hudCallout,36:flashCard,37:keywordCaption,38:numberPop};
 // fast moves (the first 0.42 s and the exit) are drawn with motion blur
 const drawG=(c,t)=>{const f=GDRAW[c[3]];if(!f)return;const dt=t-c[0],left=c[1]>90?9:c[1]-t;if(MBLUR&&(dt<.42||left<.36))blurred(f,c,t);else f(c,t)};
 // a behind ordinal burst needs the titles layer even in a job without kinetic titles
 // screen cards and b-roll panels (mode 11) sit behind the top of the presenter's head: layer front|behind|auto per panel, or
 // panelLayer for the job (default auto = behind; where the head never reaches the panel it looks the same as front).
-// Graphics 12 to 37 take the same layer: auto is behind when the graphic sits high in the frame (y below autoBehindY,
+// Graphics 12 to 38 take the same layer: auto is behind when the graphic sits high in the frame (y below autoBehindY,
 // kit/graphics.json), where the top of the head can reach it, and front lower down.
 // Behind panels draw on their own layer, ovlp/, which assemble.cjs puts over the picture, then the top of the head (the
 // person mask above the eyes, kit/headmask.py) on top: hair over the panel, the face and body always under it.
 const PANM=m=>PANMODES.has(m);
 const PANB=c=>{const l=['front','behind','auto'].includes(c[4].layer)?c[4].layer:['front','behind','auto'].includes(CAP.panelLayer)?CAP.panelLayer:'auto';if(l!=='auto')return l==='behind';if(c[3]===11)return true;return gd(c,'y',1)<ABY};
 window.__panels=()=>flips.some(c=>PANM(c[3])&&PANB(c));
-window.__layered=()=>TITLES.length>0||flips.some(c=>c[3]===9&&c[4].layer==='behind')||(CAPBEH&&flips.some(c=>c[3]===0))||window.__panels();
+window.__layered=()=>TITLES.length>0||flips.some(c=>c[3]===9&&c[4].layer==='behind')||(CAPBEH&&flips.some(c=>c[3]===0))||flips.some(c=>c[3]===0&&placeOf(c[4])==='face')||window.__panels();
 window.__graphics=()=>flips.filter(c=>c[3]===9||c[3]===10||PANM(c[3])).map(c=>{const a=gxa(c);return{start:c[0],end:c[1],mode:c[3],text:c[2]||'',layer:PANM(c[3])?(PANB(c)?'behind':'front'):(c[4].layer||'front'),asset:a.frames?'video':(a.src||a.icon)?'image':c[3]>=12?'drawn':'placeholder',loaded:[a.icon,a.src,...(a.frames||[]).slice(0,1)].filter(Boolean).every(u=>GIMG[u]&&GIMG[u].naturalWidth>0)}});
 let LAYER='all';
 // Layout pass (runs once, after the fonts load). Every element's box is measured from its own pixels (drawn alone on a
@@ -1089,7 +1139,7 @@ function layoutPass(){LAYOUT.clear();REPORT.length=0;const R=safeRect(),M=18;
  // 1. export frame and safe areas, every element but a full-frame takeover
  if(EXPF)for(const x of els){if(x.takeover)continue;const k=fitInto(x.raw,R);if(k){x.xf=k;x.box=xfBox(x.raw,k);x.action='safe-area'}}
  // 2. titles clear of graphics, then captions clear of graphics and titles
- const G=els.filter(x=>x.kind==='graphic');
+ const G=els.filter(x=>x.kind==='graphic'&&x.c[3]!==8); // a colour card carries the words on it, so it is not something to move clear of
  const place=(x,obs)=>{const hit=obs.filter(o=>live(o,x)&&inter(o.box,x.box,M));if(!hit.length)return;
   if(hit.some(o=>o.takeover)){x.hide=hit.map(o=>[Math.max(o.s,x.s),Math.min(o.e,x.e)]);x.action='hide';return}
   // candidates: just below or just above each graphic it meets, shrunk to no less than 70% when the room is short
@@ -1111,11 +1161,12 @@ window.__layout=()=>({export:EXPF?EXPF.name||'custom':null,safe:safeRect(),face:
 window.__boxesAt=t=>flips.filter(c=>t>=c[0]&&t<c[1]).map(c=>({kind:kindOf(c),mode:c[3],start:c[0],end:c[1],text:String(c[2]||'').slice(0,40),box:boxNow([c],t,false),takeover:(REPORT.find(r=>r.start===c[0]&&r.mode===c[3])||{}).takeover||false})).filter(x=>x.box);
 function flip(t,only){for(const c of (only||flips)){if(t<c[0]||t>=c[1])continue;if(LAYER==='panels'&&!(PANM(c[3])&&PANB(c)))continue;use(c.ps);const dt=t-c[0],m=c[3],out=c[1]>90?1:cl((c[1]-t)/.05);ctx.save();ctx.globalAlpha=out;{const k=LXF(c,t);if(k===0){ctx.restore();continue}if(k)xfApply(k)}
 if(m===9){const beh=c[4].layer==='behind';if(LAYER==='titles'){if(beh)ordBurst(c,t)}else{if(!(beh&&LAYER==='front'))ordBurst(c,t);ordWord(c,t)}}
-else if(m===7){if(zoneAt(t)!=='hide'){const lay=c.layer||'front';if(LAYER==='titles'){if(lay==='behind')title(c,t,'hero')}else if(LAYER==='front'){title(c,t,lay==='behind'?'partner':'all')}else title(c,t,'all')}}
+else if(m===7){if(zoneAt(t)!=='hide'){const lay=cardAt(t)?'front':(c.layer||'front'); // on a colour card there is no head to sit behind
+if(LAYER==='titles'){if(lay==='behind')title(c,t,'hero')}else if(LAYER==='front'){title(c,t,lay==='behind'?'partner':'all')}else title(c,t,'all')}}
 else if(PANM(m)&&PANB(c)){if(LAYER==='panels'||LAYER==='all')drawG(c,t)}
-else if(m===0&&CAPBEH){if(LAYER!=='front')caption(c,t)}
+else if(m===0&&(CAPBEH||(placeOf(c[4])==='face'&&!cardAt(t)))){if(LAYER!=='front')caption(c,t)}
 else if(LAYER==='titles'){}
-else if(m===8)typeCard(c);
+else if(m===8)typeCard(c,t);
 else if(m===10)appLabel(c,t);
 else if(PANM(m))drawG(c,t);
 else if(m===0)caption(c,t);
@@ -1130,7 +1181,7 @@ if(LAYER!=='panels'&&(CAPBEH?LAYER!=='front':LAYER!=='titles')&&(!only||only.som
 function burst(dt,seed){if(dt<-.1||dt>.42)return;const r=rng(seed),p=(dt+.1)/.52,a=Math.sin(Math.PI*cl(p));ctx.save();ctx.translate(540,Y);ctx.lineCap='round';for(let i=0;i<54;i++){const ang=r()*6.283,sp=.6+r()*.9,len=120+r()*520,st=120+p*sp*1150;ctx.strokeStyle=i%3?CY:IV;ctx.globalAlpha=a*(.35+r()*.6);ctx.lineWidth=2+r()*7;ctx.beginPath();ctx.moveTo(Math.cos(ang)*st,Math.sin(ang)*st);ctx.lineTo(Math.cos(ang)*(st+len),Math.sin(ang)*(st+len));ctx.stroke()}ctx.restore()}
 function glitch(t){glitchAt.forEach((h,i)=>{const dt=t-h;if(dt<-.05||dt>.2)return;const r=rng(Math.floor(t*24)*97+i*13+5),a=1-Math.max(0,dt)/.2;ctx.save();for(let k=0;k<16;k++){const y=r()*1920,hh=4+r()*r()*90;ctx.globalAlpha=a*(.12+r()*.5);ctx.fillStyle=k%3===0?CY:IV;ctx.fillRect(r()*200-100,y,r()>.4?1300:200+r()*700,hh)}ctx.fillStyle=IV;for(let k=0;k<2600;k++){ctx.globalAlpha=a*r()*.55;ctx.fillRect(r()*1080,r()*1920,2+r()*3,2)}ctx.restore()})}
 // layer: 'all' (default), 'front' (captions, plus front titles and partner words), 'titles' (behind-head hero words only)
-// or 'panels' (screen cards and graphics 12 to 37 behind the top of the head)
+// or 'panels' (screen cards and graphics 12 to 38 behind the top of the head)
 window.seek=(t,layer)=>{LAYER=layer||'all';ctx.clearRect(0,0,1080,1920);flip(t);if(LAYER==='titles'||LAYER==='panels')return;(CAP.bursts||[]).forEach((h,i)=>burst(t-h,7919*(i+3)));glitch(t)};
 window.__titles=TITLES.map(c=>({start:c[0],end:c[1],text:c[2],entrance:c.entr,flicker:c.flick,layer:c.layer||'front'}));
 // Fonts: optional web-font stylesheet from the theme, then wait for every face we draw with, then the logo.

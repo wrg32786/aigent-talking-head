@@ -61,10 +61,10 @@ const tail = (s, n = 60) => s.trim().split('\n').slice(-n).join('\n');
 
 const REEL = cmd('reel'), PLAN = cmd('plan'), VERIFY = cmd('verify'), MENU = cmd('menu'), LIST = cmd('list'), RMD = cmd('reelmd'), CHECK = cmd('check');
 const TOOLS = [
-  { name: 'menu', description: 'Every option the kit has (looks, caption styles, titles, the 29 graphics, transitions, effects, sounds, beds, presets, exports). Offer it to the user before you draft. ' + MENU.summary,
+  { name: 'menu', description: 'Every option the kit has (looks, caption styles, titles, the 30 graphics, the editing principles, transitions, effects, sounds, beds, presets, exports). Offer it to the user before you draft. ' + MENU.summary,
     inputSchema: { type: 'object', properties: {}, additionalProperties: false }, call: () => ['kit/menu.mjs', [], 60e3] },
-  { name: 'list_effects', description: 'One part of the effects menu as names, one-line descriptions, the exact flag or field to use, and a looping preview path (npm run list -- <kind> --json). Kinds: transitions, titles (title entrances), captions (caption entrances and caption styles), graphics, effects, or any menu section id. Leave kind out for the list of kinds. Show the user docs/effects.md to see them animated. ' + LIST.summary,
-    inputSchema: { type: 'object', properties: { kind: { type: 'string', description: 'transitions, titles, captions, graphics, effects, or a section id from the menu tool' } }, additionalProperties: false },
+  { name: 'list_effects', description: 'One part of the effects menu as names, one-line descriptions, the exact flag or field to use, and a looping preview path (npm run list -- <kind> --json). Kinds: transitions, titles (title entrances), captions (caption entrances and caption styles), graphics, effects, editing (the editing principles and the magazine preset), or any menu section id. Leave kind out for the list of kinds. Show the user docs/effects.md to see them animated. ' + LIST.summary,
+    inputSchema: { type: 'object', properties: { kind: { type: 'string', description: 'transitions, titles, captions, graphics, effects, editing, or a section id from the menu tool' } }, additionalProperties: false },
     call: a => [MENU.script, ['--list', ...(a.kind ? [String(a.kind)] : []), '--json'], 60e3] },
   { name: 'draft', description: 'Transcribe a phone clip and draft the reel without rendering (npm run reel -- <clip> --name <job> --draft): cut.json, captions.js and the transcript the plan tool reads. ' + REEL.summary,
     inputSchema: schemaOf(REEL, { omit: ['draft', 'rebuild', 'json'] }), call: a => [REEL.script, argsOf(REEL, a, ['--draft', '--json']), 60 * 60e3] },

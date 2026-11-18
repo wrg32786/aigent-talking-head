@@ -1,0 +1,28 @@
+{
+  "name": "magazine",
+  "label": "Magazine: serif and sans mixed, colour and chapter cards, sound on the moves, no dead air",
+  "theme": "magazine",
+  "look": "kinetic",
+  "captionStyle": "kinetic",
+  "fonts": "playfair",
+  "titles": true,
+  "finish": null,
+  "transition": "crossfade",
+  "glitch": false,
+  "punch": 0.12,
+  "tighten": 0.3,
+  "cards": "auto",
+  "cardPalette": ["olive", "ivory", "sage", "clay"],
+  "musicEnergy": "auto",
+  "bed": "auto",
+  "sfxMap": true,
+  "sfxCap": { "minGap": 0.35, "per10": 5 },
+  "titlePlaces": ["left", "face", "right", "chest"],
+  "entranceOrder": ["typewriter", "blur-rise", "pop-zoom", "stagger-rise", "slide-left", "drop"],
+  "titleLayer": "front",
+  "effectsFavourites": [
+    "headline-box",
+    "slow-push"
+  ],
+  "notes": "Common short-form editing advice as one preset: a serif numeral, an italic serif word and sans text in one phrase; titles set around the head (left, right, chest, big over the face behind the head); olive and cream cards on lines to land and numbered chapter cards on a list, with numbers popping in around the head; a bed picked by the energy of what you say; a whoosh on transitions, a pop on text, a click on key moves, capped so they stay sparse; a 12% punch-in on every other cut, a typewriter entrance, soft crossfades; pauses over 0.3 s cut out."
+}

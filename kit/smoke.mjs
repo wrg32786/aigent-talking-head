@@ -317,9 +317,9 @@ try {
       try { run(node, [join(KIT, 'capture.mjs'), u], work); fail('capture accepted ' + u); } catch (e) { if (!/only public pages|only http/.test(String(e.stderr || ''))) throw e; }
     }
     const GX = JSON.parse(readFileSync(join(KIT, 'graphics.json'), 'utf8')).graphics;
-    if (GX.map(x => x.mode).join(',') !== Array.from({ length: 29 }, (_, i) => i + 9).join(',') || GX.some(x => !x.entrance || !x.exit || !x.detect || !Array.isArray(x.spoken) || !x.example)) fail('kit/graphics.json: modes, entrance, exit, spoken fields, example and detect rule for each graphic');
+    if (GX.map(x => x.mode).join(',') !== Array.from({ length: 30 }, (_, i) => i + 9).join(',') || GX.some(x => !x.entrance || !x.exit || !x.detect || !Array.isArray(x.spoken) || !x.example)) fail('kit/graphics.json: modes, entrance, exit, spoken fields, example and detect rule for each graphic');
   });
-  step('graphics 12 to 37: each draws with an entrance and an exit, auto layer by height, behind only on the panel layer, words you say, Reel.md round trip', () => {
+  step('graphics 12 to 38: each draws with an entrance and an exit, auto layer by height, behind only on the panel layer, words you say, Reel.md round trip', () => {
     const GX = JSON.parse(readFileSync(join(KIT, 'graphics.json'), 'utf8')).graphics.filter(g => g.mode >= 12);
     const d = join(work, 'gfx2'); mkdirSync(d, { recursive: true });
     const flips = GX.map((g, i) => ({ ...g.example, start: i * 3, end: i * 3 + 3 }));
@@ -735,10 +735,10 @@ try {
     const fl = m[1].split(', ').map(x => /\+flicker/.test(x)); if (!fl[0] || !fl[7] || fl.slice(1, 7).some(Boolean)) fail('flicker placement: ' + m[1]);
     const a = readFileSync(join(b, 'stills', 't0.10.png')), z = readFileSync(join(b, 'stills', 't0.70.png'));
     if (a.equals(z)) fail('title did not move between mid-entrance and settled');
-    caps.flips.push({ start: 7.3, end: 7.5, text: 'NINE', mode: 7 });
+    caps.flips.push({ start: 7.3, end: 7.5, text: 'NINE', mode: 7 }, { start: 8.1, end: 8.3, text: 'TEN', mode: 7 });
     writeFileSync(join(b, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(caps) + ';\n');
-    try { run(node, [join(KIT, 'check.mjs'), b], work); fail('check passed 9 titles'); } catch (e) { if (!/9 titles/.test(String(e.stdout || ''))) throw e; }
-    caps.flips = caps.flips.filter(f => f.text !== 'NINE' && f.text !== 'EIGHT').concat([{ start: 6.3, end: 6.5, text: 'EIGHT', mode: 7, entrance: 'slam' }, { start: 7.3, end: 7.5, text: 'NINE', mode: 7, entrance: 'slam' }]).filter(f => f.text !== 'SEVEN');
+    try { run(node, [join(KIT, 'check.mjs'), b], work); fail('check passed 10 titles'); } catch (e) { if (!/10 titles/.test(String(e.stdout || ''))) throw e; }
+    caps.flips = caps.flips.filter(f => f.text !== 'NINE' && f.text !== 'EIGHT' && f.text !== 'TEN').concat([{ start: 6.3, end: 6.5, text: 'EIGHT', mode: 7, entrance: 'slam' }, { start: 7.3, end: 7.5, text: 'NINE', mode: 7, entrance: 'slam' }]).filter(f => f.text !== 'SEVEN');
     writeFileSync(join(b, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(caps) + ';\n');
     try { run(node, [join(KIT, 'check.mjs'), b], work); fail('check passed a repeated entrance'); } catch (e) { if (!/entrance "slam" already used/.test(String(e.stdout || ''))) throw e; }
   });
@@ -830,6 +830,50 @@ try {
       try { run(node, [add, join(work, name)], work); fail('music:add accepted ' + name); } catch (e) { if (!want.test(String(e.stderr || ''))) throw e; }
     }
     if (statSync(lib).mtimeMs !== before || existsSync(join(KIT, 'music', '.mp3'))) fail('music:add wrote to the library on a refused import');
+  });
+  step('editing principles: chapter cards and number pop from a counted list, sfx map and cap, energy beds, magazine preset, cards and typewriter draw', () => {
+    const C = createRequire(import.meta.url)('./cards.cjs'), M = createRequire(import.meta.url)('./sfx-map.cjs');
+    const say = 'Five easy edits for more views. First, pick two fonts. Second, add a colour card. Third, never leave dead air. Number four, match the music. Fifth, keep it simple!';
+    let t = 0; const words = say.split(' ').map(w => { const o = { start: +t.toFixed(2), end: +(t + 0.28).toFixed(2), word: w }; t += /[.,!]$/.test(w) ? 0.6 : 0.34; return o; });
+    const pc = C.proposeCards(words, { palette: ['olive', 'ivory', 'sage'] });
+    if (pc.chapters.map(c => c.n).join(',') !== '1,2,3,4,5') fail('chapters: ' + JSON.stringify(pc.chapters));
+    const ch = pc.cards.filter(c => c.chapter != null);
+    if (ch.length < 4 || ch[0].bg !== 'olive' || ch[1].bg !== 'ivory') fail('chapter cards: ' + JSON.stringify(pc.cards));
+    if (pc.cards.some((c, i) => i && c.start < pc.cards[i - 1].end) || pc.cards.some(c => c.start < 1.2)) fail('cards overlap or cover the hook: ' + JSON.stringify(pc.cards));
+    if (!pc.numberPop || pc.numberPop.count !== 5 || pc.numberPop.end > ch[0].start) fail('number pop: ' + JSON.stringify(pc.numberPop));
+    if (!C.validateCard({ start: 1, end: 6, bg: 'mauve' }).length) fail('validateCard passed a bad card');
+    // the map: a whoosh on a transition, a swipe on a card, typing under a typewriter title, a pop per number
+    const cut = { segs: [{ clip: 'a.mp4', in: 0, out: 2 }, { clip: 'a.mp4', in: 2, out: 4, transition: 'crossfade' }] };
+    const flips = [{ start: 0.2, end: 1.6, mode: 38, count: 3 }, { start: 2.5, end: 3.5, mode: 8, bg: 'olive', chapter: '1' }, { start: 3.6, end: 4.2, mode: 7, text: 'TYPE', entrance: 'typewriter' }];
+    const hits = M.autoHits(cut, flips), ids = hits.map(h => h.id);
+    for (const id of [M.MAP.transition, M.MAP.card, M.MAP.type]) if (!ids.includes(id)) fail(`sfx map has no ${id}: ` + JSON.stringify(hits));
+    if (ids.filter(x => x === M.MAP.number).length !== 3 || !hits.every(h => h.auto)) fail('number pops: ' + JSON.stringify(hits));
+    // the cap: never two sounds closer than minGap, never more than per10 in 10 s, the bigger move wins
+    const ev = Array.from({ length: 30 }, (_, i) => ({ t: i * 0.2, kind: i === 1 ? 'whoosh' : 'pop' }));
+    const kept = M.capHits(ev, { minGap: 0.4, per10: 4 }).filter(e => e.keep);
+    if (kept.length > 4 || kept.some((e, i) => i && e.t - kept[i - 1].t < 0.4) || !kept.some(e => e.kind === 'whoosh')) fail('cap: ' + JSON.stringify(kept));
+    if (M.capHits(ev, false).some(e => !e.keep)) fail('cap false dropped a sound');
+    // energy: every library bed is tagged, a fast script picks a high bed, a slow one a low bed, stable per seed
+    for (const e of R.ENERGIES) if (!R.bedsByEnergy(e).length) fail('no ' + e + ' bed');
+    const fast = Array.from({ length: 20 }, (_, i) => [i * 0.25, i * 0.25 + 0.2, 'w']), slow = Array.from({ length: 20 }, (_, i) => [i * 0.6, i * 0.6 + 0.4, 'w']);
+    if (R.scriptEnergy(fast) !== 'high' || R.scriptEnergy(slow) !== 'low') fail('scriptEnergy');
+    if (R.pickBed('high', 'job') !== R.pickBed('high', 'job') || !R.bedsByEnergy('high').includes(R.pickBed('high', 'job'))) fail('pickBed');
+    if (!R.ENTRANCES.includes('typewriter')) fail('typewriter is not an entrance');
+    // the magazine preset bundles them; the default stays aigent
+    const mg = P.load('magazine');
+    if (mg.cards !== 'auto' || mg.sfxMap !== true || mg.glitch !== false || mg.fonts !== 'playfair' || typeof mg.punch !== 'number' || !(mg.tighten > 0)) fail('magazine preset: ' + JSON.stringify(mg));
+    // draw: a chapter card covers the frame in its colour with a numeral, a typewriter title types on, number pop draws
+    const b = join(work, 'jobs', 'muse', 'build'), capF = join(b, 'captions.js'), keepC = readFileSync(capF, 'utf8');
+    const caps = JSON.parse(keepC.replace(/^window\.CAPTIONS=/, '').replace(/;\s*$/, ''));
+    const base = caps.flips.filter(f => f.mode !== 7 && f.mode !== 8 && f.mode < 9);
+    writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify({ ...caps, flips: base.concat([
+      { start: 0, end: 1.2, mode: 38, count: 4, layer: 'front' },
+      { start: 1.4, end: 2.4, mode: 8, text: '', bg: 'olive', chapter: '2' },
+      { start: 2.6, end: 4.0, mode: 7, text: 'Type it on', entrance: 'typewriter', place: 'left' }]) }) + ';\n');
+    run(node, [join(KIT, 'render.mjs'), '0', '0.9,1.9,2.75,3.9'], b);
+    const st = x => readFileSync(join(b, 'stills', `t${x}.png`));
+    if (st('1.90').equals(st('0.90')) || st('2.75').equals(st('3.90'))) fail('card or typewriter did not draw');
+    writeFileSync(capF, keepC);
   });
   { // the MCP server: seven tools whose schemas come from contract.json; a tool call runs the real command
     process.stdout.write('- MCP server (stdio): menu, list_effects, draft, plan, validate, render, verify; validate runs reelmd check ... ');

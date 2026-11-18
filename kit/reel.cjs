@@ -34,6 +34,12 @@
 //          --caption-outline none|thin|thick  --caption-shadow none|soft  --caption-case upper|lower|as-said  the one-word look
 //          --caption-layer front|behind|auto  captions under the person where they overlap the head (auto = behind at the top)
 //          --panel-layer front|behind|auto  screen cards behind the head where it reaches into them (auto = behind)
+//          --tighten <s> / --no-tighten  no dead air: cut every pause inside a line longer than <s> seconds to a jump
+//            (keeps 0.12 s of breath; each jump gets the punch toggle). On at 0.3 in the magazine preset.
+//          --music-energy low|mid|high|auto  pick a library bed by energy (auto reads your pace); --bed still wins
+//          --cards auto|off  colour cards on short lines to land and numbered chapter cards on a list (kit/cards.cjs),
+//            plus the number-pop intro on a list. Auto in the magazine preset.
+//          --no-sfx-cap  turn off the sound density cap (on by default: kit/sfx-map.cjs)
 // Writes jobs/<name>/: clips/ (clip.py output), build/ (cut.json, captions.js, theme.js, overlay frames), reel-vN.mp4.
 // Steps: clip.py (Whisper, best take per sentence, retakes flagged) -> cut.json from every "keep" clip (zoom punch on
 // every cut, big punch after the hook and into the payoff, a few sounds on the key cuts only) -> autocaption ->
@@ -48,12 +54,14 @@ const B = require('./beats.cjs');
 const P = require('./preset.cjs');
 const RM = require('./reelmd.cjs');
 const S = require('./spoken.cjs');
+const CARDS = require('./cards.cjs');
+const SFXMAP = require('./sfx-map.cjs');
 
 const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer']);
+const VALUED = new Set(['export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const JSON_OUT = flag('json');
@@ -105,7 +113,7 @@ if (opt('recipe')) {
   warn.forEach(w => console.warn('note: ' + w));
   if (errs.length) die('Reel.md problems:\n- ' + errs.join('\n- '));
   const rp = RM.toPreset(recipe);
-  if (rp.bed && !R.isBed(rp.bed)) rp.bed = path.resolve(path.dirname(rf), rp.bed);
+  if (rp.bed && rp.bed !== 'auto' && !R.isBed(rp.bed)) rp.bed = path.resolve(path.dirname(rf), rp.bed);
   if (rp.logo && !opt('logo')) { const lf = path.resolve(path.dirname(rf), rp.logo); if (fs.existsSync(lf)) argv.push('--logo', lf); else console.warn('note: recipe logo not found: ' + lf); }
   preset = preset ? { ...preset, ...rp, name: rp.name } : rp;
   console.log(RM.summary(recipe).split('\n').map(l => 'recipe ' + l).join('\n'));
@@ -138,22 +146,36 @@ if (!flag('rebuild')) {
   if (!keep.length) die('No keep clips in ' + clipsDir);
   // 2. cut.json from every keep clip, in order; a glitch hit and a woosh on each seam
   const rel = p => path.relative(build, path.isAbsolute(p) ? p : path.join(path.dirname(clipsDir), p)).split(path.sep).join('/');
-  const segs = keep.map((c, i) => ({ file: rel(path.join(clipsDir, path.basename(c.file))), in: 0, out: +c.dur.toFixed(3), ...(i === 0 ? { fadeIn: 0.25 } : {}) }));
-  // big punch on the cut after the hook and the cut into the payoff (with 3+ segments)
+  // no dead air (--tighten <s>, or the preset's "tighten"): a pause inside a line longer than that cuts to a jump. The
+  // word times say where you stop and start; 0.06 s of breath stays on each side, so the jump keeps a 0.12 s pause.
+  const TIGHT = flag('no-tighten') ? false : opt('tighten') != null ? +opt('tighten') : (preset && preset.tighten != null ? preset.tighten : false);
+  if (TIGHT !== false && !(TIGHT >= 0.15 && TIGHT <= 2)) die('--tighten must be the longest pause to keep, 0.15 to 2 seconds');
+  const spansOf = c => {
+    const dur = +(+c.dur).toFixed(3), ws = (c.words || []).filter(w => w[1] > w[0]);
+    if (!TIGHT || ws.length < 2) return [[0, dur]];
+    const out = []; let a = 0;
+    for (let i = 0; i < ws.length - 1; i++) { const b = ws[i][1] + 0.06, n = ws[i + 1][0] - 0.06; if (ws[i + 1][0] - ws[i][1] > TIGHT && b - a >= 0.35) { out.push([a, b]); a = n; } }
+    out.push([a, dur]);
+    return out.map(([x, y]) => [+x.toFixed(3), +y.toFixed(3)]).filter(([x, y]) => y - x > 0.05);
+  };
+  const segs = [], clipStart = [];
+  keep.forEach((c, ci) => { clipStart.push(segs.length); spansOf(c).forEach(([a, b], k) => segs.push({ file: rel(path.join(clipsDir, path.basename(c.file))), in: a, out: b, ...(k ? { jump: true } : {}), ...(ci === 0 && k === 0 ? { fadeIn: 0.25 } : {}) })); });
+  if (TIGHT) { const was = keep.reduce((a, c) => a + +c.dur, 0), now = segs.reduce((a, s) => a + s.out - s.in, 0), n = segs.filter(s => s.jump).length; console.log(`no dead air: ${n} pause${n === 1 ? '' : 's'} over ${TIGHT} s cut to jumps (${(was - now).toFixed(1)} s shorter)`); }
+  // big punch on the cut after the hook and the cut into the payoff (with 3+ clips); a jump inside a line keeps the toggle
   const wantPunch = flag('no-punch') ? false : (preset && preset.punch === false ? false : true);
-  if (wantPunch && segs.length >= 3) { segs[1].bigPunch = true; segs[segs.length - 1].bigPunch = true; }
-  let t = 0; const seams = [];
-  segs.forEach((s, i) => { if (i) seams.push(+t.toFixed(3)); t += s.out - s.in; });
+  if (wantPunch && keep.length >= 3) { segs[clipStart[1]].bigPunch = true; segs[clipStart[keep.length - 1]].bigPunch = true; }
+  let t = 0; const seams = [], jumpSeams = new Set();
+  segs.forEach((s, i) => { if (i) { seams.push(+t.toFixed(3)); if (s.jump) jumpSeams.add(+t.toFixed(3)); } t += s.out - s.in; });
   // sound, fewer and deeper: a whoosh on the big-punch cuts (or the first cut), the boom (loudest) into the payoff;
   // every seam keeps its glitch hit, but not a sound
   const big = segs.map((s, i) => (s.bigPunch ? i : -1)).filter(i => i > 0).map(i => seams[i - 1]);
   const sfx = {};
   if (seams.length) {
-    const last = seams[seams.length - 1], wh = (big.length ? big : [seams[0]]).filter(x => x !== last || seams.length === 1);
+    const clipSeams = seams.filter(x => !jumpSeams.has(x)), last = clipSeams.length ? clipSeams[clipSeams.length - 1] : seams[seams.length - 1], wh = (big.length ? big : [clipSeams[0] ?? seams[0]]).filter(x => x !== last || seams.length === 1);
     if (wh.length) sfx.whoosh = wh;
-    if (seams.length >= 2) sfx.boom = [[last, 0.55]];
+    if (clipSeams.length >= 2) sfx.boom = [[last, 0.55]];
   }
-  const cut = { note: `Drafted by kit/reel.cjs from ${keep.length} keep clips (${clips.length - keep.length} retakes skipped). Edit, then: npm run reel -- --rebuild --name ${name}`, segs, tail: 0.3, punch: wantPunch ? 0.1 : false, hits: [[0.02, 14], ...seams.map(s => [s, 24])], sfx, overlay: 'ovl/%04d.png' };
+  const cut = { note: `Drafted by kit/reel.cjs from ${keep.length} keep clips (${clips.length - keep.length} retakes skipped). Edit, then: npm run reel -- --rebuild --name ${name}`, segs, tail: 0.3, punch: wantPunch ? (typeof (preset && preset.punch) === 'number' ? preset.punch : 0.1) : false, hits: [[0.02, 14], ...seams.filter(s => !jumpSeams.has(s)).map(s => [s, 24])], sfx, overlay: 'ovl/%04d.png' };
   if (TITLES) {
     if (flag('no-mask')) Object.assign(cut, { titles: 'ovlt/%04d.png' });
     else {
@@ -162,15 +184,29 @@ if (!flag('rebuild')) {
       Object.assign(cut, { titles: 'ovlt/%04d.png', mask: 'mask.mkv', ...(model ? { maskModel: model } : {}) });
     }
   }
-  // a library name stays a name in cut.json (portable across machines); your own file becomes an absolute path
-  const bed = opt('bed') || (preset && preset.bed) || undefined;
+  // a library name stays a name in cut.json (portable across machines); your own file becomes an absolute path.
+  // Music matched to energy: "bed": "auto" (or --music-energy, or the preset's musicEnergy) picks a library bed by
+  // energy; auto energy reads your pace (kit/rules.cjs scriptEnergy). --bed always wins.
+  let bed = opt('bed') || (preset && preset.bed) || undefined, energyBed = false;
+  const energyArg = opt('music-energy') || (preset && preset.musicEnergy) || (bed === 'auto' ? 'auto' : undefined);
+  if (energyArg && !['auto', ...R.ENERGIES].includes(String(energyArg))) die('--music-energy must be low, mid, high or auto');
+  if (!opt('bed') && energyArg && (bed === 'auto' || !bed || opt('music-energy'))) {
+    const words = []; let off = 0; for (const c of keep) { for (const w of c.words || []) words.push([w[0] + off, w[1] + off]); off += +c.dur; }
+    const e = energyArg === 'auto' ? R.scriptEnergy(words) : energyArg; bed = R.pickBed(e, name) || undefined; energyBed = true;
+    console.log(`music: ${e} energy${energyArg === 'auto' ? ' (from your pace)' : ''} -> bed ${bed || 'none'} (npm run music lists them by energy)`);
+  } else if (bed === 'auto') bed = undefined;
   if (bed) Object.assign(cut, { bed: require('./rules.cjs').isBed(bed) ? bed : path.resolve(bed), bedVol: 0.16, ...(opt('bed-start') != null ? { bedStart: +opt('bed-start') } : {}) });
+  // sound mapped to the moves and the density cap (kit/sfx-map.cjs)
+  if (preset && preset.sfxMap) cut.sfxMap = true;
+  if (preset && preset.sfxCap !== undefined) cut.sfxCap = preset.sfxCap;
+  if (flag('no-sfx-cap')) cut.sfxCap = false;
   if (flag('no-beat-sync')) cut.beatSync = false;
   else if (flag('beat-sync') || bed) cut.beatSync = true;
   if (recipe) {
     const plan = RM.shotSettings(recipe);
-    plan.forEach((p, i) => { const sg = segs[i]; if (!sg) return; if (p.finish) sg.finish = p.finish; if (p.bigPunch && wantPunch) sg.bigPunch = true; if (p.transition && i) sg.transition = p.transition; });
-    if (plan.length !== segs.length) console.log(`recipe: ${plan.length} shots in the recipe, ${segs.length} segments from your clip; per-shot settings applied to the first ${Math.min(plan.length, segs.length)}`);
+    // per-shot settings go to each clip (its first segment, or every segment for a finish, when pauses were tightened)
+    plan.forEach((p, i) => { const k = clipStart[i]; if (k == null) return; const sg = segs[k], subs = segs.slice(k, clipStart[i + 1] ?? segs.length); if (p.finish) subs.forEach(x => { x.finish = p.finish; }); if (p.bigPunch && wantPunch) sg.bigPunch = true; if (p.transition && i) sg.transition = p.transition; });
+    if (plan.length !== keep.length) console.log(`recipe: ${plan.length} shots in the recipe, ${keep.length} clips from your takes; per-shot settings applied to the first ${Math.min(plan.length, keep.length)}`);
     if (preset.bedStart != null && opt('bed-start') == null && cut.bed) cut.bedStart = preset.bedStart;
     if (preset.bedVol != null && cut.bed) cut.bedVol = preset.bedVol;
     cut.recipe = recipe.card.name;
@@ -180,12 +216,14 @@ if (!flag('rebuild')) {
   if (preset) {
     P.apply(preset, { cut }, {
       finish: opt('finish') || undefined,
-      bed: opt('bed') || undefined,
+      bed: opt('bed') || (energyBed ? bed || null : undefined),
       punch: flag('no-punch') ? false : undefined,
       beatSync: flag('no-beat-sync') ? false : (flag('beat-sync') ? true : undefined),
       titleLayer: opt('title-layer') || undefined,
     });
   }
+  // glitch off (the magazine preset): no glitch seams and no RGB drop shakes from beat-sync, soft transitions only
+  if (preset && preset.glitch === false) { cut.hits = []; cut.glitch = false; }
   if (opt('title-layer')) {
     const layer = String(opt('title-layer')).toLowerCase();
     if (!R.TITLE_LAYERS.includes(layer)) die('--title-layer must be front, behind or auto');
@@ -213,9 +251,9 @@ if (!flag('rebuild')) {
     } else {
       const mine = (caps.flips || []).filter(f => f.mode === 7).sort((a, b) => a.start - b.start), used = new Set();
       const set = new Set();
-      mine.forEach((f, i) => { const r = rt[i]; if (!r) return; if (r.entrance && !used.has(r.entrance)) { f.entrance = r.entrance; used.add(r.entrance); set.add(f); } if (r.layer) f.layer = r.layer; });
+      mine.forEach((f, i) => { const r = rt[i]; if (!r) return; if (r.entrance && !used.has(r.entrance)) { f.entrance = r.entrance; used.add(r.entrance); set.add(f); } if (r.layer) f.layer = r.layer; if (r.place) f.place = r.place; if (r.lockup) f.lockup = r.lockup; });
       mine.forEach(f => { if (!set.has(f) && f.entrance && used.has(f.entrance)) delete f.entrance; }); // each entrance once; the engine fills the rest
-      console.log(`recipe titles: entrance and layer pattern applied to ${Math.min(mine.length, rt.length)} of your ${mine.length} titles (pass --recipe-titles to use the recipe's text)`);
+      console.log(`recipe titles: entrance, layer and place pattern applied to ${Math.min(mine.length, rt.length)} of your ${mine.length} titles (pass --recipe-titles to use the recipe's text)`);
     }
     fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
   }
@@ -284,6 +322,51 @@ if (!flag('rebuild')) {
       if (gfx.length && caps.faceTop == null) { const hw = measureHead(); if (hw && hw.head_w && hw.head_cy != null) { caps.faceTop = Math.round(Math.max(0, (hw.head_top != null ? hw.head_top : hw.head_cy - hw.head_w * 0.6)) * 1920); caps.faceBottom = Math.round(Math.min(1920, hw.head_cy * 1920 + hw.head_w * 1080 * 0.9)); console.log(`face zone for the layout: ${caps.faceTop} to ${caps.faceBottom} px down (moved captions stay out of it)`); } }
       if (pos || col || Object.keys(look).length) console.log(`captions: ${pos || 'default band'}${col ? ', ' + String(col).toLowerCase() : ''}${Object.entries(look).map(([k, v]) => `, ${k === 'panelLayer' ? 'screen cards' : k.replace('caption', '').toLowerCase()} ${v}`).join('')}`);
       fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
+    }
+  }
+  // Editorial pass (the magazine preset, or the matching flags and Reel.md lines): colour and chapter cards, the
+  // number-pop intro on a list, titles placed around the head, a set entrance order. docs/guide.md "Editing principles built in".
+  {
+    const cardsMode = opt('cards') || (preset && preset.cards) || 'off';
+    if (!['auto', 'off'].includes(String(cardsMode))) die('--cards must be auto or off');
+    const places = (preset && preset.titlePlaces) || [], order = (preset && preset.entranceOrder) || [];
+    const rCards = recipe ? RM.cardFlips(recipe) : [];
+    if (cardsMode === 'auto' || rCards.length || places.length || order.length) {
+      const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), len = segs.reduce((a, sg) => a + (sg.out - sg.in), 0);
+      let fl = caps.flips || [];
+      if (rCards.length || cardsMode === 'auto') {
+        let cards = rCards.filter(c => c.start < len - 0.3).map(c => ({ ...c, end: +Math.min(c.end, len).toFixed(3) })), pop = null;
+        if (!rCards.length) {
+          const pr = CARDS.proposeCards(S.timeline(segs, build), { len, palette: preset && preset.cardPalette });
+          cards = pr.cards.map(c => CARDS.cardFlip(c)); pop = pr.numberPop;
+          for (const c of pr.cards) console.log(`card: ${c.start}-${c.end}s ${c.bg}${c.chapter != null ? ' chapter ' + c.chapter : ''} (${c.why})`);
+        }
+        fl = fl.filter(f => f.mode !== 8).concat(cards);
+        if (pop && !fl.some(f => f.mode === 38)) { fl.push({ start: pop.start, end: pop.end, mode: 38, count: pop.count }); console.log(`number pop: 1 to ${pop.count} around your head at ${pop.start}s (${pop.why})`); }
+        // a title that would sit on a card moves off it; one that starts inside a card is dropped (the card is the headline)
+        fl = fl.filter(f => !(f.mode === 7 && cards.some(c => f.start >= c.start && f.start < c.end)));
+      }
+      const titles = fl.filter(f => f.mode === 7).sort((a, b) => a.start - b.start), used = new Set(titles.map(f => f.entrance).filter(Boolean));
+      let k = 0;
+      titles.forEach((f, i) => {
+        if (order.length && !f.entrance) { const e = order.find(x => !used.has(x)); if (e) { f.entrance = e; used.add(e); } }
+        if (places.length && !f.place) { const pl = places[k++ % places.length]; if (pl !== 'center') f.place = pl; }
+        if (f.place === 'face' && !f.layer) f.layer = 'behind';
+      });
+      // the head box for placing words around it (left, right, above, chest, face), from the person mask
+      if ((places.length || fl.some(f => f.place)) && caps.headX0 == null) {
+        const fxPy = path.join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+        let hw = null; if (fs.existsSync(fxPy)) try { hw = JSON.parse(execFileSync(fxPy, [path.join(KIT, 'teardown.py'), 'headwidth', path.resolve(build, segs[0].file)], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim().split('\n').pop()); } catch {}
+        if (hw && hw.head_w) {
+          const cx = (hw.head_cx != null ? hw.head_cx : 0.5) * 1080, w = hw.head_w * 1080;
+          caps.headX0 = Math.round(cx - w / 2); caps.headX1 = Math.round(cx + w / 2);
+          if (caps.faceTop == null) { caps.faceTop = Math.round(Math.max(0, (hw.head_top != null ? hw.head_top : hw.head_cy - hw.head_w * 0.6)) * 1920); caps.faceBottom = Math.round(Math.min(1920, hw.head_cy * 1920 + w * 0.9)); }
+          console.log(`head box for placed titles: x ${caps.headX0} to ${caps.headX1}, y ${caps.faceTop} to ${caps.faceBottom} px`);
+        } else console.log('note: no person mask to measure your head (npm run effects:setup); placed titles use a typical head box');
+      }
+      caps.flips = fl;
+      fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
+      if (titles.some(f => f.place)) console.log(`titles placed: ${titles.map(f => f.place || 'center').join(', ')}`);
     }
   }
   // last check on a recipe job: every title, ordinal sticker, app label and worded graphic (kit/graphics.json "spoken")
@@ -364,6 +447,7 @@ if (B.wantBeatSync(cut) && cut.bed) {
     cut = synced.cut;
     fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
     if (synced.captions) B.writeCaptions(capFile, synced.captions);
+    if (cut.glitch === false && cut.dropHits) { delete cut.dropHits; fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); }
     const nDrop = (cut.dropHits || []).length;
     console.log(`beat-sync: ${grid.tempo_bpm} BPM, ${(grid.beats || []).length} beats, ${nDrop} drop shakes (window ${B.windowOf(cut)}s); speech cuts unchanged`);
   }
@@ -372,6 +456,15 @@ if (B.wantBeatSync(cut) && cut.bed) {
   fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
 }
 const LEN = cut.segs.reduce((a, s) => a + (s.out - s.in) + (s.pad || 0), 0) + (cut.tail ?? 0.3);
+// sounds mapped to the moves (cut.json "sfxMap": true, the magazine preset): the auto ones are replaced on every run,
+// the ones you placed stay; the density cap in kit/assemble.cjs thins them out
+if (cut.sfxMap) {
+  const capF = path.join(build, 'captions.js'), fl = fs.existsSync(capF) ? (R.readCaptions(capF).flips || []) : [];
+  const auto = SFXMAP.autoHits(cut, fl);
+  cut.sfxHits = (cut.sfxHits || []).filter(h => !h.auto).concat(auto);
+  fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
+  console.log(`sfx map: ${auto.length} sounds on the moves (${[...new Set(auto.map(h => h.why.split(' ')[0]))].join(', ')})`);
+}
 // --export <name>: the layout pass keeps everything inside that platform's safe area (captions.js exportFrame); the
 // name stays in cut.json so a later --rebuild exports again
 { const capF = path.join(build, 'captions.js');
@@ -398,6 +491,8 @@ if (cut.titles && cut.mask) {
     for (const [a, b] of spans) { const l = merged[merged.length - 1]; if (l && a <= l[1] + 1.6) l[1] = Math.max(l[1], b + 1.5); else merged.push([a, b + 1.5]); }
     if (merged.length) { behind.push(...merged.map(([a, b]) => ({ start: a, end: Math.min(b, LEN) }))); console.log(`captions behind the person: mask over ${merged.length} caption span${merged.length > 1 ? 's' : ''}`); }
   }
+  // a caption placed over the face draws behind the person
+  else { const fc = (capsNow.flips || []).filter(f => f.mode === 0 && f.place === 'face'); if (fc.length) behind.push(...fc.map(f => ({ start: f.start, end: Math.min(f.end, LEN) }))); }
   // screen cards behind the head: mask their spans, then cut the head out of the person mask (kit/headmask.py)
   const panels = R.panelsBehind(capsNow).map(f => ({ start: f.start, end: Math.min(f.end, LEN) }));
   if (panels.length && cut.panels) { behind.push(...panels); console.log(`screen cards behind the top of the head: mask over ${panels.length} card span${panels.length > 1 ? 's' : ''}`); }

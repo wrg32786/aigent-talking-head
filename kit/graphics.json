@@ -1,5 +1,5 @@
 {
- "note": "Graphic overlays drawn by kit/overlay.html as captions.js flips (modes 9 to 37). Original generic designs, drawn in code with the theme's colours and fonts; icons are Tabler (MIT) path data; techniques from the MIT repos in THIRD_PARTY.md are redrawn, no code copied. \"cues\" on any graphic are beat words or seconds that kit/spoken.cjs turns into \"at\" times from when you say them. Bring your own icon, image or screen recording where a graphic takes one, or the kit draws a neutral placeholder. \"required\" lists the worded fields a graphic cannot show without (kit/spoken.cjs keeps the graphic and leaves off any other worded field you do not say). Listed in npm run menu, the showcase, contract.json and the teardown mapping (kit/videomd2reel.cjs). Words on screen follow kit/spoken.cjs: the fields under \"spoken\" must be words you say in the graphic's window, or a recipe job drops them. \"layer\" on modes 11 to 37 is front, behind or auto: behind draws on the panel layer under the crown mask (kit/headmask.py), so only the top of your head (hair and crown) goes over the graphic, never your face or chin. auto is behind for a screen card, and for the others behind when the graphic sits in the top part of the frame (its y below \"autoBehindY\").",
+ "note": "Graphic overlays drawn by kit/overlay.html as captions.js flips (modes 9 to 38). Original generic designs, drawn in code with the theme's colours and fonts; icons are Tabler (MIT) path data; techniques from the MIT repos in THIRD_PARTY.md are redrawn, no code copied. \"cues\" on any graphic are beat words or seconds that kit/spoken.cjs turns into \"at\" times from when you say them. Bring your own icon, image or screen recording where a graphic takes one, or the kit draws a neutral placeholder. \"required\" lists the worded fields a graphic cannot show without (kit/spoken.cjs keeps the graphic and leaves off any other worded field you do not say). Listed in npm run menu, the showcase, contract.json and the teardown mapping (kit/videomd2reel.cjs). Words on screen follow kit/spoken.cjs: the fields under \"spoken\" must be words you say in the graphic's window, or a recipe job drops them. \"layer\" on modes 11 to 37 is front, behind or auto: behind draws on the panel layer under the crown mask (kit/headmask.py), so only the top of your head (hair and crown) goes over the graphic, never your face or chin. auto is behind for a screen card, and for the others behind when the graphic sits in the top part of the frame (its y below \"autoBehindY\").",
  "graphics": [
   {
    "id": "ordinal-sticker",
@@ -1007,6 +1007,35 @@
     "keyword": "one"
    },
    "detect": "a caption line where one word sits on a solid coloured block"
+  },
+  {
+   "id": "number-pop",
+   "mode": 38,
+   "entrance": "num-pop",
+   "exit": "pop-out",
+   "label": "number pop: a listicle intro, the numbers 1 to N pop in one by one on solid tiles around your head (alternating sides, never over the face), hold, then pop out together; pair it with a pop sound",
+   "fields": {
+    "count": "how many numbers, 2 to 10 (default 5)",
+    "cues": "one beat per number, words or seconds separated by ; (written to at)",
+    "at": "pop times in reel seconds, one per number (else spread over the first 60%)",
+    "color": "tile colour (default the theme accent)",
+    "ink": "numeral colour (default readable on the tile)",
+    "size": "tile size in px (default 132)",
+    "layer": "front, behind or auto (default auto: front at the default y)"
+   },
+   "spoken": [],
+   "required": [],
+   "defaults": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "example": {
+    "start": 0,
+    "end": 2.4,
+    "mode": 38,
+    "count": 5
+   },
+   "detect": "small solid tiles with the numbers 1, 2, 3... popping in one by one around the speaker's head at the start of a list video"
   }
  ],
  "autoBehindY": 0.45

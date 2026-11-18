@@ -1,6 +1,6 @@
 ---
 name: talking-head-brand
-description: "Set up and apply brand styles for aigent-talking-head reels: list, show, save and pick presets (aigent, one-word, hormozi-bold, karaoke, minimal-clean, cinematic, editorial, muse-pill, retro-scan-lines, neutral), import a brand guide into a draft preset, or let the agent choose. Use when someone wants their reels on brand, asks for a house style, or hands over a brand guide."
+description: "Set up and apply brand styles for aigent-talking-head reels: list, show, save and pick presets (aigent, one-word, hormozi-bold, karaoke, minimal-clean, cinematic, editorial, magazine, muse-pill, retro-scan-lines, neutral), import a brand guide into a draft preset, or let the agent choose. Use when someone wants their reels on brand, asks for a house style, or hands over a brand guide."
 ---
 
 # Brand presets

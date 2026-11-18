@@ -2,15 +2,15 @@
 
 Every transition, title entrance, caption entrance and caption style in aigent-talking-head, with a looping preview rendered by the kit itself, the exact name to use, and where to put it. Graphics and video effects are listed at the end.
 
-**56 transitions · 8 title entrances · 9 caption entrances · 7 caption styles · 29 graphics · 51 effects**
+**56 transitions · 9 title entrances · 10 caption entrances · 7 caption styles · 30 graphics · 51 effects**
 
-Jump to: [Transitions](#transitions) · [Title entrances](#title-entrances) · [Caption entrances](#caption-entrances) · [Caption styles](#caption-styles) · [Graphics](#graphics) · [Effects](#effects) · [For agents](#for-agents)
+Jump to: [Transitions](#transitions) · [Title entrances](#title-entrances) · [Caption entrances](#caption-entrances) · [Caption styles](#caption-styles) · [Graphics](#graphics) · [Effects](#effects) · [Editing principles](#editing-principles) · [For agents](#for-agents)
 
 ## How to pick
 
 - Browse the previews below. Each one loops: the effect plays, holds for a moment, then starts again. The name is burned into the bottom of every preview.
 - Copy the name into your `cut.json`, `captions.js`, Reel.md or command line, as shown in the **Use** column.
-- From a terminal: `npm run list -- transitions` (or `titles`, `captions`, `graphics`, `effects`) prints the same names with a one-line description. Add `--json` for machine-readable output.
+- From a terminal: `npm run list -- transitions` (or `titles`, `captions`, `graphics`, `effects`) prints the same names with a one-line description (`editing` lists the editing principles). Add `--json` for machine-readable output.
 - Previews use an AI-generated fictional presenter made for this project (`showcase/source/presenter.jpg`) and a plain gradient plate. Rebuild them with `npm run menu:render`.
 
 ## Transitions
@@ -80,7 +80,7 @@ Jump to: [Transitions](#transitions) · [Title entrances](#title-entrances) · [
 
 ## Title entrances
 
-8 ways a kinetic title (a mode 7 flip) comes in. Use each one at most once per video. In `captions.js` set `"entrance"` on the title; in a Reel.md put `entrance <name>` on a line of the `reel-titles` block. Titles sit in front of the presenter by default; `"layer": "behind"` tucks the hero word behind the head.
+9 ways a kinetic title (a mode 7 flip) comes in. Use each one at most once per video. In `captions.js` set `"entrance"` on the title; in a Reel.md put `entrance <name>` on a line of the `reel-titles` block. Titles sit in front of the presenter by default; `"layer": "behind"` tucks the hero word behind the head.
 
 <img src="menu/sheets/titles.webp" width="720" alt="Animated grid of the title entrances, each labelled with its name">
 
@@ -94,10 +94,11 @@ Jump to: [Transitions](#transitions) · [Title entrances](#title-entrances) · [
 | <img src="menu/titles/flip.webp" width="160" alt="flip title entrance"> | `flip` | The word flips in vertically, like a card turning over. | `{ "mode": 7, "text": "Record one take", "entrance": "flip" }`<br>Reel.md `#01 0.3-1.8 \| entrance flip \| text Record one take` |
 | <img src="menu/titles/pop-zoom.webp" width="160" alt="pop-zoom title entrance"> | `pop-zoom` | The word pops in from nothing with a small overshoot. | `{ "mode": 7, "text": "Record one take", "entrance": "pop-zoom" }`<br>Reel.md `#01 0.3-1.8 \| entrance pop-zoom \| text Record one take` |
 | <img src="menu/titles/drop.webp" width="160" alt="drop title entrance"> | `drop` | Each letter falls in from above with a small bounce and tilt. | `{ "mode": 7, "text": "Record one take", "entrance": "drop" }`<br>Reel.md `#01 0.3-1.8 \| entrance drop \| text Record one take` |
+| <img src="menu/titles/typewriter.webp" width="160" alt="typewriter title entrance"> | `typewriter` | The letters type on one at a time from the left behind a blinking caret. | `{ "mode": 7, "text": "Record one take", "entrance": "typewriter" }`<br>Reel.md `#01 0.3-1.8 \| entrance typewriter \| text Record one take` |
 
 ## Caption entrances
 
-9 ways the big hero word of a kinetic caption comes in, most of them letter by letter. Set one for the whole reel with `--caption-entrance <name>`, `"captionEntrance": "<name>"` in `captions.js`, or `- caption-entrance: <name>` under Style in a Reel.md. A caption flip's own `"entrance"` wins. They apply to the `kinetic` caption style (the default look).
+10 ways the big hero word of a kinetic caption comes in, most of them letter by letter. Set one for the whole reel with `--caption-entrance <name>`, `"captionEntrance": "<name>"` in `captions.js`, or `- caption-entrance: <name>` under Style in a Reel.md. A caption flip's own `"entrance"` wins. They apply to the `kinetic` caption style (the default look).
 
 <img src="menu/sheets/caption-entrances.webp" width="720" alt="Animated grid of the caption entrances, each labelled with its name">
 
@@ -112,6 +113,7 @@ Jump to: [Transitions](#transitions) · [Title entrances](#title-entrances) · [
 | <img src="menu/caption-entrances/compute.webp" width="160" alt="compute caption entrance"> | `compute` | The word decodes from random characters. | `--caption-entrance compute`<br>`"captionEntrance": "compute"` |
 | <img src="menu/caption-entrances/levitate.webp" width="160" alt="levitate caption entrance"> | `levitate` | Letters float up into place. | `--caption-entrance levitate`<br>`"captionEntrance": "levitate"` |
 | <img src="menu/caption-entrances/undulate.webp" width="160" alt="undulate caption entrance"> | `undulate` | Letters ride a wave that calms down. | `--caption-entrance undulate`<br>`"captionEntrance": "undulate"` |
+| <img src="menu/caption-entrances/typewriter.webp" width="160" alt="typewriter caption entrance"> | `typewriter` | The word types on letter by letter behind a blinking caret. | `--caption-entrance typewriter`<br>`"captionEntrance": "typewriter"` |
 
 ## Caption styles
 
@@ -131,7 +133,7 @@ Jump to: [Transitions](#transitions) · [Title entrances](#title-entrances) · [
 
 ## Graphics
 
-29 overlay graphics drawn in the theme colours and fonts, each with its own entrance. Add one as a flip in `captions.js` with its `"mode"`, or as a line in a Reel.md `reel-graphics` block with `type <name>`. Words on a graphic must be words you say. Field details are in [reel-md.md](reel-md.md) and [contract.json](../contract.json); stills of every one are in the [gallery](../showcase/GALLERY.md#graphics).
+30 overlay graphics drawn in the theme colours and fonts, each with its own entrance. Add one as a flip in `captions.js` with its `"mode"`, or as a line in a Reel.md `reel-graphics` block with `type <name>`. Words on a graphic must be words you say. Field details are in [reel-md.md](reel-md.md) and [contract.json](../contract.json); stills of every one are in the [gallery](../showcase/GALLERY.md#graphics).
 
 ![Contact sheet of the overlay graphics](../showcase/sheets/graphics.jpg)
 
@@ -166,6 +168,7 @@ Jump to: [Transitions](#transitions) · [Title entrances](#title-entrances) · [
 | `hud-callout` | 35 | `lock-on` | HUD callout: corner brackets spin in and lock onto a region (a flash, centre ticks, a scan line), a leader line draws out with an elbow to a label that decodes into place | `"mode": 35`<br>Reel.md `type hud-callout` |
 | `flash-card` | 36 | `flash-cut` | flash cards: full-bleed type cards, one word each in Anton, hard cut on each beat with a punch-in, alternating accent and ink grounds; covers the frame | `"mode": 36`<br>Reel.md `type flash-card` |
 | `keyword-caption` | 37 | `block-in` | keyword caption: a caption line rises word by word, then a solid accent block wipes in behind the keyword and its letters flip to ink on it; an optional tag above | `"mode": 37`<br>Reel.md `type keyword-caption` |
+| `number-pop` | 38 | `num-pop` | number pop: a listicle intro, the numbers 1 to N pop in one by one on solid tiles around your head (alternating sides, never over the face), hold, then pop out together; pair it with a pop sound | `"mode": 38`<br>Reel.md `type number-pop` |
 
 ## Effects
 
@@ -227,8 +230,31 @@ Jump to: [Transitions](#transitions) · [Title entrances](#title-entrances) · [
 | `crayon-write` | claim, hook | A red crayon writes your word behind your head, then underlines it and flies off. | `"fx": "crayon-write"` |
 | `fan-build` | proof | Your reel covers deal into a fan behind your head, one card at a time. | `"fx": "fan-build"` |
 
+## Editing principles
+
+Common short-form editing advice, built into the engine. Each one works on its own; `--preset magazine` (or `- preset: magazine` under Brand kit in a Reel.md) turns them all on, and [examples/recipes/magazine.Reel.md](../examples/recipes/magazine.Reel.md) shows every line. Why each one helps, in plain words: [guide.md](guide.md#editing-principles-built-in). The `typewriter` entrances are in the tables above and `number-pop` is in Graphics.
+
+| Name | What it does | Use |
+|---|---|---|
+| `magazine` | Every principle below at once: serif and sans mixed, placed titles, colour and chapter cards, energy-matched music, mapped and capped sounds, 12% punch-ins, typewriter and crossfades, no dead air. | `--preset magazine  or  Reel.md  - preset: magazine` |
+| `accent-script` | Three faces in one phrase: a serif numeral or hero word, one italic serif word, sans for the rest (pairings playfair and dmserif do it by default). | `"lockup": { "accent": "script" }  or  Reel.md title  \| accent script \|` |
+| `place-left` | The words sit left of your head at eye level. | `"place": "left"  on a title or caption  or  Reel.md  \| place left \|` |
+| `place-right` | The words sit right of your head at eye level. | `"place": "right"  or  \| place right \|` |
+| `place-above` | The words sit above your head. | `"place": "above"  or  \| place above \|` |
+| `place-chest` | The words sit across your chest. | `"place": "chest"  or  \| place chest \|` |
+| `place-face` | Big over your face, behind your head (a title goes in front with layer front). | `"place": "face"  or  \| place face \|` |
+| `title-places` | Drafted titles take these places in turn. | `"titlePlaces": ["left","face","right","chest"]  in a preset  or  Reel.md  - title-places: left, face, right` |
+| `colour-card` | The frame cuts to a flat colour for a beat and your caption words carry it in the card ink (olive, ivory, sage, clay, blush, forest, navy, cream, paper, blue, ink). | `{ "mode": 8, "bg": "olive" }  or  Reel.md reel-cards  #01 4.2-5.4 \| bg olive` |
+| `chapter-card` | A colour card with a big serif numeral, one per list item. | `{ "mode": 8, "bg": "ivory", "chapter": "2" }  or  reel-cards  \| bg ivory \| chapter 2` |
+| `cards-auto` | Chapter cards when you count off a list, colour cards on short lines to land, and the number-pop intro; npm run plan -- <job> --cards writes them to the Reel.md first. | `--cards auto  or  "cards": "auto"  or  Reel.md  - cards: auto` |
+| `music-energy` | A library bed picked by energy; auto reads how fast you talk. | `--music-energy low\|mid\|high\|auto  or  Reel.md Music  - energy: auto  (- bed: auto)` |
+| `sfx-map` | A whoosh on named transitions, a swipe on cards, a pop on titles, graphics and list numbers, typing under a typewriter title, a click on a big punch-in. | `"sfxMap": true  or  Reel.md  - sfx-map: on` |
+| `sfx-cap` | The sound density cap, on by default: sounds stay apart and sparse, the bigger move wins. | `"sfxCap": { "minGap": 0.25, "per10": 6 }  or  --no-sfx-cap  or  Reel.md  - sfx-cap: 0.4/4` |
+| `punch` | Every other cut punches in by this much (10% by default; 10 to 15% reads best). | `"punch": 0.12  in cut.json or a preset  or  Reel.md  - punch: 0.12` |
+| `tighten` | No dead air: a pause inside a line longer than this cuts to a jump, keeping a breath. | `--tighten 0.3  or  "tighten": 0.3  or  Reel.md  - tighten: 0.3   (--no-tighten)` |
+
 ## For agents
 
-- `npm run list -- <kind> --json` returns `{ kind, sections: [{ id, title, hint, items: [{ id, flag, label, preview }] }] }`. Kinds: `transitions`, `titles`, `captions` (caption entrances and caption styles), `graphics`, `effects`, or any section id from `npm run menu`.
+- `npm run list -- <kind> --json` returns `{ kind, sections: [{ id, title, hint, items: [{ id, flag, label, preview }] }] }`. Kinds: `transitions`, `titles`, `captions` (caption entrances and caption styles), `graphics`, `effects`, `editing`, or any section id from `npm run menu`.
 - The MCP server (`npm run mcp`) has a `list_effects` tool with the same kinds, and the `menu` tool for every option.
 - `npm run check` fails if a name in the kit is missing from this page, so the menu cannot fall behind the code.

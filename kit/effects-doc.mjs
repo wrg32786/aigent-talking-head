@@ -17,7 +17,7 @@ export function effectsDoc(menu = loadMenu()) {
   const sec = id => menu.sections.find(s => s.id === id);
   const trans = JSON.parse(readFileSync(join(KIT, 'transitions.json'), 'utf8'));
   const T = sec('transitions').items, TE = sec('title-entrances').items, CE = sec('caption-entrances').items;
-  const CS = sec('caption-styles').items, G = sec('graphics').items, E = sec('effects').items;
+  const CS = sec('caption-styles').items, G = sec('graphics').items, E = sec('effects').items, ED = sec('editing').items;
   // aliases: names that map to the same engine mode as an earlier name
   const firstOf = {};
   for (const it of T) { const k = JSON.stringify(trans.names[it.id]); if (trans.names[it.id] != null && !(k in firstOf)) firstOf[k] = it.id; }
@@ -26,11 +26,11 @@ export function effectsDoc(menu = loadMenu()) {
   L.push('# Effects menu', '');
   L.push('Every transition, title entrance, caption entrance and caption style in aigent-talking-head, with a looping preview rendered by the kit itself, the exact name to use, and where to put it. Graphics and video effects are listed at the end.', '');
   L.push(`**${T.length} transitions · ${TE.length} title entrances · ${CE.length} caption entrances · ${CS.length} caption styles · ${G.length} graphics · ${E.length} effects**`, '');
-  L.push('Jump to: [Transitions](#transitions) · [Title entrances](#title-entrances) · [Caption entrances](#caption-entrances) · [Caption styles](#caption-styles) · [Graphics](#graphics) · [Effects](#effects) · [For agents](#for-agents)', '');
+  L.push('Jump to: [Transitions](#transitions) · [Title entrances](#title-entrances) · [Caption entrances](#caption-entrances) · [Caption styles](#caption-styles) · [Graphics](#graphics) · [Effects](#effects) · [Editing principles](#editing-principles) · [For agents](#for-agents)', '');
   L.push('## How to pick', '');
   L.push('- Browse the previews below. Each one loops: the effect plays, holds for a moment, then starts again. The name is burned into the bottom of every preview.');
   L.push('- Copy the name into your `cut.json`, `captions.js`, Reel.md or command line, as shown in the **Use** column.');
-  L.push('- From a terminal: `npm run list -- transitions` (or `titles`, `captions`, `graphics`, `effects`) prints the same names with a one-line description. Add `--json` for machine-readable output.');
+  L.push('- From a terminal: `npm run list -- transitions` (or `titles`, `captions`, `graphics`, `effects`) prints the same names with a one-line description (`editing` lists the editing principles). Add `--json` for machine-readable output.');
   L.push('- Previews use an AI-generated fictional presenter made for this project (`showcase/source/presenter.jpg`) and a plain gradient plate. Rebuild them with `npm run menu:render`.', '');
 
   L.push('## Transitions', '');
@@ -75,8 +75,14 @@ export function effectsDoc(menu = loadMenu()) {
   for (const it of E) L.push(`| ${code(it.id)} | ${it.moments.join(', ')} | ${cell(it.label)} | ${code(`"fx": "${it.id}"`)} |`);
   L.push('');
 
+  L.push('## Editing principles', '');
+  L.push(`Common short-form editing advice, built into the engine. Each one works on its own; \`--preset magazine\` (or \`- preset: magazine\` under Brand kit in a Reel.md) turns them all on, and [examples/recipes/magazine.Reel.md](../examples/recipes/magazine.Reel.md) shows every line. Why each one helps, in plain words: [guide.md](guide.md#editing-principles-built-in). The \`typewriter\` entrances are in the tables above and \`number-pop\` is in Graphics.`, '');
+  L.push('| Name | What it does | Use |', '|---|---|---|');
+  for (const it of ED) L.push(`| ${code(it.id)} | ${cell(cap(it.label))}. | ${code(it.flag)} |`);
+  L.push('');
+
   L.push('## For agents', '');
-  L.push('- `npm run list -- <kind> --json` returns `{ kind, sections: [{ id, title, hint, items: [{ id, flag, label, preview }] }] }`. Kinds: `transitions`, `titles`, `captions` (caption entrances and caption styles), `graphics`, `effects`, or any section id from `npm run menu`.');
+  L.push('- `npm run list -- <kind> --json` returns `{ kind, sections: [{ id, title, hint, items: [{ id, flag, label, preview }] }] }`. Kinds: `transitions`, `titles`, `captions` (caption entrances and caption styles), `graphics`, `effects`, `editing`, or any section id from `npm run menu`.');
   L.push('- The MCP server (`npm run mcp`) has a `list_effects` tool with the same kinds, and the `menu` tool for every option.');
   L.push('- `npm run check` fails if a name in the kit is missing from this page, so the menu cannot fall behind the code.', '');
   return L.join('\n');

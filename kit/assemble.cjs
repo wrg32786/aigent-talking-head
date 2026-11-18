@@ -35,6 +35,9 @@
 // time or [time, gain]. "sfxHits": [{ "id": "01-cinematic-hit-a", "t": 4.2 }] places a pack sound (kit/sfx/sfx.json) so
 // its hit point lands on t. fx.cjs auto-picks these from the effect plan unless --sfx off. Fewer and deeper: never a
 // sound on every cut, the key moment gets the loudest one. SFX and the bed both duck under the voice.
+// "sfxMap": true maps pack sounds to the moves (kit/sfx-map.cjs: whoosh on transitions, swipe on cards, pop on text,
+// typing under a typewriter title, click on a big punch); "sfxCap": {"minGap":0.25,"per10":6} is the density cap, on by
+// default ("sfxCap": false turns it off).
 // "norm": true runs loudnorm -16 LUFS on that segment (raw camera audio sits near -32 LUFS; HeyGen and clip.py output do not need it).
 // Env overrides: NOSFX=1, NOBED=1, BEDVOL=<n>, BEDNOFADE=1. "bedStart" (or --bed-start on npm run reel) is where the track begins.
 // Effects pass (kit/fx.cjs drives these): BASEONLY=1 writes just the graded cut with the voice (no overlay, hits,
@@ -48,6 +51,7 @@ const out = process.argv[2] || 'out.mp4';
 const KIT = __dirname;
 const R = require('./rules.cjs');
 const SFXPLAN = require('./sfx-plan.cjs');
+const SFXMAP = require('./sfx-map.cjs');
 const B = require('./beats.cjs');
 const XFX = require('./xfx.cjs');
 const A = 'aresample=48000,aformat=channel_layouts=stereo,asetpts=PTS-STARTPTS';
@@ -212,17 +216,27 @@ f.push(`[${vcur}]fps=24,trim=0:${LEN}[vo]`);
 // A job can add its own sound files in cut.json: "sounds": {"name": {"file": "../sfx/x.wav", "peak": 0.2, "vol": 0.4}} (file relative to build/).
 const lbl = [], SFX = { ...R.SFX, ...Object.fromEntries(Object.entries(C.sounds || {}).map(([k, s]) => [k, { peak: 0, vol: 0.4, ...s, file: path.resolve(s.file) }])) };
 if (!process.env.NOSFX) {
+  // the density cap (kit/sfx-map.cjs): at least minGap s between sounds, at most per10 in any 10 s, the bigger move
+  // and the sound you placed winning; cut.json "sfxCap": false turns it off
+  const packHits = Array.isArray(C.sfxHits) ? C.sfxHits
+    : (fs.existsSync('sfx-hits.json') ? (JSON.parse(fs.readFileSync('sfx-hits.json', 'utf8')).hits || []) : []);
+  const ev = [];
   for (const k of Object.keys(C.sfx || {})) {
-    const S = SFX[k]; if (!S) { console.error(`unknown sfx "${k}"; use one of ${Object.keys(SFX).join(', ')}`); process.exit(1); }
-    const ts = R.sfxHits(C.sfx[k]); if (!ts.length) continue;
+    if (!SFX[k]) { console.error(`unknown sfx "${k}"; use one of ${Object.keys(SFX).join(', ')}`); process.exit(1); }
+    R.sfxHits(C.sfx[k]).forEach(h => ev.push({ t: h.t, kind: SFXMAP.kindOf(k), manual: true, k, h }));
+  }
+  packHits.forEach(h => { if (!SFXPLAN.lookup(h.id)) { console.error(`unknown sfx id "${h.id}" (kit/sfx/sfx.json)`); process.exit(1); } ev.push({ t: +h.t, kind: SFXMAP.kindOf(h.id), manual: !h.auto, p: h }); });
+  const capped = SFXMAP.capHits(ev, C.sfxCap), dropped = capped.filter(e => !e.keep);
+  if (dropped.length) console.log(`sfx cap: ${dropped.length} of ${ev.length} sounds left out (too close together or too many in 10 s): ${dropped.map(e => `${e.k || e.p.id}@${(+e.t).toFixed(2)}`).join(', ')}`);
+  const keptEv = capped.filter(e => e.keep);
+  for (const k of Object.keys(C.sfx || {})) {
+    const S = SFX[k], ts = keptEv.filter(e => e.k === k).map(e => e.h); if (!ts.length) continue;
     const n = inp('-i', path.resolve(KIT, S.file));
     f.push(`[${n}:a]${A},asplit=${ts.length}` + ts.map((_, j) => `[${k}s${j}]`).join(''));
     ts.forEach((h, j) => { const ms = Math.max(0, Math.round((h.t - S.peak) * 1000)); f.push(`[${k}s${j}]volume=${h.g ?? S.vol},adelay=${ms}|${ms}[${k}d${j}]`); lbl.push(`[${k}d${j}]`); });
   }
-  const packHits = Array.isArray(C.sfxHits) ? C.sfxHits
-    : (fs.existsSync('sfx-hits.json') ? (JSON.parse(fs.readFileSync('sfx-hits.json', 'utf8')).hits || []) : []);
-  packHits.forEach((h, j) => {
-    const S = SFXPLAN.lookup(h.id); if (!S) { console.error(`unknown sfx id "${h.id}" (kit/sfx/sfx.json)`); process.exit(1); }
+  keptEv.filter(e => e.p).map(e => e.p).forEach((h, j) => {
+    const S = SFXPLAN.lookup(h.id);
     const n = inp('-i', path.join(KIT, 'sfx', S.file));
     const hit = h.hit != null ? +h.hit : S.hit, gain = h.gain != null ? +h.gain : S.gain;
     let st = h.t - hit, cut = 0; if (st < 0) { cut = -st; st = 0; }

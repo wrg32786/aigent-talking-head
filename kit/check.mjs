@@ -57,10 +57,10 @@ function checkJob(captionsFile, cutFile, label) {
   }
   if (CAP.lockup && CAP.lockup.arrange && !ARR.includes(CAP.lockup.arrange)) errs.push(`lockup arrange "${CAP.lockup.arrange}" (${ARR.join(', ')})`);
   if (CAP.captionPosition && !['top', 'middle', 'bottom'].includes(CAP.captionPosition)) errs.push(`captionPosition "${CAP.captionPosition}" (top, middle, bottom)`);
-  for (const [k, vals] of [['captionOutline', ['none', 'thin', 'thick']], ['captionShadow', ['none', 'soft']], ['captionCase', ['upper', 'lower', 'as-said']], ['captionLayer', ['front', 'behind', 'auto']], ['captionEntrance', ['pop', 'unfurl', 'cascade', 'orbit', 'warp', 'crystallize', 'compute', 'levitate', 'undulate']]]) if (CAP[k] && !vals.includes(CAP[k])) errs.push(`${k} "${CAP[k]}" (${vals.join(', ')})`);
+  for (const [k, vals] of [['captionOutline', ['none', 'thin', 'thick']], ['captionShadow', ['none', 'soft']], ['captionCase', ['upper', 'lower', 'as-said']], ['captionLayer', ['front', 'behind', 'auto']], ['captionEntrance', ['pop', 'unfurl', 'cascade', 'orbit', 'warp', 'crystallize', 'compute', 'levitate', 'undulate', 'typewriter']]]) if (CAP[k] && !vals.includes(CAP[k])) errs.push(`${k} "${CAP[k]}" (${vals.join(', ')})`);
   if (CAP.captionColor && !/^#[0-9a-f]{6}$/i.test(CAP.captionColor)) errs.push(`captionColor "${CAP.captionColor}" (a #rrggbb colour)`);
   // graphics (kit/graphics.json): an icon or screen file that is named must exist; leaving it out draws the placeholder
-  for (const f of flips.filter(x => x.mode >= 9 && x.mode <= 37)) {
+  for (const f of flips.filter(x => x.mode >= 9 && x.mode <= 38)) {
     const file = f.mode === 10 || f.mode === 19 ? f.icon : f.mode === 11 ? f.src : null;
     if (file && !existsSync(resolve(dirname(captionsFile), file))) errs.push(`graphic ${f.start}s: no file at ${file}`);
     if (f.mode === 9 && f.layer && !['front', 'behind'].includes(f.layer)) errs.push(`graphic ${f.start}s: layer "${f.layer}" (front, behind)`);
@@ -68,7 +68,7 @@ function checkJob(captionsFile, cutFile, label) {
     if (f.mode >= 12 && f.layer && !R.PANEL_LAYERS.includes(f.layer)) errs.push(`graphic ${f.start}s: layer "${f.layer}" (front, behind, auto)`);
     for (const [m, nm] of [[14, 'checklist'], [30, 'ticker'], [32, 'feature cards']]) if (f.mode === m && !(Array.isArray(f.items) ? f.items.length : String(f.items || '').trim())) errs.push(`${nm} ${f.start}s: no items`);
     if (f.mode === 24 && !String(f.values || '').trim()) errs.push(`data chart ${f.start}s: no values`);
-    // the worded fields of graphics 12 to 37 follow the copy rules too (a code card and a terminal session are code, so they are left alone)
+    // the worded fields of graphics 12 to 38 follow the copy rules too (a code card and a terminal session are code, so they are left alone)
     if (f.mode >= 12 && f.mode !== 23 && f.mode !== 28) for (const v of [f.text, f.sub, f.left, f.right, f.keyword, ...(Array.isArray(f.items) ? f.items : []), ...(Array.isArray(f.details) ? f.details : [])]) if (typeof v === 'string' && v) R.lintCopy(v).errs.forEach(x => errs.push(`graphic ${f.start}s: ${x}`));
   }
   if (CAP.captionStyle && !['kinetic', 'oneword', 'classic', 'pill', 'hormozi', 'karaoke', 'one-word'].includes(CAP.captionStyle)) errs.push(`captionStyle "${CAP.captionStyle}" (kinetic, oneword, classic, pill, hormozi, karaoke, one-word)`);

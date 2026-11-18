@@ -60,7 +60,8 @@
       {"id": "cta-button", "mode": 34, "entrance": "button-press", "exit": "fade-down", "spoken": ["text", "sub"], "required": ["text"], "fields": ["text", "sub", "cues", "at", "color", "x", "y", "layer"], "summary": "CTA button: a lit accent button rises, a pointer glides in and clicks it (the button squashes and flashes, a ripple rings out); a sub line under it"},
       {"id": "hud-callout", "mode": 35, "entrance": "lock-on", "exit": "release", "spoken": ["text", "sub"], "required": ["text"], "fields": ["text", "sub", "x", "y", "w", "h", "color", "layer"], "summary": "HUD callout: corner brackets spin in and lock onto a region (a flash, centre ticks, a scan line), a leader line draws out with an elbow to a label that decodes into place"},
       {"id": "flash-card", "mode": 36, "entrance": "flash-cut", "exit": "slats-out", "spoken": ["text"], "required": ["text"], "fields": ["text", "cues", "at", "bg", "color", "size", "layer"], "summary": "flash cards: full-bleed type cards, one word each in Anton, hard cut on each beat with a punch-in, alternating accent and ink grounds; covers the frame"},
-      {"id": "keyword-caption", "mode": 37, "entrance": "block-in", "exit": "drop-away", "spoken": ["text", "keyword"], "required": ["text", "keyword"], "fields": ["text", "keyword", "tag", "cues", "at", "case", "color", "y", "textSize", "layer"], "summary": "keyword caption: a caption line rises word by word, then a solid accent block wipes in behind the keyword and its letters flip to ink on it; an optional tag above"}
+      {"id": "keyword-caption", "mode": 37, "entrance": "block-in", "exit": "drop-away", "spoken": ["text", "keyword"], "required": ["text", "keyword"], "fields": ["text", "keyword", "tag", "cues", "at", "case", "color", "y", "textSize", "layer"], "summary": "keyword caption: a caption line rises word by word, then a solid accent block wipes in behind the keyword and its letters flip to ink on it; an optional tag above"},
+      {"id": "number-pop", "mode": 38, "entrance": "num-pop", "exit": "pop-out", "spoken": [], "required": [], "fields": ["count", "cues", "at", "color", "ink", "size", "layer"], "summary": "number pop: a listicle intro, the numbers 1 to N pop in one by one on solid tiles around your head (alternating sides, never over the face), hold, then pop out together; pair it with a pop sound"}
     ]
   },
   "commands": [
@@ -95,10 +96,14 @@
         { "name": "caption-case", "type": "enum", "values": ["upper", "lower", "as-said"], "values_from": "kit/reelmd.cjs CAPTION_LOOK", "default": null },
         { "name": "caption-layer", "type": "enum", "values": ["front", "behind", "auto"], "values_from": "kit/reelmd.cjs CAPTION_LOOK", "default": "auto for top captions, front otherwise", "description": "captions under the person where they overlap the head; auto puts top captions behind" },
         { "name": "panel-layer", "type": "enum", "values": ["front", "behind", "auto"], "values_from": "kit/reelmd.cjs CAPTION_LOOK", "default": "auto", "description": "screen cards behind the head where it reaches into them; auto means behind" },
-        { "name": "caption-entrance", "type": "enum", "values": ["pop", "unfurl", "cascade", "orbit", "warp", "crystallize", "compute", "levitate", "undulate"], "values_from": "kit/reelmd.cjs CAPTION_LOOK", "default": "pop", "description": "how kinetic hero words enter, letter by letter (rewritten from the MIT SwiftUI thinking-text catalog)" },
+        { "name": "caption-entrance", "type": "enum", "values": ["pop", "unfurl", "cascade", "orbit", "warp", "crystallize", "compute", "levitate", "undulate", "typewriter"], "values_from": "kit/reelmd.cjs CAPTION_LOOK", "default": "pop", "description": "how kinetic hero words enter, letter by letter (rewritten from the MIT SwiftUI thinking-text catalog)" },
         { "name": "mask", "type": "enum", "values": ["birefnet", "birefnet-general-lite", "birefnet-portrait", "mediapipe"], "values_from": "kit/rules.cjs MASK_MODELS", "default": "mediapipe", "description": "person-mask backend for titles behind the head" },
         { "name": "no-mask", "type": "boolean", "default": false, "description": "skip the person mask" },
         { "name": "no-punch", "type": "boolean", "default": false, "description": "no zoom punch on cuts" },
+        { "name": "tighten", "type": "number", "default": "off (0.3 in the magazine preset)", "description": "no dead air: cut every pause inside a line longer than this many seconds to a jump (0.15 to 2)" },
+        { "name": "no-tighten", "type": "boolean", "default": false, "description": "keep every pause, even when the preset tightens" },
+        { "name": "cards", "type": "enum", "values": ["auto", "off"], "default": "off (auto in the magazine preset)", "description": "colour cards on short lines to land, numbered chapter cards and a number-pop intro on a counted list" },
+        { "name": "music-energy", "type": "enum", "values": ["low", "mid", "high", "auto"], "default": null, "description": "pick a library bed by energy; auto reads your pace; --bed still wins" },
         { "name": "cropx", "type": "number", "default": "0.5", "description": "horizontal crop centre, 0 to 1 (0.4 puts the face left of centre)" },
         { "name": "model", "type": "string", "default": "small.en (or TX_MODEL)", "description": "Whisper model for clip.py: small.en is fast on a CPU; large-v3 is the most accurate and slow, a ~3 GB download the first time (a notice prints before any download)" },
         { "name": "hook", "type": "string", "default": null, "description": "take to use for the first sentence" },
@@ -111,6 +116,7 @@
         { "name": "logo", "type": "path", "default": null, "description": "logo file for the end card" },
         { "name": "sfx", "type": "enum", "values": ["off"], "default": null, "description": "off skips the locked-set sounds" },
         { "name": "no-sfx", "type": "boolean", "default": false, "description": "same as --sfx off" },
+        { "name": "no-sfx-cap", "type": "boolean", "default": false, "description": "turn off the sound density cap (at least 0.25 s apart, at most 6 in any 10 s, by default)" },
         { "name": "draft", "type": "boolean", "default": false, "description": "stop after captions.js so it can be edited" },
         { "name": "rebuild", "type": "boolean", "default": false, "description": "re-render and re-assemble an edited job (use with --name)" },
         { "name": "force", "type": "boolean", "default": false, "description": "re-clip and redraft over an existing job" },
@@ -147,6 +153,8 @@
         { "name": "max", "type": "number", "default": "one per 3 s of reel", "description": "at most this many graphics" },
         { "name": "fresh", "type": "boolean", "default": false, "description": "propose again over lines an earlier plan wrote (they carry why); lines you wrote always stay" },
         { "name": "dry", "type": "boolean", "default": false, "description": "print the Reel.md, write nothing" },
+        { "name": "cards", "type": "boolean", "default": false, "description": "propose colour cards and chapter cards (on by default when the recipe uses cards, as the magazine preset does)" },
+        { "name": "no-cards", "type": "boolean", "default": false, "description": "no colour or chapter cards" },
         { "name": "jobs", "type": "path", "default": "jobs/", "description": "jobs folder" },
         { "name": "json", "type": "boolean", "default": false, "description": "print one JSON result line at the end: { ok, recipe, seconds, proposed, kept, dropped, fuzzy, next }" }
       ],
