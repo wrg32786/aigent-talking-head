@@ -165,6 +165,34 @@ Like the rest of Studio, both endpoints answer on localhost only and refuse cros
 
 Draft first. "Picks and why" opens with each pick per beat and the reason. The log and the exact command are folded below it. Render then builds the reel, applies your choices edits, and lists every output (`reel-vN.mp4` and the export) with a player and a download link. The effects pass (camera moves, person-mask effects) runs when the effects venv is set up (`npm run effects:setup`); without it, Studio says which picked effects were skipped.
 
+## Review your edit
+
+Five tools in the Reference and Render steps help you see what changed and say what to change next. They read files the kit already writes (the teardown's `Reel.md`, the draft's `clips.json` and `choices.json`), so nothing goes online.
+
+**What to swap** (Reference step, under the breakdown). The reference's parts in order with their times: the hook, every cut and how it moves, title moments, b-roll and cards, graphics and the call to action. Click a time to watch that moment in the reference. Each part lists the Studio picks that match it (transition, title entrance, finish, caption style, punch, graphic); click one chip to pick it, or **Use** to pick them all. Only items the menu has are offered.
+
+<img src="studio/swap-desktop.png" width="620" alt="What to swap: the reference video next to a list of its parts, each with a time button, a kind such as Hook, Cut, Title or CTA, what happens there, chips for matching picks and a Use button">
+
+**Show original** (Render step). Your reel and the reference on one clock: side by side, or the reference laid over your reel with an opacity slider. One play button and one scrubber drive both. If the reference starts earlier or later than your reel, set "Original starts at" in seconds. The reference plays muted unless you tick its sound.
+
+<img src="studio/compare-desktop.png" width="620" alt="Show original: the reference and your reel side by side at the same moment, with one play button, one scrubber, a start offset and a sound checkbox">
+
+**Comment on the preview.** Press **Comment on this frame**: the reel pauses and you click a spot or drag a box on it, then type what should change ("move this title up"). It goes to the Studio chat as one message with the reel name, the time, the spot or box in percent of the frame, and a saved copy of the frame with your mark on it (`jobs/<job>/comments/comment-N.jpg`). Your terminal agent gets the frame path and the box in the message's `attach` field (`studio_wait_for_message`, `studio_get_pending`), so it can open the image and act on it. With a model or keywords answering the chat, the same line goes to them.
+
+<img src="studio/comment-desktop.png" width="620" alt="Commenting: a red box drawn over the head in your reel, the time of the frame, and a text box with Move this title up a little">
+
+**Clean-up pass.** After a draft, Studio lists what it could cut, from the Whisper word timings of your clips: pauses longer than 0.7 s (you can change that), filler words (um, uh, erm, ah, hmm) and the takes the take check flagged as retakes. Each row has a play button to hear it and Keep or Remove. Pauses and fillers start as Remove; retakes are already left out of the draft, and Keep brings one back. **Apply and redraft** writes `jobs/<job>/cleanup.json` and drafts again from the same clips (no new transcription) with `npm run reel -- --cleanup <file>`: each removed span becomes a jump cut, like `--tighten`, and the captions follow. Nothing is deleted, and **Turn off** goes back to the plain draft. When you change the footage, the clean-up stops applying until you review it again.
+
+<img src="studio/cleanup-desktop.png" width="620" alt="Clean-up pass: filters for pauses, fillers and retakes, and rows for a filler um, a 0.9 s pause and a flagged retake, each with a play button and Keep or Remove">
+
+**Edit receipt.** `choices.json` in plain sentences: the style and your locks, captions and music, then every beat, title, graphic and card with its time and the reason the engine gave. The clean-up shows here too. **Copy** puts it on the clipboard as text. "Picks and why" below it is still where you change a pick.
+
+<img src="studio/receipt-desktop.png" width="620" alt="Edit receipt: the look, the clean-up, each beat with its time, transition, finish and reason, and each title with its entrance and reason">
+
+API: `GET /api/reference/video` (the session's reference file, with range requests), `GET /api/cleanup?silence=`, `POST /api/cleanup` (`decisions`, `silence`, `redraft`, or `on: false`), `POST /api/comment` (`text`, `t`, `region` as 0 to 1 fractions, `video`, `image` as a data URL), and `GET /api/choices` now returns `receipt`. The state carries `swap` (the parts list) and `cleanupReady`. The logic lives in `kit/studio/review.mjs`.
+
+On a phone the two videos stay side by side at half width and the lists stack: [screenshot](studio/review-phone.png).
+
 ## On a phone
 
 <p>

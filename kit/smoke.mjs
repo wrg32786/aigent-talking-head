@@ -983,6 +983,7 @@ try {
     } finally { srv.kill(); rmSync(join(dirname(KIT), 'jobs', job), { recursive: true, force: true }); }
     console.log('ok');
   }
+  step('Studio review tools in Chrome: what to swap, show original, comments, clean-up pass, edit receipt (tests/studio-review.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-review.e2e.mjs')], dirname(KIT)); });
   step('check.mjs flags em dashes and banned phrases in captions', () => {
     const b = join(work, 'jobs', 'muse', 'build');
     const caps = { captionStyle: 'pill', flips: [{ start: 0, end: 1, text: 'This is not a tool but a team', mode: 0 }, { start: 1, end: 2, text: 'Fast \u2014 really fast', mode: 0 }] };

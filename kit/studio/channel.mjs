@@ -28,7 +28,7 @@ export function touch(info = {}) {
 
 export const pending = s => (s.chat || []).filter(m => m.role === 'user' && m.to === 'agent' && m.status === 'queued');
 export const unanswered = s => (s.chat || []).filter(m => m.role === 'user' && m.to === 'agent' && m.status !== 'answered');
-const brief = m => ({ id: m.id, text: m.text, at: m.at });
+const brief = m => ({ id: m.id, text: m.text, at: m.at, ...(m.attach ? { attach: m.attach } : {}) });
 
 // what the agent needs to act on a Studio message, without the whole menu
 export function context(s) {

@@ -28,6 +28,8 @@ When the user says "install and run Studio", "set up Studio and run the Studio c
 
 **Getting Studio messages while you are busy.** You cannot be interrupted mid-step. Idle: wait with `studio_wait_for_message` and you answer within seconds. Busy in the terminal: call `studio_get_pending` at the start of each turn (it is cheap and returns nothing when nothing waits). Claude Code also gets the Studio hook, which adds "N Studio messages waiting" to your context after each tool call, on each prompt and when you stop. The page shows each message as queued, seen by your agent, or answered.
 
+**Comments on a frame.** A Studio message can be a comment on the preview: its text says the reel, the time and the spot or box, and its `attach` field has `{ kind: "comment", t, region, video, frame, note }`. `frame` is a JPEG of that moment with the mark drawn on it (under `jobs/<job>/comments/`); open it before you act. `region` is in fractions of the frame (x, y, w, h from the top left).
+
 Other Studio tools: `studio_get_state` (their picks, the reference, the task), `studio_set_selections` (change picks), `studio_add_reference_url` and `studio_get_reference_teardown` (reference links and what the teardown found), `studio_run` (draft or render with progress in the page), `studio_settings` (download folder, renders folder, chat backend, action notes). Studio's menu is the same engine catalog; never offer an effect it does not list.
 
 Use the scripts in `kit/` as they are. Put job data in `jobs/<name>/build/cut.json` and `captions.js`, and the look in `theme.js`, never in the scripts. The worked example is in `kit/example/` (the shipped Awakening ad).

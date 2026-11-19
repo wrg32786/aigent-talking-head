@@ -54,11 +54,11 @@ export function Reference({ CAT, V, s, apply, patch }) {
     </ol>
     {r.status === 'uploaded' && <Button id="ref-go" variant="secondary" label="Break down the file" isDisabled={running} onClick={() => api('/api/reference', {}).then(apply).catch(() => {})} />}
     <span id="ref-status" className="sr" role="status">{r.status === 'running' ? 'Breaking it down' : r.status === 'ready' ? 'Reference ready' : ''}</span>
-    {r.extracted ? <Breakdown CAT={CAT} s={s} apply={apply} patch={patch} /> : !q.length && <div id="ref-empty" className="empty-art"><Icon n="film" /><p>Add a link to see its shots, beats and effects.</p></div>}
+    {r.extracted ? <Breakdown CAT={CAT} V={V} s={s} apply={apply} patch={patch} /> : !q.length && <div id="ref-empty" className="empty-art"><Icon n="film" /><p>Add a link to see its shots, beats and effects.</p></div>}
   </section>;
 }
 
-function Breakdown({ CAT, s, apply, patch }) {
+function Breakdown({ CAT, V, s, apply, patch }) {
   const r = s.reference, ex = r.extracted, q = r.queue || [];
   const sm = ex.summary || {}, mu = sm.music || {}, item = q.find(x => x.id === r.active);
   const len = sm.seconds || 0, cuts = (sm.cuts || []).filter(c => c > 0 && (!len || c < len));
@@ -105,6 +105,36 @@ function Breakdown({ CAT, s, apply, patch }) {
           })}</div>
         </div>}
         <p className="fine">Your agent sees this breakdown. Try: "use the transitions from the reference but calmer".</p>
+      </div>
+    </div>
+    {V.swap && V.swap.parts && V.swap.parts.length > 0 && <Swap CAT={CAT} sw={V.swap} s={s} apply={apply} patch={patch} />}
+  </div>;
+}
+
+// What to swap: the reference's parts on its own clock, each mapped to Studio picks you can use in one click
+const PART = { hook: 'Hook', cut: 'Cut', title: 'Title', broll: 'B-roll', cta: 'CTA', graphic: 'Graphic' };
+function Swap({ CAT, sw, s, apply, patch }) {
+  const vid = useRef(null), [only, setOnly] = useState('all');
+  const kinds = ['hook', 'cut', 'title', 'broll', 'cta', 'graphic'].filter(k => sw.parts.some(p => p.kind === k));
+  const parts = sw.parts.filter(p => only === 'all' || p.kind === only);
+  const at = x => { const v = vid.current; if (!v) return; v.currentTime = x; v.play().catch(() => {}); };
+  const use = p => api('/api/reference/apply', { refs: p.refs.map(r => r.ref) }).then(v => { apply(v); toast(`${p.label}: ${p.refs.map(r => r.id).join(', ')} picked`, true); }).catch(() => {});
+  const fmt = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}.${Math.floor((t % 1) * 10)}`;
+  return <div className="swap" id="swap">
+    <div className="sugg-h"><span className="lbl">What to swap</span><span className="fine">The reference's parts in order. Click a time to watch it, then use its look.</span></div>
+    <div className="sw-body">
+      {s.reference.file && <video ref={vid} className="sw-vid" src={'/api/reference/video?v=' + encodeURIComponent(s.reference.file)} controls preload="metadata" playsInline muted aria-label="The reference" />}
+      <div>
+        <div className="chips" role="group" aria-label="Show parts">{['all', ...kinds].map(k => <button key={k} type="button" className={'chip' + (only === k ? ' on' : '')} aria-pressed={String(only === k)} onClick={() => setOnly(k)}>{k === 'all' ? 'All' : PART[k]}</button>)}</div>
+        <ol className="sw-list" aria-label="Parts of the reference">{parts.map(p => <li key={p.id} className={'sw-' + p.kind}>
+          <button type="button" className="sw-t mono" onClick={() => at(p.at)} aria-label={`Watch ${p.label} at ${fmt(p.at)}`} disabled={!s.reference.file}>{fmt(p.at)}</button>
+          <span className="sw-k">{PART[p.kind]}</span>
+          <span className="sw-d"><b>{p.label === PART[p.kind] ? '' : p.label + '. '}</b>{p.detail}</span>
+          <span className="sw-refs">{p.refs.map(x => { const it = CAT.items[x.ref], st = it && pickState(s, it);
+            return <button key={x.ref} type="button" className={'chip sm' + (st === 'allow' ? ' on' : '')} aria-pressed={String(st === 'allow')} title={KIND_NAME[x.kind] || x.kind}
+              onClick={() => patch({ picks: { [x.ref]: st === 'allow' ? 'clear' : 'allow' } })}><Icon n={st === 'allow' ? 'check' : 'plus'} /><span className="k">{KIND_NAME[x.kind] || x.kind}</span>{x.id}</button>; })}</span>
+          {p.refs.length > 0 ? <Button variant="secondary" size="sm" label="Use" aria-label={`Use the ${p.label} look at ${fmt(p.at)}`} onClick={() => use(p)} /> : <span className="fine">no match in the menu</span>}
+        </li>)}</ol>
       </div>
     </div>
   </div>;
