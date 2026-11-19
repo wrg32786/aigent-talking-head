@@ -78,6 +78,14 @@ For talking-head reels, yes: captions, titles, graphics, music and platform expo
 
 Remotion is a React framework for making videos in code, free for individuals and small companies with a paid license for larger ones. aigent-talking-head is a finished pipeline for one job, talking-head reels, under Apache-2.0. It uses no Remotion code.
 
+## Show your reel
+
+### How can I share a reel I made, or turn off the star reminder?
+
+[Open a Show your reel issue](https://github.com/wrg32786/aigent-talking-head/issues/new?template=show-your-reel.md) and drop the link, or tag [@the_aigent_news](https://www.instagram.com/the_aigent_news/) on Instagram. A star on the repo helps other creators find it.
+
+The CLI may print a one-line reminder after your first successful render, and once more after five renders. Set `AIGENT_NO_STAR=1` to turn it off. It also stays off when you pass `--json`, when `CI` is set, or when stdout is not a TTY.
+
 ## License
 
 ### What license is it? Can I use it commercially?

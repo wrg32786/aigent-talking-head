@@ -7,6 +7,8 @@
 //          --export tiktok|reels|shorts|feed45|square  lay the reel out for that platform's safe area and write
 //            reel-vN-<name>.mp4 too (crop, length and bitrate caps: kit/exports.json)
 //          --json  print one JSON result line at the end ({ ok, job, reel, export, layout, verify }), for agents and the MCP server
+//          After a successful render (not --draft), a one-line star reminder may print on the first
+//            render and once more after 5 renders. Skipped with --json, a non-TTY stdout, CI, or AIGENT_NO_STAR=1.
 //          --name <job>  --clips <dir> (reuse an existing clip.py folder, skips transcription)  --newest (inbox: newest file only)
 //          --hook <take> (first sentence from this take: your most extreme angle)
 //          --look kinetic|oneword|muse|classic|one-word (default kinetic: every word animated + one kinetic title per beat, in front of the person by default;
@@ -583,4 +585,5 @@ if (cut.export && X.get(cut.export)) {
 let LAY = null; try { LAY = JSON.parse(fs.readFileSync(path.join(build, 'layout.json'), 'utf8')); } catch {}
 const lay = LAY ? { moved: LAY.elements.filter(e => e.action === 'shift').length, hidden: LAY.elements.filter(e => e.action === 'hide').length, safeArea: LAY.elements.filter(e => e.action === 'safe-area').length } : null;
 console.log(`\nReel: ${out}${exported ? '\nExport: ' + exported : ''}\nCheck it: npm run verify -- ${name}${cut.export ? ' --export ' + cut.export : ''} (contact sheet, ffprobe, loudness, mask, overlap${cut.export ? ', safe area' : ''}), watch it, read clips/clips.md for skipped retakes, then edit build/captions.js or build/cut.json and run: npm run reel -- --rebuild --name ${name}`);
+try { require('./star.cjs').maybePrompt({ json: JSON_OUT }); } catch {}
 if (JSON_OUT) console.log(JSON.stringify({ ok: true, job: name, dir: job, reel: out, export: exported, exportPreset: cut.export || null, seconds: +LEN.toFixed(2), layout: lay, verify: `npm run verify -- ${name}${cut.export ? ' --export ' + cut.export : ''} --json` }));
