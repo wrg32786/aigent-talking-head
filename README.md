@@ -8,7 +8,7 @@ Made by Will Gwyn at [The AIgent](https://theaigent.xyz).
 
 If it saves you an edit, a ⭐ helps other creators find it.
 
-[Quick start](#quick-start) · [Install](#install) · [Features](#features) · [How it compares](#how-it-compares) · [FAQ](#faq) · [Show your reel](#show-your-reel) · [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) · [Guide](docs/guide.md) · [Full gallery](showcase/GALLERY.md) · [Get guidance](#get-guidance)
+[Quick start](#quick-start) · [Studio](#studio-edit-in-a-browser-with-your-agent-in-the-chat) · [Install](#install) · [Features](#features) · [How it compares](#how-it-compares) · [FAQ](#faq) · [Show your reel](#show-your-reel) · [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) · [Guide](docs/guide.md) · [Full gallery](showcase/GALLERY.md) · [Get guidance](#get-guidance)
 
 ![Before and after: a plain phone clip on the left, the finished reel with kinetic captions and graphics on the right](kit/example/demo-reel/before-after.gif)
 
@@ -52,18 +52,49 @@ You get `jobs/my-reel/reel-v1.mp4` and `reel-v1-reels.mp4` (inside Instagram's s
 
 Made a reel? [Star the repo](https://github.com/wrg32786/aigent-talking-head) and [share it](#show-your-reel).
 
-## Studio: pick your effects in a browser
+## Studio: edit in a browser, with your agent in the chat
 
-`npm run studio` opens a local page where you drop in your footage, add a reference reel to borrow from (as an influence or a full recreation), click effects from a visual menu in 17 categories, pick a style pack, music energy and pace, then draft, review every pick and render. Talk to it in plain words ("calm and cinematic, no glitch"), connect your own assistant over MCP, or set an API key. Everything runs on your computer. Guide: [docs/studio.md](docs/studio.md).
+Studio is a local page for making a reel without memorising commands. Drop in your footage, paste links to reels you like, click effects from a visual menu, pick a style pack, music and pace, then draft and render. The chat on the page is answered by your own terminal agent (Claude Code, Codex, Cursor or any MCP client), so it can change the edit for you while you watch. Everything runs on your computer. Full guide: [docs/studio.md](docs/studio.md).
 
-<img src="docs/studio/desktop.png" width="720" alt="Studio in a browser: footage, reference and style pack steps, with the effects menu below">
+**Set it up by telling your terminal agent:**
+
+```
+Install aigent-talking-head, set up Studio from AGENTS.md and run the Studio chat loop.
+```
+
+The agent clones and installs the kit, registers the MCP server in its own config (`npm run studio:connect -- claude`, `codex` or `cursor`), starts Studio with `npm run studio:agent`, opens the page and listens. Step by step for each agent: [docs/setup-with-ai.md](docs/setup-with-ai.md) and the Studio section of [AGENTS.md](AGENTS.md).
 
 **No terminal?** One line installs everything and puts a "Talking Head Studio" icon on your desktop:
 
 - macOS or Linux: `curl -fsSL https://raw.githubusercontent.com/wrg32786/aigent-talking-head/main/install/install.sh | bash`
 - Windows (PowerShell): `irm https://raw.githubusercontent.com/wrg32786/aigent-talking-head/main/install/install.ps1 | iex`
 
-Or tell your assistant "install aigent-talking-head and open Studio" ([docs/setup-with-ai.md](docs/setup-with-ai.md)).
+Then run `npm run studio` (or click the icon). Without an agent the chat works on keywords, a local model or an API key.
+
+<img src="docs/studio/desktop.png" width="720" alt="Studio in a browser: four steps across the top, the Style step with style packs and a grid of effect previews, the picks tray floating at the bottom, and the chat in a frosted glass panel on the right with Claude Code connected and listening">
+
+**Reference links.** Paste one or more links (YouTube and Shorts, TikTok, X, Vimeo, a direct .mp4, or one public Instagram post) and Studio downloads each to a folder on your computer, shows the progress, and breaks it down: length, shots and cut times, pace, music BPM and energy, caption style, transitions, finishes and graphics. It then suggests matching items from the effects menu. The breakdown goes into the chat, so "use the transitions from the reference but calmer" works. Use it as an influence (soft defaults) or recreate its structure with your clip. Link downloads need [yt-dlp](https://github.com/yt-dlp/yt-dlp), which the installer adds; Instagram uses [instaloader](https://github.com/instaloader/instaloader) anonymously, with no login. Only use videos you have the rights to use as a reference.
+
+<img src="docs/studio/ref-url-desktop.png" width="720" alt="Studio Reference step: a pasted YouTube link broken down into 90 seconds, 17 shots, 123 BPM and a 5.29 second average shot, a shot timeline with a beat grid, tags for what was found, suggested picks as chips, and a contact sheet">
+
+**Effects menu.** Every transition, title entrance, caption style, graphic, finish and sound in 17 categories, each a looping preview with just its name. Hover for the details, click to pick, use the forbid button for what you never want, and your picks collect in the tray at the bottom. Once you pick any transition, only picked transitions are used, and the same for each kind.
+
+<img src="docs/studio/menu.png" width="720" alt="Studio effects menu on the Transitions tab: animated preview tiles with glitch forbidden and whip picked, a hover card describing dip-black, and the picks tray at the bottom">
+
+**Style packs.** Pick a pack such as cinematic or magazine as a starting point; your own picks always win. A reference can become its own local pack.
+
+**Two separate chats.** The Studio chat and your terminal conversation are separate channels. Studio shows only what you type on the page, your agent's replies to it and its Studio actions, never the terminal conversation. Each message shows whether it is queued, seen by your agent or answered. Edits from either place update the page live, and when the agent changes the edit from the terminal, Studio can show a one-line note such as "picked caption style kinetic (from the terminal)" (a setting, on by default). An agent can't be interrupted in the middle of a step: messages wait until its next step, and a Claude Code hook tells it how many Studio messages are waiting.
+
+<p>
+<img src="docs/studio/chat-agent.png" width="300" alt="Studio chat with a Claude Code, listening badge: page messages marked Answered, the agent's replies, and a one-line action note for an edit made from the terminal">
+<img src="docs/studio/chat-phone.png" width="300" alt="Studio chat as a full-screen sheet on a phone: the agent status badge, messages marked Answered and the agent's replies">
+</p>
+
+**Settings.** Dark by default, with a light theme. The chat, step bar and settings are frosted glass panels; a switch turns them solid on older computers. Choose who answers the chat (your terminal agent by default, or a local model through Ollama, LM Studio or llama.cpp, the Claude or OpenAI API, or keywords only), where reference downloads go, and where finished reels are copied.
+
+<img src="docs/studio/settings.png" width="720" alt="Studio settings in a side sheet: who answers the chat with a local model picked, the action note switch, the reference downloads and finished reels folders, and the theme">
+
+On a phone each step stacks into one column and the chat opens as a sheet: [reference](docs/studio/ref-url-phone.png), [effects](docs/studio/menu-phone.png), [settings](docs/studio/settings-phone.png). Studio also speaks [AG-UI](docs/studio.md#ag-ui), so AG-UI clients can watch it or send it messages. The page is built with React and [Astryx](https://github.com/meta/astryx) and ships prebuilt, so nothing extra installs. Reference screenshots show Big Buck Bunny (c) Blender Foundation, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), blender.org.
 
 ## Install
 
@@ -107,9 +138,9 @@ Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FRE
 | Editing principles built in: mixed serif and sans, titles placed around the head, colour and chapter cards, music by energy, mapped and capped sounds, punch-ins, no dead air | 7, all in `--preset magazine` | [Guide](docs/guide.md#editing-principles-built-in), [effects menu](docs/effects.md#editing-principles) |
 | Sound effects and CC0 music beds, beat-synced | 37 and 11 | [Music beds](kit/music/README.md) |
 | Export presets: TikTok, Reels, Shorts, 4:5, 1:1 | 5 | [Quick start](#quick-start) |
-| Studio: a local page to pick effects visually, chat, draft and render | 1 | [docs/studio.md](docs/studio.md) |
-| Agent skills, installed with `npx skills add wrg32786/aigent-talking-head` | 7 | [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) |
-| MCP tools: menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify, and three for Studio | 14 | [MCP setup](docs/mcp.md) |
+| Studio: a local page for reference links and teardowns, the visual effects menu, a chat your agent answers, draft and render | 1 | [docs/studio.md](docs/studio.md) |
+| Agent skills, installed with `npx skills add wrg32786/aigent-talking-head` | 8 | [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) |
+| MCP tools: menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify, and ten for Studio | 21 | [MCP setup](docs/mcp.md) |
 
 Also: a `plan` step that proposes graphics from your transcript, a layout pass that stops overlaps, `verify` with a contact sheet, [Reel.md recipes](#reelmd-recipes) you can share, and [teardowns](#remake-a-reel-you-like) that turn a reel you like into a recipe. `npm run menu` prints every option.
 
@@ -282,9 +313,9 @@ The code and docs are Apache-2.0, so commercial use is fine. The bundled sounds 
 | Cursor | `npx skills add wrg32786/aigent-talking-head -a cursor` |
 | Codex | `npx skills add wrg32786/aigent-talking-head -a codex` |
 
-That installs seven skills: aigent-talking-head, talking-head-reel, talking-head-recipe, talking-head-brand, talking-head-teardown, talking-head-ad and clip-raw-footage. Add `-g` to install for every project. By hand: copy the folders under `skills/` into `.claude/skills/` (Claude Code) or `.agents/skills/` (Cursor, Codex). The skills drive a local checkout, so the agent still needs the kit installed ([agent install steps](INSTALL.md)).
+That installs eight skills: aigent-talking-head, aigent-studio, talking-head-reel, talking-head-recipe, talking-head-brand, talking-head-teardown, talking-head-ad and clip-raw-footage. Add `-g` to install for every project. By hand: copy the folders under `skills/` into `.claude/skills/` (Claude Code) or `.agents/skills/` (Cursor, Codex). The skills drive a local checkout, so the agent still needs the kit installed ([agent install steps](INSTALL.md)).
 
-**MCP.** `npm run mcp` serves the same flow as MCP tools (menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify) with schemas generated from contract.json. See the [MCP setup for Claude Code, Cursor and Codex](docs/mcp.md). For a summary written for language models, see [llms.txt](llms.txt).
+**MCP.** `npm run mcp` serves the same flow as MCP tools (menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify) with schemas generated from contract.json, plus studio_ tools that let your agent listen and answer in the Studio chat, add reference links and read their teardowns. See the [MCP setup for Claude Code, Cursor and Codex](docs/mcp.md). For a summary written for language models, see [llms.txt](llms.txt).
 
 ## Show your reel
 

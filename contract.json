@@ -387,6 +387,42 @@
       ]
     },
     {
+      "name": "studio:agent",
+      "script": "kit/studio/launch.mjs",
+      "summary": "Start Studio in the background for a terminal agent (or reuse the one running), wait until it answers, open the page and print {\"url\"} as JSON. --stop stops the Studio it started. AGENTS.md.",
+      "positional": [],
+      "flags": [
+        { "name": "port", "type": "number", "default": "4757", "description": "port on 127.0.0.1 (or STUDIO_PORT)" },
+        { "name": "no-open", "type": "boolean", "default": false, "description": "do not open the browser" },
+        { "name": "stop", "type": "boolean", "default": false, "description": "stop the Studio this command started" }
+      ],
+      "outputs": ["{\"url\":\"http://127.0.0.1:<port>\",\"started\":true} on stdout", "jobs/.studio/server.log"],
+      "success": "exit 0 with the URL",
+      "failures": ["Studio did not start on <url> (the log tail follows)"]
+    },
+    {
+      "name": "studio:connect",
+      "script": "kit/studio/connect.mjs",
+      "summary": "Connect a terminal agent to Studio: register the kit's MCP server in the agent's own config (claude mcp add, ~/.codex/config.toml, .cursor/mcp.json) and, for Claude Code, install the hook that flags waiting Studio messages. Safe to run again.",
+      "positional": [{ "name": "agent", "description": "claude, codex, cursor or print" }],
+      "flags": [
+        { "name": "user", "type": "boolean", "default": false, "description": "Claude Code or Cursor: user-wide config instead of the kit folder" },
+        { "name": "no-hooks", "type": "boolean", "default": false, "description": "Claude Code: skip the Studio hook" }
+      ],
+      "outputs": ["one line per thing added"],
+      "success": "exit 0",
+      "failures": ["unknown agent \"<name>\": claude, codex, cursor or print"]
+    },
+    {
+      "name": "studio:build",
+      "script": "kit/studio/build.mjs",
+      "summary": "Rebuild the Studio page (React + Astryx) from kit/studio/web into kit/studio/public. Only for people editing the page; the built page is committed, so installing and running Studio never builds.",
+      "flags": [],
+      "outputs": ["kit/studio/public (index.html, assets/, build.json)"],
+      "success": "exit 0",
+      "failures": ["npm ci or vite build failed"]
+    },
+    {
       "name": "reelmd",
       "script": "kit/reelmd.cjs",
       "summary": "Check, compile, export or package a Reel.md recipe.",
