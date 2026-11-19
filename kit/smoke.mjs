@@ -908,7 +908,7 @@ try {
     writeFileSync(capF, keepC);
   });
   { // the MCP server: fourteen tools whose schemas come from contract.json; a tool call runs the real command
-    process.stdout.write('- MCP server (stdio): menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify, studio_get_state, studio_set_selections, studio_run; validate runs reelmd check ... ');
+    process.stdout.write('- MCP server (stdio): menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify, studio_get_state, studio_set_selections, studio_run and the Studio chat, reference and settings tools; validate runs reelmd check ... ');
     const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
     const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
     const cl = new Client({ name: 'smoke', version: '1' });
@@ -916,7 +916,7 @@ try {
     await cl.connect(new StdioClientTransport({ command: node, args: [join(KIT, 'mcp.mjs')], cwd: dirname(KIT), stderr: 'ignore', env: { ...process.env, STUDIO_DIR: studioDir } }));
     try {
       const names = (await cl.listTools()).tools.map(t => t.name).join(',');
-      if (names !== 'menu,list_effects,list_packs,get_pack,draft,explain,set_locks,plan,validate,render,verify,studio_get_state,studio_set_selections,studio_run') fail('MCP tools: ' + names);
+      if (names !== 'menu,list_effects,list_packs,get_pack,draft,explain,set_locks,plan,validate,render,verify,studio_get_state,studio_set_selections,studio_run,studio_start,studio_wait_for_message,studio_get_pending,studio_reply,studio_add_reference_url,studio_get_reference_teardown,studio_settings') fail('MCP tools: ' + names);
       const lp = await cl.callTool({ name: 'list_packs', arguments: {} });
       if (lp.isError || !lp.structuredContent || !lp.structuredContent.packs.some(p => p.name === 'magazine')) fail('MCP list_packs: ' + JSON.stringify(lp).slice(0, 300));
       const gp = await cl.callTool({ name: 'get_pack', arguments: { pack: 'cinematic' } });
