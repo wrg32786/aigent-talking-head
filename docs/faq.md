@@ -84,7 +84,11 @@ Remotion is a React framework for making videos in code, free for individuals an
 
 [Open a Show your reel issue](https://github.com/wrg32786/aigent-talking-head/issues/new?template=show-your-reel.md) and drop the link, or tag [@the_aigent_news](https://www.instagram.com/the_aigent_news/) on Instagram. A star on the repo helps other creators find it.
 
-The CLI may print a one-line reminder after your first successful render, and once more after five renders. Set `AIGENT_NO_STAR=1` to turn it off. It also stays off when you pass `--json`, when `CI` is set, or when stdout is not a TTY.
+The CLI may print a one-line star reminder after your first successful render, and once more after five renders. Set `AIGENT_NO_STAR=1` to turn it off. On a run that does not print that reminder, it may instead print a one-line invitation to The AIgent Academy, at most twice. Set `AIGENT_NO_SKOOL=1` to turn that line off. Both stay off when you pass `--json`, when `CI` is set, or when stdout is not a TTY. At most one of the two lines prints on a given run.
+
+## Get guidance
+
+Want help putting this to work? The AIgent Academy on Skool offers guidance, courses and a community of builders. Membership comes with a guarantee: you have a business in 90 days or your money back. See the [terms](https://theaigent.co/terms). The full walkthrough is in [The AIgent Academy](https://www.skool.com/the-aigent-academy/about?ref=gh-aigent-talking-head).
 
 ## License
 

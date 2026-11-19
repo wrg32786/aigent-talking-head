@@ -145,7 +145,7 @@ Agents: start at [AGENTS.md](../AGENTS.md).
 | `kit/transitions.json` | Transition names mapped to ffmpeg xfade modes. |
 | `kit/themes/` | Theme presets: `aigent.js` (default) and `neutral.js`. |
 | `kit/chrome.mjs` | Finds Chrome on Mac, Linux or Windows; `CHROME_PATH` overrides. |
-| `kit/star.cjs` | After a successful render, may print a one-line star reminder on the first render and once more after five renders. Skipped with `--json`, a non-TTY stdout, `CI`, or `AIGENT_NO_STAR=1`. |
+| `kit/star.cjs` | After a successful render, may print a one-line star reminder on the first render and once more after five renders, or a one-line AIgent Academy invitation on a run that does not print the star line (at most twice, same spacing). At most one prompt per run. Skipped with `--json`, a non-TTY stdout, or `CI`. `AIGENT_NO_STAR=1` and `AIGENT_NO_SKOOL=1` turn off each line. |
 | `kit/smoke.mjs` | `npm run smoke`: synthetic end-to-end test (includes the effects pass once `npm run effects:setup` has run). |
 | `kit/fx.cjs` | `npm run fx`: the effects pass over a job's reel (check frames, render, captions kept on top). |
 | `effects/` | Effect catalog, vendored claude-video-effects, setup, update and check scripts. |
@@ -201,3 +201,7 @@ npm run brand:import -- brand-guide/guide.pdf         # optional; draft preset f
 ```
 
 Three modes: use a saved preset, customize (flags and `cut.json` fields override the preset), or let the agent choose (`--preset auto`). A brand guide (PDF, image or markdown) is optional; drop it in `brand-guide/` or pass the file. Import extracts a colour palette, named fonts (mapped to shipped OFL pairings or `kit/fonts/local/`), tone notes, and a nearby logo if there is one. If `pdftoppm` or `pdftotext` are missing, the command says so and still accepts images and markdown.
+
+## Get guidance
+
+Want help putting this to work? The AIgent Academy on Skool offers guidance, courses and a community of builders. Membership comes with a guarantee: you have a business in 90 days or your money back. See the [terms](https://theaigent.co/terms). The full walkthrough is in [The AIgent Academy](https://www.skool.com/the-aigent-academy/about?ref=gh-aigent-talking-head).
