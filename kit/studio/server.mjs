@@ -15,6 +15,7 @@ import * as LLM from './llm.mjs';
 import * as S from './settings.mjs';
 import * as F from './fetch.mjs';
 import * as CH from './channel.mjs';
+import * as AG from './agui.mjs';
 
 const require = createRequire(import.meta.url);
 const K = require('../packs.cjs');
@@ -34,7 +35,10 @@ const VIDEO = ['.mp4', '.mov', '.m4v', '.webm', '.mkv'], AUDIO = ['.mp3', '.wav'
 
 // ---------- live updates ----------
 const clients = new Set();
-const send = (ev, data) => { const s = `event: ${ev}\ndata: ${JSON.stringify(data)}\n\n`; for (const c of clients) c.write(s); };
+const send = (ev, data) => { const s = `event: ${ev}\ndata: ${JSON.stringify(data)}\n\n`; for (const c of clients) c.write(s); if (ev !== 'log') aguiTick(); };
+// AG-UI observers (kit/studio/agui.mjs): the same session as AG-UI events
+const aguiClients = new Set();
+function aguiTick() { if (!aguiClients.size) return; const s = C.load(); for (const c of aguiClients) for (const ev of c.obs.next(s, task)) c.res.write(AG.encode(ev)); }
 let lastRev = -1;
 const pushState = force => { const s = C.load(); if (s.rev !== lastRev || force === true) { lastRev = s.rev; send('state', view(s)); } };
 const update = fn => { const s = C.load(); const r = fn(s); C.save(s); pushState(); return r === undefined ? s : r; };
@@ -192,6 +196,33 @@ function copyRenders(outputs) {
   return done;
 }
 
+// one Studio chat turn from the page or an AG-UI run: queue it for the terminal agent, or answer with a model or keywords
+async function chatTurn(text, offline) {
+  const st = S.load(), backend = offline ? 'keywords' : st.chat.backend;
+  if (backend === 'agent') {
+    // queued for the terminal agent; it reads it with studio_wait_for_message or studio_get_pending and answers with studio_reply
+    const s = update(x => { C.applyPatch(x, { say: text, from: 'ui', toAgent: true }); });
+    const a = CH.presence();
+    return { via: 'agent', queued: true, agent: a, reply: null, ...view(s) };
+  }
+  update(s => { C.applyPatch(s, { say: text, from: 'ui' }); });
+  const s = C.load(), cat = C.catalog();
+  let reply, patch, via;
+  const prov = backend === 'keywords' ? null : LLM.provider(process.env, st.chat);
+  if (prov) {
+    try { const r = await LLM.chat(text, s, cat, process.env, st.chat); reply = r.reply; patch = r.patch; via = r.provider; }
+    catch (e) { const v = C.vibes(text, s, cat); patch = v.patch; via = 'keywords'; reply = `The ${prov.name} chat failed (${e.message}), so I used the keyword matcher. ` + (v.said.length ? 'Changed: ' + v.said.join('; ') + '.' : 'Nothing matched.'); }
+  } else {
+    const v = C.vibes(text, s, cat); patch = v.patch; via = 'keywords';
+    reply = v.said.length ? `Changed: ${v.said.join('; ')}.` : 'I did not catch an effect or vibe there. Try words like calm, punchy, cinematic, clean, names like "no glitch" or "typewriter titles", or "the transitions from the reference". For a real conversation, connect your terminal agent (Settings, Chat).';
+    if (backend !== 'keywords' && !prov) reply = `No ${backend === 'auto' ? 'API key' : backend} backend is ready, so I used keywords. ` + reply;
+  }
+  const s2 = C.load(), r = C.applyPatch(s2, patch || {});
+  if (r.errs.length) reply += ' Skipped: ' + r.errs.join('; ');
+  C.applyPatch(s2, { reply, from: via }); C.save(s2); pushState();
+  return { reply, via, log: r.log, errs: r.errs, ...view(s2) };
+}
+
 // ---------- http ----------
 const json = (res, code, body) => { res.writeHead(code, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify(body)); };
 const readBody = req => new Promise((ok, bad) => { let b = ''; req.on('data', d => { b += d; if (b.length > 2e6) { bad(new Error('too big')); req.destroy(); } }); req.on('end', () => { try { ok(b ? JSON.parse(b) : {}); } catch { bad(Object.assign(new Error('send JSON'), { code: 400 })); } }); });
@@ -324,29 +355,7 @@ async function api(req, res, u) {
   if (p === '/api/chat' && M === 'POST') {
     const b = await readBody(req), text = String(b.text || '').trim();
     if (!text) return json(res, 400, { error: 'say something' });
-    const st = S.load(), backend = b.offline ? 'keywords' : st.chat.backend;
-    if (backend === 'agent') {
-      // queued for the terminal agent; it reads it with studio_wait_for_message or studio_get_pending and answers with studio_reply
-      const s = update(x => { C.applyPatch(x, { say: text, from: 'ui', toAgent: true }); });
-      const a = CH.presence();
-      return json(res, 200, { via: 'agent', queued: true, agent: a, reply: null, ...view(s) });
-    }
-    update(s => { C.applyPatch(s, { say: text, from: 'ui' }); });
-    const s = C.load(), cat = C.catalog();
-    let reply, patch, via;
-    const prov = backend === 'keywords' ? null : LLM.provider(process.env, st.chat);
-    if (prov) {
-      try { const r = await LLM.chat(text, s, cat, process.env, st.chat); reply = r.reply; patch = r.patch; via = r.provider; }
-      catch (e) { const v = C.vibes(text, s, cat); patch = v.patch; via = 'keywords'; reply = `The ${prov.name} chat failed (${e.message}), so I used the keyword matcher. ` + (v.said.length ? 'Changed: ' + v.said.join('; ') + '.' : 'Nothing matched.'); }
-    } else {
-      const v = C.vibes(text, s, cat); patch = v.patch; via = 'keywords';
-      reply = v.said.length ? `Changed: ${v.said.join('; ')}.` : 'I did not catch an effect or vibe there. Try words like calm, punchy, cinematic, clean, names like "no glitch" or "typewriter titles", or "the transitions from the reference". For a real conversation, connect your terminal agent (Settings, Chat).';
-      if (backend !== 'keywords' && !prov) reply = `No ${backend === 'auto' ? 'API key' : backend} backend is ready, so I used keywords. ` + reply;
-    }
-    const s2 = C.load(), r = C.applyPatch(s2, patch || {});
-    if (r.errs.length) reply += ' Skipped: ' + r.errs.join('; ');
-    C.applyPatch(s2, { reply, from: via }); C.save(s2); pushState();
-    return json(res, 200, { reply, via, log: r.log, errs: r.errs, ...view(s2) });
+    return json(res, 200, await chatTurn(text, b.offline));
   }
   if (p === '/api/settings' && M === 'GET') return json(res, 200, { settings: S.load(), tools: F.tools({ fresh: u.searchParams.has('fresh') }) });
   if (p === '/api/settings' && M === 'POST') {
@@ -367,6 +376,34 @@ async function api(req, res, u) {
   return json(res, 404, { error: 'no such endpoint' });
 }
 
+// AG-UI run: RunAgentInput in, events out. The message joins the Studio chat; the run ends when it is answered (or times out, still queued).
+async function aguiRun(req, res) {
+  const input = await readBody(req), threadId = String(input.threadId || 'studio'), runId = String(input.runId || 'run-' + Date.now());
+  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
+  let closed = false; res.on('close', () => { closed = true; });
+  const w = ev => { if (!closed) res.write(AG.encode(ev)); };
+  const say = m => { const id = 'studio-' + m.id; w({ type: 'TEXT_MESSAGE_START', messageId: id, role: 'assistant' }); w({ type: 'TEXT_MESSAGE_CONTENT', messageId: id, delta: m.text }); w({ type: 'TEXT_MESSAGE_END', messageId: id }); };
+  const finish = result => { w({ type: 'STATE_SNAPSHOT', snapshot: AG.snapshot(C.load()) }); w({ type: 'RUN_FINISHED', threadId, runId, result }); res.end(); };
+  w({ type: 'RUN_STARTED', threadId, runId });
+  const text = AG.lastUserText(input).trim();
+  if (!text) { w({ type: 'RUN_ERROR', message: 'the run has no user message', code: 'no_message' }); return res.end(); }
+  try {
+    const r = await chatTurn(text.slice(0, 4000), false);
+    if (r.via !== 'agent') { const m = r.state.chat.filter(x => x.role === 'assistant').at(-1); if (m) say(m); return finish({ status: 'answered', via: r.via }); }
+    const mine = r.state.chat.filter(x => x.role === 'user').at(-1).id, sent = new Set();
+    const fp = input.forwardedProps || {}, deadline = Date.now() + Math.min(600, Math.max(1, +fp.timeout_s || 300)) * 1000;
+    let status = '';
+    while (!closed && Date.now() < deadline) {
+      const s = C.load(), m = s.chat.find(x => x.id === mine);
+      if (m && m.status !== status) { status = m.status; w({ type: 'CUSTOM', name: 'studio.message_status', value: { id: 'studio-' + mine, status } }); }
+      for (const x of s.chat) if (x.role === 'assistant' && x.replyTo === mine && !sent.has(x.id)) { sent.add(x.id); say(x); }
+      if (status === 'answered') return finish({ status: 'answered', via: 'agent' });
+      await new Promise(ok => setTimeout(ok, 250));
+    }
+    if (!closed) finish({ status: status || 'queued', via: 'agent', note: 'No answer yet. The message stays in the Studio chat for your agent.' });
+  } catch (e) { w({ type: 'RUN_ERROR', message: e.message }); res.end(); }
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     // only this computer: refuse other hosts (DNS rebinding) and cross-site posts
@@ -379,6 +416,12 @@ const server = http.createServer(async (req, res) => {
       res.write(`event: state\ndata: ${JSON.stringify(view(C.load()))}\n\n`); clients.add(res);
       const ka = setInterval(() => res.write(': ka\n\n'), 20e3); req.on('close', () => { clearInterval(ka); clients.delete(res); }); return;
     }
+    if (u.pathname === '/api/agui/events') {
+      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
+      const c = { res, obs: AG.observer(C.load(), task) }; for (const ev of c.obs.first) res.write(AG.encode(ev)); aguiClients.add(c);
+      const ka = setInterval(() => res.write(': ka\n\n'), 20e3); req.on('close', () => { clearInterval(ka); aguiClients.delete(c); }); return;
+    }
+    if (u.pathname === '/api/agui' && req.method === 'POST') return await aguiRun(req, res);
     if (u.pathname.startsWith('/api/')) return await api(req, res, u);
     if (u.pathname === '/' || u.pathname === '/index.html') return serveFile(req, res, join(STUDIO, 'public', 'index.html'));
     if (/^\/(app\.js|app\.css|favicon\.svg)$/.test(u.pathname)) return serveFile(req, res, join(STUDIO, 'public', u.pathname.slice(1)));

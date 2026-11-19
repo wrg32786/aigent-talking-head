@@ -144,6 +144,35 @@ try {
     assert.strictEqual((await req('/api/state')).j.state.chat.length, before + 1);
     const td = await call('studio_get_reference_teardown'); assert.ok(Array.isArray(td.queue));
   });
+  await t('AG-UI: observer stream, JSON Patch deltas, and a run answered by the terminal agent', async () => {
+    const AG = await import('../kit/studio/agui.mjs');
+    const a = { picks: { transition: { allow: ['whip'], deny: [] } }, music: { energy: 'auto' }, x: 1, 'a/b': 2 }, b = { picks: { transition: { allow: ['whip', 'zoom'], deny: [] } }, music: { energy: 'low' }, 'a/b': 3 };
+    assert.deepStrictEqual(AG.applyPatch(a, AG.diff(a, b)), b);
+    assert.strictEqual(AG.lastUserText({ messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }] }), 'hi');
+    const events = [], ac = new AbortController();
+    const sse = (text, out) => { for (const c of text.split('\n\n')) { const d = c.split('\n').find(l => l.startsWith('data: ')); if (d) out.push(JSON.parse(d.slice(6))); } };
+    const obs = fetch(url + '/api/agui/events', { signal: ac.signal }).then(async r => { const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '';
+      for (;;) { const { value, done } = await rd.read(); if (done) break; buf += dec.decode(value, { stream: true }); const i = buf.lastIndexOf('\n\n'); if (i >= 0) { sse(buf.slice(0, i), events); buf = buf.slice(i + 2); } } }).catch(() => {});
+    await sleep(400);
+    assert.deepStrictEqual(events.slice(0, 2).map(e => e.type), ['STATE_SNAPSHOT', 'MESSAGES_SNAPSHOT']);
+    const call = async (name, args = {}) => { const r = await client.callTool({ name, arguments: args }); if (r.isError) throw new Error(r.content[0].text); return r.structuredContent; };
+    const waiting = call('studio_wait_for_message', { timeout_s: 20 });
+    const run = fetch(url + '/api/agui', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
+      body: JSON.stringify({ threadId: 't1', runId: 'r1', messages: [{ id: 'u1', role: 'user', content: 'make it punchy from AG-UI' }], tools: [], context: [], state: {}, forwardedProps: { timeout_s: 20 } }) }).then(r => r.text());
+    const w = await waiting, mine = w.messages.at(-1); assert.strictEqual(mine.text, 'make it punchy from AG-UI');
+    await call('studio_reply', { replyTo: mine.id, text: 'Punchier now.', patch: { music: { energy: 'high' } } });
+    const evs = []; sse(await run, evs); const types = evs.map(e => e.type);
+    assert.strictEqual(types[0], 'RUN_STARTED'); assert.strictEqual(types.at(-1), 'RUN_FINISHED'); assert.strictEqual(evs.at(-1).result.status, 'answered');
+    assert.strictEqual(evs.find(e => e.type === 'TEXT_MESSAGE_CONTENT').delta, 'Punchier now.');
+    assert.strictEqual(evs.find(e => e.type === 'STATE_SNAPSHOT').snapshot.music.energy, 'high');
+    await sleep(1500); ac.abort(); await obs;
+    const ot = events.map(e => e.type);
+    assert.ok(ot.includes('STATE_DELTA') && ot.includes('TEXT_MESSAGE_START') && ot.includes('MESSAGES_SNAPSHOT'), ot.join(','));
+    assert.ok(events.some(e => e.type === 'CUSTOM' && e.name === 'studio.message_status' && e.value.status === 'answered'), ot.join(','));
+    assert.ok(events.filter(e => e.type === 'STATE_DELTA').flatMap(e => e.delta).some(o => o.path === '/music/energy' && o.value === 'high'));
+    const bad = await fetch(url + '/api/agui', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ threadId: 't', runId: 'r', messages: [], tools: [], context: [] }) }).then(r => r.text());
+    assert.ok(/RUN_ERROR/.test(bad));
+  });
 } finally {
   try { await client?.close(); } catch {}
   srv.kill(); media.close();

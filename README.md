@@ -71,30 +71,30 @@ The agent clones and installs the kit, registers the MCP server in its own confi
 
 Then run `npm run studio` (or click the icon). Without an agent the chat works on keywords, a local model or an API key.
 
-<img src="docs/studio/desktop.png" width="720" alt="Studio in a browser: footage, reference and style pack steps, with the effects menu below">
+<img src="docs/studio/desktop.png" width="720" alt="Studio in a browser: four steps across the top, the Style step with style packs and a grid of effect previews, the picks tray at the bottom, and the chat on the right with Claude Code connected and listening">
 
 **Reference links.** Paste one or more links (YouTube and Shorts, TikTok, X, Vimeo, a direct .mp4, or one public Instagram post) and Studio downloads each to a folder on your computer, shows the progress, and breaks it down: length, shots and cut times, pace, music BPM and energy, caption style, transitions, finishes and graphics. It then suggests matching items from the effects menu. The breakdown goes into the chat, so "use the transitions from the reference but calmer" works. Use it as an influence (soft defaults) or recreate its structure with your clip. Link downloads need [yt-dlp](https://github.com/yt-dlp/yt-dlp), which the installer adds; Instagram uses [instaloader](https://github.com/instaloader/instaloader) anonymously, with no login. Only use videos you have the rights to use as a reference.
 
-<img src="docs/studio/ref-url-desktop.png" width="720" alt="Studio reference step: a pasted YouTube link downloaded and broken down into 7 shots, cut times, 117 BPM, caption style and detected finishes, with menu suggestions as clickable chips and a contact sheet of the shots">
+<img src="docs/studio/ref-url-desktop.png" width="720" alt="Studio Reference step: a pasted YouTube link broken down into 30 seconds, 7 shots, 117 BPM and a 4.29 second average shot, a shot timeline with a beat grid, tags for what was found, suggested picks as chips, and a contact sheet">
 
-**Effects menu.** Every transition, title entrance, caption style, graphic, finish and sound in 17 categories, each with a looping preview. Click to pick, forbid what you never want, and your picks show at the bottom. Once you pick any transition, only picked transitions are used, and the same for each kind.
+**Effects menu.** Every transition, title entrance, caption style, graphic, finish and sound in 17 categories, each a looping preview with just its name. Hover for the details, click to pick, use the forbid button for what you never want, and your picks collect in the tray at the bottom. Once you pick any transition, only picked transitions are used, and the same for each kind.
 
-<img src="docs/studio/menu.png" width="720" alt="Studio effects menu on the Transitions tab: preview tiles with glitch forbidden and whip picked, the picks bar at the bottom, and the Studio chat on the right with Claude Code connected">
+<img src="docs/studio/menu.png" width="720" alt="Studio effects menu on the Transitions tab: animated preview tiles with glitch forbidden and whip picked, a hover card describing dip-black, and the picks tray at the bottom">
 
 **Style packs.** Pick a pack such as cinematic or magazine as a starting point; your own picks always win. A reference can become its own local pack.
 
 **Two separate chats.** The Studio chat and your terminal conversation are separate channels. Studio shows only what you type on the page, your agent's replies to it and its Studio actions, never the terminal conversation. Each message shows whether it is queued, seen by your agent or answered. Edits from either place update the page live, and when the agent changes the edit from the terminal, Studio can show a one-line note such as "picked caption style kinetic (from the terminal)" (a setting, on by default). An agent can't be interrupted in the middle of a step: messages wait until its next step, and a Claude Code hook tells it how many Studio messages are waiting.
 
 <p>
-<img src="docs/studio/chat-agent.png" width="300" alt="Studio chat with Claude Code connected and listening: a user message marked answered, the agent's reply about calmer transitions, and a one-line action note for an edit made from the terminal">
-<img src="docs/studio/chat-phone.png" width="300" alt="Studio chat on a phone: the agent status bar, messages marked answered and the agent's replies">
+<img src="docs/studio/chat-agent.png" width="300" alt="Studio chat with a Claude Code, listening badge: page messages marked Answered, the agent's replies, and a one-line action note for an edit made from the terminal">
+<img src="docs/studio/chat-phone.png" width="300" alt="Studio chat as a full-screen sheet on a phone: the agent status badge, messages marked Answered and the agent's replies">
 </p>
 
-**Settings.** Choose who answers the chat (your terminal agent by default, or a local model through Ollama, LM Studio or llama.cpp, the Claude or OpenAI API, or keywords only), where reference downloads go, and where finished reels are copied.
+**Settings.** Dark by default, with a light theme. Choose who answers the chat (your terminal agent by default, or a local model through Ollama, LM Studio or llama.cpp, the Claude or OpenAI API, or keywords only), where reference downloads go, and where finished reels are copied.
 
-<img src="docs/studio/settings.png" width="420" alt="Studio settings: chat backend choices with a local model server address and model picker, the action note option, and the reference downloads and finished reels folders">
+<img src="docs/studio/settings.png" width="720" alt="Studio settings in a side sheet: who answers the chat with a local model picked, the action note switch, the reference downloads and finished reels folders, and the theme">
 
-On a phone the reference step stacks into one column: [screenshot](docs/studio/ref-url-phone.png). Reference screenshots show Big Buck Bunny (c) Blender Foundation, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), blender.org.
+On a phone each step stacks into one column and the chat opens as a sheet: [reference](docs/studio/ref-url-phone.png), [effects](docs/studio/menu-phone.png), [settings](docs/studio/settings-phone.png). Studio also speaks [AG-UI](docs/studio.md#ag-ui), so AG-UI clients can watch it or send it messages. Reference screenshots show Big Buck Bunny (c) Blender Foundation, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), blender.org.
 
 ## Install
 
