@@ -697,6 +697,26 @@ try {
     const fg = SP.fitGraphics([{ start: 2.5, end: 3.25, mode: 9, text: 'FIRST', layer: 'behind' }], [{ start: 2.97, end: 3.29, word: 'second,' }], 10).gfx;
     if (fg.length !== 1 || fg[0].text !== 'SECOND' || Math.abs(fg[0].start - 2.82) > 0.01) fail('ordinal from your words: ' + JSON.stringify(fg));
   });
+  step('style pack + locks: --pack magazine with --lock keeps every seam and title inside the lock; choices.json explains and applies edits', () => {
+    run(node, [join(KIT, 'reel.cjs'), '--clips', join(work, 'clips-muse'), '--jobs', join(work, 'jobs'), '--name', 'pack-lock', '--pack', 'magazine', '--lock', 'transitions=whip,zoom; titles=typewriter', '--no-mask', '--draft'], work);
+    const b = join(work, 'jobs', 'pack-lock', 'build'), cut = JSON.parse(readFileSync(join(b, 'cut.json'), 'utf8'));
+    if (cut.pack !== 'magazine') fail('cut.json should name the pack: ' + cut.pack);
+    const seams = cut.segs.filter((s, i) => i && !s.jump).map(s => s.transition || 'glitch');
+    if (!seams.length || seams.some(t => !['whip', 'zoom'].includes(t))) fail('a seam outside the transitions lock: ' + seams);
+    const ts = R.readCaptions(join(b, 'captions.js')).flips.filter(f => f.mode === 7);
+    if (ts.some(t => t.entrance !== 'typewriter')) fail('a title outside the titles lock: ' + ts.map(t => t.entrance));
+    run(node, [join(KIT, 'check.mjs'), b], work); // a locked repeat is allowed
+    const cf = join(work, 'jobs', 'pack-lock', 'choices.json');
+    if (!existsSync(cf)) fail('the draft should write choices.json');
+    const ch = JSON.parse(readFileSync(cf, 'utf8'));
+    if (ch.beats.length !== cut.segs.length || !/locked|weighted/.test(ch.beats.find(r => r.n > 1 && !r.jump).transitionWhy)) fail('choices.json beats: ' + JSON.stringify(ch.beats.slice(0, 3)));
+    const k = ch.beats.findIndex(r => r.n > 1 && !r.jump); ch.beats[k].transition = 'dissolve';
+    writeFileSync(cf, JSON.stringify(ch));
+    const o = run(node, [join(KIT, 'choices.cjs'), 'pack-lock', '--jobs', join(work, 'jobs'), '--apply', '--json'], work);
+    const res = JSON.parse(o.trim().split('\n').pop());
+    if (!res.ok || JSON.parse(readFileSync(join(b, 'cut.json'), 'utf8')).segs[k].transition !== 'dissolve' || res.beats[k].transitionWhy !== 'you') fail('choices --apply: ' + o.slice(-400));
+    try { run(node, [join(KIT, 'reel.cjs'), '--clips', join(work, 'clips-muse'), '--jobs', join(work, 'jobs'), '--name', 'pack-x', '--pack', 'magazine', '--preset', 'aigent', '--draft'], work); fail('--pack with --preset should refuse'); } catch (e) { if (!/not both/.test(String(e.stderr || '') + String(e.stdout || '') + e.message)) throw e; }
+  });
   step('teardown (built-in fallback) on a synthetic 3-shot reel: shots, mono shot, titles, Reel.md', () => {
     const td = join(work, 'td'); mkdirSync(td);
     const font = join(KIT, 'fonts', 'ArchivoBlack-Regular.ttf').replace(/\\/g, '/').replace(/:/g, '\\:');
@@ -887,15 +907,19 @@ try {
     if (effects) run(fxPy, ['-c', `import sys; sys.path.insert(0, ${JSON.stringify(KIT)}); import cover; cover.selftest()`]);
     writeFileSync(capF, keepC);
   });
-  { // the MCP server: seven tools whose schemas come from contract.json; a tool call runs the real command
-    process.stdout.write('- MCP server (stdio): menu, list_effects, draft, plan, validate, render, verify; validate runs reelmd check ... ');
+  { // the MCP server: eleven tools whose schemas come from contract.json; a tool call runs the real command
+    process.stdout.write('- MCP server (stdio): menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify; validate runs reelmd check ... ');
     const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
     const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
     const cl = new Client({ name: 'smoke', version: '1' });
     await cl.connect(new StdioClientTransport({ command: node, args: [join(KIT, 'mcp.mjs')], cwd: dirname(KIT), stderr: 'ignore' }));
     try {
       const names = (await cl.listTools()).tools.map(t => t.name).join(',');
-      if (names !== 'menu,list_effects,draft,plan,validate,render,verify') fail('MCP tools: ' + names);
+      if (names !== 'menu,list_effects,list_packs,get_pack,draft,explain,set_locks,plan,validate,render,verify') fail('MCP tools: ' + names);
+      const lp = await cl.callTool({ name: 'list_packs', arguments: {} });
+      if (lp.isError || !lp.structuredContent || !lp.structuredContent.packs.some(p => p.name === 'magazine')) fail('MCP list_packs: ' + JSON.stringify(lp).slice(0, 300));
+      const gp = await cl.callTool({ name: 'get_pack', arguments: { pack: 'cinematic' } });
+      if (gp.isError || !gp.structuredContent.locks.transitions) fail('MCP get_pack: ' + JSON.stringify(gp).slice(0, 300));
       const le = await cl.callTool({ name: 'list_effects', arguments: { kind: 'transitions' } });
       if (le.isError || !le.structuredContent || le.structuredContent.sections[0].items.length < 50) fail('MCP list_effects: ' + JSON.stringify(le).slice(0, 300));
       const v = await cl.callTool({ name: 'validate', arguments: { recipe: 'examples/recipes/cinematic.Reel.md' } });

@@ -31,7 +31,8 @@ export function effectsDoc(menu = loadMenu()) {
   L.push('- Browse the previews below. Each one loops: the effect plays, holds for a moment, then starts again. The name is burned into the bottom of every preview.');
   L.push('- Copy the name into your `cut.json`, `captions.js`, Reel.md or command line, as shown in the **Use** column.');
   L.push('- From a terminal: `npm run list -- transitions` (or `titles`, `captions`, `graphics`, `effects`) prints the same names with a one-line description (`editing` lists the editing principles). Add `--json` for machine-readable output.');
-  L.push('- Previews use an AI-generated fictional presenter made for this project (`showcase/source/presenter.jpg`) and a plain gradient plate. Rebuild them with `npm run menu:render`.', '');
+  L.push('- Previews use an AI-generated fictional presenter made for this project (`showcase/source/presenter.jpg`) and a plain gradient plate. Rebuild them with `npm run menu:render`.');
+  L.push('- Want a whole look, or to stop the kit picking for you? [Style packs](packs.md) bundle a set of these with locks (`--pack magazine`, `--lock "transitions=whip,zoom; titles=typewriter"`), and every draft writes `choices.json` listing what was picked per beat and why, for you to edit.', '');
 
   L.push('## Transitions', '');
   L.push(`${T.length} named cuts between segments. The default is \`glitch\`, a hard cut with a quick shake on the seam. Set one per segment in \`cut.json\` (\`"transition": "crossfade"\`, optional \`"transitionDur"\` in seconds, default 0.3), at the top level of \`cut.json\` for every cut, or in a Reel.md (\`- transition: crossfade\` under Style, or \`| transition crossfade\` on a shot line). Any raw ffmpeg xfade mode name also works.`, '');

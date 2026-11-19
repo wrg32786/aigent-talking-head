@@ -1,5 +1,5 @@
 import { chromium } from 'playwright-core';
-import { mkdirSync, rmSync, existsSync, copyFileSync, writeFileSync, readFileSync, readdirSync, statSync } from 'fs';
+import { mkdirSync, rmSync, existsSync, copyFileSync, writeFileSync, readFileSync, readdirSync, statSync, renameSync } from 'fs';
 import { execFileSync } from 'child_process';
 import { resolveFonts } from './fonts.mjs';
 import { createRequire } from 'module';
@@ -130,5 +130,17 @@ let i = 0;
 for (const [d, layer] of passes) {
   const dir = join(ROOT, d); if (!only) rmSync(dir, { recursive: true, force: true }); mkdirSync(dir, { recursive: true });
   i = 0; for (const t of list) { await p.evaluate(([t, l]) => window.seek(t, l), [t, layer]); await p.screenshot({ path: join(dir, `${only ? ('t' + t.toFixed(2)) : String(i).padStart(4, '0')}.png`), omitBackground: true }); i++ }
+}
+// Chrome saves a fully opaque frame (a colour card) as an RGB PNG inside an otherwise RGBA sequence, and ffmpeg can drop
+// those frames when the pixel format changes mid-sequence (the card vanished from some renders). Rewrite them as RGBA.
+if (!only) {
+  let fixed = 0;
+  for (const [d] of passes) for (const fn of readdirSync(join(ROOT, d))) {
+    const fp = join(ROOT, d, fn);
+    if (!fn.endsWith('.png') || readFileSync(fp).subarray(25, 26)[0] !== 2) continue; // PNG colour type 2 = RGB, no alpha
+    try { execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', fp, '-pix_fmt', 'rgba', fp + '.rgba.png'], { stdio: 'ignore' }); renameSync(fp + '.rgba.png', fp); fixed++; }
+    catch { console.warn('note: could not rewrite opaque frame ' + fn + ' as RGBA (ffmpeg missing?)'); break; }
+  }
+  if (fixed) console.log(`opaque frames: ${fixed} rewritten as RGBA so the frame sequence keeps one pixel format`);
 }
 console.log('frames', i, passes.map(x => x[0]).join(' + ')); await b.close();

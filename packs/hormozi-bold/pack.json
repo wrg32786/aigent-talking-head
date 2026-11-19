@@ -1,0 +1,44 @@
+{
+  "$schema": "../pack.schema.json",
+  "format": "aigent-style-pack",
+  "formatVersion": 1,
+  "name": "hormozi-bold",
+  "version": "1.0.0",
+  "label": "Bold: heavy caps, cyan on the spoken word, punchy glitch, whip and flash cuts",
+  "description": "High energy. Caption words in bold caps with the active word lit, titles that slam or pop, and hard, fast seams.",
+  "author": "AIgent",
+  "license": "Apache-2.0",
+  "extends": "hormozi-bold",
+  "style": {},
+  "locks": {
+    "transitions": [
+      "glitch",
+      "whip",
+      "zoom",
+      "flash"
+    ],
+    "titles": [
+      "slam",
+      "pop-zoom",
+      "elastic",
+      "drop"
+    ],
+    "finishes": [
+      "grain",
+      "crushed"
+    ]
+  },
+  "weights": {
+    "transitions": {
+      "glitch": 2,
+      "whip": 2,
+      "zoom": 1,
+      "flash": 1
+    }
+  },
+  "preview": {
+    "webp": "preview.webp",
+    "png": "preview.png"
+  },
+  "assets": []
+}

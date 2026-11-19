@@ -52,7 +52,7 @@ Work inside a checkout (it has `kit/reel.cjs` and a `package.json` with `npm run
 
 Without a plan, `npm run reel -- inbox/<file>` still makes a reel in one command (captions and titles, no graphics).
 
-**Agents with tools.** `npm run mcp` is an MCP server with the same flow as tools (menu, list_effects, draft, plan, validate, render, verify), schemas generated from `contract.json`. Setup for Claude Code, Cursor and Codex: `docs/mcp.md`. Without MCP, pass `--json` to `reel`, `plan`, `verify` and `export`: the last line printed is one JSON result.
+**Agents with tools.** `npm run mcp` is an MCP server with the same flow as tools (menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify), schemas generated from `contract.json`. Setup for Claude Code, Cursor and Codex: `docs/mcp.md`. Without MCP, pass `--json` to `reel`, `plan`, `verify` and `export`: the last line printed is one JSON result.
 
 ## Commands
 
@@ -68,6 +68,8 @@ Run each as `npm run <command> -- <args>` from the repo root. Full flag list wit
 | `check` | lint a job's copy and plan, or self-test the repo | `[job]`, `--warn-only` |
 | `smoke` | end-to-end test on synthetic clips | `--whisper`, `--effects`, `--keep` |
 | `fx` | effects pass over a reel or any video | `--name <job>` or `<video>`, `--plan fx.json`, `--list`, `--still 1.2,6.5`, `--out`, `--captions on\|off`, `--mask`, `--allow-demo-copy`, `--pill`, `--sfx off` |
+| `pack` | list or show style packs; `pack:new` scaffolds one, `pack:validate` checks them, `pack:preview` renders previews and docs/packs.md | `list`, `show <name>`, `new <name> --from <preset\|pack\|job>`, `validate [name]`, `--json` |
+| `choices` | every pick in a drafted job per beat with its reason; apply edits from `jobs/<job>/choices.json`, or pin locks on the job | `<job>`, `--apply`, `--lock "..."`, `--json` |
 | `preset` | list, show or save presets | `--show <name>`, `--save <name> --from <job>` |
 | `reelmd` | Reel.md recipes | `check <Reel.md>`, `compile <Reel.md> [--out dir]`, `export <job> [--out Reel.md] [--name n]`, `package <Reel.md> <dir>` |
 | `teardown` | reference reel to a Reel.md | `<video>`, `--out`, `--name`, `--engine rea\|lite`, `--install`, `--model`, `--no-asr`, `--no-ocr`, `--vlm`, `--reuse` |
@@ -140,6 +142,13 @@ Common short-form editing advice built in as options; `--preset magazine` or `- 
 - Sound: `"sfxMap": true` (whoosh on transitions, swipe on cards, pop on text and numbers, typing under typewriter, click on big punches). The density cap `"sfxCap": {"minGap": 0.25, "per10": 6}` is on by default; `--no-sfx-cap` or `"sfxCap": false` turns it off.
 - Effects: `"punch": 0.12` (10 to 15%), the `typewriter` title and caption entrance, soft transitions with `glitch: off`.
 - No dead air: `--tighten 0.3` / `- tighten: 0.3` cuts pauses inside a line to jumps; `--no-tighten` keeps them.
+
+## Style packs, locks and choices (give the user control)
+
+- Offer the packs before you draft (`npm run pack`, MCP `list_packs`; previews in `docs/packs.md`). `--pack <name>` applies one: its base preset, style keys and locks. Use `--pack` or `--preset`, not both.
+- When the user names what they want ("only whip and zoom", "typewriter titles", "no checklist", "no cards"), pass it as a lock, not a one-off edit: `--lock "transitions=whip,zoom; titles=typewriter; no-graphics=checklist; cards=off"`. Keys: transitions, titles, max-titles, caption-entrance, graphics, no-graphics, finishes (`none` for no finish), cards, sfx, punch. The auto-picker only chooses inside a lock; a lock adds to the pack's locks key by key.
+- After a draft, show the user the choices table it printed (or `npm run choices -- <job>`, MCP `explain`). Each pick says why: locked, pack or preset, recipe, you, kit default, or engine picks at render. To change a pick, edit `jobs/<job>/choices.json` and run `npm run choices -- <job> --apply` (MCP `explain` with `apply: true`), or pin it with `npm run choices -- <job> --lock "..."` (MCP `set_locks`), then `npm run reel -- --rebuild --name <job>`.
+- A user who wants to keep a look: `npm run pack:new -- <name> --from <preset|pack|job>`, then `npm run pack:validate -- <name>`. Packs are data only and must list any asset with a permissive license.
 
 ## Transitions
 

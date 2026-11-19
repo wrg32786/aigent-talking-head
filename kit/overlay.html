@@ -85,7 +85,9 @@ let BOOST=false;
 const inkLight=c=>{const m=/^#([0-9a-f]{6})$/i.exec(String(c.fillStyle||''));if(!m)return true;const n=parseInt(m[1],16);return((n>>16)*.299+((n>>8)&255)*.587+(n&255)*.114)>140};
 function shadow(c,fs){if(FLAT){c.shadowColor='transparent';c.shadowBlur=0;return}if(BOOST){c.shadowColor=inkLight(c)?'rgba(0,0,0,.92)':'rgba(255,255,255,.92)';c.shadowBlur=Math.max(6,fs*.09);c.shadowOffsetX=0;c.shadowOffsetY=Math.max(1,fs*.012);return}c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=fs*.16;c.shadowOffsetX=fs*.03;c.shadowOffsetY=fs*.05}
 function glyphs(txt,fs,cx,cy,p,fill,sh,fam=S){ctx.font=fnt(fam,fs);ctx.letterSpacing=fam===S?'0px':(TRK*fs)+'px';ctx.textAlign='left';ctx.textBaseline='middle';const tot=ctx.measureText(txt).width;let x=cx-tot/2;for(let i=0;i<txt.length;i++){const w=ctx.measureText(txt.slice(0,i+1)).width-ctx.measureText(txt.slice(0,i)).width,e=expo(cl((p-i*.035)/.3));ctx.save();ctx.globalAlpha*=e;ctx.translate(x,cy+(1-e)*fs*.42);if(sh)shadow(ctx,fs);ctx.fillStyle=fill;ctx.fillText(txt[i],0,0);ctx.restore();x+=w}}
-function fit(lines,fam,fs,max){const long=lines.reduce((a,b)=>a.length>b.length?a:b);ctx.font=fnt(fam,fs);while(ctx.measureText(long).width>max){fs-=4;ctx.font=fnt(fam,fs)}return fs}
+// measured with no letter spacing (a title drawn earlier in the frame can leave tracking set, and fixed px tracking never
+// shrinks, which looped forever on a long hormozi or karaoke line under a kinetic title), with a floor
+function fit(lines,fam,fs,max){const long=lines.reduce((a,b)=>a.length>b.length?a:b),ls=ctx.letterSpacing;ctx.letterSpacing='0px';ctx.font=fnt(fam,fs);while(ctx.measureText(long).width>max&&fs>16){fs-=4;ctx.font=fnt(fam,fs)}ctx.letterSpacing=ls;return fs}
 // Drips start at measured letter bottoms (Will 11-08: paint must line up with the letters). Scanned once per word from the
 // unmasked text canvas: per line, find each column's lowest inked pixel, keep runs sitting on that line's baseline, drip from their centres.
 const dripCache={};

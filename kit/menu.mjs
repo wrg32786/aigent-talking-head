@@ -2,7 +2,7 @@
 // bed, font, theme, transition or sound cannot stay hidden.
 //   npm run menu              print every option, grouped, with a one-line label
 //   npm run menu -- --json    machine-readable
-//   npm run list -- transitions|titles|captions|graphics|effects [--json]   one part of the effects menu (docs/effects.md)
+//   npm run list -- transitions|titles|captions|graphics|effects|editing|packs|presets [--json]   one part of the effects menu (docs/effects.md)
 //
 // Used by kit/showcase.mjs and npm run check (coverage: every catalog entry must
 // appear in the menu, and in showcase/index.html once that gallery is generated).
@@ -17,6 +17,8 @@ const R = require('./rules.cjs');
 const SFXPLAN = require('./sfx-plan.cjs');
 const XFX = require('./xfx.cjs');
 const Preset = require('./preset.cjs');
+const Packs = require('./packs.cjs');
+const Locks = require('./locks.cjs');
 
 const KIT = dirname(fileURLToPath(import.meta.url));
 const ROOT = dirname(KIT);
@@ -222,6 +224,14 @@ export function loadMenu() {
     draft: !!p.draft,
   }));
 
+  const packItems = Packs.list().map(p => ({
+    kind: 'pack', id: p.name, section: 'packs',
+    flag: `--pack ${p.name}`,
+    label: `${p.label}. Locks: ${Locks.describe(p.locks)}`,
+    shipped: !!p.shipped,
+    ...(p.preview && p.preview.webp ? { preview: `${p.origin}/${p.preview.webp}` } : {}),
+  }));
+
   const sections = [
     { id: 'finishes', title: 'Film finishes', hint: 'On the picture, before titles. Set globally or per segment, and vary them across scenes rather than one look on everything.', items: finishes },
     { id: 'beat-sync', title: 'Beat-sync', hint: 'When a music bed is set, accents can land on the music. Speech cuts stay put.', items: beatSync },
@@ -240,6 +250,7 @@ export function loadMenu() {
     { id: 'exports', title: 'Export presets', hint: 'npm run reel -- ... --export <name> lays the reel out for that platform (titles, captions and graphics kept out of its UI) and writes reel-vN-<name>.mp4; npm run export re-exports a finished reel; npm run verify -- <job> --export <name> checks it.', items: exportItems },
     { id: 'editing', title: 'Editing principles', hint: 'Common short-form editing advice built into the engine, each usable on its own; --preset magazine (or "- preset: magazine" in a Reel.md) turns them all on. Plain words: docs/guide.md "Editing principles built in".', items: EDITING.map(x => ({ kind: 'editing', section: 'editing', ...x })) },
     { id: 'presets', title: 'Brand presets', hint: 'A saved mix of theme, look, type, finishes and favourites. npm run reel -- --preset <name>. Flags you pass win. --preset auto picks one and prints what it chose.', items: presetItems },
+    { id: 'packs', title: 'Style packs', hint: 'A whole look in one folder (packs/<name>/pack.json): a base preset, style keys and locks that pin what the auto-picker may choose. npm run reel -- <clip> --pack <name>; add --lock "transitions=whip,zoom" to pin more. Gallery: docs/packs.md. Make your own: npm run pack:new -- <name> --from <preset|pack|job>.', items: packItems },
   ];
 
   const items = sections.flatMap(s => s.items);
@@ -276,6 +287,7 @@ export function sourceCatalogIds() {
     beatSync: BEAT_SYNC.map(x => x.id),
     titleLayer: TITLE_LAYER.map(x => x.id),
     preset: Preset.shipped().map(p => p.name),
+    pack: Packs.shipped().map(p => p.name),
   };
 }
 
@@ -364,6 +376,7 @@ export function printMenu(menu) {
 export function showcaseHas(html, ids) {
   const missing = [];
   for (const [kind, list] of Object.entries(ids)) {
+    if (kind === 'pack') continue; // style packs have their own gallery, docs/packs.md (npm run check covers it)
     for (const id of list) {
       const token = `data-id="${kind}:${id}"`;
       if (!html.includes(token)) missing.push(`${kind}:${id}`);
@@ -381,6 +394,8 @@ export const LIST_KINDS = {
   graphics: ['graphics'],
   effects: ['effects'],
   editing: ['editing'],
+  packs: ['packs'],
+  presets: ['presets'],
 };
 const PREVIEW_DIR = { transitions: 'transitions', 'title-entrances': 'titles', 'caption-entrances': 'caption-entrances', 'caption-styles': 'caption-styles' };
 export function listKind(kind, menu) {
@@ -391,7 +406,8 @@ export function listKind(kind, menu) {
     const s = m.sections.find(x => x.id === id);
     return { id: s.id, title: s.title, hint: s.hint, items: s.items.map(it => {
       const rel = PREVIEW_DIR[id] ? `docs/menu/${PREVIEW_DIR[id]}/${it.id}.webp` : null;
-      return { id: it.id, flag: it.flag, label: it.label, ...(rel && existsSync(join(ROOT, rel)) ? { preview: rel } : {}) };
+      const prev = rel || it.preview || null;
+      return { id: it.id, flag: it.flag, label: it.label, ...(prev && existsSync(join(ROOT, prev)) ? { preview: prev } : {}) };
     }) };
   });
   return { kind, doc: 'docs/effects.md', sections };
@@ -403,7 +419,7 @@ export function printList(res) {
     for (const it of s.items) lines.push(`  ${it.id.padEnd(24)} ${it.label}`, `  ${''.padEnd(24)} ${it.flag}`);
     lines.push('');
   }
-  lines.push('Animated previews of each: docs/effects.md');
+  lines.push('Animated previews of each: docs/effects.md (style packs: docs/packs.md)');
   return lines.join('\n');
 }
 function opt(name) {

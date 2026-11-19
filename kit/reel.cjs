@@ -23,6 +23,12 @@
 //          --beat-sync / --no-beat-sync  (default on when a bed is set: snap punches, SFX, titles and fx hits to the bed)
 //          --finish grain[,vignette,...]  optional film look (grain, vignette, chroma, scan-lines, warm, cool, teal, crushed, mono, bleach)
 //          --preset <name>|auto  apply a brand style (npm run preset -- --list). Flags you pass win over the preset.
+//          --pack <name|path>  apply a style pack (packs/, npm run pack; docs/packs.md): its base preset, style keys and
+//            locks. Use --pack or --preset, not both. Flags you pass still win over the pack's style.
+//          --lock "transitions=whip,zoom; titles=typewriter; no-graphics=checklist"  pin choices: the auto-picker only
+//            chooses inside them (kit/locks.cjs lists the keys). Adds to a pack's locks, key by key. Works on --rebuild too.
+//          Every draft writes jobs/<name>/choices.json and prints each pick per beat with its reason; edit it and run
+//            npm run choices -- <name> --apply, then --rebuild (kit/choices.cjs).
 //          --title-layer front|behind|auto  job default for whether titles sit in front or behind the head (default front)
 //          --recipe Reel.md  make it from a Reel.md recipe (docs/reel-md.md): brand kit, music, style, per-shot finishes and
 //            punches, title entrances and layers in order. Flags win over the recipe; the recipe wins over the preset it names.
@@ -59,6 +65,9 @@ const path = require('path');
 const R = require('./rules.cjs');
 const B = require('./beats.cjs');
 const P = require('./preset.cjs');
+const K = require('./packs.cjs');
+const L = require('./locks.cjs');
+const CH = require('./choices.cjs');
 const RM = require('./reelmd.cjs');
 const S = require('./spoken.cjs');
 const CARDS = require('./cards.cjs');
@@ -68,7 +77,7 @@ const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards']);
+const VALUED = new Set(['pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const JSON_OUT = flag('json');
@@ -109,6 +118,23 @@ if (presetArg === 'auto') {
   if (preset.draft) console.warn('note: preset "' + preset.name + '" is a draft from a brand guide; confirm it before you ship.');
   console.log('preset:', preset.name, '-', preset.label || '');
 }
+// --pack: a style pack is a preset plus locks (kit/packs.cjs). --lock adds to its locks, key by key.
+const packArg = opt('pack');
+let pack = null;
+if (packArg) {
+  if (presetArg) die('Use --pack or --preset, not both (a pack names its base preset in "extends").');
+  pack = K.load(packArg);
+  if (!pack) die('Unknown pack "' + packArg + '". See npm run pack');
+  const kerrs = K.validate({ ...pack, preview: undefined });
+  if (kerrs.length) die('Invalid pack "' + packArg + '": ' + kerrs.join('; '));
+  preset = K.toPreset(pack);
+  console.log(`pack: ${pack.name} v${pack.version} - ${pack.label}`);
+}
+const lockArgs = opt('lock') ? argv.flatMap((a, i) => (a === '--lock' && argv[i + 1] && !argv[i + 1].startsWith('--') ? [argv[i + 1]] : [])) : [];
+let LOCKS = {};
+try { LOCKS = L.merge(pack && pack.locks, ...lockArgs.map(L.parse)); } catch (e) { die('--lock: ' + e.message); }
+{ const lerrs = L.validate(LOCKS); if (lerrs.length) die('locks: ' + lerrs.join('; ')); }
+if (!L.isEmpty(LOCKS)) console.log('locks: ' + L.describe(LOCKS));
 // names and words Whisper mishears, written the way you mean them in captions and titles and counted as said by the
 // spoken check: the recipe's "## Aliases" plus --aliases "Gwyn: Guinn, Gwin; aigent: agent" (the flag adds to the recipe's)
 function aliasesFlag(v) { const o = {}; for (const part of String(v || '').split(';')) { const m = /^\s*([^:]+?)\s*:\s*(.+)$/.exec(part); if (m) o[m[1]] = m[2].split(',').map(x => x.trim()).filter(Boolean); } return o; }
@@ -246,6 +272,10 @@ if (!flag('rebuild')) {
     if (!R.TITLE_LAYERS.includes(layer)) die('--title-layer must be front, behind or auto');
     cut.titleLayer = layer;
   }
+  // the pack and its locks: what the style asked for (choices.json explains each pick from it), then the locks win
+  if (pack) { cut.pack = pack.name; if (pack.weights) cut.weights = pack.weights; }
+  if (preset) cut.packStyle = { transition: preset.transition, entranceOrder: preset.entranceOrder, finishPool: preset.finishPool };
+  if (!L.isEmpty(LOCKS)) for (const l of L.applyCut(LOCKS, cut, { weights: pack && pack.weights, repick: !!(pack && pack.weights && pack.weights.transitions), defaultTransition: preset && preset.transition })) console.log(l);
   if (fs.existsSync(path.join(build, 'cut.json')) && !flag('force')) die('build/cut.json exists. Use --rebuild to render your edits, or --force to redraft.');
   fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
   console.log(`cut.json: ${segs.length} segments, seams ${JSON.stringify(seams)}`);
@@ -444,13 +474,27 @@ if (!flag('rebuild')) {
       console.log(`shapes: ${ins.filter(s => s.line).length} of ${ins.length} cutaways set on a shape in the shot, ${face.filter(x => x.anchor).length} key words on your head or a shoulder, ${face.filter(x => x.arc).length} phrases along your outline`);
     }
   }
+  // locks on the captions side: title entrances and count, caption entrance, graphics, cards (kit/locks.cjs)
+  if (!L.isEmpty(LOCKS)) {
+    const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), lg = L.applyCaptions(LOCKS, caps);
+    fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
+    lg.forEach(l => console.log(l));
+  }
   // 4. theme
   const th = path.join(KIT, 'themes', opt('theme', (preset && preset.theme) || 'aigent') + '.js');
   if (!fs.existsSync(th)) die('No theme ' + th);
   fs.copyFileSync(th, path.join(build, 'theme.js'));
+  // what was picked, per beat, and why: jobs/<name>/choices.json to edit (kit/choices.cjs)
+  try {
+    const x = CH.explain(build);
+    fs.writeFileSync(path.join(job, 'choices.json'), JSON.stringify(x, null, 1) + '\n');
+    console.log('\n' + CH.printTable(x) + `\nChange any pick: edit jobs/${name}/choices.json, then npm run choices -- ${name} --apply (or pin one: --lock). docs/packs.md`);
+  } catch (e) { console.warn('note: could not write choices.json: ' + e.message); }
   if (flag('draft')) { console.log(`\nDraft ready. Edit ${build}/captions.js (and cut.json), then: npm run reel -- --rebuild --name ${name}`); process.exit(0); }
 }
 
+// --lock on --rebuild: pin choices on the edited job before it renders
+if (flag('rebuild') && !L.isEmpty(LOCKS)) { try { CH.lockJob(build, LOCKS).forEach(l => console.log(l)); } catch (e) { die('--lock: ' + e.message); } }
 // 5. beat-sync (optional), then render + assemble
 let cut = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8'));
 if (flag('no-beat-sync')) cut.beatSync = false;

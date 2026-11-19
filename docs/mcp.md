@@ -6,7 +6,11 @@
 |---|---|---|
 | `menu` | `npm run menu` | show the user every option before drafting |
 | `list_effects` | `npm run list -- <kind> --json` | get exact names, one-liners and preview paths for one kind (`transitions`, `titles`, `captions`, `graphics`, `effects`); point the user at `docs/effects.md` to see them animated |
-| `draft` | `npm run reel -- ... --draft --json` | transcribe and cut a clip into `jobs/<name>/` |
+| `list_packs` | `npm run pack -- list --json` | every style pack with its locks and preview path; show the user `docs/packs.md` |
+| `get_pack` | `npm run pack -- show <pack> --json` | one pack resolved: merged style, locks, weights, previews |
+| `draft` | `npm run reel -- ... --draft --json` | transcribe and cut a clip into `jobs/<name>/`; takes `pack` and `lock` |
+| `explain` | `npm run choices -- <job> --json` | what was picked per beat and why; with `apply: true`, write the user's edits in `jobs/<job>/choices.json` back first |
+| `set_locks` | `npm run choices -- <job> --lock "..." --json` | pin the user's choices on a drafted job (a string like `"transitions=whip,zoom; titles=typewriter"` or an object), then `render` with `rebuild` |
 | `plan` | `npm run plan -- <job> --json` | propose graphics from what was said into `jobs/<job>/Reel.md` |
 | `validate` | `npm run reelmd -- check <recipe>` or `npm run check -- <job>` | check a Reel.md, or lint a job's copy and plan |
 | `render` | `npm run reel -- ... --json` | render the reel (and an `export`) |
@@ -60,8 +64,8 @@ Or `codex mcp add aigent-talking-head --env PYTHON=/path/to/aigent-talking-head/
 
 ## The flow
 
-1. `menu` (and `list_effects` for transitions, title entrances or caption entrances), and ask the user what they want (and which platform: `tiktok`, `reels`, `shorts`, `feed45`, `square`).
-2. `draft` with `videos: ["inbox/take.mov"]` and `name`.
+1. `menu` (and `list_effects` for transitions, title entrances or caption entrances, `list_packs` for whole looks), and ask the user what they want (and which platform: `tiktok`, `reels`, `shorts`, `feed45`, `square`).
+2. `draft` with `videos: ["inbox/take.mov"]` and `name` (plus `pack`, and `lock` for anything the user pinned). Then `explain` with `job` and show the user what was picked and why; change picks with `explain` and `apply: true`, or `set_locks`.
 3. `plan` with `job`. Show the user the proposed lines in `jobs/<job>/Reel.md` and change them together. Misheard names go in its `## Aliases` section.
 4. `validate` with `recipe: "jobs/<job>/Reel.md"`.
 5. `render` with `recipe`, `clips: "jobs/<job>/clips"`, `name`, `force: true` and `export`.

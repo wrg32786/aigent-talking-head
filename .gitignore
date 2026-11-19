@@ -49,3 +49,6 @@ kit/presets/local/
 
 # agent briefs, build reports and run logs (maintainers only)
 .aigent/
+
+# your own style packs (npm run pack:new)
+packs/local/
