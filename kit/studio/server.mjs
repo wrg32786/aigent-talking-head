@@ -233,7 +233,7 @@ function serveFile(req, res, file) {
   if (!st.isFile()) return json(res, 404, { error: 'not found' });
   const type = MIME[extname(file).toLowerCase()] || 'application/octet-stream';
   const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
-  const headers = { 'content-type': type, 'accept-ranges': 'bytes', 'cache-control': file.includes(sep + 'jobs' + sep) ? 'no-store' : 'max-age=300' };
+  const headers = { 'content-type': type, 'accept-ranges': 'bytes', 'cache-control': file.includes(sep + 'jobs' + sep) ? 'no-store' : file.startsWith(join(STUDIO, 'public') + sep) ? 'no-cache' : 'max-age=300' };
   if (new URL(req.url, 'http://x').searchParams.has('download')) headers['content-disposition'] = `attachment; filename="${basename(file)}"`;
   if (range) {
     const start = range[1] ? +range[1] : st.size - +range[2], end = range[1] && range[2] ? Math.min(+range[2], st.size - 1) : st.size - 1;
@@ -424,7 +424,7 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === '/api/agui' && req.method === 'POST') return await aguiRun(req, res);
     if (u.pathname.startsWith('/api/')) return await api(req, res, u);
     if (u.pathname === '/' || u.pathname === '/index.html') return serveFile(req, res, join(STUDIO, 'public', 'index.html'));
-    if (/^\/(app\.js|app\.css|favicon\.svg)$/.test(u.pathname)) return serveFile(req, res, join(STUDIO, 'public', u.pathname.slice(1)));
+    if (/^\/(favicon\.svg|assets\/[\w.-]+\.(js|css))$/.test(u.pathname)) return serveFile(req, res, join(STUDIO, 'public', u.pathname.slice(1)));
     if (u.pathname.startsWith('/files/')) {
       const relp = decodeURIComponent(u.pathname.slice(7));
       const abs = resolve(ROOT, relp);

@@ -414,6 +414,15 @@
       "failures": ["unknown agent \"<name>\": claude, codex, cursor or print"]
     },
     {
+      "name": "studio:build",
+      "script": "kit/studio/build.mjs",
+      "summary": "Rebuild the Studio page (React + Astryx) from kit/studio/web into kit/studio/public. Only for people editing the page; the built page is committed, so installing and running Studio never builds.",
+      "flags": [],
+      "outputs": ["kit/studio/public (index.html, assets/, build.json)"],
+      "success": "exit 0",
+      "failures": ["npm ci or vite build failed"]
+    },
+    {
       "name": "reelmd",
       "script": "kit/reelmd.cjs",
       "summary": "Check, compile, export or package a Reel.md recipe.",

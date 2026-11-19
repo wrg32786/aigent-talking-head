@@ -96,6 +96,8 @@ The settings button (top right, the sliders) opens a side sheet and saves to `jo
 | Also copy finished reels to | none (reels stay in `jobs/<job>/`) | `STUDIO_RENDERS` |
 | Action notes from the terminal | on | |
 
+Theme (dark or light) and Glass panels (on, or solid panels for older computers) live under Look and are saved in the browser, not in the file.
+
 Folders must be full paths; Studio makes them if needed and checks it can write there before saving. The `studio_settings` MCP tool reads and changes the same file.
 
 ## Chat
@@ -200,6 +202,18 @@ A double-click app with no installer at all is planned: [docs/desktop-app-plan.m
 
 ## Design
 
-Plain HTML, CSS and JavaScript, no framework and no build step, so the installers and `npm run studio` work with nothing extra. The look follows [shadcn/ui](https://github.com/shadcn-ui/ui) (MIT): its token names (background, card, muted, border, input, ring, radius), a small set of radii, segmented tabs, badges, a side sheet for settings, a hover card for details, switches and a toast, rebuilt in plain CSS with the AIgent palette (warm ink and paper neutrals, one cyan accent, Anton for headings, Hanken Grotesk and JetBrains Mono from the kit's fonts). Dismissal and focus follow the behaviors in [vercel-labs/ui](https://github.com/vercel-labs/ui) (Apache-2.0): Escape closes the chat sheet and the dialog, focus returns to the button that opened it, and focus stays put when the page updates. No code from either is copied; see THIRD_PARTY.md.
+The page is React 19 with [Astryx](https://github.com/meta/astryx) components (MIT, Meta): buttons, badges, switches, segmented controls, progress bars, status dots, the keyboard hint and the settings drawer. Its theme (`kit/studio/web/src/theme.js`) extends Astryx Neutral with the AIgent palette: warm ink and paper neutrals, one cyan accent, Anton for headings, Hanken Grotesk and JetBrains Mono from the kit's fonts. Effect tiles, the shot timeline and the chat are drawn for Studio.
 
-Rules it keeps: the cyan accent marks only the primary action, the current step and what is picked; one dark fade sits under tile names so they read on any preview frame; shadow only on the floating layers (hover card, sheet, toast, popover). Keyboard: Tab through everything, arrow keys move between effect tabs, F forbids a tile, / jumps to search. Controls are at least 44 px on touch screens, text at least 12 px, contrast at least 4.5:1 in both themes (measured), focus is always visible, and motion stops under reduced motion. The layout was checked against [ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) and [Anti-Slop](https://github.com/miqdadbadjuber/Anti-Slop) (both MIT), used as guidance only.
+**Prebuilt, so installs stay one step.** The source is in `kit/studio/web`; the built page is committed in `kit/studio/public`, so the installers and `npm run studio` never run a build or download React. `npm run check` fails if the committed build is older than the source. After editing the page, run `npm run studio:build` (it installs the page's own dependencies in `kit/studio/web` and rebuilds) and commit both folders. License notices for everything bundled are in `kit/studio/public/THIRD_PARTY_LICENSES.txt`.
+
+**Glass.** The floating layers are frosted glass: the header, the step bar, the chat panel, the settings drawer, the hover card, the toast and the save popover. Each is a translucent surface with a 20 px backdrop blur and a one-pixel top highlight, floating with a soft shadow over one faint ambient light. Cards are translucent but not blurred, so a page has at most a few blurred layers and stays smooth on older laptops and phones. Fallbacks:
+
+- **Settings, Look, Glass panels** turns every panel solid (saved in the browser).
+- `prefers-reduced-transparency` gets solid panels automatically, and so do browsers without `backdrop-filter`.
+- `prefers-reduced-motion` stops transitions and the preview loops (or pause them with the button above the grid).
+
+**Contrast with glass.** Glass opacity is set so text clears 4.5:1 even in the worst case, with pure white footage right behind a dark panel or pure black behind a light one: body text 11.2:1 and secondary text 4.7:1 in dark, 14.5:1 and 5.6:1 in light. Accent text on light glass uses a deeper teal (5.5:1 on a picked chip). Cards over the ambient light measure 12.9:1 and 5.3:1 in dark, 17.0:1 and 6.6:1 in light.
+
+Rules it keeps: the cyan accent marks only the primary action, the current step and what is picked; one dark fade sits under tile names so they read on any preview frame. Keyboard: Tab through everything, arrow keys move between effect tabs, F forbids a tile, / jumps to search, Escape closes the chat sheet and the drawer, and focus stays on the same tile when the page updates. Controls are at least 44 px on touch screens and text at least 12 px.
+
+Credits: Astryx and React are bundled (both MIT). The token names and component shapes first followed [shadcn/ui](https://github.com/shadcn-ui/ui) (MIT) and the dismissal and focus behavior [vercel-labs/ui](https://github.com/vercel-labs/ui) (Apache-2.0), with no code copied from either. Checked against [ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) and [Anti-Slop](https://github.com/miqdadbadjuber/Anti-Slop) (both MIT), used as guidance only. See THIRD_PARTY.md.

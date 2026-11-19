@@ -241,6 +241,19 @@ if (target) {
     results.push({ label: 'showcase/index.html covers catalogs', errs, warns: [] });
   }
 }
+if (!target) {
+  // The Studio page is React + Astryx, built from kit/studio/web into kit/studio/public and committed, so installs never build it.
+  const errs = [], pub = join(KIT, 'studio', 'public');
+  try {
+    const { webHash } = await import('./studio/web-hash.mjs');
+    const stamp = JSON.parse(readFileSync(join(pub, 'build.json'), 'utf8'));
+    if (stamp.source !== webHash()) errs.push('kit/studio/public is older than kit/studio/web; run npm run studio:build and commit kit/studio/public');
+    const html = readFileSync(join(pub, 'index.html'), 'utf8');
+    for (const m of html.matchAll(/(?:src|href)="\/(assets\/[^"]+)"/g)) if (!existsSync(join(pub, m[1]))) errs.push('kit/studio/public/index.html points at a missing ' + m[1]);
+    if (!/assets\/app\.js/.test(html)) errs.push('kit/studio/public/index.html does not load assets/app.js');
+  } catch (e) { errs.push('Studio page build missing: ' + e.message + ' (npm run studio:build)'); }
+  results.push({ label: 'Studio page build in kit/studio/public matches kit/studio/web', errs, warns: [] });
+}
 let bad = 0;
 for (const r of results) {
   console.log(`${r.errs.length ? 'FAIL' : 'ok  '} ${r.label}`);

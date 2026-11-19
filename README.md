@@ -71,11 +71,11 @@ The agent clones and installs the kit, registers the MCP server in its own confi
 
 Then run `npm run studio` (or click the icon). Without an agent the chat works on keywords, a local model or an API key.
 
-<img src="docs/studio/desktop.png" width="720" alt="Studio in a browser: four steps across the top, the Style step with style packs and a grid of effect previews, the picks tray at the bottom, and the chat on the right with Claude Code connected and listening">
+<img src="docs/studio/desktop.png" width="720" alt="Studio in a browser: four steps across the top, the Style step with style packs and a grid of effect previews, the picks tray floating at the bottom, and the chat in a frosted glass panel on the right with Claude Code connected and listening">
 
 **Reference links.** Paste one or more links (YouTube and Shorts, TikTok, X, Vimeo, a direct .mp4, or one public Instagram post) and Studio downloads each to a folder on your computer, shows the progress, and breaks it down: length, shots and cut times, pace, music BPM and energy, caption style, transitions, finishes and graphics. It then suggests matching items from the effects menu. The breakdown goes into the chat, so "use the transitions from the reference but calmer" works. Use it as an influence (soft defaults) or recreate its structure with your clip. Link downloads need [yt-dlp](https://github.com/yt-dlp/yt-dlp), which the installer adds; Instagram uses [instaloader](https://github.com/instaloader/instaloader) anonymously, with no login. Only use videos you have the rights to use as a reference.
 
-<img src="docs/studio/ref-url-desktop.png" width="720" alt="Studio Reference step: a pasted YouTube link broken down into 30 seconds, 7 shots, 117 BPM and a 4.29 second average shot, a shot timeline with a beat grid, tags for what was found, suggested picks as chips, and a contact sheet">
+<img src="docs/studio/ref-url-desktop.png" width="720" alt="Studio Reference step: a pasted YouTube link broken down into 90 seconds, 17 shots, 123 BPM and a 5.29 second average shot, a shot timeline with a beat grid, tags for what was found, suggested picks as chips, and a contact sheet">
 
 **Effects menu.** Every transition, title entrance, caption style, graphic, finish and sound in 17 categories, each a looping preview with just its name. Hover for the details, click to pick, use the forbid button for what you never want, and your picks collect in the tray at the bottom. Once you pick any transition, only picked transitions are used, and the same for each kind.
 
@@ -90,11 +90,11 @@ Then run `npm run studio` (or click the icon). Without an agent the chat works o
 <img src="docs/studio/chat-phone.png" width="300" alt="Studio chat as a full-screen sheet on a phone: the agent status badge, messages marked Answered and the agent's replies">
 </p>
 
-**Settings.** Dark by default, with a light theme. Choose who answers the chat (your terminal agent by default, or a local model through Ollama, LM Studio or llama.cpp, the Claude or OpenAI API, or keywords only), where reference downloads go, and where finished reels are copied.
+**Settings.** Dark by default, with a light theme. The chat, step bar and settings are frosted glass panels; a switch turns them solid on older computers. Choose who answers the chat (your terminal agent by default, or a local model through Ollama, LM Studio or llama.cpp, the Claude or OpenAI API, or keywords only), where reference downloads go, and where finished reels are copied.
 
 <img src="docs/studio/settings.png" width="720" alt="Studio settings in a side sheet: who answers the chat with a local model picked, the action note switch, the reference downloads and finished reels folders, and the theme">
 
-On a phone each step stacks into one column and the chat opens as a sheet: [reference](docs/studio/ref-url-phone.png), [effects](docs/studio/menu-phone.png), [settings](docs/studio/settings-phone.png). Studio also speaks [AG-UI](docs/studio.md#ag-ui), so AG-UI clients can watch it or send it messages. Reference screenshots show Big Buck Bunny (c) Blender Foundation, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), blender.org.
+On a phone each step stacks into one column and the chat opens as a sheet: [reference](docs/studio/ref-url-phone.png), [effects](docs/studio/menu-phone.png), [settings](docs/studio/settings-phone.png). Studio also speaks [AG-UI](docs/studio.md#ag-ui), so AG-UI clients can watch it or send it messages. The page is built with React and [Astryx](https://github.com/meta/astryx) and ships prebuilt, so nothing extra installs. Reference screenshots show Big Buck Bunny (c) Blender Foundation, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), blender.org.
 
 ## Install
 

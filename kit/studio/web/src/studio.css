@@ -1,6 +1,6 @@
-/* AIgent Studio. Tokens follow shadcn/ui's naming (background, card, muted, border, ring, radius; MIT, see THIRD_PARTY.md)
+/* AIgent Studio. Built on Astryx (MIT, Meta) with the AIgent theme in theme.js. Tokens follow shadcn/ui's naming (background, card, muted, border, ring, radius; MIT, see THIRD_PARTY.md)
    with the AIgent palette: warm ink and paper neutrals and one cyan accent, used for the primary action and the current state only.
-   Fonts are the kit's own (OFL). No build step. */
+   Fonts are the kit's own (OFL). Built into ../public by npm run studio:build. */
 @font-face { font-family: "Hanken Grotesk"; src: url("/files/kit/fonts/HankenGrotesk-VF.ttf") format("truetype"); font-weight: 100 900; font-display: swap; }
 @font-face { font-family: "Anton"; src: url("/files/kit/fonts/Anton-Regular.ttf") format("truetype"); font-display: swap; }
 @font-face { font-family: "JetBrains Mono"; src: url("/files/kit/fonts/JetBrainsMono-VF.ttf") format("truetype"); font-weight: 100 800; font-display: swap; }
@@ -29,27 +29,27 @@
 }
 :root { --radius: 8px; --radius-sm: 6px; --radius-lg: 12px; --top: 60px; --chat: 380px; }
 
-* { box-sizing: border-box; }
+/* Element defaults sit in the lowest cascade layer so Astryx components (MIT, Meta) keep their own styles. */
+@layer reset {
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--background); color: var(--foreground); font: 15px/1.5 "Hanken Grotesk", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: var(--primary); }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  :where(input:not([type=checkbox], [type=radio]), select, textarea) { background: transparent; border: 1px solid var(--input); border-radius: var(--radius-sm); padding: 8px 12px; min-height: 40px; transition: border-color .15s; }
+  :where(input, textarea)::placeholder { color: var(--muted-foreground); opacity: .8; }
+  :where(input:not([type=checkbox], [type=radio]), select, textarea):focus { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 22%, transparent); }
+  select { background: var(--card); }
+}
 [hidden] { display: none !important; }
-html, body { margin: 0; background: var(--background); color: var(--foreground); font: 15px/1.5 "Hanken Grotesk", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-a { color: var(--primary); }
-button, input, select, textarea { font: inherit; color: inherit; }
-button { cursor: pointer; }
-svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .skip { position: absolute; left: -999px; } .skip:focus { left: 12px; top: 8px; background: var(--primary); color: var(--primary-foreground); padding: 6px 10px; z-index: 30; border-radius: var(--radius-sm); }
 .fine { color: var(--muted-foreground); font-size: 13px; margin: 6px 0 0; }
 .lbl { color: var(--muted-foreground); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
 .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .col { display: flex; flex-direction: column; gap: 6px; } .grow { flex: 1 1 220px; min-width: 0; }
-kbd { font: 11px "JetBrains Mono", monospace; border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--muted-foreground); }
-
-/* inputs and buttons */
-input, select, textarea { background: transparent; border: 1px solid var(--input); border-radius: var(--radius-sm); padding: 8px 12px; min-height: 40px; transition: border-color .15s; }
-input::placeholder, textarea::placeholder { color: var(--muted-foreground); opacity: .8; }
-input:focus, select:focus, textarea:focus { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 22%, transparent); }
-select { background: var(--card); }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--primary); color: var(--primary-foreground); border: 1px solid transparent; border-radius: var(--radius-sm); padding: 8px 16px; min-height: 40px; font-weight: 650; font-size: 14px; white-space: nowrap; transition: filter .15s, background .15s, border-color .15s, color .15s; }
 .btn:hover { filter: brightness(1.08); } .btn:disabled { opacity: .4; cursor: not-allowed; filter: none; }
 .btn.outline { background: transparent; color: var(--foreground); border-color: var(--input); } .btn.outline:hover { background: var(--muted); }
@@ -121,15 +121,14 @@ main[data-step="footage"] .step[data-step="footage"], main[data-step="reference"
 .urlbar textarea:focus { box-shadow: none; }
 .queue { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 6px; }
 .qi { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-areas: "site qt badge qa"; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 8px 8px 12px; }
-.qi .site { grid-area: site; } .qi .qt { grid-area: qt; } .qi > .badge { grid-area: badge; } .qi .qa { grid-area: qa; }
+.qi .site { grid-area: site; } .qi .qt { grid-area: qt; } .qi .qb { grid-area: badge; } .qi .qa { grid-area: qa; }
 .qi.active { border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
-.qi .site { grid-area: site; } .qi .qt { grid-area: qt; } .qi > .badge { grid-area: badge; } .qi .qa { grid-area: qa; }
+.qi .site { grid-area: site; } .qi .qt { grid-area: qt; } .qi .qb { grid-area: badge; } .qi .qa { grid-area: qa; }
 .qi .site { font: 11px "JetBrains Mono", monospace; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: .04em; }
 .qi .qt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 14px; }
 .qi .qa { display: flex; gap: 2px; } .qi .qa .icon-btn { width: 34px; height: 34px; }
-.qi .bar, .qi .err, .qi .fine { grid-column: 1 / -1; grid-row: auto; margin: 0; }
+.qi .qbar, .qi .err, .qi .fine { grid-column: 1 / -1; grid-row: auto; margin: 0; }
 .qi .err { color: var(--destructive); font-size: 13px; }
-.qi.ready .badge { color: var(--success); } .qi.failed .badge { color: var(--destructive); }
 .bar { height: 4px; border-radius: 4px; background: var(--muted); overflow: hidden; }
 .bar span { display: block; height: 100%; width: 0; background: var(--primary); transition: width .3s; }
 .bar.indet span { width: 35%; animation: indet 1.3s ease-in-out infinite; }
@@ -164,7 +163,7 @@ main[data-step="footage"] .step[data-step="footage"], main[data-step="reference"
 .chip svg { width: 14px; height: 14px; }
 .chip.on { border-color: transparent; background: color-mix(in srgb, var(--primary) 16%, transparent); color: var(--primary); }
 .chip.deny { color: var(--destructive); border-color: color-mix(in srgb, var(--destructive) 45%, transparent); }
-.chip .k { color: var(--muted-foreground); } .chip.on .k { color: inherit; opacity: .75; }
+.chip .k { color: var(--muted-foreground); } .chip.on .k { color: inherit; }
 
 /* segmented control (shadcn tabs look) */
 .seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--muted); border-radius: var(--radius); }
@@ -193,7 +192,7 @@ main[data-step="footage"] .step[data-step="footage"], main[data-step="reference"
 .tab { flex: none; display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; background: transparent; border-radius: 999px; padding: 6px 12px; min-height: 36px; font-size: 13px; font-weight: 600; color: var(--muted-foreground); white-space: nowrap; transition: background .15s, color .15s; }
 .tab:hover { background: var(--muted); color: var(--foreground); }
 .tab[aria-selected="true"] { background: var(--foreground); color: var(--background); }
-.tab .c { font-size: 11px; opacity: .65; font-weight: 500; }
+.tab .c { font-size: 11px; font-weight: 500; }
 .tab .pd { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); }
 .tabselect { display: none; }
 #tabhint { margin: 0 0 12px; }
@@ -306,17 +305,13 @@ main[data-step="style"] .picks { display: flex; }
 .only-sm { display: none; }
 
 /* settings sheet */
-.sheet { margin: 0 0 0 auto; height: 100vh; max-height: 100vh; width: min(440px, 100vw); border: 0; border-left: 1px solid var(--border); padding: 0; background: var(--card); color: var(--foreground); box-shadow: var(--shadow); }
-.sheet[open] { animation: slide .2s ease-out; }
-@keyframes slide { from { transform: translateX(24px); opacity: 0; } }
-.sheet::backdrop { background: rgba(0, 0, 0, .5); }
-.sheet form { display: flex; flex-direction: column; height: 100%; }
+.settings-sheet form { display: flex; flex-direction: column; height: 100%; }
 .sheet-h { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 14px 20px; border-bottom: 1px solid var(--border); }
 .sheet-h h2 { margin: 0; font-size: 17px; }
-.sheet-b { flex: 1; overflow-y: auto; padding: 8px 20px 20px; }
+.sheet-b { flex: 1; overflow-y: auto; padding: 4px 20px 20px; }
 .sheet-f { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
-.sheet fieldset { border: 0; padding: 0; margin: 16px 0 0; display: flex; flex-direction: column; gap: 8px; }
-.sheet legend { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 8px; padding: 0; }
+.settings-sheet fieldset { border: 0; padding: 0; margin: 16px 0 0; display: flex; flex-direction: column; gap: 8px; }
+.settings-sheet legend { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 8px; padding: 0; }
 .radios { display: grid; gap: 6px; }
 .rcard { display: flex; align-items: center; gap: 12px; border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; cursor: pointer; transition: border-color .15s, background .15s; }
 .rcard:hover { background: var(--muted); }
@@ -370,8 +365,74 @@ main[data-step="style"] .picks { display: flex; }
 .qi .site { grid-column: 1 / -1; }
   .stepnav .btn span { display: none; } .stepnav .btn { padding: 8px 12px; }
   .packs .pack { flex-basis: 96px; }
-  .sheet { width: 100vw; }
   .toast { left: 12px; right: 12px; bottom: 84px; }
 }
 @media (pointer: coarse) { .btn, .seg button, .tab, .chip, .icon-btn { min-height: 44px; } .icon-btn { min-width: 44px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------- glass ----------
+   Floating chrome (header, step bar, chat, settings, hover card, toast, popover) is frosted glass: a translucent
+   surface plus backdrop blur, so the work scrolling underneath stays visible. Cards are translucent but not
+   blurred: one blur per floating layer keeps it smooth on older laptops and phones.
+   Text contrast is measured against the worst case (bright footage right behind the glass), see docs/studio.md.
+   Fallbacks: solid surfaces for prefers-reduced-transparency, browsers without backdrop-filter, and the
+   Glass panels switch in Settings. */
+:root, [data-theme="dark"] {
+  --glass: rgba(19, 17, 16, .88); --glass-card: rgba(30, 27, 24, .52);
+  --glass-edge: rgba(241, 232, 220, .12); --glass-hi: inset 0 1px 0 rgba(255, 255, 255, .06);
+  --glass-shadow: 0 18px 50px rgba(0, 0, 0, .45);
+  --ambient-a: rgba(92, 249, 226, .17); --ambient-b: rgba(255, 150, 90, .10); --ambient-c: rgba(120, 110, 255, .07);
+  --card-shadow: 0 1px 0 rgba(255, 255, 255, .03), 0 12px 32px rgba(0, 0, 0, .28);
+}
+[data-theme="light"] {
+  --glass: rgba(255, 253, 250, .9); --glass-card: rgba(255, 255, 255, .58);
+  --glass-edge: rgba(23, 19, 15, .09); --glass-hi: inset 0 1px 0 rgba(255, 255, 255, .7);
+  --glass-shadow: 0 18px 50px rgba(60, 40, 20, .14);
+  --ambient-a: rgba(11, 122, 109, .14); --ambient-b: rgba(230, 140, 60, .12); --ambient-c: rgba(110, 100, 230, .06);
+  --card-shadow: 0 1px 2px rgba(60, 40, 20, .05), 0 12px 32px rgba(60, 40, 20, .08);
+}
+.ambient { position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(55vmax 45vmax at 6% -8%, var(--ambient-a), transparent 62%), radial-gradient(45vmax 40vmax at 100% 105%, var(--ambient-b), transparent 60%), radial-gradient(40vmax 30vmax at 70% 30%, var(--ambient-c), transparent 65%), var(--background); }
+html { background: var(--background); } body { background: transparent; }
+.glass { background: var(--glass); border-color: var(--glass-edge); -webkit-backdrop-filter: blur(20px) saturate(150%); backdrop-filter: blur(20px) saturate(150%); box-shadow: var(--glass-hi); }
+.glass-card { background: var(--glass-card); border: 1px solid var(--glass-edge); box-shadow: var(--glass-hi), var(--card-shadow); }
+.block.glass-card, .teardown.glass-card, .runbar.glass-card { border-radius: 18px; }
+.outputs figure.glass-card, .fold.glass-card, .qi.glass-card { border-radius: 14px; }
+.top.glass { border-bottom: 1px solid var(--glass-edge); }
+.stepnav.glass { border-top: 1px solid var(--glass-edge); }
+.chat.glass { border-left: 1px solid var(--glass-edge); }
+.hovercard.glass, .toast.glass, .popover.glass { box-shadow: var(--glass-hi), var(--glass-shadow); }
+.settings-sheet { --color-background-surface: var(--glass); background: var(--glass) !important; -webkit-backdrop-filter: blur(24px) saturate(150%); backdrop-filter: blur(24px) saturate(150%); border-left: 1px solid var(--glass-edge); }
+.settings-sheet::backdrop { background: rgba(0, 0, 0, .35); }
+.stat { background: color-mix(in srgb, var(--foreground) 4%, transparent); border-color: var(--glass-edge); }
+.urlbar.glass-card { border-color: var(--input); }
+.drop.big { background: var(--glass-card); }
+.boot { display: flex; align-items: center; gap: 12px; justify-content: center; min-height: 100vh; color: var(--muted-foreground); font-weight: 600; }
+.qbar { grid-column: 1 / -1; }
+.agentbar { display: inline-flex; align-items: center; gap: 8px; }
+.nextpad { width: 1px; }
+.ph-only { display: none; }
+@media (max-width: 640px) { .hide-sm { display: none !important; } .ph-only { display: inline-flex; } }
+#ref-mode, #energy, #sfx, #tighten, #theme-seg { display: inline-flex; }
+@media (prefers-reduced-transparency: reduce) {
+  .glass, .glass-card, .settings-sheet { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .glass, .settings-sheet { background: var(--card) !important; } .glass-card, .drop.big { background: var(--card); }
+  .ambient { background: var(--background); }
+}
+[data-glass="off"] .glass, [data-glass="off"] .glass-card, [data-glass="off"] .settings-sheet { -webkit-backdrop-filter: none; backdrop-filter: none; }
+[data-glass="off"] .glass, [data-glass="off"] .settings-sheet { background: var(--card) !important; }
+[data-glass="off"] .glass-card, [data-glass="off"] .drop.big { background: var(--card); }
+[data-glass="off"] .ambient { background: var(--background); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass, .settings-sheet { background: var(--card) !important; }
+}
+/* Floating glass panels on wide screens: the chat and the step bar sit off the edges with depth. */
+@media (min-width: 901px) {
+  .chat.glass { top: calc(var(--top) + 12px); height: calc(100vh - var(--top) - 24px); margin: 12px 12px 0 0; border: 1px solid var(--glass-edge); border-radius: 20px; overflow: hidden; box-shadow: var(--glass-hi), var(--glass-shadow); }
+  .stepnav.glass { bottom: 12px; margin: auto -12px 12px; padding: 10px 12px; border: 1px solid var(--glass-edge); border-radius: 18px; box-shadow: var(--glass-hi), var(--glass-shadow); }
+}
+@media (pointer: coarse) { .kbdwrap { display: none; } }
+@media (max-width: 900px) { .chat.glass { background: color-mix(in srgb, var(--card) 94%, transparent); } }
+.settings-sheet form { min-height: 100%; }
+/* Light theme: accent text on glass uses a deeper teal so it clears 4.5:1 even with dark footage behind the glass. */
+[data-theme="light"] .chip.on, [data-theme="light"] .brand b, [data-theme="light"] .pack[aria-checked="true"] b { color: #06564d; }
