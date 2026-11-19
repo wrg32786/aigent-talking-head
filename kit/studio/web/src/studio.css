@@ -469,6 +469,10 @@ html { background: var(--background); } body { background: transparent; }
 .rec-guides .head { left: 30%; right: 30%; top: 14%; height: 34%; border-radius: 45% 45% 40% 40%; }
 .rec-guides .caps { left: 8%; right: 14%; top: 62%; height: 12%; border-radius: 8px; border-color: rgba(255, 255, 255, .5); color: rgba(255, 255, 255, .85); }
 .f16x9 .rec-guides .head { left: 38%; right: 38%; top: 10%; height: 44%; } .f16x9 .rec-guides .caps { left: 20%; right: 20%; top: 74%; height: 13%; }
+/* where the app UI covers a 9:16 reel (kit/exports.json reels): keep your face and words out of it */
+.rec-guides .ui-zone { position: absolute; background: repeating-linear-gradient(135deg, rgba(255, 80, 80, .22) 0 8px, rgba(255, 80, 80, .1) 8px 16px); }
+.rec-guides .ui-zone.top { left: 0; right: 0; top: 0; } .rec-guides .ui-zone.bottom { left: 0; right: 0; bottom: 0; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6px; color: rgba(255, 190, 190, .95); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; text-shadow: 0 1px 2px #000; }
+.rec-guides .ui-zone.rail { right: 0; }
 .f1x1 .rec-guides .head { left: 34%; right: 34%; top: 10%; height: 40%; } .f1x1 .rec-guides .caps { left: 12%; right: 12%; top: 70%; height: 13%; }
 .rec-prompter { position: absolute; left: 6%; right: 6%; top: 3%; height: 26%; overflow: hidden; padding: 8px 12px; border-radius: 10px; background: rgba(0, 0, 0, .55); color: #fff; font-size: clamp(16px, 2.2vw, 22px); line-height: 1.35; font-weight: 600; text-align: center; scroll-behavior: auto; }
 .rec-prompter p { margin: 0 0 .5em; } .rec-prompter p:last-child { margin-bottom: 80%; }

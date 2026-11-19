@@ -7,6 +7,11 @@ import { Badge } from '@astryxdesign/core/Badge';
 import { Switch } from '@astryxdesign/core/Switch';
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
 import { api, file, toast, RM, cue, Icon, IconBtn } from './lib.jsx';
+import EXPORTS from '../../../exports.json';
+
+// where the app's own buttons and captions cover a 9:16 reel (kit/exports.json "reels"), as % of the frame
+const UI = (() => { const r = EXPORTS.reels, p = (v, of) => (100 * v / of).toFixed(2) + '%';
+  return { top: p(r.safe.top, r.h), bottom: p(r.safe.bottom, r.h), right: p(r.safe.right, r.w) }; })();
 
 const FRAMES = { '9:16': 9 / 16, '16:9': 16 / 9, '1:1': 1 };
 const MIMES = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4;codecs=avc1,mp4a', 'video/mp4'];
@@ -161,6 +166,41 @@ export function Recorder({ V, s, apply, onClose, onLive, visible = true, scriptI
     const el = box.querySelector(`[data-line="${line}"]`); if (!el) return;
     box.querySelector('.rp-roll').style.transform = `translateY(${-el.offsetTop + 6}px)`;
   }, [line, text, fontPx, prompt, phase]);
+  // pop-out prompter: the same script in its own window, for a second screen or a monitor above the lens.
+  // A same-origin window opened from this page; it is drawn from here, so nothing goes over the network.
+  const pop = useRef(null);
+  const [popped, setPopped] = useState(false);
+  function popOut() {
+    if (pop.current && !pop.current.closed) { pop.current.focus(); return; }
+    const w = window.open('', 'studio-prompter', 'width=960,height=640');
+    if (!w) return toast('The browser blocked the window. Allow pop-ups for Studio, then try again.');
+    w.document.title = 'Teleprompter';
+    w.document.body.innerHTML = '<div id="roll"></div>';
+    const st = w.document.createElement('style');
+    st.textContent = `html,body{margin:0;height:100%;background:#000;color:#fff;font:600 48px/1.35 Inter,system-ui,sans-serif;overflow:hidden}
+      #roll{padding:12vh 8vw 100vh;text-align:center;transition:transform .45s ease} #roll.still{transition:none}
+      #roll.flip{transform-origin:center} p{margin:0 0 .6em;opacity:.45} p.now{opacity:1;color:#5cf9e2} p.past{opacity:.25}
+      em{display:block;font-size:.45em;font-style:normal;letter-spacing:.08em;text-transform:uppercase;color:#9aa4ad}`;
+    w.document.head.appendChild(st);
+    w.addEventListener('beforeunload', () => setPopped(false));
+    pop.current = w; setPopped(true);
+  }
+  useEffect(() => () => { if (pop.current && !pop.current.closed) pop.current.close(); }, []);
+  useEffect(() => {
+    const w = pop.current; if (!popped || !w || w.closed) return;
+    const d = w.document, roll = d.getElementById('roll'); if (!roll) return;
+    roll.className = RM ? 'still' : '';
+    roll.innerHTML = '';
+    lines.forEach((x, i) => {
+      const p = d.createElement('p'); p.dataset.line = i; p.className = i === line ? 'now' : i < line ? 'past' : '';
+      if (x.section) { const em = d.createElement('em'); em.textContent = x.section; p.appendChild(em); }
+      p.appendChild(d.createTextNode(x.text)); roll.appendChild(p);
+    });
+    d.body.style.fontSize = Math.round(fontPx * 2.2) + 'px';
+    const el = roll.querySelector(`[data-line="${line}"]`), y = el ? -el.offsetTop + w.innerHeight * 0.12 : 0;
+    roll.style.transform = `${flipText ? 'scaleX(-1) ' : ''}translateY(${y}px)`;
+  }, [popped, line, text, wpm, fontPx, flipText]);
+
   // keys while the recorder is on screen: Space record or stop, P pause, up and down change the WPM, left and right move a line
   useEffect(() => {
     if (!visible) return;
@@ -197,6 +237,11 @@ export function Recorder({ V, s, apply, onClose, onLive, visible = true, scriptI
         {live && guides && <div className="rec-guides" aria-hidden="true">
           <i className="v1" /><i className="v2" /><i className="h1" /><i className="h2" />
           <span className="head">Head</span><span className="caps">Captions</span>
+          {frame === '9:16' && <>
+            <b className="ui-zone top" style={{ height: UI.top }} />
+            <b className="ui-zone bottom" style={{ height: UI.bottom }}>App buttons</b>
+            <b className="ui-zone rail" style={{ width: UI.right, top: UI.top, bottom: UI.bottom }} />
+          </>}
         </div>}
         {live && prompt && <div className={'rec-prompter' + (flipText ? ' flip' : '') + (RM ? ' still' : '')} ref={prompter} aria-label="Teleprompter" style={{ fontSize: fontPx }}>
           <div className="rp-roll">{lines.length ? lines.map((x, i) => <p key={i} data-line={i} className={(i === line ? 'now' : i < line ? 'past' : '') + (x.pause ? ' hold' : '')}>{x.section && <em>{x.section}</em>}{x.text}{x.pause > 0 && <span className="rp-pause" aria-label="pause">||</span>}</p>)
@@ -244,7 +289,8 @@ export function Recorder({ V, s, apply, onClose, onLive, visible = true, scriptI
           <label className="lbl" htmlFor="rec-font">Text size <b>{fontPx}</b></label>
           <input id="rec-font" type="range" min={14} max={44} step={1} value={fontPx} onChange={e => { setFontPx(+e.target.value); remember('font', e.target.value); }} />
           <Switch id="rec-flip" size="sm" label="Mirror text (beam splitter)" value={flipText} onChange={v => { setFlipText(v); remember('flip', v); }} />
-          <p className="fine">Paced by a timer from the start of the take. Space records or stops, P pauses, arrows change the pace or move a line.</p>
+          <Button id="rec-popout" size="sm" variant="secondary" label={popped ? 'Prompter window is open' : 'Pop out the prompter'} onClick={popOut} />
+          <p className="fine">Paced by a timer from the start of the take. Space records or stops, P pauses, arrows change the pace or move a line. Pop out puts the script in its own window: drag it to a second screen near your lens.</p>
         </>}
       </div>
     </div>
