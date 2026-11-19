@@ -916,7 +916,7 @@ try {
     await cl.connect(new StdioClientTransport({ command: node, args: [join(KIT, 'mcp.mjs')], cwd: dirname(KIT), stderr: 'ignore', env: { ...process.env, STUDIO_DIR: studioDir } }));
     try {
       const names = (await cl.listTools()).tools.map(t => t.name).join(',');
-      if (names !== 'menu,list_effects,list_packs,get_pack,draft,explain,set_locks,plan,validate,render,verify,studio_get_state,studio_set_selections,studio_run,studio_start,studio_wait_for_message,studio_get_pending,studio_reply,studio_add_reference_url,studio_get_reference_teardown,studio_settings') fail('MCP tools: ' + names);
+      if (names !== 'menu,list_effects,list_packs,get_pack,draft,explain,set_locks,plan,validate,render,verify,studio_get_state,studio_set_selections,studio_run,studio_start,studio_wait_for_message,studio_get_pending,studio_reply,studio_add_reference_url,studio_get_reference_teardown,studio_settings,studio_takes') fail('MCP tools: ' + names);
       const lp = await cl.callTool({ name: 'list_packs', arguments: {} });
       if (lp.isError || !lp.structuredContent || !lp.structuredContent.packs.some(p => p.name === 'magazine')) fail('MCP list_packs: ' + JSON.stringify(lp).slice(0, 300));
       const gp = await cl.callTool({ name: 'get_pack', arguments: { pack: 'cinematic' } });
@@ -983,6 +983,7 @@ try {
     } finally { srv.kill(); rmSync(join(dirname(KIT), 'jobs', job), { recursive: true, force: true }); }
     console.log('ok');
   }
+  step('Studio Record now in Chrome with a fake camera and mic (tests/studio-record.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-record.e2e.mjs')], dirname(KIT)); });
   step('check.mjs flags em dashes and banned phrases in captions', () => {
     const b = join(work, 'jobs', 'muse', 'build');
     const caps = { captionStyle: 'pill', flips: [{ start: 0, end: 1, text: 'This is not a tool but a team', mode: 0 }, { start: 1, end: 2, text: 'Fast \u2014 really fast', mode: 0 }] };

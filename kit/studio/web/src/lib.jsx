@@ -48,6 +48,12 @@ const P = {
   right: <path d="M9 5l7 7-7 7" />,
   film: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 3v18M16 3v18M4 8h4M4 13h4M16 8h4M16 13h4M4 17h4M16 17h4" /></>,
   download: <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />,
+  camera: <><rect x="3" y="6" width="13" height="12" rx="2" /><path d="M16 10l5-3v10l-5-3" /></>,
+  mic: <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></>,
+  stop: <rect x="6" y="6" width="12" height="12" rx="2" />,
+  grid: <path d="M9 4v16M15 4v16M4 9h16M4 15h16" />,
+  script: <path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4" />,
+  trash: <path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13" />,
 };
 export const Icon = ({ n, className }) => <svg className={'ic' + (className ? ' ' + className : '')} viewBox="0 0 24 24" aria-hidden="true">{P[n]}</svg>;
 export const IconBtn = ({ n, label, onClick, className = '', ...rest }) => <button type="button" className={'icon-btn ' + className} aria-label={label} title={label} onClick={onClick} {...rest}><Icon n={n} /></button>;

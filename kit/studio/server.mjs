@@ -16,6 +16,7 @@ import * as S from './settings.mjs';
 import * as F from './fetch.mjs';
 import * as CH from './channel.mjs';
 import * as AG from './agui.mjs';
+import * as REC from './record.mjs';
 
 const require = createRequire(import.meta.url);
 const K = require('../packs.cjs');
@@ -226,6 +227,7 @@ async function chatTurn(text, offline) {
 // ---------- http ----------
 const json = (res, code, body) => { res.writeHead(code, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify(body)); };
 const readBody = req => new Promise((ok, bad) => { let b = ''; req.on('data', d => { b += d; if (b.length > 2e6) { bad(new Error('too big')); req.destroy(); } }); req.on('end', () => { try { ok(b ? JSON.parse(b) : {}); } catch { bad(Object.assign(new Error('send JSON'), { code: 400 })); } }); });
+const readRaw = (req, max) => new Promise((ok, bad) => { const parts = []; let n = 0; req.on('data', d => { n += d.length; if (n > max) { bad(Object.assign(new Error('chunk too big'), { code: 413 })); req.destroy(); } else parts.push(d); }); req.on('end', () => ok(Buffer.concat(parts))); req.on('error', bad); });
 const safeName = n => basename(String(n || 'file')).replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+/, '').slice(0, 80) || 'file';
 
 function serveFile(req, res, file) {
@@ -271,6 +273,21 @@ async function api(req, res, u) {
     });
     return json(res, 200, { ok: true, path: relp, ...view(s) });
   }
+  // Record now (kit/studio/record.mjs): start, numbered chunks while filming, finish converts to mp4
+  if (p === '/api/record/start' && M === 'POST') { const b = await readBody(req); const id = update(st => REC.start(st, b)); return json(res, 200, { id, ...view(C.load()) }); }
+  if (p === '/api/record/chunk' && M === 'POST') {
+    const id = +u.searchParams.get('id'), sq = +u.searchParams.get('seq');
+    const buf = await readRaw(req, REC.MAX_CHUNK);
+    try { return json(res, 200, REC.chunk(id, sq, buf)); } catch (e) { return json(res, e.code || 500, { error: e.message, ...(e.next != null ? { next: e.next } : {}) }); }
+  }
+  if (p === '/api/record/finish' && M === 'POST') {
+    const b = await readBody(req), id = +b.id;
+    try { REC.finish(id, b, fn => update(fn)); } catch (e) { return json(res, e.code || 500, { error: e.message }); }
+    return json(res, 202, { id, ...view(C.load()) });
+  }
+  if (p === '/api/record/abort' && M === 'POST') { const b = await readBody(req); const s = update(st => { REC.abort(st, +b.id); }); return json(res, 200, view(s)); }
+  if (p === '/api/record/take' && M === 'POST') { const b = await readBody(req); try { const s = update(st => { REC.act(st, +b.id, b.action); }); return json(res, 200, view(s)); } catch (e) { return json(res, e.code || 500, { error: e.message }); } }
+  if (p === '/api/record/takes' && M === 'GET') return json(res, 200, { takes: REC.list(C.load()) });
   if (p === '/api/footage/remove' && M === 'POST') { const b = await readBody(req); const s = update(st => { st.footage = st.footage.filter(f => f !== b.path); }); return json(res, 200, view(s)); }
   if (p === '/api/reference' && M === 'POST') {
     const b = await readBody(req), s = C.load();
@@ -457,6 +474,8 @@ server.on('error', async e => {
   console.error(`Port ${PORT} is in use by another program. Start Studio on another port: npm run studio -- --port 4758`);
   process.exit(1);
 });
+// a take still marked recording or converting was cut off when Studio last stopped
+{ const s0 = C.load(); if ((s0.takes || []).some(t => t.status === 'recording' || t.status === 'converting')) update(st => { for (const t of st.takes) if (t.status === 'recording' || t.status === 'converting') Object.assign(t, { status: 'failed', error: 'Studio stopped while this take was being saved' }); }); }
 server.listen(PORT, HOST, () => {
   const url = `http://${HOST}:${server.address().port}`;
   const e = env();

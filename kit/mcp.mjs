@@ -4,7 +4,7 @@
 // Tools: menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify. Each runs the matching npm command from the repo root with
 // --json where the command has it and returns the log tail plus the JSON result (structuredContent).
 // Studio tools: studio_start, studio_get_state, studio_set_selections, studio_run, studio_wait_for_message, studio_get_pending,
-// studio_reply, studio_add_reference_url, studio_get_reference_teardown, studio_settings. They read and write the same
+// studio_reply, studio_add_reference_url, studio_get_reference_teardown, studio_settings, studio_takes. They read and write the same
 // session as the Studio page (npm run studio, kit/studio/core.mjs), so you and the user see and change the same picks; the
 // page updates live. The Studio chat is its own channel (kit/studio/channel.mjs): answer page messages with studio_reply,
 // keep the terminal conversation in the terminal.
@@ -20,6 +20,7 @@ import * as Studio from './studio/core.mjs';
 import * as Channel from './studio/channel.mjs';
 import * as Settings from './studio/settings.mjs';
 import * as Launch from './studio/launch.mjs';
+import * as Record from './studio/record.mjs';
 
 const KIT = dirname(fileURLToPath(import.meta.url)), ROOT = dirname(KIT);
 const C = JSON.parse(readFileSync(join(ROOT, 'contract.json'), 'utf8'));
@@ -176,6 +177,9 @@ TOOLS.push(
   { name: 'studio_settings', description: 'Read or change Studio settings: downloads (folder for reference downloads, a full path; null resets to the kit\'s gitignored teardown-in/studio/<job>/), renders (folder finished reels are copied to; null for none), actionNotes (true: a one-line note in Studio when you change the edit from the terminal), chat { backend: agent (default: you answer the Studio chat) | auto | anthropic | openai | local | keywords, baseUrl (local OpenAI-compatible server), model }. Folders are checked to exist or be creatable and writable.',
     inputSchema: { type: 'object', properties: { downloads: { type: ['string', 'null'] }, renders: { type: ['string', 'null'] }, actionNotes: { type: 'boolean' }, chat: { type: 'object' } }, additionalProperties: false },
     direct: a => { seen(); if (!Object.keys(a).length) return { settings: Settings.load(), path: Settings.settingsPath() }; const r = Settings.update(a); if (r.errs.length) throw new Error(r.errs.join('; ')); try { const s = Studio.load(); Studio.save(s); } catch {} return { ok: true, settings: r.settings }; } },
+  { name: 'studio_takes', description: 'Takes the user filmed with Record now in the Studio page (camera and mic in the browser): each with its id, mp4 file, thumbnail, seconds, status (recording, converting, ready, failed) and whether it is kept in the footage. A new take is kept by default and drafts like any footage; Studio also posts a one-line note in its chat ("New take recorded: 42 s"). Give id and action (keep, unkeep or discard) to change one; discard deletes its files.',
+    inputSchema: { type: 'object', properties: { id: { type: 'integer' }, action: { type: 'string', enum: ['keep', 'unkeep', 'discard'] } }, additionalProperties: false },
+    direct: a => { const s = Studio.load(); if (a.action) { if (!a.id) throw new Error('give the take id'); Record.act(s, a.id, a.action); Studio.save(s); } return { takes: Record.list(Studio.load()), folder: s.job ? Record.takesDir(s).split('\\').join('/') : null }; } }
 );
 for (const t of TOOLS) if (t.name.startsWith('studio_') && t.direct && !t._wrapped) { const d = t.direct; t.direct = a => { seen(); return d(a); }; t._wrapped = true; }
 

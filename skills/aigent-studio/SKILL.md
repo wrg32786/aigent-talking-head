@@ -30,6 +30,10 @@ You cannot be interrupted mid-step: a Studio message sent while you run a long c
 
 `studio_add_reference_url { urls, mode }` downloads each link (YouTube, Shorts, TikTok, X, Vimeo through yt-dlp, a direct video file, or one public Instagram post fetched anonymously with instaloader) into the user's download folder, then tears it down. Read the result with `studio_get_reference_teardown`: cuts, pacing, BPM and beats, energy, caption style, detected effects, and suggestions as menu refs. "Use the transitions from this reference but calmer" means: allow the reference's transitions, then lower the energy and forbid the harsh ones. Only use videos the user has the rights to use as a reference. Never log in to Instagram.
 
+## Recorded takes
+
+The user can film takes in the Footage step (Record now). A saved take is already in the footage, and the Studio chat shows an action note such as "New take recorded: 42 s (take 3)" in `recentStudioChat`. `studio_takes` lists them (file, seconds, status, kept) and keeps, unkeeps or discards one; discard deletes the files, so only do it when the user asks. You can't film for the user: the camera only runs in their browser.
+
 ## Rules
 
 - Only names from the Studio menu (`studio_get_state` with `catalog: true`); the tools refuse anything else.
