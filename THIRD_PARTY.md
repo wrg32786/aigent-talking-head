@@ -6,6 +6,7 @@ What this repo ships from other projects, and what it only took ideas from. Lice
 
 | Path | From | Licence |
 |---|---|---|
+| `skills/humanizer/SKILL.md`, `skills/humanizer/LICENSE` | [blader/humanizer](https://github.com/blader/humanizer) by Siqi Chen, commit `a32f24407364c74c812b43c15926d638bee1e072` (v4.0.0), copied unchanged; Studio's script chat follows a short summary of its rules (`kit/studio/scripts.mjs`) | MIT |
 | `kit/sfx/F-cinematic-woosh-648729.mp3`, `kit/sfx/whoosh.wav` | "Cinematic Woosh SFX-010" by AudioPapkin, Freesound 648729 (WAV is a mono 48 kHz conversion) | CC0 1.0 |
 | `kit/sfx/D-quick-woosh-683101.mp3`, `kit/sfx/swipe.wav` | "quick woosh" by florianreichelt, Freesound 683101 (WAV is a mono 48 kHz conversion) | CC0 1.0 |
 | `kit/sfx/boom.wav` | [ANVEAI/motion-pack](https://github.com/ANVEAI/motion-pack) `snd.hit.deep_impact`, commit `33f36b3f1a3c69a12352cf2a55e29b446cfeb991`, trimmed to 2.4 s with a fade, mono 48 kHz | CC0 1.0 (motion-pack `LICENSE-MEDIA`, which covers its synthesized sound masters and previews) |

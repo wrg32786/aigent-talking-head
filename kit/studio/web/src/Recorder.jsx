@@ -6,7 +6,7 @@ import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';
 import { Switch } from '@astryxdesign/core/Switch';
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
-import { api, file, toast, RM, Icon, IconBtn } from './lib.jsx';
+import { api, file, toast, RM, cue, Icon, IconBtn } from './lib.jsx';
 
 const FRAMES = { '9:16': 9 / 16, '16:9': 16 / 9, '1:1': 1 };
 const MIMES = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4;codecs=avc1,mp4a', 'video/mp4'];
@@ -28,7 +28,7 @@ export function cropFor(vw, vh, aspect) {
   return { sx: (vw - cw) / 2, sy: (vh - ch) / 2, sw: cw, sh: ch, w: even(cw * k), h: even(ch * k) };
 }
 
-export function Recorder({ s, apply, onClose, onLive, visible = true }) {
+export function Recorder({ V, s, apply, onClose, onLive, visible = true, scriptId }) {
   const video = useRef(null), canvas = useRef(null), meter = useRef(null), prompter = useRef(null);
   const stream = useRef(null), rec = useRef(null), audio = useRef(null), sendQ = useRef(null), tick = useRef(null);
   const [phase, setPhase] = useState(window.isSecureContext && navigator.mediaDevices ? 'off' : 'insecure');
@@ -42,7 +42,12 @@ export function Recorder({ s, apply, onClose, onLive, visible = true }) {
   const [countdownOn, setCountdownOn] = useState(localStorage.getItem('studio.rec.countdown') !== '0');
   const [prompt, setPrompt] = useState(localStorage.getItem('studio.rec.prompt') === '1');
   const [script, setScript] = useState(localStorage.getItem('studio.script') || '');
-  const [speed, setSpeed] = useState(+(localStorage.getItem('studio.rec.speed') || 4));
+  const [src, setSrc] = useState(scriptId || localStorage.getItem('studio.rec.src') || 'paste');
+  const [picked, setPicked] = useState(null);
+  const [wpm, setWpm] = useState(+(localStorage.getItem('studio.rec.wpm') || 150));
+  const [fontPx, setFontPx] = useState(+(localStorage.getItem('studio.rec.font') || 22));
+  const [flipText, setFlipText] = useState(localStorage.getItem('studio.rec.flip') === '1');
+  const [nudge, setNudge] = useState(0);
   const [count, setCount] = useState(0), [secs, setSecs] = useState(0), [level, setLevel] = useState(0), [lastId, setLastId] = useState(null);
   const remember = (k, v) => localStorage.setItem('studio.rec.' + k, typeof v === 'boolean' ? (v ? '1' : '0') : String(v));
   const busy = ['countdown', 'recording', 'paused', 'saving'].includes(phase);
@@ -101,7 +106,7 @@ export function Recorder({ s, apply, onClose, onLive, visible = true }) {
     const out = new MediaStream([...c.captureStream(30).getVideoTracks(), ...stream.current.getAudioTracks()]);
     const mime = pickMime();
     let id;
-    try { const j = await api('/api/record/start', { mime }); id = j.id; apply(j); setLastId(id); } catch { drawing = false; clearInterval(timer); setPhase('ready'); return; }
+    try { const j = await api('/api/record/start', { mime, script: prompt && text.trim() ? { id: picked ? picked.id : null, title: picked ? picked.title : 'Pasted script', text } : null }); id = j.id; apply(j); setLastId(id); } catch { drawing = false; clearInterval(timer); setPhase('ready'); return; }
     // chunks go out one at a time, in order, with retries; nothing is dropped if a request fails
     const q = { id, seq: 0, items: [], running: false, failed: null, idle: Promise.resolve() };
     sendQ.current = q;
@@ -130,19 +135,46 @@ export function Recorder({ s, apply, onClose, onLive, visible = true }) {
       setPhase(stream.current ? 'ready' : 'off');
     };
     setSecs(0); mr.start(1000); setPhase('recording');
-    if (prompter.current) prompter.current.scrollTop = 0;
   }
   const pause = () => { const m = rec.current && rec.current.mr; if (!m) return; if (m.state === 'recording') { m.pause(); setPhase('paused'); } else if (m.state === 'paused') { m.resume(); setPhase('recording'); } };
   const stop = () => { const m = rec.current && rec.current.mr; if (m && m.state !== 'inactive') m.stop(); };
   const retake = async id => { await api('/api/record/take', { id, action: 'discard' }).then(apply).catch(() => {}); begin(); };
 
-  // teleprompter: scrolls while recording, at speed x 12 px a second
+  // teleprompter pacer: timer pacing at the chosen WPM, on the take's own clock (starts after the countdown, stops
+  // when you pause). [pause] holds a line 1.5 s longer. Voice follow is not used: Chrome's speech recognition sends
+  // the audio to a server, and Studio keeps everything on this computer.
+  const scripts = (V && V.scripts) || [];
+  useEffect(() => { if (scriptId) { setSrc(scriptId); setPrompt(true); remember('src', scriptId); remember('prompt', true); } }, [scriptId]);
   useEffect(() => {
-    if (!prompt || phase !== 'recording' || !speed) return;
-    let raf, last = performance.now(), acc = 0;
-    const step = t => { const el = prompter.current; if (el) { acc += ((t - last) / 1000) * speed * 12; const whole = Math.floor(acc); if (whole) { el.scrollTop += whole; acc -= whole; } } last = t; raf = requestAnimationFrame(step); };
-    raf = requestAnimationFrame(step); return () => cancelAnimationFrame(raf);
-  }, [prompt, phase, speed]);
+    if (src === 'paste') { setPicked(null); return; }
+    api('/api/scripts/get?id=' + encodeURIComponent(src)).then(j => { setPicked(j.script); if (j.script.wpm && !localStorage.getItem('studio.rec.wpm')) setWpm(j.script.wpm); }).catch(() => { setSrc('paste'); });
+  }, [src, (scripts.find(x => x.id === src) || {}).updated]);
+  const text = picked ? picked.text : script;
+  const lines = cue(text, wpm);
+  const total = lines.reduce((a, x) => a + x.dur, 0);
+  const tNow = phase === 'recording' || phase === 'paused' ? secs : 0;
+  let at = lines.findIndex(x => tNow < x.at + x.dur); if (at < 0) at = lines.length - 1;
+  const line = Math.max(0, Math.min(lines.length - 1, at + nudge));
+  useEffect(() => { if (phase === 'countdown') setNudge(0); }, [phase]);
+  useEffect(() => {
+    const box = prompter.current; if (!box) return;
+    const el = box.querySelector(`[data-line="${line}"]`); if (!el) return;
+    box.querySelector('.rp-roll').style.transform = `translateY(${-el.offsetTop + 6}px)`;
+  }, [line, text, fontPx, prompt, phase]);
+  // keys while the recorder is on screen: Space record or stop, P pause, up and down change the WPM, left and right move a line
+  useEffect(() => {
+    if (!visible) return;
+    const onKey = e => {
+      if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === ' ' && !document.activeElement.closest('button, [role="switch"]')) { e.preventDefault(); if (phase === 'ready') begin(); else if (phase === 'recording' || phase === 'paused') stop(); }
+      else if (e.key === 'p' || e.key === 'P') { if (phase === 'recording' || phase === 'paused') { e.preventDefault(); pause(); } }
+      else if (prompt && e.key === 'ArrowUp') { e.preventDefault(); setWpm(w => { const v = Math.min(260, w + 10); remember('wpm', v); return v; }); }
+      else if (prompt && e.key === 'ArrowDown') { e.preventDefault(); setWpm(w => { const v = Math.max(60, w - 10); remember('wpm', v); return v; }); }
+      else if (prompt && e.key === 'ArrowRight') { e.preventDefault(); setNudge(n => n + 1); }
+      else if (prompt && e.key === 'ArrowLeft') { e.preventDefault(); setNudge(n => n - 1); }
+    };
+    document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey);
+  });
 
   const takes = (s.takes || []).slice().reverse();
   const live = phase !== 'off' && phase !== 'asking' && phase !== 'insecure';
@@ -166,7 +198,10 @@ export function Recorder({ s, apply, onClose, onLive, visible = true }) {
           <i className="v1" /><i className="v2" /><i className="h1" /><i className="h2" />
           <span className="head">Head</span><span className="caps">Captions</span>
         </div>}
-        {live && prompt && <div className="rec-prompter" ref={prompter} aria-label="Teleprompter">{script ? script.split(/\n+/).map((l, i) => <p key={i}>{l}</p>) : <p className="fine">Paste your script on the right.</p>}</div>}
+        {live && prompt && <div className={'rec-prompter' + (flipText ? ' flip' : '') + (RM ? ' still' : '')} ref={prompter} aria-label="Teleprompter" style={{ fontSize: fontPx }}>
+          <div className="rp-roll">{lines.length ? lines.map((x, i) => <p key={i} data-line={i} className={(i === line ? 'now' : i < line ? 'past' : '') + (x.pause ? ' hold' : '')}>{x.section && <em>{x.section}</em>}{x.text}{x.pause > 0 && <span className="rp-pause" aria-label="pause">||</span>}</p>)
+            : <p className="fine">Pick a script or paste one on the right.</p>}</div>
+        </div>}
         {phase === 'countdown' && <div className={'rec-count' + (RM ? ' still' : '')} key={count} aria-live="assertive">{count}</div>}
       </div>
       <div className="rec-bar">
@@ -198,10 +233,18 @@ export function Recorder({ s, apply, onClose, onLive, visible = true }) {
         <Switch id="rec-countdown" size="sm" label="3, 2, 1 countdown" value={countdownOn} onChange={v => { setCountdownOn(v); remember('countdown', v); }} />
         <Switch id="rec-prompt" size="sm" label="Teleprompter" value={prompt} onChange={v => { setPrompt(v); remember('prompt', v); }} />
         {prompt && <>
-          <label className="lbl" htmlFor="rec-script">Script</label>
-          <textarea id="rec-script" rows={4} placeholder="Paste what you will say" value={script} onChange={e => { setScript(e.target.value); localStorage.setItem('studio.script', e.target.value); }} />
-          <label className="lbl" htmlFor="rec-speed">Scroll speed <b>{speed}</b></label>
-          <input id="rec-speed" type="range" min={0} max={10} step={1} value={speed} onChange={e => { setSpeed(+e.target.value); remember('speed', e.target.value); }} />
+          <label className="lbl" htmlFor="rec-src">Script</label>
+          <select id="rec-src" value={src} disabled={busy} onChange={e => { setSrc(e.target.value); remember('src', e.target.value); }}>
+            <option value="paste">Paste a script here</option>
+            {scripts.map(x => <option key={x.id} value={x.id}>{x.title} ({x.words} words)</option>)}
+          </select>
+          {src === 'paste' && <textarea id="rec-script" rows={4} aria-label="Script to read" placeholder="Paste what you will say" value={script} onChange={e => { setScript(e.target.value); localStorage.setItem('studio.script', e.target.value); }} />}
+          <label className="lbl" htmlFor="rec-wpm">Pace <b>{wpm} WPM</b>{total ? `, about ${Math.round(total)} s` : ''}</label>
+          <input id="rec-wpm" type="range" min={60} max={260} step={5} value={wpm} onChange={e => { setWpm(+e.target.value); remember('wpm', e.target.value); }} />
+          <label className="lbl" htmlFor="rec-font">Text size <b>{fontPx}</b></label>
+          <input id="rec-font" type="range" min={14} max={44} step={1} value={fontPx} onChange={e => { setFontPx(+e.target.value); remember('font', e.target.value); }} />
+          <Switch id="rec-flip" size="sm" label="Mirror text (beam splitter)" value={flipText} onChange={v => { setFlipText(v); remember('flip', v); }} />
+          <p className="fine">Paced by a timer from the start of the take. Space records or stops, P pauses, arrows change the pace or move a line.</p>
         </>}
       </div>
     </div>

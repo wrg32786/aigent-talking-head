@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { api, file, toast, Icon, IconBtn } from './lib.jsx';
 import { upload } from './upload.js';
 import { Recorder } from './Recorder.jsx';
+import { Scripts } from './Scripts.jsx';
 
 export function Dropzone({ id, inputId, kind, s, apply, accept, multiple, big, children, label }) {
   const input = useRef(null); const [over, setOver] = useState(false);
@@ -15,13 +16,14 @@ export function Dropzone({ id, inputId, kind, s, apply, accept, multiple, big, c
   </div>;
 }
 
-export function Footage({ s, apply, hidden, onLive }) {
+export function Footage({ V, s, apply, hidden, onLive }) {
+  const [readId, setReadId] = useState(null);
   const [rec, setRec] = useState(() => localStorage.getItem('studio.rec.open') === '1' || /record/.test(location.hash));
   const open = v => { localStorage.setItem('studio.rec.open', v ? '1' : '0'); setRec(v); };
   const needJob = () => { if (s.job) return false; toast('Name the reel first (top left)'); document.getElementById('job')?.focus(); return true; };
   return <section className="step" id="s-footage" data-step="footage" aria-labelledby="h-footage" hidden={hidden}>
-    <header className="sh"><h2 id="h-footage">Footage</h2><p className="sub">Your raw clip, a few takes, or film one now.</p></header>
-    {rec ? <Recorder s={s} apply={apply} onClose={() => open(false)} onLive={onLive} visible={!hidden} />
+    <header className="sh"><h2 id="h-footage">Footage</h2><p className="sub">Your raw clip, a few takes, or film one now from a script.</p></header>
+    {rec ? <Recorder V={V} s={s} apply={apply} onClose={() => open(false)} onLive={onLive} visible={!hidden} scriptId={readId} />
       : <div className="sources">
         <Dropzone id="drop-footage" inputId="file-footage" kind="footage" s={s} apply={apply} big multiple accept="video/*,.mov,.mp4,.m4v,.webm,.mkv" label="Add footage: drop video files or press Enter to choose">
           <Icon n="upload" className="di" /><strong>Drop video here</strong><span>or click to choose</span>
@@ -30,6 +32,7 @@ export function Footage({ s, apply, hidden, onLive }) {
           <Icon n="camera" className="di" /><strong>Record now</strong><span>Camera and mic on this computer</span>
         </button>
       </div>}
+    <Scripts V={V} s={s} apply={apply} onRead={id => { if (needJob()) return; setReadId(id); open(true); requestAnimationFrame(() => document.getElementById('recorder')?.scrollIntoView({ block: 'start', behavior: 'smooth' })); }} />
     <ul id="footage" className="clips">
       {s.clips && <li className="note">Using the clips folder {s.clips}</li>}
       {s.footage.map(f => <li key={f} className="glass-card">

@@ -4,7 +4,7 @@
 // Tools: menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify. Each runs the matching npm command from the repo root with
 // --json where the command has it and returns the log tail plus the JSON result (structuredContent).
 // Studio tools: studio_start, studio_get_state, studio_set_selections, studio_run, studio_wait_for_message, studio_get_pending,
-// studio_reply, studio_add_reference_url, studio_get_reference_teardown, studio_settings, studio_takes. They read and write the same
+// studio_reply, studio_add_reference_url, studio_get_reference_teardown, studio_settings, studio_takes; list_scripts, get_script, write_script (Studio scripts). They read and write the same
 // session as the Studio page (npm run studio, kit/studio/core.mjs), so you and the user see and change the same picks; the
 // page updates live. The Studio chat is its own channel (kit/studio/channel.mjs): answer page messages with studio_reply,
 // keep the terminal conversation in the terminal.
@@ -21,6 +21,7 @@ import * as Channel from './studio/channel.mjs';
 import * as Settings from './studio/settings.mjs';
 import * as Launch from './studio/launch.mjs';
 import * as Record from './studio/record.mjs';
+import * as Scripts from './studio/scripts.mjs';
 
 const KIT = dirname(fileURLToPath(import.meta.url)), ROOT = dirname(KIT);
 const C = JSON.parse(readFileSync(join(ROOT, 'contract.json'), 'utf8'));
@@ -179,7 +180,18 @@ TOOLS.push(
     direct: a => { seen(); if (!Object.keys(a).length) return { settings: Settings.load(), path: Settings.settingsPath() }; const r = Settings.update(a); if (r.errs.length) throw new Error(r.errs.join('; ')); try { const s = Studio.load(); Studio.save(s); } catch {} return { ok: true, settings: r.settings }; } },
   { name: 'studio_takes', description: 'Takes the user filmed with Record now in the Studio page (camera and mic in the browser): each with its id, mp4 file, thumbnail, seconds, status (recording, converting, ready, failed) and whether it is kept in the footage. A new take is kept by default and drafts like any footage; Studio also posts a one-line note in its chat ("New take recorded: 42 s"). Give id and action (keep, unkeep or discard) to change one; discard deletes its files.',
     inputSchema: { type: 'object', properties: { id: { type: 'integer' }, action: { type: 'string', enum: ['keep', 'unkeep', 'discard'] } }, additionalProperties: false },
-    direct: a => { const s = Studio.load(); if (a.action) { if (!a.id) throw new Error('give the take id'); Record.act(s, a.id, a.action); Studio.save(s); } return { takes: Record.list(Studio.load()), folder: s.job ? Record.takesDir(s).split('\\').join('/') : null }; } }
+    direct: a => { const s = Studio.load(); if (a.action) { if (!a.id) throw new Error('give the take id'); Record.act(s, a.id, a.action); Studio.save(s); } return { takes: Record.list(Studio.load()), folder: s.job ? Record.takesDir(s).split('\\').join('/') : null }; } },
+  { name: 'list_scripts', description: 'Scripts the user reads on camera, kept per job in Studio (jobs/.studio/scripts/<job>/): id, title, words, estimated seconds at its WPM, sections and who wrote it. job defaults to the Studio session job.',
+    inputSchema: { type: 'object', properties: { job: { type: 'string' } }, additionalProperties: false },
+    direct: a => { const job = a.job || Studio.load().job; return { job, scripts: Scripts.list(job) }; } },
+  { name: 'get_script', description: 'One script with its full text, word count, estimated seconds, sections and [pause] marks.',
+    inputSchema: { type: 'object', properties: { id: { type: 'string' }, job: { type: 'string' } }, required: ['id'], additionalProperties: false },
+    direct: a => ({ script: Scripts.get(a.job || Studio.load().job, a.id) }) },
+  { name: 'write_script', description: 'Create or replace a script in Studio (it shows in the Scripts area and the teleprompter at once). Leave out id for a new script; give an id from list_scripts to replace it. ' + Scripts.SCRIPT_FORMAT + ' For a script from a reference, follow its hook, pacing, shot count and beat times (studio_get_reference_teardown). Before saving every draft, run the humanizer skill on it (skills/humanizer in this repo, or an equivalent humanizer skill you already have) and save the humanized text; no em dashes. Then tell the user in the channel they asked in (studio_reply for Studio).',
+    inputSchema: { type: 'object', properties: { id: { type: 'string' }, title: { type: 'string' }, text: { type: 'string' }, wpm: { type: 'integer', minimum: 60, maximum: 260 }, from: { type: 'string', description: 'what it was written from, e.g. a reference url or "topic: ..."' }, job: { type: 'string' } }, required: ['text'], additionalProperties: false },
+    direct: a => { const s = Studio.load(), job = a.job || s.job; if (!job) throw new Error('no job: name the reel in Studio first or give job');
+      const sc = Scripts.write(job, { id: a.id, title: a.title, text: String(a.text).replace(/\u2014/g, ', '), wpm: a.wpm, from: a.from, by: Channel.prettyName(agentName()) });
+      if (job === s.job) { s.scriptsAt = Date.now(); Studio.save(s); } return { script: sc }; } }
 );
 for (const t of TOOLS) if (t.name.startsWith('studio_') && t.direct && !t._wrapped) { const d = t.direct; t.direct = a => { seen(); return d(a); }; t._wrapped = true; }
 

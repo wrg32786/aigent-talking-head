@@ -19,7 +19,7 @@ const extFor = mime => /mp4/i.test(mime || '') ? '.mp4' : /x-matroska/i.test(mim
 const fmt = sec => { const s = Math.round(sec); return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`; };
 
 // start a take: returns its id; chunks follow with seq 0, 1, 2 ...
-export function start(s, { mime } = {}) {
+export function start(s, { mime, script } = {}) {
   if (!s.job) throw Object.assign(new Error('name the reel first'), { code: 400 });
   const dir = takesDir(s); mkdirSync(join(ROOT, dir), { recursive: true });
   s.takes = s.takes || [];
@@ -27,7 +27,9 @@ export function start(s, { mime } = {}) {
   const raw = relOf(join(dir, `take-${id}.part${extFor(mime)}`));
   writeFileSync(join(ROOT, raw), '');
   live.set(id, { raw, next: 0, bytes: 0, mime: String(mime || '') });
-  s.takes.push({ id, raw, file: null, thumb: null, seconds: null, status: 'recording', kept: true, error: null, at: new Date().toISOString(), mime: String(mime || '') });
+  s.takes.push({ id, raw, file: null, thumb: null, seconds: null, status: 'recording', kept: true, error: null, at: new Date().toISOString(), mime: String(mime || ''),
+    // the script it was read from, as it was when filmed: the draft hands it to Whisper so captions spell its words
+    script: script && typeof script.text === 'string' && script.text.trim() ? { id: script.id ? String(script.id).slice(0, 64) : null, title: String(script.title || '').slice(0, 120), text: script.text.slice(0, 20000) } : null });
   return id;
 }
 // append chunk seq of a take. A repeat of a chunk already written is ignored (the page retries on errors);
@@ -99,4 +101,4 @@ export function abort(s, id) {
   s.takes = (s.takes || []).filter(y => !(y.id === id && y.status === 'recording'));
 }
 // for MCP and the agent: what was recorded this session
-export const list = s => (s.takes || []).map(({ id, file, thumb, seconds, status, kept, error, at }) => ({ id, file, thumb, seconds, status, kept, inFootage: !!file && s.footage.includes(file), error, at }));
+export const list = s => (s.takes || []).map(({ id, file, thumb, seconds, status, kept, error, at, script }) => ({ id, file, thumb, seconds, status, kept, inFootage: !!file && s.footage.includes(file), error, at, script: script ? { id: script.id, title: script.title, text: script.text } : null }));
