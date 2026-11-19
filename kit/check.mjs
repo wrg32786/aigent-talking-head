@@ -188,6 +188,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-scripts.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { cerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio script tests (tests/studio-scripts.test.mjs: scripts API, MCP script tools, model-written scripts, takes with scripts)', errs: cerrs, warns: [] });
+    const verrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-review.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { verrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio review tests (tests/studio-review.test.mjs: what to swap, clean-up pass, edit receipt, preview comments)', errs: verrs, warns: [] });
   }
   {
     const star = createRequire(import.meta.url)('./star.cjs');

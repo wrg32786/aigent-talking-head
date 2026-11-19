@@ -9,7 +9,7 @@ Studio is a page on the user's computer (http://127.0.0.1:4757) where they drop 
 
 ## Two channels, one agent
 
-- **Studio chat**: what the user types in the page. Read it with `studio_wait_for_message` or `studio_get_pending`; answer with `studio_reply` (it shows only in Studio).
+- **Studio chat**: what the user types in the page. Read it with `studio_wait_for_message` or `studio_get_pending`; answer with `studio_reply` (it shows only in Studio). A comment on the preview comes with `attach` (`t`, `region`, `video`, `frame`): open the frame image first; the region is fractions of the frame.
 - **Terminal**: your normal conversation with the user. Answer it here, as usual.
 - Keep them separate. Never paste terminal discussion into Studio, and never answer a Studio message only in the terminal, unless the user asks.
 - Edits are shared: whatever you change (picks, pack, music, references, drafts) updates the page live, whichever channel asked. When the terminal asked for it, call `studio_set_selections` with `origin: "terminal"`; Studio then shows a one-line action note (if the user keeps action notes on), never the conversation.

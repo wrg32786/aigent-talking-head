@@ -108,6 +108,10 @@ Then run `npm run studio` (or click the icon). Without an agent the chat works o
 
 <img src="docs/studio/settings.png" width="720" alt="Studio settings in a side sheet: who answers the chat with a local model picked, the action note switch, the reference downloads and finished reels folders, and the theme">
 
+**Review your edit.** The Reference step lists the reference's parts with times (hook, cuts, titles, b-roll, CTA), each with the matching Studio picks one click away. In the Render step you can watch your reel beside the reference or under it with an opacity slider, on one clock; click or drag a box on a frame to send your agent a comment with the frame and the time; run a clean-up pass that lists long pauses, filler words and retakes from the Whisper word timings to keep or remove before a redraft; and read the edit receipt, every pick and its reason in plain words. Details: [docs/studio.md](docs/studio.md#review-your-edit).
+
+<img src="docs/studio/compare-desktop.png" width="420" alt="Show original: the reference and your reel side by side on one clock"> <img src="docs/studio/cleanup-desktop.png" width="420" alt="Clean-up pass: a filler word, a long pause and a retake, each with Keep or Remove">
+
 On a phone each step stacks into one column and the chat opens as a sheet: [reference](docs/studio/ref-url-phone.png), [effects](docs/studio/menu-phone.png), [settings](docs/studio/settings-phone.png). Studio also speaks [AG-UI](docs/studio.md#ag-ui), so AG-UI clients can watch it or send it messages. The page is built with React and [Astryx](https://github.com/meta/astryx) and ships prebuilt, so nothing extra installs. Reference screenshots show Big Buck Bunny (c) Blender Foundation, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), blender.org.
 
 ## Install

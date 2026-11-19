@@ -16,6 +16,7 @@ import * as S from './settings.mjs';
 import * as F from './fetch.mjs';
 import * as CH from './channel.mjs';
 import * as AG from './agui.mjs';
+import * as RV from './review.mjs';
 import * as REC from './record.mjs';
 import * as SC from './scripts.mjs';
 
@@ -56,7 +57,7 @@ function env() {
 function view(s) {
   let comp; try { comp = C.compose(s, { refPack: refPackName(s) }); } catch (e) { comp = { args: [], errs: [e.message], notes: [] }; }
   let scripts = []; try { scripts = SC.list(s.job); } catch {}
-  return { state: s, compose: comp, outputs: C.outputsOf(s), scripts, env: env(), task: task && { id: task.id, kind: task.kind, status: task.status, startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
+  return { state: s, compose: comp, outputs: C.outputsOf(s), scripts, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
 }
 
 // ---------- tasks (one at a time) ----------
@@ -109,7 +110,7 @@ function draftSteps(s) {
   if (comp.errs.length) throw Object.assign(new Error(comp.errs.join('; ')), { code: 400 });
   let args = comp.args.slice();
   if (recreate) { const i = args.indexOf('--pack'); if (i >= 0) args.splice(i, 2); args.push('--recipe', join(s.reference.out, 'Reel.md')); }
-  const src = s.clips ? ['--clips', s.clips] : s.footage;
+  const cl = cleanupFor(s), src = cl ? ['--clips', relOf(clipsDirOf(s)), '--cleanup', cl] : s.clips ? ['--clips', s.clips] : s.footage;
   // takes filmed from a script: hand the script to Whisper as a hint (TX_PROMPT, kit/tx.py and kit/clip.py), so captions spell its words
   const said = (s.takes || []).filter(t => t.script && t.script.text && s.footage.includes(t.file)).map(t => t.script.text.replace(/\[[a-z]+\]/gi, ' ').replace(/\s+/g, ' ').trim());
   const stepEnv = said.length && !process.env.TX_PROMPT ? { TX_PROMPT: [...new Set(said)].join(' ').slice(0, 800) } : {};
@@ -130,7 +131,43 @@ function renderSteps(s) {
   return { steps, fx, effects: comp.effects };
 }
 const choicesPath = s => join(ROOT, 'jobs', s.job || '-', 'choices.json');
+// ---------- review: what to swap, the clean-up pass, comments on the preview (kit/studio/review.mjs) ----------
+let swapCache = { key: '', val: null };
+function swapOf(s) {
+  const r = s.reference; if (!r || !r.extracted || !r.out) return null;
+  const f = join(ROOT, r.out, 'Reel.md'); let key;
+  try { key = f + statSync(f).mtimeMs; } catch { return null; }
+  if (swapCache.key !== key) { try { swapCache = { key, val: RV.swapList(f, C.catalog()) }; } catch (e) { swapCache = { key, val: { error: e.message, parts: [] } }; } }
+  return swapCache.val;
+}
+// the clip.py folder the draft used: the session's clips folder, or the job's own clips/
+const clipsDirOf = s => s.clips ? resolve(ROOT, s.clips) : join(ROOT, 'jobs', s.job || '-', 'clips');
+const clipsJsonPath = s => join(clipsDirOf(s), 'clips.json');
+const cleanupFile = s => join('jobs', s.job, 'cleanup.json');
+const footageKey = s => JSON.stringify([s.footage, s.clips]);
+// the clean-up plan the next draft uses: only while it is on and the footage is the footage it was made from
+function cleanupFor(s) {
+  const c = s.cleanup;
+  if (!s.job || !c || !c.on || c.footage !== footageKey(s) || !existsSync(clipsJsonPath(s)) || !existsSync(join(ROOT, cleanupFile(s)))) return null;
+  return cleanupFile(s);
+}
+function cleanupView(s, silence) {
+  let cj; try { cj = JSON.parse(readFileSync(clipsJsonPath(s), 'utf8')); } catch { return { ready: false, items: [] }; }
+  const c = s.cleanup || {}, sil = +(silence || c.silence || 0.7);
+  const items = RV.cleanup(cj, { silence: sil }), dec = c.decisions || {};
+  for (const it of items) if (dec[it.id] !== undefined) it.remove = !!dec[it.id];
+  const rel = relOf(join(clipsDirOf(s), 'x')).replace(/\/x$/, ''), served = rel.startsWith('jobs/') || rel.startsWith('inbox/studio/');
+  const clips = Object.fromEntries((cj.clips || []).map(x => [x.id, { file: served ? `${rel}/${basename(x.file)}` : null, dur: +x.dur, status: x.status, text: x.text }]));
+  return { ready: true, silence: sil, items, clips, on: !!cleanupFor(s), stale: !!(c.on && c.footage !== footageKey(s)), plan: RV.plan(items, {}, cj) };
+}
 const readChoices = s => { try { return JSON.parse(readFileSync(choicesPath(s), 'utf8')); } catch { return null; } };
+function receiptOf(s, ch) {
+  const r = RV.receipt(ch); if (!r) return null;
+  let pl = null;
+  if (cleanupFor(s)) try { pl = JSON.parse(readFileSync(join(ROOT, cleanupFile(s)), 'utf8')); } catch {}
+  if (pl) { const n = Object.values(pl.cuts || {}).reduce((a, l) => a + l.length, 0); r.sections.splice(1, 0, { h: 'Clean-up', rows: [{ at: null, what: `${n} cut${n === 1 ? '' : 's'} inside clips, ${pl.saved} s out${pl.keep.length ? `, ${pl.keep.length} retake${pl.keep.length === 1 ? '' : 's'} kept` : ''}`, why: 'your clean-up review' }] }); r.text += `\n\nClean-up\n- ${n} cuts inside clips, ${pl.saved} s out. Why: your clean-up review.`; }
+  return r;
+}
 
 function teardownSteps(s, url) {
   if (!s.job) throw Object.assign(new Error('name the job first'), { code: 400 });
@@ -205,15 +242,15 @@ function copyRenders(outputs) {
 // one Studio chat turn from the page or an AG-UI run: queue it for the terminal agent, or answer with a model or keywords
 const SCRIPT_ASK = /\b(script|rewrite|teleprompter)\b/i;
 const SCRIPT_NOTE = 'Writing scripts needs your terminal agent, an API key or a local model (Settings). Keywords mode only changes effects.';
-async function chatTurn(text, offline) {
+async function chatTurn(text, offline, attach) {
   const st = S.load(), backend = offline ? 'keywords' : st.chat.backend;
   if (backend === 'agent') {
     // queued for the terminal agent; it reads it with studio_wait_for_message or studio_get_pending and answers with studio_reply
-    const s = update(x => { C.applyPatch(x, { say: text, from: 'ui', toAgent: true }); });
+    const s = update(x => { C.applyPatch(x, { say: text, from: 'ui', toAgent: true, attach }); });
     const a = CH.presence();
     return { via: 'agent', queued: true, agent: a, reply: null, ...view(s) };
   }
-  update(s => { C.applyPatch(s, { say: text, from: 'ui' }); });
+  update(s => { C.applyPatch(s, { say: text, from: 'ui', attach }); });
   const s = C.load(), cat = C.catalog();
   let reply, patch, via;
   const prov = backend === 'keywords' ? null : LLM.provider(process.env, st.chat);
@@ -237,7 +274,7 @@ async function chatTurn(text, offline) {
 
 // ---------- http ----------
 const json = (res, code, body) => { res.writeHead(code, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify(body)); };
-const readBody = req => new Promise((ok, bad) => { let b = ''; req.on('data', d => { b += d; if (b.length > 2e6) { bad(new Error('too big')); req.destroy(); } }); req.on('end', () => { try { ok(b ? JSON.parse(b) : {}); } catch { bad(Object.assign(new Error('send JSON'), { code: 400 })); } }); });
+const readBody = (req, max = 2e6) => new Promise((ok, bad) => { let b = ''; req.on('data', d => { b += d; if (b.length > max) { bad(new Error('too big')); req.destroy(); } }); req.on('end', () => { try { ok(b ? JSON.parse(b) : {}); } catch { bad(Object.assign(new Error('send JSON'), { code: 400 })); } }); });
 const readRaw = (req, max) => new Promise((ok, bad) => { const parts = []; let n = 0; req.on('data', d => { n += d.length; if (n > max) { bad(Object.assign(new Error('chunk too big'), { code: 413 })); req.destroy(); } else parts.push(d); }); req.on('end', () => ok(Buffer.concat(parts))); req.on('error', bad); });
 const safeName = n => basename(String(n || 'file')).replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+/, '').slice(0, 80) || 'file';
 
@@ -375,7 +412,7 @@ async function api(req, res, u) {
     return json(res, 202, { ...view(C.load()), fx: r.fx, effectsSkipped: r.effects.length && !r.fx ? 'effects need npm run effects:setup' : null });
   }
   if (p === '/api/task/cancel' && M === 'POST') { if (task && task.status === 'running') { task.status = 'cancelled'; task.proc && task.proc.kill('SIGTERM'); } return json(res, 200, view(C.load())); }
-  if (p === '/api/choices' && M === 'GET') { const s = C.load(); return json(res, 200, { choices: readChoices(s) }); }
+  if (p === '/api/choices' && M === 'GET') { const s = C.load(), ch = readChoices(s); return json(res, 200, { choices: ch, receipt: receiptOf(s, ch) }); }
   if (p === '/api/choices' && M === 'POST') {
     const b = await readBody(req), s = C.load(), cur = readChoices(s);
     if (!cur) return json(res, 400, { error: 'make a draft first' });
@@ -384,7 +421,50 @@ async function api(req, res, u) {
     const r = await new Promise(ok => { const pr = spawn(process.execPath, [join(KIT, 'choices.cjs'), s.job, '--apply', '--json'], { cwd: ROOT }); let o = '', e = ''; pr.stdout.on('data', d => o += d); pr.stderr.on('data', d => e += d); pr.on('close', code => ok({ code, o, e })); });
     if (r.code !== 0) return json(res, 400, { error: (r.e || r.o).trim().split('\n').slice(-4).join(' ') });
     update(st => { st.lockedAtDraft = C.compose(st, { refPack: refPackName(st) }).lockString || ''; });
-    return json(res, 200, { ok: true, choices: readChoices(s), log: r.o.trim().split('\n').filter(l => !l.startsWith('{')).slice(-20) });
+    const ch2 = readChoices(s);
+    return json(res, 200, { ok: true, choices: ch2, receipt: receiptOf(s, ch2), log: r.o.trim().split('\n').filter(l => !l.startsWith('{')).slice(-20) });
+  }
+  // show original: the session's reference video, wherever the downloads setting put it
+  if (p === '/api/reference/video' && M === 'GET') {
+    const f = C.load().reference.file; if (!f) return json(res, 404, { error: 'no reference video' });
+    const abs = resolve(ROOT, f); if (!VIDEO.includes(extname(abs).toLowerCase())) return json(res, 404, { error: 'no reference video' });
+    return serveFile(req, res, abs);
+  }
+  if (p === '/api/cleanup' && M === 'GET') { const s = C.load(); if (!s.job) return json(res, 400, { error: 'name the job first' }); return json(res, 200, cleanupView(s, u.searchParams.get('silence'))); }
+  if (p === '/api/cleanup' && M === 'POST') {
+    const b = await readBody(req), s0 = C.load();
+    if (!s0.job || !existsSync(clipsJsonPath(s0))) return json(res, 400, { error: 'make a draft first' });
+    if (b.on === false) { update(st => { st.cleanup = { ...(st.cleanup || {}), on: false }; }); return json(res, 200, { ...cleanupView(C.load()), ...view(C.load()) }); }
+    const sil = b.silence != null ? +b.silence : undefined;
+    if (sil !== undefined && !(sil >= 0.3 && sil <= 3)) return json(res, 400, { error: 'silence: 0.3 to 3 seconds' });
+    const dec = {}; for (const [k, v] of Object.entries(b.decisions || {})) if (/^[\w:.-]{1,80}$/.test(k)) dec[k] = !!v;
+    const cj = JSON.parse(readFileSync(clipsJsonPath(s0), 'utf8')), items = RV.cleanup(cj, { silence: sil || (s0.cleanup && s0.cleanup.silence) || 0.7 });
+    const pl = RV.plan(items, dec, cj);
+    writeFileSync(join(ROOT, cleanupFile(s0)), JSON.stringify(pl, null, 1) + '\n');
+    const removed = items.filter(it => dec[it.id] !== undefined ? dec[it.id] : it.remove);
+    const note = `Clean-up: ${removed.filter(x => x.type === 'silence').length} pauses, ${removed.filter(x => x.type === 'filler').length} filler words and ${items.filter(x => x.type === 'take').length - pl.keep.length} retakes left out, ${pl.saved} s shorter. ${b.redraft === false ? 'Used on the next draft.' : 'Redrafting.'}`;
+    update(st => { st.cleanup = { on: true, silence: sil || (st.cleanup && st.cleanup.silence) || 0.7, decisions: dec, footage: footageKey(st), at: new Date().toISOString(), saved: pl.saved };
+      if (S.load().actionNotes !== false) C.applyPatch(st, { reply: note, from: 'Studio', kind: 'action' }); });
+    if (b.redraft !== false) { const s = C.load(), d = draftSteps(s); update(st => { st.lockedAtDraft = d.lockString || ''; }); runTask('draft', () => d.steps, () => ({ choices: !!readChoices(C.load()), cleanup: pl })); }
+    return json(res, 202, { ...cleanupView(C.load()), plan: pl, ...view(C.load()) });
+  }
+  // comment on the preview: a click or a box on a frame, sent to whoever answers the chat, with the frame saved in the job
+  if (p === '/api/comment' && M === 'POST') {
+    const b = await readBody(req, 8e6), s = C.load(), text = String(b.text || '').trim().slice(0, 1500);
+    if (!s.job) return json(res, 400, { error: 'name the job first' });
+    if (!text) return json(res, 400, { error: 'say what should change' });
+    const t = Math.max(0, +b.t || 0), rg = b.region && typeof b.region === 'object' ? Object.fromEntries(['x', 'y', 'w', 'h'].map(k => [k, Math.max(0, Math.min(1, +b.region[k] || 0))])) : null;
+    const video = typeof b.video === 'string' && /^jobs\/[\w.-]+\/[\w.-]+\.mp4$/.test(b.video) ? b.video : null;
+    let frame = null;
+    const m = /^data:image\/(jpeg|png);base64,([A-Za-z0-9+/=]+)$/.exec(String(b.image || ''));
+    if (m) {
+      const dir = join('jobs', s.job, 'comments'); mkdirSync(join(ROOT, dir), { recursive: true });
+      const n = (s.commentSeq || 0) + 1; frame = `${dir}/comment-${n}.${m[1] === 'png' ? 'png' : 'jpg'}`.split(sep).join('/');
+      writeFileSync(join(ROOT, frame), Buffer.from(m[2], 'base64'));
+      update(st => { st.commentSeq = n; });
+    }
+    const line = RV.commentLine({ text, t, region: rg, video, frame });
+    return json(res, 200, await chatTurn(line, false, { kind: 'comment', t: +t.toFixed(2), region: rg, video, frame, note: text }));
   }
   if (p === '/api/pack/save' && M === 'POST') {
     const b = await readBody(req), s = C.load(), name = String(b.name || '').toLowerCase();

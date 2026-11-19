@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { ProgressBar } from '@astryxdesign/core/ProgressBar';
 import { api, file, toast, fmtS, cap1, Icon } from './lib.jsx';
+import { Compare, Cleanup, Receipt } from './Review.jsx';
 
 export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
   const t = V.task, c = V.compose, running = t && t.status === 'running';
-  const [choices, setChoices] = useState(null), [dirty, setDirty] = useState(false), [now, setNow] = useState(Date.now());
+  const [choices, setChoices] = useState(null), [receipt, setReceipt] = useState(null), [dirty, setDirty] = useState(false), [now, setNow] = useState(Date.now());
   const foldRef = useRef(null), logRef = useRef(null), last = useRef(''), loadedFor = useRef(null);
-  const loadChoices = async () => { const j = await api('/api/choices').catch(() => ({})); setChoices(j.choices || null); setDirty(false); if (j.choices && foldRef.current) foldRef.current.open = true; };
+  const loadChoices = async () => { const j = await api('/api/choices').catch(() => ({})); setChoices(j.choices || null); setReceipt(j.receipt || null); setDirty(false); if (j.choices && foldRef.current) foldRef.current.open = true; };
   useEffect(() => { if (t && !running && (t.kind === 'draft' || t.kind === 'render') && last.current !== t.id + t.status) { last.current = t.id + t.status; loadChoices(); } });
   useEffect(() => { if (!choices && s.job && loadedFor.current !== s.job) { loadedFor.current = s.job; loadChoices(); } }, [s.job, choices]);
   useEffect(() => { if (!running) return; const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, [running]);
@@ -27,7 +28,7 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
     <header className="sh"><h2 id="h-render">Render</h2><p className="sub">Draft, check the picks, then render.</p></header>
     <div className="runbar glass-card">
       <Button id="draft" size="lg" variant={drafted ? 'secondary' : 'primary'} label={drafted ? 'Redraft' : 'Draft'} isDisabled={running || !s.job || (!s.footage.length && !s.clips)}
-        onClick={() => { setChoices(null); setLog(''); api('/api/draft', {}).then(apply).catch(() => {}); }} />
+        onClick={() => { setChoices(null); setReceipt(null); setLog(''); api('/api/draft', {}).then(apply).catch(() => {}); }} />
       <Button id="render" size="lg" variant={drafted ? 'primary' : 'secondary'} label="Render" isDisabled={running || !s.job}
         onClick={() => { setLog(''); api('/api/render', {}).then(j => { apply(j); if (j.effectsSkipped) toast(j.effectsSkipped); }).catch(() => {}); }} />
       {running && <Button id="cancel" variant="ghost" label="Cancel" onClick={() => api('/api/task/cancel', {}).then(apply)} />}
@@ -41,8 +42,11 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
         <figcaption><span>{o.split('/').pop()}</span><a className="btn ghost sm" href={file(o) + '?download'} download={o.split('/').pop()}><Icon n="download" />Download</a></figcaption></figure>)
         : <div className="empty-art"><Icon n="film" /><p>{s.job ? 'Your reels show up here.' : 'Name the reel at the top to start.'}</p></div>}
     </div>
+    {!hidden && <Compare V={V} s={s} apply={apply} />}
+    <Receipt r={receipt} />
+    <Cleanup V={V} s={s} apply={apply} drafted={drafted} />
     <details className="fold glass-card" id="choices-fold" ref={foldRef}><summary>Picks and why</summary>
-      <div id="choices" className="choices"><Choices CAT={CAT} x={choices} setX={setChoices} dirty={dirty} setDirty={setDirty} /></div></details>
+      <div id="choices" className="choices"><Choices CAT={CAT} x={choices} setX={setChoices} setReceipt={setReceipt} dirty={dirty} setDirty={setDirty} /></div></details>
     <details className="fold glass-card"><summary>Log</summary><pre id="log" className="log" aria-live="off" ref={logRef}>{log}</pre></details>
     <details className="fold glass-card"><summary>Command</summary><pre id="cmd" className="cmd" aria-label="The command Studio will run">{cmd}</pre></details>
   </section>;
@@ -50,12 +54,12 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
 
 const Wrap = ({ label, children }) => <div className="tablewrap" tabIndex={0} role="region" aria-label={label + ' table'}>{children}</div>;
 
-function Choices({ CAT, x, setX, dirty, setDirty }) {
+function Choices({ CAT, x, setX, setReceipt, dirty, setDirty }) {
   if (!x) return <p className="empty">Draft first. Every pick then shows here with its reason.</p>;
   const trans = Object.values(CAT.items).filter(i => i.kind === 'transition').map(i => i.id), ents = Object.values(CAT.items).filter(i => i.kind === 'entrance').map(i => i.id);
   const edit = (list, n, k, v) => { setX({ ...x, [list]: x[list].map(r => r.n === n ? { ...r, [k]: v } : r) }); setDirty(true); };
   const Sel = ({ opts, val, blank, on, label }) => <select aria-label={label} value={val || ''} onChange={e => on(e.target.value || null)}><option value="">{blank}</option>{opts.map(o => <option key={o} value={o}>{o}</option>)}</select>;
-  const applyEdits = async () => { const j = await api('/api/choices', { beats: x.beats, titles: x.titles, graphics: x.graphics }); setX(j.choices); setDirty(false); toast('Edits applied. Render to see them.', true); };
+  const applyEdits = async () => { const j = await api('/api/choices', { beats: x.beats, titles: x.titles, graphics: x.graphics }); setX(j.choices); setReceipt(j.receipt || null); setDirty(false); toast('Edits applied. Render to see them.', true); };
   return <>
     <p className="fine">Locks: {x.locksText || 'none'}. Captions: {x.captions.style}, entrance {x.captions.entrance || 'pop'}. Music: {x.music.bed || 'none'}. Punch: {String(x.punch)}.</p>
     <Wrap label="Beats"><table><thead><tr>{['Beat', 'Time', 'Transition in', 'Why', 'Finish', 'Why'].map((h, i) => <th key={i}>{h}</th>)}</tr></thead><tbody>

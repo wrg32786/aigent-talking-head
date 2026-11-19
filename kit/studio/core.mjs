@@ -109,7 +109,7 @@ const ENERGY = ['auto', 'low', 'mid', 'high'];
 export function applyPatch(s, p, cat = catalog()) {
   const errs = [], log = [];
   if (!p || typeof p !== 'object') return { errs: ['patch must be an object'], log };
-  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind'];
+  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach'];
   for (const k of Object.keys(p)) if (!known.includes(k)) errs.push(`unknown field "${k}" (${known.join(', ')})`);
   if (p.job !== undefined) { if (p.job && !JOB_RE.test(p.job)) errs.push('job: lowercase letters, numbers and dashes'); else { s.job = p.job || null; log.push(`job ${s.job}`); } }
   if (p.pack !== undefined) {
@@ -145,7 +145,7 @@ export function applyPatch(s, p, cat = catalog()) {
   const at = new Date().toISOString();
   // the Studio chat is its own channel: only lines typed in the page, answers to them, and short action notes
   const line = m => { m.id = s.chatSeq = (s.chatSeq || 0) + 1; m.channel = 'studio'; s.chat.push(m); return m; };
-  if (p.say) line({ role: 'user', text: String(p.say).slice(0, 2000), at, from: p.from || 'ui', ...(p.toAgent ? { to: 'agent', status: 'queued' } : {}) });
+  if (p.say) line({ role: 'user', text: String(p.say).slice(0, 2000), at, from: p.from || 'ui', ...(p.toAgent ? { to: 'agent', status: 'queued' } : {}), ...(p.attach && typeof p.attach === 'object' ? { attach: p.attach } : {}) });
   if (p.reply) line({ role: 'assistant', text: String(p.reply).slice(0, 4000), at, from: p.from || 'assistant', ...(p.replyTo ? { replyTo: p.replyTo } : {}), ...(p.kind ? { kind: p.kind } : {}) });
   return { errs, log };
 }

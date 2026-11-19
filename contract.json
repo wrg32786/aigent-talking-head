@@ -104,6 +104,7 @@
         { "name": "no-punch", "type": "boolean", "default": false, "description": "no zoom punch on cuts" },
         { "name": "tighten", "type": "number", "default": "off (0.3 in the magazine preset)", "description": "no dead air: cut every pause inside a line longer than this many seconds to a jump (0.15 to 2)" },
         { "name": "no-tighten", "type": "boolean", "default": false, "description": "keep every pause, even when the preset tightens" },
+        { "name": "cleanup", "type": "path", "default": null, "description": "a clean-up file from Studio: spans to cut out of clips, retakes to keep, clips to leave out (kit/studio/review.mjs)" },
         { "name": "cards", "type": "enum", "values": ["auto", "off"], "default": "off (auto in the magazine preset)", "description": "colour cards on short lines to land, numbered chapter cards and a number-pop intro on a counted list" },
         { "name": "aliases", "type": "string", "default": null, "description": "names Whisper mishears, written your way in captions and titles: \"Gwyn: Guinn, Gwin; aigent: agent\" (adds to a recipe's Aliases)" },
         { "name": "no-boost", "type": "boolean", "default": false, "description": "skip the legibility pass that gives a low-contrast caption moment a denser halo" },

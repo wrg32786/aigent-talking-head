@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { StatusDot } from '@astryxdesign/core/StatusDot';
-import { api, toast, grow, Icon, IconBtn, MSG_STATUS, SETUP_LINE } from './lib.jsx';
+import { api, file, toast, grow, Icon, IconBtn, MSG_STATUS, SETUP_LINE } from './lib.jsx';
+import { clock } from './Review.jsx';
 
 const DOT = { on: 'success', busy: 'warning', off: 'error', alt: 'neutral' };
 
@@ -33,7 +34,8 @@ export function Chat({ V, s, apply, open, setOpen, agentState }) {
     <p id="chatmode" className="sr">{backend === 'agent' ? 'Separate from your terminal conversation.' : ''}</p>
     <ol id="msgs" className="msgs" aria-live="polite" ref={ol} onScroll={ev => { const o = ev.currentTarget; atBottom.current = o.scrollHeight - o.scrollTop - o.clientHeight < 40; }}>
       {s.chat.length ? s.chat.map((m, i) => m.kind === 'action' ? <li key={i} className="action">{m.text}</li>
-        : m.role === 'user' ? <li key={i} className="user">{m.text}{m.to === 'agent' && <span className={'meta ' + (m.status || '')}>{m.status === 'answered' && <Icon n="check" />}{MSG_STATUS[m.status] || m.status}</span>}</li>
+        : m.role === 'user' ? <li key={i} className={'user' + (m.attach && m.attach.kind === 'comment' ? ' comment' : '')}>{m.attach && m.attach.kind === 'comment' ? <>
+          {m.attach.frame && <img className="cm-thumb" src={file(m.attach.frame)} alt={`Your reel at ${clock(m.attach.t)}, with the spot marked`} />}<span className="cm-at">Comment at {clock(m.attach.t)}</span>{m.attach.note}</> : m.text}{m.to === 'agent' && <span className={'meta ' + (m.status || '')}>{m.status === 'answered' && <Icon n="check" />}{MSG_STATUS[m.status] || m.status}</span>}</li>
         : <li key={i} className="assistant"><span className="who">{m.from === 'keywords' ? 'Studio' : (m.from && m.from !== 'agent' ? m.from : name)}</span>{m.text}</li>) : empty}
       {waiting.length > 0 && backend === 'agent' && <li className="typing" aria-label="waiting for your agent"><i /><i /><i />{waiting.some(m => m.status === 'seen') ? `${name} is on it` : a.connected ? `${name} reads it at its next step` : 'Waiting for your agent to connect'}</li>}
     </ol>
