@@ -191,4 +191,14 @@ function pickBed(energy, seed = '') {
   return l[h % l.length];
 }
 
-module.exports = { BEDS, isBed, bedFile, ENERGIES, bedsByEnergy, scriptEnergy, pickBed, SFX, CUT_SOUNDS, sfxHits, ENTRANCES, TITLE_ENTER, TITLE_MODE, TITLE_LAYERS, normalizeLayer, PUNCH, TRANSITIONS, xfadeMode, timeline, lintCopy, scriptShape, readCaptions, resolveTitles, maskSpec, MASK_MODELS, captionLayer, PANEL_LAYERS, PANEL_MODES, panelLayer, panelsBehind };
+const dupWords = (plan, caps) => {   // caption words that repeat an effect's own text inside its window
+  const norm = w => String(w).toLowerCase().replace(/[^a-z0-9]/g, ''), out = [];
+  for (const d of plan) {
+    if (!d.text) continue;
+    const fxw = new Set(String(d.text).split(/[\s|]+/).map(norm).filter(w => w.length > 1));
+    for (const f of (caps && caps.flips) || []) for (const w of f.words || []) if (w[0] < d.end && w[1] > d.start && fxw.has(norm(w[2])))
+      out.push(`"${w[2]}" is in the ${d.fx} text and in the caption at ${(+w[0]).toFixed(2)} s: drop it from the caption flip or hide captions for the window (one or the other)`);
+  }
+  return out;
+};
+module.exports = { BEDS, isBed, bedFile, ENERGIES, bedsByEnergy, scriptEnergy, pickBed, SFX, CUT_SOUNDS, sfxHits, ENTRANCES, TITLE_ENTER, TITLE_MODE, TITLE_LAYERS, normalizeLayer, PUNCH, TRANSITIONS, xfadeMode, timeline, lintCopy, scriptShape, readCaptions, resolveTitles, maskSpec, MASK_MODELS, captionLayer, PANEL_LAYERS, PANEL_MODES, panelLayer, panelsBehind, dupWords };

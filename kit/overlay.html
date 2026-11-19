@@ -293,7 +293,7 @@ function title(c,t,part='all'){const o=c[4];if(o.lockup===false)return part==='p
  const R=lockup(ws,oo,o.y||(ps&&ps.y)||TY,ps?ps.P:P0),hc=cd?cd.ink:R.hc,pc=cd?cd.ink:R.pc;
  const ex=c[1]>90?1:cl((c[1]-t)/.08),dy=riseOff(c,dt),late=riseEnd(c);ctx.save();ctx.globalAlpha*=ex;ctx.textBaseline='alphabetic';if(pl)placeXf(pl,R.box);FLAT=!!cd;
  if(part!=='partner'){ctx.save();ctx.translate(0,dy);R.heroes.forEach((h,li)=>{ctx.save();ctx.font=h.font;ctx.letterSpacing=h.track+'px';ctx.fillStyle=hc;shadow(ctx,h.size);heroEnter(c.entr,h,li,dt);ctx.restore()});ctx.restore()}
- if(part!=='hero')R.parts.forEach((p,pi)=>partnerDraw({...p,outline:!cd},pc,(k,i)=>dt-late-.24-pi*.06-i*.07));FLAT=false;ctx.restore()}
+ if(part!=='hero')R.parts.forEach((p,pi)=>partnerDraw({...p,outline:!cd&&COUT!=='none'},pc,(k,i)=>dt-late-.24-pi*.06-i*.07));FLAT=false;ctx.restore()}
 // Caption entrances for kinetic hero words (captionEntrance for the job, or "entrance" on a caption flip). Letter by
 // letter motions rewritten for canvas from the SwiftUI Agent Thinking Text Animations catalog (MIT, amosgyamfi;
 // THIRD_PARTY.md): unfurl, cascade, orbit, warp, crystallize, compute, levitate, undulate. pop is the default pop-in.
@@ -429,7 +429,7 @@ function oneword(c,t){const s=owAt(c,t);if(s&&s.face==='stack'&&s.txt)return dra
  ctx.restore()}
 // every word state in the job, for render.mjs (build/oneword.json) and the smoke test
 window.__oneword=()=>flips.filter(c=>c[3]===0&&(c[4].style||CSTYLE)==='oneword').flatMap(c=>{use(c.ps);return wordsOf(c).map(w=>{const s=owAt(c,w[0]+.01);return s&&{t:w[0],txt:s.txt,face:s.face,size:s.size,tail:s.tail,card:!!s.cd,ink:s.ink,onLine:!!s.base,x:Math.round(s.x||540),y:Math.round(s.y)}}).filter(Boolean)});
-// captionOutline none|thin|thick (default thick), captionShadow none|soft (default soft), captionCase upper|lower|as-said
+// captionOutline none|thin|thick (default thick; none also drops the dark stroke on kinetic partner words), captionShadow none|soft (default soft), captionCase upper|lower|as-said
 // (default upper): the one-word caption's look, from a Reel.md's Style (a teardown measures them) or captions.js.
 const COUT=CAP.captionOutline||'thick',CSHD=CAP.captionShadow||'soft',CCASE=CAP.captionCase||'upper';
 function oneWordDraw(c,raw,a,t,y){let txt=String(raw).replace(/^[\s.,;:!?"“”]+|[\s.,;:!?"“”]+$/g,'');if(!txt)return;txt=CCASE==='lower'?txt.toLowerCase():CCASE==='upper'?txt.toUpperCase():txt;

@@ -250,9 +250,9 @@ open(os.path.join(a.out, "clips.md"), "w", encoding="utf-8").write("\n".join(md)
 tiles = []
 for c in out:
     f = c["file"]
-    for tag, ss in (("a", "0"), ("b", f"{max(0, c['dur'] - 0.05):.2f}")):
+    for tag, ss in (("a", ["-ss", "0"]), ("b", ["-sseof", "-0.25"])):   # last frame read from the end: a seek to dur-0.05 can land past the final frame and write nothing (pheme 11-18)
         t = os.path.join(a.out, f"_{c['id']}{tag}.png")
-        run(["ffmpeg", "-v", "error", "-y", "-ss", ss, "-i", f, "-frames:v", "1", "-vf", "scale=-2:240", t])
+        run(["ffmpeg", "-v", "error", "-y", *ss, "-i", f, "-frames:v", "1", "-vf", "scale=-2:240", t])
         tiles.append(t)
 if tiles:
     ins = sum([["-i", t] for t in tiles], [])

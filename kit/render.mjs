@@ -34,6 +34,8 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
     const names = (Array.isArray(want) ? want : String(want || 'theme').split(',')).map(s => String(s).trim()).filter(Boolean);
     const sets = names.map(n => resolveFonts(n) || { name: 'theme' }), fp = resolveFonts(names[0]);
     writeFileSync(join(ROOT, 'fonts.js'), 'window.FONTS=' + JSON.stringify(fp) + ';\n' + (sets.length > 1 ? 'window.FONTSETS=' + JSON.stringify(sets) + ';\n' : ''));
+    // Pairing rule (Will, 2026-11-18): a pair is bold with thin, the contrast is the pair. "contrast": "low" marks thin-with-thin pairs.
+    for (const s of sets) if (s && s.contrast === 'low') console.warn(`note: font pairing "${s.name}" is thin with thin (low contrast); pair a bold face with a thin one, and set a script on top of a big bold word`);
     if (sets.length > 1) console.log('font cycle', sets.map(s => s.name).join(' > '));
     if (fp) console.log('fonts', fp.name, [fp.display, fp.secondary, fp.script].filter(Boolean).map(r => r.family).join(' + '));
   }

@@ -141,6 +141,8 @@ const job = path.resolve(opt('jobs') || path.join(ROOT, 'jobs'), name), build = 
 if (!fs.existsSync(path.join(build, 'cut.json'))) die('No ' + path.join(build, 'cut.json') + '. Make the reel first (npm run reel).');
 fs.mkdirSync(dir, { recursive: true });
 const cut = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8'));
+// One or the other (Will, 2026-11-18): a word an effect puts on screen must not also be in the caption at the same time.
+for (const w of R.dupWords(plan.filter(d => !hide.includes(d)), R.readCaptions(path.join(build, 'captions.js')))) console.warn('note:', w);
 if (!MATTE) MATTE = R.maskSpec(cut).model;   // the job's own mask model, so titles and effects share one cut-out
 if (matteModel(MATTE)) console.log('> person cut-out for the effects:', matteModel(MATTE));
 const LEN = cut.segs.reduce((a, s) => a + (s.out - s.in) + (s.pad || 0), 0) + (cut.tail ?? 0.3);

@@ -63,7 +63,7 @@
     "partnerColor": "text"
    }
   },
-  "elegant": {
+  "elegant": { "contrast": "low",
    "about": "classical serif caps + formal script crossing it (free stand-in for Optitimes + Sloop)",
    "display": {
     "family": "Marcellus",
@@ -98,7 +98,7 @@
     "scriptBoost": 1.35
    }
   },
-  "editorial": {
+  "editorial": { "contrast": "low",
    "about": "condensed serif italic hero + roman text serif support (free stand-in for Vanguard + Athelas)",
    "display": {
     "family": "Instrument Serif",
