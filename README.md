@@ -157,7 +157,7 @@ Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FRE
 | Sound effects and CC0 music beds, beat-synced | 37 and 11 | [Music beds](kit/music/README.md) |
 | Export presets: TikTok, Reels, Shorts, 4:5, 1:1 | 5 | [Quick start](#quick-start) |
 | Studio: a local page for reference links and teardowns, the visual effects menu, a chat your agent answers, draft and render | 1 | [docs/studio.md](docs/studio.md) |
-| Agent skills, installed with `npx skills add wrg32786/aigent-talking-head` | 8 | [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) |
+| Agent skills, installed with `npx skills add wrg32786/aigent-talking-head` | 9 | [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) |
 | MCP tools: menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify, and fourteen for Studio and scripts | 25 | [MCP setup](docs/mcp.md) |
 
 Also: a `plan` step that proposes graphics from your transcript, a layout pass that stops overlaps, `verify` with a contact sheet, [Reel.md recipes](#reelmd-recipes) you can share, and [teardowns](#remake-a-reel-you-like) that turn a reel you like into a recipe. `npm run menu` prints every option.
@@ -341,7 +341,7 @@ The code and docs are Apache-2.0, so commercial use is fine. The bundled sounds 
 | Cursor | `npx skills add wrg32786/aigent-talking-head -a cursor` |
 | Codex | `npx skills add wrg32786/aigent-talking-head -a codex` |
 
-That installs nine skills: aigent-talking-head, aigent-studio, talking-head-reel, talking-head-recipe, talking-head-brand, talking-head-teardown, talking-head-ad, clip-raw-footage and humanizer (by Siqi Chen, MIT, for scripts). Add `-g` to install for every project. By hand: copy the folders under `skills/` into `.claude/skills/` (Claude Code) or `.agents/skills/` (Cursor, Codex). The skills drive a local checkout, so the agent still needs the kit installed ([agent install steps](INSTALL.md)).
+That installs ten skills: aigent-talking-head, aigent-studio, talking-head-reel, talking-head-recipe, talking-head-brand, talking-head-teardown, talking-head-split, talking-head-ad, clip-raw-footage and humanizer (by Siqi Chen, MIT, for scripts). Add `-g` to install for every project. By hand: copy the folders under `skills/` into `.claude/skills/` (Claude Code) or `.agents/skills/` (Cursor, Codex). The skills drive a local checkout, so the agent still needs the kit installed ([agent install steps](INSTALL.md)).
 
 **MCP.** `npm run mcp` serves the same flow as MCP tools (menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify) with schemas generated from contract.json, plus studio_ tools that let your agent listen and answer in the Studio chat, add reference links and read their teardowns. See the [MCP setup for Claude Code, Cursor and Codex](docs/mcp.md). For a summary written for language models, see [llms.txt](llms.txt).
 

@@ -623,6 +623,21 @@
       "outputs": ["kit/fonts/examples/"],
       "success": "exit 0",
       "failures": []
+    },
+    {
+      "name": "split",
+      "script": "kit/split.mjs",
+      "summary": "Split-screen explainer from a drafted job: proof panels on top, the presenter in a rounded frame below, short captions between, full-frame cutaways, a keyword punch-in and the call to action. Built and rendered with HyperFrames.",
+      "positional": [
+        { "name": "job", "type": "string", "variadic": false, "required": true, "description": "a drafted job under jobs/ (npm run reel -- inbox/<clip> --name <job> --draft)" }
+      ],
+      "flags": [
+        { "name": "spec", "type": "path", "default": "jobs/<job>/Split.json", "description": "the Split.json that lists the hook, beats, cutaways and call to action (docs/split.md)" },
+        { "name": "no-render", "type": "boolean", "default": false, "description": "build and check the HyperFrames project in jobs/<job>/split/ without rendering" }
+      ],
+      "outputs": ["jobs/<job>/split/ (editable HyperFrames project)", "jobs/<job>/split-vN.mp4"],
+      "success": "prints Split: <path> and exit 0",
+      "failures": ["no draft for the job", "no Split.json", "a beat's phrase is not in the transcript", "HyperFrames check errors", "render failed"]
     }
   ]
 }

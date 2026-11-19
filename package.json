@@ -44,7 +44,8 @@
     "studio": "node kit/studio/server.mjs",
     "studio:build": "node kit/studio/build.mjs",
     "studio:agent": "node kit/studio/launch.mjs",
-    "studio:connect": "node kit/studio/connect.mjs"
+    "studio:connect": "node kit/studio/connect.mjs",
+    "split": "node kit/split.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
