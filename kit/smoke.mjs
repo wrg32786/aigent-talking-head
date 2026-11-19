@@ -907,15 +907,16 @@ try {
     if (effects) run(fxPy, ['-c', `import sys; sys.path.insert(0, ${JSON.stringify(KIT)}); import cover; cover.selftest()`]);
     writeFileSync(capF, keepC);
   });
-  { // the MCP server: eleven tools whose schemas come from contract.json; a tool call runs the real command
-    process.stdout.write('- MCP server (stdio): menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify; validate runs reelmd check ... ');
+  { // the MCP server: fourteen tools whose schemas come from contract.json; a tool call runs the real command
+    process.stdout.write('- MCP server (stdio): menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify, studio_get_state, studio_set_selections, studio_run; validate runs reelmd check ... ');
     const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
     const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
     const cl = new Client({ name: 'smoke', version: '1' });
-    await cl.connect(new StdioClientTransport({ command: node, args: [join(KIT, 'mcp.mjs')], cwd: dirname(KIT), stderr: 'ignore' }));
+    const studioDir = join(work, 'studio-mcp'); mkdirSync(studioDir, { recursive: true });
+    await cl.connect(new StdioClientTransport({ command: node, args: [join(KIT, 'mcp.mjs')], cwd: dirname(KIT), stderr: 'ignore', env: { ...process.env, STUDIO_DIR: studioDir } }));
     try {
       const names = (await cl.listTools()).tools.map(t => t.name).join(',');
-      if (names !== 'menu,list_effects,list_packs,get_pack,draft,explain,set_locks,plan,validate,render,verify') fail('MCP tools: ' + names);
+      if (names !== 'menu,list_effects,list_packs,get_pack,draft,explain,set_locks,plan,validate,render,verify,studio_get_state,studio_set_selections,studio_run') fail('MCP tools: ' + names);
       const lp = await cl.callTool({ name: 'list_packs', arguments: {} });
       if (lp.isError || !lp.structuredContent || !lp.structuredContent.packs.some(p => p.name === 'magazine')) fail('MCP list_packs: ' + JSON.stringify(lp).slice(0, 300));
       const gp = await cl.callTool({ name: 'get_pack', arguments: { pack: 'cinematic' } });
@@ -924,9 +925,62 @@ try {
       if (le.isError || !le.structuredContent || le.structuredContent.sections[0].items.length < 50) fail('MCP list_effects: ' + JSON.stringify(le).slice(0, 300));
       const v = await cl.callTool({ name: 'validate', arguments: { recipe: 'examples/recipes/cinematic.Reel.md' } });
       if (v.isError || !/REELMD PASS/.test(v.content[0].text)) fail('MCP validate: ' + JSON.stringify(v));
+      // Studio tools share the page's session file
+      const ss = await cl.callTool({ name: 'studio_set_selections', arguments: { pack: 'cinematic', picks: { 'transition:dissolve': 'allow', 'graphic:checklist': 'deny' }, reply: 'Went calmer.' } });
+      if (ss.isError) fail('MCP studio_set_selections: ' + JSON.stringify(ss).slice(0, 300));
+      const sg = await cl.callTool({ name: 'studio_get_state', arguments: { catalog: true } });
+      const st = sg.structuredContent;
+      if (sg.isError || st.state.pack !== 'cinematic' || !st.compose.lockString.includes('transitions=dissolve') || !st.catalog.selectable.includes('effect:slow-push') || st.state.chat.pop().text !== 'Went calmer.') fail('MCP studio_get_state: ' + JSON.stringify(sg).slice(0, 400));
+      if (JSON.parse(readFileSync(join(studioDir, 'state.json'), 'utf8')).pack !== 'cinematic') fail('studio state file not shared');
+      const sb = await cl.callTool({ name: 'studio_set_selections', arguments: { picks: { 'transition:teleport': 'allow' } } });
+      if (!sb.isError) fail('MCP studio_set_selections took a name the engine does not have');
       const bad = await cl.callTool({ name: 'render', arguments: { look: 'nope' } });
       if (!bad.isError) fail('MCP render should refuse a value the contract does not list');
     } finally { await cl.close(); }
+    console.log('ok');
+  }
+  { // Studio: the local page drives a real draft from a session, inside the locks it shows; the page loads with no errors,
+    // a click on a tile changes the session, and the phone layout has no sideways scroll
+    process.stdout.write('- Studio (npm run studio): session to draft inside its locks, choices table, headless page click, phone layout ... ');
+    const { spawn } = await import('child_process');
+    const sdir = join(work, 'studio'), job = 'smoke-studio-' + process.pid;
+    const srv = spawn(node, [join(KIT, 'studio', 'server.mjs'), '--port', '0', '--no-open'], { cwd: dirname(KIT), env: { ...process.env, CI: '1', STUDIO_DIR: sdir, ANTHROPIC_API_KEY: '', OPENAI_API_KEY: '' } });
+    try {
+      const url = await new Promise((ok, bad) => { let o = ''; srv.stdout.on('data', d => { o += d; const m = o.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.on('close', c => bad(new Error('studio exited ' + c + o))); });
+      const api = async (path, body) => { const r = await fetch(url + path, body === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); const j = await r.json(); if (!r.ok) fail(`studio ${path}: ${j.error}`); return j; };
+      await api('/api/state', { job, clips: join(work, 'clips-muse'), pack: 'magazine', picks: { 'transition:whip': 'allow', 'transition:zoom': 'allow', 'entrance:typewriter': 'allow', 'graphic:checklist': 'deny' }, sound: { sfx: 'off' }, music: { bed: 'none' } });
+      await api('/api/draft', {});
+      let v; const t0 = Date.now();
+      do { await new Promise(r => setTimeout(r, 1500)); v = await api('/api/state'); } while (v.task && v.task.status === 'running' && Date.now() - t0 < 15 * 60e3);
+      if (!v.task || v.task.status !== 'done') fail('studio draft: ' + JSON.stringify(v.task).slice(0, 800));
+      const ch = (await api('/api/choices')).choices;
+      const seams = ch.beats.slice(1).filter(b => !b.jump).map(b => b.transition);
+      if (!seams.length || seams.some(x => !['whip', 'zoom'].includes(x))) fail('studio draft left the transitions lock: ' + seams);
+      if (ch.titles.some(x => x.entrance && x.entrance !== 'typewriter')) fail('studio draft left the titles lock: ' + ch.titles.map(x => x.entrance));
+      if (ch.graphics.some(g => g.id === 'checklist')) fail('studio draft used a forbidden graphic');
+      const k = ch.beats.findIndex((b, i) => i > 0 && !b.jump), to = ch.beats[k].transition === 'whip' ? 'zoom' : 'whip';
+      const ap = await api('/api/choices', { ...ch, beats: ch.beats.map((b, i) => i === k ? { ...b, transition: to } : b) });
+      if (ap.choices.beats[k].transition !== to || ap.choices.beats[k].transitionWhy !== 'you') fail('studio choices apply: ' + JSON.stringify(ap.choices.beats[k]));
+      const { chromium } = await import('playwright-core');
+      const b = await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox'] });
+      try {
+        const pg = await b.newPage({ viewport: { width: 1280, height: 860 } }); const errs = [];
+        pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
+        await pg.goto(url + '/#menu=transitions', { waitUntil: 'networkidle' });
+        await pg.waitForSelector('.tile .pick');
+        const before = (await api('/api/state')).state.rev;
+        await pg.click('.tile .pick[aria-label="Pick cut, transition"]');
+        let s2; for (let i = 0; i < 20; i++) { await pg.waitForTimeout(150); s2 = (await api('/api/state')).state; if (s2.rev > before) break; }
+        if (!s2.picks.transition.allow.includes('cut')) fail('clicking a tile did not pick it: ' + JSON.stringify(s2.picks.transition));
+        if (await pg.getAttribute('.tile .pick[aria-label="Pick cut, transition"]', 'aria-pressed') !== 'true') fail('tile does not show it is picked');
+        if (!/whip|zoom/.test(await pg.textContent('#choices'))) fail('choices table not shown');
+        await pg.setViewportSize({ width: 375, height: 800 }); await pg.waitForTimeout(300);
+        const over = await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+        if (over > 1) fail('phone layout scrolls sideways by ' + over + 'px');
+        await pg.screenshot({ path: join(work, 'studio-phone.png') });
+        if (errs.length) fail('studio page errors: ' + errs.join(' | '));
+      } finally { await b.close(); }
+    } finally { srv.kill(); rmSync(join(dirname(KIT), 'jobs', job), { recursive: true, force: true }); }
     console.log('ok');
   }
   step('check.mjs flags em dashes and banned phrases in captions', () => {

@@ -15,8 +15,11 @@
 | `validate` | `npm run reelmd -- check <recipe>` or `npm run check -- <job>` | check a Reel.md, or lint a job's copy and plan |
 | `render` | `npm run reel -- ... --json` | render the reel (and an `export`) |
 | `verify` | `npm run verify -- <job> --json` | check the finished reel: size, loudness, overlap, safe area, copy |
+| `studio_get_state` | reads the Studio session (`jobs/.studio/state.json`) | what the user picked in Studio (`npm run studio`), their reference, music, pace, the chat and the running task, and the reel arguments it adds up to; with `catalog: true`, every menu item as a `kind:id` ref by category |
+| `studio_set_selections` | writes the Studio session | change picks (`{"transition:whip": "allow"}`, `deny` or `clear`), pack, music, sound, pace, export or reference mode, and answer the user in the Studio chat with `reply`; the page updates live, and unknown names are refused |
+| `studio_run` | POSTs to the running Studio | start a draft or render the user watches in the page, then poll `studio_get_state` |
 
-Each call returns the command line, its exit code and the end of its log as text, and the command's JSON result (the last line it prints with `--json`) as structured content. A value the contract does not list (a `look` or `export` name that does not exist) is refused before anything runs.
+The three Studio tools work on the same session file as the page, so the assistant and the page stay in step ([docs/studio.md](studio.md)). Each other call returns the command line, its exit code and the end of its log as text, and the command's JSON result (the last line it prints with `--json`) as structured content. A value the contract does not list (a `look` or `export` name that does not exist) is refused before anything runs.
 
 Install the kit first ([INSTALL.md](../INSTALL.md)): `npm install`, the Python venv with `PYTHON` set, and Chrome. The server finds the repo from its own path, so any working directory works. Use the absolute path of your checkout below (`/path/to/aigent-talking-head`).
 

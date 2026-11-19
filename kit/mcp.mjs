@@ -3,6 +3,8 @@
 //   npm run mcp            (an MCP client starts this; see docs/mcp.md for Claude Code, Cursor and Codex)
 // Tools: menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify. Each runs the matching npm command from the repo root with
 // --json where the command has it and returns the log tail plus the JSON result (structuredContent).
+// Studio tools: studio_get_state, studio_set_selections, studio_run. They read and write the same session as the Studio page
+// (npm run studio, kit/studio/core.mjs), so you and the user see and change the same picks; the page updates live.
 // Built on the official MCP TypeScript SDK (@modelcontextprotocol/sdk, MIT). Logs go to stderr; stdout is the protocol.
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -11,6 +13,7 @@ import { spawn } from 'child_process';
 import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import * as Studio from './studio/core.mjs';
 
 const KIT = dirname(fileURLToPath(import.meta.url)), ROOT = dirname(KIT);
 const C = JSON.parse(readFileSync(join(ROOT, 'contract.json'), 'utf8'));
@@ -101,14 +104,31 @@ const TOOLS = [
     inputSchema: schemaOf(REEL, { omit: ['draft', 'json'] }), call: a => [REEL.script, argsOf(REEL, a, ['--json']), 60 * 60e3] },
   { name: 'verify', description: 'Check a finished reel before handing it over: ffprobe, loudness, overlap between graphics, captions and titles, the export safe area, mask and copy. Returns the contact sheet and stills to look at. ' + VERIFY.summary,
     inputSchema: schemaOf(VERIFY, { omit: ['json'] }), call: a => [VERIFY.script, argsOf(VERIFY, a, ['--json']), 20 * 60e3] },
+  { name: 'studio_get_state', description: 'The Studio session the user sees in the browser (npm run studio): job, footage, reference and what was extracted from it, the pack, every pick (allowed and forbidden effects by kind), music, sound, pace, export, the chat with the user, the running task, outputs, and the npm run reel arguments it adds up to. Read the chat: lines from the user are for you to answer with studio_set_selections (reply). With catalog true, also every effect Studio shows, by category, as kind:id refs.',
+    inputSchema: { type: 'object', properties: { catalog: { type: 'boolean', description: 'include the menu: categories with kind:id refs, packs, beds, exports' } }, additionalProperties: false },
+    direct: a => { const s = Studio.load(), c = Studio.catalog(); let comp; try { comp = Studio.compose(s); } catch (e) { comp = { errs: [e.message] }; }
+      const out = { state: s, compose: comp, outputs: Studio.outputsOf(s), statePath: Studio.statePath() };
+      if (a.catalog) out.catalog = { categories: c.categories.filter(x => x.count).map(x => ({ id: x.id, label: x.label, items: x.items })), packs: c.packs.map(p => p.name), beds: c.beds.map(b => `${b.id} (${b.energy})`), exports: c.exports, selectable: Object.values(c.items).filter(i => i.mode !== 'info').map(i => i.ref) };
+      return out; } },
+  { name: 'studio_set_selections', description: 'Change the Studio session; the page updates live. Use it when the user tells you a vibe or names effects. Fields (all optional): pack (a pack name or null), picks { "transition:whip": "allow" | "deny" | "clear" } (kind:id refs from studio_get_state with catalog true; allow means only allowed ones of that kind are used, deny forbids one), clearPicks, music { bed: auto | none | a bed id, energy: auto | low | mid | high }, sound { sfx: on | off, cap: on | off }, pace { tighten: null | off | 0.1 to 2, punch: on | off }, export, job, reference { mode: influence | recreate | off }, reply (your answer, shown in the Studio chat), say (a user line you relay). Unknown names are refused and nothing is changed.',
+    inputSchema: { type: 'object', properties: { pack: { type: ['string', 'null'] }, picks: { type: 'object', additionalProperties: { type: 'string', enum: ['allow', 'deny', 'clear'] } }, clearPicks: { type: 'boolean' }, music: { type: 'object' }, sound: { type: 'object' }, pace: { type: 'object' }, export: { type: ['string', 'null'] }, job: { type: 'string' }, reference: { type: 'object' }, reply: { type: 'string' }, say: { type: 'string' } }, additionalProperties: false },
+    direct: a => { const s = Studio.load(), r = Studio.applyPatch(s, { ...a, from: 'assistant' }); if (r.errs.length) throw new Error(r.errs.join('; ')); Studio.save(s); return { ok: true, changed: r.log, compose: Studio.compose(s) }; } },
+  { name: 'studio_run', description: 'Start a draft or a render in the running Studio (npm run studio) so the user sees the progress in the page. Then poll studio_get_state (task) and, after a draft, call explain with the job to talk the picks through. Needs Studio open; otherwise use draft and render.',
+    inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['draft', 'render'] }, port: { type: 'number', description: 'Studio port, default 4757' } }, required: ['action'], additionalProperties: false },
+    direct: async a => { const port = a.port || +(process.env.STUDIO_PORT || 4757); let r; try { r = await fetch(`http://127.0.0.1:${port}/api/${a.action}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); } catch { throw new Error(`Studio is not running on port ${port}. Ask the user to run npm run studio (or use the draft and render tools).`); }
+      const j = await r.json(); if (!r.ok) throw new Error(j.error || `Studio said ${r.status}`); return { ok: true, task: j.task, compose: j.compose }; } },
 ];
 for (const c of [REEL, PLAN, VERIFY, MENU, RMD, CHECK, PACK, CHOICES]) if (!existsSync(join(ROOT, c.script))) throw new Error(`${c.name}: ${c.script} is missing`);
 
-const server = new Server({ name: 'aigent-talking-head', version: PKG.version }, { capabilities: { tools: {} }, instructions: 'Talking-head reel kit. Flow: menu (offer options; list_effects for transitions, title or caption entrances with preview paths, and docs/effects.md to show them animated; list_packs for whole looks with previews in docs/packs.md), draft (transcribe, with pack and lock when the user picked a look or pinned choices), explain (show the user what was picked per beat and why; they can change any of it, or pin it with set_locks), plan (propose graphics from the words), review the Reel.md with the user, validate, render (with export for a platform), verify (then look at the contact sheet). Read skills/aigent-talking-head/SKILL.md for the rules: on-screen words are words the presenter says, nothing ever covers the face.' });
+const server = new Server({ name: 'aigent-talking-head', version: PKG.version }, { capabilities: { tools: {} }, instructions: 'Talking-head reel kit. Flow: menu (offer options; list_effects for transitions, title or caption entrances with preview paths, and docs/effects.md to show them animated; list_packs for whole looks with previews in docs/packs.md), draft (transcribe, with pack and lock when the user picked a look or pinned choices), explain (show the user what was picked per beat and why; they can change any of it, or pin it with set_locks), plan (propose graphics from the words), review the Reel.md with the user, validate, render (with export for a platform), verify (then look at the contact sheet). When the user has Studio open (npm run studio), work in their session: studio_get_state (read their picks and the chat), studio_set_selections (change picks, answer in the chat with reply), studio_run (draft or render with progress in their page). Read skills/aigent-talking-head/SKILL.md for the rules: on-screen words are words the presenter says, nothing ever covers the face.' });
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) }));
 server.setRequestHandler(CallToolRequestSchema, async req => {
   const t = TOOLS.find(x => x.name === req.params.name);
   if (!t) return { isError: true, content: [{ type: 'text', text: `unknown tool ${req.params.name}` }] };
+  if (t.direct) {
+    try { const out = await t.direct(req.params.arguments || {}); return { content: [{ type: 'text', text: JSON.stringify(out, null, 1).slice(0, 60000) }], structuredContent: out }; }
+    catch (e) { return { isError: true, content: [{ type: 'text', text: e.message }] }; }
+  }
   let spec;
   try { spec = t.call(req.params.arguments || {}); } catch (e) { return { isError: true, content: [{ type: 'text', text: e.message }] }; }
   if (!spec) return { isError: true, content: [{ type: 'text', text: 'give recipe (a Reel.md path) or job (a job name)' }] };

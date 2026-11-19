@@ -358,6 +358,35 @@
       "failures": ["No drafted job at <job>", "choices.json problems: ... (unknown names)", "locks: ... (unknown names)"]
     },
     {
+      "name": "studio",
+      "script": "kit/studio/server.mjs",
+      "summary": "Studio: a local web page over the kit (footage, a reference to influence or recreate, the effects menu by category, packs, music and pace, chat, the choices table, draft, render and download). Binds to 127.0.0.1 only. docs/studio.md.",
+      "positional": [],
+      "flags": [
+        {
+          "name": "port",
+          "type": "number",
+          "default": "4757",
+          "description": "port on 127.0.0.1 (or STUDIO_PORT)"
+        },
+        {
+          "name": "no-open",
+          "type": "boolean",
+          "default": false,
+          "description": "do not open the browser"
+        }
+      ],
+      "outputs": [
+        "http://127.0.0.1:<port>",
+        "jobs/.studio/state.json (the session the MCP studio tools share)",
+        "jobs/<job>/ as npm run reel writes it"
+      ],
+      "success": "prints \"Studio: http://127.0.0.1:<port>\"",
+      "failures": [
+        "EADDRINUSE: another program has the port (use --port)"
+      ]
+    },
+    {
       "name": "reelmd",
       "script": "kit/reelmd.cjs",
       "summary": "Check, compile, export or package a Reel.md recipe.",

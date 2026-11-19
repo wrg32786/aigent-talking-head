@@ -52,3 +52,8 @@ kit/presets/local/
 
 # your own style packs (npm run pack:new)
 packs/local/
+
+# local venv and launcher made by install/install.sh or install.ps1
+/.venv/
+/studio.sh
+/studio.bat
