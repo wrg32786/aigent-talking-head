@@ -1,0 +1,27 @@
+{
+  "$schema": "../pack.schema.json",
+  "format": "aigent-style-pack",
+  "formatVersion": 1,
+  "name": "minimal-clean",
+  "version": "1.0.0",
+  "label": "Minimal: quiet type, hard cuts only, no grade, no cards",
+  "description": "For talks and tutorials where the words carry it. Phrase captions, no titles, no film finish, no glitch.",
+  "author": "AIgent",
+  "license": "Apache-2.0",
+  "extends": "minimal-clean",
+  "style": {},
+  "locks": {
+    "transitions": [
+      "cut"
+    ],
+    "finishes": [
+      "none"
+    ],
+    "cards": false
+  },
+  "preview": {
+    "webp": "preview.webp",
+    "png": "preview.png"
+  },
+  "assets": []
+}

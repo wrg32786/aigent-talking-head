@@ -5,3 +5,5 @@ Shipped JSON files for `npm run reel -- --preset <name>`. Each one is a mix of e
 User-saved presets go in `local/` (gitignored). A local file of the same name overrides the shipped one. Drafts from `npm run brand:import` land there too; confirm them before you ship a reel.
 
 See the README in the repo root, and `npm run preset -- --list`.
+
+To share a look with its locks (transitions, title entrances, graphics and more pinned) and a preview, make it a style pack: `npm run pack:new -- <name> --from <preset>`. See docs/packs.md.

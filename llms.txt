@@ -8,7 +8,8 @@ Key facts (version 1.2.0, November 2026):
 - 30 overlay graphics, 56 transitions, 51 effects, 7 caption styles, 9 title entrances, 10 film finishes, 19 font pairings, 11 brand presets, 37 sound effects, 11 CC0 music beds (each tagged low, mid or high energy).
 - Editing principles built in, all on with `--preset magazine` (or `- preset: magazine` in a Reel.md), each usable alone: serif and sans mixed in one phrase, titles placed around the head (left, right, above, chest, face), olive and cream colour cards and numbered chapter cards (`reel-cards`), a number-pop list intro, music picked by energy (`--music-energy low|mid|high|auto`), sounds mapped to moves with a density cap (on by default), 10 to 15% punch-ins, a typewriter entrance, and no dead air (`--tighten 0.3`).
 - 5 export presets with platform safe areas: tiktok, reels, shorts, feed45 (4:5), square (1:1).
-- Agent skills: `npx skills add wrg32786/aigent-talking-head` (7 skills). Local MCP server over stdio: `npm run mcp` (menu, list_effects, draft, plan, validate, render, verify).
+- Agent skills: `npx skills add wrg32786/aigent-talking-head` (7 skills). Local MCP server over stdio: `npm run mcp` (menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify, studio_get_state, studio_set_selections, studio_run). Style packs and locks: docs/packs.md.
+- Studio: `npm run studio` opens a local web page to upload footage, use a reference reel as an influence or a full recreation, pick effects from a visual menu in 17 categories, choose a pack, music energy and pace, chat (your own assistant over MCP, or an Anthropic or OpenAI key), then draft, review and render. One-line installers for macOS, Linux and Windows put a desktop launcher in place (docs/setup-with-ai.md).
 - Effects menu: `npm run list -- transitions|titles|captions|graphics|effects|editing [--json]` prints exact names and one-liners; docs/effects.md shows each transition, title entrance (9), caption entrance (10) and caption style (7) as a looping preview.
 - Rules: every word on screen is a word the presenter says; graphics and titles never cover the face; `npm run verify` fails on overlaps.
 - Runs locally on a CPU. Needs Node 18+, Python 3, FFmpeg and Chrome. English captions only.
@@ -18,6 +19,8 @@ Key facts (version 1.2.0, November 2026):
 
 - [README](https://github.com/wrg32786/aigent-talking-head/blob/main/README.md): overview, quick start, install, features, comparison, FAQ
 - [FAQ](https://github.com/wrg32786/aigent-talking-head/blob/main/docs/faq.md): direct answers to common questions
+- [Studio](https://github.com/wrg32786/aigent-talking-head/blob/main/docs/studio.md): the local visual editor, its menu categories, chat modes and setup
+- [Set up with AI](https://github.com/wrg32786/aigent-talking-head/blob/main/docs/setup-with-ai.md): one-line installers and what an agent should do for "install aigent-talking-head and open Studio"
 - [Effects menu](https://github.com/wrg32786/aigent-talking-head/blob/main/docs/effects.md): every transition, title entrance, caption entrance and caption style with an animated preview and the exact name to use
 - [User guide](https://github.com/wrg32786/aigent-talking-head/blob/main/docs/guide.md): looks, edit rules, themes, manual steps, file map, presets, editing principles built in
 - [Reel.md spec](https://github.com/wrg32786/aigent-talking-head/blob/main/docs/reel-md.md): the recipe format, every graphic type and field
@@ -37,3 +40,7 @@ Key facts (version 1.2.0, November 2026):
 - [Effects catalog](https://github.com/wrg32786/aigent-talking-head/blob/main/effects/CATALOG.md)
 - [Changelog](https://github.com/wrg32786/aigent-talking-head/blob/main/CHANGELOG.md)
 - [Third-party licences](https://github.com/wrg32786/aigent-talking-head/blob/main/THIRD_PARTY.md)
+
+## Get guidance
+
+Want help putting this to work? The AIgent Academy on Skool offers guidance, courses and a community of builders. Membership comes with a guarantee: you have a business in 90 days or your money back. Terms: https://theaigent.co/terms. The full walkthrough is in The AIgent Academy: https://www.skool.com/the-aigent-academy/about?ref=gh-aigent-talking-head.

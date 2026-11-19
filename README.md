@@ -4,7 +4,11 @@
 
 Made by Will Gwyn at [The AIgent](https://theaigent.xyz).
 
-[Quick start](#quick-start) · [Install](#install) · [Features](#features) · [How it compares](#how-it-compares) · [FAQ](#faq) · [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) · [Guide](docs/guide.md) · [Full gallery](showcase/GALLERY.md)
+[![GitHub stars](https://img.shields.io/github/stars/wrg32786/aigent-talking-head?style=social)](https://github.com/wrg32786/aigent-talking-head/stargazers)
+
+If it saves you an edit, a ⭐ helps other creators find it.
+
+[Quick start](#quick-start) · [Install](#install) · [Features](#features) · [How it compares](#how-it-compares) · [FAQ](#faq) · [Show your reel](#show-your-reel) · [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) · [Guide](docs/guide.md) · [Full gallery](showcase/GALLERY.md) · [Get guidance](#get-guidance)
 
 ![Before and after: a plain phone clip on the left, the finished reel with kinetic captions and graphics on the right](kit/example/demo-reel/before-after.gif)
 
@@ -45,6 +49,21 @@ You get `jobs/my-reel/reel-v1.mp4` and `reel-v1-reels.mp4` (inside Instagram's s
 - Change something: edit `jobs/<name>/build/captions.js` or `build/cut.json`, then `npm run reel -- --rebuild --name <name>`.
 - Accuracy over speed: `--model large-v3` (about 3 GB, downloaded once, a notice prints first).
 - Everything else (looks, edit rules, themes, manual steps, presets, the file map) is in the [user guide](docs/guide.md). Every command and flag is in [contract.json](contract.json).
+
+Made a reel? [Star the repo](https://github.com/wrg32786/aigent-talking-head) and [share it](#show-your-reel).
+
+## Studio: pick your effects in a browser
+
+`npm run studio` opens a local page where you drop in your footage, add a reference reel to borrow from (as an influence or a full recreation), click effects from a visual menu in 17 categories, pick a style pack, music energy and pace, then draft, review every pick and render. Talk to it in plain words ("calm and cinematic, no glitch"), connect your own assistant over MCP, or set an API key. Everything runs on your computer. Guide: [docs/studio.md](docs/studio.md).
+
+<img src="docs/studio/desktop.png" width="720" alt="Studio in a browser: footage, reference and style pack steps, with the effects menu below">
+
+**No terminal?** One line installs everything and puts a "Talking Head Studio" icon on your desktop:
+
+- macOS or Linux: `curl -fsSL https://raw.githubusercontent.com/wrg32786/aigent-talking-head/main/install/install.sh | bash`
+- Windows (PowerShell): `irm https://raw.githubusercontent.com/wrg32786/aigent-talking-head/main/install/install.ps1 | iex`
+
+Or tell your assistant "install aigent-talking-head and open Studio" ([docs/setup-with-ai.md](docs/setup-with-ai.md)).
 
 ## Install
 
@@ -88,8 +107,9 @@ Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FRE
 | Editing principles built in: mixed serif and sans, titles placed around the head, colour and chapter cards, music by energy, mapped and capped sounds, punch-ins, no dead air | 7, all in `--preset magazine` | [Guide](docs/guide.md#editing-principles-built-in), [effects menu](docs/effects.md#editing-principles) |
 | Sound effects and CC0 music beds, beat-synced | 37 and 11 | [Music beds](kit/music/README.md) |
 | Export presets: TikTok, Reels, Shorts, 4:5, 1:1 | 5 | [Quick start](#quick-start) |
+| Studio: a local page to pick effects visually, chat, draft and render | 1 | [docs/studio.md](docs/studio.md) |
 | Agent skills, installed with `npx skills add wrg32786/aigent-talking-head` | 8 | [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) |
-| MCP tools: menu, list_effects, draft, plan, validate, render, verify | 7 | [MCP setup](docs/mcp.md) |
+| MCP tools: menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify, and three for Studio | 14 | [MCP setup](docs/mcp.md) |
 
 Also: a `plan` step that proposes graphics from your transcript, a layout pass that stops overlaps, `verify` with a contact sheet, [Reel.md recipes](#reelmd-recipes) you can share, and [teardowns](#remake-a-reel-you-like) that turn a reel you like into a recipe. `npm run menu` prints every option.
 
@@ -98,6 +118,24 @@ Also: a `plan` step that proposes graphics from your transcript, a layout pass t
 **[docs/effects.md](docs/effects.md)** is the menu of every transition, title entrance, caption entrance and caption style, each with a looping preview, its exact name and the line to paste. `npm run list -- transitions` (or `titles`, `captions`, `graphics`, `effects`, `editing`) prints the same list in a terminal, and `--json` gives it to agents.
 
 <img src="docs/menu/sheets/transitions.webp" width="720" alt="Animated grid of all 56 transitions, each labelled with its name: glitch, cut, crossfade, dissolve, dip, flash, whip, push, swipe, cover, reveal, wipe, iris, doorway, barn door, zoom, pixelate, blur, radial, squeeze, slice, wind, warp, slats, checkerboard, light leak, zoom blur and news ribbon">
+
+### See everything, take control, make your own pack
+
+**See everything.** [docs/effects.md](docs/effects.md) shows every transition, title entrance, caption entrance and caption style animated. `npm run menu` prints every option, and `npm run list -- packs` lists the style packs.
+
+**Pick a whole look.** A style pack bundles a preset with locks: `npm run reel -- inbox/take.mov --pack magazine`. Six ship in [packs/](packs/), each with a preview in the [pack gallery](docs/packs.md): aigent, magazine, cinematic, hormozi-bold, minimal-clean and neutral.
+
+<img src="packs/magazine/preview.webp" width="160" alt="magazine pack preview: typewriter title, chapter card, crossfade"> <img src="packs/cinematic/preview.webp" width="160" alt="cinematic pack preview: blur-rise title, film dissolve"> <img src="packs/hormozi-bold/preview.webp" width="160" alt="hormozi-bold pack preview: slam title, bold caps captions, glitch cut">
+
+**Take control.** The kit picks transitions, title entrances, finishes and graphics for you. Lock what you care about and it only picks inside your choices:
+
+```
+npm run reel -- inbox/take.mov --pack magazine --lock "transitions=whip,zoom; titles=typewriter; no-graphics=checklist" --draft
+```
+
+Every draft prints what it picked per beat and why (locked, from the pack, from the recipe, or the kit's default) and saves it to `jobs/<name>/choices.json`. Change any pick there, then `npm run choices -- <name> --apply` and `npm run reel -- --rebuild --name <name>`.
+
+**Make your own pack.** `npm run pack:new -- my-look --from magazine` writes `packs/local/my-look/pack.json`. Edit its style and locks, then `npm run pack:validate -- my-look` and `npm run pack:preview -- my-look`. Share the folder and anyone can use it with `--pack ./my-look`. The format is in [docs/packs.md](docs/packs.md) and [packs/pack.schema.json](packs/pack.schema.json).
 
 ### Effects
 
@@ -246,7 +284,13 @@ The code and docs are Apache-2.0, so commercial use is fine. The bundled sounds 
 
 That installs eight skills: aigent-talking-head, talking-head-reel, talking-head-recipe, talking-head-brand, talking-head-teardown, talking-head-split, talking-head-ad and clip-raw-footage. Add `-g` to install for every project. By hand: copy the folders under `skills/` into `.claude/skills/` (Claude Code) or `.agents/skills/` (Cursor, Codex). The skills drive a local checkout, so the agent still needs the kit installed ([agent install steps](INSTALL.md)).
 
-**MCP.** `npm run mcp` serves the same flow as MCP tools (menu, list_effects, draft, plan, validate, render, verify) with schemas generated from contract.json. See the [MCP setup for Claude Code, Cursor and Codex](docs/mcp.md). For a summary written for language models, see [llms.txt](llms.txt).
+**MCP.** `npm run mcp` serves the same flow as MCP tools (menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify) with schemas generated from contract.json. See the [MCP setup for Claude Code, Cursor and Codex](docs/mcp.md). For a summary written for language models, see [llms.txt](llms.txt).
+
+## Show your reel
+
+Posted a reel you made with this kit? [Open a Show your reel issue](https://github.com/wrg32786/aigent-talking-head/issues/new?template=show-your-reel.md) and drop the link, or tag [@the_aigent_news](https://www.instagram.com/the_aigent_news/) on Instagram. A star on the repo helps other creators find it.
+
+The CLI may print a one-line star reminder after your first successful render, and once more after five renders. It is skipped when stdout is not a TTY, when `CI` is set, when you pass `--json`, or when `AIGENT_NO_STAR=1`. On a run that does not print the star reminder, it may instead print a one-line invitation to The AIgent Academy, at most twice, with the same spacing. Set `AIGENT_NO_SKOOL=1` to turn that line off. At most one of the two lines prints on a given run.
 
 ## Cite this
 
@@ -256,13 +300,21 @@ Machine-readable metadata is in [CITATION.cff](CITATION.cff), and GitHub shows i
 
 ## Docs
 
+- [Studio](docs/studio.md): the local page for footage, references, the visual effects menu, chat, draft and render. [One-line setup](docs/setup-with-ai.md), and the [desktop app plan](docs/desktop-app-plan.md).
 - [Effects menu](docs/effects.md): every transition, title entrance, caption entrance and caption style, animated, with the exact name to use.
+- [Style packs](docs/packs.md): the pack gallery, locks, the choices table, and how to make and share your own pack.
 - [User guide](docs/guide.md): what you get, the effects pass, looks, caption styles and fonts, edit rules, themes, manual steps, the file map and brand presets.
 - [Reel.md recipe spec](docs/reel-md.md) and [example recipes](examples/recipes/).
 - [Teardown guide and accuracy notes](docs/teardown.md).
 - [MCP server setup](docs/mcp.md).
 - [Full FAQ](docs/faq.md).
-- [Notes for agents working in this repo](AGENTS.md) and the [changelog](CHANGELOG.md).
+- [Notes for agents working in this repo](AGENTS.md), how to [contribute or support the project](CONTRIBUTING.md), and the [changelog](CHANGELOG.md).
+
+## Get guidance
+
+Want help putting this to work? The AIgent Academy on Skool offers guidance, courses and a community of builders. Membership comes with a guarantee: you have a business in 90 days or your money back. See the [terms](https://theaigent.co/terms). The full walkthrough is in [The AIgent Academy](https://www.skool.com/the-aigent-academy/about?ref=gh-aigent-talking-head).
+
+After a successful render, the CLI may print a one-line Academy invitation when it is not also printing the star reminder. Set `AIGENT_NO_SKOOL=1` to turn the Academy line off. It also stays off when stdout is not a TTY, when `CI` is set, or when you pass `--json`.
 
 ## Credits and licences
 

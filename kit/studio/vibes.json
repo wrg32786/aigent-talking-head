@@ -1,0 +1,15 @@
+{
+  "about": "Plain words Studio understands without a model (chat with no API key and no assistant attached). Each vibe only names packs and engine names that exist; npm run check verifies them.",
+  "vibes": [
+    { "words": ["calm", "chill", "soft", "slow", "gentle", "relaxed"], "energy": "low", "picks": { "transition:glitch": "deny" }, "say": "calmer: low-energy music, no glitch seams" },
+    { "words": ["cinematic", "film", "filmic", "moody", "dramatic"], "pack": "cinematic", "energy": "low", "say": "the cinematic pack: film grade, soft dissolves" },
+    { "words": ["hype", "punchy", "energetic", "bold", "loud", "aggressive", "hormozi"], "pack": "hormozi-bold", "energy": "high", "say": "the hormozi-bold pack with high-energy music" },
+    { "words": ["fast", "snappy", "tight", "quick"], "pace": { "tighten": 0.3 }, "say": "tighter pace: pauses over 0.3 s cut" },
+    { "words": ["clean", "minimal", "simple", "plain", "quiet"], "pack": "minimal-clean", "energy": "mid", "say": "the minimal-clean pack: hard cuts, no grade" },
+    { "words": ["magazine", "editorial", "elegant", "classy", "luxury"], "pack": "magazine", "say": "the magazine pack: serif and sans, colour cards" },
+    { "words": ["neutral", "unbranded", "corporate"], "pack": "neutral", "say": "the neutral pack" },
+    { "words": ["techy", "tech", "futuristic", "cyber"], "pack": "aigent", "picks": { "finish:scan-lines": "allow", "finish:chroma": "allow" }, "say": "the aigent pack with scan lines and colour split" },
+    { "words": ["retro", "vintage", "vhs", "old-school"], "picks": { "finish:grain": "allow", "finish:scan-lines": "allow", "finish:warm": "allow" }, "say": "retro: grain, scan lines, warm grade" },
+    { "words": ["silent", "quiet-sound", "nosfx"], "say": "no sounds on the cuts" }
+  ]
+}

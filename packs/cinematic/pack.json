@@ -1,0 +1,47 @@
+{
+  "$schema": "../pack.schema.json",
+  "format": "aigent-style-pack",
+  "formatVersion": 1,
+  "name": "cinematic",
+  "version": "1.0.0",
+  "label": "Cinematic: teal and orange grade, film dissolves and dips, slow reveals",
+  "description": "A film grade that varies across scenes, soft film cuts and dips to black, and titles that rise or type in rather than slam.",
+  "author": "AIgent",
+  "license": "Apache-2.0",
+  "extends": "cinematic",
+  "style": {},
+  "locks": {
+    "transitions": [
+      "film",
+      "dissolve",
+      "dip-black",
+      "fade-slow"
+    ],
+    "titles": [
+      "blur-rise",
+      "drop",
+      "typewriter",
+      "stagger-rise"
+    ],
+    "maxTitles": 4,
+    "finishes": [
+      "teal",
+      "grain",
+      "vignette",
+      "crushed"
+    ]
+  },
+  "weights": {
+    "transitions": {
+      "film": 2,
+      "dissolve": 2,
+      "dip-black": 1,
+      "fade-slow": 1
+    }
+  },
+  "preview": {
+    "webp": "preview.webp",
+    "png": "preview.png"
+  },
+  "assets": []
+}

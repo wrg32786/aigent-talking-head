@@ -200,7 +200,26 @@ function apply(preset, dest, overrides = {}) {
   return { cut, captions: caps, applied, theme: applied.theme, look: applied.look, style: applied.captionStyle, fonts: applied.fonts, titles: applied.titles };
 }
 
-function pickAuto(hints = {}) {
+// Pairing rule (Will, 2026-11-18): bold with thin. An automatic pick never hands out a pairing marked
+// "contrast": "low", read from the same merged catalog the renderer uses (kit/fonts/pairings.json, then
+// kit/fonts/local/pairings.json over it). It drops the pairing, or swaps in the first contrast-safe one
+// (literata first). An explicit --fonts or --preset choice is kept.
+function pairingCatalog() {
+  const read = f => { try { return JSON.parse(fs.readFileSync(f, 'utf8')).pairings || {}; } catch { return {}; } };
+  return { ...read(path.join(__dirname, 'fonts', 'pairings.json')), ...read(path.join(__dirname, 'fonts', 'local', 'pairings.json')) };
+}
+function contrastSafe(p, cat = pairingCatalog()) {
+  if (!p || !p.fonts) return p;
+  const low = n => !!(cat[n] && cat[n].contrast === 'low');
+  const names = String(p.fonts).split(',').map(s => s.trim()).filter(Boolean);
+  if (!names.some(low)) return p;
+  const kept = names.filter(n => !low(n));
+  const fallback = ['literata', ...Object.keys(cat)].find(n => cat[n] && !low(n));
+  return { ...p, fonts: (kept.length ? kept : fallback ? [fallback] : ['theme']).join(',') };
+}
+
+function pickAuto(hints = {}) { return contrastSafe(pickAutoRaw(hints)); }
+function pickAutoRaw(hints = {}) {
   const all = shipped();
   if (!all.length) throw new Error('no shipped presets');
   const want = String(hints.want || hints.style || hints.energy || '').toLowerCase();
@@ -287,6 +306,8 @@ function resolveJob(name) {
 }
 
 module.exports = {
+  contrastSafe,
+  pairingCatalog,
   LOOKS, STYLES, SHIPPED, LOCAL,
   load, list, shipped, validate, apply, pickAuto, fromJob, save, printList,
   themes, fontNames, transitionNames, isPlain,

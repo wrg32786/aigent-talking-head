@@ -1,0 +1,33 @@
+{
+  "$schema": "../pack.schema.json",
+  "format": "aigent-style-pack",
+  "formatVersion": 1,
+  "name": "neutral",
+  "version": "1.0.0",
+  "label": "Neutral: unbranded, system fonts, hard cuts with the odd crossfade",
+  "description": "No brand colours or logo. A safe start for your own pack: npm run pack:new -- my-look --from neutral.",
+  "author": "AIgent",
+  "license": "Apache-2.0",
+  "extends": "neutral",
+  "style": {},
+  "locks": {
+    "transitions": [
+      "cut",
+      "crossfade"
+    ],
+    "finishes": [
+      "none"
+    ]
+  },
+  "weights": {
+    "transitions": {
+      "cut": 3,
+      "crossfade": 1
+    }
+  },
+  "preview": {
+    "webp": "preview.webp",
+    "png": "preview.png"
+  },
+  "assets": []
+}

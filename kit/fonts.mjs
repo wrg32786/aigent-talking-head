@@ -19,5 +19,5 @@ export function resolveFonts(want) {
     if (r.file) { const f = isAbsolute(r.file) ? r.file : join(dir, r.file); if (!existsSync(f)) throw new Error(`Font file missing: ${f}`); out.url = pathToFileURL(f).href; out.vf = /-VF\.|\[wght\]|Variable/i.test(r.file); }
     return out;
   };
-  return { name: want, display: role(p.display), secondary: role(p.secondary), script: role(p.script), lockup: p.lockup || null };
+  return { name: want, display: role(p.display), secondary: role(p.secondary), script: role(p.script), lockup: p.lockup || null, contrast: p.contrast || null };
 }

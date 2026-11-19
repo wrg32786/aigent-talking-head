@@ -6,6 +6,7 @@
 // hype words) in captions, titles or the script; a repeated or unknown title entrance; more than 7 titles; an unknown
 // transition, sound or film-finish name. Warnings: flicker on a middle title, a sound on every cut, more than 2 big punches, a possible
 // forced triad, the script shape (40-55 words, 15-20 s; over 25 s cut a middle sentence), and beat-sync on with no bed.
+import { execFileSync } from 'child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { coverage, loadMenu, showcaseHas, sourceCatalogIds } from './menu.mjs';
 import { checkContract } from './contract.mjs';
@@ -29,11 +30,12 @@ function checkJob(captionsFile, cutFile, label) {
   }
   for (const k of ['card', 'cta']) if (CAP[k]) for (const v of Object.values(CAP[k])) if (typeof v === 'string') R.lintCopy(v).errs.forEach(x => errs.push(`${k}: ${x}`));
   const raw = flips.filter(f => f.mode === R.TITLE_MODE);
-  if (raw.length > R.ENTRANCES.length) errs.push(`${raw.length} titles; there are ${R.ENTRANCES.length} entrances and none repeats in one video`);
+  if (raw.length > R.ENTRANCES.length && !CAP.entranceRepeat) errs.push(`${raw.length} titles; there are ${R.ENTRANCES.length} entrances and none repeats in one video`);
   const seen = {};
   for (const t of raw) if (t.entrance) {
     if (!R.ENTRANCES.includes(t.entrance)) errs.push(`title ${t.start}s: unknown entrance "${t.entrance}" (${R.ENTRANCES.join(', ')})`);
-    if (seen[t.entrance]) errs.push(`title ${t.start}s: entrance "${t.entrance}" already used at ${seen[t.entrance]}s`);
+    // a repeat is allowed when you chose it (a titles lock with fewer entrances than titles, or npm run choices --apply)
+    if (seen[t.entrance] && !CAP.entranceRepeat) errs.push(`title ${t.start}s: entrance "${t.entrance}" already used at ${seen[t.entrance]}s`);
     seen[t.entrance] = t.start;
   }
   const sorted = raw.slice().sort((a, b) => a.start - b.start);
@@ -154,8 +156,30 @@ if (target) {
   results.push({ label: 'contract.json matches the CLIs', errs: checkContract(), warns: [] });
   {
     const errs = [];
-    for (const f of ['skills/aigent-talking-head/SKILL.md', 'contract.json']) if (existsSync(join(ROOT, f)) && readFileSync(join(ROOT, f), 'utf8').includes('\u2014')) errs.push(`${f} has an em dash`);
+    for (const f of ['skills/aigent-talking-head/SKILL.md', 'contract.json', 'CONTRIBUTING.md']) if (existsSync(join(ROOT, f)) && readFileSync(join(ROOT, f), 'utf8').includes('\u2014')) errs.push(`${f} has an em dash`);
     results.push({ label: 'SKILL.md and contract.json copy', errs, warns: [] });
+  }
+  // style packs (packs/), locks and the choices table: shipped packs valid with previews, docs/packs.md lists each
+  {
+    const req = createRequire(import.meta.url);
+    results.push({ label: 'locks self-test (kit/locks.cjs)', errs: req('./locks.cjs').selfTest(), warns: [] });
+    results.push({ label: 'choices self-test (kit/choices.cjs)', errs: req('./choices.cjs').selfTest(), warns: [] });
+    const K = req('./packs.cjs'), errs = K.selfTest(), doc = join(ROOT, 'docs', 'packs.md');
+    if (!existsSync(doc)) errs.push('docs/packs.md is missing; run npm run pack:preview -- --docs-only');
+    else { const md = readFileSync(doc, 'utf8'); for (const p of K.shipped()) { if (!md.includes(`### ${p.name} `)) errs.push(`docs/packs.md is missing pack ${p.name}`); if (md.includes('\u2014')) { errs.push('docs/packs.md has an em dash'); break; } } }
+    results.push({ label: 'style packs (packs/)', errs, warns: [] });
+    const tp = join(ROOT, 'tests', 'packs.test.cjs'), terrs = [];
+    try { execFileSync(process.execPath, [tp], { cwd: ROOT, stdio: 'pipe' }); }
+    catch (e) { terrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 6).join(' | ')); }
+    results.push({ label: 'pack tests (tests/packs.test.cjs)', errs: terrs, warns: [] });
+    const serrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { serrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio tests (tests/studio.test.mjs: catalog, session, server, chat)', errs: serrs, warns: [] });
+  }
+  {
+    const star = createRequire(import.meta.url)('./star.cjs');
+    results.push({ label: 'star reminder self-test', errs: star.selfTest(), warns: [] });
   }
 
   const menuCov = coverage();

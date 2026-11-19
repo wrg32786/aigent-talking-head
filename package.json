@@ -36,6 +36,12 @@
     "plan": "node kit/plan.cjs",
     "export": "node kit/export.mjs",
     "mcp": "node kit/mcp.mjs",
+    "pack": "node kit/packs.cjs",
+    "pack:new": "node kit/packs.cjs new",
+    "pack:validate": "node kit/packs.cjs validate",
+    "pack:preview": "node kit/pack-preview.mjs",
+    "choices": "node kit/choices.cjs",
+    "studio": "node kit/studio/server.mjs",
     "split": "node kit/split.mjs"
   },
   "dependencies": {

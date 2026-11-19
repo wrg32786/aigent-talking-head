@@ -79,6 +79,8 @@
         { "name": "name", "type": "string", "default": "the video's file name", "description": "job name under jobs/" },
         { "name": "jobs", "type": "path", "default": "jobs/", "description": "jobs folder" },
         { "name": "preset", "type": "string", "default": null, "description": "a preset name from npm run preset, or auto" },
+        { "name": "pack", "type": "string", "default": null, "description": "a style pack name from npm run pack, or a pack folder: its base preset, style keys and locks (docs/packs.md). Use pack or preset, not both" },
+        { "name": "lock", "type": "string", "default": null, "description": "pin choices so the auto-picker stays inside them, e.g. \"transitions=whip,zoom; titles=typewriter; no-graphics=checklist\" (keys in kit/locks.cjs); adds to a pack's locks; works on rebuild too" },
         { "name": "recipe", "type": "path", "default": null, "description": "a Reel.md recipe (docs/reel-md.md)" },
         { "name": "recipe-titles", "type": "boolean", "default": false, "description": "use the recipe's title text and times, only where you say that text" },
         { "name": "capture-sources", "type": "boolean", "default": false, "description": "capture the recipe's confirmed screen-card sources first (public pages)" },
@@ -130,7 +132,8 @@
         "jobs/<name>/build/cut.json, captions.js, theme.js and overlay frames",
         "jobs/<name>/reel-vN.mp4 (a new number each run; earlier versions are kept)",
         "jobs/<name>/reel-vN-<export>.mp4 with --export",
-        "jobs/<name>/build/layout.json: what the layout pass moved clear of a graphic, hid while one was up, or placed inside the export's safe area"
+        "jobs/<name>/build/layout.json: what the layout pass moved clear of a graphic, hid while one was up, or placed inside the export's safe area",
+        "jobs/<name>/choices.json: every pick per beat (transition, finish, punch, title entrance, place, layer, graphics, music, sound) with its reason, to edit and apply with npm run choices"
       ],
       "success": "prints \"Reel: <path>\" (or \"Draft ready.\" with --draft); with --json the last line is the JSON result",
       "failures": [
@@ -288,6 +291,100 @@
       "outputs": ["no flags: the preset list on stdout", "--save: kit/presets/local/<name>.json"],
       "success": "exit 0",
       "failures": ["No preset named <name>", "invalid presets: ...", "usage: --save <name> --from <job>"]
+    },
+    {
+      "name": "pack",
+      "script": "kit/packs.cjs",
+      "summary": "Style packs: list, show, scaffold or validate a pack (packs/<name>/pack.json: a base preset, style keys, locks, weights, preview). Gallery: docs/packs.md.",
+      "subcommands": [
+        { "name": "list", "positional": [], "outputs": ["the pack list with each pack's locks (default when no subcommand)"] },
+        { "name": "show", "positional": [{ "name": "pack", "type": "string", "required": true, "description": "a pack name or folder" }], "outputs": ["the resolved pack: merged style, locks, weights, preview paths"] },
+        { "name": "new", "positional": [{ "name": "name", "type": "string", "required": true }], "outputs": ["packs/local/<name>/pack.json and README.md (or --dir)"] },
+        { "name": "validate", "positional": [{ "name": "pack", "type": "string", "required": false, "description": "pack names or folders; all packs when none given" }], "success": "prints PACKS PASS" }
+      ],
+      "flags": [
+        { "name": "json", "type": "boolean", "default": false, "description": "print JSON" },
+        { "name": "from", "type": "string", "default": "aigent", "description": "new: start from this preset, pack or job" },
+        { "name": "dir", "type": "path", "default": "packs/local", "description": "new: the folder to write the pack into" },
+        { "name": "lock", "type": "string", "default": null, "description": "new: locks to start with, e.g. \"transitions=cut,crossfade\"" },
+        { "name": "label", "type": "string", "default": null, "description": "new: the one-line label" },
+        { "name": "force", "type": "boolean", "default": false, "description": "new: replace an existing pack.json" }
+      ],
+      "success": "exit 0",
+      "failures": ["No pack named <name>", "invalid: ... (each problem)", "an unknown subcommand exits 1"]
+    },
+    {
+      "name": "pack:new",
+      "alias": "pack",
+      "args": ["new"],
+      "summary": "Scaffold a style pack: npm run pack:new -- <name> [--from <preset|pack|job>] [--dir <folder>] [--lock \"...\"]."
+    },
+    {
+      "name": "pack:validate",
+      "alias": "pack",
+      "args": ["validate"],
+      "summary": "Check packs against packs/pack.schema.json and the kit catalogs: npm run pack:validate [-- <name|path> ...]."
+    },
+    {
+      "name": "pack:preview",
+      "script": "kit/pack-preview.mjs",
+      "summary": "Render each pack's looping preview (preview.webp) and still strip (preview.png), and rewrite docs/packs.md. Needs ffmpeg and Chrome.",
+      "positional": [
+        { "name": "pack", "type": "string", "required": false, "variadic": true, "description": "pack names or folders; every pack when none given" }
+      ],
+      "flags": [
+        { "name": "sheet", "type": "path", "default": null, "description": "also write one contact sheet PNG of every preview strip" },
+        { "name": "docs-only", "type": "boolean", "default": false, "description": "rewrite docs/packs.md without rendering" }
+      ],
+      "outputs": ["packs/<name>/preview.webp and preview.png", "docs/packs.md"],
+      "success": "exit 0",
+      "failures": ["No pack <name>", "ffmpeg or Chrome errors"]
+    },
+    {
+      "name": "choices",
+      "script": "kit/choices.cjs",
+      "summary": "See every pick in a drafted job per beat with its reason (locked, pack, recipe, you, kit default), edit jobs/<job>/choices.json and apply it, or pin locks on the job; then npm run reel -- --rebuild.",
+      "positional": [
+        { "name": "job", "type": "string", "required": true, "description": "job name in jobs/ (or a job or build folder) with build/cut.json" }
+      ],
+      "flags": [
+        { "name": "apply", "type": "boolean", "default": false, "description": "write the edits in jobs/<job>/choices.json back into build/cut.json and build/captions.js" },
+        { "name": "lock", "type": "string", "default": null, "description": "pin locks on the job, e.g. \"titles=typewriter; transitions=whip,zoom\"" },
+        { "name": "jobs", "type": "path", "default": "jobs/", "description": "the jobs folder" },
+        { "name": "json", "type": "boolean", "default": false, "description": "print one JSON result line" }
+      ],
+      "outputs": ["jobs/<job>/choices.json", "the choices table on stdout"],
+      "success": "exit 0",
+      "failures": ["No drafted job at <job>", "choices.json problems: ... (unknown names)", "locks: ... (unknown names)"]
+    },
+    {
+      "name": "studio",
+      "script": "kit/studio/server.mjs",
+      "summary": "Studio: a local web page over the kit (footage, a reference to influence or recreate, the effects menu by category, packs, music and pace, chat, the choices table, draft, render and download). Binds to 127.0.0.1 only. docs/studio.md.",
+      "positional": [],
+      "flags": [
+        {
+          "name": "port",
+          "type": "number",
+          "default": "4757",
+          "description": "port on 127.0.0.1 (or STUDIO_PORT)"
+        },
+        {
+          "name": "no-open",
+          "type": "boolean",
+          "default": false,
+          "description": "do not open the browser"
+        }
+      ],
+      "outputs": [
+        "http://127.0.0.1:<port>",
+        "jobs/.studio/state.json (the session the MCP studio tools share)",
+        "jobs/<job>/ as npm run reel writes it"
+      ],
+      "success": "prints \"Studio: http://127.0.0.1:<port>\"",
+      "failures": [
+        "EADDRINUSE: another program has the port (use --port)"
+      ]
     },
     {
       "name": "reelmd",

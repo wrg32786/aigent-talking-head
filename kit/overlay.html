@@ -85,7 +85,9 @@ let BOOST=false;
 const inkLight=c=>{const m=/^#([0-9a-f]{6})$/i.exec(String(c.fillStyle||''));if(!m)return true;const n=parseInt(m[1],16);return((n>>16)*.299+((n>>8)&255)*.587+(n&255)*.114)>140};
 function shadow(c,fs){if(FLAT){c.shadowColor='transparent';c.shadowBlur=0;return}if(BOOST){c.shadowColor=inkLight(c)?'rgba(0,0,0,.92)':'rgba(255,255,255,.92)';c.shadowBlur=Math.max(6,fs*.09);c.shadowOffsetX=0;c.shadowOffsetY=Math.max(1,fs*.012);return}c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=fs*.16;c.shadowOffsetX=fs*.03;c.shadowOffsetY=fs*.05}
 function glyphs(txt,fs,cx,cy,p,fill,sh,fam=S){ctx.font=fnt(fam,fs);ctx.letterSpacing=fam===S?'0px':(TRK*fs)+'px';ctx.textAlign='left';ctx.textBaseline='middle';const tot=ctx.measureText(txt).width;let x=cx-tot/2;for(let i=0;i<txt.length;i++){const w=ctx.measureText(txt.slice(0,i+1)).width-ctx.measureText(txt.slice(0,i)).width,e=expo(cl((p-i*.035)/.3));ctx.save();ctx.globalAlpha*=e;ctx.translate(x,cy+(1-e)*fs*.42);if(sh)shadow(ctx,fs);ctx.fillStyle=fill;ctx.fillText(txt[i],0,0);ctx.restore();x+=w}}
-function fit(lines,fam,fs,max){const long=lines.reduce((a,b)=>a.length>b.length?a:b);ctx.font=fnt(fam,fs);while(ctx.measureText(long).width>max){fs-=4;ctx.font=fnt(fam,fs)}return fs}
+// measured with no letter spacing (a title drawn earlier in the frame can leave tracking set, and fixed px tracking never
+// shrinks, which looped forever on a long hormozi or karaoke line under a kinetic title), with a floor
+function fit(lines,fam,fs,max){const long=lines.reduce((a,b)=>a.length>b.length?a:b),ls=ctx.letterSpacing;ctx.letterSpacing='0px';ctx.font=fnt(fam,fs);while(ctx.measureText(long).width>max&&fs>16){fs-=4;ctx.font=fnt(fam,fs)}ctx.letterSpacing=ls;return fs}
 // Drips start at measured letter bottoms (Will 11-08: paint must line up with the letters). Scanned once per word from the
 // unmasked text canvas: per line, find each column's lowest inked pixel, keep runs sitting on that line's baseline, drip from their centres.
 const dripCache={};
@@ -238,7 +240,7 @@ function lockup(ws,o,Y0,P){const key=PN+'|'+P.kind+'|'+P.maxW+','+P.target+','+P
 // partner words: script writes on (a left-to-right wipe), sans and serif rise in; each word on its own time
 function partnerDraw(p,col,dtOf){ctx.save();ctx.font=p.font;ctx.letterSpacing=p.track+'px';ctx.textAlign='left';ctx.textBaseline='alphabetic';ctx.fillStyle=col;shadow(ctx,p.size*1.4);ctx.translate(p.x+p.w/2,p.y);if(p.rot)ctx.rotate(p.rot);ctx.translate(-p.w/2,0);
  p.toks.forEach((k,i)=>{const dt=dtOf(k,i);if(dt<0)return;ctx.save();if(k.font){ctx.font=k.font;ctx.letterSpacing=k.track+'px'}
-  const ol=(x,y)=>{if(!p.outline)return;ctx.save();ctx.shadowColor='transparent';ctx.lineJoin='round';ctx.strokeStyle='rgba(0,0,0,.55)';ctx.lineWidth=Math.max(3,p.size*(p.script?.05:.07));ctx.strokeText(k.txt,x,y);ctx.restore()};
+  const ol=(x,y)=>{if(!p.outline)return;ctx.save();ctx.shadowColor='transparent';ctx.lineJoin='round';ctx.strokeStyle='rgba(0,0,0,.55)';ctx.lineWidth=Math.max(p.thin?2:3,p.size*(p.script?.05:.07)*(p.thin?.5:1));ctx.strokeText(k.txt,x,y);ctx.restore()};
   if(p.script){const q=expo(cl(dt/.42));ctx.beginPath();ctx.rect(k.dx-p.size*.3,-p.size*1.4,(k.w+p.size*.6)*q,p.size*2.6);ctx.clip();ol(k.dx,0);ctx.fillText(k.txt,k.dx,0)}
   else{const q=expo(cl(dt/.26)),yy=(1-q)*p.size*.5;ctx.globalAlpha*=q;ol(k.dx,yy);ctx.fillText(k.txt,k.dx,yy)}
   ctx.restore()});ctx.restore()}
@@ -320,7 +322,7 @@ function kinetic(c,t){const o=c[4];if(o.lockup===false)return kineticSolo(c,t);c
  const R0=lockup(wordsOf(c),o,y,ps?ps.P:LKP.K),R=cd?{...R0,hc:cd.ink,pc:cd.ink,parts:R0.parts.map(p=>({...p,outline:false}))}:R0;ctx.save();ctx.textBaseline='alphabetic';if(pl)placeXf(pl,R.box);FLAT=!!cd;
  const ce=CENTR.includes(o.entrance)?o.entrance:CENTR.includes(CAP.captionEntrance)?CAP.captionEntrance:'pop';
  R.heroes.forEach(h=>{const dt=t-h.a+.04;if(dt<0)return;if(ce!=='pop'){ctx.save();ctx.font=h.font;ctx.letterSpacing=h.track+'px';ctx.fillStyle=R.hc;shadow(ctx,h.size);capEnter(ce,h,dt,Math.round(h.a*100));ctx.restore();return}const q=cl(dt/.22),s=q<1?1.5-.5*overshoot(q,.2):1;ctx.save();ctx.font=h.font;ctx.letterSpacing=h.track+'px';ctx.textAlign='center';ctx.fillStyle=R.hc;shadow(ctx,h.size);ctx.globalAlpha*=cl(dt/.05);ctx.translate(h.x,h.y-h.asc/2);ctx.scale(s,s);ctx.fillText(h.txt,0,h.asc/2);ctx.restore()});
- R.parts.forEach(p=>partnerDraw(p,R.pc,k=>t-k.a+.04));FLAT=false;ctx.restore()}
+ R.parts.forEach(p=>partnerDraw(COUT==='none'?{...p,outline:false}:COUT==='thin'?{...p,thin:true}:p,R.pc,k=>t-k.a+.04));FLAT=false;ctx.restore()}   // captionOutline reaches the kinetic caption's partners only; title partners keep their stroke
 const LKP={T:{kind:'T',maxW:960,target:880,max:360,min:150,pmin:56},K:{kind:'K',maxW:940,target:620,max:Math.round(CSZ*2.3),min:Math.round(CSZ*1.1),pmin:Math.round(CSZ*.66)}};
 // every lockup in the job, for render.mjs (build/lockups.json) and the smoke test
 window.__lockups=()=>flips.filter(c=>c[4].lockup!==false&&(c[3]===7||(c[3]===0&&(c[4].style||CSTYLE)==='kinetic'))).map(c=>{use(c.ps);const T=c[3]===7,o=c[4],ws=T?c[2].replace(/\|/g,' ').split(/\s+/).filter(Boolean).map(w=>[0,0,w]):wordsOf(c),R=lockup(ws,o,T?(o.y||TY):(o.y||KY),T&&o.size?{...LKP.T,target:1e4,max:o.size}:LKP[T?'T':'K']);
@@ -429,7 +431,7 @@ function oneword(c,t){const s=owAt(c,t);if(s&&s.face==='stack'&&s.txt)return dra
  ctx.restore()}
 // every word state in the job, for render.mjs (build/oneword.json) and the smoke test
 window.__oneword=()=>flips.filter(c=>c[3]===0&&(c[4].style||CSTYLE)==='oneword').flatMap(c=>{use(c.ps);return wordsOf(c).map(w=>{const s=owAt(c,w[0]+.01);return s&&{t:w[0],txt:s.txt,face:s.face,size:s.size,tail:s.tail,card:!!s.cd,ink:s.ink,onLine:!!s.base,x:Math.round(s.x||540),y:Math.round(s.y)}}).filter(Boolean)});
-// captionOutline none|thin|thick (default thick), captionShadow none|soft (default soft), captionCase upper|lower|as-said
+// captionOutline none|thin|thick (default thick; none also drops the dark stroke on kinetic partner words), captionShadow none|soft (default soft), captionCase upper|lower|as-said
 // (default upper): the one-word caption's look, from a Reel.md's Style (a teardown measures them) or captions.js.
 const COUT=CAP.captionOutline||'thick',CSHD=CAP.captionShadow||'soft',CCASE=CAP.captionCase||'upper';
 function oneWordDraw(c,raw,a,t,y){let txt=String(raw).replace(/^[\s.,;:!?"“”]+|[\s.,;:!?"“”]+$/g,'');if(!txt)return;txt=CCASE==='lower'?txt.toLowerCase():CCASE==='upper'?txt.toUpperCase():txt;
