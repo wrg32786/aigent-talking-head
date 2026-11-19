@@ -250,15 +250,27 @@ open(os.path.join(a.out, "clips.md"), "w", encoding="utf-8").write("\n".join(md)
 tiles = []
 for c in out:
     f = c["file"]
-    for tag, ss in (("a", ["-ss", "0"]), ("b", ["-sseof", "-0.25"])):   # last frame read from the end: a seek to dur-0.05 can land past the final frame and write nothing (pheme 11-18)
+    # last frame: decode the final quarter second and keep overwriting (-update 1), so the file ends on the true last
+    # frame; a seek to dur-0.05 can land past it and write nothing (pheme 11-18)
+    for tag, ss, keep in (("a", ["-ss", "0"], ["-frames:v", "1"]), ("b", ["-sseof", "-0.25"], ["-update", "1"])):
         t = os.path.join(a.out, f"_{c['id']}{tag}.png")
-        run(["ffmpeg", "-v", "error", "-y", *ss, "-i", f, "-frames:v", "1", "-vf", "scale=-2:240", t])
+        if os.path.exists(t):
+            os.remove(t)
+        run(["ffmpeg", "-v", "error", "-y", *ss, "-i", f, *keep, "-vf", "scale=-2:240", t])
+        if not (os.path.exists(t) and os.path.getsize(t)):   # e.g. audio outlasts video past the seek window: decode it all
+            run(["ffmpeg", "-v", "error", "-y", "-i", f, "-update", "1", "-vf", "scale=-2:240", t])
+        if not (os.path.exists(t) and os.path.getsize(t)):
+            print(f"warning: no {'first' if tag == 'a' else 'last'} frame from {f}; the sheet shows a black tile")
+            run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "color=black:s=426x240", "-frames:v", "1", t])
         tiles.append(t)
 if tiles:
     ins = sum([["-i", t] for t in tiles], [])
     n = len(out)
     lay = "|".join([f"0_{'+'.join(['h0'] * r) if r else '0'}|w0_{'+'.join(['h0'] * r) if r else '0'}" for r in range(n)])
-    run(["ffmpeg", "-v", "error", "-y", *ins, "-filter_complex", f"xstack=inputs={len(tiles)}:layout={lay}:fill=black", os.path.join(a.out, "clips-sheet.png")])
+    sheet = os.path.join(a.out, "clips-sheet.png")
+    r = run(["ffmpeg", "-v", "error", "-y", *ins, "-filter_complex", f"xstack=inputs={len(tiles)}:layout={lay}:fill=black", sheet])
+    if r.returncode or not os.path.exists(sheet):
+        print("warning: clips-sheet.png was not written: " + (r.stderr or "").strip()[-300:])
     for t in tiles:
         os.remove(t)
 print(f"\n{len(out)} clips -> {a.out}/  (clips.json, clips.md, clips-sheet.png). Retakes are marked, not removed."

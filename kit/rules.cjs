@@ -191,13 +191,39 @@ function pickBed(energy, seed = '') {
   return l[h % l.length];
 }
 
-const dupWords = (plan, caps) => {   // caption words that repeat an effect's own text inside its window
-  const norm = w => String(w).toLowerCase().replace(/[^a-z0-9]/g, ''), out = [];
+// One or the other (Will, 2026-11-18): caption words that repeat an effect's on-screen copy while both show.
+// Approximate, warning only. A caption word counts from when it shows to when it goes, by caption style: kinetic
+// (default) from the word to the end of its flip, one-word from the word to the next word, other styles the whole
+// flip; a flip with no word timings counts its text for the whole flip. Only caption cues count (mode 0, and the
+// mode 1 spray word on the caption track): titles (mode 7), stickers, cards and CTAs are skipped, since the overlay
+// draws only part of their text (a one-word title shows its hero alone). Effect copy (COPY_FIELDS) counts for the
+// whole effect window: per-message reveal times are not modelled. Windows that hide the caption track (merged
+// when they overlap or touch) do not count.
+const COPY_FIELDS = ['text', 'sub', 'title', 'reply', 'lines', 'label', 'hl', 'pill', 'total'];
+const mergeSpans = spans => spans.map(([a, b]) => [+a, +b]).sort((x, y) => x[0] - y[0])
+  .reduce((m, s) => { const l = m[m.length - 1]; if (l && s[0] <= l[1]) l[1] = Math.max(l[1], s[1]); else m.push(s); return m; }, []);
+const dupWords = (plan, caps, hidden = []) => {
+  const norm = w => String(w).normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, ''), out = [], hide = mergeSpans(hidden);
+  const flips = ((caps && caps.flips) || []).filter(f => !f.mode || f.mode === 1), base = String((caps && caps.captionStyle) || 'kinetic').toLowerCase();
+  const shown = f => {   // [word, from, to] for each caption word while it is on screen
+    const st = String(f.style || base).toLowerCase(), ws = f.words && f.words.length ? f.words : null;
+    if (!ws) return String(f.text || '').split(/\s+/).filter(Boolean).map(w => [w, +f.start, +f.end]);
+    if (f.mode === 1) return String(f.text || ws.map(w => w[2]).join(' ')).split(/\s+/).filter(Boolean).map(w => [w, +f.start, +f.end]);   // a spray shows its displayed text, whole, from the cue start
+    if (/one-?word/.test(st)) return ws.map((w, i) => [w[2], +w[0], i + 1 < ws.length ? +ws[i + 1][0] : +(f.end ?? w[1])]);
+    if (st === 'kinetic') return ws.map(w => [w[2], +w[0], +(f.end ?? w[1])]);
+    return ws.map(w => [w[2], +f.start, +f.end]);
+  };
   for (const d of plan) {
-    if (!d.text) continue;
-    const fxw = new Set(String(d.text).split(/[\s|]+/).map(norm).filter(w => w.length > 1));
-    for (const f of (caps && caps.flips) || []) for (const w of f.words || []) if (w[0] < d.end && w[1] > d.start && fxw.has(norm(w[2])))
-      out.push(`"${w[2]}" is in the ${d.fx} text and in the caption at ${(+w[0]).toFixed(2)} s: drop it from the caption flip or hide captions for the window (one or the other)`);
+    const copy = COPY_FIELDS.map(k => d[k]).filter(v => typeof v === 'string' && v).join(' ');
+    const fxw = new Set(copy.split(/::|[\s|]+/).map(norm).filter(Boolean));
+    if (!fxw.size) continue;
+    for (const f of flips) for (const [w, from, to] of shown(f)) {
+      let a = Math.max(from, +d.start); const b = Math.min(to, +d.end);
+      if (a >= b || !fxw.has(norm(w))) continue;
+      for (const [h0, h1] of hide) if (h0 <= a && h1 > a) a = h1;   // first instant no hide covers (hides are merged and sorted)
+      if (a >= b) continue;
+      out.push(`"${w}" is in the ${d.fx} copy and in the caption at ${a.toFixed(2)} s (approximate check): drop it from the caption flip or hide captions for the window (one or the other)`);
+    }
   }
   return out;
 };
