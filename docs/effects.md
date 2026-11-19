@@ -12,6 +12,7 @@ Jump to: [Transitions](#transitions) · [Title entrances](#title-entrances) · [
 - Copy the name into your `cut.json`, `captions.js`, Reel.md or command line, as shown in the **Use** column.
 - From a terminal: `npm run list -- transitions` (or `titles`, `captions`, `graphics`, `effects`) prints the same names with a one-line description (`editing` lists the editing principles). Add `--json` for machine-readable output.
 - Previews use an AI-generated fictional presenter made for this project (`showcase/source/presenter.jpg`) and a plain gradient plate. Rebuild them with `npm run menu:render`.
+- Want a whole look, or to stop the kit picking for you? [Style packs](packs.md) bundle a set of these with locks (`--pack magazine`, `--lock "transitions=whip,zoom; titles=typewriter"`), and every draft writes `choices.json` listing what was picked per beat and why, for you to edit.
 
 ## Transitions
 

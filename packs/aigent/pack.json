@@ -1,0 +1,36 @@
+{
+  "$schema": "../pack.schema.json",
+  "format": "aigent-style-pack",
+  "formatVersion": 1,
+  "name": "aigent",
+  "version": "1.0.0",
+  "label": "AIgent house style: kinetic type, cyan accent, glitch seams with a few whips and zooms (the default)",
+  "description": "The default look as a pack. Every word animates, one kinetic title per beat, a glitch seam on most cuts and grain or vignette varied across scenes.",
+  "author": "AIgent",
+  "license": "Apache-2.0",
+  "extends": "aigent",
+  "style": {},
+  "locks": {
+    "transitions": [
+      "glitch",
+      "whip",
+      "zoom"
+    ],
+    "finishes": [
+      "grain",
+      "vignette"
+    ]
+  },
+  "weights": {
+    "transitions": {
+      "glitch": 3,
+      "whip": 1,
+      "zoom": 1
+    }
+  },
+  "preview": {
+    "webp": "preview.webp",
+    "png": "preview.png"
+  },
+  "assets": []
+}

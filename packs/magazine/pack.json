@@ -1,0 +1,41 @@
+{
+  "$schema": "../pack.schema.json",
+  "format": "aigent-style-pack",
+  "formatVersion": 1,
+  "name": "magazine",
+  "version": "1.0.0",
+  "label": "Magazine: serif and sans mixed, colour and chapter cards, soft crossfades, typewriter first",
+  "description": "Common short-form editing advice as one look: placed titles around the head, olive and cream cards, energy-matched music, sparse mapped sounds and no dead air.",
+  "author": "AIgent",
+  "license": "Apache-2.0",
+  "extends": "magazine",
+  "style": {},
+  "locks": {
+    "transitions": [
+      "crossfade",
+      "dissolve",
+      "fade-fast"
+    ],
+    "titles": [
+      "typewriter",
+      "blur-rise",
+      "pop-zoom",
+      "stagger-rise",
+      "slide-left",
+      "drop"
+    ],
+    "maxTitles": 6
+  },
+  "weights": {
+    "transitions": {
+      "crossfade": 3,
+      "dissolve": 1,
+      "fade-fast": 1
+    }
+  },
+  "preview": {
+    "webp": "preview.webp",
+    "png": "preview.png"
+  },
+  "assets": []
+}

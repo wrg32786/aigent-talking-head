@@ -1,0 +1,615 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/wrg32786/aigent-talking-head/blob/main/packs/pack.schema.json",
+  "title": "aigent-talking-head style pack (pack.json)",
+  "description": "A whole look in one folder: a base preset, style overrides, locks that pin choices, transition weights, previews and asset licenses. Checked by npm run pack:validate, which also checks names against the kit catalogs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "formatVersion",
+    "name",
+    "version",
+    "label"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "format": {
+      "const": "aigent-style-pack"
+    },
+    "formatVersion": {
+      "const": 1,
+      "description": "The pack format version this kit reads. A breaking change bumps it."
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Must match the folder name."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?$",
+      "description": "The pack's own semver. Bump it when the look changes."
+    },
+    "label": {
+      "type": "string",
+      "minLength": 1,
+      "description": "One line, shown in npm run pack and the gallery."
+    },
+    "description": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "author": {
+      "type": "string"
+    },
+    "license": {
+      "enum": [
+        "Apache-2.0",
+        "MIT",
+        "BSD-2-Clause",
+        "BSD-3-Clause",
+        "ISC",
+        "CC0-1.0",
+        "OFL-1.1"
+      ]
+    },
+    "extends": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "A preset in kit/presets (or kit/presets/local) to start from."
+    },
+    "style": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Any preset key, on top of the base preset. See kit/presets/README.md.",
+      "properties": {
+        "theme": {
+          "type": "string"
+        },
+        "look": {
+          "enum": [
+            "kinetic",
+            "oneword",
+            "muse",
+            "classic",
+            "one-word"
+          ]
+        },
+        "captionStyle": {
+          "enum": [
+            "kinetic",
+            "oneword",
+            "classic",
+            "pill",
+            "hormozi",
+            "karaoke",
+            "one-word"
+          ]
+        },
+        "fonts": {
+          "type": "string"
+        },
+        "titles": {
+          "type": "boolean"
+        },
+        "finish": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "finishPool": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "transition": {
+          "enum": [
+            "glitch",
+            "cut",
+            "crossfade",
+            "dissolve",
+            "fade-fast",
+            "fade-slow",
+            "film",
+            "dip",
+            "dip-black",
+            "flash",
+            "dip-white",
+            "whip",
+            "whip-left",
+            "whip-right",
+            "push-left",
+            "push-right",
+            "swipe-up",
+            "swipe-down",
+            "cover-left",
+            "cover-right",
+            "cover-up",
+            "reveal-left",
+            "reveal-right",
+            "wipe",
+            "wipe-left",
+            "wipe-right",
+            "wipe-up",
+            "wipe-down",
+            "luma-wipe",
+            "soft-wipe",
+            "iris",
+            "iris-open",
+            "iris-close",
+            "circle-crop",
+            "doorway",
+            "barn-door",
+            "zoom",
+            "zoom-through",
+            "pixelate",
+            "blur",
+            "blur-cross",
+            "radial",
+            "clock",
+            "squeeze",
+            "slice",
+            "blinds",
+            "wind",
+            "warp",
+            "diagonal",
+            "distance",
+            "slats",
+            "checkerboard",
+            "light-leak",
+            "zoom-blur",
+            "news-ribbon",
+            "breaking-news"
+          ]
+        },
+        "glitch": {
+          "type": "boolean"
+        },
+        "punch": {
+          "type": [
+            "boolean",
+            "number"
+          ]
+        },
+        "tighten": {
+          "type": [
+            "boolean",
+            "number"
+          ]
+        },
+        "cards": {
+          "enum": [
+            "auto",
+            "off",
+            false
+          ]
+        },
+        "cardPalette": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "musicEnergy": {
+          "enum": [
+            "auto",
+            "low",
+            "mid",
+            "high"
+          ]
+        },
+        "bed": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sfxMap": {
+          "type": "boolean"
+        },
+        "sfxCap": {
+          "type": [
+            "object",
+            "boolean"
+          ]
+        },
+        "titlePlaces": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "left",
+              "right",
+              "above",
+              "chest",
+              "face",
+              "center"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "entranceOrder": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "stagger-rise",
+              "slam",
+              "blur-rise",
+              "slide-left",
+              "elastic",
+              "flip",
+              "pop-zoom",
+              "drop",
+              "typewriter"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "titleLayer": {
+          "enum": [
+            "front",
+            "behind",
+            "auto"
+          ]
+        },
+        "effectsFavourites": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "beatSync": {
+          "type": "boolean"
+        }
+      }
+    },
+    "locks": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Pinned choices. The auto-picker only chooses inside them (kit/locks.cjs).",
+      "properties": {
+        "transitions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "glitch",
+              "cut",
+              "crossfade",
+              "dissolve",
+              "fade-fast",
+              "fade-slow",
+              "film",
+              "dip",
+              "dip-black",
+              "flash",
+              "dip-white",
+              "whip",
+              "whip-left",
+              "whip-right",
+              "push-left",
+              "push-right",
+              "swipe-up",
+              "swipe-down",
+              "cover-left",
+              "cover-right",
+              "cover-up",
+              "reveal-left",
+              "reveal-right",
+              "wipe",
+              "wipe-left",
+              "wipe-right",
+              "wipe-up",
+              "wipe-down",
+              "luma-wipe",
+              "soft-wipe",
+              "iris",
+              "iris-open",
+              "iris-close",
+              "circle-crop",
+              "doorway",
+              "barn-door",
+              "zoom",
+              "zoom-through",
+              "pixelate",
+              "blur",
+              "blur-cross",
+              "radial",
+              "clock",
+              "squeeze",
+              "slice",
+              "blinds",
+              "wind",
+              "warp",
+              "diagonal",
+              "distance",
+              "slats",
+              "checkerboard",
+              "light-leak",
+              "zoom-blur",
+              "news-ribbon",
+              "breaking-news"
+            ]
+          },
+          "uniqueItems": true,
+          "description": "Named cuts every seam may use. Without glitch there is no glitch seam.",
+          "minItems": 1
+        },
+        "titles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "stagger-rise",
+              "slam",
+              "blur-rise",
+              "slide-left",
+              "elastic",
+              "flip",
+              "pop-zoom",
+              "drop",
+              "typewriter"
+            ]
+          },
+          "uniqueItems": true,
+          "description": "Title entrances; they repeat in turn when there are more titles than entrances."
+        },
+        "maxTitles": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 12
+        },
+        "captionEntrance": {
+          "enum": [
+            "pop",
+            "unfurl",
+            "cascade",
+            "orbit",
+            "warp",
+            "crystallize",
+            "compute",
+            "levitate",
+            "undulate",
+            "typewriter"
+          ]
+        },
+        "graphics": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allow": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ordinal-sticker",
+                  "app-label",
+                  "screen-card",
+                  "lower-third",
+                  "stat-callout",
+                  "checklist",
+                  "quote-card",
+                  "highlight",
+                  "step-counter",
+                  "versus",
+                  "icon-badge",
+                  "sticker-pop",
+                  "price-tag",
+                  "cta-card",
+                  "code-card",
+                  "data-chart",
+                  "chapter-card",
+                  "logo-bug",
+                  "channel-bug",
+                  "terminal-session",
+                  "news-strap",
+                  "ticker",
+                  "split-flap",
+                  "feature-cards",
+                  "release-pill",
+                  "cta-button",
+                  "hud-callout",
+                  "flash-card",
+                  "keyword-caption",
+                  "number-pop"
+                ]
+              },
+              "uniqueItems": true
+            },
+            "deny": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ordinal-sticker",
+                  "app-label",
+                  "screen-card",
+                  "lower-third",
+                  "stat-callout",
+                  "checklist",
+                  "quote-card",
+                  "highlight",
+                  "step-counter",
+                  "versus",
+                  "icon-badge",
+                  "sticker-pop",
+                  "price-tag",
+                  "cta-card",
+                  "code-card",
+                  "data-chart",
+                  "chapter-card",
+                  "logo-bug",
+                  "channel-bug",
+                  "terminal-session",
+                  "news-strap",
+                  "ticker",
+                  "split-flap",
+                  "feature-cards",
+                  "release-pill",
+                  "cta-button",
+                  "hud-callout",
+                  "flash-card",
+                  "keyword-caption",
+                  "number-pop"
+                ]
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        "finishes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true,
+          "description": "Film finishes the scenes may use; \"none\" for no finish."
+        },
+        "cards": {
+          "type": "boolean"
+        },
+        "sfx": {
+          "type": "boolean"
+        },
+        "punch": {
+          "type": [
+            "boolean",
+            "number"
+          ]
+        }
+      }
+    },
+    "weights": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "transitions": {
+          "type": "object",
+          "propertyNames": {
+            "enum": [
+              "glitch",
+              "cut",
+              "crossfade",
+              "dissolve",
+              "fade-fast",
+              "fade-slow",
+              "film",
+              "dip",
+              "dip-black",
+              "flash",
+              "dip-white",
+              "whip",
+              "whip-left",
+              "whip-right",
+              "push-left",
+              "push-right",
+              "swipe-up",
+              "swipe-down",
+              "cover-left",
+              "cover-right",
+              "cover-up",
+              "reveal-left",
+              "reveal-right",
+              "wipe",
+              "wipe-left",
+              "wipe-right",
+              "wipe-up",
+              "wipe-down",
+              "luma-wipe",
+              "soft-wipe",
+              "iris",
+              "iris-open",
+              "iris-close",
+              "circle-crop",
+              "doorway",
+              "barn-door",
+              "zoom",
+              "zoom-through",
+              "pixelate",
+              "blur",
+              "blur-cross",
+              "radial",
+              "clock",
+              "squeeze",
+              "slice",
+              "blinds",
+              "wind",
+              "warp",
+              "diagonal",
+              "distance",
+              "slats",
+              "checkerboard",
+              "light-leak",
+              "zoom-blur",
+              "news-ribbon",
+              "breaking-news"
+            ]
+          },
+          "additionalProperties": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 10
+          }
+        }
+      }
+    },
+    "preview": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "webp": {
+          "type": "string"
+        },
+        "png": {
+          "type": "string"
+        }
+      }
+    },
+    "assets": {
+      "type": "array",
+      "description": "Files the pack ships (fonts, beds, logos), each with its license and source. Only permissive licenses.",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "license",
+          "source"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "license": {
+            "enum": [
+              "Apache-2.0",
+              "MIT",
+              "BSD-2-Clause",
+              "BSD-3-Clause",
+              "ISC",
+              "CC0-1.0",
+              "OFL-1.1"
+            ]
+          },
+          "source": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
