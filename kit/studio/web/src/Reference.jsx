@@ -5,6 +5,7 @@ import { ProgressBar } from '@astryxdesign/core/ProgressBar';
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
 import { api, file, toast, grow, pickState, Icon, IconBtn, SITE, STATUS, KIND_NAME, MODE_TIP } from './lib.jsx';
 import { upload } from './upload.js';
+import { canWrite, NO_WRITER } from './Scripts.jsx';
 
 export function Reference({ CAT, V, s, apply, patch }) {
   const r = s.reference, env = V.env, q = r.queue || [], t = env.tools || {};
@@ -54,11 +55,11 @@ export function Reference({ CAT, V, s, apply, patch }) {
     </ol>
     {r.status === 'uploaded' && <Button id="ref-go" variant="secondary" label="Break down the file" isDisabled={running} onClick={() => api('/api/reference', {}).then(apply).catch(() => {})} />}
     <span id="ref-status" className="sr" role="status">{r.status === 'running' ? 'Breaking it down' : r.status === 'ready' ? 'Reference ready' : ''}</span>
-    {r.extracted ? <Breakdown CAT={CAT} s={s} apply={apply} patch={patch} /> : !q.length && <div id="ref-empty" className="empty-art"><Icon n="film" /><p>Add a link to see its shots, beats and effects.</p></div>}
+    {r.extracted ? <Breakdown CAT={CAT} V={V} s={s} apply={apply} patch={patch} /> : !q.length && <div id="ref-empty" className="empty-art"><Icon n="film" /><p>Add a link to see its shots, beats and effects.</p></div>}
   </section>;
 }
 
-function Breakdown({ CAT, s, apply, patch }) {
+function Breakdown({ CAT, V, s, apply, patch }) {
   const r = s.reference, ex = r.extracted, q = r.queue || [];
   const sm = ex.summary || {}, mu = sm.music || {}, item = q.find(x => x.id === r.active);
   const len = sm.seconds || 0, cuts = (sm.cuts || []).filter(c => c > 0 && (!len || c < len));
@@ -104,6 +105,9 @@ function Breakdown({ CAT, s, apply, patch }) {
               <Icon n={st === 'allow' ? 'check' : 'plus'} /><span className="k">{KIND_NAME[it.kind] || it.kind}</span>{it.id}</button>;
           })}</div>
         </div>}
+        <div className="row ref-script"><Button id="ref-script" variant="secondary" size="sm" label="Write script from this reference" icon={<Icon n="script" />} isDisabled={!canWrite(V.env)}
+          onClick={() => api('/api/scripts/from-reference', {}).then(j => { apply(j); toast(V.env.backend === 'agent' ? 'Sent to your agent with the breakdown' : 'Writing the script', true); }).catch(() => {})} />
+          {!canWrite(V.env) && <span className="fine">{NO_WRITER}</span>}</div>
         <p className="fine">Your agent sees this breakdown. Try: "use the transitions from the reference but calmer".</p>
       </div>
     </div>

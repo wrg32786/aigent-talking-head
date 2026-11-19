@@ -16,7 +16,7 @@ Four steps across the top: Footage, Reference, Style, Render. Each one is its ow
 
 ## What you can do
 
-1. **Footage.** Drag clips onto the page or pick files (mp4, mov, m4v, webm, mkv). They go to `inbox/studio/<job>/`. An assistant can also point the session at a clips folder (`clips` in `studio_set_selections`).
+1. **Footage.** Drag clips onto the page or pick files (mp4, mov, m4v, webm, mkv). They go to `inbox/studio/<job>/`. An assistant can also point the session at a clips folder (`clips` in `studio_set_selections`). Or film it now with **Record now** (see [Record now](#record-now)).
 2. **Reference.** Paste one or more links (Enter adds them, Shift+Enter starts another line) or upload a file. Links can be YouTube (and Shorts), TikTok, X, Vimeo, a direct video file (.mp4, .mov, .m4v, .webm), or one public Instagram post. Studio downloads each into your download folder, breaks it down, and shows what it found: length, cut times and pace, music BPM, beats and energy, caption style, titles, transitions, finishes, graphics and effects, plus suggestions mapped to the effects menu that you can click to pick. The chat gets the same teardown. See [Reference links](#reference-links). Then choose:
    - **Influence:** the reference becomes soft defaults on top of the pack you picked (the pack's locks stay). Saved as a local pack, `ref-<job>`.
    - **Recreate:** the draft uses the reference's Reel.md as the recipe (`--recipe`), so its shots, titles and look are copied as closely as the engine can.
@@ -67,6 +67,51 @@ No category is empty today, so none is hidden. These are thin, or are things peo
 - **Light and lens effects.** Light leak is a transition; there is no lens flare or bokeh overlay.
 - **Sound design: ducking controls.** Ducking is automatic; there is no per-clip control.
 - Thin today: Lower thirds and name tags (7) and Overlays and textures (7).
+
+## Record now
+
+Film takes in the Footage step with this computer's camera and mic. Click **Record now**, then **Turn on camera**; the browser asks once for the camera and mic.
+
+<p>
+<img src="studio/record-desktop.png" width="520" alt="Studio Record now: a 9:16 camera preview with head and caption guides, the record button and timer, camera and mic pickers with a level meter, the frame, mirror, guides, countdown and teleprompter switches, the script box, and a saved take marked In footage">
+<img src="studio/record-phone.png" width="200" alt="Studio Record now on a phone: the 9:16 camera preview with framing guides, with the timer and record button below">
+</p>
+
+- **Camera and mic.** Pick either from the lists (they fill in after you allow access). The bar under them is a live mic level.
+- **Frame.** 9:16 (default, for reels), 16:9 or 1:1. The preview shows the whole camera; the recording is cropped to the frame from the middle of the picture, at the camera's full resolution (up to 1920 px on the long side).
+- **Mirror preview.** Flips only the preview, like a mirror. The take is saved the right way round.
+- **Framing guides.** Rule-of-thirds lines, a head zone and the caption band. Keep your head in the zone: kinetic titles can then sit behind your head and captions sit below it, inside the reels safe area from `kit/exports.json`.
+- **Countdown.** 3, 2, 1 before it records (a switch turns it off). Then pause, resume and stop, with a timer.
+- **Teleprompter.** Pick a script from the Scripts area (or paste one). It sits in a band at the top of the preview, near the lens, so your eyes stay close to the camera. It is paced by a timer at your words per minute (60 to 260) on the take's own clock: it starts when recording starts, after the countdown, and stops when you pause. The current line is highlighted, a `[pause]` mark holds its line 1.5 s longer, and you can set the text size and mirror the text for a beam-splitter rig. Keys while the recorder is on screen: Space records or stops, P pauses or resumes, up and down change the pace by 10 WPM, left and right move a line. Voice-follow pacing is not used: Chrome's speech recognition sends the audio to a server, and Studio keeps everything on this computer.
+- **Takes remember their script.** A take filmed with the teleprompter on keeps a copy of the script text. `studio_takes` shows it, and the next draft passes it to Whisper as a hint (`TX_PROMPT`, read by `kit/tx.py` and `kit/clip.py`), so names and unusual words in your captions come out spelled the way the script has them.
+- **Takes.** Each take is listed with a thumbnail and its length. A new take is kept and in the footage as soon as it is saved. The switch takes it out of the edit or puts it back, **Retake** throws away the last take and records again, and the bin deletes a take's files.
+
+**How a take is saved.** The page records with MediaRecorder (webm in Chrome, Edge and Firefox, mp4 in Safari) and sends it to Studio in numbered pieces about once a second while you film, so a long take survives a slow request: a failed piece is retried, a repeated piece is ignored, and pieces arriving out of order are refused until the missing one comes. On stop, Studio converts the take with FFmpeg to an H.264 and AAC mp4 at 30 fps with a thumbnail, in `inbox/studio/<job>/takes/` (gitignored, next to uploaded footage), adds it to the footage and posts "New take recorded: 42 s (take 3)" in the Studio chat, which your agent reads with the session context. If you switch steps while filming the take keeps going and a red Recording badge in the top bar brings you back; when you are not recording, leaving the step turns the camera off.
+
+**Agents.** `studio_takes` lists the takes (id, file, thumbnail, seconds, status, kept) and keeps, unkeeps or discards one. The page uses `POST /api/record/start`, `/api/record/chunk?id=&seq=`, `/api/record/finish`, `/api/record/abort`, `/api/record/take` and `GET /api/record/takes`.
+
+**Where it works.** Browsers only allow the camera on a secure page, and `http://127.0.0.1` or `http://localhost` on the same computer count as secure. Studio listens on 127.0.0.1 only and never opens itself to your network, so to film on a phone, run Studio on the phone itself or put it behind your own https. If the camera is blocked, missing or busy in another app, the recorder says so in one line with a Try again button. Tested in Chrome with a fake camera and mic; see What is not tested in the changelog.
+
+## Scripts
+
+The Scripts area in the Footage step holds what you will say on camera, per reel (job). Scripts are files in `jobs/.studio/scripts/<job>/` (gitignored, next to the session).
+
+<p>
+<img src="studio/scripts-desktop.png" width="520" alt="Studio Scripts area: the script list, the editor with Hook, Body, CTA and Pause buttons and a WPM box, the stats line with section times, and Read it in Record">
+<img src="studio/scripts-phone.png" width="200" alt="Studio Scripts area on a phone: the script list above the editor and its stats">
+</p>
+<p>
+<img src="studio/teleprompter-desktop.png" width="520" alt="Studio Record now while recording: the teleprompter band at the top of the preview with the current line highlighted, and the script, pace, text size and mirror text controls">
+<img src="studio/teleprompter-phone.png" width="200" alt="Studio teleprompter on a phone, the current line highlighted at the top of the preview">
+</p>
+
+- **Edit.** New, rename (the title box), duplicate and delete. The editor saves as you type and shows the word count and read time at the script's WPM (default 150).
+- **Marks.** A line that is only `[hook]`, `[body]` or `[cta]` starts a section; the stats show when each starts. `[pause]` anywhere is a breath: it adds 1.5 s and the teleprompter holds there.
+- **Ask for one.** Type a request under the editor ("write a 30 s script on cold showers", "rewrite this tighter") and it goes to whoever answers the chat. After a reference breakdown, **Write script from this reference** sends your agent a Studio message with the teardown, so the script follows the reference's hook, pacing and beat times.
+- **Who writes.** Your terminal agent writes with `write_script` and runs a humanizer skill on every draft first: its own if it has one, otherwise the bundled `skills/humanizer` ([blader/humanizer](https://github.com/blader/humanizer), MIT, by Siqi Chen). With an API key or a local model, the Studio chat writes the script itself and follows a short form of the same rules (`HUMANIZER_RULES` in `kit/studio/scripts.mjs`); em dashes are removed either way. In keywords mode the page says in one line that writing scripts needs an agent, an API key or a local model.
+- **Read it.** **Read it in Record** opens the recorder with that script in the teleprompter (see [Record now](#record-now)).
+
+API: `GET /api/scripts`, `GET /api/scripts/get?id=`, `POST /api/scripts` (create, or replace with `id`), `POST /api/scripts/action` (`delete`, `duplicate`, `rename`), `POST /api/scripts/from-reference`. MCP: `list_scripts`, `get_script`, `write_script`.
 
 ## Reference links
 
@@ -144,7 +189,7 @@ Then, in the agent: "Run the Studio chat loop."
 - **Busy in the terminal:** the message queues. The agent checks `studio_get_pending` at the start of each turn. In Claude Code, the Studio hook (`kit/studio/hooks/studio-pending.mjs`, installed by `npm run studio:connect -- claude`) adds "N Studio messages waiting" to its context after each tool call, when you send it a prompt, and when it finishes a turn, so it picks them up at its next step. Codex and Cursor have no equivalent hook here; they rely on the per-turn check in AGENTS.md. A long command (a render) still finishes first.
 - **On the page:** each message you send shows Queued, then Seen, then Answered with a check. The badge at the top of the chat shows "Claude Code, listening" (green), "busy" (amber, messages wait for its next step) or "No agent" (red), and an empty chat shows the one line to say to your agent with a copy button.
 
-**MCP tools for the channel:** `studio_start`, `studio_wait_for_message`, `studio_get_pending`, `studio_reply` (Studio channel only; `replyTo` marks messages answered), `studio_set_selections` with `origin: "terminal"` for terminal edits, plus `studio_add_reference_url`, `studio_get_reference_teardown`, `studio_settings`, `studio_get_state` and `studio_run`. Presence is in `jobs/.studio/agent.json`; the hook reads `GET /api/agent/pending` (localhost only).
+**MCP tools for the channel:** `studio_start`, `studio_wait_for_message`, `studio_get_pending`, `studio_reply` (Studio channel only; `replyTo` marks messages answered), `studio_set_selections` with `origin: "terminal"` for terminal edits, plus `studio_add_reference_url`, `studio_get_reference_teardown`, `studio_settings`, `studio_takes`, `list_scripts`, `get_script`, `write_script`, `studio_get_state` and `studio_run`. Presence is in `jobs/.studio/agent.json`; the hook reads `GET /api/agent/pending` (localhost only).
 
 `npm run studio:agent` starts Studio in the background and prints its URL as JSON (`--no-open`, `--port`, `--stop`), so an agent's terminal is not held by the server. `tests/studio-agent.test.mjs` runs the whole loop with a scripted MCP client acting as the agent.
 
@@ -195,7 +240,7 @@ A double-click app with no installer at all is planned: [docs/desktop-app-plan.m
 
 ## Files and safety
 
-- The session lives in `jobs/.studio/state.json` (`STUDIO_DIR` moves it). Uploads go to `inbox/studio/<job>/` and `teardown-in/studio/<job>/`, drafts to `jobs/<job>/`, teardowns to `teardown/studio-<job>/`. All gitignored.
+- The session lives in `jobs/.studio/state.json` (`STUDIO_DIR` moves it). Uploads go to `inbox/studio/<job>/` (recorded takes in its `takes/` folder) and `teardown-in/studio/<job>/`, drafts to `jobs/<job>/`, teardowns to `teardown/studio-<job>/`. All gitignored.
 - The server listens on 127.0.0.1 only, refuses other Host headers (so a web page can't reach it by DNS rebinding) and cross-site posts, and serves files only from the kit's media folders.
 - One task runs at a time; Cancel stops it.
 - `STUDIO_REEL_ARGS` and `STUDIO_TEARDOWN_ARGS` add flags to every draft or teardown (for example `--engine lite --no-asr`). `STUDIO_TEARDOWN` swaps the teardown script (the tests use a stand-in).

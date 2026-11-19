@@ -54,7 +54,7 @@ Made a reel? [Star the repo](https://github.com/wrg32786/aigent-talking-head) an
 
 ## Studio: edit in a browser, with your agent in the chat
 
-Studio is a local page for making a reel without memorising commands. Drop in your footage, paste links to reels you like, click effects from a visual menu, pick a style pack, music and pace, then draft and render. The chat on the page is answered by your own terminal agent (Claude Code, Codex, Cursor or any MCP client), so it can change the edit for you while you watch. Everything runs on your computer. Full guide: [docs/studio.md](docs/studio.md).
+Studio is a local page for making a reel without memorising commands. Drop in your footage or film it right there, paste links to reels you like, click effects from a visual menu, pick a style pack, music and pace, then draft and render. The chat on the page is answered by your own terminal agent (Claude Code, Codex, Cursor or any MCP client), so it can change the edit for you while you watch. Everything runs on your computer. Full guide: [docs/studio.md](docs/studio.md).
 
 **Set it up by telling your terminal agent:**
 
@@ -76,6 +76,20 @@ Then run `npm run studio` (or click the icon). Without an agent the chat works o
 **Reference links.** Paste one or more links (YouTube and Shorts, TikTok, X, Vimeo, a direct .mp4, or one public Instagram post) and Studio downloads each to a folder on your computer, shows the progress, and breaks it down: length, shots and cut times, pace, music BPM and energy, caption style, transitions, finishes and graphics. It then suggests matching items from the effects menu. The breakdown goes into the chat, so "use the transitions from the reference but calmer" works. Use it as an influence (soft defaults) or recreate its structure with your clip. Link downloads need [yt-dlp](https://github.com/yt-dlp/yt-dlp), which the installer adds; Instagram uses [instaloader](https://github.com/instaloader/instaloader) anonymously, with no login. Only use videos you have the rights to use as a reference.
 
 <img src="docs/studio/ref-url-desktop.png" width="720" alt="Studio Reference step: a pasted YouTube link broken down into 90 seconds, 17 shots, 123 BPM and a 5.29 second average shot, a shot timeline with a beat grid, tags for what was found, suggested picks as chips, and a contact sheet">
+
+**Record now.** No clip yet? Film it in the Footage step with your computer's camera and mic. Pick the camera and mic, choose 9:16 (the default), 16:9 or 1:1, and record with a 3, 2, 1 countdown, pause and a timer. Framing guides show where your head goes so titles can sit behind it and captions below, and an optional teleprompter scrolls your script near the lens. Every take is listed with a thumbnail: keep it, drop it from the edit, or retake. A kept take is converted to an mp4 and joins your footage right away, and your agent gets a one-line note ("New take recorded: 42 s"). The recording is sent to Studio in small pieces as you film, so a long take is not lost to one failed upload, and nothing leaves your computer. Browsers only allow the camera on a secure page, which `http://127.0.0.1` is. On a phone, open Studio on the phone itself or over https; Studio never opens itself to your network.
+
+<p>
+<img src="docs/studio/record-desktop.png" width="520" alt="Studio Record now: a 9:16 camera preview with framing guides for the head and the caption band, the record button and timer, camera and mic pickers with a mic level meter, frame, mirror, guides, countdown and teleprompter switches, the script box, and a saved take marked In footage">
+<img src="docs/studio/record-phone.png" width="200" alt="Studio Record now on a phone: the 9:16 camera preview with framing guides fills the width, with the timer and record button below">
+</p>
+
+**Scripts and a teleprompter.** The Footage step has a Scripts area: write, rename, duplicate and delete scripts for the reel, with a word count and read time at your pace, and optional `[hook]`, `[body]`, `[cta]` and `[pause]` marks. Ask your agent for one ("write a 30 s script on cold showers", "rewrite this tighter"), or press **Write script from this reference** after a breakdown and it writes one that follows the reference's hook, pacing and beats. Agents run the bundled [humanizer](https://github.com/blader/humanizer) skill (MIT, by Siqi Chen) on every draft so it sounds like you; the API and local model chat follows its rules too. In Record now, pick a script and the teleprompter paces it at your words per minute from the moment the take starts, highlights the line you are on, holds on `[pause]`, stops when you pause, and can mirror the text for a beam-splitter rig. Space records and stops, P pauses, the arrows change the pace. A take remembers its script, and the next draft hands that script to Whisper so the captions spell your words. Pacing is a timer: voice-follow would need the browser's speech recognition, which in Chrome sends your audio to a server.
+
+<p>
+<img src="docs/studio/scripts-desktop.png" width="520" alt="Studio Scripts area: a list of scripts with word counts and read times, the editor with Hook, Body, CTA and Pause buttons, a WPM box, the stats line with section start times, and a Read it in Record button">
+<img src="docs/studio/teleprompter-phone.png" width="200" alt="Studio teleprompter on a phone: the current line of the script highlighted near the top of the 9:16 camera preview, with section labels">
+</p>
 
 **Effects menu.** Every transition, title entrance, caption style, graphic, finish and sound in 17 categories, each a looping preview with just its name. Hover for the details, click to pick, use the forbid button for what you never want, and your picks collect in the tray at the bottom. Once you pick any transition, only picked transitions are used, and the same for each kind.
 
@@ -140,7 +154,7 @@ Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FRE
 | Export presets: TikTok, Reels, Shorts, 4:5, 1:1 | 5 | [Quick start](#quick-start) |
 | Studio: a local page for reference links and teardowns, the visual effects menu, a chat your agent answers, draft and render | 1 | [docs/studio.md](docs/studio.md) |
 | Agent skills, installed with `npx skills add wrg32786/aigent-talking-head` | 8 | [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) |
-| MCP tools: menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify, and ten for Studio | 21 | [MCP setup](docs/mcp.md) |
+| MCP tools: menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify, and fourteen for Studio and scripts | 25 | [MCP setup](docs/mcp.md) |
 
 Also: a `plan` step that proposes graphics from your transcript, a layout pass that stops overlaps, `verify` with a contact sheet, [Reel.md recipes](#reelmd-recipes) you can share, and [teardowns](#remake-a-reel-you-like) that turn a reel you like into a recipe. `npm run menu` prints every option.
 
@@ -249,16 +263,26 @@ Every option, labelled, is in the [full gallery](showcase/GALLERY.md). The [HTML
 
 ## How it compares
 
-The tools people usually reach for, from their own sites and docs, checked November 2026. Each is good at something different; this table is about how they work, not which is better.
+The tools people usually reach for, from their own sites and docs, checked November 19, 2026. Each is good at something different; this table is about how they work, not which is better.
 
-| | aigent-talking-head | CapCut auto captions | Submagic | Opus Clip | Descript | Remotion |
-|---|---|---|---|---|---|---|
-| What it is | Talking-head reel pipeline | Video editor app | Caption and short-clip web app | Long video to short clips web app | Transcript-based video editor | React framework for making videos in code |
-| Source | Open source, Apache-2.0 | Closed | Closed | Closed | Closed | Source available; free for individuals and companies of up to 3 people, paid company license above that |
-| Where your video is processed | Your machine | CapCut's apps | Submagic's servers | Opus Clip's servers | Descript's apps and cloud | Your machine or your cloud |
-| Price | Free | Free tier and paid plans | Free trial, then paid plans | Free tier and paid plans | Free tier and paid plans | See Source |
-| Agent access | Skills plus a local MCP server | No official MCP server | Hosted MCP server | Hosted MCP server (tool calls on paid plans) | Hosted MCP server | You or your agent write React code |
-| Best at | One phone clip to a finished, captioned 9:16 reel with graphics | Hands-on editing with a timeline | Fast styled captions | Finding clips in long videos | Editing video by editing text | Custom, data-driven video in code |
+| | aigent-talking-head | HyperFrames | CapCut auto captions | Submagic | Opus Clip | Descript | Remotion |
+|---|---|---|---|---|---|---|---|
+| What it is | Talking-head reel pipeline with a local Studio page | HTML video framework plus a Studio desktop app, from HeyGen | Video editor app | Caption and short-clip web app | Long video to short clips web app | Transcript-based video editor | React framework for making videos in code |
+| Source | Open source, Apache-2.0 | Framework open source, Apache-2.0 | Closed | Closed | Closed | Closed | Source available; free for individuals and companies of up to 3 people, paid company license above that |
+| Where your video is processed | Your machine | Renders on your machine or HeyGen's cloud; reference reads run through HeyGen | CapCut's apps | Submagic's servers | Opus Clip's servers | Descript's apps and cloud | Your machine or your cloud |
+| Price | Free: no account, no credits, no watermark | Framework free; app free plan with credits, Pro $25 a month | Free tier and paid plans | Free trial, then paid plans | Free tier and paid plans | Free tier and paid plans | See Source |
+| Agent access | Skills plus a local MCP server; your terminal agent also answers the Studio chat | Skills and plugins for Claude Code, Codex and others; the app works with your agent | No official MCP server | Hosted MCP server | Hosted MCP server (tool calls on paid plans) | Hosted MCP server | You or your agent write React code |
+| Best at | One phone clip to a finished, captioned 9:16 reel with graphics | Motion graphics and edits written as HTML by an agent | Hands-on editing with a timeline | Fast styled captions | Finding clips in long videos | Editing video by editing text | Custom, data-driven video in code |
+
+Recreating a reel you like from a link: in Studio it is free and runs on your computer. In the HyperFrames Studio app it is part of HyperFrames Pro and the app reads the video through HeyGen ([docs](https://hyperframes.heygen.com/studio-app/reference-video.md), [pricing](https://hyperframes.studio/pricing)); the app also asks you to sign in with a HeyGen account ([install](https://hyperframes.heygen.com/studio-app/index.md)). HyperFrames has many more motion templates and renders any kind of video, not only talking heads.
+
+Other open-source tools in the same space: [OpenShorts](https://github.com/faris-sait/openshorts) (MIT) cuts long videos into vertical clips, and [kinocut](https://github.com/KyaniteLabs/kinocut) (Apache-2.0) is an MCP server that gives agents guarded FFmpeg and HyperFrames editing tools.
+
+In short:
+
+- Free and open source. Studio runs on your computer with no account, no credits and no watermark.
+- Paste a link to a reel you like and Studio breaks it down on your machine, free.
+- Your own terminal agent is the editor. Chat with it in Studio or your terminal, and edits update live.
 
 Pick aigent-talking-head if you want a local, scriptable pipeline your agent can run end to end and you are fine installing Node, Python, FFmpeg and Chrome. Pick a hosted app if you want a web editor, team sharing or multi-language captions today: this kit transcribes English only.
 
@@ -313,7 +337,7 @@ The code and docs are Apache-2.0, so commercial use is fine. The bundled sounds 
 | Cursor | `npx skills add wrg32786/aigent-talking-head -a cursor` |
 | Codex | `npx skills add wrg32786/aigent-talking-head -a codex` |
 
-That installs eight skills: aigent-talking-head, aigent-studio, talking-head-reel, talking-head-recipe, talking-head-brand, talking-head-teardown, talking-head-ad and clip-raw-footage. Add `-g` to install for every project. By hand: copy the folders under `skills/` into `.claude/skills/` (Claude Code) or `.agents/skills/` (Cursor, Codex). The skills drive a local checkout, so the agent still needs the kit installed ([agent install steps](INSTALL.md)).
+That installs nine skills: aigent-talking-head, aigent-studio, talking-head-reel, talking-head-recipe, talking-head-brand, talking-head-teardown, talking-head-ad, clip-raw-footage and humanizer (by Siqi Chen, MIT, for scripts). Add `-g` to install for every project. By hand: copy the folders under `skills/` into `.claude/skills/` (Claude Code) or `.agents/skills/` (Cursor, Codex). The skills drive a local checkout, so the agent still needs the kit installed ([agent install steps](INSTALL.md)).
 
 **MCP.** `npm run mcp` serves the same flow as MCP tools (menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify) with schemas generated from contract.json, plus studio_ tools that let your agent listen and answer in the Studio chat, add reference links and read their teardowns. See the [MCP setup for Claude Code, Cursor and Codex](docs/mcp.md). For a summary written for language models, see [llms.txt](llms.txt).
 

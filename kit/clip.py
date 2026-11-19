@@ -74,7 +74,7 @@ def words_of(src):
         from faster_whisper import WhisperModel
         notice_download(a.model)
         model = WhisperModel(a.model, device="cpu", compute_type="int8")
-    segs, _ = model.transcribe(src, language="en", word_timestamps=True, vad_filter=False, condition_on_previous_text=False)
+    segs, _ = model.transcribe(src, language="en", word_timestamps=True, vad_filter=False, condition_on_previous_text=False, initial_prompt=os.environ.get("TX_PROMPT") or None)
     return [{"s": w.start, "e": w.end, "w": w.word.strip(), "p": float(getattr(w, "probability", 0.9) or 0.9)} for g in segs for w in g.words if w.word.strip()]
 
 norm = lambda s: [re.sub(r"[^a-z0-9']", "", x["w"].lower()) for x in s]
