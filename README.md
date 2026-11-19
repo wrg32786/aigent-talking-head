@@ -258,7 +258,7 @@ That installs seven skills: aigent-talking-head, talking-head-reel, talking-head
 
 Posted a reel you made with this kit? [Open a Show your reel issue](https://github.com/wrg32786/aigent-talking-head/issues/new?template=show-your-reel.md) and drop the link, or tag [@the_aigent_news](https://www.instagram.com/the_aigent_news/) on Instagram. A star on the repo helps other creators find it.
 
-The CLI may print a one-line star reminder after your first successful render, and once more after five renders. It is skipped when stdout is not a TTY, when `CI` is set, when you pass `--json`, or when `AIGENT_NO_STAR=1`.
+The CLI may print a one-line star reminder after your first successful render, and once more after five renders. It is skipped when stdout is not a TTY, when `CI` is set, when you pass `--json`, or when `AIGENT_NO_STAR=1`. On a run that does not print the star reminder, it may instead print a one-line invitation to The AIgent Academy, at most twice, with the same spacing. Set `AIGENT_NO_SKOOL=1` to turn that line off. At most one of the two lines prints on a given run.
 
 ## Cite this
 
@@ -278,7 +278,9 @@ Machine-readable metadata is in [CITATION.cff](CITATION.cff), and GitHub shows i
 
 ## Get guidance
 
-Want help putting this to work? The AIgent Academy on Skool offers guidance, courses and a community of builders. Membership comes with a guarantee: you have a business in 90 days or your money back. See the [terms](https://theaigent.co/terms). [Join The AIgent Academy](https://www.skool.com/the-aigent-academy/about).
+Want help putting this to work? The AIgent Academy on Skool offers guidance, courses and a community of builders. Membership comes with a guarantee: you have a business in 90 days or your money back. See the [terms](https://theaigent.co/terms). The full walkthrough is in [The AIgent Academy](https://www.skool.com/the-aigent-academy/about?ref=gh-aigent-talking-head).
+
+After a successful render, the CLI may print a one-line Academy invitation when it is not also printing the star reminder. Set `AIGENT_NO_SKOOL=1` to turn the Academy line off. It also stays off when stdout is not a TTY, when `CI` is set, or when you pass `--json`.
 
 ## Credits and licences
 
