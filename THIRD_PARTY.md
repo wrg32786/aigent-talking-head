@@ -6,6 +6,7 @@ What this repo ships from other projects, and what it only took ideas from. Lice
 
 | Path | From | Licence |
 |---|---|---|
+| `skills/humanizer/SKILL.md`, `skills/humanizer/LICENSE` | [blader/humanizer](https://github.com/blader/humanizer) by Siqi Chen, commit `a32f24407364c74c812b43c15926d638bee1e072` (v4.0.0), copied unchanged; Studio's script chat follows a short summary of its rules (`kit/studio/scripts.mjs`) | MIT |
 | `kit/sfx/F-cinematic-woosh-648729.mp3`, `kit/sfx/whoosh.wav` | "Cinematic Woosh SFX-010" by AudioPapkin, Freesound 648729 (WAV is a mono 48 kHz conversion) | CC0 1.0 |
 | `kit/sfx/D-quick-woosh-683101.mp3`, `kit/sfx/swipe.wav` | "quick woosh" by florianreichelt, Freesound 683101 (WAV is a mono 48 kHz conversion) | CC0 1.0 |
 | `kit/sfx/boom.wav` | [ANVEAI/motion-pack](https://github.com/ANVEAI/motion-pack) `snd.hit.deep_impact`, commit `33f36b3f1a3c69a12352cf2a55e29b446cfeb991`, trimmed to 2.4 s with a fade, mono 48 kHz | CC0 1.0 (motion-pack `LICENSE-MEDIA`, which covers its synthesized sound masters and previews) |
@@ -32,12 +33,29 @@ What this repo ships from other projects, and what it only took ideas from. Lice
 | Icon path data in `kit/overlay.html` (`TABLER`: check, star, bolt, heart, flame, player-play, bell, sparkles, plus, lock, tag, user, code, quote, list-check, app-window, circle-check, outline and filled; arrow-right, rocket, terminal-2, chart-bar, world, cpu, outline), used for the glyphs, stickers and card icons | [Tabler Icons](https://github.com/tabler/tabler-icons) 3.52.0 (`@tabler/icons` on npm), Copyright (c) 2020-2026 Pawel Kuna. Only the SVG path data is copied; circles are rewritten as arcs. Licence text in `kit/icons/LICENSE-tabler.txt` | MIT |
 | `showcase/source/presenter.jpg` (and the derived `presenter-mask.png`) | AI-generated fictional person made for this project, to demo the showcase gallery. Not a portrait of a real person. No third-party stock or likeness rights. | Apache-2.0, same as this repo |
 
+## Bundled in the Studio page
+
+The Studio page (`kit/studio/public`, built from `kit/studio/web`) bundles these npm packages. Full license texts are generated into `kit/studio/public/THIRD_PARTY_LICENSES.txt` on every build, and the build refuses any package that is not MIT, ISC, BSD or Apache-2.0.
+
+| Package | Source | License |
+| --- | --- | --- |
+| `@astryxdesign/core` 0.7.16, `@astryxdesign/theme-neutral` 0.7.16 (components and the Neutral theme that the AIgent theme extends) | [meta/astryx](https://github.com/meta/astryx), Copyright (c) 2026 Meta Platforms, Inc., checked at commit `49473f0a243a7c4721aebdb407227dfdbc5bbaaa` | MIT |
+| `react` 19.3.1, `react-dom` 19.3.1, `scheduler` 0.28.0 | [react/react](https://github.com/react/react) (the React repository, formerly facebook/react), Copyright (c) Meta Platforms, Inc. and affiliates, checked at commit `e04279e76e2703ceb0d99c3599f0b74f01770dd4` | MIT |
+| `@stylexjs/stylex` 0.19.2, `styleq` 0.2.1 (Astryx's styling runtime) | facebook/stylex, necolas/styleq | MIT |
+| `lucide-react` 1.76.0 (icons used by the Astryx Neutral theme) | lucide-icons/lucide | ISC |
+| `intl-messageformat` 11.2.15 and `@formatjs/*` (Astryx's message strings) | formatjs/formatjs | BSD-3-Clause (intl-messageformat), MIT |
+
+Build tools in `kit/studio/web` (Vite, `@vitejs/plugin-react`, `@astryxdesign/build`, Babel, the StyleX compiler) are only used to make the page and are not shipped.
+
 ## Adapted from Will's other work
 
 - **Beat grid and film-finish looks** (`kit/beats.py`, `kit/beats.cjs`): the librosa analysis (tempo, beats, onsets, RMS energy, drop spikes plus an intensity filter) and the ffmpeg-builtin film looks (grain, vignette, chromatic aberration, scan lines, colour grades) are adapted from Will Gwyn's `music-video` project (`pipeline/audio_analysis.py`, `pipeline/effects_planner.py`, `pipeline/scene_effects.py`). Relicensed Apache-2.0 by the author for this repo. No brand portraits, project files, LUT `.cube` files or light-leak overlays were copied.
 
 ## Ideas adapted (no code copied)
 
+- **Studio's look** (`kit/studio/web/src/studio.css`): the design tokens (background, foreground, card, popover, muted, muted-foreground, border, input, primary, destructive, ring, radius) and the shapes of the segmented tabs, badges, side sheet, hover card, switch and toast follow [shadcn/ui](https://github.com/shadcn-ui/ui) (MIT, Copyright (c) 2023 shadcn), checked at commit `f50887ae68d0fdcbfbe86b57be08af94a4c88a68`. They were rebuilt in plain CSS with the AIgent palette; no shadcn/ui code, Tailwind classes or shadcn components are included. The glass treatment (translucent surfaces, backdrop blur, a top highlight) is written for Studio over Astryx's tokens; Astryx's own frosted chat dock was the reference.
+- **Studio's dismissal and focus behavior** (`kit/studio/web/src`): Escape closes the chat sheet and the dialog, focus goes back to the button that opened it, and focus stays on the same tile across live updates, as in the behaviors of [vercel-labs/ui](https://github.com/vercel-labs/ui) (UI SDK, Apache-2.0), checked at commit `b4dbe88209ecf4dc555225f630268095f510ad49`. No UI SDK code is included and it is not a dependency.
+- **AG-UI event shapes** (`kit/studio/agui.mjs`): the `/api/agui` endpoints emit events in the shapes defined by the [AG-UI protocol](https://github.com/ag-ui-protocol/ag-ui) core types (MIT, Copyright (c) 2025), checked at commit `3416b86da4b3288e87f827c7f2759a7fa18b5231`: RUN_STARTED, RUN_FINISHED, RUN_ERROR, STATE_SNAPSHOT, STATE_DELTA (RFC 6902 JSON Patch), MESSAGES_SNAPSHOT, TEXT_MESSAGE_START, TEXT_MESSAGE_CONTENT, TEXT_MESSAGE_END, STEP_STARTED, STEP_FINISHED and CUSTOM, with SSE `data:` framing as in its encoder. Written for this repo; no AG-UI code is included and no AG-UI package is a dependency.
 - **Transition names** (`kit/transitions.json`): the mapping of friendly names to stock ffmpeg `xfade` modes follows motion-pack's `transitions/lib/xfade.js`. motion-pack code is MIT; the map was rewritten as JSON here.
 - **Hormozi and karaoke caption looks** (`kit/overlay.html`): the presets follow [Capite](https://github.com/muneebkhan08/Capite) (white bold caps with a cyan active word and a heavy outline; a colour wipe as each word is said). No Capite code is included. Capite is MIT:
 

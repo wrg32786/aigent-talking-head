@@ -93,7 +93,7 @@ try {
     let out = ''; p.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok({ p, url: m[1] }); });
     p.stderr.on('data', d => { out += d; }); p.on('close', c => bad(new Error('server exited ' + c + ': ' + out)));
   });
-  const { p: srv, url } = await start({ OPENAI_API_KEY: 'test-key', OPENAI_BASE_URL: `http://127.0.0.1:${fake.address().port}`, ANTHROPIC_API_KEY: '' });
+  const { p: srv, url } = await start({ STUDIO_CHAT: 'auto', OPENAI_API_KEY: 'test-key', OPENAI_BASE_URL: `http://127.0.0.1:${fake.address().port}`, ANTHROPIC_API_KEY: '' });
   const req = async (path, { method, body, headers, raw } = {}) => {
     const r = await fetch(url + path, { method: method || (body !== undefined ? 'POST' : 'GET'), headers: { ...(body !== undefined && !raw ? { 'content-type': 'application/json' } : {}), ...(headers || {}) }, body: raw ? body : body !== undefined ? JSON.stringify(body) : undefined });
     const ct = r.headers.get('content-type') || ''; return { status: r.status, j: ct.includes('json') ? await r.json() : null, text: ct.includes('json') ? null : await r.text() };
@@ -123,7 +123,7 @@ try {
       const up = await req('/api/upload?kind=footage&name=../../take one.mp4', { body: 'not really a video', raw: true });
       assert.strictEqual(up.status, 200); assert.strictEqual(up.j.path, `inbox/studio/${JOB}/take-one.mp4`);
       assert.ok(existsSync(join(ROOT, up.j.path))); assert.deepStrictEqual(up.j.state.footage, [up.j.path]);
-      assert.strictEqual((await req('/api/reference', { body: { url: 'https://example.com/reel.mp4' } })).status, 400);
+      const bad = await req('/api/reference', { body: { url: 'not a link' } }); assert.strictEqual(bad.status, 202); assert.strictEqual(bad.j.added[0].status, 'failed');
     });
     await t('server: chat in direct API mode applies a checked patch; a bad name is skipped, not applied', async () => {
       const r = await req('/api/chat', { body: { text: 'make it calm' } });

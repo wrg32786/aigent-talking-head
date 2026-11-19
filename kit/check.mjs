@@ -176,6 +176,22 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { serrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio tests (tests/studio.test.mjs: catalog, session, server, chat)', errs: serrs, warns: [] });
+    const aerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-agent.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { aerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio agent tests (tests/studio-agent.test.mjs: reference links, settings, local model, agent channel over MCP, hook)', errs: aerrs, warns: [] });
+    const rerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-record.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { rerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio record tests (tests/studio-record.test.mjs: chunked take upload, mp4 conversion, takes over MCP)', errs: rerrs, warns: [] });
+    const cerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-scripts.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { cerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio script tests (tests/studio-scripts.test.mjs: scripts API, MCP script tools, model-written scripts, takes with scripts)', errs: cerrs, warns: [] });
+    const verrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-review.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { verrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio review tests (tests/studio-review.test.mjs: what to swap, clean-up pass, edit receipt, preview comments)', errs: verrs, warns: [] });
   }
   {
     const star = createRequire(import.meta.url)('./star.cjs');
@@ -236,6 +252,19 @@ if (target) {
     }
     results.push({ label: 'showcase/index.html covers catalogs', errs, warns: [] });
   }
+}
+if (!target) {
+  // The Studio page is React + Astryx, built from kit/studio/web into kit/studio/public and committed, so installs never build it.
+  const errs = [], pub = join(KIT, 'studio', 'public');
+  try {
+    const { webHash } = await import('./studio/web-hash.mjs');
+    const stamp = JSON.parse(readFileSync(join(pub, 'build.json'), 'utf8'));
+    if (stamp.source !== webHash()) errs.push('kit/studio/public is older than kit/studio/web; run npm run studio:build and commit kit/studio/public');
+    const html = readFileSync(join(pub, 'index.html'), 'utf8');
+    for (const m of html.matchAll(/(?:src|href)="\/(assets\/[^"]+)"/g)) if (!existsSync(join(pub, m[1]))) errs.push('kit/studio/public/index.html points at a missing ' + m[1]);
+    if (!/assets\/app\.js/.test(html)) errs.push('kit/studio/public/index.html does not load assets/app.js');
+  } catch (e) { errs.push('Studio page build missing: ' + e.message + ' (npm run studio:build)'); }
+  results.push({ label: 'Studio page build in kit/studio/public matches kit/studio/web', errs, warns: [] });
 }
 let bad = 0;
 for (const r of results) {

@@ -1,7 +1,7 @@
 {
   "about": "Plain words Studio understands without a model (chat with no API key and no assistant attached). Each vibe only names packs and engine names that exist; npm run check verifies them.",
   "vibes": [
-    { "words": ["calm", "chill", "soft", "slow", "gentle", "relaxed"], "energy": "low", "picks": { "transition:glitch": "deny" }, "say": "calmer: low-energy music, no glitch seams" },
+    { "words": ["calm", "calmer", "chill", "chiller", "soft", "softer", "slow", "slower", "gentle", "relaxed"], "energy": "low", "picks": { "transition:glitch": "deny" }, "say": "calmer: low-energy music, no glitch seams" },
     { "words": ["cinematic", "film", "filmic", "moody", "dramatic"], "pack": "cinematic", "energy": "low", "say": "the cinematic pack: film grade, soft dissolves" },
     { "words": ["hype", "punchy", "energetic", "bold", "loud", "aggressive", "hormozi"], "pack": "hormozi-bold", "energy": "high", "say": "the hormozi-bold pack with high-energy music" },
     { "words": ["fast", "snappy", "tight", "quick"], "pace": { "tighten": 0.3 }, "say": "tighter pace: pauses over 0.3 s cut" },

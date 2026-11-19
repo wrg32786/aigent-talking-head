@@ -57,3 +57,7 @@ packs/local/
 /.venv/
 /studio.sh
 /studio.bat
+
+# per-machine agent setup written by npm run studio:connect
+/.claude/settings.local.json
+/.cursor/mcp.json

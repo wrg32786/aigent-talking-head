@@ -77,7 +77,7 @@ const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards']);
+const VALUED = new Set(['pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const JSON_OUT = flag('json');
@@ -185,7 +185,12 @@ if (!flag('rebuild')) {
     else sh(PY, [path.join(KIT, 'clip.py'), ...srcs.map(f => path.resolve(f)), '--out', clipsDir, '--vertical', '--cropx', opt('cropx', '0.5'), ...(opt('model') ? ['--model', opt('model')] : []), ...(opt('hook') ? ['--hook', opt('hook')] : [])], job);
   }
   const clips = JSON.parse(fs.readFileSync(path.join(clipsDir, 'clips.json'), 'utf8')).clips;
-  const keep = clips.filter(c => !/^retake/.test(c.status));
+  // --cleanup <file>: the clean-up pass from Studio (kit/studio/review.mjs): spans to cut out of a clip (clip seconds,
+  // they become jump cuts like --tighten), retakes to keep after all, and clips to leave out
+  let CLEAN = null;
+  if (opt('cleanup')) { try { CLEAN = JSON.parse(fs.readFileSync(path.resolve(opt('cleanup')), 'utf8')); } catch (e) { die('--cleanup: ' + e.message); } }
+  const inList = (k, c) => !!(CLEAN && Array.isArray(CLEAN[k]) && CLEAN[k].includes(c.id));
+  let keep = clips.filter(c => inList('keep', c) || (!inList('drop', c) && !/^retake/.test(c.status)));
   if (!keep.length) die('No keep clips in ' + clipsDir);
   // 2. cut.json from every keep clip, in order; a glitch hit and a woosh on each seam
   const rel = p => path.relative(build, path.isAbsolute(p) ? p : path.join(path.dirname(clipsDir), p)).split(path.sep).join('/');
@@ -193,7 +198,7 @@ if (!flag('rebuild')) {
   // word times say where you stop and start; 0.06 s of breath stays on each side, so the jump keeps a 0.12 s pause.
   const TIGHT = flag('no-tighten') ? false : opt('tighten') != null ? +opt('tighten') : (preset && preset.tighten != null ? preset.tighten : false);
   if (TIGHT !== false && !(TIGHT >= 0.15 && TIGHT <= 2)) die('--tighten must be the longest pause to keep, 0.15 to 2 seconds');
-  const spansOf = c => {
+  const spansOf0 = c => {
     const dur = +(+c.dur).toFixed(3), ws = (c.words || []).filter(w => w[1] > w[0]);
     if (!TIGHT || ws.length < 2) return [[0, dur]];
     const out = []; let a = 0;
@@ -201,6 +206,19 @@ if (!flag('rebuild')) {
     out.push([a, dur]);
     return out.map(([x, y]) => [+x.toFixed(3), +y.toFixed(3)]).filter(([x, y]) => y - x > 0.05);
   };
+  const cutsOf = c => (CLEAN && CLEAN.cuts && Array.isArray(CLEAN.cuts[c.id]) ? CLEAN.cuts[c.id] : []).filter(x => Array.isArray(x) && +x[1] > +x[0]);
+  const spansOf = c => {
+    let out = spansOf0(c);
+    for (const [a, b] of cutsOf(c)) out = out.flatMap(([x, y]) => +b <= x || +a >= y ? [[x, y]] : [[x, +a], [+b, y]].filter(([p, q]) => q - p > 0.05));
+    return out.map(([x, y]) => [+(+x).toFixed(3), +(+y).toFixed(3)]);
+  };
+  if (CLEAN) {
+    const before = keep.reduce((a, c) => a + +c.dur, 0);
+    keep = keep.filter(c => spansOf(c).length);
+    if (!keep.length) die('--cleanup removes every clip');
+    const after = keep.reduce((a, c) => a + spansOf(c).reduce((x, [p, q]) => x + q - p, 0), 0), n = keep.reduce((a, c) => a + cutsOf(c).length, 0);
+    console.log(`clean-up: ${n} cut${n === 1 ? '' : 's'} inside clips, ${(CLEAN.keep || []).length} retake${(CLEAN.keep || []).length === 1 ? '' : 's'} kept, ${(CLEAN.drop || []).length} clip${(CLEAN.drop || []).length === 1 ? '' : 's'} left out (${(before - after).toFixed(1)} s shorter before pauses)`);
+  }
   const segs = [], clipStart = [];
   keep.forEach((c, ci) => { clipStart.push(segs.length); spansOf(c).forEach(([a, b], k) => segs.push({ file: rel(path.join(clipsDir, path.basename(c.file))), in: a, out: b, ...(k ? { jump: true } : {}), ...(ci === 0 && k === 0 ? { fadeIn: 0.25 } : {}) })); });
   if (TIGHT) { const was = keep.reduce((a, c) => a + +c.dur, 0), now = segs.reduce((a, s) => a + s.out - s.in, 0), n = segs.filter(s => s.jump).length; console.log(`no dead air: ${n} pause${n === 1 ? '' : 's'} over ${TIGHT} s cut to jumps (${(was - now).toFixed(1)} s shorter)`); }
