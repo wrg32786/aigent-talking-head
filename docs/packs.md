@@ -119,3 +119,5 @@ packs/local/my-look/
 Share a pack by sharing its folder. Someone drops it into `packs/local/` (or passes the path: `--pack ./my-look`) and runs `npm run pack:validate` first. Packs are data only: no code runs from a pack.
 
 Got a pack worth showing? Open a "Show your reel" issue with the pack folder and a reel made with it.
+
+Prefer clicking? [Studio](studio.md) shows the packs as a gallery, turns your picks from its effects menu into locks, and saves them as a new pack.

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIgent Studio</title>
+<link rel="icon" href="favicon.svg">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the editor</a>
+<header class="top">
+  <div class="brand"><span class="mark" aria-hidden="true"></span><span>AIgent <b>Studio</b></span></div>
+  <label class="job">Job <input id="job" name="job" placeholder="my-reel" autocomplete="off" spellcheck="false" aria-describedby="job-hint"></label>
+  <span id="job-hint" class="sr">Lowercase letters, numbers and dashes. Your files go in jobs/ under this name.</span>
+  <nav class="steps" aria-label="Steps"><a href="#s-footage">Footage</a><a href="#s-ref">Reference</a><a href="#s-look">Look</a><a href="#s-menu">Effects</a><a href="#s-music">Music</a><a href="#s-render">Render</a><a href="#h-chat" class="tochat">Chat</a></nav>
+  <div id="taskpill" class="pill" role="status" aria-live="polite">Ready</div>
+</header>
+<div class="layout">
+<main id="main">
+  <section class="card" id="s-footage" aria-labelledby="h-footage">
+    <h2 id="h-footage"><span class="n">1</span> Footage</h2>
+    <p class="hint">Drop the raw clip, or several takes. The kit picks the best take of each line and cuts the dead air.</p>
+    <div class="drop" id="drop-footage" tabindex="0" role="button" aria-label="Add footage: drop video files or press Enter to choose">
+      <strong>Drop video here</strong><span>or click to choose (mp4, mov, webm)</span>
+      <input type="file" id="file-footage" accept="video/*,.mov,.mp4,.m4v,.webm,.mkv" multiple hidden>
+    </div>
+    <ul id="footage" class="files"></ul>
+  </section>
+
+  <section class="card" id="s-ref" aria-labelledby="h-ref">
+    <h2 id="h-ref"><span class="n">2</span> Reference <small>optional</small></h2>
+    <p class="hint">A reel you like. Influence borrows its style as soft defaults; Recreate remakes its structure with your clip.</p>
+    <div class="row">
+      <div class="drop small" id="drop-ref" tabindex="0" role="button" aria-label="Add a reference video">
+        <strong>Drop a reference</strong><span>a video you have the rights to</span>
+        <input type="file" id="file-ref" accept="video/*,.mov,.mp4,.m4v,.webm,.mkv" hidden>
+      </div>
+      <div class="col grow">
+        <label class="lbl" for="ref-url">or one public Instagram post or reel link</label>
+        <input id="ref-url" type="url" placeholder="https://www.instagram.com/reel/..." autocomplete="off">
+        <p class="fine">Fetched anonymously with the optional instaloader helper. No login, one post only.</p>
+      </div>
+    </div>
+    <div class="row">
+      <div class="seg" role="radiogroup" aria-label="Reference mode" id="ref-mode">
+        <button role="radio" data-v="influence">Influence</button><button role="radio" data-v="recreate">Recreate</button><button role="radio" data-v="off">Off</button>
+      </div>
+      <button class="btn" id="ref-go">Break it down</button>
+      <span id="ref-status" class="muted"></span>
+    </div>
+    <div id="ref-out" class="refout" hidden></div>
+  </section>
+
+  <section class="card" id="s-look" aria-labelledby="h-look">
+    <h2 id="h-look"><span class="n">3</span> Look</h2>
+    <p class="hint">A style pack is a whole look. Your picks below become locks on top of it.</p>
+    <div id="packs" class="packs" role="radiogroup" aria-label="Style pack"></div>
+    <p id="look-note" class="fine" hidden></p>
+    <form class="row" id="save-pack">
+      <label class="lbl" for="pack-name">Save my selections as a pack</label>
+      <input id="pack-name" placeholder="my-look" pattern="[a-z0-9][a-z0-9\-]{1,40}" required>
+      <button class="btn ghost" type="submit">Save pack</button>
+      <span id="pack-msg" class="muted" role="status"></span>
+    </form>
+  </section>
+
+  <section class="card" id="s-menu" aria-labelledby="h-menu">
+    <h2 id="h-menu"><span class="n">4</span> Effects menu</h2>
+    <p class="hint">Pick what you like: once you pick any transition, only picked transitions are used, and the same for each kind. Forbid what you never want. Tiles marked Still show one frame of the effect.</p>
+    <div class="tabs" role="tablist" id="tabs" aria-label="Effect categories"></div>
+    <label class="tabselect"><span class="lbl">Category</span><select id="tabselect"></select></label>
+    <div class="row tools"><input id="filter" type="search" placeholder="Filter by name" aria-label="Filter effects"><button class="btn ghost small" id="pause" type="button" aria-pressed="false">Pause previews</button><span id="tabhint" class="muted"></span></div>
+    <div id="grid" class="grid" role="tabpanel"></div>
+    <div class="picks"><span class="lbl">Your picks</span><div id="chips" class="chips" aria-live="polite"></div><button class="btn ghost small" id="clear-picks">Clear all</button></div>
+  </section>
+
+  <section class="card" id="s-music" aria-labelledby="h-music">
+    <h2 id="h-music"><span class="n">5</span> Music, sound and pace</h2>
+    <div class="form">
+      <label class="lbl" for="bed">Music bed</label>
+      <div class="row"><select id="bed"></select><audio id="bed-audio" controls preload="none"></audio>
+        <div class="drop tiny" id="drop-music" tabindex="0" role="button" aria-label="Upload your own music"><span>Upload music</span><input type="file" id="file-music" accept="audio/*" hidden></div></div>
+      <span class="lbl" id="l-energy">Music energy</span>
+      <div class="seg" role="radiogroup" aria-labelledby="l-energy" id="energy"><button role="radio" data-v="auto">Auto</button><button role="radio" data-v="low">Low</button><button role="radio" data-v="mid">Mid</button><button role="radio" data-v="high">High</button></div>
+      <span class="lbl" id="l-sfx">Sound effects</span>
+      <div class="row"><div class="seg" role="radiogroup" aria-labelledby="l-sfx" id="sfx"><button role="radio" data-v="on">On</button><button role="radio" data-v="off">Off</button></div>
+        <label class="check"><input type="checkbox" id="cap"> keep sounds sparse (sound cap)</label></div>
+      <span class="lbl" id="l-pace">Pace</span>
+      <div class="row"><div class="seg" role="radiogroup" aria-labelledby="l-pace" id="tighten"><button role="radio" data-v="">Pack decides</button><button role="radio" data-v="off">Keep pauses</button><button role="radio" data-v="0.5">Tight</button><button role="radio" data-v="0.3">Tighter</button><button role="radio" data-v="0.2">Tightest</button></div>
+        <label class="check"><input type="checkbox" id="punch"> zoom punch on cuts</label></div>
+      <label class="lbl" for="export">Export for</label>
+      <select id="export"></select>
+    </div>
+  </section>
+
+  <section class="card" id="s-render" aria-labelledby="h-render">
+    <h2 id="h-render"><span class="n">6</span> Plan and render</h2>
+    <p class="hint">Draft first: the kit cuts, captions and picks inside your locks, then shows each pick and why. Change any of it, then render.</p>
+    <pre id="cmd" class="cmd" aria-label="The command Studio will run"></pre>
+    <div class="row"><button class="btn" id="draft" type="button">Draft</button><button class="btn ghost" id="render" type="button">Render</button><button class="btn ghost" id="cancel" hidden>Cancel</button><span id="elapsed" class="muted"></span></div>
+    <div id="notes" class="notes"></div>
+    <pre id="log" class="log" aria-live="off" hidden></pre>
+    <div id="choices" class="choices"></div>
+    <div id="outputs" class="outputs"></div>
+  </section>
+</main>
+<aside class="chat" aria-labelledby="h-chat">
+  <h2 id="h-chat">Editor chat</h2>
+  <p id="chatmode" class="fine"></p>
+  <ol id="msgs" class="msgs" aria-live="polite"></ol>
+  <form id="chatform" class="chatform">
+    <label class="sr" for="chatin">Tell the editor the vibe</label>
+    <textarea id="chatin" rows="2" placeholder="Calm and cinematic, no glitch, typewriter titles"></textarea>
+    <button class="btn" type="submit">Send</button>
+  </form>
+</aside>
+</div>
+<div id="toast" class="toast" role="alert" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

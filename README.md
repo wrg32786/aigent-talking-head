@@ -52,6 +52,19 @@ You get `jobs/my-reel/reel-v1.mp4` and `reel-v1-reels.mp4` (inside Instagram's s
 
 Made a reel? [Star the repo](https://github.com/wrg32786/aigent-talking-head) and [share it](#show-your-reel).
 
+## Studio: pick your effects in a browser
+
+`npm run studio` opens a local page where you drop in your footage, add a reference reel to borrow from (as an influence or a full recreation), click effects from a visual menu in 17 categories, pick a style pack, music energy and pace, then draft, review every pick and render. Talk to it in plain words ("calm and cinematic, no glitch"), connect your own assistant over MCP, or set an API key. Everything runs on your computer. Guide: [docs/studio.md](docs/studio.md).
+
+<img src="docs/studio/desktop.png" width="720" alt="Studio in a browser: footage, reference and style pack steps, with the effects menu below">
+
+**No terminal?** One line installs everything and puts a "Talking Head Studio" icon on your desktop:
+
+- macOS or Linux: `curl -fsSL https://raw.githubusercontent.com/wrg32786/aigent-talking-head/main/install/install.sh | bash`
+- Windows (PowerShell): `irm https://raw.githubusercontent.com/wrg32786/aigent-talking-head/main/install/install.ps1 | iex`
+
+Or tell your assistant "install aigent-talking-head and open Studio" ([docs/setup-with-ai.md](docs/setup-with-ai.md)).
+
 ## Install
 
 | Need | Mac | Linux | Windows |
@@ -94,8 +107,9 @@ Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FRE
 | Editing principles built in: mixed serif and sans, titles placed around the head, colour and chapter cards, music by energy, mapped and capped sounds, punch-ins, no dead air | 7, all in `--preset magazine` | [Guide](docs/guide.md#editing-principles-built-in), [effects menu](docs/effects.md#editing-principles) |
 | Sound effects and CC0 music beds, beat-synced | 37 and 11 | [Music beds](kit/music/README.md) |
 | Export presets: TikTok, Reels, Shorts, 4:5, 1:1 | 5 | [Quick start](#quick-start) |
+| Studio: a local page to pick effects visually, chat, draft and render | 1 | [docs/studio.md](docs/studio.md) |
 | Agent skills, installed with `npx skills add wrg32786/aigent-talking-head` | 7 | [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) |
-| MCP tools: menu, list_effects, draft, plan, validate, render, verify | 7 | [MCP setup](docs/mcp.md) |
+| MCP tools: menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify, and three for Studio | 14 | [MCP setup](docs/mcp.md) |
 
 Also: a `plan` step that proposes graphics from your transcript, a layout pass that stops overlaps, `verify` with a contact sheet, [Reel.md recipes](#reelmd-recipes) you can share, and [teardowns](#remake-a-reel-you-like) that turn a reel you like into a recipe. `npm run menu` prints every option.
 
@@ -286,6 +300,7 @@ Machine-readable metadata is in [CITATION.cff](CITATION.cff), and GitHub shows i
 
 ## Docs
 
+- [Studio](docs/studio.md): the local page for footage, references, the visual effects menu, chat, draft and render. [One-line setup](docs/setup-with-ai.md), and the [desktop app plan](docs/desktop-app-plan.md).
 - [Effects menu](docs/effects.md): every transition, title entrance, caption entrance and caption style, animated, with the exact name to use.
 - [Style packs](docs/packs.md): the pack gallery, locks, the choices table, and how to make and share your own pack.
 - [User guide](docs/guide.md): what you get, the effects pass, looks, caption styles and fonts, edit rules, themes, manual steps, the file map and brand presets.

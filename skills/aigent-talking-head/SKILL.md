@@ -150,6 +150,13 @@ Common short-form editing advice built in as options; `--preset magazine` or `- 
 - After a draft, show the user the choices table it printed (or `npm run choices -- <job>`, MCP `explain`). Each pick says why: locked, pack or preset, recipe, you, kit default, or engine picks at render. To change a pick, edit `jobs/<job>/choices.json` and run `npm run choices -- <job> --apply` (MCP `explain` with `apply: true`), or pin it with `npm run choices -- <job> --lock "..."` (MCP `set_locks`), then `npm run reel -- --rebuild --name <job>`.
 - A user who wants to keep a look: `npm run pack:new -- <name> --from <preset|pack|job>`, then `npm run pack:validate -- <name>`. Packs are data only and must list any asset with a permissive license.
 
+## Studio (a visual front end the user can click)
+
+- Setup for someone who doesn't use a terminal: the one-line installer (`install/install.sh` for macOS and Linux, `install/install.ps1` for Windows) installs the dependencies, makes the venv and puts a "Talking Head Studio" launcher on the desktop. Steps for agents: docs/setup-with-ai.md. Ask before passing `--yes`, which installs missing tools with the system package manager.
+- `npm run studio` serves http://127.0.0.1:4757 (`--port`, `--no-open`): footage upload, a reference teardown used as influence (soft defaults on the chosen pack) or recreate (`--recipe` from its Reel.md), the effects menu in 17 categories (kit/studio/categories.json, only engine effects), packs, music energy, sound, pace, a chat, and draft, choices and render.
+- When the user has Studio open, use its session instead of separate drafts: `studio_get_state` (read the chat lines from the user and answer them), `studio_set_selections` (refs like `transition:whip` allow, deny or clear; `pack`; `music`; `sound`; `pace`; `reply`), `studio_run` with `draft` or `render`, then `explain` with the job. The page updates live.
+- Picking any item of a kind means only the picked ones of that kind are used (a lock); forbidding leaves the rest. Effects from the effects pass are planned per beat and need `npm run effects:setup`.
+
 ## Transitions
 
 56 named cuts for `cut.json` segments (`"transition": "<name>"`, optional `"transitionDur"`) or a recipe shot (`| transition <name>`); the glitch seam is the default and right most of the time. The list is `kit/transitions.json`.
