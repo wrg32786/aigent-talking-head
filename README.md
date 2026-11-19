@@ -4,7 +4,11 @@
 
 Made by Will Gwyn at [The AIgent](https://theaigent.xyz).
 
-[Quick start](#quick-start) · [Install](#install) · [Features](#features) · [How it compares](#how-it-compares) · [FAQ](#faq) · [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) · [Guide](docs/guide.md) · [Full gallery](showcase/GALLERY.md)
+[![GitHub stars](https://img.shields.io/github/stars/wrg32786/aigent-talking-head?style=social)](https://github.com/wrg32786/aigent-talking-head/stargazers)
+
+If it saves you an edit, a ⭐ helps other creators find it.
+
+[Quick start](#quick-start) · [Install](#install) · [Features](#features) · [How it compares](#how-it-compares) · [FAQ](#faq) · [Show your reel](#show-your-reel) · [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) · [Guide](docs/guide.md) · [Full gallery](showcase/GALLERY.md)
 
 ![Before and after: a plain phone clip on the left, the finished reel with kinetic captions and graphics on the right](kit/example/demo-reel/before-after.gif)
 
@@ -45,6 +49,8 @@ You get `jobs/my-reel/reel-v1.mp4` and `reel-v1-reels.mp4` (inside Instagram's s
 - Change something: edit `jobs/<name>/build/captions.js` or `build/cut.json`, then `npm run reel -- --rebuild --name <name>`.
 - Accuracy over speed: `--model large-v3` (about 3 GB, downloaded once, a notice prints first).
 - Everything else (looks, edit rules, themes, manual steps, presets, the file map) is in the [user guide](docs/guide.md). Every command and flag is in [contract.json](contract.json).
+
+Made a reel? [Star the repo](https://github.com/wrg32786/aigent-talking-head) and [share it](#show-your-reel).
 
 ## Install
 
@@ -248,6 +254,12 @@ That installs seven skills: aigent-talking-head, talking-head-reel, talking-head
 
 **MCP.** `npm run mcp` serves the same flow as MCP tools (menu, list_effects, draft, plan, validate, render, verify) with schemas generated from contract.json. See the [MCP setup for Claude Code, Cursor and Codex](docs/mcp.md). For a summary written for language models, see [llms.txt](llms.txt).
 
+## Show your reel
+
+Posted a reel you made with this kit? [Open a Show your reel issue](https://github.com/wrg32786/aigent-talking-head/issues/new?template=show-your-reel.md) and drop the link, or tag [@the_aigent_news](https://www.instagram.com/the_aigent_news/) on Instagram. A star on the repo helps other creators find it.
+
+The CLI may print a one-line star reminder after your first successful render, and once more after five renders. It is skipped when stdout is not a TTY, when `CI` is set, when you pass `--json`, or when `AIGENT_NO_STAR=1`.
+
 ## Cite this
 
 > Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.2.0) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
@@ -262,7 +274,7 @@ Machine-readable metadata is in [CITATION.cff](CITATION.cff), and GitHub shows i
 - [Teardown guide and accuracy notes](docs/teardown.md).
 - [MCP server setup](docs/mcp.md).
 - [Full FAQ](docs/faq.md).
-- [Notes for agents working in this repo](AGENTS.md) and the [changelog](CHANGELOG.md).
+- [Notes for agents working in this repo](AGENTS.md), how to [contribute or support the project](CONTRIBUTING.md), and the [changelog](CHANGELOG.md).
 
 ## Credits and licences
 

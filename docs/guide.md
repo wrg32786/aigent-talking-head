@@ -145,6 +145,7 @@ Agents: start at [AGENTS.md](../AGENTS.md).
 | `kit/transitions.json` | Transition names mapped to ffmpeg xfade modes. |
 | `kit/themes/` | Theme presets: `aigent.js` (default) and `neutral.js`. |
 | `kit/chrome.mjs` | Finds Chrome on Mac, Linux or Windows; `CHROME_PATH` overrides. |
+| `kit/star.cjs` | After a successful render, may print a one-line star reminder on the first render and once more after five renders. Skipped with `--json`, a non-TTY stdout, `CI`, or `AIGENT_NO_STAR=1`. |
 | `kit/smoke.mjs` | `npm run smoke`: synthetic end-to-end test (includes the effects pass once `npm run effects:setup` has run). |
 | `kit/fx.cjs` | `npm run fx`: the effects pass over a job's reel (check frames, render, captions kept on top). |
 | `effects/` | Effect catalog, vendored claude-video-effects, setup, update and check scripts. |
