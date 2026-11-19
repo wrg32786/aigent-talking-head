@@ -97,6 +97,9 @@ if (-not (Test-Path $vpy)) { $a = @($py | Select-Object -Skip 1) + @('-m', 'venv
 & $vpy -m pip install --quiet -r requirements.txt
 if ($LASTEXITCODE -ne 0) { Stop-Install 'pip install failed' }
 Ok 'Python packages'
+# optional reference-link helpers for Studio: yt-dlp (Unlicense) and instaloader (MIT, anonymous). Not fatal.
+& $vpy -m pip install --quiet --upgrade yt-dlp instaloader
+if ($LASTEXITCODE -eq 0) { Ok 'yt-dlp and instaloader (Studio reference links)' } else { Write-Host "    note: yt-dlp did not install; Studio still takes direct video links. Later: $vpy -m pip install yt-dlp" }
 if ($PrefetchModel) {
   Say 'Downloading the Whisper model (small.en, about 470 MB)'
   & $vpy -c "from faster_whisper import WhisperModel; WhisperModel('small.en')"

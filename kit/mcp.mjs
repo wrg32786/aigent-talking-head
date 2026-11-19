@@ -3,8 +3,11 @@
 //   npm run mcp            (an MCP client starts this; see docs/mcp.md for Claude Code, Cursor and Codex)
 // Tools: menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify. Each runs the matching npm command from the repo root with
 // --json where the command has it and returns the log tail plus the JSON result (structuredContent).
-// Studio tools: studio_get_state, studio_set_selections, studio_run. They read and write the same session as the Studio page
-// (npm run studio, kit/studio/core.mjs), so you and the user see and change the same picks; the page updates live.
+// Studio tools: studio_start, studio_get_state, studio_set_selections, studio_run, studio_wait_for_message, studio_get_pending,
+// studio_reply, studio_add_reference_url, studio_get_reference_teardown, studio_settings. They read and write the same
+// session as the Studio page (npm run studio, kit/studio/core.mjs), so you and the user see and change the same picks; the
+// page updates live. The Studio chat is its own channel (kit/studio/channel.mjs): answer page messages with studio_reply,
+// keep the terminal conversation in the terminal.
 // Built on the official MCP TypeScript SDK (@modelcontextprotocol/sdk, MIT). Logs go to stderr; stdout is the protocol.
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -14,6 +17,9 @@ import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import * as Studio from './studio/core.mjs';
+import * as Channel from './studio/channel.mjs';
+import * as Settings from './studio/settings.mjs';
+import * as Launch from './studio/launch.mjs';
 
 const KIT = dirname(fileURLToPath(import.meta.url)), ROOT = dirname(KIT);
 const C = JSON.parse(readFileSync(join(ROOT, 'contract.json'), 'utf8'));
@@ -110,19 +116,75 @@ const TOOLS = [
       const out = { state: s, compose: comp, outputs: Studio.outputsOf(s), statePath: Studio.statePath() };
       if (a.catalog) out.catalog = { categories: c.categories.filter(x => x.count).map(x => ({ id: x.id, label: x.label, items: x.items })), packs: c.packs.map(p => p.name), beds: c.beds.map(b => `${b.id} (${b.energy})`), exports: c.exports, selectable: Object.values(c.items).filter(i => i.mode !== 'info').map(i => i.ref) };
       return out; } },
-  { name: 'studio_set_selections', description: 'Change the Studio session; the page updates live. Use it when the user tells you a vibe or names effects. Fields (all optional): pack (a pack name or null), picks { "transition:whip": "allow" | "deny" | "clear" } (kind:id refs from studio_get_state with catalog true; allow means only allowed ones of that kind are used, deny forbids one), clearPicks, music { bed: auto | none | a bed id, energy: auto | low | mid | high }, sound { sfx: on | off, cap: on | off }, pace { tighten: null | off | 0.1 to 2, punch: on | off }, export, job, reference { mode: influence | recreate | off }, reply (your answer, shown in the Studio chat), say (a user line you relay). Unknown names are refused and nothing is changed.',
-    inputSchema: { type: 'object', properties: { pack: { type: ['string', 'null'] }, picks: { type: 'object', additionalProperties: { type: 'string', enum: ['allow', 'deny', 'clear'] } }, clearPicks: { type: 'boolean' }, music: { type: 'object' }, sound: { type: 'object' }, pace: { type: 'object' }, export: { type: ['string', 'null'] }, job: { type: 'string' }, reference: { type: 'object' }, reply: { type: 'string' }, say: { type: 'string' } }, additionalProperties: false },
-    direct: a => { const s = Studio.load(), r = Studio.applyPatch(s, { ...a, from: 'assistant' }); if (r.errs.length) throw new Error(r.errs.join('; ')); Studio.save(s); return { ok: true, changed: r.log, compose: Studio.compose(s) }; } },
+  { name: 'studio_set_selections', description: 'Change the Studio session; the page updates live. Use it when the user tells you a vibe or names effects. Fields (all optional): pack (a pack name or null), picks { "transition:whip": "allow" | "deny" | "clear" } (kind:id refs from studio_get_state with catalog true; allow means only allowed ones of that kind are used, deny forbids one), clearPicks, music { bed: auto | none | a bed id, energy: auto | low | mid | high }, sound { sfx: on | off, cap: on | off }, pace { tighten: null | off | 0.1 to 2, punch: on | off }, export, job, reference { mode: influence | recreate | off }, reply (your answer to a Studio message, shown in the Studio chat; prefer studio_reply), origin ("studio" when a Studio page message asked for this, "terminal" when the user asked in your terminal conversation: Studio then shows only a one-line action note such as "changed transitions to whip (from the terminal)" if the user keeps action notes on; never put terminal conversation in reply). Unknown names are refused and nothing is changed.',
+    inputSchema: { type: 'object', properties: { pack: { type: ['string', 'null'] }, picks: { type: 'object', additionalProperties: { type: 'string', enum: ['allow', 'deny', 'clear'] } }, clearPicks: { type: 'boolean' }, music: { type: 'object' }, sound: { type: 'object' }, pace: { type: 'object' }, export: { type: ['string', 'null'] }, job: { type: 'string' }, reference: { type: 'object' }, reply: { type: 'string' }, say: { type: 'string' }, origin: { type: 'string', enum: ['studio', 'terminal'] } }, additionalProperties: false },
+    direct: a => { seen(); const { origin, ...patch } = a; if (origin === 'terminal') { delete patch.reply; delete patch.say; }
+      const s = Studio.load(), r = Studio.applyPatch(s, { ...patch, from: Channel.prettyName(agentName()) }); if (r.errs.length) throw new Error(r.errs.join('; '));
+      const note = origin === 'terminal' && Settings.load().actionNotes ? Channel.actionNote(s, r.log.filter(x => !/^job /.test(x)), agentName()) : null;
+      Studio.save(s); return { ok: true, changed: r.log, actionNote: note, compose: Studio.compose(s) }; } },
   { name: 'studio_run', description: 'Start a draft or a render in the running Studio (npm run studio) so the user sees the progress in the page. Then poll studio_get_state (task) and, after a draft, call explain with the job to talk the picks through. Needs Studio open; otherwise use draft and render.',
     inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['draft', 'render'] }, port: { type: 'number', description: 'Studio port, default 4757' } }, required: ['action'], additionalProperties: false },
     direct: async a => { const port = a.port || +(process.env.STUDIO_PORT || 4757); let r; try { r = await fetch(`http://127.0.0.1:${port}/api/${a.action}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); } catch { throw new Error(`Studio is not running on port ${port}. Ask the user to run npm run studio (or use the draft and render tools).`); }
       const j = await r.json(); if (!r.ok) throw new Error(j.error || `Studio said ${r.status}`); return { ok: true, task: j.task, compose: j.compose }; } },
 ];
+// ---------- Studio as a chat channel for this agent ----------
+let clientName = null;
+const agentName = () => clientName || 'agent';
+const seen = (extra = {}) => { try { Channel.touch({ name: clientName, ...extra }); } catch {} };
+const studioPort = a => a.port || +(process.env.STUDIO_PORT || 4757);
+async function studioPost(a, path, body) {
+  let r; try { r = await fetch(`http://127.0.0.1:${studioPort(a)}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}) }); }
+  catch { throw new Error(`Studio is not running on port ${studioPort(a)}. Start it with studio_start (or npm run studio:agent).`); }
+  const j = await r.json(); if (!r.ok) throw new Error(j.error || `Studio said ${r.status}`); return j;
+}
+const CHANNEL_RULE = 'The Studio page chat is a separate channel from your terminal conversation: answer Studio messages with studio_reply (they show only in Studio), answer terminal messages in the terminal, and never paste terminal discussion into Studio unless the user asks.';
+TOOLS.push(
+  { name: 'studio_start', description: 'Start Studio in the background if it is not running (same as npm run studio:agent), open it in the user\'s browser, and return its URL. Then call studio_wait_for_message to listen to the Studio chat. ' + CHANNEL_RULE,
+    inputSchema: { type: 'object', properties: { port: { type: 'number', description: 'default 4757' }, open: { type: 'boolean', description: 'open the browser, default true' } }, additionalProperties: false },
+    direct: async a => { seen(); const r = await Launch.start({ port: studioPort(a), open: a.open !== false }); return { ...r, next: 'Tell the user Studio is open at ' + r.url + ', then call studio_wait_for_message.' }; } },
+  { name: 'studio_wait_for_message', description: 'Listen to the Studio page chat: waits up to timeout_s (default 45, max 240) for the user to type in Studio, then returns those messages (marked seen on the page) with the session context (picks, reference teardown, task). Answer each with studio_reply, change the edit with studio_set_selections (origin studio) or other studio_ tools, then call this again. Returns { messages: [] , timedOut: true } when nothing came; call it again to keep listening. While it waits the page shows you as listening. ' + CHANNEL_RULE,
+    inputSchema: { type: 'object', properties: { timeout_s: { type: 'number', description: 'seconds to wait, default 45 (keep under your client\'s tool timeout)' } }, additionalProperties: false },
+    direct: async a => {
+      const until = Date.now() + Math.min(Math.max(+a.timeout_s || 45, 1), 240) * 1000;
+      let beat = 0;
+      try {
+        for (;;) {
+          const r = Channel.take();
+          if (r.messages.length) { seen({ waiting: false }); return { messages: r.messages, context: Channel.context(r.state), howToAnswer: 'studio_reply { replyTo: <id>, text, patch? }' }; }
+          if (Date.now() >= until) break;
+          if (Date.now() - beat > 4000) { seen({ waiting: true }); beat = Date.now(); }
+          await new Promise(ok => setTimeout(ok, 400));
+        }
+      } finally { seen({ waiting: false }); }
+      return { messages: [], timedOut: true, next: 'nothing new in Studio; call studio_wait_for_message again to keep listening, or go back to the terminal' };
+    } },
+  { name: 'studio_get_pending', description: 'Check the Studio page chat without waiting: returns messages the user typed in Studio that you have not read (and marks them seen), plus the session context. Call it at the start of every turn while Studio is open, so Studio messages are never missed while you work in the terminal. ' + CHANNEL_RULE,
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    direct: () => { seen(); const r = Channel.take(); return r.messages.length ? { messages: r.messages, context: Channel.context(r.state) } : { messages: [] }; } },
+  { name: 'studio_reply', description: 'Answer in the Studio page chat (the Studio channel only; it never shows in the terminal). replyTo is the id (or ids) of the Studio messages you answer; they show as answered. patch, optional, changes the edit first with the same fields as studio_set_selections (pack, picks, music, sound, pace, export, reference { mode }); unknown names are refused and nothing is changed. ' + CHANNEL_RULE,
+    inputSchema: { type: 'object', properties: { text: { type: 'string', description: 'your answer, plain and short' }, replyTo: { oneOf: [{ type: 'number' }, { type: 'array', items: { type: 'number' } }] }, patch: { type: 'object' } }, required: ['text'], additionalProperties: false },
+    direct: a => { seen(); const r = Channel.reply({ text: a.text, replyTo: a.replyTo, patch: a.patch, agent: agentName() }); if (r.errs.length) throw new Error(r.errs.join('; ')); return { ok: true, ...r }; } },
+  { name: 'studio_add_reference_url', description: 'Add one or more reference video links to Studio (YouTube, Shorts, TikTok, X, Vimeo, a direct .mp4, or one public Instagram post fetched anonymously). Studio downloads each to the user\'s download folder, runs the teardown and shows it in the page; poll studio_get_reference_teardown. mode: influence (borrow the style) or recreate (follow its structure). Only for videos the user has the rights to use as a reference. Needs Studio running.',
+    inputSchema: { type: 'object', properties: { urls: { type: 'array', items: { type: 'string' } }, url: { type: 'string' }, mode: { type: 'string', enum: ['influence', 'recreate', 'off'] }, port: { type: 'number' } }, additionalProperties: false },
+    direct: async a => { seen(); const j = await studioPost(a, '/api/reference/url', { urls: [].concat(a.urls || [], a.url || []), mode: a.mode }); return { added: j.added.map(x => ({ id: x.id, url: x.url, site: x.site, status: x.status, error: x.error })), next: 'poll studio_get_reference_teardown until status is ready or failed' }; } },
+  { name: 'studio_get_reference_teardown', description: 'The reference queue and teardowns: each link with its status (queued, downloading, tearing, ready, failed), progress and error, and for ready ones the teardown summary (duration, shots, cut times, average shot and pacing, music BPM, beats, energy, caption style, titles, detected transitions, finishes, graphics and effects, and suggestions mapped to the Studio menu as kind:id refs with reasons). id picks one; the default is the one the session uses.',
+    inputSchema: { type: 'object', properties: { id: { type: 'number' } }, additionalProperties: false },
+    direct: a => { seen(); const s = Studio.load(), q = s.reference.queue || [];
+      const pickOne = a.id ? q.find(x => x.id === a.id) : q.find(x => x.id === s.reference.active);
+      return { mode: s.reference.mode, active: s.reference.active, queue: q.map(x => ({ id: x.id, url: x.url, site: x.site, title: x.title, status: x.status, progress: x.progress, error: x.error })),
+        teardown: pickOne ? { id: pickOne.id, url: pickOne.url, status: pickOne.status, recipe: pickOne.out ? pickOne.out + '/Reel.md' : null, report: pickOne.out ? pickOne.out + '/teardown.md' : null, extracted: pickOne.extracted || null } : (s.reference.extracted ? { id: null, file: s.reference.file, extracted: s.reference.extracted } : null) }; } },
+  { name: 'studio_settings', description: 'Read or change Studio settings: downloads (folder for reference downloads, a full path; null resets to the kit\'s gitignored teardown-in/studio/<job>/), renders (folder finished reels are copied to; null for none), actionNotes (true: a one-line note in Studio when you change the edit from the terminal), chat { backend: agent (default: you answer the Studio chat) | auto | anthropic | openai | local | keywords, baseUrl (local OpenAI-compatible server), model }. Folders are checked to exist or be creatable and writable.',
+    inputSchema: { type: 'object', properties: { downloads: { type: ['string', 'null'] }, renders: { type: ['string', 'null'] }, actionNotes: { type: 'boolean' }, chat: { type: 'object' } }, additionalProperties: false },
+    direct: a => { seen(); if (!Object.keys(a).length) return { settings: Settings.load(), path: Settings.settingsPath() }; const r = Settings.update(a); if (r.errs.length) throw new Error(r.errs.join('; ')); try { const s = Studio.load(); Studio.save(s); } catch {} return { ok: true, settings: r.settings }; } },
+);
+for (const t of TOOLS) if (t.name.startsWith('studio_') && t.direct && !t._wrapped) { const d = t.direct; t.direct = a => { seen(); return d(a); }; t._wrapped = true; }
+
 for (const c of [REEL, PLAN, VERIFY, MENU, RMD, CHECK, PACK, CHOICES]) if (!existsSync(join(ROOT, c.script))) throw new Error(`${c.name}: ${c.script} is missing`);
 
-const server = new Server({ name: 'aigent-talking-head', version: PKG.version }, { capabilities: { tools: {} }, instructions: 'Talking-head reel kit. Flow: menu (offer options; list_effects for transitions, title or caption entrances with preview paths, and docs/effects.md to show them animated; list_packs for whole looks with previews in docs/packs.md), draft (transcribe, with pack and lock when the user picked a look or pinned choices), explain (show the user what was picked per beat and why; they can change any of it, or pin it with set_locks), plan (propose graphics from the words), review the Reel.md with the user, validate, render (with export for a platform), verify (then look at the contact sheet). When the user has Studio open (npm run studio), work in their session: studio_get_state (read their picks and the chat), studio_set_selections (change picks, answer in the chat with reply), studio_run (draft or render with progress in their page). Read skills/aigent-talking-head/SKILL.md for the rules: on-screen words are words the presenter says, nothing ever covers the face.' });
+const server = new Server({ name: 'aigent-talking-head', version: PKG.version }, { capabilities: { tools: {} }, instructions: 'Talking-head reel kit. Flow: menu (offer options; list_effects for transitions, title or caption entrances with preview paths, and docs/effects.md to show them animated; list_packs for whole looks with previews in docs/packs.md), draft (transcribe, with pack and lock when the user picked a look or pinned choices), explain (show the user what was picked per beat and why; they can change any of it, or pin it with set_locks), plan (propose graphics from the words), review the Reel.md with the user, validate, render (with export for a platform), verify (then look at the contact sheet). Studio (npm run studio:agent or studio_start): you are the agent in the Studio page chat. When idle, listen with studio_wait_for_message and answer with studio_reply; while you work in the terminal, call studio_get_pending at the start of each turn. The Studio chat and the terminal are separate channels: answer each where it was asked, and never copy terminal conversation into Studio. Change the edit with studio_set_selections (origin studio or terminal), add reference links with studio_add_reference_url, read teardowns with studio_get_reference_teardown, and start drafts or renders with studio_run. Read skills/aigent-talking-head/SKILL.md for the rules: on-screen words are words the presenter says, nothing ever covers the face.' });
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) }));
 server.setRequestHandler(CallToolRequestSchema, async req => {
+  if (!clientName) { const v = server.getClientVersion && server.getClientVersion(); if (v && v.name) clientName = v.name; }
   const t = TOOLS.find(x => x.name === req.params.name);
   if (!t) return { isError: true, content: [{ type: 'text', text: `unknown tool ${req.params.name}` }] };
   if (t.direct) {

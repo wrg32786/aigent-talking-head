@@ -7,11 +7,14 @@
 // studio_set_selections read and write the same file, and the page updates live when they do.
 import http from 'http';
 import { spawn } from 'child_process';
-import { createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, statSync, watchFile, writeFileSync } from 'fs';
+import { copyFileSync, createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, watchFile, writeFileSync } from 'fs';
 import { join, extname, basename, resolve, sep } from 'path';
 import { createRequire } from 'module';
 import * as C from './core.mjs';
 import * as LLM from './llm.mjs';
+import * as S from './settings.mjs';
+import * as F from './fetch.mjs';
+import * as CH from './channel.mjs';
 
 const require = createRequire(import.meta.url);
 const K = require('../packs.cjs');
@@ -33,12 +36,16 @@ const VIDEO = ['.mp4', '.mov', '.m4v', '.webm', '.mkv'], AUDIO = ['.mp3', '.wav'
 const clients = new Set();
 const send = (ev, data) => { const s = `event: ${ev}\ndata: ${JSON.stringify(data)}\n\n`; for (const c of clients) c.write(s); };
 let lastRev = -1;
-const pushState = () => { const s = C.load(); if (s.rev !== lastRev) { lastRev = s.rev; send('state', view(s)); } };
+const pushState = force => { const s = C.load(); if (s.rev !== lastRev || force === true) { lastRev = s.rev; send('state', view(s)); } };
 const update = fn => { const s = C.load(); const r = fn(s); C.save(s); pushState(); return r === undefined ? s : r; };
 
 function env() {
-  const p = LLM.provider();
-  return { llm: p ? `${p.name} (${p.model})` : null, effectsReady: existsSync(join(ROOT, 'effects', '.venv')), port: PORT };
+  const st = S.load(), backend = st.chat.backend, p = backend === 'agent' || backend === 'keywords' ? null : LLM.provider(process.env, st.chat);
+  const t = F.tools();
+  return { llm: p ? `${p.name}${p.model ? ' (' + p.model + ')' : ''}` : null, backend, agent: CH.presence(), effectsReady: existsSync(join(ROOT, 'effects', '.venv')), port: PORT,
+    settings: { downloads: st.downloads, renders: st.renders, actionNotes: st.actionNotes, chat: st.chat, from: st.from, defaultDownloads: 'teardown-in/studio/<job>/ (in the kit, not shared)', defaultRenders: 'jobs/<job>/ (in the kit)' },
+    keys: { anthropic: !!process.env.ANTHROPIC_API_KEY, openai: !!process.env.OPENAI_API_KEY }, localPresets: S.LOCAL_PRESETS,
+    tools: { ytdlp: t.ytdlp ? t.ytdlp.version : null, instaloader: t.instaloader, ffmpeg: t.ffmpeg }, install: F.INSTALL };
 }
 function view(s) {
   let comp; try { comp = C.compose(s, { refPack: refPackName(s) }); } catch (e) { comp = { args: [], errs: [e.message], notes: [] }; }
@@ -47,15 +54,18 @@ function view(s) {
 
 // ---------- tasks (one at a time) ----------
 let task = null, seq = 0;
-function runTask(kind, steps, done) {
+function runTask(kind, steps, done, hooks = {}) {
   if (task && task.status === 'running') throw Object.assign(new Error(`busy: ${task.kind} is running`), { code: 409 });
   task = { id: ++seq, kind, status: 'running', startedAt: Date.now(), lines: [], proc: null };
   const me = task;
-  const log = l => { for (const x of String(l).split(/\r?\n/)) if (x.trim()) { me.lines.push(x.slice(0, 400)); if (me.lines.length > 400) me.lines.shift(); send('log', { id: me.id, line: x.slice(0, 400) }); } };
+  const log = l => { for (const x of String(l).split(/\r?\n/)) if (x.trim()) { me.lines.push(x.slice(0, 400)); if (me.lines.length > 400) me.lines.shift(); send('log', { id: me.id, line: x.slice(0, 400) }); if (hooks.line) try { hooks.line(x); } catch {} } };
   update(s => { s.task = { id: me.id, kind, status: 'running' }; });
   (async () => {
     let out = '';
+    let si = 0;
     for (const [script, args] of steps()) {
+      if (hooks.step) try { hooks.step(si); } catch {}
+      si++;
       log(`$ node ${script} ${args.map(a => /\s/.test(a) ? JSON.stringify(a) : a).join(' ')}`);
       const code = await new Promise(res => {
         const p = spawn(process.execPath, [join(ROOT, script), ...args], { cwd: ROOT, env: process.env });
@@ -67,7 +77,7 @@ function runTask(kind, steps, done) {
       if (code !== 0) { me.status = 'failed'; me.result = { code }; break; }
     }
     if (me.status === 'running') { me.status = 'done'; try { me.result = (await done(out)) || {}; } catch (e) { me.status = 'failed'; log('error: ' + e.message); } }
-  })().finally(() => { me.endedAt = Date.now(); update(s => { s.task = { id: me.id, kind, status: me.status }; s.outputs = C.outputsOf(s); }); send('task', { id: me.id, status: me.status }); });
+  })().finally(() => { me.endedAt = Date.now(); if (hooks.end) try { hooks.end(me.status, me.lines); } catch (e) { log('error: ' + e.message); } update(s => { s.task = { id: me.id, kind, status: me.status }; s.outputs = C.outputsOf(s); }); send('task', { id: me.id, status: me.status }); setImmediate(pump); });
   return me;
 }
 
@@ -122,6 +132,66 @@ function teardownSteps(s, url) {
   return { steps: [['kit/teardown.mjs', args]], out };
 }
 
+// ---------- reference links: a queue, one download and teardown at a time ----------
+const TEARDOWN = process.env.STUDIO_TEARDOWN || 'kit/teardown.mjs';
+const relOf = p => (p.startsWith(ROOT + sep) ? p.slice(ROOT.length + 1) : p).split(sep).join('/');
+function refDir(s) { const st = S.load(); return st.downloads ? join(st.downloads, s.job) : join(ROOT, 'teardown-in', 'studio', s.job); }
+const setItem = (id, fn) => update(st => { const it = (st.reference.queue || []).find(x => x.id === id); if (it) fn(it, st); });
+function useItem(st, it) {
+  st.reference = { ...st.reference, active: it.id, file: it.file, url: it.url, status: 'ready', out: it.out, extracted: it.extracted, contact: it.contact || null, applied: false };
+}
+function addLinks(urls) {
+  const s0 = C.load(); if (!s0.job) throw Object.assign(new Error('name the job first'), { code: 400 });
+  const list = [...new Set(urls.map(u => String(u || '').trim()).filter(Boolean))].slice(0, 20);
+  if (!list.length) throw Object.assign(new Error('paste one or more links'), { code: 400 });
+  const added = [];
+  update(st => {
+    const q = st.reference.queue || (st.reference.queue = []);
+    for (const url of list) {
+      const c = F.classify(url), id = (st.refSeq = (st.refSeq || 0) + 1);
+      const miss = c.ok ? F.missingFor(c) : null;
+      const it = { id, url: c.url || url, site: c.site || null, via: c.via || null, status: c.ok && !miss ? 'queued' : 'failed', progress: 0, error: c.ok ? miss : c.error, hint: miss || null, at: new Date().toISOString() };
+      q.push(it); added.push(it);
+    }
+    if (q.length > 30) st.reference.queue = q.slice(-30);
+  });
+  setImmediate(pump);
+  return added;
+}
+function pump() {
+  if (task && task.status === 'running') return;
+  const s = C.load(), it = (s.reference.queue || []).find(x => x.status === 'queued');
+  if (!it || !s.job) return;
+  const dir = refDir(s), file = join(dir, `ref-${it.id}.mp4`), out = join('teardown', `studio-${s.job}-r${it.id}`);
+  const max = String(+(process.env.STUDIO_REF_MAX_SECONDS || F.DEFAULT_MAX_SECONDS));
+  let lastP = -1, title = null;
+  setItem(it.id, x => { x.status = 'downloading'; x.progress = 0; x.error = null; x.file = file; x.out = out.split(sep).join('/'); });
+  try {
+    runTask('reference', () => [['kit/studio/fetch.mjs', [it.url, '--out', file, '--max-seconds', max, '--json']],
+      [TEARDOWN, [file, '--out', out, '--name', `studio-${s.job}-r${it.id}`, ...(process.env.STUDIO_TEARDOWN_ARGS ? process.env.STUDIO_TEARDOWN_ARGS.split(' ') : [])]]], () => {
+      const recipe = join(ROOT, out, 'Reel.md');
+      if (!existsSync(recipe)) throw new Error('teardown wrote no Reel.md');
+      const ex = C.extract(recipe);
+      setItem(it.id, (x, st) => { x.status = 'ready'; x.progress = 100; x.extracted = ex; x.contact = existsSync(join(ROOT, out, 'contact.jpg')) ? `${out}/contact.jpg`.split(sep).join('/') : null; if (title) x.title = title;
+        if (!st.reference.active || st.reference.active === x.id || !(st.reference.queue || []).some(q => q.id === st.reference.active && q.status === 'ready')) useItem(st, x); });
+      return { extracted: ex };
+    }, {
+      step: i => { if (i === 1) setItem(it.id, x => { x.status = 'tearing'; x.progress = 100; }); },
+      line: l => {
+        const m = /^progress (\d+)%/.exec(l); if (m && +m[1] !== lastP && (+m[1] - lastP >= 5 || +m[1] === 100)) { lastP = +m[1]; setItem(it.id, x => { if (x.status === 'downloading') x.progress = lastP; }); }
+        if (l.startsWith('{"file"')) { try { const j = JSON.parse(l); title = j.title; setItem(it.id, x => { x.title = j.title; x.seconds = j.seconds; x.trimmed = j.trimmed; }); } catch {} }
+      },
+      end: (status, lines) => { if (status !== 'done') setItem(it.id, x => { if (x.status !== 'ready') { x.status = status === 'cancelled' ? 'cancelled' : 'failed'; const e = lines.filter(l => /download failed|error|Error|failed|not found/i.test(l) && !l.startsWith('$')).pop(); x.error = (e || lines[lines.length - 1] || 'failed').replace(/^download failed: /, '').slice(0, 300); } }); },
+    });
+  } catch (e) { setItem(it.id, x => { x.status = 'failed'; x.error = e.message; }); }
+}
+function copyRenders(outputs) {
+  const st = S.load(); if (!st.renders) return [];
+  const done = [];
+  for (const o of outputs) { const src = join(ROOT, o), dst = join(st.renders, basename(o)); try { copyFileSync(src, dst); done.push(dst); } catch {} }
+  return done;
+}
+
 // ---------- http ----------
 const json = (res, code, body) => { res.writeHead(code, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify(body)); };
 const readBody = req => new Promise((ok, bad) => { let b = ''; req.on('data', d => { b += d; if (b.length > 2e6) { bad(new Error('too big')); req.destroy(); } }); req.on('end', () => { try { ok(b ? JSON.parse(b) : {}); } catch { bad(Object.assign(new Error('send JSON'), { code: 400 })); } }); });
@@ -173,8 +243,8 @@ async function api(req, res, u) {
   if (p === '/api/footage/remove' && M === 'POST') { const b = await readBody(req); const s = update(st => { st.footage = st.footage.filter(f => f !== b.path); }); return json(res, 200, view(s)); }
   if (p === '/api/reference' && M === 'POST') {
     const b = await readBody(req), s = C.load();
-    if (b.url && !/^https:\/\/(www\.)?instagram\.com\/(reel|p)\/[A-Za-z0-9_-]+\/?/.test(b.url)) return json(res, 400, { error: 'a link must be one Instagram post or reel (fetched anonymously, no login). Otherwise download it where you have the rights and upload the file.' });
-    const t = teardownSteps(s, b.url);
+    if (b.url || b.urls) { const added = addLinks([].concat(b.urls || [], b.url || [])); return json(res, 202, { added, ...view(C.load()) }); }
+    const t = teardownSteps(s, null);
     update(st => { st.reference.status = 'running'; st.reference.url = b.url || null; st.reference.out = t.out; });
     runTask('teardown', () => t.steps, () => {
       const recipe = join(ROOT, t.out, 'Reel.md');
@@ -185,16 +255,30 @@ async function api(req, res, u) {
     });
     return json(res, 202, view(C.load()));
   }
+  if (p === '/api/reference/url' && M === 'POST') {
+    const b = await readBody(req);
+    if (b.mode) update(st => { C.applyPatch(st, { reference: { mode: b.mode } }); });
+    const added = addLinks([].concat(b.urls || [], b.url || []).flatMap(x => String(x).split(/\n+/)));
+    return json(res, 202, { added, ...view(C.load()) });
+  }
+  if (p === '/api/reference/item' && M === 'POST') {
+    const b = await readBody(req), id = +b.id, s = C.load(), it = (s.reference.queue || []).find(x => x.id === id);
+    if (!it) return json(res, 404, { error: `no reference ${id}` });
+    if (b.action === 'use') { if (it.status !== 'ready') return json(res, 400, { error: 'that reference is not broken down yet' }); update(st => useItem(st, st.reference.queue.find(x => x.id === id))); }
+    else if (b.action === 'retry') { if (['downloading', 'tearing'].includes(it.status)) return json(res, 409, { error: 'it is running' }); setItem(id, x => { x.status = 'queued'; x.error = null; x.progress = 0; const c = F.classify(x.url); const miss = c.ok ? F.missingFor(c, F.tools({ fresh: true })) : c.error; if (miss) { x.status = 'failed'; x.error = miss; } }); setImmediate(pump); }
+    else if (b.action === 'remove') {
+      if (['downloading', 'tearing'].includes(it.status) && task && task.status === 'running') { task.status = 'cancelled'; task.proc && task.proc.kill('SIGTERM'); }
+      if (it.file && b.deleteFile !== false) rmSync(it.file, { force: true });
+      update(st => { st.reference.queue = st.reference.queue.filter(x => x.id !== id); if (st.reference.active === id) st.reference = { ...st.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null }; });
+    } else return json(res, 400, { error: 'action: use, retry or remove' });
+    return json(res, 200, view(C.load()));
+  }
   if (p === '/api/reference/apply' && M === 'POST') {
     const s = C.load(), ex = s.reference.extracted; if (!ex) return json(res, 400, { error: 'tear down a reference first' });
-    const cat = C.catalog(), picks = {};
-    for (const t of Object.keys(ex.transitions)) picks[`transition:${t}`] = 'allow';
-    for (const e of ex.entrances) picks[`entrance:${e}`] = 'allow';
-    for (const f of ex.finishes) picks[`finish:${f}`] = 'allow';
-    for (const g of ex.graphics) picks[`graphic:${g}`] = 'allow';
-    for (const e of ex.effects) picks[`effect:${e}`] = 'allow';
-    if (ex.captionStyle && cat.items[`captionStyle:${ex.captionStyle}`]) picks[`captionStyle:${ex.captionStyle}`] = 'allow';
+    const b = await readBody(req).catch(() => ({})), cat = C.catalog();
+    const picks = Array.isArray(b.refs) ? Object.fromEntries(b.refs.filter(r => cat.items[r]).map(r => [r, 'allow'])) : C.referencePicks(ex, b.kinds || null, cat);
     const patch = { picks, ...(ex.music.bed && cat.beds.some(b => b.id === ex.music.bed) ? { music: { bed: ex.music.bed } } : {}), ...(ex.preset && cat.packs.some(x => x.name === ex.preset) ? { pack: ex.preset } : {}) };
+    if (Array.isArray(b.refs) || b.kinds) { delete patch.music; delete patch.pack; }
     const r = C.applyPatch(s, patch); s.reference.applied = true; C.save(s); pushState();
     return json(res, 200, { ...view(s), log: r.log, errs: r.errs });
   }
@@ -206,7 +290,7 @@ async function api(req, res, u) {
   }
   if (p === '/api/render' && M === 'POST') {
     const s = C.load(); const r = renderSteps(s);
-    runTask('render', () => r.steps, () => { const st = C.load(); return { outputs: C.outputsOf(st), fx: r.fx, effects: r.effects }; });
+    runTask('render', () => r.steps, () => { const st = C.load(), outputs = C.outputsOf(st); return { outputs, copiedTo: copyRenders(outputs), fx: r.fx, effects: r.effects }; });
     return json(res, 202, { ...view(C.load()), fx: r.fx, effectsSkipped: r.effects.length && !r.fx ? 'effects need npm run effects:setup' : null });
   }
   if (p === '/api/task/cancel' && M === 'POST') { if (task && task.status === 'running') { task.status = 'cancelled'; task.proc && task.proc.kill('SIGTERM'); } return json(res, 200, view(C.load())); }
@@ -240,22 +324,46 @@ async function api(req, res, u) {
   if (p === '/api/chat' && M === 'POST') {
     const b = await readBody(req), text = String(b.text || '').trim();
     if (!text) return json(res, 400, { error: 'say something' });
+    const st = S.load(), backend = b.offline ? 'keywords' : st.chat.backend;
+    if (backend === 'agent') {
+      // queued for the terminal agent; it reads it with studio_wait_for_message or studio_get_pending and answers with studio_reply
+      const s = update(x => { C.applyPatch(x, { say: text, from: 'ui', toAgent: true }); });
+      const a = CH.presence();
+      return json(res, 200, { via: 'agent', queued: true, agent: a, reply: null, ...view(s) });
+    }
     update(s => { C.applyPatch(s, { say: text, from: 'ui' }); });
     const s = C.load(), cat = C.catalog();
     let reply, patch, via;
-    if (LLM.provider() && !b.offline) {
-      try { const r = await LLM.chat(text, s, cat); reply = r.reply; patch = r.patch; via = r.provider; }
-      catch (e) { const v = C.vibes(text, s, cat); patch = v.patch; via = 'keywords'; reply = `The ${LLM.provider().name} API failed (${e.message}), so I used the keyword matcher. ` + (v.said.length ? 'Changed: ' + v.said.join('; ') + '.' : 'Nothing matched.'); }
+    const prov = backend === 'keywords' ? null : LLM.provider(process.env, st.chat);
+    if (prov) {
+      try { const r = await LLM.chat(text, s, cat, process.env, st.chat); reply = r.reply; patch = r.patch; via = r.provider; }
+      catch (e) { const v = C.vibes(text, s, cat); patch = v.patch; via = 'keywords'; reply = `The ${prov.name} chat failed (${e.message}), so I used the keyword matcher. ` + (v.said.length ? 'Changed: ' + v.said.join('; ') + '.' : 'Nothing matched.'); }
     } else {
       const v = C.vibes(text, s, cat); patch = v.patch; via = 'keywords';
-      reply = v.said.length ? `Changed: ${v.said.join('; ')}.` : 'I did not catch an effect or vibe there. Try words like calm, punchy, cinematic, clean, or names like "no glitch" or "typewriter titles". For a full conversation, ask Claude Code, Cursor or Codex through MCP, or set ANTHROPIC_API_KEY or OPENAI_API_KEY before npm run studio.';
+      reply = v.said.length ? `Changed: ${v.said.join('; ')}.` : 'I did not catch an effect or vibe there. Try words like calm, punchy, cinematic, clean, names like "no glitch" or "typewriter titles", or "the transitions from the reference". For a real conversation, connect your terminal agent (Settings, Chat).';
+      if (backend !== 'keywords' && !prov) reply = `No ${backend === 'auto' ? 'API key' : backend} backend is ready, so I used keywords. ` + reply;
     }
     const s2 = C.load(), r = C.applyPatch(s2, patch || {});
     if (r.errs.length) reply += ' Skipped: ' + r.errs.join('; ');
     C.applyPatch(s2, { reply, from: via }); C.save(s2); pushState();
     return json(res, 200, { reply, via, log: r.log, errs: r.errs, ...view(s2) });
   }
-  if (p === '/api/reset' && M === 'POST') { const s = C.defaultState(); s.rev = C.load().rev; C.save(s); pushState(); return json(res, 200, view(s)); }
+  if (p === '/api/settings' && M === 'GET') return json(res, 200, { settings: S.load(), tools: F.tools({ fresh: u.searchParams.has('fresh') }) });
+  if (p === '/api/settings' && M === 'POST') {
+    const b = await readBody(req), r = S.update(b);
+    if (r.errs.length) return json(res, 400, { error: r.errs.join('; '), errs: r.errs });
+    pushState(true); return json(res, 200, { settings: r.settings, ...view(C.load()) });
+  }
+  if (p === '/api/llm/models' && M === 'GET') {
+    const st = S.load(), base = u.searchParams.get('base') || st.chat.baseUrl || process.env.STUDIO_LOCAL_URL || S.LOCAL_PRESETS[0].url;
+    if (!/^https?:\/\//.test(base)) return json(res, 400, { error: 'base: an http(s) address' });
+    try { return json(res, 200, { base, models: await LLM.models(base, process.env.LOCAL_LLM_API_KEY) }); }
+    catch (e) { return json(res, 502, { error: `no answer from ${base} (${e.cause ? e.cause.code || e.cause.message : e.message}). Is Ollama, LM Studio or your llama.cpp server running?` }); }
+  }
+  if (p === '/api/agent' && M === 'GET') return json(res, 200, { agent: CH.presence(), ...CH.peek() });
+  // for the Claude Code hook (kit/studio/hooks/studio-pending.mjs): a cheap peek, nothing is marked seen
+  if (p === '/api/agent/pending' && M === 'GET') { const q = CH.peek(); return json(res, 200, { ...q, notice: CH.notice(q) }); }
+  if (p === '/api/reset' && M === 'POST') { const s = C.defaultState(), o = C.load(); s.rev = o.rev; s.chatSeq = o.chatSeq || 0; s.refSeq = o.refSeq || 0; C.save(s); pushState(); return json(res, 200, view(s)); }
   return json(res, 404, { error: 'no such endpoint' });
 }
 
@@ -285,6 +393,11 @@ const server = http.createServer(async (req, res) => {
 });
 
 watchFile(C.statePath(), { interval: 400 }, pushState);
+// the agent's presence: push when it connects, starts or stops waiting, and when it goes quiet
+let lastAgent = '';
+const agentTick = () => { const a = CH.presence(), k = `${a.name}|${a.connected}|${a.listening}`; if (k !== lastAgent) { lastAgent = k; pushState(true); } };
+watchFile(CH.presencePath(), { interval: 700 }, agentTick);
+setInterval(agentTick, 5000).unref();
 function openBrowser(url) {
   if (flag('no-open') || process.env.CI) return;
   const cmd = process.platform === 'darwin' ? ['open', [url]] : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]] : ['xdg-open', [url]];
@@ -303,7 +416,8 @@ server.on('error', async e => {
 });
 server.listen(PORT, HOST, () => {
   const url = `http://${HOST}:${server.address().port}`;
-  console.log(`Studio: ${url}\nSession: ${C.statePath()}\nChat: ${env().llm ? 'direct API, ' + env().llm : 'keywords here; for a full conversation use your assistant over MCP (npm run mcp) or set ANTHROPIC_API_KEY or OPENAI_API_KEY'}\nStop with Ctrl+C.`);
+  const e = env();
+  console.log(`Studio: ${url}\nSession: ${C.statePath()}\nChat: ${e.backend === 'agent' ? 'your terminal agent (tell it: Run the Studio chat loop; setup in AGENTS.md)' : e.llm ? e.llm : e.backend}\nReference links: ${e.tools.ytdlp ? 'yt-dlp ' + e.tools.ytdlp : 'direct video links and Instagram only (pip install yt-dlp for YouTube, TikTok, X, Vimeo)'}\nStop with Ctrl+C.`);
   openBrowser(url);
 });
 export { server };

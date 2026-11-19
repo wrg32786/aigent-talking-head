@@ -13,7 +13,7 @@ That starts Studio on http://127.0.0.1:4757 and opens your browser. `--port <n>`
 ## What you can do
 
 1. **Footage.** Drag clips onto the page or pick files (mp4, mov, m4v, webm, mkv). They go to `inbox/studio/<job>/`. An assistant can also point the session at a clips folder (`clips` in `studio_set_selections`).
-2. **Reference.** Upload a reel you like, or paste a single public Instagram post URL (uses instaloader, no login, one post; you need the rights). Studio runs the teardown and shows what it found: shots, titles and their entrances, transitions, finishes, graphics, effects, caption style and music. Then choose:
+2. **Reference.** Paste one or more links (one per line) or drop a file. Links can be YouTube (and Shorts), TikTok, X, Vimeo, a direct video file (.mp4, .mov, .m4v, .webm), or one public Instagram post. Studio downloads each into your download folder, breaks it down, and shows what it found: length, cut times and pace, music BPM, beats and energy, caption style, titles, transitions, finishes, graphics and effects, plus suggestions mapped to the effects menu that you can click to pick. The chat gets the same teardown. See [Reference links](#reference-links). Then choose:
    - **Influence:** the reference becomes soft defaults on top of the pack you picked (the pack's locks stay). Saved as a local pack, `ref-<job>`.
    - **Recreate:** the draft uses the reference's Reel.md as the recipe (`--recipe`), so its shots, titles and look are copied as closely as the engine can.
 3. **Look.** Pick a style pack from the gallery. Your picks below add to it.
@@ -64,14 +64,81 @@ No category is empty today, so none is hidden. These are thin, or are things peo
 - **Sound design: ducking controls.** Ducking is automatic; there is no per-clip control.
 - Thin today: Lower thirds and name tags (7) and Overlays and textures (7).
 
+## Reference links
+
+![The Reference step: a link in the queue, downloaded and broken down, with the teardown and menu suggestions](studio/ref-url-desktop.png)
+
+- **Queue.** Paste several links at once; they download and tear down one at a time, each with its status (waiting, downloading with a progress bar, breaking it down, ready, failed with the reason) and Stop, Try again, Remove and "Use this one" buttons. The newest ready one is used unless you pick another.
+- **Downloaders.** YouTube, TikTok, X, Vimeo and most video pages go through [yt-dlp](https://github.com/yt-dlp/yt-dlp), an optional free program you install yourself (`pip install yt-dlp`, or its standalone program on your PATH, or `YTDLP=/path/to/yt-dlp`). The one-line installers add it to the kit's venv. It runs as a separate program; none of its code is in the kit. A direct video link is downloaded by Studio itself. Instagram uses the kit's [instaloader](https://github.com/instaloader/instaloader) helper (MIT): one public post, anonymous, never a login. Without yt-dlp, the page says how to install it and the link fails with that hint.
+- **Where it goes.** By default `teardown-in/studio/<job>/` in the kit, which git ignores. Pick any folder in [Settings](#settings). Downloads never go into the repo's tracked files, and the teardown (`teardown/studio-<job>-r<id>/`: Reel.md, teardown.md, contact sheet) is gitignored too.
+- **Long videos.** Studio keeps the first 90 seconds for the teardown (`STUDIO_REF_MAX_SECONDS` changes it); with ffmpeg present yt-dlp downloads only that part.
+- **Teardown.** The same `npm run teardown` as the CLI (rea-video when installed, otherwise the built-in analyzer). `STUDIO_TEARDOWN_ARGS` adds flags, for example `--engine lite --no-asr` for speed.
+- **Influence and Recreate** work the same for links and files: Influence makes `packs/local/ref-<job>/` from the teardown, Recreate drafts with its Reel.md.
+- **Rights.** Only download videos you have the rights to use as a reference, and follow each site's terms. Studio uses a reference to learn its style and structure; your reel is made from your own footage.
+
+## Settings
+
+![Settings: who answers the chat, a local model server and model, the download folder and the renders folder](studio/settings.png)
+
+The Settings button (top right) saves to `jobs/.studio/settings.json`, which git ignores. Environment variables win over it.
+
+| Setting | Default | Environment |
+|---|---|---|
+| Who answers the Studio chat | your terminal agent | `STUDIO_CHAT` = `agent`, `local`, `anthropic`, `openai`, `auto` (a key if set, else keywords) or `keywords` |
+| Local model server and model | Ollama at `http://127.0.0.1:11434/v1`, first model it lists | `STUDIO_LOCAL_URL`, `STUDIO_MODEL` |
+| Reference downloads | `teardown-in/studio/<job>/` in the kit | `STUDIO_DOWNLOADS` |
+| Also copy finished reels to | none (reels stay in `jobs/<job>/`) | `STUDIO_RENDERS` |
+| Action notes from the terminal | on | |
+
+Folders must be full paths; Studio makes them if needed and checks it can write there before saving. The `studio_settings` MCP tool reads and changes the same file.
+
 ## Chat
 
-The chat box takes plain words. Two ways to give it a real conversation:
+The Studio chat is answered by one of these, picked in Settings:
 
-- **Use your own assistant (recommended).** Connect Claude Code, Cursor, Codex or another MCP client to `npm run mcp` ([docs/mcp.md](mcp.md)). It sees the same session as the page through three tools: `studio_get_state` (your picks, the reference, the chat, the running task), `studio_set_selections` (change picks, answer in the page chat) and `studio_run` (start a draft or render with progress in the page). The page updates live when the assistant changes something, and the assistant sees what you click.
-- **Direct API.** Set `ANTHROPIC_API_KEY` (model `STUDIO_MODEL`, default `claude-sonnet-4-5`) or `OPENAI_API_KEY` (default `gpt-4o-mini`) before `npm run studio`. Studio sends the menu names and your session, and applies only names the engine has. Keys stay in your environment; nothing is saved to the repo or the session file. `ANTHROPIC_BASE_URL` and `OPENAI_BASE_URL` point at compatible servers.
+- **Your terminal agent (default).** Claude Code, Codex, Cursor or any MCP client, running in your terminal. See the next section.
+- **A local model.** Any OpenAI-compatible server on your computer: [Ollama](https://ollama.com) (`http://127.0.0.1:11434/v1`), LM Studio (`http://127.0.0.1:1234/v1`) or the llama.cpp server (`http://127.0.0.1:8080/v1`). "Find models" lists what the server has. No key needed (`LOCAL_LLM_API_KEY` if yours asks for one).
+- **Claude or OpenAI API.** Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` before starting Studio (`STUDIO_MODEL` picks the model; `ANTHROPIC_BASE_URL` and `OPENAI_BASE_URL` point at compatible servers). Keys stay in your environment; nothing is saved.
+- **Keywords only.** No model: vibe words (calm, calmer, cinematic, hype, fast, clean, magazine, techy, retro, silent and more, in `kit/studio/vibes.json`), pack and effect names, "no ..." to forbid, and "the transitions from the reference" (or titles, captions, grade, graphics, effects, music, beats, or everything).
 
-With neither, the chat still understands vibe words (calm, cinematic, hype, fast, clean, magazine, techy, retro, silent and more, in `kit/studio/vibes.json`), pack names, effect names, and "no ..." to forbid.
+Every backend gets the session and the reference teardown, so "use the transitions from this reference but calmer" works in each, and every change is checked against the engine's names before it is applied.
+
+## Your terminal agent in Studio
+
+![Studio chat with Claude Code connected and listening: page messages marked answered, an action note for an edit made from the terminal](studio/chat-agent.png)
+
+You tell your agent, in its terminal: **"Set up Studio from AGENTS.md and run the Studio chat loop."** It installs what is missing, registers the kit's MCP server in its own config (`npm run studio:connect -- claude`, `codex` or `cursor`), asks you to restart it once so the tools load, starts Studio (`studio_start`), opens the page, and listens. The steps per agent are in [AGENTS.md](../AGENTS.md#studio-set-it-up-and-be-the-agent-in-it) and the loop is in [skills/aigent-studio/SKILL.md](../skills/aigent-studio/SKILL.md).
+
+By hand, per agent:
+
+```
+# Claude Code (in the kit folder)
+claude mcp add aigent-talking-head -e PYTHON=$PWD/.venv/bin/python -- node $PWD/kit/mcp.mjs
+npm run studio:connect -- claude        # same, plus the Studio hook in .claude/settings.local.json
+
+# Codex: ~/.codex/config.toml
+[mcp_servers.aigent-talking-head]
+command = "node"
+args = ["/path/to/aigent-talking-head/kit/mcp.mjs"]
+tool_timeout_sec = 300
+
+# Cursor: .cursor/mcp.json in the kit, or ~/.cursor/mcp.json
+{ "mcpServers": { "aigent-talking-head": { "command": "node", "args": ["/path/to/aigent-talking-head/kit/mcp.mjs"] } } }
+```
+
+Then, in the agent: "Run the Studio chat loop."
+
+**Two channels, one agent.** The Studio chat shows only the Studio conversation: what you type in the page, the agent's answers to it, and short action notes. Your terminal conversation stays in the terminal and is never copied into Studio. Edits are shared: whatever the agent changes, from either conversation, updates the page live. When it changes the edit because you asked in the terminal, Studio shows a one-line note such as "Claude Code changed picked transition whip (from the terminal)." Turn those notes off in Settings.
+
+**How a Studio message reaches the agent.** A terminal agent cannot be interrupted in the middle of a step, so:
+
+- **Idle and listening:** it waits on `studio_wait_for_message` and answers within a second or two. The page shows "Claude Code connected, listening".
+- **Busy in the terminal:** the message queues. The agent checks `studio_get_pending` at the start of each turn. In Claude Code, the Studio hook (`kit/studio/hooks/studio-pending.mjs`, installed by `npm run studio:connect -- claude`) adds "N Studio messages waiting" to its context after each tool call, when you send it a prompt, and when it finishes a turn, so it picks them up at its next step. Codex and Cursor have no equivalent hook here; they rely on the per-turn check in AGENTS.md. A long command (a render) still finishes first.
+- **On the page:** each message you send shows "queued", then "seen by your agent", then "answered". The status bar shows connected and listening, connected but busy, or no agent connected, with what to say to yours.
+
+**MCP tools for the channel:** `studio_start`, `studio_wait_for_message`, `studio_get_pending`, `studio_reply` (Studio channel only; `replyTo` marks messages answered), `studio_set_selections` with `origin: "terminal"` for terminal edits, plus `studio_add_reference_url`, `studio_get_reference_teardown`, `studio_settings`, `studio_get_state` and `studio_run`. Presence is in `jobs/.studio/agent.json`; the hook reads `GET /api/agent/pending` (localhost only).
+
+`npm run studio:agent` starts Studio in the background and prints its URL as JSON (`--no-open`, `--port`, `--stop`), so an agent's terminal is not held by the server. `tests/studio-agent.test.mjs` runs the whole loop with a scripted MCP client acting as the agent.
 
 ![Chat on a tablet](studio/tablet.png)
 
@@ -110,7 +177,7 @@ A double-click app with no installer at all is planned: [docs/desktop-app-plan.m
 - The session lives in `jobs/.studio/state.json` (`STUDIO_DIR` moves it). Uploads go to `inbox/studio/<job>/` and `teardown-in/studio/<job>/`, drafts to `jobs/<job>/`, teardowns to `teardown/studio-<job>/`. All gitignored.
 - The server listens on 127.0.0.1 only, refuses other Host headers (so a web page can't reach it by DNS rebinding) and cross-site posts, and serves files only from the kit's media folders.
 - One task runs at a time; Cancel stops it.
-- `STUDIO_REEL_ARGS` and `STUDIO_TEARDOWN_ARGS` add flags to every draft or teardown (for example `--engine lite --no-asr`).
+- `STUDIO_REEL_ARGS` and `STUDIO_TEARDOWN_ARGS` add flags to every draft or teardown (for example `--engine lite --no-asr`). `STUDIO_TEARDOWN` swaps the teardown script (the tests use a stand-in).
 
 ## Design
 

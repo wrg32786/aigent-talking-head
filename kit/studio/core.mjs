@@ -84,7 +84,7 @@ export const stateDir = () => resolve(process.env.STUDIO_DIR || join(ROOT, 'jobs
 export const statePath = () => join(stateDir(), 'state.json');
 export function defaultState() {
   return { format: 'aigent-studio', version: 1, rev: 0, job: null, footage: [], clips: null,
-    reference: { file: null, url: null, mode: 'influence', status: 'none', out: null, extracted: null, applied: false },
+    reference: { file: null, url: null, mode: 'influence', status: 'none', out: null, extracted: null, applied: false, queue: [], active: null },
     pack: null, picks: {}, music: { bed: 'auto', energy: 'auto', upload: null }, sound: { sfx: 'on', cap: 'on' }, pace: { tighten: null, punch: 'on' },
     export: 'reels', chat: [], task: null, outputs: [] };
 }
@@ -109,7 +109,7 @@ const ENERGY = ['auto', 'low', 'mid', 'high'];
 export function applyPatch(s, p, cat = catalog()) {
   const errs = [], log = [];
   if (!p || typeof p !== 'object') return { errs: ['patch must be an object'], log };
-  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips'];
+  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind'];
   for (const k of Object.keys(p)) if (!known.includes(k)) errs.push(`unknown field "${k}" (${known.join(', ')})`);
   if (p.job !== undefined) { if (p.job && !JOB_RE.test(p.job)) errs.push('job: lowercase letters, numbers and dashes'); else { s.job = p.job || null; log.push(`job ${s.job}`); } }
   if (p.pack !== undefined) {
@@ -143,8 +143,10 @@ export function applyPatch(s, p, cat = catalog()) {
   if (p.reference && p.reference.mode !== undefined) { if (!['influence', 'recreate', 'off'].includes(p.reference.mode)) errs.push('reference.mode: influence, recreate or off'); else { s.reference.mode = p.reference.mode; log.push(`reference mode ${p.reference.mode}`); } }
   if (p.clips !== undefined) s.clips = p.clips || null;
   const at = new Date().toISOString();
-  if (p.say) s.chat.push({ role: 'user', text: String(p.say).slice(0, 2000), at, from: p.from || 'ui' });
-  if (p.reply) s.chat.push({ role: 'assistant', text: String(p.reply).slice(0, 4000), at, from: p.from || 'assistant' });
+  // the Studio chat is its own channel: only lines typed in the page, answers to them, and short action notes
+  const line = m => { m.id = s.chatSeq = (s.chatSeq || 0) + 1; m.channel = 'studio'; s.chat.push(m); return m; };
+  if (p.say) line({ role: 'user', text: String(p.say).slice(0, 2000), at, from: p.from || 'ui', ...(p.toAgent ? { to: 'agent', status: 'queued' } : {}) });
+  if (p.reply) line({ role: 'assistant', text: String(p.reply).slice(0, 4000), at, from: p.from || 'assistant', ...(p.replyTo ? { replyTo: p.replyTo } : {}), ...(p.kind ? { kind: p.kind } : {}) });
   return { errs, log };
 }
 
@@ -218,12 +220,68 @@ export function extract(recipePath) {
   const cat = catalog();
   const real = (kind, ids) => ids.filter(id => cat.items[`${kind}:${id}`]);
   return {
+    summary: summarize(r, recipePath, { transitions: tcount, entrances: real('entrance', entrances), finishes: real('finish', finishes), graphics: real('graphic', graphics), effects: real('effect', effects) }, cat),
     name: (r.card && r.card.name) || basename(dirname(recipePath)), shots: (r.shots || []).length, titles: (r.titles || []).length,
     preset: br.preset && br.preset !== 'none' ? br.preset : null, look: st.look || null, captionStyle: st.captions || null,
     transitions: tcount, entrances: real('entrance', entrances), finishes: real('finish', finishes), graphics: real('graphic', graphics), effects: real('effect', effects),
     music: { bed: mu.bed && mu.bed !== 'none' ? mu.bed : null, energy: mu.energy || null, beatSync: mu['beat-sync'] || null }, punch: st.punch || null,
   };
 }
+// the teardown as facts a person or a model can act on: cuts and pacing, beats and music energy, caption style, what
+// was detected, and suggestions mapped onto the Studio menu (kind:id refs that exist, each with the reason)
+export function summarize(r, recipePath, found, cat = catalog()) {
+  const shots = r.shots || [], st = r.style || {}, mu = r.music || {}, card = r.card || {};
+  const seconds = +((card.source && card.source.duration) || (shots.length ? shots[shots.length - 1].end : 0)) || null;
+  const lens = shots.map(x => +(x.end - x.start).toFixed(2)).filter(x => x > 0);
+  const avg = lens.length ? +(lens.reduce((a, b) => a + b, 0) / lens.length).toFixed(2) : null;
+  const pacing = avg == null ? null : avg < 1.5 ? 'very fast' : avg < 2.5 ? 'fast' : avg < 4.5 ? 'medium' : 'slow';
+  const bpm = +mu.bpm || null;
+  let beats = null; try { const fb = JSON.parse(readFileSync(join(dirname(recipePath), 'fallback.json'), 'utf8')); beats = ((fb.audio || {}).music || {}).beats?.length || null; } catch {}
+  const energy = mu.energy || (bpm ? (bpm < 90 ? 'low' : bpm < 118 ? 'mid' : 'high') : null);
+  const sugg = [], add = (ref, why) => { if (cat.items[ref] && cat.items[ref].mode !== 'info' && !sugg.some(x => x.ref === ref)) sugg.push({ ref, why }); };
+  for (const [t, n] of Object.entries(found.transitions).sort((a, b) => b[1] - a[1])) add(`transition:${t}`, `seen ${n} time${n > 1 ? 's' : ''} between shots`);
+  for (const e of found.entrances) add(`entrance:${e}`, 'title entrance in the reference');
+  if (st.captions) add(`captionStyle:${st.captions}`, 'caption style of the reference');
+  if (st.look) add(`look:${st.look}`, 'caption look of the reference');
+  for (const f of found.finishes) add(`finish:${f}`, 'grade on some shots');
+  for (const g of found.graphics) add(`graphic:${g}`, 'graphic seen on screen');
+  for (const e of found.effects) add(`effect:${e}`, 'effect in the reference');
+  if (mu['beat-sync'] === 'on') add('beatSync:beat-sync', `cuts land on the beat${bpm ? ` (${bpm} BPM)` : ''}`);
+  if (mu.bed && mu.bed !== 'none') add(`bed:${mu.bed}`, `closest library bed${bpm ? ' by tempo' : ''}`);
+  if (avg != null && avg < 2.5) add('editing:tighten', `fast cutting: a shot every ${avg} s`);
+  if (st.punch === 'on' || (avg != null && avg < 2)) add('editing:punch', 'zoom punch-ins keep the pace');
+  const desc = card.description || '';
+  return { seconds, shots: shots.length, cuts: shots.slice(1).map(x => +(+x.start).toFixed(2)), averageShot: avg, pacing,
+    music: { bpm, beats, energy, bed: mu.bed && mu.bed !== 'none' ? mu.bed : null, beatSync: mu['beat-sync'] || null },
+    captions: { style: st.captions || null, look: st.look || null, position: st['caption-position'] || null, color: st['caption-color'] || null },
+    titles: (r.titles || []).map(t => ({ at: +t.start || 0, text: t.text || '', entrance: t.entrance || null })).slice(0, 12),
+    detected: { transitions: found.transitions, entrances: found.entrances, finishes: found.finishes, graphics: found.graphics, effects: found.effects, punch: st.punch || null },
+    suggestions: sugg, engine: /fallback/.test(desc) ? 'built-in fallback (rougher)' : /rea-video|VIDEO\.md/i.test(desc) ? 'rea-video' : null };
+}
+// the reference the session uses plus the rest of the queue, short enough for a model's context
+export function refContext(s) {
+  const r = s.reference || {}, q = r.queue || [];
+  const one = x => x && { id: x.id, url: x.url, site: x.site, title: x.title, status: x.status, error: x.error || undefined, summary: x.extracted ? x.extracted.summary : undefined };
+  const active = q.find(x => x.id === r.active);
+  return { mode: r.mode, active: active ? one(active) : r.extracted ? { id: null, url: r.url, title: r.file, status: r.status, summary: r.extracted.summary } : null,
+    others: q.filter(x => x.id !== r.active).map(x => ({ id: x.id, url: x.url, site: x.site, title: x.title, status: x.status })) };
+}
+// the picks a reference suggests, optionally only some kinds (transition, entrance, captionStyle, ...)
+export function referencePicks(ex, kinds = null, cat = catalog()) {
+  const picks = {};
+  if (!ex) return picks;
+  const want = k => !kinds || kinds.includes(k);
+  if (want('transition')) for (const t of Object.keys(ex.transitions || {})) picks[`transition:${t}`] = 'allow';
+  if (want('entrance')) for (const e of ex.entrances || []) picks[`entrance:${e}`] = 'allow';
+  if (want('finish')) for (const f of ex.finishes || []) picks[`finish:${f}`] = 'allow';
+  if (want('graphic')) for (const g of ex.graphics || []) picks[`graphic:${g}`] = 'allow';
+  if (want('effect')) for (const e of ex.effects || []) picks[`effect:${e}`] = 'allow';
+  if (want('captionStyle') && ex.captionStyle && cat.items[`captionStyle:${ex.captionStyle}`]) picks[`captionStyle:${ex.captionStyle}`] = 'allow';
+  if (want('bed') && ex.music && ex.music.bed && cat.items[`bed:${ex.music.bed}`]) picks[`bed:${ex.music.bed}`] = 'allow';
+  if (want('beatSync') && ex.music && ex.music.beatSync === 'on' && cat.items['beatSync:beat-sync']) picks['beatSync:beat-sync'] = 'allow';
+  return picks;
+}
+
 export function influencePack(ex, job, basePack) {
   const base = basePack ? K.load(basePack) : null;
   const presets = require('../preset.cjs').list().map(x => x.name);
@@ -317,6 +375,17 @@ export function vibes(text, s, cat = catalog()) {
     if (how === 'deny' && it.mode === 'one') continue;
     if (patch.picks[it.ref] === undefined || vibePicks.has(it.ref)) { if (vibePicks.has(it.ref)) { vibePicks.delete(it.ref); } patch.picks[it.ref] = how; said.push(`${how === 'deny' ? 'no' : 'use'} ${it.kind} ${it.id}`); }
   } }
+  // "use the transitions from this reference but calmer": the reference's picks for the kinds named, under the vibe words
+  const ex = s && s.reference && s.reference.extracted;
+  if (ex && /\b(reference|ref|that video|this video|the link|that reel|this reel|that one)\b/.test(t)) {
+    const KW = [['transition', /\b(transitions?|cuts?|seams?)\b/], ['entrance', /\b(titles?|entrances?|text)\b/], ['captionStyle', /\b(captions?|subtitles?)\b/], ['finish', /\b(grade|grading|finish(es)?|colou?rs?)\b/],
+      ['graphic', /\b(graphics?|stickers?)\b/], ['effect', /\beffects?\b/], ['bed', /\b(music|song|track|bed)\b/], ['beatSync', /\b(beats?|rhythm)\b/]];
+    const kinds = KW.filter(([, re]) => re.test(t)).map(([k]) => k);
+    const all = /\b(everything|style|look|all of it|same)\b/.test(t) || !kinds.length;
+    const rp = referencePicks(ex, all ? null : kinds, cat);
+    let n = 0; for (const [ref, how] of Object.entries(rp)) if (patch.picks[ref] === undefined) { patch.picks[ref] = how; n++; }
+    if (n) said.push(`from the reference: ${all ? 'its look' : kinds.join(', ')} (${n} pick${n > 1 ? 's' : ''})`);
+  }
   if (!Object.keys(patch.picks).length) delete patch.picks;
   return { patch, said };
 }

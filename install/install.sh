@@ -110,6 +110,9 @@ say "Setting up Python (venv in $DIR/.venv)"
 [ -x .venv/bin/python ] || "$PY" -m venv .venv
 .venv/bin/python -m pip install --quiet --upgrade pip
 .venv/bin/python -m pip install --quiet -r requirements.txt; ok "Python packages"
+# optional reference-link helpers for Studio: yt-dlp (YouTube, TikTok, X, Vimeo; Unlicense) and instaloader (one public
+# Instagram post, anonymous; MIT). Separate programs the kit runs; a failure here does not stop the install.
+if .venv/bin/python -m pip install --quiet --upgrade yt-dlp instaloader; then ok "yt-dlp and instaloader (Studio reference links)"; else warn "yt-dlp did not install; Studio still takes direct video links. Later: .venv/bin/python -m pip install yt-dlp"; fi
 if [ "$PREFETCH" = 1 ]; then
   say "Downloading the Whisper model (small.en, about 470 MB)"
   .venv/bin/python -c "from faster_whisper import WhisperModel; WhisperModel('small.en')" && ok "model ready"

@@ -18,8 +18,15 @@
 | `studio_get_state` | reads the Studio session (`jobs/.studio/state.json`) | what the user picked in Studio (`npm run studio`), their reference, music, pace, the chat and the running task, and the reel arguments it adds up to; with `catalog: true`, every menu item as a `kind:id` ref by category |
 | `studio_set_selections` | writes the Studio session | change picks (`{"transition:whip": "allow"}`, `deny` or `clear`), pack, music, sound, pace, export or reference mode, and answer the user in the Studio chat with `reply`; the page updates live, and unknown names are refused |
 | `studio_run` | POSTs to the running Studio | start a draft or render the user watches in the page, then poll `studio_get_state` |
+| `studio_start` | starts Studio in the background (as `npm run studio:agent`) | returns the URL and opens the page |
+| `studio_wait_for_message` | long-polls the Studio chat (default 45 s) | the lines the user typed in the Studio page since you last read, marked seen, plus the session context; the page shows you as listening while it waits |
+| `studio_get_pending` | checks the Studio chat without waiting | the same, for the start of each turn while you work in the terminal |
+| `studio_reply` | writes to the Studio chat only | your answer to Studio message ids (`replyTo`), with an optional `patch`; those messages show as answered |
+| `studio_add_reference_url` | POSTs to the running Studio | queues reference links to download and tear down |
+| `studio_get_reference_teardown` | reads the session | the reference queue and each teardown summary (cuts, pace, BPM, beats, energy, captions, detected effects, menu suggestions) |
+| `studio_settings` | reads or writes `jobs/.studio/settings.json` | download folder, renders folder, chat backend, action notes |
 
-The three Studio tools work on the same session file as the page, so the assistant and the page stay in step ([docs/studio.md](studio.md)). Each other call returns the command line, its exit code and the end of its log as text, and the command's JSON result (the last line it prints with `--json`) as structured content. A value the contract does not list (a `look` or `export` name that does not exist) is refused before anything runs.
+The Studio tools work on the same session file as the page. The Studio chat is its own channel: answer page messages with `studio_reply`, keep the terminal conversation in the terminal, and set `origin: "terminal"` on `studio_set_selections` for edits asked in the terminal (Studio then shows only a one-line action note). Setup per agent and the chat loop: [AGENTS.md](../AGENTS.md#studio-set-it-up-and-be-the-agent-in-it), so the assistant and the page stay in step ([docs/studio.md](studio.md)). Each other call returns the command line, its exit code and the end of its log as text, and the command's JSON result (the last line it prints with `--json`) as structured content. A value the contract does not list (a `look` or `export` name that does not exist) is refused before anything runs.
 
 Install the kit first ([INSTALL.md](../INSTALL.md)): `npm install`, the Python venv with `PYTHON` set, and Chrome. The server finds the repo from its own path, so any working directory works. Use the absolute path of your checkout below (`/path/to/aigent-talking-head`).
 

@@ -176,6 +176,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { serrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio tests (tests/studio.test.mjs: catalog, session, server, chat)', errs: serrs, warns: [] });
+    const aerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-agent.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { aerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio agent tests (tests/studio-agent.test.mjs: reference links, settings, local model, agent channel over MCP, hook)', errs: aerrs, warns: [] });
   }
   {
     const star = createRequire(import.meta.url)('./star.cjs');

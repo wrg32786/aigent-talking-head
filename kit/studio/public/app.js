@@ -37,19 +37,46 @@ function renderFootage(s) {
   for (const f of s.footage) ul.append(el('li', {}, el('video', { src: file(f), muted: true, preload: 'metadata', 'aria-label': f }), el('span', {}, f.split('/').pop()),
     el('button', { class: 'btn ghost small', onclick: () => api('/api/footage/remove', { path: f }).then(apply), 'aria-label': 'Remove ' + f }, 'Remove')));
 }
+const SITE = { youtube: 'YouTube', 'youtube-shorts': 'YouTube Shorts', tiktok: 'TikTok', x: 'X', vimeo: 'Vimeo', instagram: 'Instagram', file: 'Video file', other: 'Link' };
+const STATUS = { queued: 'Waiting', downloading: 'Downloading', tearing: 'Breaking it down', ready: 'Ready', failed: 'Failed', cancelled: 'Cancelled' };
 function renderRef(s) {
-  const r = s.reference;
+  const r = s.reference, env = V.env, q = r.queue || [];
   for (const b of $('#ref-mode').children) b.setAttribute('aria-checked', String(b.dataset.v === r.mode));
-  $('#ref-status').textContent = r.status === 'none' ? 'No reference yet.' : r.status === 'uploaded' ? `Ready to break down: ${(r.file || '').split('/').pop()}` : r.status === 'running' ? 'Breaking it down...' : r.status === 'ready' ? `Broken down${r.applied ? ', picks applied' : ''}.` : r.status;
+  const t = env.tools || {};
+  $('#ref-tools').textContent = t.ytdlp ? `YouTube, Shorts, TikTok, X and Vimeo through yt-dlp ${t.ytdlp}; direct video links; one public Instagram post${t.instaloader ? '' : ' (needs pip install instaloader)'}, anonymous, no login. Only use videos you have the rights to use as a reference.`
+    : `Direct video links work now. For YouTube, TikTok, X and Vimeo install yt-dlp (free): pip install yt-dlp. Only use videos you have the rights to use as a reference.`;
+  $('#ref-go').hidden = r.status !== 'uploaded';
+  $('#ref-status').textContent = r.status === 'none' ? (q.length ? '' : 'No reference yet.') : r.status === 'uploaded' ? `Ready to break down: ${(r.file || '').split('/').pop()}` : r.status === 'running' ? 'Breaking it down...' : r.status === 'ready' ? `Using ${r.active ? 'reference ' + r.active : (r.file || '').split('/').pop()}${r.applied ? ', picks applied' : ''}.` : r.status;
+  $('#ref-queue').replaceChildren(...q.slice().reverse().map(it => {
+    const busy = it.status === 'downloading' || it.status === 'tearing', isActive = r.active === it.id;
+    const bar = busy ? el('div', { class: 'bar' + (it.status === 'tearing' || !it.progress ? ' indet' : ''), role: 'progressbar', 'aria-label': STATUS[it.status], 'aria-valuemin': 0, 'aria-valuemax': 100, ...(it.status === 'downloading' && it.progress ? { 'aria-valuenow': it.progress } : {}) }, el('span', { style: it.status === 'downloading' && it.progress ? `width:${it.progress}%` : '' })) : null;
+    return el('li', { class: `qi ${it.status}${isActive ? ' active' : ''}` },
+      el('div', { class: 'qh' }, el('span', { class: 'site' }, SITE[it.site] || 'Link'), el('span', { class: 'qt', title: it.url }, it.title || it.url),
+        el('span', { class: 'st' }, (STATUS[it.status] || it.status) + (it.status === 'downloading' && it.progress ? ` ${it.progress}%` : '') + (isActive ? ', in use' : ''))),
+      bar, it.error ? el('p', { class: 'err' }, it.error) : null, it.trimmed ? el('p', { class: 'fine' }, `Kept the first part of a longer video for the teardown.`) : null,
+      el('div', { class: 'row qa' }, it.status === 'ready' && !isActive ? el('button', { class: 'btn ghost small', type: 'button', onclick: () => api('/api/reference/item', { id: it.id, action: 'use' }).then(apply) }, 'Use this one') : null,
+        ['failed', 'cancelled'].includes(it.status) ? el('button', { class: 'btn ghost small', type: 'button', onclick: () => api('/api/reference/item', { id: it.id, action: 'retry' }).then(apply) }, 'Try again') : null,
+        el('button', { class: 'btn ghost small', type: 'button', 'aria-label': 'Remove ' + it.url, onclick: () => api('/api/reference/item', { id: it.id, action: 'remove' }).then(apply) }, busy ? 'Stop' : 'Remove')));
+  }));
   const out = $('#ref-out'); const ex = r.extracted;
   out.hidden = !ex; if (!ex) return;
+  const sm = ex.summary || {}, mu = sm.music || {};
   const tr = Object.entries(ex.transitions).map(([k, n]) => `${k} x${n}`).join(', ') || 'none found';
-  const dl = el('dl', {}, ...[['Shots', ex.shots], ['Titles', ex.titles], ['Preset', ex.preset || 'none'], ['Look', [ex.look, ex.captionStyle].filter(Boolean).join(', ') || 'kit default'], ['Transitions', tr], ['Title entrances', ex.entrances.join(', ') || 'none'],
-    ['Finishes', ex.finishes.join(', ') || 'none'], ['Graphics', ex.graphics.join(', ') || 'none'], ['Effects', ex.effects.join(', ') || 'none'], ['Music', [ex.music.bed, ex.music.energy && ex.music.energy + ' energy', ex.music.beatSync === 'on' && 'beat-synced'].filter(Boolean).join(', ') || 'none']]
-    .flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, String(v))]));
+  const rows = [['Length', sm.seconds ? `${sm.seconds} s, ${ex.shots} shots` : `${ex.shots} shots`], ['Pace', sm.averageShot ? `${sm.pacing}: a cut every ${sm.averageShot} s` : 'not measured'],
+    ['Cuts at', sm.cuts && sm.cuts.length ? sm.cuts.slice(0, 14).map(c => c + ' s').join(', ') + (sm.cuts.length > 14 ? ` and ${sm.cuts.length - 14} more` : '') : 'none'],
+    ['Music', [mu.bpm && mu.bpm + ' BPM', mu.beats && mu.beats + ' beats', mu.energy && mu.energy + ' energy', mu.beatSync === 'on' && 'cuts on the beat', mu.bed && 'closest bed ' + mu.bed].filter(Boolean).join(', ') || 'none'],
+    ['Captions', [sm.captions && sm.captions.style, sm.captions && sm.captions.position].filter(Boolean).join(', ') || 'kit default'], ['Titles', ex.titles + (sm.titles && sm.titles.length ? ': ' + sm.titles.slice(0, 5).map(t => t.text).join(', ') : '')],
+    ['Transitions', tr], ['Title entrances', ex.entrances.join(', ') || 'none'], ['Finishes', ex.finishes.join(', ') || 'none'], ['Graphics', ex.graphics.join(', ') || 'none'], ['Effects', ex.effects.join(', ') || 'none']];
+  const dl = el('dl', {}, ...rows.flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, String(v))]));
+  const sugg = (sm.suggestions || []).filter(x => CAT.items[x.ref]);
+  const chips = sugg.length ? el('div', { class: 'sugg' }, el('span', { class: 'lbl' }, 'Suggested from the menu'), el('div', { class: 'chips' }, ...sugg.map(x => {
+    const it = CAT.items[x.ref], st = pickState(s, it);
+    return el('button', { class: 'chip' + (st === 'allow' ? ' on' : ''), type: 'button', title: x.why, 'aria-pressed': String(st === 'allow'), onclick: () => patch({ picks: { [x.ref]: st === 'allow' ? 'clear' : 'allow' } }) }, `${KIND_NAME[it.kind] || it.kind}: ${it.id}`);
+  }))) : null;
   const how = r.mode === 'recreate' ? 'Recreate: the draft follows this recipe (shots, titles, cards) with your clip.' : r.mode === 'influence' ? 'Influence: these become soft defaults in a reference pack (ref-' + s.job + '); your picks still win.' : 'Off: the reference is ignored.';
-  out.replaceChildren(...[el('div', {}, dl, el('p', { class: 'fine' }, how), el('div', { class: 'row' }, el('button', { class: 'btn ghost small', onclick: () => api('/api/reference/apply', {}).then(v => { apply(v); toast('Reference picks added to your picks', true); }) }, 'Use these as my picks'),
-    r.out ? el('span', { class: 'fine' }, `Recipe: ${r.out}/Reel.md`) : null)), r.contact ? el('img', { src: file(r.contact), alt: 'Contact sheet of the reference, one frame per shot' }) : el('div', { class: 'muted' }, 'No contact sheet.')].filter(Boolean));
+  out.replaceChildren(...[el('div', {}, dl, chips, el('p', { class: 'fine' }, how + ' The chat knows this teardown: try "use the transitions from the reference but calmer".'),
+    el('div', { class: 'row' }, el('button', { class: 'btn ghost small', onclick: () => api('/api/reference/apply', {}).then(v => { apply(v); toast('Reference picks added to your picks', true); }) }, 'Use all as my picks'),
+      r.out ? el('span', { class: 'fine' }, `Recipe: ${r.out}/Reel.md`) : null)), r.contact ? el('img', { src: file(r.contact), alt: 'Contact sheet of the reference, one frame per shot' }) : el('div', { class: 'muted' }, 'No contact sheet.')].filter(Boolean));
 }
 function renderPacks(s) {
   const box = $('#packs');
@@ -184,12 +211,58 @@ async function applyChoices() {
   const j = await api('/api/choices', { beats: choicesCache.beats, titles: choicesCache.titles, graphics: choicesCache.graphics });
   choicesCache = j.choices; choicesDirty = false; renderChoices(); toast('Edits applied. Render to see them.', true);
 }
+const MSG_STATUS = { queued: 'queued', seen: 'seen by your agent', answered: 'answered' };
 function renderChat(s) {
-  const p = V.env.llm;
-  $('#chatmode').textContent = p ? `Direct chat with ${p}. Your assistant can also join through MCP.` : 'Keyword mode: vibes and effect names change your picks here. For a full conversation, open Claude Code, Cursor or Codex with the MCP server; it sees and edits this same session.';
+  const e = V.env, a = e.agent || {}, backend = e.backend;
+  const bar = $('#agentbar');
+  if (backend === 'agent') {
+    bar.className = 'agentbar ' + (a.listening ? 'on' : a.connected ? 'busy' : 'off');
+    bar.replaceChildren(el('span', { class: 'dot', 'aria-hidden': 'true' }), a.listening ? `${a.name || 'Your agent'} connected, listening` : a.connected ? `${a.name || 'Your agent'} connected, busy in the terminal. Messages wait until its next step.` : 'No agent connected');
+  } else { bar.className = 'agentbar alt'; bar.replaceChildren(el('span', { class: 'dot', 'aria-hidden': 'true' }), e.llm ? `Chat: ${e.llm}` : `Chat: ${backend === 'keywords' ? 'keywords only' : 'keywords (no ' + backend + ' backend ready)'}`); }
+  $('#chatmode').textContent = backend === 'agent' ? 'This chat is its own channel: your terminal conversation stays in the terminal. Edits from either place update this page.' : 'Change who answers in Settings.';
   const ol = $('#msgs'); const atBottom = ol.scrollHeight - ol.scrollTop - ol.clientHeight < 40;
-  ol.replaceChildren(...(s.chat.length ? s.chat.map(m => el('li', { class: m.role }, m.text, el('small', {}, m.role === 'user' ? (m.from === 'assistant' ? 'you, via assistant' : 'you') : m.from === 'keywords' ? 'studio' : m.from || 'assistant'))) : [el('li', { class: 'empty' }, 'Tell the editor the vibe: "calm and cinematic", "punchy, only whip and zoom transitions", "no checklist". Then pick what you like in the menu.')]));
+  const empty = backend === 'agent' && !a.connected
+    ? el('li', { class: 'empty' }, el('b', {}, 'Connect your terminal agent'), '\nIn Claude Code, Codex or Cursor, in the kit folder, say:\n', el('code', {}, 'Set up Studio from AGENTS.md and run the Studio chat loop'), '\nIt registers itself, opens this page and answers here. Or pick another chat in Settings.')
+    : el('li', { class: 'empty' }, 'Tell the editor the vibe: "calm and cinematic", "punchy, only whip and zoom transitions", "use the transitions from the reference but calmer".');
+  ol.replaceChildren(...(s.chat.length ? s.chat.map(m => el('li', { class: m.role + (m.kind === 'action' ? ' action' : '') }, m.text,
+    el('small', {}, m.role === 'user' ? ['you', m.to === 'agent' ? MSG_STATUS[m.status] || m.status : null].filter(Boolean).join(', ') : m.kind === 'action' ? 'action note' : m.from === 'keywords' ? 'studio' : (m.from && m.from !== 'agent' ? m.from : a.name || 'agent')))) : [empty]));
+  const waiting = s.chat.filter(m => m.role === 'user' && m.to === 'agent' && m.status !== 'answered');
+  if (waiting.length && backend === 'agent') ol.append(el('li', { class: 'typing', 'aria-label': 'waiting for your agent' }, waiting.some(m => m.status === 'seen') ? `${a.name || 'Your agent'} is working on it...` : a.connected ? `Queued: ${a.name || 'your agent'} picks it up at its next step.` : 'Queued until your agent connects.'));
   if (atBottom) ol.scrollTop = ol.scrollHeight;
+  $('#chatin').placeholder = backend === 'agent' ? (a.connected ? `Message ${a.name || 'your agent'}` : 'Message your agent (it reads this when it connects)') : 'Calm and cinematic, no glitch, typewriter titles';
+}
+// ---------- settings ----------
+function openSettings() {
+  const e = V.env, st = e.settings, d = $('#settings');
+  for (const r of document.querySelectorAll('input[name=backend]')) r.checked = r.value === (st.chat.backend === 'auto' ? (e.keys.anthropic ? 'anthropic' : e.keys.openai ? 'openai' : 'keywords') : st.chat.backend);
+  $('#key-anthropic').textContent = e.keys.anthropic ? 'ANTHROPIC_API_KEY is set.' : 'Set ANTHROPIC_API_KEY before starting Studio.';
+  $('#key-openai').textContent = e.keys.openai ? 'OPENAI_API_KEY is set.' : 'Set OPENAI_API_KEY before starting Studio.';
+  $('#local-url').value = st.chat.baseUrl || ''; $('#local-url').placeholder = e.localPresets[0].url;
+  const pre = $('#local-preset'); pre.replaceChildren(el('option', { value: '' }, 'Common servers'), ...e.localPresets.map(x => el('option', { value: x.url }, `${x.label} (${x.url.replace('http://', '')})`)));
+  pre.onchange = () => { if (pre.value) $('#local-url').value = pre.value; };
+  const ms = $('#local-model'); if (st.chat.model && ![...ms.options].some(o => o.value === st.chat.model)) ms.append(el('option', { value: st.chat.model }, st.chat.model)); ms.value = st.chat.model || '';
+  $('#action-notes').checked = st.actionNotes !== false;
+  $('#set-downloads').value = st.downloads || ''; $('#set-downloads').placeholder = e.settings.defaultDownloads;
+  $('#set-renders').value = st.renders || ''; $('#set-renders').placeholder = 'none: reels stay in ' + e.settings.defaultRenders;
+  $('#settings-msg').textContent = Object.entries(st.from || {}).filter(([, v]) => v.startsWith('env')).map(([k, v]) => `${k} comes from ${v}`).join('; ');
+  syncLocal(); d.showModal();
+}
+const syncLocal = () => { $('#local-box').hidden = !document.querySelector('input[name=backend][value=local]').checked; };
+async function findModels() {
+  const base = $('#local-url').value.trim() || $('#local-url').placeholder, msg = $('#local-msg');
+  msg.textContent = 'Asking ' + base + '...';
+  try { const r = await fetch('/api/llm/models?base=' + encodeURIComponent(base)); const j = await r.json(); if (!r.ok) throw new Error(j.error);
+    const ms = $('#local-model'), cur = ms.value; ms.replaceChildren(el('option', { value: '' }, 'First model the server lists'), ...j.models.map(m => el('option', { value: m }, m))); ms.value = j.models.includes(cur) ? cur : j.models[0] || '';
+    msg.textContent = j.models.length ? `${j.models.length} model${j.models.length > 1 ? 's' : ''} found.` : 'The server answered but lists no models. Pull one first (for example: ollama pull llama3.2).';
+  } catch (e) { msg.textContent = e.message; }
+}
+async function saveSettings() {
+  const backend = (document.querySelector('input[name=backend]:checked') || {}).value || 'agent';
+  const body = { downloads: $('#set-downloads').value.trim() || null, renders: $('#set-renders').value.trim() || null, actionNotes: $('#action-notes').checked,
+    chat: { backend, ...(backend === 'local' ? { baseUrl: $('#local-url').value.trim() || null, model: $('#local-model').value || null } : {}) } };
+  const r = await fetch('/api/settings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); const j = await r.json();
+  if (!r.ok) { $('#settings-msg').textContent = j.error; return; }
+  apply(j); $('#settings').close(); toast('Settings saved', true);
 }
 
 // ---------- uploads ----------
@@ -221,7 +294,16 @@ async function main() {
   $('#job').addEventListener('change', e => patch({ job: e.target.value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || null }));
   dropzone('#drop-footage', '#file-footage', 'footage'); dropzone('#drop-ref', '#file-ref', 'reference'); dropzone('#drop-music', '#file-music', 'music');
   for (const b of $('#ref-mode').children) b.addEventListener('click', () => patch({ reference: { mode: b.dataset.v } }));
-  $('#ref-go').addEventListener('click', () => { const url = $('#ref-url').value.trim(); api('/api/reference', url ? { url } : {}).then(apply).catch(() => {}); });
+  $('#ref-go').addEventListener('click', () => api('/api/reference', {}).then(apply).catch(() => {}));
+  const addLinks = () => { const urls = $('#ref-urls').value.split(/\s+/).filter(Boolean); if (!urls.length) { toast('Paste a link first'); return; } if (!V.state.job) { toast('Name the job first (top left)'); $('#job').focus(); return; }
+    api('/api/reference/url', { urls }).then(j => { apply(j); $('#ref-urls').value = ''; const bad = j.added.filter(x => x.status === 'failed'); if (bad.length) toast(bad[0].error); }).catch(() => {}); };
+  $('#ref-add').addEventListener('click', addLinks);
+  $('#ref-urls').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); addLinks(); } });
+  $('#ref-urls').addEventListener('paste', () => setTimeout(() => { if (/^https?:\/\/\S+$/.test($('#ref-urls').value.trim()) && V.state.job) addLinks(); }, 0));
+  $('#open-settings').addEventListener('click', openSettings);
+  $('#save-settings').addEventListener('click', saveSettings);
+  $('#find-models').addEventListener('click', findModels);
+  for (const r of document.querySelectorAll('input[name=backend]')) r.addEventListener('change', syncLocal);
   $('#filter').addEventListener('input', renderGrid);
   const pb = $('#pause'); const syncPause = () => { pb.setAttribute('aria-pressed', String(paused())); pb.textContent = paused() ? 'Play previews' : 'Pause previews'; };
   syncPause(); pb.addEventListener('click', () => { localStorage.setItem('studio.paused', paused() ? '0' : '1'); syncPause(); renderGrid(); });

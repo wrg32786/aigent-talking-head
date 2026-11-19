@@ -15,6 +15,7 @@
   <span id="job-hint" class="sr">Lowercase letters, numbers and dashes. Your files go in jobs/ under this name.</span>
   <nav class="steps" aria-label="Steps"><a href="#s-footage">Footage</a><a href="#s-ref">Reference</a><a href="#s-look">Look</a><a href="#s-menu">Effects</a><a href="#s-music">Music</a><a href="#s-render">Render</a><a href="#h-chat" class="tochat">Chat</a></nav>
   <div id="taskpill" class="pill" role="status" aria-live="polite">Ready</div>
+  <button class="btn ghost small" id="open-settings" type="button" aria-haspopup="dialog">Settings</button>
 </header>
 <div class="layout">
 <main id="main">
@@ -30,23 +31,25 @@
 
   <section class="card" id="s-ref" aria-labelledby="h-ref">
     <h2 id="h-ref"><span class="n">2</span> Reference <small>optional</small></h2>
-    <p class="hint">A reel you like. Influence borrows its style as soft defaults; Recreate remakes its structure with your clip.</p>
-    <div class="row">
-      <div class="drop small" id="drop-ref" tabindex="0" role="button" aria-label="Add a reference video">
-        <strong>Drop a reference</strong><span>a video you have the rights to</span>
+    <p class="hint">A reel you like. Paste links or drop a file. Studio downloads it to your computer, breaks it down (cuts, pace, beats, captions, effects) and hands that to the chat. Influence borrows its style as soft defaults; Recreate remakes its structure with your clip.</p>
+    <div class="row refin">
+      <div class="col grow">
+        <label class="lbl" for="ref-urls">Reference links, one per line</label>
+        <textarea id="ref-urls" rows="2" placeholder="https://www.youtube.com/shorts/...&#10;https://www.tiktok.com/@.../video/...&#10;https://example.com/clip.mp4" autocomplete="off" spellcheck="false" aria-describedby="ref-tools"></textarea>
+        <p class="fine" id="ref-tools"></p>
+      </div>
+      <button class="btn" id="ref-add" type="button">Add links</button>
+      <div class="drop small" id="drop-ref" tabindex="0" role="button" aria-label="Add a reference video file">
+        <strong>Or drop a file</strong><span>a video you have the rights to</span>
         <input type="file" id="file-ref" accept="video/*,.mov,.mp4,.m4v,.webm,.mkv" hidden>
       </div>
-      <div class="col grow">
-        <label class="lbl" for="ref-url">or one public Instagram post or reel link</label>
-        <input id="ref-url" type="url" placeholder="https://www.instagram.com/reel/..." autocomplete="off">
-        <p class="fine">Fetched anonymously with the optional instaloader helper. No login, one post only.</p>
-      </div>
     </div>
+    <ol id="ref-queue" class="queue" aria-label="Reference queue" aria-live="polite"></ol>
     <div class="row">
       <div class="seg" role="radiogroup" aria-label="Reference mode" id="ref-mode">
         <button role="radio" data-v="influence">Influence</button><button role="radio" data-v="recreate">Recreate</button><button role="radio" data-v="off">Off</button>
       </div>
-      <button class="btn" id="ref-go">Break it down</button>
+      <button class="btn ghost" id="ref-go" hidden>Break down the file</button>
       <span id="ref-status" class="muted"></span>
     </div>
     <div id="ref-out" class="refout" hidden></div>
@@ -106,7 +109,8 @@
   </section>
 </main>
 <aside class="chat" aria-labelledby="h-chat">
-  <h2 id="h-chat">Editor chat</h2>
+  <h2 id="h-chat">Studio chat</h2>
+  <div id="agentbar" class="agentbar" role="status" aria-live="polite"></div>
   <p id="chatmode" class="fine"></p>
   <ol id="msgs" class="msgs" aria-live="polite"></ol>
   <form id="chatform" class="chatform">
@@ -116,6 +120,39 @@
   </form>
 </aside>
 </div>
+<dialog id="settings" class="settings" aria-labelledby="h-settings">
+  <form method="dialog" id="settings-form">
+    <h2 id="h-settings">Settings</h2>
+    <fieldset>
+      <legend class="lbl">Who answers the Studio chat</legend>
+      <div class="radios" id="backend">
+        <label><input type="radio" name="backend" value="agent"> <b>Your terminal agent</b> <span class="fine">Claude Code, Codex, Cursor or any MCP client. Default.</span></label>
+        <label><input type="radio" name="backend" value="local"> <b>A local model</b> <span class="fine">Ollama, LM Studio, llama.cpp server or any OpenAI-compatible address.</span></label>
+        <label><input type="radio" name="backend" value="anthropic"> <b>Claude API</b> <span class="fine" id="key-anthropic"></span></label>
+        <label><input type="radio" name="backend" value="openai"> <b>OpenAI API</b> <span class="fine" id="key-openai"></span></label>
+        <label><input type="radio" name="backend" value="keywords"> <b>Keywords only</b> <span class="fine">No model. Vibe words and effect names.</span></label>
+      </div>
+      <div id="local-box" class="col" hidden>
+        <label class="lbl" for="local-url">Server address</label>
+        <div class="row"><input id="local-url" type="url" placeholder="http://127.0.0.1:11434/v1" class="grow"><select id="local-preset" aria-label="Common local servers"></select></div>
+        <label class="lbl" for="local-model">Model</label>
+        <div class="row"><select id="local-model" class="grow"><option value="">First model the server lists</option></select><button class="btn ghost small" type="button" id="find-models">Find models</button></div>
+        <p class="fine" id="local-msg" role="status"></p>
+      </div>
+      <label class="check"><input type="checkbox" id="action-notes"> Show a one-line note here when my agent changes the edit from the terminal (never the terminal conversation)</label>
+    </fieldset>
+    <fieldset>
+      <legend class="lbl">Where files go</legend>
+      <label class="lbl" for="set-downloads">Reference downloads</label>
+      <input id="set-downloads" placeholder="" spellcheck="false" autocomplete="off">
+      <label class="lbl" for="set-renders">Also copy finished reels to</label>
+      <input id="set-renders" placeholder="" spellcheck="false" autocomplete="off">
+      <p class="fine">Full paths. Leave empty for the default. Studio checks the folder exists (or makes it) and that it can write there.</p>
+    </fieldset>
+    <p id="settings-msg" class="fine" role="status"></p>
+    <div class="row"><button class="btn" type="button" id="save-settings">Save</button><button class="btn ghost" value="cancel">Close</button></div>
+  </form>
+</dialog>
 <div id="toast" class="toast" role="alert" hidden></div>
 <script src="app.js"></script>
 </body>
