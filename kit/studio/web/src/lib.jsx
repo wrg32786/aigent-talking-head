@@ -48,6 +48,37 @@ const P = {
   right: <path d="M9 5l7 7-7 7" />,
   film: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 3v18M16 3v18M4 8h4M4 13h4M16 8h4M16 13h4M4 17h4M16 17h4" /></>,
   download: <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />,
+  camera: <><rect x="3" y="6" width="13" height="12" rx="2" /><path d="M16 10l5-3v10l-5-3" /></>,
+  mic: <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></>,
+  stop: <rect x="6" y="6" width="12" height="12" rx="2" />,
+  grid: <path d="M9 4v16M15 4v16M4 9h16M4 15h16" />,
+  script: <path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4" />,
+  trash: <path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13" />,
+  edit: <path d="M4 20h4L19 9l-4-4L4 16zM13 7l4 4" />,
+  dup: <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M4 16V5a1 1 0 0 1 1-1h11" /></>,
+  spark: <path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" />,
 };
 export const Icon = ({ n, className }) => <svg className={'ic' + (className ? ' ' + className : '')} viewBox="0 0 24 24" aria-hidden="true">{P[n]}</svg>;
 export const IconBtn = ({ n, label, onClick, className = '', ...rest }) => <button type="button" className={'icon-btn ' + className} aria-label={label} title={label} onClick={onClick} {...rest}><Icon n={n} /></button>;
+
+// Script timing, the same rules as kit/studio/scripts.mjs: [hook] [body] [cta] lines start sections, [pause] holds 1.5 s.
+export const PAUSE_S = 1.5;
+const countWords = t => t.split(/\s+/).filter(x => /[\p{L}\p{N}]/u.test(x)).length;
+export function cue(text, wpm = 150) {
+  const out = []; let t = 0, section = null;
+  for (const raw of String(text || '').split(/\r?\n/)) {
+    const l = raw.trim(); if (!l) continue;
+    const m = l.match(/^\[(hook|body|cta)\]$/i); if (m) { section = m[1].toLowerCase(); continue; }
+    const pause = (l.match(/\[pause\]/gi) || []).length, shown = l.replace(/\s*\[pause\]\s*/gi, ' ').trim();
+    const words = countWords(shown), dur = (words / wpm) * 60 + pause * PAUSE_S;
+    out.push({ text: shown, words, pause, section, at: t, dur }); section = null; t += dur;
+  }
+  return out;
+}
+export function scriptStats(text, wpm = 150) {
+  const c = cue(text, wpm), secs = [];
+  let pending = null;
+  for (const raw of String(text || '').split(/\r?\n/)) { const m = raw.trim().match(/^\[(hook|body|cta)\]$/i); if (m) pending = m[1].toLowerCase(); else if (raw.trim() && pending) { const line = c.find(x => x.section === pending && !secs.some(s => s.line === x)); if (line) secs.push({ name: pending, at: line.at, line }); pending = null; } }
+  const total = c.reduce((a, x) => a + x.dur, 0);
+  return { words: c.reduce((a, x) => a + x.words, 0), pauses: c.reduce((a, x) => a + x.pause, 0), seconds: Math.round(total), sections: secs.map(s => ({ name: s.name, at: Math.round(s.at) })) };
+}

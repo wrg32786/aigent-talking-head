@@ -17,6 +17,8 @@ import * as F from './fetch.mjs';
 import * as CH from './channel.mjs';
 import * as AG from './agui.mjs';
 import * as RV from './review.mjs';
+import * as REC from './record.mjs';
+import * as SC from './scripts.mjs';
 
 const require = createRequire(import.meta.url);
 const K = require('../packs.cjs');
@@ -54,7 +56,8 @@ function env() {
 }
 function view(s) {
   let comp; try { comp = C.compose(s, { refPack: refPackName(s) }); } catch (e) { comp = { args: [], errs: [e.message], notes: [] }; }
-  return { state: s, compose: comp, outputs: C.outputsOf(s), env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
+  let scripts = []; try { scripts = SC.list(s.job); } catch {}
+  return { state: s, compose: comp, outputs: C.outputsOf(s), scripts, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
 }
 
 // ---------- tasks (one at a time) ----------
@@ -68,12 +71,12 @@ function runTask(kind, steps, done, hooks = {}) {
   (async () => {
     let out = '';
     let si = 0;
-    for (const [script, args] of steps()) {
+    for (const [script, args, stepEnv] of steps()) {
       if (hooks.step) try { hooks.step(si); } catch {}
       si++;
       log(`$ node ${script} ${args.map(a => /\s/.test(a) ? JSON.stringify(a) : a).join(' ')}`);
       const code = await new Promise(res => {
-        const p = spawn(process.execPath, [join(ROOT, script), ...args], { cwd: ROOT, env: process.env });
+        const p = spawn(process.execPath, [join(ROOT, script), ...args], { cwd: ROOT, env: { ...process.env, ...(stepEnv || {}) } });
         me.proc = p;
         p.stdout.on('data', d => { out += d; log(d); }); p.stderr.on('data', d => log(d));
         p.on('close', c => res(c)); p.on('error', e => { log(e.message); res(1); });
@@ -108,7 +111,10 @@ function draftSteps(s) {
   let args = comp.args.slice();
   if (recreate) { const i = args.indexOf('--pack'); if (i >= 0) args.splice(i, 2); args.push('--recipe', join(s.reference.out, 'Reel.md')); }
   const cl = cleanupFor(s), src = cl ? ['--clips', relOf(clipsDirOf(s)), '--cleanup', cl] : s.clips ? ['--clips', s.clips] : s.footage;
-  return { steps: [['kit/reel.cjs', [...src, '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])]]], lockString: comp.lockString };
+  // takes filmed from a script: hand the script to Whisper as a hint (TX_PROMPT, kit/tx.py and kit/clip.py), so captions spell its words
+  const said = (s.takes || []).filter(t => t.script && t.script.text && s.footage.includes(t.file)).map(t => t.script.text.replace(/\[[a-z]+\]/gi, ' ').replace(/\s+/g, ' ').trim());
+  const stepEnv = said.length && !process.env.TX_PROMPT ? { TX_PROMPT: [...new Set(said)].join(' ').slice(0, 800) } : {};
+  return { steps: [['kit/reel.cjs', [...src, '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])], stepEnv]], lockString: comp.lockString, txPrompt: stepEnv.TX_PROMPT || null };
 }
 function renderSteps(s) {
   if (!s.job || !existsSync(join(ROOT, 'jobs', s.job, 'build', 'cut.json'))) throw Object.assign(new Error('make a draft first'), { code: 400 });
@@ -234,6 +240,8 @@ function copyRenders(outputs) {
 }
 
 // one Studio chat turn from the page or an AG-UI run: queue it for the terminal agent, or answer with a model or keywords
+const SCRIPT_ASK = /\b(script|rewrite|teleprompter)\b/i;
+const SCRIPT_NOTE = 'Writing scripts needs your terminal agent, an API key or a local model (Settings). Keywords mode only changes effects.';
 async function chatTurn(text, offline, attach) {
   const st = S.load(), backend = offline ? 'keywords' : st.chat.backend;
   if (backend === 'agent') {
@@ -247,10 +255,14 @@ async function chatTurn(text, offline, attach) {
   let reply, patch, via;
   const prov = backend === 'keywords' ? null : LLM.provider(process.env, st.chat);
   if (prov) {
-    try { const r = await LLM.chat(text, s, cat, process.env, st.chat); reply = r.reply; patch = r.patch; via = r.provider; }
+    try {
+      const r = await LLM.chat(text, s, cat, process.env, st.chat, SC.list(s.job)); reply = r.reply; patch = r.patch; via = r.provider;
+      if (r.script && r.script.text && s.job) { const sc = SC.write(s.job, { id: r.script.id && SC.list(s.job).some(x => x.id === r.script.id) ? r.script.id : undefined, title: r.script.title, text: String(r.script.text).replace(/\u2014/g, ', '), by: r.model || r.provider }); update(x => { x.scriptsAt = Date.now(); }); reply = (reply ? reply + ' ' : '') + `Saved as the script "${sc.title}" (${sc.words} words, about ${sc.seconds} s).`; }
+    }
     catch (e) { const v = C.vibes(text, s, cat); patch = v.patch; via = 'keywords'; reply = `The ${prov.name} chat failed (${e.message}), so I used the keyword matcher. ` + (v.said.length ? 'Changed: ' + v.said.join('; ') + '.' : 'Nothing matched.'); }
   } else {
     const v = C.vibes(text, s, cat); patch = v.patch; via = 'keywords';
+    if (SCRIPT_ASK.test(text) && !v.said.length) { const s3 = C.load(); C.applyPatch(s3, { reply: SCRIPT_NOTE, from: 'keywords' }); C.save(s3); pushState(); return { reply: SCRIPT_NOTE, via, ...view(s3) }; }
     reply = v.said.length ? `Changed: ${v.said.join('; ')}.` : 'I did not catch an effect or vibe there. Try words like calm, punchy, cinematic, clean, names like "no glitch" or "typewriter titles", or "the transitions from the reference". For a real conversation, connect your terminal agent (Settings, Chat).';
     if (backend !== 'keywords' && !prov) reply = `No ${backend === 'auto' ? 'API key' : backend} backend is ready, so I used keywords. ` + reply;
   }
@@ -263,6 +275,7 @@ async function chatTurn(text, offline, attach) {
 // ---------- http ----------
 const json = (res, code, body) => { res.writeHead(code, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify(body)); };
 const readBody = (req, max = 2e6) => new Promise((ok, bad) => { let b = ''; req.on('data', d => { b += d; if (b.length > max) { bad(new Error('too big')); req.destroy(); } }); req.on('end', () => { try { ok(b ? JSON.parse(b) : {}); } catch { bad(Object.assign(new Error('send JSON'), { code: 400 })); } }); });
+const readRaw = (req, max) => new Promise((ok, bad) => { const parts = []; let n = 0; req.on('data', d => { n += d.length; if (n > max) { bad(Object.assign(new Error('chunk too big'), { code: 413 })); req.destroy(); } else parts.push(d); }); req.on('end', () => ok(Buffer.concat(parts))); req.on('error', bad); });
 const safeName = n => basename(String(n || 'file')).replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+/, '').slice(0, 80) || 'file';
 
 function serveFile(req, res, file) {
@@ -307,6 +320,43 @@ async function api(req, res, u) {
       if (kind === 'music') { st.music.upload = relp; st.music.bed = 'upload'; }
     });
     return json(res, 200, { ok: true, path: relp, ...view(s) });
+  }
+  // Record now (kit/studio/record.mjs): start, numbered chunks while filming, finish converts to mp4
+  if (p === '/api/record/start' && M === 'POST') { const b = await readBody(req); const id = update(st => REC.start(st, b)); return json(res, 200, { id, ...view(C.load()) }); }
+  if (p === '/api/record/chunk' && M === 'POST') {
+    const id = +u.searchParams.get('id'), sq = +u.searchParams.get('seq');
+    const buf = await readRaw(req, REC.MAX_CHUNK);
+    try { return json(res, 200, REC.chunk(id, sq, buf)); } catch (e) { return json(res, e.code || 500, { error: e.message, ...(e.next != null ? { next: e.next } : {}) }); }
+  }
+  if (p === '/api/record/finish' && M === 'POST') {
+    const b = await readBody(req), id = +b.id;
+    try { REC.finish(id, b, fn => update(fn)); } catch (e) { return json(res, e.code || 500, { error: e.message }); }
+    return json(res, 202, { id, ...view(C.load()) });
+  }
+  if (p === '/api/record/abort' && M === 'POST') { const b = await readBody(req); const s = update(st => { REC.abort(st, +b.id); }); return json(res, 200, view(s)); }
+  if (p === '/api/record/take' && M === 'POST') { const b = await readBody(req); try { const s = update(st => { REC.act(st, +b.id, b.action); }); return json(res, 200, view(s)); } catch (e) { return json(res, e.code || 500, { error: e.message }); } }
+  if (p === '/api/record/takes' && M === 'GET') return json(res, 200, { takes: REC.list(C.load()) });
+  // Scripts (kit/studio/scripts.mjs): per job, in jobs/.studio/scripts/<job>/
+  if (p.startsWith('/api/scripts')) {
+    const job = C.load().job, touch = () => update(st => { st.scriptsAt = Date.now(); });
+    try {
+      if (p === '/api/scripts' && M === 'GET') return json(res, 200, { scripts: SC.list(job) });
+      if (p === '/api/scripts/get' && M === 'GET') return json(res, 200, { script: SC.get(job, u.searchParams.get('id')) });
+      if (!job) return json(res, 400, { error: 'name the reel first' });
+      if (p === '/api/scripts' && M === 'POST') { const b = await readBody(req); const sc = SC.write(job, { id: b.id, title: b.title, text: b.text, wpm: b.wpm, by: b.id ? undefined : 'you' }); touch(); return json(res, 200, { script: sc, ...view(C.load()) }); }
+      if (p === '/api/scripts/action' && M === 'POST') {
+        const b = await readBody(req); let sc = null;
+        if (b.action === 'delete') SC.remove(job, b.id); else if (b.action === 'duplicate') sc = SC.duplicate(job, b.id); else if (b.action === 'rename') sc = SC.rename(job, b.id, b.title);
+        else return json(res, 400, { error: 'action: delete, duplicate or rename' });
+        touch(); return json(res, 200, { script: sc, ...view(C.load()) });
+      }
+      if (p === '/api/scripts/from-reference' && M === 'POST') {
+        const b = await readBody(req), s = C.load(), ref = C.refContext(s).active;
+        if (!ref) return json(res, 400, { error: 'break down a reference first' });
+        const ask = `Write a script from this reference${b.topic ? ' about ' + String(b.topic).slice(0, 300) : ''}: match its structure, hook, pacing and beat timestamps, ${Math.round(ref.seconds || (ref.summary && ref.summary.seconds) || 30) || 30} seconds long. Save it with write_script.\nReference teardown: ${JSON.stringify(ref).slice(0, 6000)}`;
+        return json(res, 200, await chatTurn(ask));
+      }
+    } catch (e) { return json(res, e.code || 500, { error: e.message }); }
   }
   if (p === '/api/footage/remove' && M === 'POST') { const b = await readBody(req); const s = update(st => { st.footage = st.footage.filter(f => f !== b.path); }); return json(res, 200, view(s)); }
   if (p === '/api/reference' && M === 'POST') {
@@ -537,6 +587,8 @@ server.on('error', async e => {
   console.error(`Port ${PORT} is in use by another program. Start Studio on another port: npm run studio -- --port 4758`);
   process.exit(1);
 });
+// a take still marked recording or converting was cut off when Studio last stopped
+{ const s0 = C.load(); if ((s0.takes || []).some(t => t.status === 'recording' || t.status === 'converting')) update(st => { for (const t of st.takes) if (t.status === 'recording' || t.status === 'converting') Object.assign(t, { status: 'failed', error: 'Studio stopped while this take was being saved' }); }); }
 server.listen(PORT, HOST, () => {
   const url = `http://${HOST}:${server.address().port}`;
   const e = env();

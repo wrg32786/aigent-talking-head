@@ -29,6 +29,7 @@ export function App() {
   const [chatOpen, setChatOpen] = useState(/chat/.test(location.hash));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [log, setLog] = useState('');
+  const [recLive, setRecLive] = useState(null);
   const mainRef = useRef(null);
 
   const apply = useCallback(v => { if (v && v.state) setV(v); return v; }, []);
@@ -89,6 +90,7 @@ export function App() {
             </button></li>)}
         </ol></nav>
         <div className="topr">
+          {recLive && step !== 'footage' && <button type="button" className="rec-pill" id="rec-pill" onClick={() => go('footage', true)} aria-label="Recording, go back to the recorder"><i aria-hidden="true" />{recLive.phase === 'paused' ? 'Paused' : recLive.phase === 'saving' ? 'Saving take' : 'Recording'}</button>}
           <span id="taskpill" role="status" aria-live="polite"><Badge label={pill} variant={running ? 'cyan' : t && t.status === 'failed' ? 'error' : 'neutral'} /></span>
           <IconBtn id="theme" n={theme === 'dark' ? 'sun' : 'moon'} label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
           <button className="icon-btn fab" id="chat-open" type="button" aria-controls="chat" aria-expanded={String(chatOpen)} aria-label="Open chat" onClick={() => setChatOpen(true)}><Icon n="chat" /><span className={'dot ' + agentState} id="fab-dot" aria-hidden="true" /></button>
@@ -97,7 +99,7 @@ export function App() {
       </header>
       <div className="layout">
         <main id="main" data-step={step} ref={mainRef}>
-          {step === 'footage' && <Footage {...ctx} />}
+          <Footage {...ctx} hidden={step !== 'footage'} onLive={setRecLive} />
           {step === 'reference' && <Reference {...ctx} />}
           <Style {...ctx} hidden={step !== 'style'} tab={tab} setTab={pickTab} />
           <Render {...ctx} hidden={step !== 'render'} />

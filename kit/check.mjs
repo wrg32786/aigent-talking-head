@@ -181,9 +181,17 @@ if (target) {
     catch (e) { aerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio agent tests (tests/studio-agent.test.mjs: reference links, settings, local model, agent channel over MCP, hook)', errs: aerrs, warns: [] });
     const rerrs = [];
-    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-review.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-record.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { rerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
-    results.push({ label: 'Studio review tests (tests/studio-review.test.mjs: what to swap, clean-up pass, edit receipt, preview comments)', errs: rerrs, warns: [] });
+    results.push({ label: 'Studio record tests (tests/studio-record.test.mjs: chunked take upload, mp4 conversion, takes over MCP)', errs: rerrs, warns: [] });
+    const cerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-scripts.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { cerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio script tests (tests/studio-scripts.test.mjs: scripts API, MCP script tools, model-written scripts, takes with scripts)', errs: cerrs, warns: [] });
+    const verrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-review.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { verrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio review tests (tests/studio-review.test.mjs: what to swap, clean-up pass, edit receipt, preview comments)', errs: verrs, warns: [] });
   }
   {
     const star = createRequire(import.meta.url)('./star.cjs');

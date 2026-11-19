@@ -5,6 +5,7 @@ import { ProgressBar } from '@astryxdesign/core/ProgressBar';
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
 import { api, file, toast, grow, pickState, Icon, IconBtn, SITE, STATUS, KIND_NAME, MODE_TIP } from './lib.jsx';
 import { upload } from './upload.js';
+import { canWrite, NO_WRITER } from './Scripts.jsx';
 
 export function Reference({ CAT, V, s, apply, patch }) {
   const r = s.reference, env = V.env, q = r.queue || [], t = env.tools || {};
@@ -104,6 +105,9 @@ function Breakdown({ CAT, V, s, apply, patch }) {
               <Icon n={st === 'allow' ? 'check' : 'plus'} /><span className="k">{KIND_NAME[it.kind] || it.kind}</span>{it.id}</button>;
           })}</div>
         </div>}
+        <div className="row ref-script"><Button id="ref-script" variant="secondary" size="sm" label="Write script from this reference" icon={<Icon n="script" />} isDisabled={!canWrite(V.env)}
+          onClick={() => api('/api/scripts/from-reference', {}).then(j => { apply(j); toast(V.env.backend === 'agent' ? 'Sent to your agent with the breakdown' : 'Writing the script', true); }).catch(() => {})} />
+          {!canWrite(V.env) && <span className="fine">{NO_WRITER}</span>}</div>
         <p className="fine">Your agent sees this breakdown. Try: "use the transitions from the reference but calmer".</p>
       </div>
     </div>
