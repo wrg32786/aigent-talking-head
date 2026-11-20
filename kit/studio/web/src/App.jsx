@@ -45,7 +45,14 @@ export function App() {
   const [recLive, setRecLive] = useState(null);
   const mainRef = useRef(null);
 
-  const apply = useCallback(v => { if (v && v.state) setV(v); return v; }, []);
+  const seen = useRef({ boot: null, seq: 0 });
+  const apply = useCallback(v => {
+    if (!v || !v.state) return v;
+    const k = seen.current;
+    if (v.seq && v.boot === k.boot && v.seq < k.seq) return v; // an older reply than what is on screen
+    if (v.seq) seen.current = { boot: v.boot, seq: v.seq };
+    setV(v); return v;
+  }, []);
   const patch = useCallback(p => api('/api/state', p).then(apply), [apply]);
   const reloadCat = useCallback(async () => setCat(await api('/api/catalog')), []);
 

@@ -112,12 +112,15 @@ function env() {
     keys: { anthropic: KEYS.isSet('anthropic'), openai: KEYS.isSet('openai') }, broll: st.broll, localPresets: S.LOCAL_PRESETS,
     tools: { ytdlp: t.ytdlp ? t.ytdlp.version : null, instaloader: t.instaloader, ffmpeg: t.ffmpeg }, install: F.INSTALL, setup: setupBrief() };
 }
+// every view carries a rising seq (and this run's boot id) so the page can drop a reply that is older than an event it
+// already applied, e.g. a POST answer that lands after the SSE state for a download that failed right away
+const BOOT = Date.now().toString(36); let viewSeq = 0;
 function view(s) {
   let comp; try { comp = C.compose(s, { refPack: refPackName(s) }); } catch (e) { comp = { args: [], errs: [e.message], notes: [] }; }
   let scripts = []; try { scripts = SC.list(s.job); } catch {}
   let cut = null; try { cut = cutView(s); } catch (e) { cut = { error: e.message, candidates: [] }; }
   let broll = null; try { broll = BRL.view(s); } catch (e) { broll = { error: e.message, beats: [] }; }
-  return { state: s, compose: comp, outputs: C.outputsOf(s), scripts, cut, broll, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
+  return { seq: ++viewSeq, boot: BOOT, state: s, compose: comp, outputs: C.outputsOf(s), scripts, cut, broll, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
 }
 
 // ---------- tasks (one at a time) ----------
