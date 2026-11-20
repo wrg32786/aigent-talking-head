@@ -1,7 +1,7 @@
 {
   "contract": 1,
   "name": "aigent-talking-head",
-  "version": "1.10.1",
+  "version": "1.10.2",
   "summary": "Turn a phone clip into a captioned, styled 9:16 talking-head reel, locally.",
   "skill": "skills/aigent-talking-head/SKILL.md",
   "invoke": "npm run <command> -- <args>  (from the repo root; or node <script> <args>)",
@@ -430,8 +430,8 @@
       "flags": [
         { "name": "check", "type": "boolean", "default": false, "description": "only report each dependency as ready or missing with its fix; exit 1 when a core one is missing" },
         { "name": "yes", "type": "boolean", "default": false, "description": "also install ffmpeg and Chrome with Homebrew, winget or the system package manager (never asks for a password)" },
-        { "name": "only", "type": "string", "description": "comma list of the only steps to run (same names as --skip); Studio's Install buttons use it" },
-        { "name": "skip", "type": "string", "description": "comma list of steps to skip: npm, python, ytdlp, ffmpeg, chrome, model, effects, humanizer, studio" },
+        { "name": "only", "type": "string", "description": "comma list of the only steps to run (same names as --skip; effects also fetches mask); Studio's Install buttons use it" },
+        { "name": "skip", "type": "string", "description": "comma list of steps to skip: npm, python, ytdlp, ffmpeg, chrome, model, effects (also skips mask), mask, rea, humanizer, studio" },
         { "name": "json", "type": "boolean", "default": false, "description": "print the result as JSON" }
       ],
       "outputs": ["a summary: installed, already there, skipped, failed, needs you", "jobs/.studio/setup.json (the last run)"],

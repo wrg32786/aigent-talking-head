@@ -16,7 +16,7 @@ const ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const argv = process.argv.slice(2), cmd = argv[0];
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
 const die = m => { console.error('error: ' + m); process.exit(1); };
-const ff = args => { const r = spawnSync('ffmpeg', ['-v', 'error', '-y', ...args], { stdio: ['ignore', 'inherit', 'inherit'] }); if (r.error) die('ffmpeg is missing. Fix: npm run setup:all'); if (r.status) die('ffmpeg failed'); };
+const ff = args => { const r = spawnSync('ffmpeg', ['-v', 'error', '-y', ...args], { stdio: ['ignore', 'inherit', 'inherit'] }); if (r.error) die('ffmpeg is missing. Studio shows how to install it in Settings, Setup check.'); if (r.status) die('ffmpeg failed'); };
 const hasAudio = f => /audio/.test(spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type', '-of', 'csv=p=0', f], { encoding: 'utf8' }).stdout || '');
 
 if (cmd === 'extract') {

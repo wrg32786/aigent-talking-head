@@ -21,6 +21,7 @@ import { Connect } from './Connect.jsx';
 import wordmarkDark from './brand/aigent-wordmark-for-dark.svg';
 import wordmarkLight from './brand/aigent-wordmark-for-white.svg';
 import { SetupCheck } from './Setup.jsx';
+import { FixActions } from './Fix.jsx';
 
 const hashStep = () => (location.hash.match(/step=([a-z]+)/) || [])[1];
 const hashMenu = () => (location.hash.match(/menu=([a-z-]+)/) || [])[1];
@@ -147,9 +148,9 @@ export function App() {
       </div>
       <Settings {...ctx} open={settingsOpen} setOpen={setSettingsOpen} theme={theme} setTheme={setTheme} glass={glass} setGlass={setGlass} />
       <Connect {...ctx} open={connectOpen} setOpen={setConnectOpen} />
-      <SetupCheck open={setupOpen} setOpen={setSetupOpen} />
+      <SetupCheck {...ctx} open={setupOpen} setOpen={setSetupOpen} />
       <Keys {...ctx} open={keysOpen} setOpen={setKeysOpen} />
-      <Toast />
+      <Toast V={V} />
     </Theme>
   );
 }
@@ -167,8 +168,11 @@ function JobName({ s, patch }) {
     <span id="job-hint" className="sr">Lowercase letters, numbers and dashes. Your files go in jobs/ under this name.</span></label>;
 }
 
-function Toast() {
+// a toast with fix ids stays longer and shows the fix buttons (web/src/Fix.jsx) under the message
+function Toast({ V }) {
   const [t, setT] = useState(null);
-  useEffect(() => { let timer; const off = onToast(x => { setT(x); clearTimeout(timer); timer = setTimeout(() => setT(null), 4200); }); return () => { off(); clearTimeout(timer); }; }, []);
-  return <div id="toast" className={'toast glass' + (t && t.ok ? ' ok' : '')} role="alert" hidden={!t}>{t ? t.msg : ''}</div>;
+  useEffect(() => { let timer; const off = onToast(x => { setT(x); clearTimeout(timer); timer = setTimeout(() => setT(null), x.fix ? 15000 : 4200); }); return () => { off(); clearTimeout(timer); }; }, []);
+  const fixes = t && t.fix && V ? t.fix.filter(id => V.env.fixes && V.env.fixes[id]) : [];
+  return <div id="toast" className={'toast glass' + (t && t.ok ? ' ok' : '') + (fixes.length ? ' has-fix' : '')} role="alert" hidden={!t}>{t ? t.msg : ''}
+    {fixes.map(id => <div className="fix-row" key={id}>{fixes.length > 1 && <b className="fine">{V.env.fixes[id].label}</b>}<FixActions V={V} id={id} /></div>)}</div>;
 }

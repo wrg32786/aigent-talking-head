@@ -22,6 +22,7 @@ import * as SC from './scripts.mjs';
 import * as AGT from './agents.mjs';
 import * as CL from './cloud.mjs';
 import * as SETUP from '../setup.mjs';
+import * as FX from './fixes.mjs';
 import * as CUT from './cut.mjs';
 import * as MEDIA from './media.mjs';
 import * as KEYS from './keys.mjs';
@@ -62,22 +63,29 @@ const update = fn => { const s = C.load(); const r = fn(s); C.save(s); pushState
 // ---------- setup check (kit/setup.mjs): cached, refreshed in the background, so a page load never waits on it ----------
 let setupCache = null, setupAt = 0;
 function setupStatus(fresh) {
-  if (fresh || !setupCache || Date.now() - setupAt > 5 * 60e3) { try { setupCache = SETUP.status(); } catch (e) { setupCache = { ready: false, items: [], missing: 0, forUser: [], error: e.message }; } setupAt = Date.now(); }
+  // STUDIO_SETUP_STATUS: a saved status to use instead of checking this computer (the tests: a fixed set of missing things)
+  if (fresh || !setupCache || Date.now() - setupAt > 5 * 60e3) { try { setupCache = process.env.STUDIO_SETUP_STATUS ? JSON.parse(readFileSync(process.env.STUDIO_SETUP_STATUS, 'utf8')) : SETUP.status(); } catch (e) { setupCache = { ready: false, items: [], missing: 0, forUser: [], error: e.message }; } setupAt = Date.now(); }
   return setupCache;
 }
-// only what is missing: { id: fix } and whether the core is ready
+// only what is missing: { id: { label, feature, need } } and whether the core is ready. The page shows the fix buttons
+// for an id (kit/studio/fixes.mjs, env.fixes); no command ever goes to the page as text.
 function setupBrief() {
   if (!setupCache) return null;
-  return { ready: setupCache.ready, missing: Object.fromEntries(setupCache.items.filter(x => x.status !== 'ready').map(x => [x.id, { label: x.label, fix: x.fix, feature: x.feature, need: x.need }])) };
+  return { ready: setupCache.ready, missing: Object.fromEntries(setupCache.items.filter(x => x.status !== 'ready').map(x => [x.id, { label: FX.describe(x.id) ? FX.describe(x.id).label : x.label, feature: x.feature, need: x.need, user: !!x.user }])) };
 }
-// a draft or render that cannot work: the one-line fix now, instead of a failure later
+// the setup list for the page: the same items, with the command fix swapped for the fix id
+function setupForPage(st) {
+  const items = st.items.map(x => ({ ...x, fix: x.status === 'ready' ? null : x.id }));
+  return { ...st, items, forUser: items.filter(x => x.status !== 'ready' && x.user).map(x => { const d = FX.describe(x.id); return d ? `${d.label}: ${d.why}` : x.label; }) };
+}
+// a draft or render that cannot work: say so now, with the fix ids, instead of a failure later
 function needFor(kind) {
   if (process.env.STUDIO_REEL) return null; // a stand-in engine (the tests) needs none of the engine's tools
-  const b = setupBrief(), miss = b ? b.missing : {};
-  if (!miss.ffmpeg && !F.tools().ffmpeg) miss.ffmpeg = { label: 'ffmpeg', fix: 'npm run setup:all' };
+  const b = setupBrief(), miss = b ? { ...b.missing } : {};
+  if (!miss.ffmpeg && !F.tools().ffmpeg) miss.ffmpeg = { label: 'ffmpeg' };
   const need = kind === 'render' ? ['ffmpeg', 'python', 'chrome', 'npm'] : ['ffmpeg', 'python', 'npm'];
-  const m = need.map(k => miss[k]).filter(Boolean);
-  return m.length ? `${m.map(x => x.label).join(', ')} missing. Fix: ${m.map(x => x.fix).join('; ')}` : null;
+  const m = need.filter(k => miss[k]);
+  return m.length ? { error: FX.missingLine(m, `Studio cannot ${kind} yet`), fix: m, setup: true } : null;
 }
 
 // ---------- footage from links (kit/studio/cloud.mjs): Dropbox, Google Drive, plain video URLs ----------
@@ -111,7 +119,7 @@ function env() {
   return { llm: p ? `${p.name}${p.model ? ' (' + p.model + ')' : ''}` : null, backend, agent: CH.presence(), effectsReady: existsSync(join(ROOT, 'effects', '.venv')), port: PORT,
     settings: { downloads: st.downloads, renders: st.renders, actionNotes: st.actionNotes, agent: st.agent, chat: st.chat, from: st.from, defaultDownloads: 'teardown-in/studio/<job>/ (in the kit, not shared)', defaultRenders: 'jobs/<job>/ (in the kit)', defaultDownloadsPath: join(ROOT, 'teardown-in', 'studio'), defaultRendersPath: join(ROOT, 'jobs') },
     keys: { anthropic: KEYS.isSet('anthropic'), openai: KEYS.isSet('openai') }, broll: st.broll, localPresets: S.LOCAL_PRESETS,
-    tools: { ytdlp: t.ytdlp ? t.ytdlp.version : null, instaloader: t.instaloader, ffmpeg: t.ffmpeg }, install: F.INSTALL, setup: setupBrief() };
+    tools: { ytdlp: t.ytdlp ? t.ytdlp.version : null, instaloader: t.instaloader, ffmpeg: t.ffmpeg }, install: F.INSTALL, setup: setupBrief(), fixes: FX.all() };
 }
 // every view carries a rising seq (and this run's boot id) so the page can drop a reply that is older than an event it
 // already applied, e.g. a POST answer that lands after the SSE state for a download that failed right away
@@ -122,7 +130,7 @@ function view(s) {
   let cut = null; try { cut = cutView(s); } catch (e) { cut = { error: e.message, candidates: [] }; }
   let broll = null; try { broll = BRL.view(s); } catch (e) { broll = { error: e.message, beats: [] }; }
   let reopenable = []; try { reopenable = s.job ? SNAP.list(join(ROOT, 'jobs', s.job)).filter(x => x.snapshot).map(x => `jobs/${s.job}/${x.reel}`) : []; } catch {}
-  return { seq: ++viewSeq, boot: BOOT, state: s, compose: comp, outputs: C.outputsOf(s), reopenable, scripts, cut, broll, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
+  return { seq: ++viewSeq, boot: BOOT, state: s, compose: comp, outputs: C.outputsOf(s), reopenable, scripts, cut, broll, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
 }
 
 // what a finished draft says (a draft is a plan: no video until Render)
@@ -284,7 +292,7 @@ function startTranscribe(rel, then) {
   txProgress(rel, { status: 'running', done: 0, total: null, error: null, startedAt: Date.now() });
   return MEDIA.transcribe(rel, {
     onProgress: (done, total) => txProgress(rel, { status: 'running', done, total }),
-    onDone: err => { txProgress(rel, err ? { status: 'failed', error: err.message } : { status: 'ready', error: null }); if (!err && then) try { then(); } catch (e) { console.error(e.message); } },
+    onDone: err => { txProgress(rel, err ? { status: 'failed', error: err.message, fix: err.fix || null } : { status: 'ready', error: null }); if (!err && then) try { then(); } catch (e) { console.error(e.message); } },
   });
 }
 const wordsOf = rel => { const t = MEDIA.transcript(rel); return t ? t.words : null; };
@@ -503,7 +511,7 @@ function addLinks(urls) {
     for (const url of list) {
       const c = F.classify(url), id = (st.refSeq = (st.refSeq || 0) + 1);
       const miss = c.ok ? F.missingFor(c) : null;
-      const it = { id, url: c.url || url, site: c.site || null, via: c.via || null, status: c.ok && !miss ? 'queued' : 'failed', progress: 0, error: c.ok ? miss : c.error, hint: miss || null, at: new Date().toISOString() };
+      const it = { id, url: c.url || url, site: c.site || null, via: c.via || null, status: c.ok && !miss ? 'queued' : 'failed', progress: 0, error: c.ok ? miss : c.error, hint: miss || null, fix: miss ? F.fixOf(miss) : null, at: new Date().toISOString() };
       q.push(it); added.push(it);
     }
     if (q.length > 30) st.reference.queue = q.slice(-30);
@@ -534,7 +542,7 @@ function pump() {
         const m = /^progress (\d+)%/.exec(l); if (m && +m[1] !== lastP && (+m[1] - lastP >= 5 || +m[1] === 100)) { lastP = +m[1]; setItem(it.id, x => { if (x.status === 'downloading') x.progress = lastP; }); }
         if (l.startsWith('{"file"')) { try { const j = JSON.parse(l); title = j.title; setItem(it.id, x => { x.title = j.title; x.seconds = j.seconds; x.trimmed = j.trimmed; }); } catch {} }
       },
-      end: (status, lines) => { if (status !== 'done') setItem(it.id, x => { if (x.status !== 'ready') { x.status = status === 'cancelled' ? 'cancelled' : 'failed'; const e = lines.filter(l => /download failed|error|Error|failed|not found/i.test(l) && !l.startsWith('$')).pop(); x.error = (e || lines[lines.length - 1] || 'failed').replace(/^download failed: /, '').slice(0, 300); } }); },
+      end: (status, lines) => { if (status !== 'done') setItem(it.id, x => { if (x.status !== 'ready') { x.status = status === 'cancelled' ? 'cancelled' : 'failed'; const e = lines.filter(l => /download failed|error|Error|failed|not found/i.test(l) && !l.startsWith('$')).pop(); x.fix = F.fixOf(e); x.error = (e || lines[lines.length - 1] || 'failed').replace(/^download failed: /, '').slice(0, 300); } }); },
     });
   } catch (e) { setItem(it.id, x => { x.status = 'failed'; x.error = e.message; }); }
 }
@@ -692,7 +700,7 @@ async function api(req, res, u) {
     const url = `http://${req.headers.host}`;
     return json(res, 200, { agents: AGT.setups({ url }), prompt: AGT.setupPrompt({ url }), install: AGT.INSTALL_LINE, selected: S.load().agent, agent: CH.presence(), name: AGT.NAME, say: AGT.SAY });
   }
-  if (p === '/api/setup' && M === 'GET') { const st = setupStatus(u.searchParams.has('fresh')); return json(res, 200, st); }
+  if (p === '/api/setup' && M === 'GET') { const st = setupStatus(u.searchParams.has('fresh')); return json(res, 200, setupForPage(st)); }
   // ---------- footage player and the Cut step ----------
   if (p === '/api/footage/info' && M === 'GET') {
     const s = C.load(), rel = u.searchParams.get('path'); if (!okFootage(s, rel)) return json(res, 404, { error: 'not in the footage' });
@@ -728,7 +736,7 @@ async function api(req, res, u) {
   if (p === '/api/cut/edit' && M === 'POST') { const b = await readBody(req); return json(res, 200, view(await editCut(b))); }
   if (p === '/api/cut/set' && M === 'POST') { const b = await readBody(req); return json(res, 200, view(await setCuts(b))); }
   if (p === '/api/cut/render' && M === 'POST') {
-    const b = await readBody(req), miss = needFor('render'); const s = C.load(); const r = cutSteps(s, Array.isArray(b.ids) ? b.ids : null); if (miss) return json(res, 400, { error: miss, setup: true });
+    const b = await readBody(req), miss = needFor('render'); const s = C.load(); const r = cutSteps(s, Array.isArray(b.ids) ? b.ids : null); if (miss) return json(res, 400, miss);
     runTask('cuts', () => r.steps, () => ({ cuts: r.plan.map(x => ({ ...x, outputs: C.outputsOf({ job: x.job }) })), copiedTo: copyRenders(r.plan.flatMap(x => C.outputsOf({ job: x.job }).slice(0, 1))) }));
     return json(res, 202, { plan: r.plan, ...view(C.load()) });
   }
@@ -738,7 +746,7 @@ async function api(req, res, u) {
   if (p === '/api/lines' && M === 'GET') return json(res, 200, await linesView(C.load(), u.searchParams.get('path')));
   if (p === '/api/lines' && M === 'POST') { const b = await readBody(req); const r = await editLines(b); return json(res, 200, { lines: r.view, ...view(r.s) }); }
   if (p === '/api/lines/render' && M === 'POST') {
-    const b = await readBody(req), miss = needFor('render'), s = C.load(); const r = await biteSteps(s, Array.isArray(b.ids) ? b.ids : null, b.path); if (miss) return json(res, 400, { error: miss, setup: true });
+    const b = await readBody(req), miss = needFor('render'), s = C.load(); const r = await biteSteps(s, Array.isArray(b.ids) ? b.ids : null, b.path); if (miss) return json(res, 400, miss);
     // only: 'file' joins the lines into one file (no edit), for the clean take as a plain video
     const steps = b.only === 'file' ? r.steps.filter(x => x[1][0] === 'extract') : r.steps;
     runTask('bites', () => steps, () => ({ bites: r.plan.map(x => ({ ...x, outputs: C.outputsOf({ job: x.job }) })), copiedTo: b.only === 'file' ? [] : copyRenders(r.plan.flatMap(x => C.outputsOf({ job: x.job }).slice(0, 1))) }));
@@ -765,13 +773,25 @@ async function api(req, res, u) {
     if (!s.job) return json(res, 400, { error: 'name the job first' }); if (!topic) return json(res, 400, { error: 'say your topic' });
     const r = await adaptScript(s, String(b.id || ''), topic); return json(res, 200, { ...r, ...view(C.load()) });
   }
-  // Install next to a "not installed" pill: the same pip line as setup (kit/setup.mjs --only), in the kit's Python, then
-  // a fresh look at the tools, so the page updates without a restart
-  if (p === '/api/tools/install' && M === 'POST') {
-    const b = await readBody(req), step = { ytdlp: 'ytdlp', instaloader: 'ytdlp', model: 'model', effects: 'effects', rea: 'rea' }[b.tool];
-    if (!step) return json(res, 400, { error: 'tool: ytdlp, instaloader, model, effects or rea' });
-    runTask('install', () => [[process.env.STUDIO_SETUP || 'kit/setup.mjs', ['--only', step]]], () => { const t = F.tools({ fresh: true }); setupStatus(true); return { tool: b.tool, ytdlp: t.ytdlp ? t.ytdlp.version : null, instaloader: t.instaloader }; });
+  // Fix buttons (kit/studio/fixes.mjs). Install: the same step as setup (kit/setup.mjs --only <step>, nothing else), then a
+  // fresh look at the tools and the setup list, so the page updates without a restart. /api/tools/install is the old name.
+  if ((p === '/api/fix/install' || p === '/api/tools/install') && M === 'POST') {
+    const b = await readBody(req), id = String(b.id || b.tool || ''), step = FX.stepOf(id);
+    if (!step) return json(res, 400, { error: `Studio cannot install ${FX.describe(id) ? FX.describe(id).label : 'that'} by itself. Your agent can.` });
+    runTask('install', () => [[process.env.STUDIO_SETUP || 'kit/setup.mjs', ['--only', step]]], () => {
+      const t = F.tools({ fresh: true }), st = setupStatus(true), item = st.items.find(x => x.id === id);
+      return { fix: id, tool: id, ready: !!(item && item.status === 'ready'), ytdlp: t.ytdlp ? t.ytdlp.version : null, instaloader: t.instaloader };
+    });
+    task.fix = id;
     return json(res, 202, view(C.load()));
+  }
+  // Send to my agent: the fix's instruction goes to the connected terminal agent through the Studio chat channel
+  if (p === '/api/fix/send' && M === 'POST') {
+    const b = await readBody(req), text = FX.prompt(String(b.id || ''));
+    if (!text) return json(res, 400, { error: 'Nothing to send for that.' });
+    if (S.load().chat.backend !== 'agent') return json(res, 400, { error: 'Connect your agent first (Connect agent, top right).' });
+    // the page shows the short ask (attach.kind fix); the agent reads the whole instruction
+    return json(res, 200, await chatTurn(text, false, { kind: 'fix', fix: String(b.id), label: FX.describe(String(b.id)).label }));
   }
   if (p === '/api/footage/remove' && M === 'POST') { const b = await readBody(req); const s = update(st => { st.footage = st.footage.filter(f => f !== b.path); }); return json(res, 200, view(s)); }
   if (p === '/api/reference' && M === 'POST') {
@@ -817,7 +837,7 @@ async function api(req, res, u) {
   }
   if (p === '/api/draft' && M === 'POST') {
     const s = C.load(); const d = draftSteps(s); // checks the footage first, so an empty job says that before a missing tool
-    const miss = needFor('draft'); if (miss) return json(res, 400, { error: miss, setup: true });
+    const miss = needFor('draft'); if (miss) return json(res, 400, miss);
     update(st => { st.lockedAtDraft = d.lockString || ''; });
     runTask('draft', () => d.steps, () => ({ choices: !!readChoices(C.load()), note: DRAFT_DONE }));
     return json(res, 202, view(C.load()));
@@ -827,12 +847,12 @@ async function api(req, res, u) {
     // memory for the person mask (kit/memcheck.cjs): short, the page says so and offers titles in front or the lighter mask
     const mem = MC.renderCheck(join(ROOT, 'jobs', s.job, 'build'));
     if (mem.needed && !mem.ok && !['front', 'light', 'anyway'].includes(b.memory)) return json(res, 409, { error: mem.message, memory: mem });
-    const miss = needFor('render'); if (miss) return json(res, 400, { error: miss, setup: true });
+    const miss = needFor('render'); if (miss) return json(res, 400, miss);
     if (b.memory === 'front') r.steps[0][1].push('--no-mask');
     if (b.memory === 'light') r.steps[0][1].push('--mask', 'mediapipe');
     if (b.memory === 'anyway') r.steps[0][2] = { ...(r.steps[0][2] || {}), MASK_FORCE: '1' };
     runTask('render', () => r.steps, () => { const st = C.load(), outputs = C.outputsOf(st); return { outputs, copiedTo: copyRenders(outputs), fx: r.fx, effects: r.effects }; });
-    return json(res, 202, { ...view(C.load()), fx: r.fx, effectsSkipped: r.effects.length && !r.fx ? 'effects need npm run effects:setup' : null });
+    return json(res, 202, { ...view(C.load()), fx: r.fx, effectsSkipped: r.effects.length && !r.fx ? 'Effects are not set up on this computer, so this reel renders without them.' : null, ...(r.effects.length && !r.fx ? { fix: ['effects'] } : {}) });
   }
   // Edit this reel: the build behind a finished reel back into build/ (kit/snapshots.cjs); the build it replaces is saved
   if (p === '/api/reopen' && M === 'POST') {
@@ -1000,7 +1020,7 @@ const server = http.createServer(async (req, res) => {
       return serveFile(req, res, abs);
     }
     json(res, 404, { error: 'not found' });
-  } catch (e) { json(res, e.code && e.code >= 400 && e.code < 600 ? e.code : 500, { error: e.message }); }
+  } catch (e) { json(res, e.code && e.code >= 400 && e.code < 600 ? e.code : 500, { error: e.message, ...(e.fix ? { fix: e.fix } : {}) }); }
 });
 
 watchFile(C.statePath(), { interval: 400 }, pushState);

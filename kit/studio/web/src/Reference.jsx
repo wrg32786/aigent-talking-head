@@ -6,6 +6,7 @@ import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/Segme
 import { api, file, toast, grow, pickState, Icon, IconBtn, SITE, STATUS, KIND_NAME, MODE_TIP } from './lib.jsx';
 import { upload } from './upload.js';
 import { canWrite, NO_WRITER } from './Scripts.jsx';
+import { FixActions } from './Fix.jsx';
 
 export function Reference({ CAT, V, s, apply, patch }) {
   const r = s.reference, env = V.env, q = r.queue || [], t = env.tools || {};
@@ -34,7 +35,7 @@ export function Reference({ CAT, V, s, apply, patch }) {
       <input type="file" id="file-ref" ref={fileIn} accept="video/*,.mov,.mp4,.m4v,.webm,.mkv" hidden onChange={e => { upload('reference', [...e.target.files], s, apply); e.target.value = ''; }} />
     </div>
     <p className="fine" id="ref-tools">{t.ytdlp ? 'Works with YouTube, TikTok, X, Vimeo, Instagram and .mp4 links. Use videos you have the rights to.'
-      : <><Badge label="yt-dlp not installed" variant="warning" /> <InstallTool tool="ytdlp" V={V} apply={apply} /> Direct .mp4 links work now{t.instaloader ? ', and Instagram' : ''}. Use videos you have the rights to.</>}</p>
+      : <><Badge label="yt-dlp not installed" variant="warning" /> <FixActions V={V} id="ytdlp" apply={apply} /> Direct .mp4 links work now{t.instaloader ? ', and Instagram' : ''}. Use videos you have the rights to.</>}</p>
     <ol id="ref-queue" className="queue" aria-label="Reference queue" aria-live="polite">
       {q.slice().reverse().map(it => {
         const busy = it.status === 'downloading' || it.status === 'tearing', isActive = r.active === it.id;
@@ -49,6 +50,7 @@ export function Reference({ CAT, V, s, apply, patch }) {
           </span>
           {busy && <div className="qbar"><ProgressBar label={STATUS[it.status]} isLabelHidden value={it.status === 'downloading' && it.progress ? it.progress : undefined} isIndeterminate={it.status === 'tearing' || !it.progress} /></div>}
           {it.error && <p className="err">{it.error}</p>}
+          {it.fix && it.status === 'failed' && <FixActions V={V} id={it.fix} apply={apply} />}
           {it.trimmed && <p className="fine">Kept the first part of a longer video.</p>}
         </li>;
       })}
@@ -85,7 +87,7 @@ function Breakdown({ CAT, V, s, apply, patch }) {
         </SegmentedControl>
       </div>
     </div>
-    {/fallback/.test(engine || '') && <p className="fine ref-engine" id="ref-engine" role="note"><Badge label="Read by the built-in analyzer" variant="warning" /> It is rougher and can miss shots, titles and the grade. <InstallTool tool="rea" V={V} apply={apply} /> rea-video, then add this reference again.</p>}
+    {/fallback/.test(engine || '') && <p className="fine ref-engine" id="ref-engine" role="note"><Badge label="Read by the built-in analyzer" variant="warning" /> It is rougher and can miss shots, titles and the grade. Get rea-video for the full read, then add this reference again. <FixActions V={V} id="rea" apply={apply} /></p>}
     {r.mode === 'influence' && <p className="fine" id="ref-mode-note">Influence borrows its picks. It does not copy the look. Recreate does.</p>}
     <div className="td-body">
       {r.contact ? <img src={file(r.contact)} alt="Contact sheet of the reference, one frame per shot" /> : <div className="empty-art"><Icon n="film" /></div>}
@@ -161,12 +163,5 @@ function PullScript({ V, s, apply }) {
       <Button id="adapt-btn" type="submit" size="sm" variant="primary" label="Adapt to my topic" isLoading={busy} isDisabled={!canWrite(V.env) || !topic.trim()} /></form>}
     {pulled && !canWrite(V.env) && <p className="fine">{NO_WRITER}</p>}
   </div>;
-}
-// one click installs a missing tool with the kit's own Python (POST /api/tools/install runs kit/setup.mjs --only ytdlp),
-// then the page re-reads the tools; the log shows pip's output if it fails
-function InstallTool({ tool, V, apply }) {
-  const busy = V.task && V.task.kind === 'install' && V.task.status === 'running', failed = V.task && V.task.kind === 'install' && V.task.status === 'failed';
-  const go = () => api('/api/tools/install', { tool }).then(j => { apply(j); toast('Installing. The pill goes away when it is done.', true); }).catch(() => {});
-  return <><Button id={'install-' + tool} size="sm" variant="secondary" label={failed ? 'Install failed, try again' : 'Install'} isLoading={busy} onClick={go} />{failed && <span className="fine"> {(V.task.lines || []).filter(l => /error|fail/i.test(l)).pop() || 'See the log in Render.'}</span>}</>;
 }
 const Stat = ({ b, l }) => <div className="stat"><b>{b}</b><span>{l}</span></div>;
