@@ -8,7 +8,9 @@ npm run studio
 
 That starts Studio on http://127.0.0.1:4757 and opens your browser. `--port <n>` picks another port, `--no-open` skips the browser. Never used a terminal? Run the one-line installer in [Setup](#setup-without-a-terminal) and double-click the "Talking Head Studio" icon it puts on your desktop.
 
-![Studio on a laptop: the AIgent wordmark, the Style step with packs and the effects grid, the picks bar at the bottom, and the chat](studio/desktop.png)
+![Studio on a laptop in dark: the six step dots with Cut open, Your edit across the top, the Pieces sorted by what each line does, Ask my agent next to Look, and the chat with Claude Code](studio/desktop.png)
+
+![The same Cut step in the light theme](studio/light.png)
 
 Six steps across the top: Footage, Cut, Look, B-roll, Finish, Post. Each one is its own screen with Back and Next at the bottom, and a step shows a check when it is done. **Look** has two views, **Your look** (packs, effects, sound and pace) and **Reference**. Old links still land: `#step=style` and `#step=reference` open Look, `#step=render` opens Finish.
 
@@ -30,7 +32,9 @@ Six steps across the top: Footage, Cut, Look, B-roll, Finish, Post. Each one is 
 5. **Chat.** Type "calm and cinematic, no glitch, typewriter titles". See [Chat](#chat).
 6. **Render.** Draft runs `npm run reel ... --draft` and shows the choices table: every transition, finish, title and graphic per beat, with why it was picked. Change any cell and apply; the change is pinned. Render builds the reel (and the export size you picked) with progress, then plays it with a download link.
 
-![The effects menu on the Transitions tab: preview tiles with glitch forbidden and whip picked, and a hover card with the description of dip-black](studio/menu.png)
+![The Look step: the built-in Looks as previews of your face, Save as a new Look, and the Layers panel on Text with caption previews](studio/look-layers.png)
+
+![The same Look step in the light theme](studio/look-layers-light.png)
 
 ## Look and its 9 layers
 

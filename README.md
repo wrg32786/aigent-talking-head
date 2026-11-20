@@ -21,6 +21,7 @@ Phone clip on the left, finished reel on the right. [Watch the 40-second demo re
 - **Plans graphics from what you say**: a number becomes a stat callout, a list a checklist, the close a call-to-action card. The words on a graphic are words you said.
 - **Keeps your face clear**: a title or graphic set behind you goes behind only your hair and crown, never your face, and a layout pass moves captions out of the way of graphics.
 - **Exports for each platform** inside its safe area, then checks the finished file (loudness, overlaps, safe area) before you post.
+- **Renders fast**: overlay frames render about 5x faster than before (163 s down to 31 s for a 30 s reel in our benchmark), and a whole render is about 2.8x faster.
 - **Works from your agent**: a one-line skill install for Claude Code, Codex and Cursor, plus a local MCP server.
 
 ## Quick start
@@ -62,36 +63,37 @@ Made a reel? [Star the repo](https://github.com/wrg32786/aigent-talking-head) an
 
 ## Studio: edit in a browser, with your agent in the chat
 
-Studio is a local page for making a reel without memorising commands. Drop in your footage or film it right there, paste links to reels you like, click effects from a visual menu, pick a style pack, music and pace, then draft and render. The chat on the page is answered by your own terminal agent (Claude Code, Codex, Cursor or any MCP client), so it can change the edit for you while you watch. Everything runs on your computer. Full guide: [docs/studio.md](docs/studio.md).
+Studio is a local page for making a reel without memorising commands. It walks you through six steps, shown as numbered dots across the top: **Footage** (drop in clips, paste a link or film it right there), **Cut** (pick what to make and which lines to keep), **Look** (one Look for every layer, or your own picks), **B-roll**, **Finish** (draft, check and render) and **Post**. The chat on the page is answered by your own agent (Claude Code, Codex, Cursor or any MCP client), so it can change the edit for you while you watch. Everything runs on your computer. Full guide: [docs/studio.md](docs/studio.md).
 
-**Set it up by telling your terminal agent:**
+**Set it up by telling your agent:**
 
 ```
-Install aigent-talking-head, set up Studio from AGENTS.md and run the Studio chat loop.
+Read https://github.com/wrg32786/aigent-talking-head/blob/main/docs/install.md and follow it to install, set up and connect Talking Head Studio in this agent, then open Studio.
 ```
 
-The agent clones the kit and installs everything up front with `npm run setup:all` (Python, the downloaders, the Whisper model, the effects, the humanizer skill), then tells you only what it cannot do itself, like a password prompt. It registers the MCP server in its own config, starts Studio with `npm run studio:agent`, opens the page and listens. In Studio, **Connect agent** shows the exact command for Claude Code, Codex, Cursor, Gemini CLI, OpenCode or any MCP client, with your install's paths filled in and a copy button, and turns green when the agent connects. Step by step for each agent: [docs/setup-with-ai.md](docs/setup-with-ai.md) and the Studio section of [AGENTS.md](AGENTS.md).
+Your agent installs everything up front (Python, the downloaders, the Whisper model, the effects, the humanizer skill), registers the MCP server in its own config, opens Studio and listens, and tells you only what it can't do itself, like a password prompt. In Studio, **Connect agent** walks you through Claude Code, Codex, Cursor, Gemini CLI, OpenCode or any MCP client with your install's details filled in, and turns green when the agent connects. Step by step for each agent: [docs/setup-with-ai.md](docs/setup-with-ai.md) and the Studio section of [AGENTS.md](AGENTS.md).
 
-**No terminal?** One line installs everything and puts a "Talking Head Studio" icon on your desktop:
+**No agent yet?** Tell any agent that runs commands to "install Talking Head Studio and put the icon on my desktop", and it runs our one-line installer for your OS ([docs/install.md](docs/install.md)). Then click the "Talking Head Studio" icon. Without an agent connected, the chat works on keywords, a local model or an API key.
 
-- macOS or Linux: `curl -fsSL https://raw.githubusercontent.com/wrg32786/aigent-talking-head/main/install/install.sh | bash`
-- Windows (PowerShell): `irm https://raw.githubusercontent.com/wrg32786/aigent-talking-head/main/install/install.ps1 | iex`
+<img src="docs/studio/desktop.png" width="720" alt="Studio in dark: the AIgent wordmark, the six step dots with Cut open, Wizards, Outputs and Claude Code in the top bar, Your edit across the top, the Pieces sorted into Hook, Story, Tip, Proof, List and CTA, Ask my agent next to Look at the bottom, and the chat with Claude Code on the right">
 
-Then run `npm run studio` (or click the icon). Without an agent the chat works on keywords, a local model or an API key.
+<img src="docs/studio/light.png" width="720" alt="The same Cut step in the light theme">
 
-<img src="docs/studio/desktop.png" width="720" alt="Studio in a browser: the AIgent wordmark and six numbered steps across the top, the Look step with style packs and a grid of effect previews in frosted glass panels, the picks bar at the bottom, and the chat on the right">
+**Your edit.** A strip at the top of every step says what you are making in plain words: the format, where it comes from ("7 pieces, 25 s, in your order, picked by AI"), the Look, the b-roll and the sound, with one button to the next thing to do (Add footage, Draft it). Click any part to jump to the step that sets it.
 
 **Reference links.** Paste one or more links (YouTube and Shorts, TikTok, X, Vimeo, a direct .mp4, or one public Instagram post) and Studio downloads each to a folder on your computer, shows the progress, and breaks it down: length, shots and cut times, pace, music BPM and energy, caption style, transitions, finishes and graphics. It then suggests matching items from the effects menu. The breakdown goes into the chat, so "use the transitions from the reference but calmer" works. Use it as an influence (soft defaults) or recreate its structure with your clip. Link downloads need [yt-dlp](https://github.com/yt-dlp/yt-dlp), which the installer adds; Instagram uses [instaloader](https://github.com/instaloader/instaloader) anonymously, with no login. Only use videos you have the rights to use as a reference.
 
 <img src="docs/studio/ref-url-desktop.png" width="720" alt="Studio Look step, Reference view: a pasted YouTube link broken down into 90 seconds, 17 shots, 123 BPM and a 5.29 second average shot, a shot timeline with a beat grid, tags for what was found, suggested picks as chips, and a contact sheet">
 
-**Cut.** Tell Studio what to make from the take with big cards: a Short (Reels, Shorts, TikTok), a Long form YouTube video or a Square post, short, medium or long, one full edit, clips or both, organic or an ad. It picks smart defaults from the take, so you can just hit Next. **Find cuts** lists the best parts with the words, times, a score and why (picked by your agent, a model, or simple rules, and it says which), as colored blocks on the take's timeline to trim, keep, drop or add to, then renders every kept one in one go. Each cut lands on the quiet in the audio after the last word, so no word is clipped. For a long recording, **Lines and bites** lists every line with keep or retake: group lines into named bites in any order, make one clean take of the whole thing, and render or save each one (your agent can do the picking). Click any clip in Footage to play it with a waveform and a transcript you can click. On the Reference step, **Pull script** puts the reference's words in your Scripts with the hook, body and CTA marked, and **Adapt to my topic** rewrites it for yours. [More](docs/studio.md#cut).
+**Cut.** Tell Studio what to make from the take with big cards: a Short (Reels, Shorts, TikTok), a Long form YouTube video or a Square post, short, medium or long, one full edit, clips or both, organic or an ad. It picks smart defaults from the take, so you can just hit Next. **Find cuts** on the Cuts and lines tab lists the best parts with the words, times, a score and why (picked by your agent, a model, or simple rules, and it says which), as colored blocks on the take's timeline to trim, keep, drop or add to. Each cut lands on the quiet in the audio after the last word, so no word is clipped. For a long recording, **Lines and bites** lists every line with keep or retake and groups them into named bites in any order. On the Reference step, **Pull script** puts the reference's words in your Scripts with the hook, body and CTA marked, and **Adapt to my topic** rewrites it for yours. [More](docs/studio.md#cut).
 
-**Pieces.** Once the take is transcribed, every line is a piece sorted by what it does (hook, story, tip, proof, list, call to action; asides and retakes hidden). **Let AI choose** builds your combo, hook first and CTA last with a reason each, or build your own and drag to reorder. Pieces are whole lines, so a combo never cuts a word. **Outputs** in the top bar lists every version you rendered with the settings that made it, to re-open or compare.
+**Pieces.** Once the take is transcribed, every line is a piece sorted by what it does (Hook, Story, Tip, Proof or quote, List, CTA; asides and retakes tucked away). **Let AI choose** builds your edit, hook first and CTA last with a reason each, or **Build my own** and drag to reorder. Pieces are whole lines, so a reel never cuts a word.
 
-<img src="docs/studio/cut-pieces.png" width="720" alt="Studio Cut step on Pieces: lines sorted into Hook, Story, Tip, Proof or quote, List and CTA, with Your combo numbered in play order">
-<img src="docs/studio/cut-desktop.png" width="520" alt="Studio Cut step: the summary line, cards for format, length, output and goal, Find cuts, and how many cuts you kept">
-<img src="docs/studio/cut-timeline.png" width="520" alt="Cut candidates as colored blocks on lanes under the take's waveform, with filler words marked">
+<img src="docs/studio/cut-pieces.png" width="720" alt="Studio Cut step on Pieces in dark: lines sorted into Hook, Story, Tip, Proof or quote, List and CTA, numbered in play order">
+
+<img src="docs/studio/cut-pieces-light.png" width="720" alt="The same Pieces view in the light theme">
+
+<img src="docs/studio/cut-desktop.png" width="420" alt="Studio Cut step: the summary line, cards for format, length, output and goal, Find cuts, and how many cuts you kept"> <img src="docs/studio/cut-timeline.png" width="420" alt="Cut candidates as colored blocks on lanes under the take's waveform, with filler words marked">
 
 **Record now.** No clip yet? Film it in the Footage step with your computer's camera and mic. Pick the camera and mic, choose 9:16 (the default), 16:9 or 1:1, and record with a 3, 2, 1 countdown, pause and a timer. Framing guides show where your head goes so titles can sit behind it and captions below, and an optional teleprompter scrolls your script near the lens. Every take is listed with a thumbnail: keep it, drop it from the edit, or retake. A kept take is converted to an mp4 and joins your footage right away, and your agent gets a one-line note ("New take recorded: 42 s"). The recording is sent to Studio in small pieces as you film, so a long take is not lost to one failed upload, and nothing leaves your computer. Browsers only allow the camera on a secure page, which `http://127.0.0.1` is. On a phone, open Studio on the phone itself or over https; Studio never opens itself to your network.
 
@@ -117,11 +119,11 @@ Then run `npm run studio` (or click the icon). Without an agent the chat works o
 <img src="docs/studio/teleprompter-phone.png" width="200" alt="Studio teleprompter on a phone: the current line of the script highlighted near the top of the 9:16 camera preview, with section labels">
 </p>
 
-**Effects menu.** Every transition, title entrance, caption style, graphic, finish and sound in 17 categories, each a looping preview with just its name. Hover for the details, click to pick, use the forbid button for what you never want, and your picks collect in the tray at the bottom. Once you pick any transition, only picked transitions are used, and the same for each kind.
+**Look, in layers.** A Look sets every layer at once: pick one of the built-in Looks (aigent, cinematic, hormozi-bold, magazine, minimal-clean, neutral) from previews of your own face, or save your picks as a new Look. Below, the Layers panel splits the choices into Text, Fonts, Graphics, Transitions, Color and finish, Motion, Music and SFX, B-roll and Layout, each a looping preview, with one search over every layer. Each choice carries a badge for where it came from (the Look, the reference or you), your own picks always win, and the forbid button keeps out what you never want. A reference can become its own Look.
 
-<img src="docs/studio/menu.png" width="720" alt="Studio effects menu on the Transitions tab: animated preview tiles with glitch forbidden and whip picked, a hover card describing dip-black, and the picks tray at the bottom">
+<img src="docs/studio/look-layers.png" width="720" alt="The Look step in dark: Your edit at the top, the seven Looks as face previews with magazine picked, Save as a new Look, and the Layers panel on Text with caption previews">
 
-**Style packs.** Pick a pack such as cinematic or magazine as a starting point; your own picks always win. A reference can become its own local pack.
+<img src="docs/studio/look-layers-light.png" width="720" alt="The same Look step in the light theme">
 
 **Two separate chats.** The Studio chat and your terminal conversation are separate channels. Studio shows only what you type on the page, your agent's replies to it and its Studio actions, never the terminal conversation. Each message shows whether it is queued, seen by your agent or answered. Edits from either place update the page live, and when the agent changes the edit from the terminal, Studio can show a one-line note such as "picked caption style kinetic (from the terminal)" (a setting, on by default). An agent can't be interrupted in the middle of a step: messages wait until its next step, and a Claude Code hook tells it how many Studio messages are waiting.
 
@@ -129,26 +131,52 @@ Then run `npm run studio` (or click the icon). Without an agent the chat works o
 <img src="docs/studio/chat-agent.png" width="300" alt="Studio chat with a Claude Code, listening badge: page messages marked Answered, the agent's replies, and a one-line action note for an edit made from the terminal">
 <img src="docs/studio/chat-phone.png" width="300" alt="Studio chat as a full-screen sheet on a phone: the agent status badge, messages marked Answered and the agent's replies">
 </p>
+</p>
 
+**Ask my agent.** Every step has an **Ask my agent** button next to Next. It opens a few asks for that step ("Pick the strongest hook", "Drop the weak lines", "Make a 15 s ad from this too") or a box for your own words, and sends it to the chat with the step attached. When your agent suggests a change, the reply comes with a button such as **Use cinematic** to apply it in one click, or **Show me** to jump to it first.
+
+<img src="docs/studio/ask-agent.png" width="440" alt="Ask my agent open on the Cut step: three suggested asks, a box for your own words and Send"> <img src="docs/studio/apply.png" width="210" alt="The chat: the ask marked Answered and Claude Code's reply with Use cinematic and Show me"> <img src="docs/studio/apply-light.png" width="210" alt="The same reply in the light theme">
+
+**Wizards.** **Wizards** in the top bar walks you through a whole job in two or three questions: make a reel from a long take, copy a reference, or clips and ads from one take. Each answer sets the steps for you, and **Let my agent decide** hands the choice to your agent.
+
+<img src="docs/studio/wizards.png" width="400" alt="The Make a reel from a long take wizard in dark: What is this reel for, with Grow followers, Sell or sign up, Teach one thing and Full clean take"> <img src="docs/studio/wizards-light.png" width="400" alt="The same wizard in the light theme">
 **Settings.** Dark by default, with a light theme. The chat, step bar and settings are frosted glass panels; a switch turns them solid on older computers. Choose who answers the chat (your terminal agent by default, or a local model through Ollama, LM Studio or llama.cpp, the Claude or OpenAI API, or keywords only), where reference downloads go, and where finished reels are copied.
 
 <img src="docs/studio/settings.png" width="720" alt="Studio settings in a side sheet: who answers the chat, the terminal note switch, API keys and providers, and the reference downloads and finished reels folders with Browse">
 
 **B-roll that picks itself.** After every draft, Studio reads what you said and puts b-roll on spots about every 6 to 10 s: a number you say becomes a counter card, a quote a quote card, anything else a clip from your library (or free Pexels or Pixabay stock with your own key). Each spot says why, and you swap, change or remove any of it from your library, an upload, stock, a card, a screen recording or a generator with your own key (off until you allow it; every generate shows the cost and waits for your click). Uploads say what they are (testimonial, product demo, screen recording, lifestyle); raw ones are cut into pieces on whole words first, and a testimonial piece can play in your reel with its own sound. Pick full cutaway, split top panel or picture in picture; credits are written next to the reel.
 
-<img src="docs/studio/broll-spots.png" width="520" alt="The B-roll step: spots picked from what was said, a quote card and a counter card, with How it sits, Timing and Why this"> <img src="docs/studio/broll-keys.png" width="300" alt="API keys and providers: Pexels saved and tested, other providers not set">
+<img src="docs/studio/broll-spots.png" width="420" alt="The B-roll step in dark: spots picked from what was said, a quote card and a counter card, with How it sits, Timing and Why this"> <img src="docs/studio/broll-spots-light.png" width="420" alt="The same B-roll step in the light theme">
+
+<img src="docs/studio/broll-keys.png" width="300" alt="API keys and providers: Pexels saved and tested, other providers not set">
 
 **Post to Buffer.** The last step sends the finished reel to your Buffer account, one post per channel: Instagram Reels, TikTok, YouTube Shorts, LinkedIn, X, Facebook Reels and Threads. Posts are saved as Buffer drafts unless you pick queue, a time, or post now (which asks you to tick a box first). Buffer fetches the video from a public link, so Studio uploads it to your Cloudflare R2 bucket or your Cloudinary account, or you paste your own link. It re-encodes to H.264 when needed and skips channels the reel is too long for, with the reason. Your Buffer key stays on your computer and your agent can do the same with the `buffer_post_reel` tool. Details: [docs/posting.md](docs/posting.md).
 
 <img src="docs/studio/post-channels.png" width="420" alt="The Post step, Channels: the reel, four Buffer channels with Facebook Reels marked Will be skipped for a 1 min 40 s reel, and the caption"> <img src="docs/studio/post-send.png" width="420" alt="The Post step, Send: Drafts picked, Send to Buffer as drafts, and the result for each channel">
 
-**Review your edit.** Look's Reference view lists the reference's parts with times (hook, cuts, titles, b-roll, CTA), each with the matching Studio picks one click away. On the Finish step you can watch your reel beside the reference or under it with an opacity slider, on one clock; click or drag a box on a frame to send your agent a comment with the frame and the time; run a clean-up pass that lists long pauses, filler words and retakes from the Whisper word timings to keep or remove before a redraft; and read the edit receipt, every pick and its reason in plain words. Details: [docs/studio.md](docs/studio.md#review-your-edit).
+**Review your edit.** Look's Reference view lists the reference's parts with times (hook, cuts, titles, b-roll, CTA), each with the matching Studio picks one click away. On the Finish step you go Draft, Check, Render: Draft makes a quick plan with no video, Check shows the picks and the clean-up, and Render runs once at full quality and saves the version to Outputs. You can watch your reel beside the reference or under it with an opacity slider, on one clock; click or drag a box on a frame to send your agent a comment with the frame and the time; run a clean-up pass that lists long pauses, filler words and retakes from the Whisper word timings to keep or remove before a redraft; and read the edit receipt, every pick and its reason in plain words. Details: [docs/studio.md](docs/studio.md#review-your-edit).
+
+<img src="docs/studio/finish.png" width="420" alt="The Finish step in dark: Draft, Check and Render, Make with Your 7 pieces or The whole take, the reel or clips, and Show original"> <img src="docs/studio/finish-light.png" width="420" alt="The same Finish step in the light theme">
+
+**Notes on a stretch.** On Finish, press **Comment on this frame**, scrub to where the problem ends and press **Mark the end here**, then write the note ("This stretch drags"). It goes to your agent's chat with the frame, the start and end times and any box you drew; **Just this frame** turns it back into a note on one moment.
+
+<img src="docs/studio/notes.png" width="520" alt="A note on Finish: From 0:00.0 to 0:04.0, the text This stretch drags, and Send to chat, Just this frame and Cancel">
+
+**Outputs.** Every render is kept with the settings that made it: when it was made, the Look, the length, the pieces and the b-roll. Play any two side by side to compare, or re-open one to edit from exactly there and render the next version.
+
+<img src="docs/studio/outputs.png" width="420" alt="Outputs in dark: v2 marked Latest and v1, each with its Look, length, pieces and b-roll, and both playing side by side to compare"> <img src="docs/studio/outputs-light.png" width="420" alt="Outputs in the light theme">
 
 <img src="docs/studio/compare-desktop.png" width="420" alt="Show original: the reference and your reel side by side on one clock"> <img src="docs/studio/cleanup-desktop.png" width="420" alt="Clean-up pass: a filler word, a long pause and a retake, each with Keep or Remove">
 
-On a phone each step stacks into one column and the chat opens as a sheet: [reference](docs/studio/ref-url-phone.png), [effects](docs/studio/menu-phone.png), [settings](docs/studio/settings-phone.png). Studio also speaks [AG-UI](docs/studio.md#ag-ui), so AG-UI clients can watch it or send it messages. The page is built with React and [Astryx](https://github.com/meta/astryx) and ships prebuilt, so nothing extra installs. Reference screenshots show Big Buck Bunny (c) Blender Foundation, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), blender.org.
+**On a phone** each step stacks into one column, Your edit wraps to fit, the step bar turns into numbered dots, and the chat opens as a sheet. Ask my agent is shortened to Ask.
+
+<img src="docs/studio/phone.png" width="200" alt="Studio on a phone in dark: the Cut step with Your edit wrapped on four lines, the step dots and the Back, Ask and Look buttons"> <img src="docs/studio/look-phone-light.png" width="200" alt="The Look step on a phone in the light theme, Your edit wrapped above the Looks"> <img src="docs/studio/phone-light.png" width="200" alt="Studio on a phone in the light theme">
+
+More phone views: [reference](docs/studio/ref-url-phone.png), [settings](docs/studio/settings-phone.png). Studio also speaks [AG-UI](docs/studio.md#ag-ui), so AG-UI clients can watch it or send it messages. The page is built with React and [Astryx](https://github.com/meta/astryx) and ships prebuilt, so nothing extra installs. Reference screenshots show Big Buck Bunny (c) Blender Foundation, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), blender.org.
 
 ## Install
+
+The easy way is to tell your agent: paste the line in [Quick start](#quick-start) and it installs everything for you. The rest of this section is for doing it by hand.
 
 | Need | Mac | Linux | Windows |
 |---|---|---|---|
