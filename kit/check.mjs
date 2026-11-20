@@ -252,6 +252,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-videos.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { nverrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio video tests (tests/studio-videos.test.mjs: New video keeps or resets the look, nothing deleted, per-job sessions, open a past video, refused while busy, MCP list_videos, new_video, open_video)', errs: nverrs, warns: [] });
+    const fierrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-finish.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { fierrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio finish tests (tests/studio-finish.test.mjs: what the one Render makes, six steps and their old names, one render path, Your edit, MCP get_edit and studio_run from and exports)', errs: fierrs, warns: [] });
     const ferrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'face-matte.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { ferrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }

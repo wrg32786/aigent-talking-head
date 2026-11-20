@@ -22,7 +22,7 @@ const env = { ...process.env, CI: '1', STUDIO_DIR: join(TMP, 'studio'), STUDIO_C
 const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), '--port', '0', '--no-open'], { cwd: ROOT, env });
 const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out.slice(-400)))); });
 const browser = patient(await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox'] }));
-const STEPS = ['footage', 'cut', 'reference', 'style', 'broll', 'render', 'post'];
+const STEPS = ['footage', 'cut', 'look', 'broll', 'finish', 'post'];
 try {
   await fetch(url + '/api/settings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat: { backend: 'keywords' } }) });
   const errs = [], ctx = await browser.newContext({ viewport: { width: 1280, height: 860 } }), pg = await ctx.newPage();
@@ -42,7 +42,7 @@ try {
         assert.ok(m.steps.every(([l, r]) => l >= 0 && r <= w), `${w} ${st}: a step is off screen`);
       }
     }
-    if (shots) { await pg.goto(url + '/#step=style', { waitUntil: 'networkidle' }); await pg.waitForTimeout(600); await pg.screenshot({ path: join(shots, 'top-phone.png'), clip: { x: 0, y: 0, width: 375, height: 260 } }); }
+    if (shots) { await pg.goto(url + '/#step=look', { waitUntil: 'networkidle' }); await pg.waitForTimeout(600); await pg.screenshot({ path: join(shots, 'top-phone.png'), clip: { x: 0, y: 0, width: 375, height: 260 } }); }
     await pg.setViewportSize({ width: 1280, height: 860 });
     if (shots) { await pg.goto(url + '/#step=style', { waitUntil: 'networkidle' }); await pg.waitForTimeout(900); await pg.screenshot({ path: join(shots, 'liquid-glass.png') }); }
   });

@@ -91,7 +91,7 @@
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) var(--chat); min-height: calc(100vh - var(--top)); }
 main { min-width: 0; padding: 28px 32px 0; display: flex; flex-direction: column; gap: 28px; }
 .step { display: none; scroll-margin-top: 80px; max-width: 1180px; width: 100%; margin: 0 auto; }
-main[data-step="footage"] .step[data-step="footage"], main[data-step="cut"] .step[data-step="cut"], main[data-step="reference"] .step[data-step="reference"], main[data-step="style"] .step[data-step="style"], main[data-step="render"] .step[data-step="render"], main[data-step="broll"] .step[data-step="broll"], main[data-step="post"] .step[data-step="post"] { display: block; animation: rise .22s ease-out; }
+main[data-step="footage"] .step[data-step="footage"], main[data-step="cut"] .step[data-step="cut"], main[data-step="look"][data-look="reference"] .step[data-step="reference"], main[data-step="look"][data-look="style"] .step[data-step="style"], main[data-step="finish"] .step[data-step="finish"], main[data-step="broll"] .step[data-step="broll"], main[data-step="post"] .step[data-step="post"] { display: block; animation: rise .22s ease-out; }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
 .sh { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 18px; }
 .sh h2 { margin: 0; font: 34px/1.05 var(--font-display); letter-spacing: .02em; text-transform: uppercase; }
@@ -265,7 +265,7 @@ main[data-step="footage"] .step[data-step="footage"], main[data-step="cut"] .ste
 .stepnav { position: sticky; bottom: 0; z-index: 10; margin: auto -32px 0; padding: 12px 32px; display: flex; align-items: center; gap: 12px; background: color-mix(in srgb, var(--background) 92%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--border); }
 .stepnav #next { margin-left: auto; }
 .picks { display: none; flex: 1; min-width: 0; align-items: center; gap: 10px; }
-main[data-step="style"] .picks { display: flex; }
+main[data-step="look"][data-look="style"] .picks { display: flex; }
 .picks .lbl b { color: var(--foreground); }
 .picks .chips { flex-wrap: nowrap; overflow-x: auto; flex: 1; min-width: 0; scrollbar-width: none; }
 .picks .chip { flex: none; }
@@ -943,14 +943,29 @@ dialog.nv { width: min(440px, calc(100vw - 24px)); }
 .fb-f .grow { flex: 1 1 auto; font-size: 13px; }
 @media (max-width: 640px) { .jobrow { flex: 1; } .jobrow .job { flex: 1; } }
 
-/* ---------- Render step: what the Cut step picked (kept cuts and bites), the one place they render ---------- */
-.from-cut { margin: 0 0 14px; padding: 14px 16px; border-radius: var(--card-radius, 14px); }
-.from-cut .fc-t { margin: 0 0 10px; font-size: 14px; color: var(--muted-foreground); }
-.from-cut .fc-more { margin-top: 12px; box-shadow: none; }
-.from-cut .fc-more .fine { margin: 0 0 10px; }
-.fc-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 2px; }
-.fc-list li { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--hairline, var(--border)); }
-.fc-list .fc-n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
-.fc-list .fc-a { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
-@media (max-width: 640px) { .fc-list li { flex-wrap: wrap; } .fc-list .fc-a { width: 100%; justify-content: flex-start; } }
-.fc-list .mono { min-width: 56px; text-align: right; }
+/* ---------- 1.13.0: Your edit, Look's two views, Finish in three steps ---------- */
+.your-edit { max-width: 1180px; width: 100%; margin: 0 auto -12px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; padding: 8px 14px; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--card); font-size: 13px; }
+.ye-h { margin: 0; white-space: nowrap; }
+.ye-list { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0; flex: 1; min-width: 0; }
+.ye-i { display: flex; gap: 6px; align-items: baseline; min-width: 0; }
+.ye-i dt { color: var(--muted-foreground); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.ye-i dd { margin: 0; min-width: 0; }
+.ye-link { border: 0; background: transparent; padding: 2px 0; color: var(--foreground); font: inherit; text-align: left; cursor: pointer; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-bottom: 1px dashed transparent; }
+.ye-link:hover, .ye-link:focus-visible { border-bottom-color: var(--primary); }
+.ye-warn { display: inline-flex; align-items: center; gap: 4px; color: var(--warning); }
+.ye-warn svg { width: 14px; height: 14px; }
+.ye-next { margin-left: auto; }
+.look-switch { max-width: 1180px; width: 100%; margin: 0 auto -12px; }
+.dotmark { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--primary); margin-left: 6px; vertical-align: middle; }
+.fin-stages { list-style: none; margin: 0 0 16px; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.fin-stages li { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); }
+.fin-stages li > span:last-child { display: flex; flex-direction: column; min-width: 0; }
+.fin-stages li.now { border-color: color-mix(in srgb, var(--primary) 60%, transparent); }
+.fin-stages li.now .sn { background: var(--primary); color: var(--primary-foreground); border-color: transparent; }
+.fin-stages li.done .sn { background: color-mix(in srgb, var(--primary) 18%, transparent); border-color: transparent; color: var(--primary); }
+.fin-make { padding: 14px 16px; margin-bottom: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.fin-make h3 { margin: 0; }
+.fin-make .fine { margin: 0; }
+.fin-make .chips { align-items: center; }
+.chip:disabled { opacity: .5; cursor: not-allowed; }
+@media (max-width: 900px) { .fin-stages { grid-template-columns: 1fr; } .ye-link { max-width: 200px; } }

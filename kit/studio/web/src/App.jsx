@@ -3,7 +3,8 @@ import { Theme } from '@astryxdesign/core/theme';
 import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';
 import { aigentTheme } from './theme.js';
-import { api, toast, onToast, STEPS, stepName, Icon, IconBtn, cap1 } from './lib.jsx';
+import { api, toast, onToast, STEPS, stepName, stepOf, lookSubOf, Icon, IconBtn, cap1 } from './lib.jsx';
+import { YourEdit } from './Edit.jsx';
 import { BRoll } from './BRoll.jsx';
 import { Keys } from './Keys.jsx';
 import { Footage } from './Footage.jsx';
@@ -27,15 +28,19 @@ import { FixActions } from './Fix.jsx';
 const hashStep = () => (location.hash.match(/step=([a-z]+)/) || [])[1];
 const hashMenu = () => (location.hash.match(/menu=([a-z-]+)/) || [])[1];
 function firstStep() {
-  const s = hashStep() || (hashMenu() ? 'style' : localStorage.getItem('studio.step')) || 'footage';
+  const s = stepOf(hashStep() || (hashMenu() ? 'look' : localStorage.getItem('studio.step')) || 'footage');
   return STEPS.includes(s) ? s : 'footage';
 }
+// Look holds two views: your look (packs, effects, sound) and the reference
+function firstLookSub() { return lookSubOf(hashStep()) || (hashMenu() ? 'style' : localStorage.getItem('studio.look')) || 'style'; }
 
 export function App() {
   const [CAT, setCat] = useState(null);
   const [V, setV] = useState(null);
   const [step, setStep] = useState(firstStep);
   const [tab, setTab] = useState(hashMenu() || null);
+  const [lookSub, setLookSubState] = useState(firstLookSub);
+  const setLookSub = useCallback(v => { setLookSubState(v); localStorage.setItem('studio.look', v); }, []);
   const [theme, setThemeState] = useState(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
   const [glass, setGlassState] = useState(document.documentElement.dataset.glass !== 'off');
   const [chatOpen, setChatOpen] = useState(/chat/.test(location.hash));
@@ -67,11 +72,12 @@ export function App() {
   const setTheme = t => { document.documentElement.dataset.theme = t; localStorage.setItem('studio.theme', t); setThemeState(t); };
   const setGlass = on => { if (on) delete document.documentElement.dataset.glass; else document.documentElement.dataset.glass = 'off'; localStorage.setItem('studio.glass', on ? '1' : '0'); setGlassState(on); };
 
-  const go = useCallback((s, focus) => {
+  const go = useCallback((s0, focus) => {
+    const s = stepOf(s0), sub = lookSubOf(s0); if (sub) setLookSub(sub);
     setStep(s); localStorage.setItem('studio.step', s);
-    if (!/menu=/.test(location.hash) || s !== 'style') history.replaceState(null, '', '#step=' + s);
-    if (focus) requestAnimationFrame(() => { window.scrollTo({ top: 0 }); const h = document.querySelector(`.step[data-step="${s}"] h2`); if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); } });
-  }, []);
+    if (!/menu=/.test(location.hash) || s !== 'look') history.replaceState(null, '', '#step=' + s);
+    if (focus) requestAnimationFrame(() => { window.scrollTo({ top: 0 }); const h = document.querySelector(`main .step[data-step="${s === 'look' ? (sub || localStorage.getItem('studio.look') || 'style') : s}"]:not([hidden]) h2`); if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); } });
+  }, [setLookSub]);
   const pickTab = useCallback(id => { setTab(id); history.replaceState(null, '', '#menu=' + id); }, []);
 
   useEffect(() => {
@@ -86,19 +92,19 @@ export function App() {
       es.addEventListener('log', e => { const d = JSON.parse(e.data); setLog(l => (l ? l + '\n' : '') + d.line); });
       es.addEventListener('task', () => api('/api/state').then(apply).catch(() => {}));
     })();
-    const onHash = () => { const m = hashMenu(), st = hashStep(); if (m) { setStep('style'); setTab(m); } else if (st && STEPS.includes(st)) go(st, true); };
+    const onHash = () => { const m = hashMenu(), st = hashStep(); if (m) { setStep('look'); setLookSub('style'); setTab(m); } else if (st && STEPS.includes(stepOf(st))) go(st, true); };
     const onKey = e => {
       if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); go('style'); setTimeout(() => document.getElementById('filter')?.focus(), 30); }
     };
     addEventListener('hashchange', onHash); document.addEventListener('keydown', onKey);
     return () => { es && es.close(); removeEventListener('hashchange', onHash); document.removeEventListener('keydown', onKey); };
-  }, [apply, go]);
+  }, [apply, go, setLookSub]);
 
   if (!CAT || !V) return <Theme theme={aigentTheme} mode={theme}><div className="boot" role="status"><span className="spin" aria-hidden="true" />Loading Studio</div><Toast /></Theme>;
 
   const s = V.state, t = V.task, running = t && t.status === 'running';
   const picksAny = Object.values(s.picks).some(p => p.allow.length || p.deny.length);
-  const done = { footage: !!(s.footage.length || s.clips), cut: !!(V.cut && V.cut.candidates && V.cut.candidates.length), reference: !!s.reference.extracted, style: !!(s.pack || picksAny), broll: !!(V.broll && V.broll.beats && V.broll.beats.some(b => b.slot)), render: !!(V.outputs || []).length };
+  const done = { footage: !!(s.footage.length || s.clips), cut: !!(V.cut && V.cut.candidates && V.cut.candidates.length), look: !!(s.pack || picksAny || s.reference.extracted), broll: !!(V.broll && V.broll.beats && V.broll.beats.some(b => b.slot)), finish: !!(V.outputs || []).length };
   const i = STEPS.indexOf(step);
   const openConnect = () => { setSettingsOpen(false); setChatOpen(false); setConnectOpen(true); };
   const openSetup = () => { setSettingsOpen(false); setSetupOpen(true); };
@@ -139,15 +145,17 @@ export function App() {
         </div>
       </header>
       <div className="layout">
-        <main id="main" data-step={step} ref={mainRef}>
+        <main id="main" data-step={step} data-look={lookSub} ref={mainRef}>
+          {step !== 'post' && <YourEdit V={V} s={s} go={go} step={step} />}
+          {step === 'look' && <LookSwitch sub={lookSub} setSub={v => { setLookSub(v); }} s={s} />}
           {/* a new or opened video remounts the steps, so no step keeps the last board's local picks */}
           <Fragment key={'v' + (s.videoSeq || 0)}>
           <Footage {...ctx} hidden={step !== 'footage'} onLive={setRecLive} />
           {step === 'cut' && <Cut {...ctx} />}
-          {step === 'reference' && <Reference {...ctx} />}
-          <Style {...ctx} hidden={step !== 'style'} tab={tab} setTab={pickTab} />
+          {step === 'look' && lookSub === 'reference' && <Reference {...ctx} />}
+          <Style {...ctx} hidden={step !== 'look' || lookSub !== 'style'} tab={tab} setTab={pickTab} />
           {step === 'broll' && <BRoll {...ctx} />}
-          <Render {...ctx} hidden={step !== 'render'} />
+          <Render {...ctx} hidden={step !== 'finish'} />
           {step === 'post' && <Post {...ctx} />}
           </Fragment>
           <footer className="stepnav glass" id="stepnav">
@@ -166,6 +174,15 @@ export function App() {
       <Toast V={V} />
     </Theme>
   );
+}
+
+// Look is one step with two views: your look (packs, effects, sound and pace) and a reference to borrow from
+function LookSwitch({ sub, setSub, s }) {
+  const r = s.reference, refOn = !!(r && r.extracted && r.mode !== 'off');
+  return <div className="look-switch" id="look-switch"><div className="seg" role="radiogroup" aria-label="Look">
+    <button type="button" role="radio" id="look-sub-style" aria-checked={sub === 'style'} onClick={() => setSub('style')}>Your look</button>
+    <button type="button" role="radio" id="look-sub-reference" aria-checked={sub === 'reference'} onClick={() => setSub('reference')}>Reference{refOn ? <span className="dotmark" aria-label=", in use" /> : null}</button>
+  </div></div>;
 }
 
 function JobName({ s, patch }) {

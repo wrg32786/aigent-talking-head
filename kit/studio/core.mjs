@@ -86,7 +86,8 @@ export function defaultState() {
   return { format: 'aigent-studio', version: 1, rev: 0, job: null, footage: [], clips: null,
     reference: { file: null, url: null, mode: 'influence', status: 'none', out: null, extracted: null, applied: false, queue: [], active: null },
     pack: null, picks: {}, music: { bed: 'auto', energy: 'auto', upload: null }, sound: { sfx: 'on', cap: 'on' }, pace: { tighten: null, punch: 'on' },
-    export: 'reels', chat: [], task: null, outputs: [], takes: [], output: null, cut: null, tx: {}, lines: {}, broll: {} };
+    export: 'reels', chat: [], task: null, outputs: [], takes: [], output: null, cut: null, tx: {}, lines: {}, broll: {},
+    finish: { from: 'auto', reel: true, clips: false, plain: false }, drafted: null };
 }
 export function load() {
   try { const s = JSON.parse(readFileSync(statePath(), 'utf8')); return oneBed({ ...defaultState(), ...s, reference: { ...defaultState().reference, ...(s.reference || {}) } }); }
@@ -125,7 +126,7 @@ export const KIT_BRANDS = ['kit/example/skool-logo.svg'];
 export function applyPatch(s, p, cat = catalog()) {
   const errs = [], log = [];
   if (!p || typeof p !== 'object') return { errs: ['patch must be an object'], log, noop: false };
-  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands'];
+  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands', 'finish'];
   for (const k of Object.keys(p)) if (!known.includes(k)) errs.push(`unknown field "${k}" (${known.join(', ')})`);
   if (p.job !== undefined) { if (p.job && !JOB_RE.test(p.job)) errs.push('job: lowercase letters, numbers and dashes'); else { s.job = p.job || null; log.push(`job ${s.job}`); } }
   if (p.pack !== undefined) {
@@ -177,6 +178,18 @@ export function applyPatch(s, p, cat = catalog()) {
       if (bad.length) errs.push(`footage: not in this job: ${bad.join(', ')} (use the paths in state.footage, or upload the file first)`);
       else if (new Set(want).size !== want.length) errs.push('footage: a file is listed twice');
       else if (JSON.stringify(want) !== JSON.stringify(s.footage)) { s.footage = want; s.clips = null; log.push(`footage ${want.length ? want.map(f => basename(f)).join(', ') : 'none'}`); }
+    }
+  }
+  // finish: what the one Render makes. from: auto (your pieces when you kept any, else the whole take), pieces or
+  // take; reel: the one reel; clips: each piece as its own reel too; plain: each piece as a plain clip too
+  if (p.finish !== undefined) {
+    const f = p.finish, cur = { ...defaultState().finish, ...(s.finish || {}) };
+    if (!f || typeof f !== 'object') errs.push('finish: { from: auto|pieces|take, reel, clips, plain }');
+    else {
+      if (f.from !== undefined) { if (!['auto', 'pieces', 'take'].includes(f.from)) errs.push('finish.from: auto, pieces or take'); else cur.from = f.from; }
+      for (const k of ['reel', 'clips', 'plain']) if (f[k] !== undefined) cur[k] = !!f[k];
+      if (!cur.reel && !cur.clips && !cur.plain) errs.push('finish: make at least one thing (reel, clips or plain)');
+      else if (JSON.stringify(cur) !== JSON.stringify(s.finish)) { s.finish = cur; log.push(`finish ${cur.from}${cur.reel ? ', reel' : ''}${cur.clips ? ', clips' : ''}${cur.plain ? ', plain clips' : ''}`); }
     }
   }
   if (p.asIs !== undefined) { const v = !!p.asIs; if (v !== !!s.asIs) { s.asIs = v; log.push(v ? 'footage used as it is (already cut)' : 'footage cut into lines'); } }

@@ -1,4 +1,4 @@
-// Review tools in the Render step: show the original next to or over your build on one clock, comment on a frame for
+// Review tools in the Finish step: show the original next to or over your build on one clock, comment on a frame for
 // your agent, the clean-up pass (pauses, filler words, retakes) and the edit receipt (choices.json in plain words).
 import { Hint } from './ui.jsx';
 import { useEffect, useRef, useState } from 'react';
@@ -62,7 +62,7 @@ export function Compare({ V, s, apply }) {
       </SegmentedControl>
       {outs.length > 1 && <label className="lbl-in"><span className="lbl">Reel</span><select id="cmp-pick" value={pick} onChange={e => { setPick(e.target.value); setPlaying(false); }}>{outs.map(o => <option key={o} value={o}>{o.split('/').pop()}</option>)}</select></label>}
     </div>
-    {!hasRef && <p className="fine">Add a reference in the Reference step to see it here.</p>}
+    {!hasRef && <p className="fine">Add a reference in Look, Reference, to see it here.</p>}
     <div className={'cmp-stage ' + (hasRef ? mode : 'build')}>{refPane}{buildPane}</div>
     <div className="cmp-bar">
       <IconBtn id="cmp-play" n={playing ? 'pause' : 'play'} label={playing ? 'Pause both' : 'Play both'} onClick={play} />

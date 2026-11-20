@@ -1,6 +1,6 @@
 // The Cut step: what to make from the take (format, length, output, goal, with smart defaults), then the candidates
 // on the take's timeline to keep, drop, trim, reorder or add to. Nothing renders here: the kept cuts and bites render
-// on the Render step, the one place that makes videos.
+// on the Finish step, the one place that makes videos.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';
@@ -167,7 +167,7 @@ export function Cut({ V, s, apply, go }) {
     <div className="runbar glass-card">
       <Button id="cut-find" size="lg" variant={cut.candidates.length ? 'secondary' : 'primary'} label={cut.candidates.length ? 'Find again' : 'Find cuts'} isLoading={tx && tx.status === 'running'} onClick={find} />
       <span className="fine" id="cut-scored">{scored}</span>
-      {kept.length > 0 && <span className="fine" id="cut-hint">{`${kept.length} kept. ${kept.length > 1 ? 'They render' : 'It renders'} at the end, on the Render step.`}</span>}
+      {kept.length > 0 && <span className="fine" id="cut-hint">{`${kept.length} kept. ${kept.length > 1 ? 'They render' : 'It renders'} at the end, on the Finish step, as one reel.`}</span>}
     </div>
     {tx && tx.status === 'running' && <div className="tx-run" id="cut-tx"><ProgressBar label="Transcribing the take" value={tx.total ? Math.round(100 * tx.done / tx.total) : undefined} isIndeterminate={!tx.total} />
       <span className="fine">Transcribing{tx.total ? ` part ${Math.min(tx.done + 1, tx.total)} of ${tx.total}` : ''}, then finding cuts. Safe to leave this page.</span></div>}

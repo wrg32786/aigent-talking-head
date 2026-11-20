@@ -95,7 +95,7 @@ try {
       await pg.goto(url + '/#step=render', { waitUntil: 'networkidle' });
       await pg.click('#cmd-fold .fold2-h'); await pg.click('#cmd-copy');
       assert.match(await clip(), /^In my aigent-talking-head folder, make this reel by running npm run reel -- /);
-      for (const st of ['footage', 'cut', 'reference', 'style', 'broll', 'render', 'post']) { await pg.goto(url + '/#step=' + st, { waitUntil: 'networkidle' }); await noCmd(pg, 'body', 'step ' + st); }
+      for (const st of ['footage', 'cut', 'look', 'reference', 'style', 'broll', 'finish', 'post']) { await pg.goto(url + '/#step=' + st, { waitUntil: 'networkidle' }); await noCmd(pg, 'body', 'step ' + st); }
       assert.deepStrictEqual(errs, []);
     });
     await ctx.close();

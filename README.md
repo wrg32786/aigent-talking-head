@@ -79,11 +79,11 @@ The agent clones the kit and installs everything up front with `npm run setup:al
 
 Then run `npm run studio` (or click the icon). Without an agent the chat works on keywords, a local model or an API key.
 
-<img src="docs/studio/desktop.png" width="720" alt="Studio in a browser: the AIgent wordmark and six numbered steps across the top, the Style step with style packs and a grid of effect previews in frosted glass panels, the picks bar at the bottom, and the chat on the right">
+<img src="docs/studio/desktop.png" width="720" alt="Studio in a browser: the AIgent wordmark and six numbered steps across the top, the Look step with style packs and a grid of effect previews in frosted glass panels, the picks bar at the bottom, and the chat on the right">
 
 **Reference links.** Paste one or more links (YouTube and Shorts, TikTok, X, Vimeo, a direct .mp4, or one public Instagram post) and Studio downloads each to a folder on your computer, shows the progress, and breaks it down: length, shots and cut times, pace, music BPM and energy, caption style, transitions, finishes and graphics. It then suggests matching items from the effects menu. The breakdown goes into the chat, so "use the transitions from the reference but calmer" works. Use it as an influence (soft defaults) or recreate its structure with your clip. Link downloads need [yt-dlp](https://github.com/yt-dlp/yt-dlp), which the installer adds; Instagram uses [instaloader](https://github.com/instaloader/instaloader) anonymously, with no login. Only use videos you have the rights to use as a reference.
 
-<img src="docs/studio/ref-url-desktop.png" width="720" alt="Studio Reference step: a pasted YouTube link broken down into 90 seconds, 17 shots, 123 BPM and a 5.29 second average shot, a shot timeline with a beat grid, tags for what was found, suggested picks as chips, and a contact sheet">
+<img src="docs/studio/ref-url-desktop.png" width="720" alt="Studio Look step, Reference view: a pasted YouTube link broken down into 90 seconds, 17 shots, 123 BPM and a 5.29 second average shot, a shot timeline with a beat grid, tags for what was found, suggested picks as chips, and a contact sheet">
 
 **Cut.** Tell Studio what to make from the take with big cards: a Short (Reels, Shorts, TikTok), a Long form YouTube video or a Square post, short, medium or long, one full edit, clips or both, organic or an ad. It picks smart defaults from the take, so you can just hit Next. **Find cuts** lists the best parts with the words, times, a score and why (picked by your agent, a model, or simple rules, and it says which), as colored blocks on the take's timeline to trim, keep, drop or add to, then renders every kept one in one go. Each cut lands on the quiet in the audio after the last word, so no word is clipped. For a long recording, **Lines and bites** lists every line with keep or retake: group lines into named bites in any order, make one clean take of the whole thing, and render or save each one (your agent can do the picking). Click any clip in Footage to play it with a waveform and a transcript you can click. On the Reference step, **Pull script** puts the reference's words in your Scripts with the hook, body and CTA marked, and **Adapt to my topic** rewrites it for yours. [More](docs/studio.md#cut).
 
@@ -139,7 +139,7 @@ Then run `npm run studio` (or click the icon). Without an agent the chat works o
 
 <img src="docs/studio/post-channels.png" width="420" alt="The Post step, Channels: the reel, four Buffer channels with Facebook Reels marked Will be skipped for a 1 min 40 s reel, and the caption"> <img src="docs/studio/post-send.png" width="420" alt="The Post step, Send: Drafts picked, Send to Buffer as drafts, and the result for each channel">
 
-**Review your edit.** The Reference step lists the reference's parts with times (hook, cuts, titles, b-roll, CTA), each with the matching Studio picks one click away. In the Render step you can watch your reel beside the reference or under it with an opacity slider, on one clock; click or drag a box on a frame to send your agent a comment with the frame and the time; run a clean-up pass that lists long pauses, filler words and retakes from the Whisper word timings to keep or remove before a redraft; and read the edit receipt, every pick and its reason in plain words. Details: [docs/studio.md](docs/studio.md#review-your-edit).
+**Review your edit.** Look's Reference view lists the reference's parts with times (hook, cuts, titles, b-roll, CTA), each with the matching Studio picks one click away. On the Finish step you can watch your reel beside the reference or under it with an opacity slider, on one clock; click or drag a box on a frame to send your agent a comment with the frame and the time; run a clean-up pass that lists long pauses, filler words and retakes from the Whisper word timings to keep or remove before a redraft; and read the edit receipt, every pick and its reason in plain words. Details: [docs/studio.md](docs/studio.md#review-your-edit).
 
 <img src="docs/studio/compare-desktop.png" width="420" alt="Show original: the reference and your reel side by side on one clock"> <img src="docs/studio/cleanup-desktop.png" width="420" alt="Clean-up pass: a filler word, a long pause and a retake, each with Keep or Remove">
 
@@ -384,7 +384,7 @@ The CLI may print a one-line star reminder after your first successful render, a
 
 ## Cite this
 
-> Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.11.1) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
+> Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.13.0) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
 
 Machine-readable metadata is in [CITATION.cff](CITATION.cff), and GitHub shows it under "Cite this repository".
 
