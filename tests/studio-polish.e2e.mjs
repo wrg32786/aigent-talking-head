@@ -73,8 +73,12 @@ try {
   });
 
   await t('the step rises in, and not with reduced motion', async () => {
-    const anim = () => pg.$eval('#s-footage', e => getComputedStyle(e).animationName);
-    assert.strictEqual(await anim(), 'step-in');
+    const anim = () => pg.$eval('main', e => getComputedStyle(e).animationName);
+    assert.strictEqual(await anim(), 'step-in-1');
+    await pg.goto(url + '/#step=cut'); await pg.waitForFunction(() => document.querySelector('main').dataset.step === 'cut');
+    assert.strictEqual(await anim(), 'step-in-2'); // a new name per step is what replays it
+    assert.strictEqual(await pg.$eval('#s-cut', e => getComputedStyle(e).animationName), 'none'); // the section itself never replays it
+    await pg.goto(url + '/#step=footage'); await pg.waitForFunction(() => document.querySelector('main').dataset.step === 'footage');
     await pg.emulateMedia({ reducedMotion: 'reduce' }); assert.strictEqual(await anim(), 'none');
     await pg.emulateMedia({ reducedMotion: null });
   });

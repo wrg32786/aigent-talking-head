@@ -96,8 +96,21 @@
 .fb-loading { display: grid; place-items: center; min-height: 160px; }
 
 /* ---------- motion: steps rise in, cards lift ---------- */
-@keyframes step-in { from { opacity: 0; transform: translateY(10px); } }
-main[data-step] .step[data-step] { animation: step-in var(--motion-slow) var(--ease-out-4, ease-out) backwards; }
+/* The rise plays on main when the step changes, not on the section: a section that re-renders (a reference
+   being analyzed, say) never replays it. One keyframe name per step, because a new name is what restarts it. */
+main[data-step] .step[data-step] { animation: none; }
+@keyframes step-in-1 { from { opacity: 0; transform: translateY(10px); } }
+@keyframes step-in-2 { from { opacity: 0; transform: translateY(10px); } }
+@keyframes step-in-3 { from { opacity: 0; transform: translateY(10px); } }
+@keyframes step-in-4 { from { opacity: 0; transform: translateY(10px); } }
+@keyframes step-in-5 { from { opacity: 0; transform: translateY(10px); } }
+@keyframes step-in-6 { from { opacity: 0; transform: translateY(10px); } }
+main[data-step="footage"] { animation: step-in-1 var(--motion-slow) var(--ease-out-4, ease-out) backwards; }
+main[data-step="cut"] { animation: step-in-2 var(--motion-slow) var(--ease-out-4, ease-out) backwards; }
+main[data-step="reference"] { animation: step-in-3 var(--motion-slow) var(--ease-out-4, ease-out) backwards; }
+main[data-step="style"] { animation: step-in-4 var(--motion-slow) var(--ease-out-4, ease-out) backwards; }
+main[data-step="broll"] { animation: step-in-5 var(--motion-slow) var(--ease-out-4, ease-out) backwards; }
+main[data-step="render"] { animation: step-in-6 var(--motion-slow) var(--ease-out-4, ease-out) backwards; }
 .glass-card { transition: box-shadow var(--motion) var(--ease-ui), border-color var(--motion) var(--ease-ui), transform var(--motion) var(--ease-ui); }
 .pack, .tile, .agent-grid > * { transition: transform var(--motion) var(--ease-spring-2, ease), box-shadow var(--motion) var(--ease-ui); }
 @media (hover: hover) { .pack:hover, .tile:hover, .agent-grid > *:hover { transform: translateY(-2px); box-shadow: var(--shadow-stack); } }
@@ -119,7 +132,7 @@ main[data-step] .step[data-step] { animation: step-in var(--motion-slow) var(--e
 .bh { gap: var(--space-2); }
 
 @media (prefers-reduced-motion: reduce) {
-  main[data-step] .step[data-step], .btab-panels > *, .fold2-b[data-open], #next::before { animation: none !important; }
+  main[data-step], .btab-panels > *, .fold2-b[data-open], #next::before { animation: none !important; }
   .menu-panel, .hint-panel, .pop-panel, .theme-btn > .ic, .toggle, .toggle .knob, .tab, .glass-card, .pack, .tile { transition: none !important; }
   .pack:hover, .tile:hover, .agent-grid > *:hover { transform: none; }
   .spin { animation: spin 2s linear infinite !important; }
