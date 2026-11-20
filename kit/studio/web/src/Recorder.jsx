@@ -159,7 +159,9 @@ export function Recorder({ V, s, apply, onClose, onLive, visible = true, scriptI
   const keyRef = useRef(null);
   const pop = usePopout(keyRef);
   const { roll, line, nudge, place } = useRoll({ lines, rolling: phase === 'recording' || rehearse === 'running', reset: rollKey, still: RM, win: pop.win });
-  useEffect(() => { if (phase === 'countdown') { setRehearse('off'); setRollKey(k => k + 1); } }, [phase]);
+  // a new take starts the script from the top: at the countdown, or straight into recording when the countdown is off
+  const lastPhase = useRef(phase);
+  useEffect(() => { const was = lastPhase.current; lastPhase.current = phase; if (phase === 'countdown' || (phase === 'recording' && was !== 'paused' && was !== 'countdown')) { setRehearse('off'); setRollKey(k => k + 1); } }, [phase]);
   useEffect(() => { requestAnimationFrame(place); }, [pop.el, fontPx, prompt, text]);
   const startRehearse = () => { setRollKey(k => k + 1); setRehearse('running'); };
   const stopRehearse = () => { setRehearse('off'); setRollKey(k => k + 1); };

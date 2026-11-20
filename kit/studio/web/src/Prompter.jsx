@@ -54,6 +54,7 @@ export function useRoll({ lines, rolling, reset, still, win }) {
 }
 
 export function PrompterText({ lines, line, roll, flip, still, fontPx, className = '' }) {
+  line = Math.max(0, Math.min(lines.length - 1, line)); // a shorter script never leaves the prompter without a current line
   return <div className={'rec-prompter ' + className + (flip ? ' flip' : '') + (still ? ' still' : '')} aria-label="Teleprompter" style={{ fontSize: fontPx }}>
     <div className="rp-roll" ref={roll}>{lines.length ? lines.map((x, i) => <p key={i} data-line={i} className={(i === line ? 'now' : i < line ? 'past' : '') + (x.pause ? ' hold' : '')}>{x.section && <em>{x.section}</em>}{x.text}{x.pause > 0 && <span className="rp-pause" aria-label="pause">||</span>}</p>)
       : <p className="fine">Pick a script or paste one on the right.</p>}</div>

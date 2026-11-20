@@ -85,6 +85,7 @@ try {
     await pg.evaluate(() => document.activeElement && document.activeElement.blur());
     await pg.keyboard.press('Space');
     await pg.waitForSelector('#rec-stop');
+    await pg.waitForSelector('.rec-prompter p.now', { timeout: 8000 }); // the page re-renders as the take starts
     const first = await pg.$eval('.rec-prompter p.now', e => e.dataset.line);
     await pg.waitForFunction(f => document.querySelector('.rec-prompter p.now')?.dataset.line !== f, first, { timeout: 8000 });
     if (shots) await pg.screenshot({ path: join(shots, 'teleprompter-desktop.png') });
