@@ -6,6 +6,7 @@ import { upload } from './upload.js';
 import { Recorder } from './Recorder.jsx';
 import { Scripts } from './Scripts.jsx';
 import { Player, clock } from './Player.jsx';
+import { Toggle, Hint } from './ui.jsx';
 
 export function Dropzone({ id, inputId, kind, s, apply, accept, multiple, big, children, label }) {
   const input = useRef(null); const [over, setOver] = useState(false);
@@ -36,8 +37,9 @@ export function FootageLink({ s, apply }) {
       <label className="sr" htmlFor="footage-link">Footage link</label>
       <input id="footage-link" className="grow" type="url" inputMode="url" placeholder="Paste a Dropbox or Google Drive link, or a video URL" spellCheck="false" autoComplete="off" value={url} onChange={e => setUrl(e.target.value)} />
       <Button id="footage-link-add" type="submit" variant="secondary" label="Add" isLoading={busy} />
+      <Hint id="footage-link-hint" label="Which links work" align="end">Public share links only. Private links need a login, so download those and drop the file in.</Hint>
     </form>
-    <p className="fine">Public share links only. Private links need a login, so download those and drop the file in.</p>
+
     {items.length > 0 && <ul className="imports" id="imports">
       {items.map(x => <li key={x.id} className={'imp ' + x.status} data-status={x.status}>
         <span className="imp-h"><b>{x.name || SITES[x.site]}</b><span className="fine">{SITES[x.site]}{x.status === 'downloading' ? `, ${bytes(x.received)}${x.size ? ' of ' + bytes(x.size) : ''}` : x.status === 'ready' ? `, ${bytes(x.size)}, in your footage` : ''}</span></span>
@@ -94,7 +96,6 @@ export function Footage({ V, s, apply, hidden, onLive }) {
         <IconBtn n="x" label={'Remove ' + f.split('/').pop()} onClick={() => api('/api/footage/remove', { path: f }).then(apply)} />
       </li>)}
     </ul>
-    {s.footage.length > 0 && !s.clips && <label className="tick as-is"><input type="checkbox" id="as-is" checked={!!s.asIs} onChange={e => api('/api/state', { asIs: e.target.checked }).then(apply).catch(() => {})} />
-      Already cut: use each file as it is<span className="fine"> (one clip per file, in this order, no second cut)</span></label>}
+    {s.footage.length > 0 && !s.clips && <div className="as-is"><Toggle id="as-is" label="Already cut: use each file as it is" description="One clip per file, in this order, no second cut." checked={!!s.asIs} onChange={v => api('/api/state', { asIs: v }).then(apply).catch(() => {})} /></div>}
   </section>;
 }

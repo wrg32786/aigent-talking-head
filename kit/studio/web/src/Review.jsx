@@ -1,5 +1,6 @@
 // Review tools in the Render step: show the original next to or over your build on one clock, comment on a frame for
 // your agent, the clean-up pass (pauses, filler words, retakes) and the edit receipt (choices.json in plain words).
+import { Hint } from './ui.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';
@@ -103,9 +104,8 @@ export function Cleanup({ V, s, apply, drafted }) {
   const applyIt = async redraft => { setBusy(true); try { const j = await api('/api/cleanup', { decisions: Object.fromEntries(items.map(it => [it.id, it.remove])), silence: sil, redraft }); apply(j); setD(j); setDec({}); toast(redraft ? 'Clean-up applied. Redrafting.' : 'Saved for the next draft.', true); } catch {} finally { setBusy(false); } };
   const off = async () => { const j = await api('/api/cleanup', { on: false }); apply(j); setD(j); toast('Clean-up off for the next draft', true); };
   return <div className="review glass-card" id="cleanup">
-    <div className="rv-head"><h3>Clean-up pass</h3>{d.on && <Badge label="On" variant="success" />}{d.stale && <Badge label="Footage changed" variant="warning" />}
+    <div className="rv-head"><h3>Clean-up pass</h3><Hint id="cleanup-hint" label="How clean-up works">From the Whisper word timings of your draft. Retakes are already left out; switch one to Keep to bring it back. Nothing is deleted.</Hint>{d.on && <Badge label="On" variant="success" />}{d.stale && <Badge label="Footage changed" variant="warning" />}
       <span className="fine grow">{items.length ? `${items.filter(x => x.remove).length} of ${items.length} marked to remove, about ${out.toFixed(1)} s` : 'Nothing to clean up.'}</span></div>
-    <p className="fine">From the Whisper word timings of your draft. Retakes are already left out; switch one to Keep to bring it back. Nothing is deleted.</p>
     <div className="cl-opts">
       <div className="chips" role="group" aria-label="Show">{['all', 'silence', 'filler', 'take'].map(k => <button key={k} type="button" className={'chip' + (only === k ? ' on' : '')} aria-pressed={String(only === k)} onClick={() => setOnly(k)}>{k === 'all' ? `All ${items.length}` : `${TYPE[k]}s ${count(k)}`}</button>)}</div>
       <label className="lbl-in"><span className="lbl">Pauses longer than</span><input id="cl-silence" type="number" min={0.3} max={3} step={0.1} value={sil} onChange={e => setSil(+e.target.value)} onBlur={() => sil !== d.silence && sil >= 0.3 && sil <= 3 && load(sil)} /><span className="fine">s</span></label>

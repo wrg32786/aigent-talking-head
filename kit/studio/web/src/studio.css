@@ -2,30 +2,32 @@
    with the AIgent palette: warm ink and paper neutrals and one cyan accent, used for the primary action and the current state only.
    Fonts are the kit's own (OFL). Built into ../public by npm run studio:build. */
 @font-face { font-family: "Hanken Grotesk"; src: url("/files/kit/fonts/HankenGrotesk-VF.ttf") format("truetype"); font-weight: 100 900; font-display: swap; }
-@font-face { font-family: "Anton"; src: url("/files/kit/fonts/Anton-Regular.ttf") format("truetype"); font-display: swap; }
 @font-face { font-family: "JetBrains Mono"; src: url("/files/kit/fonts/JetBrainsMono-VF.ttf") format("truetype"); font-weight: 100 800; font-display: swap; }
 
 :root, [data-theme="dark"] {
   color-scheme: dark;
+  /* the AIgent brand's Plinth tokens (AIgent Brand Guide tokens.css); liquid.css adds the rest of the brand */
   --background: #0b0907; --foreground: #f1e8dc;
-  --card: #131110; --card-2: #1a1714; --popover: #1a1714;
-  --muted: #221e1a; --muted-foreground: #a39585;
-  --border: rgba(241, 232, 220, .09); --input: rgba(241, 232, 220, .16);
+  --card: #15110e; --card-2: #211b16; --popover: #15110e;
+  --muted: #211b16; --muted-foreground: #a39585;
+  --border: rgba(241, 232, 220, .12); --input: rgba(241, 232, 220, .16);
   --primary: #5cf9e2; --primary-foreground: #0b0907;
-  --destructive: #ff6b5e; --success: #8fdc6e; --warning: #f2c14e;
+  --destructive: oklch(72% 0.15 27); --success: oklch(76% 0.13 150); --warning: #f2c14e;
   --ring: #5cf9e2; --shot-a: #3a332c; --shot-b: #2a251f;
   --shadow: 0 12px 32px rgba(0, 0, 0, .45);
 }
 [data-theme="light"] {
   color-scheme: light;
-  --background: #f6f2ec; --foreground: #17130f;
-  --card: #ffffff; --card-2: #fbf8f4; --popover: #ffffff;
-  --muted: #ede6dc; --muted-foreground: #625649;
-  --border: rgba(23, 19, 15, .1); --input: rgba(23, 19, 15, .2);
-  --primary: #0b7a6d; --primary-foreground: #ffffff;
-  --destructive: #c8372b; --success: #2f7d1d; --warning: #8a6100;
-  --ring: #0b7a6d; --shot-a: #d9cfc2; --shot-b: #e8e0d5;
-  --shadow: 0 12px 32px rgba(40, 30, 20, .16);
+  /* the brand's Paper tokens: cream ground, ink text, the deep teal accent (bright cyan is 1.1:1 on cream).
+     Success, error and warning are darkened so they clear 4.5:1 on cream and on the muted chips. */
+  --background: #f1e8dc; --foreground: #0b0907;
+  --card: #ffffff; --card-2: #fbf6ef; --popover: #ffffff;
+  --muted: #e6ded2; --muted-foreground: #6b5f53;
+  --border: rgba(11, 9, 7, .12); --input: rgba(11, 9, 7, .16);
+  --primary: #0b8168; --primary-foreground: #ffffff;
+  --destructive: #b02e23; --success: #276a17; --warning: #7a5600;
+  --ring: #0b8168; --shot-a: #d9cdbd; --shot-b: #e6dccf;
+  --shadow: 0 12px 32px rgba(60, 40, 20, .16);
 }
 :root { --radius: 8px; --radius-sm: 6px; --radius-lg: 12px; --top: 60px; --chat: 380px; }
 
@@ -68,9 +70,7 @@
 
 /* header and stepper */
 .top { position: sticky; top: 0; z-index: 20; height: var(--top); display: flex; align-items: center; gap: 16px; padding: 0 16px; background: color-mix(in srgb, var(--background) 92%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
-.brand { display: flex; align-items: center; gap: 10px; font: 20px/1 "Anton", sans-serif; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
-.brand b { color: var(--primary); font-weight: 400; }
-.mark { width: 16px; height: 16px; border: 3px solid var(--primary); position: relative; } .mark::after { content: ""; position: absolute; inset: 3px; background: var(--primary); }
+.brand { display: flex; align-items: center; gap: 2px; white-space: nowrap; } /* the wordmark and its label: liquid.css */
 .job input { width: 190px; min-height: 36px; border-color: transparent; background: var(--muted); font-weight: 600; }
 .job input:hover { border-color: var(--input); }
 .stepper { margin: 0 auto; }
@@ -94,7 +94,7 @@ main { min-width: 0; padding: 28px 32px 0; display: flex; flex-direction: column
 main[data-step="footage"] .step[data-step="footage"], main[data-step="cut"] .step[data-step="cut"], main[data-step="reference"] .step[data-step="reference"], main[data-step="style"] .step[data-step="style"], main[data-step="render"] .step[data-step="render"], main[data-step="broll"] .step[data-step="broll"] { display: block; animation: rise .22s ease-out; }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
 .sh { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 18px; }
-.sh h2 { margin: 0; font: 34px/1.05 "Anton", sans-serif; letter-spacing: .02em; text-transform: uppercase; }
+.sh h2 { margin: 0; font: 34px/1.05 var(--font-display); letter-spacing: .02em; text-transform: uppercase; }
 .sub { flex-basis: 100%; margin: 0; color: var(--muted-foreground); }
 .block { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px; }
 .bh { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -143,7 +143,7 @@ main[data-step="footage"] .step[data-step="footage"], main[data-step="cut"] .ste
 .td-body > img { width: 100%; border-radius: var(--radius); display: block; }
 .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
 .stat { background: var(--card-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; }
-.stat b { display: block; font: 26px/1.1 "Anton", sans-serif; letter-spacing: .02em; }
+.stat b { display: block; font: 26px/1.1 var(--font-display); letter-spacing: .02em; }
 .stat span { font-size: 12px; color: var(--muted-foreground); }
 .timeline { margin-bottom: 16px; }
 .tl { position: relative; height: 44px; border-radius: var(--radius-sm); overflow: hidden; display: flex; }
@@ -381,14 +381,14 @@ main[data-step="style"] .picks { display: flex; }
   --glass: rgba(19, 17, 16, .88); --glass-card: rgba(30, 27, 24, .52);
   --glass-edge: rgba(241, 232, 220, .12); --glass-hi: inset 0 1px 0 rgba(255, 255, 255, .06);
   --glass-shadow: 0 18px 50px rgba(0, 0, 0, .45);
-  --ambient-a: rgba(92, 249, 226, .17); --ambient-b: rgba(255, 150, 90, .10); --ambient-c: rgba(120, 110, 255, .07);
+  --ambient-a: rgba(217, 138, 61, .07); --ambient-b: rgba(217, 138, 61, .16); --ambient-c: transparent; /* brand: one warm ember source, nothing else */
   --card-shadow: 0 1px 0 rgba(255, 255, 255, .03), 0 12px 32px rgba(0, 0, 0, .28);
 }
 [data-theme="light"] {
-  --glass: rgba(255, 253, 250, .9); --glass-card: rgba(255, 255, 255, .58);
-  --glass-edge: rgba(23, 19, 15, .09); --glass-hi: inset 0 1px 0 rgba(255, 255, 255, .7);
+  --glass: rgba(255, 252, 247, .9); --glass-card: rgba(255, 255, 255, .55);
+  --glass-edge: rgba(11, 9, 7, .16); --glass-hi: inset 0 1px 0 rgba(255, 255, 255, .7);
   --glass-shadow: 0 18px 50px rgba(60, 40, 20, .14);
-  --ambient-a: rgba(11, 122, 109, .14); --ambient-b: rgba(230, 140, 60, .12); --ambient-c: rgba(110, 100, 230, .06);
+  --ambient-a: rgba(217, 138, 61, .06); --ambient-b: rgba(217, 138, 61, .14); --ambient-c: transparent;
   --card-shadow: 0 1px 2px rgba(60, 40, 20, .05), 0 12px 32px rgba(60, 40, 20, .08);
 }
 .ambient { position: fixed; inset: 0; z-index: -1; pointer-events: none;
@@ -753,7 +753,7 @@ ol.conn-steps > li::before { content: counter(cs); position: absolute; left: 0; 
 .cd-a { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; } .cd-a .chip.sm { min-height: 28px; padding: 2px 10px; font-size: 12.5px; }
 .cd-a .up svg { rotate: 90deg; } .cd-a .down svg { rotate: 90deg; }
 .k-full { --k: #5cf9e2; } .k-part { --k: #7aa2ff; } .k-clip { --k: #ffb547; } .k-ad { --k: #ff6b8b; }
-[data-theme="light"] .k-full, [data-theme="light"] .lane.k-full .region { --k: #0b7a6d; } [data-theme="light"] .k-clip, [data-theme="light"] .lane.k-clip .region { --k: #b36b00; }
+[data-theme="light"] .k-full, [data-theme="light"] .lane.k-full .region { --k: #0b8168; } [data-theme="light"] .k-clip, [data-theme="light"] .lane.k-clip .region { --k: #b36b00; }
 .timeline { margin-top: 14px; padding: 14px; border-radius: var(--radius-lg); display: flex; flex-direction: column; gap: 6px; }
 .tl-ruler { position: relative; height: 16px; margin-left: 78px; font-size: 11px; color: var(--muted-foreground); }
 .tl-ruler span { position: absolute; translate: -50% 0; } .tl-ruler span:first-child { translate: 0; } .tl-ruler span:last-child { translate: -100% 0; }

@@ -114,6 +114,8 @@ try {
     assert.strictEqual(await wpm(), 110); assert.match(await pg.textContent('#rp-speed .rp-pace'), /Slow/);
     await pg.click('#rp-speed .rp-faster'); await pg.click('#rp-speed .rp-faster'); await pg.click('#rp-speed .rp-faster'); await pg.click('#rp-speed .rp-faster');
     assert.strictEqual(await pg.$eval('#rec-wpm', e => +e.value), 150);
+    // the slider track fills to the value after button clicks too (Liquid glass --fill, set from the value attribute)
+    assert.strictEqual(await pg.$eval('#rec-wpm', e => e.style.getPropertyValue('--fill')), ((150 - 60) / 200 * 100) + '%');
     if (shots) await pg.screenshot({ path: join(shots, 'teleprompter-speed.png') });
     await pg.click('#rec-rehearse-stop');
     assert.strictEqual((await api('/api/state')).state.takes.length, 0, 'rehearsal records nothing');
