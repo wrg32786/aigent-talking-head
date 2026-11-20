@@ -9,6 +9,7 @@ import { api, file, toast, cap1, fmtS, Icon, IconBtn } from './lib.jsx';
 import { Lines } from './Lines.jsx';
 import { FixActions } from './Fix.jsx';
 import { Player, useMedia, useTranscript, Wave, clock } from './Player.jsx';
+import { Pieces } from './Pieces.jsx';
 
 const KIND = { full: 'Full edit', part: 'Parts', clip: 'Clips', ad: 'Ad cuts' };
 const FRAME = { '9:16': [9, 16], '16:9': [16, 9], '1:1': [1, 1], '4:5': [4, 5] };
@@ -142,6 +143,10 @@ export function Cut({ V, s, apply, go }) {
   const { peaks } = useMedia(src);
   const tr = useTranscript(src, tx);
   const player = useRef(null), [now, setNow] = useState(0), [sel, setSel] = useState(null);
+  // Pieces (what each line does, and your combo) is the default once there is a transcript; Cuts and lines is the old view
+  const [mode, setModeRaw] = useState(() => localStorage.getItem('studio.cutView') || 'pieces'), setMode = m => { localStorage.setItem('studio.cutView', m); setModeRaw(m); };
+  const [pickOpen, setPickOpen] = useState(false);
+  const piecesOn = mode === 'pieces' && !!V.pieces, comboN = V.pieces ? V.pieces.combo.ids.length : 0;
   useEffect(() => { const id = setInterval(() => { if (player.current) setNow(player.current.now()); }, 200); return () => clearInterval(id); }, []);
   const set = p => api('/api/cut/output', { ...p, source: src }).then(apply).catch(() => {});
   const edit = (id, b) => api('/api/cut/edit', { id, ...b }).then(apply).catch(() => {});
@@ -161,13 +166,24 @@ export function Cut({ V, s, apply, go }) {
     <div className="cut-sum glass-card" id="cut-summary-box">
       <Icon n="spark" className="cs-i" /><p id="cut-summary" className="cs-t">{cut.summary}</p>
       {cut.output && cut.output.auto ? <Badge label={`Smart pick for a ${clock(cut.seconds)} take`} variant="cyan" /> : <Button id="cut-reset" size="sm" variant="ghost" label="Smart pick" onClick={() => api('/api/cut/output', { reset: true }).then(apply)} />}
+      {piecesOn && <Button id="cut-change" size="sm" variant="ghost" label={pickOpen ? 'Done' : 'Change'} aria-expanded={pickOpen ? 'true' : 'false'} onClick={() => setPickOpen(!pickOpen)} />}
       {cut.footage && cut.footage.length > 1 && <label className="inl"><span className="fine">Take</span><select id="cut-source" value={src || ''} onChange={e => set({ source: e.target.value })}>{cut.footage.map(f => <option key={f.path} value={f.path}>{f.path.split('/').pop()} ({clock(f.seconds)})</option>)}</select></label>}
     </div>
-    <Picker cut={cut} set={set} key={src} />
+    {/* on Pieces the what-to-make picker folds away behind Change, so the pieces fit on one screen */}
+    {(!piecesOn || pickOpen) && <Picker cut={cut} set={set} key={src} />}
+    {V.pieces && <div className="tabs cut-mode" role="tablist" aria-label="How to cut" id="cut-mode">
+      <button type="button" role="tab" id="cut-mode-pieces" aria-selected={piecesOn ? 'true' : 'false'} className="tab" onClick={() => setMode('pieces')}>Pieces</button>
+      <button type="button" role="tab" id="cut-mode-cuts" aria-selected={piecesOn ? 'false' : 'true'} className="tab" onClick={() => setMode('cuts')}>Cuts and lines</button>
+    </div>}
+    {piecesOn ? <div className="pz-layout">
+      <div className="cut-play">{src && <Player path={src} tx={tx} playerRef={player} onAddRange={r => add(r, 'clip')} />}</div>
+      <Pieces V={V} apply={apply} player={player} src={src} />
+    </div> : <>
     <div className="runbar glass-card">
       <Button id="cut-find" size="lg" variant={cut.candidates.length ? 'secondary' : 'primary'} label={cut.candidates.length ? 'Find again' : 'Find cuts'} isLoading={tx && tx.status === 'running'} onClick={find} />
       <span className="fine" id="cut-scored">{scored}</span>
-      {kept.length > 0 && <span className="fine" id="cut-hint">{`${kept.length} kept. ${kept.length > 1 ? 'They render' : 'It renders'} at the end, on the Finish step, as one reel.`}</span>}
+      {comboN > 0 && <span className="fine" id="cut-combo-wins">{`Your combo of ${comboN} piece${comboN === 1 ? '' : 's'} renders, not the kept cuts. Clear it on Pieces to render these.`}</span>}
+      {!comboN && kept.length > 0 && <span className="fine" id="cut-hint">{`${kept.length} kept. ${kept.length > 1 ? 'They render' : 'It renders'} at the end, on the Finish step, as one reel.`}</span>}
     </div>
     {tx && tx.status === 'running' && <div className="tx-run" id="cut-tx"><ProgressBar label="Transcribing the take" value={tx.total ? Math.round(100 * tx.done / tx.total) : undefined} isIndeterminate={!tx.total} />
       <span className="fine">Transcribing{tx.total ? ` part ${Math.min(tx.done + 1, tx.total)} of ${tx.total}` : ''}, then finding cuts. Safe to leave this page.</span></div>}
@@ -182,5 +198,6 @@ export function Cut({ V, s, apply, go }) {
     </div>
     {src && <Lines s={s} src={src} player={player} apply={apply} t={t} backend={V.env && V.env.backend} open={dur >= 180} key={'lines-' + src} />}
     {src && dur > 0 && (cut.candidates.length > 0 || tr) && <Timeline cut={cut} peaks={peaks} marks={(tr && tr.marks) || []} now={now} dur={dur} sel={sel} setSel={setSel} onSeek={seek} onEdit={edit} onAdd={add} />}
+    </>}
   </section>;
 }

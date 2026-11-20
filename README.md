@@ -87,6 +87,9 @@ Then run `npm run studio` (or click the icon). Without an agent the chat works o
 
 **Cut.** Tell Studio what to make from the take with big cards: a Short (Reels, Shorts, TikTok), a Long form YouTube video or a Square post, short, medium or long, one full edit, clips or both, organic or an ad. It picks smart defaults from the take, so you can just hit Next. **Find cuts** lists the best parts with the words, times, a score and why (picked by your agent, a model, or simple rules, and it says which), as colored blocks on the take's timeline to trim, keep, drop or add to, then renders every kept one in one go. Each cut lands on the quiet in the audio after the last word, so no word is clipped. For a long recording, **Lines and bites** lists every line with keep or retake: group lines into named bites in any order, make one clean take of the whole thing, and render or save each one (your agent can do the picking). Click any clip in Footage to play it with a waveform and a transcript you can click. On the Reference step, **Pull script** puts the reference's words in your Scripts with the hook, body and CTA marked, and **Adapt to my topic** rewrites it for yours. [More](docs/studio.md#cut).
 
+**Pieces.** Once the take is transcribed, every line is a piece sorted by what it does (hook, story, tip, proof, list, call to action; asides and retakes hidden). **Let AI choose** builds your combo, hook first and CTA last with a reason each, or build your own and drag to reorder. Pieces are whole lines, so a combo never cuts a word. **Outputs** in the top bar lists every version you rendered with the settings that made it, to re-open or compare.
+
+<img src="docs/studio/cut-pieces.png" width="720" alt="Studio Cut step on Pieces: lines sorted into Hook, Story, Tip, Proof or quote, List and CTA, with Your combo numbered in play order">
 <img src="docs/studio/cut-desktop.png" width="520" alt="Studio Cut step: the summary line, cards for format, length, output and goal, Find cuts, and how many cuts you kept">
 <img src="docs/studio/cut-timeline.png" width="520" alt="Cut candidates as colored blocks on lanes under the take's waveform, with filler words marked">
 
@@ -384,7 +387,7 @@ The CLI may print a one-line star reminder after your first successful render, a
 
 ## Cite this
 
-> Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.14.0) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
+> Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.15.0) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
 
 Machine-readable metadata is in [CITATION.cff](CITATION.cff), and GitHub shows it under "Cite this repository".
 

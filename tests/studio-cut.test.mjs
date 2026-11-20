@@ -150,7 +150,7 @@ try {
   });
   await t('find: transcribes a chunk at a time with progress, then the rules pick, labelled as rules', async () => {
     const f = await req('/api/cut/find', { path: SRC }); assert.strictEqual(f.status, 202, JSON.stringify(f.j));
-    const mid = await until(async () => { const s = (await req('/api/state')).j.state; const x = (s.tx || {})[SRC]; return x && x.status === 'running' && x.total ? x : null; });
+    const mid = await until(async () => { const s = (await req('/api/state')).j.state; const x = (s.tx || {})[SRC]; return x && (x.status === 'running' || x.status === 'ready') && x.total ? x : null; }); // a fast runner can finish between two polls
     assert.ok(mid.total >= 1);
     const c = await until(async () => { const v = (await req('/api/cut')).j; return v.candidates.length ? v : null; });
     assert.strictEqual(c.scoredBy, 'rules'); assert.strictEqual(c.pending, null); assert.strictEqual(c.tx.status, 'ready');
