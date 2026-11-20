@@ -1154,8 +1154,10 @@ async function api(req, res, u) {
       writeFileSync(join(ROOT, frame), Buffer.from(m[2], 'base64'));
       update(st => { st.commentSeq = n; });
     }
-    const line = RV.commentLine({ text, t, region: rg, video, frame });
-    return json(res, 200, await chatTurn(line, false, { kind: 'comment', t: +t.toFixed(2), region: rg, video, frame, note: text }));
+    // a time range (end after t) is a note on a stretch of the reel or the take, not one frame
+    const end = b.end != null && +b.end > t + 0.05 ? +(+b.end).toFixed(2) : null, source = typeof b.source === 'string' && /^inbox\/studio\/[\w.-]+\/[\w./-]+$/.test(b.source) && !b.source.includes('..') ? b.source : null;
+    const line = RV.commentLine({ text, t, end, region: rg, video: video || source, frame });
+    return json(res, 200, await chatTurn(line, false, { kind: 'comment', t: +t.toFixed(2), ...(end != null ? { end } : {}), region: rg, video: video || source, frame, note: text }));
   }
   if (p === '/api/pack/save' && M === 'POST') {
     const b = await readBody(req), s = C.load(), name = String(b.name || '').toLowerCase();
@@ -1175,10 +1177,30 @@ async function api(req, res, u) {
     const st = update(x => { x.pack = name; });
     return json(res, 200, { ok: true, pack: name, path: `packs/local/${name}/pack.json`, ...view(st) });
   }
+  if (p === '/api/chat/apply' && M === 'POST') {
+    // Apply on an agent's answer: the change it suggested (studio_reply suggest), made only when the user says so
+    const b = await readBody(req), id = +b.id, s0 = C.load(), m = s0.chat.find(x => x.id === id);
+    if (!m || !m.suggest) return json(res, 404, { error: 'no suggestion on that message' });
+    if (m.applied) return json(res, 400, { error: 'already applied' });
+    const g = m.suggest; let errs = [], log = [];
+    const st = update(x => { const mm = x.chat.find(y => y.id === id);
+      if (g.patch) { const r = C.applyPatch(x, g.patch); errs = r.errs; log = r.log; if (errs.length) return; }
+      if (g.combo && Array.isArray(g.combo.ids)) { const rel = cutSource(x), P = rel ? piecesOf(x, rel) : null;
+        if (!P) { errs.push('the take is not transcribed yet'); return; }
+        const ok = new Set(P.pieces.map(p => p.id)), ids = g.combo.ids.map(String).filter(i => ok.has(i));
+        x.pieces = x.pieces || {}; x.pieces[rel] = { ...piecesState(x, rel), ids, reasons: Object.fromEntries(Object.entries(g.combo.reasons || {}).filter(([k]) => ids.includes(k)).map(([k, v]) => [k, String(v).slice(0, 160)])), by: mm.from || 'agent' }; log.push(`combo: ${ids.length} pieces`); }
+      mm.applied = new Date().toISOString();
+      C.applyPatch(x, { reply: `Applied ${mm.from || 'your agent'}'s change${log.length ? ': ' + log.slice(0, 4).join(', ') : ''}.`, from: 'Studio', kind: 'action' }); });
+    if (errs.length) return json(res, 400, { error: errs.join('; ') });
+    return json(res, 200, { ...view(st), applied: log });
+  }
   if (p === '/api/chat' && M === 'POST') {
     const b = await readBody(req), text = String(b.text || '').trim();
     if (!text) return json(res, 400, { error: 'say something' });
-    return json(res, 200, await chatTurn(text, b.offline));
+    // Ask my agent: the step it was asked from rides along, so the agent knows what "this" is
+    const STEP = { footage: 'Footage', cut: 'Cut', look: 'Look', broll: 'B-roll', finish: 'Finish', post: 'Post' };
+    const said = b.step && STEP[b.step] ? `(On the ${STEP[b.step]} step) ${text}` : text;
+    return json(res, 200, await chatTurn(said, b.offline));
   }
   if (p === '/api/settings' && M === 'GET') return json(res, 200, { settings: S.load(), tools: F.tools({ fresh: u.searchParams.has('fresh') }) });
   if (p === '/api/settings' && M === 'POST') {

@@ -133,10 +133,11 @@ export function receipt(x) {
 }
 
 // ---------- comments on the preview ----------
-export function commentLine({ text, t, region, video, frame }) {
+export function commentLine({ text, t, end, region, video, frame }) {
   const pct = v => Math.round(Math.max(0, Math.min(1, +v || 0)) * 100);
   const where = !region ? 'the whole frame' : region.w > 0.02 || region.h > 0.02
     ? `the box from ${pct(region.x)}% to ${pct(region.x + region.w)}% across and ${pct(region.y)}% to ${pct(region.y + region.h)}% down`
     : `the point ${pct(region.x)}% across and ${pct(region.y)}% down`;
-  return `Comment on ${video ? video.split('/').pop() : 'the preview'} at ${clock(t)} (${(+t || 0).toFixed(2)} s), ${where}: ${String(text || '').trim()}${frame ? ` Frame: ${frame}` : ''}`;
+  const when = end != null && +end > +t + 0.05 ? `from ${clock(t)} to ${clock(end)} (${(+t || 0).toFixed(2)} to ${(+end).toFixed(2)} s)` : `at ${clock(t)} (${(+t || 0).toFixed(2)} s)`;
+  return `Comment on ${video ? video.split('/').pop() : 'the preview'} ${when}, ${where}: ${String(text || '').trim()}${frame ? ` Frame: ${frame}` : ''}`;
 }
