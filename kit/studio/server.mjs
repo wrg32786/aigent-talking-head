@@ -462,15 +462,15 @@ async function api(req, res, u) {
     return json(res, 200, { ...view(s), log: r.log, errs: r.errs });
   }
   if (p === '/api/draft' && M === 'POST') {
+    const s = C.load(); const d = draftSteps(s); // checks the footage first, so an empty job says that before a missing tool
     const miss = needFor('draft'); if (miss) return json(res, 400, { error: miss, setup: true });
-    const s = C.load(); const d = draftSteps(s);
     update(st => { st.lockedAtDraft = d.lockString || ''; });
     runTask('draft', () => d.steps, () => ({ choices: !!readChoices(C.load()) }));
     return json(res, 202, view(C.load()));
   }
   if (p === '/api/render' && M === 'POST') {
-    const miss = needFor('render'); if (miss) return json(res, 400, { error: miss, setup: true });
     const s = C.load(); const r = renderSteps(s);
+    const miss = needFor('render'); if (miss) return json(res, 400, { error: miss, setup: true });
     runTask('render', () => r.steps, () => { const st = C.load(), outputs = C.outputsOf(st); return { outputs, copiedTo: copyRenders(outputs), fx: r.fx, effects: r.effects }; });
     return json(res, 202, { ...view(C.load()), fx: r.fx, effectsSkipped: r.effects.length && !r.fx ? 'effects need npm run effects:setup' : null });
   }
