@@ -13,6 +13,15 @@ Release notes: [docs/releases/v1.12.0.md](docs/releases/v1.12.0.md). Overlay fra
 - **Fix: captions over a screen recording.** A screen recording's frames go to the page as data URLs (up to 96 MB), like logos. As files they tainted the canvas, so the layout pass could not move a caption clear of the card and it was drawn over the recording.
 - **Bench and tests.** `kit/render-bench.mjs` times both captures on a representative reel, compares every frame (md5, then SSIM for any that differ) and prints what WebCodecs alpha support this Chrome has. `tests/framecap.e2e.mjs` (in `npm run smoke`): three layers with a logo plate and a screen recording, one page, two pages and a forced failure part way (`RENDER_CAPTURE_FAIL_AT`), all against the screenshot frames (identical, or SSIM 0.995 or more over grey, since Chrome now and then draws a soft shadow a shade differently with either path), plus stills, and the page and worker counts.
 
+## 1.11.1 (unreleased)
+
+Release notes: [docs/releases/v1.11.1.md](docs/releases/v1.11.1.md). Render lives in one place: the Render step.
+
+- **The Cut step only chooses.** Its **Render N** button is gone, and so are the Lines and bites **Render all N**, each bite's **Render** and **Save as one file**. Cut is keep, drop, trim and order. Under Find cuts it says how many you kept and that they render at the end, on the Render step; the bites list says the same. The rendered file link on a cut or a bite stays.
+- **From the Cut step, on the Render step.** One card says what you kept ("3 kept cuts and 2 bites") with **Render my N cuts** and **Render my N bites**, each one as its own reel with your look. Folded under **More ways to save**: **Save each cut as a plain clip**, **Save each bite as one file**, and one row per cut and bite with **Render** and **Plain clip** for just that one, plus a download link once the file exists. Rendered bites now show under "From the Cut step" next to the rendered cuts. Draft reads **Draft whole take** when you kept cuts or made bites.
+- **Plain clips for cuts.** `POST /api/cut/render` takes `only: "file"`, like `/api/lines/render`: it runs only the extract, so each kept cut lands in `inbox/studio/<job>/cuts/<id>.mp4` with no reel edit. The cut view carries `file` when that clip exists. MCP `render_cuts` takes `file: true`. Every endpoint and agent tool works as before.
+- **Tests and docs.** `tests/studio-cut.e2e.mjs` checks that nothing on the Cut step renders or saves a file, renders the kept cuts from the Render step, saves a plain clip without running the reel edit, and saves a bite as one file from the fold. docs/studio.md (Cut, Lines and bites, Render), docs/mcp.md, AGENTS.md and the Studio skill say where things render now. New screenshots: `docs/studio/cut-desktop.png`, `lines-bites.png` and `render-from-cut.png`.
+
 ## 1.11.0 (unreleased)
 
 Release notes: [docs/releases/v1.11.0.md](docs/releases/v1.11.0.md).

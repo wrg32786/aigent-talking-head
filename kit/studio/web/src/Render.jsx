@@ -34,9 +34,10 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
   // a draft is a plan, not a video: say so when it ends, so it never reads like a finished render
   const planReady = t && !running && t.kind === 'draft' && t.status === 'done';
   const elapsed = running ? `${cap1(t.kind)}, ${fmtS(now - t.startedAt)}` : planReady ? 'Plan ready, no video yet. Press Render.' : t && t.endedAt ? `${cap1(t.kind)} ${t.status} in ${fmtS(t.endedAt - t.startedAt)}` : '';
-  // cuts kept on the Cut step render from there, each as its own reel; Draft here is the whole take, and says so
+  // the cuts kept and the bites made on the Cut step render here, each as its own reel (the Cut step itself never
+  // renders); Draft is the whole take, and says so
   const keptCuts = ((V.cut && V.cut.candidates) || []).filter(x => x.keep);
-  const renderCuts = () => api('/api/cut/render', {}).then(j => { apply(j); toast(`Rendering ${j.plan.length} video${j.plan.length > 1 ? 's' : ''}`, true); }).catch(() => {});
+  const bites = useBites(V, s);
   const reopen = o => api('/api/reopen', { reel: o }).then(j => { apply(j); loadChoices(); toast(`${o.split('/').pop()} is back in the editor. Render makes the next version.`, true); }).catch(() => {});
   const canReopen = new Set(V.reopenable || []);
   const outputs = (V.outputs || []).slice(0, 6);
@@ -45,10 +46,9 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
     <header className="sh"><h2 id="h-render">Render</h2><p className="sub">Draft plans the reel, Render makes the video.</p></header>
     <NeedFix V={V} ids={['ffmpeg', 'python', 'chrome', 'npm']} what="Drafting and rendering" apply={apply} />
     {c.effects && c.effects.length > 0 && !V.env.effectsReady && <NeedFix V={V} ids={['effects']} what="The effects you picked" apply={apply} />}
-    {keptCuts.length > 0 && <div id="kept-cuts" className="notes glass-card" role="note"><p>You kept {keptCuts.length} cut{keptCuts.length > 1 ? 's' : ''} on the Cut step. They render from there, each as its own reel. Draft below plans one reel from the whole take.</p>
-      <div className="row"><Button id="render-kept" size="sm" variant="primary" label={`Render my ${keptCuts.length} cut${keptCuts.length > 1 ? 's' : ''}`} isDisabled={running} onClick={renderCuts} /></div></div>}
+    <FromCut kept={keptCuts} bites={bites} src={V.cut && V.cut.source} running={running} apply={apply} />
     <div className="runbar glass-card">
-      <Button id="draft" size="lg" variant={drafted || keptCuts.length ? 'secondary' : 'primary'} label={keptCuts.length ? (drafted ? 'Redraft whole take' : 'Draft whole take') : drafted ? 'Redraft' : 'Draft'} isDisabled={running || !s.job || (!s.footage.length && !s.clips)}
+      <Button id="draft" size="lg" variant={drafted || keptCuts.length || bites.length ? 'secondary' : 'primary'} label={keptCuts.length || bites.length ? (drafted ? 'Redraft whole take' : 'Draft whole take') : drafted ? 'Redraft' : 'Draft'} isDisabled={running || !s.job || (!s.footage.length && !s.clips)}
         onClick={() => { setChoices(null); setReceipt(null); setLog(''); api('/api/draft', {}).then(apply).catch(() => {}); }} />
       <Button id="render" size="lg" variant={drafted ? 'primary' : 'secondary'} label="Render" isDisabled={running || !s.job}
         onClick={() => doRender()} />
@@ -66,7 +66,7 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
         <figcaption><span>{o.split('/').pop()}</span>{canReopen.has(o) && <button type="button" className="btn ghost sm" data-reopen={o} disabled={running} onClick={() => reopen(o)}><Icon n="edit" />Edit this reel</button>}<a className="btn ghost sm" href={file(o) + '?download'} download={o.split('/').pop()}><Icon n="download" />Download</a></figcaption></figure>)
         : <div className="empty-art"><Icon n="film" /><p>{s.job ? 'Your reels show up here.' : 'Name the reel at the top to start.'}</p></div>}
     </div>
-    <CutOutputs V={V} s={s} />
+    <CutOutputs V={V} s={s} bites={bites} />
     {!hidden && <Compare V={V} s={s} apply={apply} />}
     <Receipt r={receipt} />
     <Cleanup V={V} s={s} apply={apply} drafted={drafted} />
@@ -114,11 +114,56 @@ function Choices({ CAT, x, setX, setReceipt, dirty, setDirty, s, patch }) {
   </>;
 }
 
-// what the Cut step rendered: one row per kept cut with its own video
-function CutOutputs({ V, s }) {
-  const done = ((V.cut && V.cut.candidates) || []).filter(c => c.outputs && c.outputs.length);
+// the bites made in Lines and bites on the Cut step (GET /api/lines), refreshed when a task ends or the bites change
+function useBites(V, s) {
+  const src = V.cut && V.cut.source, t = V.task, [bites, setBites] = useState([]);
+  const key = JSON.stringify(((s.lines || {})[src]) || null);
+  useEffect(() => { if (!src) { setBites([]); return; } let on = true; fetch('/api/lines?path=' + encodeURIComponent(src)).then(r => r.json()).then(j => { if (on) setBites(j.bites || []); }).catch(() => {}); return () => { on = false; }; }, [src, key, t && t.id, t && t.status]);
+  return bites;
+}
+
+const many = (n, one) => `${n} ${one}${n > 1 ? 's' : ''}`;
+const secs = x => (x < 60 ? (+x).toFixed(1) + ' s' : fmtS(x * 1000));
+
+// what the Cut step picked, rendered from here: each kept cut and each bite as its own reel with your look, and folded
+// below, the quiet extras: one at a time, or a plain clip (just the kept words joined, no edit). The API and the agent
+// tools are the same ones as before (POST /api/cut/render and /api/lines/render, render_cuts and render_bites).
+function FromCut({ kept, bites, src, running, apply }) {
+  if (!kept.length && !bites.length) return null;
+  const go = (url, body, msg) => api(url, body).then(j => { apply(j); toast(msg(j.plan.length), true); }).catch(() => {});
+  const reels = n => `Rendering ${many(n, 'video')}`, plain = n => n > 1 ? `Saving ${n} plain clips` : 'Saving the plain clip';
+  const cuts = (ids, only) => go('/api/cut/render', { ids, only }, only ? plain : reels);
+  const bite = (ids, only) => go('/api/lines/render', { path: src, ids, only }, only ? plain : reels);
+  const what = [kept.length && many(kept.length, 'kept cut'), bites.length && many(bites.length, 'bite')].filter(Boolean).join(' and ');
+  const rows = [...kept.map(c => ({ key: 'c-' + c.id, id: c.id, name: c.label, seconds: c.seconds, file: c.file, kind: 'cut' })), ...bites.map(b => ({ key: 'b-' + b.id, id: b.id, name: b.name, seconds: b.seconds, file: b.file, kind: 'bite' }))];
+  return <div id="kept-cuts" className="from-cut glass-card" role="region" aria-label="From the Cut step">
+    <p className="fc-t">From the Cut step: {what}. Each one renders as its own reel with your look. Draft below plans one reel from the whole take.</p>
+    <div className="row">
+      {kept.length > 0 && <Button id="render-kept" size="sm" variant="primary" label={`Render my ${many(kept.length, 'cut')}`} isDisabled={running} onClick={() => cuts()} />}
+      {bites.length > 0 && <Button id="render-bites" size="sm" variant={kept.length ? 'secondary' : 'primary'} label={`Render my ${many(bites.length, 'bite')}`} isDisabled={running} onClick={() => bite()} />}
+    </div>
+    <Fold id="plain-fold" title="More ways to save" className="fc-more">
+      <p className="fine">A plain clip is just the words you kept, joined. No look, no captions, and it saves in seconds.</p>
+      <div className="row">
+        {kept.length > 0 && <Button id="cuts-file" size="sm" variant="secondary" label="Save each cut as a plain clip" isDisabled={running} onClick={() => cuts(undefined, 'file')} />}
+        {bites.length > 0 && <Button id="bites-file" size="sm" variant="secondary" label="Save each bite as one file" isDisabled={running} onClick={() => bite(undefined, 'file')} />}
+      </div>
+      <ul className="fc-list" id="fc-list" aria-label="One at a time">{rows.map(r => <li key={r.key} data-kind={r.kind} data-id={r.id}>
+        <span className="fc-n">{r.name}</span><span className="mono fine">{secs(r.seconds || 0)}</span>
+        <span className="fc-a">
+          <Button size="sm" variant="ghost" label="Render" aria-label={`Render ${r.name}`} isDisabled={running} onClick={() => (r.kind === 'cut' ? cuts : bite)([r.id])} />
+          <Button size="sm" variant="ghost" label="Plain clip" aria-label={`Save ${r.name} as a plain clip`} isDisabled={running} onClick={() => (r.kind === 'cut' ? cuts : bite)([r.id], 'file')} />
+          {r.file && <a className="btn ghost sm" href={file(r.file) + '?download'} download={r.file.split('/').pop()}><Icon n="download" />{r.file.split('/').pop()}</a>}
+        </span></li>)}</ul>
+    </Fold>
+  </div>;
+}
+
+// what the Cut step rendered: one row per kept cut and per bite with its own video
+function CutOutputs({ V, s, bites = [] }) {
+  const done = [...((V.cut && V.cut.candidates) || []).map(c => ({ key: 'c-' + c.id, id: c.id, label: c.label, outputs: c.outputs })), ...bites.map(b => ({ key: 'b-' + b.id, id: b.id, label: b.name, outputs: b.outputs }))].filter(c => c.outputs && c.outputs.length);
   if (!done.length) return null;
   return <section className="cut-outs" id="cut-outputs" aria-labelledby="h-cut-outs"><h3 id="h-cut-outs" className="lbl">From the Cut step</h3>
-    <div className="outputs">{done.map(c => { const o = c.outputs[0]; return <figure key={c.id} className="glass-card" data-id={c.id}><video src={file(o) + '?v=' + s.rev + '#t=1.2'} controls preload="metadata" aria-label={c.label} />
+    <div className="outputs">{done.map(c => { const o = c.outputs[0]; return <figure key={c.key} className="glass-card" data-id={c.id}><video src={file(o) + '?v=' + s.rev + '#t=1.2'} controls preload="metadata" aria-label={c.label} />
       <figcaption><span>{c.label}</span><a className="btn ghost sm" href={file(o) + '?download'} download={o.split('/').pop()}><Icon n="download" />Download</a></figcaption></figure>; })}</div></section>;
 }

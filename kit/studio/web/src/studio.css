@@ -942,3 +942,15 @@ dialog.nv { width: min(440px, calc(100vw - 24px)); }
 .nv-busy .ic { width: 16px; height: 16px; flex: none; }
 .fb-f .grow { flex: 1 1 auto; font-size: 13px; }
 @media (max-width: 640px) { .jobrow { flex: 1; } .jobrow .job { flex: 1; } }
+
+/* ---------- Render step: what the Cut step picked (kept cuts and bites), the one place they render ---------- */
+.from-cut { margin: 0 0 14px; padding: 14px 16px; border-radius: var(--card-radius, 14px); }
+.from-cut .fc-t { margin: 0 0 10px; font-size: 14px; color: var(--muted-foreground); }
+.from-cut .fc-more { margin-top: 12px; box-shadow: none; }
+.from-cut .fc-more .fine { margin: 0 0 10px; }
+.fc-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 2px; }
+.fc-list li { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--hairline, var(--border)); }
+.fc-list .fc-n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.fc-list .fc-a { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 640px) { .fc-list li { flex-wrap: wrap; } .fc-list .fc-a { width: 100%; justify-content: flex-start; } }
+.fc-list .mono { min-width: 56px; text-align: right; }
