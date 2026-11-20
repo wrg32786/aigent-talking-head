@@ -2,6 +2,16 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.15.0 (unreleased)
+
+Release notes: [docs/releases/v1.15.0.md](docs/releases/v1.15.0.md). The redesign, part 3: pieces, your combo and the Outputs library.
+
+- **Pieces.** The Cut step opens on **Pieces** once there is a transcript (**Cuts and lines** is the old view, one click away). Every line of the take is a piece sorted by what it does (`kit/studio/pieces.mjs`): Hook, Story, Tip, Proof or quote, List, CTA, and Aside and Retake or fragment hidden until **Show asides and retakes**. Each shows its time, length and score, plays on its own, and moves to another category from its menu (yours wins). Topics are the words said in two or more lines; one filters the grid. The what-to-make cards fold behind **Change** so the pieces fit on one screen.
+- **Your combo.** **Let AI choose** picks the strongest hook, the best middle in the take's order up to your length, then the CTA, never an aside or a retake, with one reason each. **Build my own** starts empty; a click adds a piece, drag or the arrows reorder, x drops. The Combo drafts and renders ahead of the kept cuts (`comboOf` in `kit/studio/server.mjs`), and Your edit says who built it. Pieces are whole lines with edges snapped to the audio's quiet, so a Combo never cuts a word; back to back neighbours play as one range (`comboRanges`). `GET` and `POST /api/pieces` (`choose`, `ids` with `reasons`, `add`, `remove`, `move`, `clear`, `cats`).
+- **Outputs library.** **Outputs** in the top bar lists every version of this video with the settings that made it (when, look, length and pieces, b-roll, files), with Re-open, Compare (two versions side by side, what changed marked) and Files; **All videos** lists the others and opens one. Every Render writes `jobs/<job>/reel-vN.settings.json` beside the reel. `GET /api/outputs?all=1`.
+- **MCP.** New `get_pieces`, `set_combo`, `choose_combo` and `list_outputs`.
+- **Tests and docs.** `tests/studio-pieces.test.mjs` (in `npm run check`): categories, your category, topics, Let AI choose, one range for neighbours, the Outputs library, the MCP schemas. `tests/studio-pieces.e2e.mjs` (in `npm run smoke`): Pieces in Chrome, Let AI choose, Build my own, the Combo drafted with every word in your order, the settings file, Outputs and Compare, the MCP tools, the phone layout. `docs/studio.md` (Pieces and your combo, Outputs), `docs/mcp.md`, `AGENTS.md`, the Studio skill.
+
 ## 1.14.0 (unreleased)
 
 Release notes: [docs/releases/v1.14.0.md](docs/releases/v1.14.0.md). The redesign, part 2: b-roll that picks itself.

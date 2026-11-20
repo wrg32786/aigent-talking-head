@@ -145,6 +145,7 @@ export function Cut({ V, s, apply, go }) {
   const player = useRef(null), [now, setNow] = useState(0), [sel, setSel] = useState(null);
   // Pieces (what each line does, and your combo) is the default once there is a transcript; Cuts and lines is the old view
   const [mode, setModeRaw] = useState(() => localStorage.getItem('studio.cutView') || 'pieces'), setMode = m => { localStorage.setItem('studio.cutView', m); setModeRaw(m); };
+  const [pickOpen, setPickOpen] = useState(false);
   const piecesOn = mode === 'pieces' && !!V.pieces, comboN = V.pieces ? V.pieces.combo.ids.length : 0;
   useEffect(() => { const id = setInterval(() => { if (player.current) setNow(player.current.now()); }, 200); return () => clearInterval(id); }, []);
   const set = p => api('/api/cut/output', { ...p, source: src }).then(apply).catch(() => {});
@@ -165,9 +166,11 @@ export function Cut({ V, s, apply, go }) {
     <div className="cut-sum glass-card" id="cut-summary-box">
       <Icon n="spark" className="cs-i" /><p id="cut-summary" className="cs-t">{cut.summary}</p>
       {cut.output && cut.output.auto ? <Badge label={`Smart pick for a ${clock(cut.seconds)} take`} variant="cyan" /> : <Button id="cut-reset" size="sm" variant="ghost" label="Smart pick" onClick={() => api('/api/cut/output', { reset: true }).then(apply)} />}
+      {piecesOn && <Button id="cut-change" size="sm" variant="ghost" label={pickOpen ? 'Done' : 'Change'} aria-expanded={pickOpen ? 'true' : 'false'} onClick={() => setPickOpen(!pickOpen)} />}
       {cut.footage && cut.footage.length > 1 && <label className="inl"><span className="fine">Take</span><select id="cut-source" value={src || ''} onChange={e => set({ source: e.target.value })}>{cut.footage.map(f => <option key={f.path} value={f.path}>{f.path.split('/').pop()} ({clock(f.seconds)})</option>)}</select></label>}
     </div>
-    <Picker cut={cut} set={set} key={src} />
+    {/* on Pieces the what-to-make picker folds away behind Change, so the pieces fit on one screen */}
+    {(!piecesOn || pickOpen) && <Picker cut={cut} set={set} key={src} />}
     {V.pieces && <div className="tabs cut-mode" role="tablist" aria-label="How to cut" id="cut-mode">
       <button type="button" role="tab" id="cut-mode-pieces" aria-selected={piecesOn ? 'true' : 'false'} className="tab" onClick={() => setMode('pieces')}>Pieces</button>
       <button type="button" role="tab" id="cut-mode-cuts" aria-selected={piecesOn ? 'false' : 'true'} className="tab" onClick={() => setMode('cuts')}>Cuts and lines</button>

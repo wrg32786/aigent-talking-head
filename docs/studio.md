@@ -86,6 +86,29 @@ The Cut step comes right after Footage. It asks what to make from the take, find
 
 ![The Cut step: the summary line, the Format, Length, Output and Goal cards, and Find cuts](studio/cut-desktop.png)
 
+### Pieces and your combo (1.15.0)
+
+![The Cut step on Pieces: the take's lines sorted into Hook, Story, Tip, Proof or quote, List and CTA, five numbered in Your combo, each with its reason](studio/cut-pieces.png)
+
+Once the take has a transcript, the Cut step opens on **Pieces** (the switch at the top; **Cuts and lines** is the view below). Every line of the take is a piece, sorted by what it does (`kit/studio/pieces.mjs`):
+
+| Category | What lands there |
+|---|---|
+| Hook | the open: a claim, a question or "you", near the start |
+| Story | sets up the payoff: "my first client", "I remember", "last year" |
+| Tip | one actionable line: "open", "type", "how to", "make sure" |
+| Proof or quote | a number, "doubled", "percent", or someone else's words ("said", "told me") |
+| List | a run of short points: "first", "three rules", "next" |
+| CTA | the ask: follow, comment, join, link in bio |
+| Aside | off topic, apologies, filler talk. Hidden until **Show asides and retakes** |
+| Retake or fragment | said again later, or cut off. Hidden too |
+
+Each piece shows its time, length and score; the play button plays just that line. The **...** on a piece moves it to another category (yours wins over the rules). **Topics** are the words that come back in two or more lines; click one to show only the pieces about it.
+
+**Your combo** is the pieces in the order the reel plays them. **Let AI choose** fills it: the strongest hook, then the best middle pieces in the take's order up to the length you picked, then the CTA, never an aside or a retake, each with one reason ("Strongest open", "A number backs it"). **Build my own** empties it, and clicking a piece adds it at the end. Drag to reorder, or use the arrows; x drops one. Your edit says who built it (picked by AI, changed by you, or your agent).
+
+A piece is a whole transcript line with its edges snapped to the quiet next to its words, so a combo never cuts a word or starts mid-word. Pieces next to each other in the take that sit next to each other in your combo play as one range, with no second cut. When there is a combo it is what drafts and renders, ahead of the kept cuts (the Cuts and lines view says so). The what-to-make cards fold behind **Change** on Pieces so the pieces fit on one screen.
+
 **What to make.** Four rows of big cards, with smart defaults from the take's length (up to 2 min: one full short; up to 10 min: clips; longer: a long form edit plus 5 clips), so you can just hit Next. A line at the top sums it up, for example "Both: 1 full edit (~10 min) + 5 short clips, for organic", and **Smart pick** puts the defaults back.
 
 | Row | Cards | Notes |
@@ -519,6 +542,19 @@ Nothing is deleted. The old reel's files stay where they were (`inbox/studio/<jo
 **More**, Open a past video (or the link at the bottom of New video) lists your past reels, newest first, with the date and how many reels each has. Pick one and Studio puts you back where you left it. A job Studio never saved (made before 1.11.0, or with `npm run reel`) opens with its footage and its reels, so Outputs and **Edit this reel** work. The reel you leave is saved first, so you can switch back and forth.
 
 Studio will not switch while a draft, render, download, take, transcript or b-roll generate is running: cancel it or let it finish. Your agent does the same with `new_video`, `open_video` and `list_videos` (see [mcp.md](mcp.md)); when it switches, the page follows to Footage.
+
+## Outputs
+
+<img src="studio/outputs.png" width="720" alt="The Outputs library: v2 and v1 of this video with when each was rendered, its look, length and pieces, b-roll and files, and Re-open, Compare and Files">
+
+**Outputs** in the top bar (or **More**, Outputs) lists every render of this video, newest first, with the settings that made it: when, the look, the length and how many pieces, the b-roll and the files (the reel, with effects, each export). Every Render writes them beside the reel as `jobs/<job>/reel-vN.settings.json`, so a version can say how it was made after the session has moved on.
+
+- **Re-open** puts that version back in the editor exactly as it was (the same as Re-open on Finish and `reopen_reel`); Render then makes the next version.
+- **Compare** two versions to play them side by side, with what changed between them marked.
+- **Files** lists each file to download.
+- **All videos** adds your other videos with how many versions each has and its latest look; pick one to open it.
+
+Nothing is deleted from here.
 
 ## Files and safety
 

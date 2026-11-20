@@ -547,6 +547,8 @@ function exportSteps(s, combo0, { clips, plain }) {
 }
 // Your edit: what you are making, from what, the look, b-roll, sound and what comes next, in plain words (every step
 // shows it; MCP get_edit reads it)
+// how many pieces the user sees: a Combo's back to back lines play as one range but count one each
+const pieceN = combo => combo.pieces.reduce((a, x) => a + (x.kind === 'piece' && x.lines ? x.lines.length : 1), 0);
 function editOf(s, v) {
   const combo = v.combo, o = outputOf(s), cut = v.cut || {}, from = draftFrom(s, combo), fin = { ...C.defaultState().finish, ...(s.finish || {}) };
   const fmt = (CUT.FORMATS[o.format] || {}).label || o.format, aspect = CUT.aspectOf(o);
@@ -559,7 +561,7 @@ function editOf(s, v) {
   const next = !takes && !s.clips ? { step: 'footage', label: 'Add footage' } : !s.job ? { step: 'footage', label: 'Name the reel' } : !drafted && fin.reel ? { step: 'finish', label: 'Draft it' } : { step: 'finish', label: 'Render' };
   return {
     making: { text: making, format: fmt, aspect, goal: o.goal, length: (cut.summary && cut.summary.length) || null },
-    from: { takes, source: src, seconds: from === 'pieces' ? combo.seconds : (cut.seconds || null), mode: from, pieces: combo.pieces.length, text: from === 'pieces' ? `${combo.pieces.length} piece${combo.pieces.length === 1 ? '' : 's'}, ${Math.round(combo.seconds)} s, in your order${(() => { const by = piecesState(s, src).by; return by && combo.pieces.some(x => x.kind === 'piece') ? (by === 'ai' ? ', picked by AI' : by === 'you' ? ', built by you' : `, ${by === 'ai, changed by you' ? 'picked by AI, changed by you' : 'set by ' + by}`) : ''; })()}` : takes ? `the whole take${takes > 1 ? ` (${takes} files)` : ''}` : 'no footage yet' },
+    from: { takes, source: src, seconds: from === 'pieces' ? combo.seconds : (cut.seconds || null), mode: from, pieces: combo.pieces.length, text: from === 'pieces' ? `${pieceN(combo)} piece${pieceN(combo) === 1 ? '' : 's'}, ${Math.round(combo.seconds)} s, in your order${(() => { const by = piecesState(s, combo.source).by; return by && combo.pieces.some(x => x.kind === 'piece') ? (by === 'ai' ? ', picked by AI' : by === 'you' ? ', built by you' : `, ${by === 'ai, changed by you' ? 'picked by AI, changed by you' : 'set by ' + by}`) : ''; })()}` : takes ? `the whole take${takes > 1 ? ` (${takes} files)` : ''}` : 'no footage yet' },
     look: { pack: s.pack || null, reference: ref, picks, text: [s.pack || 'Studio picks', ref ? `reference (${ref})` : null, picks ? `${picks} change${picks === 1 ? '' : 's'} by you` : null].filter(Boolean).join(', ') },
     broll: { spots, ideas: ((v.broll && v.broll.beats) || []).filter(b => b.idea && !b.slot).length, cutins: combo.pieces.filter(x => x.kind === 'testimonial').length, text: [spots ? `${spots} spot${spots === 1 ? '' : 's'}` : 'none yet', combo.pieces.some(x => x.kind === 'testimonial') ? `${combo.pieces.filter(x => x.kind === 'testimonial').length} testimonial` : null].filter(Boolean).join(', ') },
     sound: { bed: s.music.bed, sfx: s.sound.sfx, text: `${s.music.bed === 'auto' ? 'Music picked for you' : s.music.bed === 'none' ? 'No music' : s.music.bed}, sounds ${s.sound.sfx}` },
@@ -573,7 +575,7 @@ function editOf(s, v) {
 function saveSettings(s) {
   const dir = join(ROOT, 'jobs', s.job || '-'); let v = 0; try { v = Math.max(0, ...readdirSync(dir).map(f => +(f.match(/^reel-v(\d+)\.mp4$/) || [0, 0])[1])); } catch {} if (!v) return null;
   const vw = view(s), e = vw.edit, combo = vw.combo, files = C.outputsOf(s).filter(f => new RegExp(`reel(-fx)?-v${v}(-[a-z0-9]+)?\\.mp4$`).test(f));
-  const out = { version: v, at: new Date().toISOString(), job: s.job, making: e.making.text, format: e.making.format, look: e.look.text, pack: s.pack || null, reference: e.look.reference, from: e.from.text, pieces: combo.pieces.map(x => ({ id: x.id, kind: x.kind, label: x.label, seconds: x.seconds })),
+  const out = { version: v, at: new Date().toISOString(), job: s.job, making: e.making.text, format: e.making.format, look: e.look.text, pack: s.pack || null, reference: e.look.reference, from: e.from.text, pieces: combo.pieces.map(x => ({ id: x.id, kind: x.kind, label: x.label, seconds: x.seconds, lines: x.lines || null })), count: pieceN(combo), seconds: combo.seconds,
     broll: e.broll.text, sound: e.sound.text, export: s.export || null, files };
   try { writeFileSync(join(dir, `reel-v${v}.settings.json`), JSON.stringify(out, null, 1)); } catch {}
   return out;

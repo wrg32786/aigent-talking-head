@@ -9,7 +9,7 @@ import { Spinner } from './ui.jsx';
 
 const when = iso => { if (!iso) return ''; const d = new Date(iso), today = new Date().toDateString() === d.toDateString();
   return (today ? 'Today ' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ', ') + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); };
-const ROWS = [['Rendered', v => when(v.at)], ['Look', v => v.settings ? v.settings.look : 'Not recorded'], ['Length', v => [v.seconds ? `${Math.round(v.seconds)} s` : null, v.settings && v.settings.pieces ? `${v.settings.pieces.length} piece${v.settings.pieces.length === 1 ? '' : 's'}` : null].filter(Boolean).join(', ') || 'Not recorded'],
+const ROWS = [['Rendered', v => when(v.at)], ['Look', v => v.settings ? v.settings.look : 'Not recorded'], ['Length', v => [v.seconds ? `${Math.round(v.seconds)} s` : null, v.settings && v.settings.pieces ? (k => `${k} piece${k === 1 ? '' : 's'}`)(v.settings.count != null ? v.settings.count : v.settings.pieces.length) : null].filter(Boolean).join(', ') || 'Not recorded'],
   ['B-roll', v => v.settings ? v.settings.broll : 'Not recorded'], ['Files', v => v.files.map(f => f.label).join(', ')]];
 
 function Version({ v, latest, running, onReopen, cmp, onCompare }) {
@@ -24,7 +24,7 @@ function Version({ v, latest, running, onReopen, cmp, onCompare }) {
       <Button size="sm" variant={cmp ? 'primary' : 'ghost'} label={cmp ? 'Comparing' : 'Compare'} className="ov-compare" onClick={() => onCompare(v)} />
       <Button size="sm" variant="ghost" label={files ? 'Hide files' : 'Files'} className="ov-files-btn" onClick={() => setFiles(!files)} />
     </footer>
-    {!v.reopen && <p className="fine">Made before snapshots, so it can play but not re-open.</p>}
+    {!v.reopen && <p className="fine">No saved build behind this one, so it plays but cannot re-open.</p>}
   </li>;
 }
 
