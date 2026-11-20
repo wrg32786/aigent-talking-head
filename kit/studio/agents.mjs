@@ -14,6 +14,9 @@ export const CONNECT = join(ROOT, 'kit', 'studio', 'connect.mjs');
 export const NODE = process.execPath;
 export const python = (env = process.env) => env.PYTHON || [join(ROOT, '.venv', 'bin', 'python'), join(ROOT, '.venv', 'Scripts', 'python.exe')].find(existsSync) || null;
 export const SAY = 'Run the Studio chat loop';
+// the one line a user pastes into any agent to install, set up and connect Studio from scratch (docs/install.md);
+// the README Quick start shows the same line
+export const INSTALL_LINE = 'Read https://github.com/wrg32786/aigent-talking-head/blob/main/docs/install.md and follow it to install, set up and connect Talking Head Studio in this agent, then open Studio.';
 export const HOOK_EVENTS = ['UserPromptSubmit', 'PostToolUse', 'Stop'];
 export const IDS = ['claude', 'codex', 'cursor', 'gemini', 'opencode', 'windsurf', 'generic'];
 

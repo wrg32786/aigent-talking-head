@@ -37,6 +37,10 @@ export function Connect({ V, apply, open, setOpen }) {
         <span><b>{st.text}</b><small>{st.k === 'on' ? 'Type in the Studio chat. It answers there.' : st.k === 'busy' ? 'Studio messages wait for its next step.' : 'Do the steps below. This turns green when it connects.'}</small></span>
       </div>
       {!info ? <p className="fine">Loading</p> : <>
+        {info.install && <div className="conn-install" id="connect-install">
+          <p className="fine"><b>One line for any agent.</b> Paste it into your agent on any computer. It installs the kit, sets it up, connects itself here and opens Studio.</p>
+          <CopyBlock id="install-line" code={info.install} label="the one-line install" />
+        </div>}
         <fieldset><legend>Your agent</legend>
           <div className="agent-grid" role="radiogroup" aria-label="Your agent">
             {info.agents.map(x => <button key={x.id} type="button" role="radio" aria-checked={pick === x.id} className={'agent-card' + (pick === x.id ? ' on' : '')} data-agent={x.id} onClick={() => choose(x.id)}>{x.name}</button>)}

@@ -241,6 +241,22 @@ The settings button (top right, the sliders) opens a side sheet and saves to `jo
 | Also copy finished reels to | none (reels stay in `jobs/<job>/`) | `STUDIO_RENDERS` |
 | Action notes from the terminal | on | |
 
+### Picking a folder
+
+![Settings folder fields with Browse, Folder list, Open folder and Reset to default](studio/folder-fields.png)
+
+Each folder field (Reference downloads, Copy finished reels to, and the b-roll library folder under API keys and providers) takes a typed full path, or:
+
+- **Browse** opens your computer's own folder dialog and fills in the full path: File Explorer's folder picker on Windows (PowerShell `FolderBrowserDialog`), Finder's "choose folder" on macOS (`osascript`), zenity or kdialog on Linux. A browser cannot hand a page a full path, so the local server opens the dialog.
+- **Folder list** (and Browse when there is no dialog, for example Linux without zenity or kdialog, or a computer with no screen) opens Studio's own list: quick places (Home, Desktop, Downloads, Videos, Documents, the kit folder, drives and mounted volumes), a clickable path, Up, Home, **New folder** and **Use this folder**.
+- **Open folder** shows the folder (or the default one) in Explorer, Finder or your file manager. **Reset to default** empties the field.
+
+Click Save to keep a change.
+
+![The folder list: quick places, the path, folders and Use this folder](studio/folder-browser.png)
+
+What the folder list can see: folder names only, never files or what is in them, and only under your home folder, the kit, drives (Windows) and mounted volumes (`/Volumes`, `/media`, `/mnt`). Hidden folders (names starting with a dot), AppData, `~/Library` on macOS, the recycle bin and the Windows system folders are never listed or opened. The folder routes (`/api/folders`, `/api/folders/new`, `/api/folders/open`, `/api/folders/pick`) answer only on localhost and only to the Studio page itself (they need the `x-studio-page: 1` header and refuse cross-site requests). Your agent has no folder tools; it sets folders with `studio_settings`.
+
 Theme (dark or light) and Glass panels (on, or solid panels for older computers) live under Look and are saved in the browser, not in the file.
 
 ### API keys and providers
@@ -276,6 +292,12 @@ You tell your agent, in its terminal: **"Set up Studio from AGENTS.md and run th
 <img src="studio/connect-desktop.png" width="520" alt="The Connect agent sheet: waiting for your agent, a grid of agents with Claude Code picked, and numbered steps with the claude mcp add command and the hook command filled in with this install's paths, each with a copy button">
 <img src="studio/connect-phone.png" width="200" alt="Connect agent on a phone: the same agent grid and steps as a full-screen sheet">
 </p>
+
+**One line from scratch.** On a computer without the kit, paste this into any agent that runs commands. It follows [docs/install.md](install.md): finds the OS, reuses or clones the kit, runs the installer and `npm run setup:all`, connects itself with the steps below, starts Studio, checks `setup_status` and tells you only what it cannot do. The Connect agent sheet shows the same line at the top.
+
+```
+Read https://github.com/wrg32786/aigent-talking-head/blob/main/docs/install.md and follow it to install, set up and connect Talking Head Studio in this agent, then open Studio.
+```
 
 **Connect agent** in the top bar (also in the empty chat and in Settings) opens a sheet where you pick your agent: Claude Code, Codex CLI, Cursor (CLI and IDE), Gemini CLI, OpenCode, Windsurf or another MCP app, or Other / generic MCP. For the one you pick it shows exactly what to do, each with a copy button:
 

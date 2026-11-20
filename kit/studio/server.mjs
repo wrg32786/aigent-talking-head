@@ -28,6 +28,7 @@ import * as KEYS from './keys.mjs';
 import { capture as capturePage } from '../capture.mjs';
 import { findChrome } from '../chrome.mjs';
 import { mount as mountBroll } from './broll-api.mjs';
+import { mount as mountFolders } from './folders.mjs';
 
 const require = createRequire(import.meta.url);
 const K = require('../packs.cjs');
@@ -106,7 +107,7 @@ function env() {
   const st = S.load(), backend = st.chat.backend, p = backend === 'agent' || backend === 'keywords' ? null : LLM.provider(KEYS.envWithKeys(), st.chat);
   const t = F.tools();
   return { llm: p ? `${p.name}${p.model ? ' (' + p.model + ')' : ''}` : null, backend, agent: CH.presence(), effectsReady: existsSync(join(ROOT, 'effects', '.venv')), port: PORT,
-    settings: { downloads: st.downloads, renders: st.renders, actionNotes: st.actionNotes, agent: st.agent, chat: st.chat, from: st.from, defaultDownloads: 'teardown-in/studio/<job>/ (in the kit, not shared)', defaultRenders: 'jobs/<job>/ (in the kit)' },
+    settings: { downloads: st.downloads, renders: st.renders, actionNotes: st.actionNotes, agent: st.agent, chat: st.chat, from: st.from, defaultDownloads: 'teardown-in/studio/<job>/ (in the kit, not shared)', defaultRenders: 'jobs/<job>/ (in the kit)', defaultDownloadsPath: join(ROOT, 'teardown-in', 'studio'), defaultRendersPath: join(ROOT, 'jobs') },
     keys: { anthropic: KEYS.isSet('anthropic'), openai: KEYS.isSet('openai') }, broll: st.broll, localPresets: S.LOCAL_PRESETS,
     tools: { ytdlp: t.ytdlp ? t.ytdlp.version : null, instaloader: t.instaloader, ffmpeg: t.ffmpeg }, install: F.INSTALL, setup: setupBrief() };
 }
@@ -556,6 +557,9 @@ const readRaw = (req, max) => new Promise((ok, bad) => { const parts = []; let n
 const safeName = n => basename(String(n || 'file')).replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+/, '').slice(0, 80) || 'file';
 
 let chromeSeen = null; const chromeOk = () => { if (chromeSeen == null) { try { chromeSeen = !!findChrome(); } catch { chromeSeen = false; } } return chromeSeen; };
+// Settings folder fields: the native folder dialog, the in-page folder list, New folder and Open folder (kit/studio/folders.mjs)
+const FOLDERS = mountFolders({ ROOT, json, readBody, extraFolders: () => { const st = S.load(); return [st.downloads, st.renders, st.broll && st.broll.library, join(ROOT, 'teardown-in', 'studio'), join(ROOT, 'jobs')]; },
+  ensure: [join(ROOT, 'teardown-in', 'studio'), join(ROOT, 'jobs')] });
 const BRL = mountBroll({ ROOT, C, update, json, readBody, serveFile: (...a) => serveFile(...a), CH, capturePage, chromeOk });
 function serveFile(req, res, file) {
   let st; try { st = statSync(file); } catch { return json(res, 404, { error: 'not found' }); }
@@ -657,7 +661,7 @@ async function api(req, res, u) {
   }
   if (p === '/api/connect' && M === 'GET') {
     const url = `http://${req.headers.host}`;
-    return json(res, 200, { agents: AGT.setups({ url }), prompt: AGT.setupPrompt({ url }), selected: S.load().agent, agent: CH.presence(), name: AGT.NAME, say: AGT.SAY });
+    return json(res, 200, { agents: AGT.setups({ url }), prompt: AGT.setupPrompt({ url }), install: AGT.INSTALL_LINE, selected: S.load().agent, agent: CH.presence(), name: AGT.NAME, say: AGT.SAY });
   }
   if (p === '/api/setup' && M === 'GET') { const st = setupStatus(u.searchParams.has('fresh')); return json(res, 200, st); }
   // ---------- footage player and the Cut step ----------
@@ -699,6 +703,7 @@ async function api(req, res, u) {
     runTask('cuts', () => r.steps, () => ({ cuts: r.plan.map(x => ({ ...x, outputs: C.outputsOf({ job: x.job }) })), copiedTo: copyRenders(r.plan.flatMap(x => C.outputsOf({ job: x.job }).slice(0, 1))) }));
     return json(res, 202, { plan: r.plan, ...view(C.load()) });
   }
+  if (await FOLDERS(p, M, u, req, res)) return;
   if (await BRL.route(p, M, u, req, res)) return;
   if (p === '/api/lines' && M === 'GET') return json(res, 200, await linesView(C.load(), u.searchParams.get('path')));
   if (p === '/api/lines' && M === 'POST') { const b = await readBody(req); const r = await editLines(b); return json(res, 200, { lines: r.view, ...view(r.s) }); }

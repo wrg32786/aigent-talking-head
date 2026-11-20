@@ -2,6 +2,17 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.7.1 (unreleased)
+
+Release notes: [docs/releases/v1.7.1.md](docs/releases/v1.7.1.md).
+
+- **Studio: Browse for a folder.** Settings' Reference downloads, Copy finished reels to and the b-roll library folder (API keys and providers) get **Browse**, which asks the local server to open the system folder dialog and returns the full path: PowerShell `FolderBrowserDialog` in an STA thread on Windows, `osascript` "choose folder" on macOS, zenity or kdialog on Linux when one is installed and there is a display (`POST /api/folders/pick`). The start folder and title go in through environment variables, never into the script text. `STUDIO_FOLDER_DIALOG` points it at a stand-in command for tests.
+- **Studio: an in-page folder list.** When there is no dialog (or with **Folder list**), a glass panel shows quick places (Home, Desktop, Downloads, Videos or Movies, Documents, the kit folder, drives and mounted volumes), a clickable path, Up, Home, **New folder** and **Use this folder** (`GET /api/folders`, `POST /api/folders/new`). It lists folder names only, never files or their contents, only under the home folder, the kit, drives (Windows) and `/Volumes`, `/media`, `/mnt`. Dot folders, AppData, `~/Library` on macOS, the recycle bin and the Windows system folders are neither listed nor opened, symlinks are resolved before the check, and `../` cannot leave those roots (`kit/studio/folders.mjs`).
+- **Studio: Open folder and Reset to default** under each folder field (`POST /api/folders/open` opens Explorer, Finder or the Linux file manager, only for those folders, the defaults and the current settings). Typing a full path still works.
+- **Folder routes are for the page only.** Besides Studio's localhost and same-origin checks, every `/api/folders` call needs the `x-studio-page: 1` header (a cross-site page cannot send it without a preflight Studio refuses), and a cross-site `Sec-Fetch-Site` is refused. MCP has no folder tools.
+- **One-line agent install.** `docs/install.md` is written for agents: find the OS, reuse or clone the kit, run the installer and `npm run setup:all`, connect over MCP for the agent it is (the same steps as the Connect agent dialog), start Studio, check with `setup_status`, and tell the user only what it cannot do. The line to paste is at the top of the README Quick start and in the Connect agent dialog (`GET /api/connect` returns it as `install`). The idea follows OpenMotion's agent quick start (Apache-2.0); the text is new.
+- **Tests.** `tests/studio-folders.test.mjs` in `npm run check` (folders only, no secrets, no escapes by `../` or symlinks, the page header, cross-site and other hosts refused, New folder names, Open folder, the dialog picked, cancelled or missing, the per-system dialog commands, the one-line install in the README, the Connect API and docs/install.md); `tests/studio-folders.e2e.mjs` in the smoke (the folder list in Chrome, New folder, Use this folder, Save, typing a path, Open folder, Reset, Escape, a 375 px phone, a dialog filling the path, the line in Connect agent).
+
 ## 1.7.0 (unreleased)
 
 Release notes: [docs/releases/v1.7.0.md](docs/releases/v1.7.0.md).

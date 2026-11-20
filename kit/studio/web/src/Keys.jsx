@@ -7,6 +7,7 @@ import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';
 import { Switch } from '@astryxdesign/core/Switch';
 import { api, toast, Icon, IconBtn } from './lib.jsx';
+import { FolderField } from './Folders.jsx';
 
 const GROUPS = [['stock', 'Stock footage (free)'], ['generate', 'Generate (paid, your account)'], ['text', 'Text']];
 
@@ -66,9 +67,7 @@ export function Keys({ V, apply, open, setOpen }) {
           <input id={'model-' + p.id} spellCheck="false" autoComplete="off" placeholder={Object.values(p.defaults || {}).join(' or ') || 'owner/model'} value={f.models[p.id] || ''} onChange={e => setF(x => ({ ...x, models: { ...x.models, [p.id]: e.target.value } }))} />
           <small className="fine">{p.note}</small></label>)}
         {keys && <p className="fine">Not wired yet: {keys.generate.providers.filter(p => p.stub).map(p => p.note).join(' ')}</p>}
-        <label className="lbl" htmlFor="broll-lib">B-roll library folder</label>
-        <input id="broll-lib" spellCheck="false" autoComplete="off" placeholder={V.broll ? V.broll.library.dir : 'broll-library in the kit'} value={f.library} onChange={e => setF(x => ({ ...x, library: e.target.value }))} />
-        <p className="fine">A full path. Reused by every job. Empty uses broll-library in the kit (git ignores it).</p>
+        <FolderField id="broll-lib" label="B-roll library folder" value={f.library} onChange={v => setF(x => ({ ...x, library: v }))} placeholder={V.broll ? V.broll.library.dir : 'broll-library in the kit'} defaultPath={V.broll ? V.broll.library.dir : undefined} note="A full path. Reused by every job. Empty uses broll-library in the kit (git ignores it)." />
         <p id="keys-msg" className="fine" role="status">{msg}</p>
       </fieldset>}
     </div>
