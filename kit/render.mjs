@@ -6,6 +6,7 @@ import { createRequire } from 'module';
 import { dirname, join, isAbsolute } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { findChrome } from './chrome.mjs';
+import * as FC from './framecap.mjs';
 // Run from the job's build/ folder (holds captions.js):  node <kit>/render.mjs <durationSec> [t1,t2,... for stills only]
 // Writes ovl/%04d.png (and ovlt/%04d.png when captions.js has kinetic titles), or stills/t<sec>.png.
 // STILLS_LAYERS=1 with a stills-only run writes stills-front/ and stills-titles/ so a mask can put titles behind the person.
@@ -76,8 +77,17 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
       if (!existsSync(abs)) { console.warn(`logo ${ref}: no such file`); continue; }
       const u = dataUrl(abs); if (u) DATAURLS[ref] = u; else console.warn(`logo ${ref}: not an .svg, .png, .webp or .jpg`);
     }
-    // graphic images (icons, screens) the same way; a screen recording's frames stay files (they never meet the face check)
+    // graphic images (icons, screens) the same way. A screen recording's frames go in as data URLs too, up to 96 MB in
+    // all: a frame from a file taints the canvas, which kept the layout pass from moving captions clear of the card
+    // (they were drawn over the recording) and stops the fast frame capture (kit/framecap.mjs). Past the budget they
+    // stay files and the capture falls back to screenshots once a card shows.
     for (const a of Object.values(assets)) for (const k of ['icon', 'src']) if (a[k] && a[k].startsWith('file:')) { const u = dataUrl(fileURLToPath(a[k])); if (u) a[k] = u; }
+    { let budget = 96 * 2 ** 20;
+      for (const a of Object.values(assets)) if (a.frames) {
+        const size = a.frames.reduce((n, u) => n + (u.startsWith('file:') ? statSync(fileURLToPath(u)).size : 0), 0) * 4 / 3;
+        if (size > budget) continue;
+        budget -= size; a.frames = a.frames.map(u => u.startsWith('file:') ? dataUrl(fileURLToPath(u)) || u : u);
+      } }
     const F = join(KIT, 'fonts');
     const GJ = JSON.parse(readFileSync(join(KIT, 'graphics.json'), 'utf8'));
     const defaults = Object.fromEntries(GJ.graphics.map(g => [g.mode, g.defaults || {}])), panelModes = GJ.graphics.filter(g => g.mode >= 11).map(g => g.mode);
@@ -161,11 +171,59 @@ const passes = split
 if (!only && !layered) rmSync(join(ROOT, 'ovlt'), { recursive: true, force: true });
 if (!only && !panels) rmSync(join(ROOT, 'ovlp'), { recursive: true, force: true });
 const list = only || [...Array(Math.round(DUR * FPS)).keys()].map(f => f / FPS);
+const name = (k) => `${only ? ('t' + list[k].toFixed(2)) : String(k).padStart(4, '0')}.png`;
+// Frames: Chrome encodes the canvas to PNG on worker threads while the page draws the next frame (kit/framecap.mjs),
+// with up to 3 pages drawing at once; same pixels as a screenshot, several times faster. RENDER_CAPTURE=screenshot
+// uses page screenshots; any error on the fast path falls back to screenshots from that frame on.
+const MODE = String(process.env.RENDER_CAPTURE || 'auto').toLowerCase(), FAIL_AT = +(process.env.RENDER_CAPTURE_FAIL_AT || -1);
+const t0 = Date.now(), frames = list.length * passes.length;
+const pages = [{ p, fast: false }];
+if (MODE !== 'screenshot') {
+  const want = only ? 1 : process.env.RENDER_PAGES ? FC.pickPages() : Math.min(FC.pickPages(), Math.max(1, Math.floor(list.length / 48)));
+  for (let k = 1; k < want; k++) {
+    try {
+      const q = await b.newPage({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: 1 });
+      await q.goto(pathToFileURL(join(ROOT, 'overlay.html')).href, { waitUntil: 'networkidle' });
+      await q.waitForFunction(() => window.__ready === true, null, { timeout: 20000 });
+      pages.push({ p: q, fast: false });
+    } catch (e) { console.warn('note: could not open another drawing page (' + String(e.message || e).split('\n')[0] + '), going on with ' + pages.length); break; }
+  }
+  const W = FC.pickWorkers(undefined, pages.length);
+  const why = await Promise.all(pages.map(x => FC.install(x.p, W)));
+  why.forEach((w, k) => { pages[k].fast = !w; if (w) console.warn('note: fast frame capture is off (' + w + '); using screenshots'); });
+}
+await Promise.all(pages.map(x => FC.warm(x.p, only ? list : FC.warmTimes(DUR))));
+const startedFast = pages.some(x => x.fast), fellBack = new Set();
+const shot = async (pg, dir, ts, ks, layer) => { for (let j = 0; j < ts.length; j++) { await pg.p.evaluate(([t, l]) => window.seek(t, l), [ts[j], layer]); await pg.p.screenshot({ path: join(dir, name(ks[j])), omitBackground: true }); } };
 let i = 0;
 for (const [d, layer] of passes) {
   const dir = join(ROOT, d); if (!only) rmSync(dir, { recursive: true, force: true }); mkdirSync(dir, { recursive: true });
-  i = 0; for (const t of list) { await p.evaluate(([t, l]) => window.seek(t, l), [t, layer]); await p.screenshot({ path: join(dir, `${only ? ('t' + t.toFixed(2)) : String(i).padStart(4, '0')}.png`), omitBackground: true }); i++ }
+  // a queue of short runs of frames; each page takes the next run when it is free
+  const runs = []; for (let k = 0; k < list.length; k += FC.BATCH) runs.push([...Array(Math.min(FC.BATCH, list.length - k)).keys()].map(j => k + j));
+  let nextRun = 0;
+  await Promise.all(pages.map(async pg => {
+    while (nextRun < runs.length) {
+      const ks = runs[nextRun++], ts = ks.map(k => list[k]);
+      if (pg.fast) {
+        try {
+          if (FAIL_AT >= 0 && ks.some(k => k >= FAIL_AT)) throw new Error('RENDER_CAPTURE_FAIL_AT test');
+          const bufs = await FC.batch(pg.p, ts, layer);
+          bufs.forEach((buf, j) => writeFileSync(join(dir, name(ks[j])), buf));
+          continue;
+        } catch (e) {
+          pg.fast = false;
+          const raw = String(e.message || e), m = /origin-clean|taint|SecurityError/i.test(raw) ? 'an image from a file is on the canvas' : (raw.split('\n').find(l => /error|test|fail/i.test(l)) || raw.split('\n')[0]).replace(/^page\.evaluate:\s*/, '').trim();
+          if (!fellBack.size) console.warn(`note: fast frame capture stopped at frame ${ks[0]} (${m}); screenshots from there on`);
+          fellBack.add(ks[0]);
+        }
+      }
+      await shot(pg, dir, ts, ks, layer);
+    }
+  }));
+  i = list.length;
 }
+const secs = (Date.now() - t0) / 1000;
+console.log(`capture: ${frames} frames in ${secs.toFixed(1)} s (${(frames / Math.max(secs, 0.001)).toFixed(0)} fps), ${startedFast ? (fellBack.size ? 'in-page PNG, then screenshots' : 'in-page PNG') : 'screenshots'}, ${pages.length} page${pages.length === 1 ? '' : 's'}`);
 // Chrome saves a fully opaque frame (a colour card) as an RGB PNG inside an otherwise RGBA sequence, and ffmpeg can drop
 // those frames when the pixel format changes mid-sequence (the card vanished from some renders). Rewrite them as RGBA.
 if (!only) {
