@@ -472,6 +472,10 @@ try {
     const notes = V.gradeChoice(shots);
     if (shots.slice(0, 3).some(s => s.finish) || !/mono/.test(shots[3].finish || '') || /warm/.test(shots[3].finish || '')) fail('finish choice: ' + shots.map(s => s.finish).join(' / '));
     if (!notes.length || !/room/.test(notes[0])) fail('ambient note missing: ' + notes);
+    // never a finish from a black frame or a shot under 2 s (session report 2, F: 1.6 s of black read as mono everywhere)
+    if (V.finishOf({ sat: 0.0, mean_l: 2, dark_share: 0.99, contrast: 0.01 }, 1.6).finish) fail('a black end card read as a finish');
+    if (V.finishOf({ ...warm, sat: 0.01, mean_l: 50 }, 1.2).finish) fail('a 1.2 s shot gave a finish');
+    if (!/mono/.test(V.finishOf({ ...warm, sat: 0.01, mean_l: 50 }, 3).finish || '')) fail('a 3 s black and white shot should read as mono');
     const gm = V.mapGraphics(b, { graphics: [
       { type: 'ordinal-sticker', start: 0.5, end: 1.5, text: 'FIRST', layer: 'behind', color: '#f2e8a0', bbox: [0.15, 0.2, 0.7, 0.2] },
       { type: 'ordinal-sticker', start: 3, end: 4, text: null, layer: 'behind', color: '#f2e8a0', bbox: [0.15, 0.2, 0.7, 0.2] },
@@ -735,7 +739,7 @@ try {
   step('teardown (built-in fallback) on a synthetic 3-shot reel: shots, mono shot, titles, Reel.md', () => {
     const td = join(work, 'td'); mkdirSync(td);
     const font = join(KIT, 'fonts', 'ArchivoBlack-Regular.ttf').replace(/\\/g, '/').replace(/:/g, '\\:');
-    const shot = (n, src, extra) => run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', src, '-vf', `scale=720:1280,setsar=1${extra}`, '-t', '2', '-r', '24', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', `s${n}.mp4`], td);
+    const shot = (n, src, extra) => run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', src, '-vf', `scale=720:1280,setsar=1${extra}`, '-t', '2.5', '-r', '24', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', `s${n}.mp4`], td);
     const txt = w => `,drawtext=fontfile='${font}':text='${w}':fontsize=150:fontcolor=white:borderw=6:bordercolor=black:x=(w-tw)/2:y=h*0.3`;
     shot(1, 'testsrc2=size=720x1280:rate=24', txt('HELLO'));
     shot(2, 'smptebars=size=720x1280:rate=24', ',' + B.finishChain('mono'));
@@ -931,7 +935,7 @@ try {
     await cl.connect(new StdioClientTransport({ command: node, args: [join(KIT, 'mcp.mjs')], cwd: dirname(KIT), stderr: 'ignore', env: { ...process.env, STUDIO_DIR: studioDir } }));
     try {
       const names = (await cl.listTools()).tools.map(t => t.name).join(',');
-      if (names !== 'menu,list_effects,list_packs,get_pack,draft,explain,set_locks,plan,validate,render,verify,studio_get_state,studio_set_selections,studio_run,studio_start,studio_wait_for_message,studio_get_pending,studio_reply,studio_add_reference_url,studio_get_reference_teardown,studio_settings,studio_takes,list_scripts,get_script,write_script,set_output,get_cuts,set_cuts,render_cuts,get_lines,set_bites,render_bites,list_broll,add_broll,suggest_broll,fill_slot,broll_providers,setup_status') fail('MCP tools: ' + names);
+      if (names !== 'menu,list_effects,list_packs,get_pack,draft,explain,set_locks,plan,validate,render,verify,studio_get_state,studio_set_selections,studio_run,studio_start,studio_wait_for_message,studio_get_pending,studio_reply,studio_add_reference_url,studio_get_reference_teardown,studio_settings,studio_takes,list_scripts,get_script,write_script,set_output,get_cuts,set_cuts,render_cuts,get_lines,set_bites,render_bites,list_broll,add_broll,suggest_broll,fill_slot,broll_providers,reopen_reel,cut_range,find_noises,setup_status') fail('MCP tools: ' + names);
       const lp = await cl.callTool({ name: 'list_packs', arguments: {} });
       if (lp.isError || !lp.structuredContent || !lp.structuredContent.packs.some(p => p.name === 'magazine')) fail('MCP list_packs: ' + JSON.stringify(lp).slice(0, 300));
       const gp = await cl.callTool({ name: 'get_pack', arguments: { pack: 'cinematic' } });
@@ -1096,6 +1100,12 @@ try {
     const diff = (x, y) => x.reduce((a, v, k) => a + Math.abs(v - y[k]), 0) / x.length;
     if (diff(frame('fin-plain.mp4', 0.8), frame('fin-look.mp4', 0.8)) < 0.5) fail('finish did not change the picture');
     writeFileSync(join(b, 'cut.json'), JSON.stringify(cut));
+  });
+  step('a capital I inside a word reads as I, not l ("AIgent", tests/caption-glyphs.e2e.mjs)', () => {
+    run(node, [join(dirname(KIT), 'tests', 'caption-glyphs.e2e.mjs')], dirname(KIT));
+  });
+  step('logo files reach the overlay as data URLs, so the face check never meets a tainted canvas (tests/logo-dataurl.e2e.mjs)', () => {
+    run(node, [join(dirname(KIT), 'tests', 'logo-dataurl.e2e.mjs')], dirname(KIT));
   });
   step('face keep-out: the layout moves captions and titles off the face zone, the face check counts what is left', () => {
     // a still face in the middle of the frame (kit/facezone.py output shape), a caption and a behind title stacked over it

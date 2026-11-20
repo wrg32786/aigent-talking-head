@@ -7,7 +7,7 @@
 // only does what is still missing. The last run is kept in jobs/.studio/setup.json (or STUDIO_DIR).
 // Steps: Node packages, the Python venv (.venv) and requirements.txt, yt-dlp and instaloader (reference links),
 // ffmpeg and ffprobe, Chrome, the Whisper model (small.en, about 470 MB), the effects venv (npm run effects:setup:
-// MediaPipe, OpenCV, rembg), the humanizer skill, and the Studio page build.
+// MediaPipe, OpenCV, rembg), rea-video for references (optional: --skip rea), the humanizer skill, and the Studio page build.
 // ffmpeg and Chrome are system programs: with --yes it uses Homebrew, winget, or apt/dnf/pacman when sudo works
 // without a password; otherwise it prints the one command for the user to run (it needs their password).
 import { spawnSync } from 'child_process';
@@ -47,6 +47,13 @@ const SYS = {
 const sysFix = what => SYS[what][pm() || 'none'];
 const needsPassword = fix => /^sudo /.test(fix);
 
+// rea-video next to the kit's Python or on PATH (kit/teardown.mjs looks the same way)
+export const REA_PKG = 'rea-video[ocr] @ git+https://github.com/JuneYaooo/rea-video';
+function findRea(py) {
+  if (process.env.REA_VIDEO && existsSync(process.env.REA_VIDEO)) return process.env.REA_VIDEO;
+  const bin = WIN ? 'rea-video.exe' : 'rea-video', pyDir = py && (py.includes('/') || py.includes('\\')) ? dirname(py) : null;
+  return (pyDir && existsSync(join(pyDir, bin)) ? join(pyDir, bin) : null) || onPath('rea-video');
+}
 // each check: { id, label, need: 'core' | 'feature', feature, ready, detail, fix, user (only the user can do the fix) }
 export function checks() {
   const py = python(), out = [];
@@ -69,6 +76,10 @@ export function checks() {
   // the default person mask's weights (birefnet-portrait, about 928 MB), so the first render does not stop to download them
   const maskW = fx && okRun(FX_PY, ['-c', 'import sys; sys.path.insert(0, "kit"); import mask_refine as R; sys.exit(0 if R.cached_weights("birefnet-portrait") else 1)'], { cwd: ROOT, timeout: 60e3 });
   add('mask', 'Person mask weights (birefnet-portrait)', 'feature', 'titles and captions behind your head', !!maskW, maskW ? 'cached' : 'about 928 MB, not downloaded yet', 'npm run effects:setup -- --birefnet');
+  // rea-video (Apache-2.0): the full reference breakdown. Without it the built-in analyzer reads references, much rougher
+  // (session report 2, F: 11 shots of 21, 0 titles of 7). Optional; needs Git, and the first breakdown downloads ~216 MB.
+  const rea = !!findRea(py);
+  add('rea', 'rea-video (reference breakdown)', 'feature', 'reading a reference: shots, titles, captions, grade (else the rougher built-in analyzer)', rea, rea ? findRea(py) : 'not installed: the built-in analyzer reads references', 'npm run setup:all -- --only rea');
   add('humanizer', 'Humanizer skill', 'feature', 'scripts your agent writes', existsSync(join(ROOT, 'skills', 'humanizer', 'SKILL.md')), 'skills/humanizer/SKILL.md', 'git checkout skills/humanizer (it ships with the kit)');
   let built = false, why = 'missing';
   try { const stamp = JSON.parse(readFileSync(join(KIT, 'studio', 'public', 'build.json'), 'utf8')); built = existsSync(join(KIT, 'studio', 'public', 'index.html')); why = built ? 'built ' + (stamp.built || '') : why; } catch {}
@@ -135,6 +146,19 @@ export function install({ yes = false, skip = [], log = console.log } = {}) {
     if (!existsSync(FX_PY)) return { result: 'failed', detail: 'needs the effects pass first' };
     sh(FX_PY, [join(KIT, 'mask.py'), '--download'], log); return { result: 'installed' };
   }, log)));
+  // optional: a failure here never fails setup (references still read with the built-in analyzer)
+  res.push(skipIf('rea', () => step('rea-video (reference breakdown, optional)', () => {
+    if (has('rea')) return { result: 'ready' };
+    const p2 = python(); if (!p2) return { result: 'needs you', detail: 'needs the Python venv first' };
+    if (!onPath('git')) return { result: 'needs you', detail: 'rea-video installs from GitHub and needs Git: install Git, then npm run setup:all -- --only rea' };
+    try {
+      sh(p2, ['-m', 'pip', 'install', '--quiet', REA_PKG], log);
+      // rapidocr-onnxruntime pulls opencv-python, which fights opencv-python-headless for cv2 (rea-video's setup note)
+      run(p2, ['-m', 'pip', 'uninstall', '-y', 'opencv-python']);
+      sh(p2, ['-m', 'pip', 'install', '--quiet', '--force-reinstall', '--no-deps', 'opencv-python-headless>=4.8,<5'], log);
+    } catch (e) { return { result: 'needs you', detail: `rea-video did not install (${e.message}); references use the built-in analyzer. Retry: npm run setup:all -- --only rea` }; }
+    return has('rea') ? { result: 'installed' } : { result: 'needs you', detail: 'pip finished but rea-video is not on PATH; set REA_VIDEO to its path' };
+  }, log)));
   res.push(skipIf('humanizer', () => step('Humanizer skill', () => has('humanizer') ? { result: 'ready' } : { result: 'failed', detail: 'skills/humanizer is missing from this copy: git checkout skills/humanizer' }, log)));
   res.push(skipIf('studio', () => step('Studio page', () => { if (has('studio')) return { result: 'ready' }; sh(process.execPath, [join(KIT, 'studio', 'build.mjs')], log); return { result: 'installed' }; }, log)));
   const summary = { ready: res.filter(r => r.result === 'ready').length, installed: res.filter(r => r.result === 'installed').length, skipped: res.filter(r => r.result === 'skipped').length, failed: res.filter(r => r.result === 'failed').length, needsYou: res.filter(r => r.result === 'needs you').length };
@@ -146,7 +170,7 @@ export function install({ yes = false, skip = [], log = console.log } = {}) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const argv = process.argv.slice(2), flag = k => argv.includes('--' + k);
   const opt = k => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : undefined; };
-  const VALUED = new Set(['skip', 'only']), json = flag('json'), STEP_IDS = ['npm', 'python', 'ytdlp', 'ffmpeg', 'chrome', 'model', 'effects', 'humanizer', 'studio'];
+  const VALUED = new Set(['skip', 'only']), json = flag('json'), STEP_IDS = ['npm', 'python', 'ytdlp', 'ffmpeg', 'chrome', 'model', 'effects', 'rea', 'humanizer', 'studio'];
   const only = (opt('only') || '').split(',').map(x => x.trim()).filter(Boolean), skipArg = only.length ? STEP_IDS.filter(x => !only.includes(x)).join(',') : opt('skip') || '';
   if (flag('check')) {
     const s = status();

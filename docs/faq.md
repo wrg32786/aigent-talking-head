@@ -98,4 +98,4 @@ The code and docs are Apache-2.0, so commercial use is fine. The bundled sounds 
 
 ### How do I cite it?
 
-Use [CITATION.cff](../CITATION.cff), or: Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.9.0) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
+Use [CITATION.cff](../CITATION.cff), or: Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.9.1) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head

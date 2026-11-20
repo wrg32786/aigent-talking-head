@@ -107,6 +107,8 @@ const flips = phrases.map((p, i) => {
 // --titles: one kinetic title per beat (segment), from the beat's last phrase, held to the cut. Up to 7 (the first
 // six beats plus the payoff), so no entrance repeats. That phrase leaves the caption track (the title says it).
 if (opt('titles', false)) {
+  // --title-words one|phrase (lock title-words): one word per title, or the phrase. Default: one for oneword, else phrase
+  const ONE = opt('title-words', null) === 'one' || (opt('title-words', null) !== 'phrase' && STYLE === 'oneword');
   const beats = flips.filter(f => f._beatEnd !== undefined);
   // oneword: only the opening beat and the last one, as a single word title while the words run on
   const pick = STYLE === 'oneword' ? [...new Set([beats[0], beats[beats.length - 1]])].filter(Boolean) : beats.length > 7 ? [...beats.slice(0, 6), beats[beats.length - 1]] : beats;
@@ -115,7 +117,7 @@ if (opt('titles', false)) {
     // a title is a font lockup too: the hero word big in the display face, the rest of the phrase in the partner face
     const words = f.text.replace(/[.?!,]+$/, '').split(/\s+/);
     const tEnd = +Math.min(total, f._beatEnd === C.segs.length - 1 ? 99 : segEnd(f._beatEnd)).toFixed(2);
-    if (STYLE === 'oneword') { flips.push({ start: f.start, end: tEnd, text: words[heroIdx(words)].replace(/[^\w'$%-]+$/, ''), mode: 7, lockup: false }); continue; }
+    if (ONE) { flips.push({ start: f.start, end: tEnd, text: words[heroIdx(words)].replace(/[^\w'$%-]+$/, ''), mode: 7, lockup: false }); continue; }
     flips.push({ start: f.start, end: tEnd, text: words.join(' '), hero: [heroIdx(words)], mode: 7 });
     f._title = true; // the title says this phrase big, so the caption track skips it
   }

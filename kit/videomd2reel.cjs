@@ -173,8 +173,14 @@ function captionLook(samples, cues, layerSamples) {
 // One shot's grade -> a finish (or none). Calibrated on the shipped finishes applied to showcase/source/presenter.jpg,
 // then made stricter so a dark room or warm light on real footage does not read as a finish. Subtle finishes (grain,
 // chroma, a light warm or cool) are often missed; strong ones (mono, scan-lines, heavy vignette, teal) are caught.
-function finishOf(m) {
+// Never from a black frame (a fade to black reads as zero saturation, so "mono") or a shot under 2 s (a flash frame or a
+// transition, not a grade): session report 2, F, where 1.6 s of black at the end made every shot black and white.
+const MIN_GRADE_SHOT = 2;
+const isBlack = m => (m.mean_l != null && m.mean_l < 8) || (m.dark_share != null && m.dark_share > 0.9) || (m.bright_share != null && m.mean_l != null && m.mean_l < 12 && m.bright_share < 0.01);
+function finishOf(m, secs) {
   if (!m || m.sat == null) return { finish: null, why: 'no grade data' };
+  if (isBlack(m)) return { finish: null, why: 'a black frame: no grade to read', unread: true };
+  if (secs != null && secs < MIN_GRADE_SHOT) return { finish: null, why: `shot under ${MIN_GRADE_SHOT} s: too short to read a grade`, unread: true };
   const f = [], why = [];
   if (m.sat < 0.03) { f.push('mono'); why.push(`saturation ${m.sat}`); }
   else {
@@ -327,17 +333,18 @@ function convert(b, extras = {}, opts = {}) {
   const shots = (b.shots || []).map((s, i) => {
     const m = { ...((s.aspects && s.aspects.grade && s.aspects.grade.measured) || {}), ...(extras.shots && extras.shots[i] ? extras.shots[i] : {}) };
     if (s.x_scan != null && m.scan == null) m.scan = s.x_scan;
-    const fin = finishOf(m);
+    const fin = finishOf(m, (+s.end || 0) - (+s.start || 0));
     const cam = (s.aspects && s.aspects.camera && (s.aspects.camera.result || s.aspects.camera.measured)) || {};
     const move = cam.move || cam.motion;
-    return { n: i + 1, m, start: r2(s.start), end: r2(s.end), finish: fin.finish, finishWhy: fin.why, transitionIn: s.transition_in, move: typeof move === 'string' ? move : null, shake: (s.aspects && s.aspects.camera && s.aspects.camera.measured && s.aspects.camera.measured.shake) };
+    return { n: i + 1, m, start: r2(s.start), end: r2(s.end), finish: fin.finish, finishWhy: fin.why, ...(fin.unread ? { unread: true } : {}), transitionIn: s.transition_in, move: typeof move === 'string' ? move : null, shake: (s.aspects && s.aspects.camera && s.aspects.camera.measured && s.aspects.camera.measured.shake) };
   });
-  const ambient = gradeChoice(shots);
-  // the most common finish becomes the job default; shots that differ keep their own
+  const read = shots.filter(s => !s.unread);
+  const ambient = gradeChoice(read);
+  // the most common finish becomes the job default (over the shots a grade could be read from); shots that differ keep their own
   const counts = {};
-  shots.forEach(s => { const k = s.finish || 'none'; counts[k] = (counts[k] || 0) + 1; });
+  read.forEach(s => { const k = s.finish || 'none'; counts[k] = (counts[k] || 0) + 1; });
   const top = Object.entries(counts).sort((a, c) => c[1] - a[1])[0];
-  const jobFinish = top && top[0] !== 'none' && top[1] / shots.length >= 0.6 ? top[0] : null;
+  const jobFinish = top && top[0] !== 'none' && top[1] / read.length >= 0.6 ? top[0] : null;
   const audio = b.audio || {}, music = audio.music || {};
   const bpm = music.tempo_bpm || audio.tempo_bpm || null;
   const hasMusic = !!(music.present || bpm);

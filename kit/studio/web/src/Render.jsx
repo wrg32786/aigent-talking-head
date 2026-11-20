@@ -30,14 +30,23 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
   if (s.reference.mode === 'recreate' && s.reference.out) notes.unshift(`Recreate: follows ${s.reference.out}/Reel.md; the recipe sets the look.`);
   if (c.effects && c.effects.length && !V.env.effectsReady) notes.push('Effects are picked but not set up on this computer (npm run effects:setup). The reel renders without them.');
   const drafted = !!choices;
-  const elapsed = running ? `${cap1(t.kind)}, ${fmtS(now - t.startedAt)}` : t && t.endedAt ? `${cap1(t.kind)} ${t.status} in ${fmtS(t.endedAt - t.startedAt)}` : '';
+  // a draft is a plan, not a video: say so when it ends, so it never reads like a finished render
+  const planReady = t && !running && t.kind === 'draft' && t.status === 'done';
+  const elapsed = running ? `${cap1(t.kind)}, ${fmtS(now - t.startedAt)}` : planReady ? 'Plan ready, no video yet. Press Render.' : t && t.endedAt ? `${cap1(t.kind)} ${t.status} in ${fmtS(t.endedAt - t.startedAt)}` : '';
+  // cuts kept on the Cut step render from there, each as its own reel; Draft here is the whole take, and says so
+  const keptCuts = ((V.cut && V.cut.candidates) || []).filter(x => x.keep);
+  const renderCuts = () => api('/api/cut/render', {}).then(j => { apply(j); toast(`Rendering ${j.plan.length} video${j.plan.length > 1 ? 's' : ''}`, true); }).catch(() => {});
+  const reopen = o => api('/api/reopen', { reel: o }).then(j => { apply(j); loadChoices(); toast(`${o.split('/').pop()} is back in the editor. Render makes the next version.`, true); }).catch(() => {});
+  const canReopen = new Set(V.reopenable || []);
   const outputs = (V.outputs || []).slice(0, 6);
 
   return <section className="step" id="s-render" data-step="render" aria-labelledby="h-render" hidden={hidden}>
-    <header className="sh"><h2 id="h-render">Render</h2><p className="sub">Draft, check the picks, then render.</p></header>
+    <header className="sh"><h2 id="h-render">Render</h2><p className="sub">Draft plans the reel, Render makes the video.</p></header>
     <NeedFix V={V} ids={['ffmpeg', 'python', 'chrome', 'npm']} what="Drafting and rendering" />
+    {keptCuts.length > 0 && <div id="kept-cuts" className="notes glass-card" role="note"><p>You kept {keptCuts.length} cut{keptCuts.length > 1 ? 's' : ''} on the Cut step. They render from there, each as its own reel. Draft below plans one reel from the whole take.</p>
+      <div className="row"><Button id="render-kept" size="sm" variant="primary" label={`Render my ${keptCuts.length} cut${keptCuts.length > 1 ? 's' : ''}`} isDisabled={running} onClick={renderCuts} /></div></div>}
     <div className="runbar glass-card">
-      <Button id="draft" size="lg" variant={drafted ? 'secondary' : 'primary'} label={drafted ? 'Redraft' : 'Draft'} isDisabled={running || !s.job || (!s.footage.length && !s.clips)}
+      <Button id="draft" size="lg" variant={drafted || keptCuts.length ? 'secondary' : 'primary'} label={keptCuts.length ? (drafted ? 'Redraft whole take' : 'Draft whole take') : drafted ? 'Redraft' : 'Draft'} isDisabled={running || !s.job || (!s.footage.length && !s.clips)}
         onClick={() => { setChoices(null); setReceipt(null); setLog(''); api('/api/draft', {}).then(apply).catch(() => {}); }} />
       <Button id="render" size="lg" variant={drafted ? 'primary' : 'secondary'} label="Render" isDisabled={running || !s.job}
         onClick={() => doRender()} />
@@ -52,7 +61,7 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
     <div id="notes" className="notes">{notes.map((n, i) => <p key={i}>{n}</p>)}</div>
     <div id="outputs" className="outputs">
       {outputs.length ? outputs.map(o => <figure key={o} className="glass-card"><video src={file(o) + '?v=' + s.rev + '#t=1.2'} controls preload="metadata" aria-label={o} />
-        <figcaption><span>{o.split('/').pop()}</span><a className="btn ghost sm" href={file(o) + '?download'} download={o.split('/').pop()}><Icon n="download" />Download</a></figcaption></figure>)
+        <figcaption><span>{o.split('/').pop()}</span>{canReopen.has(o) && <button type="button" className="btn ghost sm" data-reopen={o} disabled={running} onClick={() => reopen(o)}><Icon n="edit" />Edit this reel</button>}<a className="btn ghost sm" href={file(o) + '?download'} download={o.split('/').pop()}><Icon n="download" />Download</a></figcaption></figure>)
         : <div className="empty-art"><Icon n="film" /><p>{s.job ? 'Your reels show up here.' : 'Name the reel at the top to start.'}</p></div>}
     </div>
     <CutOutputs V={V} s={s} />

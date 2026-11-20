@@ -4,7 +4,7 @@
 // Tools: menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify. Each runs the matching npm command from the repo root with
 // --json where the command has it and returns the log tail plus the JSON result (structuredContent).
 // Studio tools: studio_start, studio_get_state, studio_set_selections, studio_run, studio_wait_for_message, studio_get_pending,
-// studio_reply, studio_add_reference_url, studio_get_reference_teardown, studio_settings, studio_takes; list_scripts, get_script, write_script (Studio scripts); set_output, get_cuts, set_cuts, render_cuts, get_lines, set_bites, render_bites (the Cut step); list_broll, add_broll, suggest_broll, fill_slot, broll_providers (the B-roll step; keys are never shown, only whether each is set); setup_status (what is installed and the fix for what is not). They read and write the same
+// studio_reply, studio_add_reference_url, studio_get_reference_teardown, studio_settings, studio_takes; list_scripts, get_script, write_script (Studio scripts); set_output, get_cuts, set_cuts, render_cuts, get_lines, set_bites, render_bites (the Cut step); list_broll, add_broll, suggest_broll, fill_slot, broll_providers (the B-roll step; keys are never shown, only whether each is set); reopen_reel, cut_range, find_noises (edit a finished reel, cut a stretch out of a clip); setup_status (what is installed and the fix for what is not). They read and write the same
 // session as the Studio page (npm run studio, kit/studio/core.mjs), so you and the user see and change the same picks; the
 // page updates live. The Studio chat is its own channel (kit/studio/channel.mjs): answer page messages with studio_reply,
 // keep the terminal conversation in the terminal.
@@ -73,7 +73,7 @@ const tail = (s, n = 60) => s.trim().split('\n').slice(-n).join('\n');
 
 const REEL = cmd('reel'), PLAN = cmd('plan'), VERIFY = cmd('verify'), MENU = cmd('menu'), LIST = cmd('list'), RMD = cmd('reelmd'), CHECK = cmd('check'), PACK = cmd('pack'), CHOICES = cmd('choices');
 // a locks object ({ "transitions": ["whip"], "graphics": { "deny": ["checklist"] } }) as the --lock string kit/locks.cjs parses
-const KEBAB = { maxTitles: 'max-titles', captionEntrance: 'caption-entrance' };
+const KEBAB = { maxTitles: 'max-titles', titleWords: 'title-words', captionEntrance: 'caption-entrance' };
 function lockString(l) {
   if (typeof l === 'string') return l;
   const parts = [];
@@ -84,7 +84,7 @@ function lockString(l) {
   }
   return parts.join('; ');
 }
-const LOCK_HELP = 'Keys: transitions, titles (title entrances), max-titles, caption-entrance, graphics (only these), no-graphics, finishes (none for no finish), cards=off, sfx=off, punch (off or 0.02 to 0.3). String form: "transitions=whip,zoom; titles=typewriter". Object form: { "transitions": ["whip","zoom"], "titles": ["typewriter"], "graphics": { "deny": ["checklist"] } }.';
+const LOCK_HELP = 'Keys: transitions, titles (title entrances), max-titles, title-words (one or phrase: each title its key word, or the phrase), caption-entrance, graphics (only these), no-graphics, finishes (none for no finish), cards=off, sfx=off, punch (off or 0.02 to 0.3). String form: "transitions=whip,zoom; titles=typewriter". Object form: { "transitions": ["whip","zoom"], "titles": ["typewriter"], "graphics": { "deny": ["checklist"] } }.';
 const TOOLS = [
   { name: 'menu', description: 'Every option the kit has (looks, caption styles, titles, the 30 graphics, the editing principles, transitions, effects, sounds, beds, presets, exports). Offer it to the user before you draft. ' + MENU.summary,
     inputSchema: { type: 'object', properties: {}, additionalProperties: false }, call: () => ['kit/menu.mjs', [], 60e3] },
@@ -252,6 +252,19 @@ TOOLS.push(
     inputSchema: { type: 'object', properties: { port: { type: 'number' } }, additionalProperties: false },
     direct: async a => { let j; try { j = await studioGet(a, '/api/keys'); } catch { const K = await import('./studio/keys.mjs'); return { keys: K.status().map(k => ({ id: k.id, name: k.name, set: k.set, from: k.from })), note: 'Studio is not running, so sources and generate are unknown.' }; }
       return { keys: j.keys.map(k => ({ id: k.id, name: k.name, set: k.set, from: k.from, tested: k.tested && k.tested.ok })), sources: j.sources.map(s => ({ id: s.id, on: s.on, note: s.note })), generateAllowed: j.generate.on, generators: j.generate.providers.filter(p => !p.stub).map(p => ({ id: p.id, set: p.set, kinds: p.kinds, verified: p.verified })) }; } },
+  { name: 'reopen_reel', description: 'Edit a finished reel: every render saves the build behind it (jobs/<job>/reel-vN.build/: cut.json, captions.js, choices.json and the clips it played), so a later draft cannot erase it. Without reel, lists the job\'s reels and which can be reopened. With reel (v3 or reel-v3.mp4), puts that build back into jobs/<job>/build (the build it replaces is saved as draft-<time>.build/); then edit captions.js or cut.json, or explain and apply, and render with rebuild true. Reels rendered before 1.9.1 have no saved build.',
+    inputSchema: { type: 'object', properties: { job: { type: 'string' }, reel: { type: 'string', description: 'v3 or reel-v3.mp4; leave out to list' } }, required: ['job'], additionalProperties: false },
+    direct: async a => { const S = (await import('./snapshots.cjs')).default, dir = S.jobDir(a.job); if (!existsSync(dir)) throw new Error('no job ' + a.job);
+      if (!a.reel) return { job: a.job, reels: S.list(dir) };
+      return { job: a.job, ...S.reopen(dir, a.reel), then: `render with rebuild true and name ${a.job}` }; } },
+  { name: 'cut_range', description: 'Cut a stretch out of one clip of a drafted job: a noise between two sentences, a cough, a false start that no word or retake switch reaches. job, clip (the clip id in clips.json, e.g. clip-004), from and to in that clip\'s seconds (the clock of its words in clips.json), or source true for the take\'s own seconds. Saved in jobs/<job>/manual-cuts.json on the take\'s clock, so it survives a redraft; the next draft makes it a jump with short audio fades. find_noises lists short sounds worth cutting. Then draft again (the same clips: clips jobs/<job>/clips) and render.',
+    inputSchema: { type: 'object', properties: { job: { type: 'string' }, clip: { type: 'string' }, from: { type: 'number' }, to: { type: 'number' }, source: { type: 'boolean' }, note: { type: 'string' }, clips: { type: 'string', description: 'the clips folder when it is not jobs/<job>/clips (a Studio session clips folder)' } }, required: ['job', 'clip', 'from', 'to'], additionalProperties: false },
+    direct: async a => { const M = (await import('./manual-cuts.cjs')).default, dir = join(ROOT, 'jobs', a.job); if (!existsSync(dir)) throw new Error('no job ' + a.job);
+      const r = M.add(dir, a, a.clips ? resolve(ROOT, a.clips) : null); return { ...r, cuts: M.read(dir), next: `draft again from the same clips (npm run reel -- --clips ${a.clips || 'jobs/' + a.job + '/clips'} --name ${a.job} --force --draft), then render` }; } },
+  { name: 'find_noises', description: 'Short sounds no word sits on (80 ms to 0.3 s: a click, a lip smack, a chair) inside the pauses of each kept clip of a drafted job, or of one clip, found on the audio. Each comes with the clip, its times in clip and take seconds, the words around it, and the cut_range call that removes it. Tighten (no dead air) already cuts a noise that sits inside a pause it cuts; this finds the rest.',
+    inputSchema: { type: 'object', properties: { job: { type: 'string' }, clip: { type: 'string' }, clips: { type: 'string' } }, required: ['job'], additionalProperties: false },
+    direct: async a => { const M = (await import('./manual-cuts.cjs')).default, dir = join(ROOT, 'jobs', a.job); if (!existsSync(dir)) throw new Error('no job ' + a.job);
+      return { job: a.job, noises: M.noises(dir, a.clip, a.clips ? resolve(ROOT, a.clips) : null) }; } },
   { name: 'setup_status', description: 'What the kit has installed: each dependency (Node packages, Python venv and requirements, ffmpeg, Chrome, the Whisper model, yt-dlp, instaloader, the effects pass and the person mask weights, the humanizer skill, the Studio page) as ready or missing, the feature it is for and the one fix command, plus forUser: the plain-words list of things only the user can do (for example "Installing ffmpeg needs your password: run sudo apt-get install -y ffmpeg"). Run npm run setup:all yourself for everything else, then tell the user only the forUser lines. Same list as the Setup check in Studio.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     direct: () => Setup.status() }

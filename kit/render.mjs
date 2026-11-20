@@ -64,10 +64,24 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
         assets[key] = { fps: 12, frames: readdirSync(dir).filter(x => x.endsWith('.jpg')).sort().map(x => url(join(dir, x))) };
       } else assets[key] = f.mode === 11 ? { src: url(abs) } : { icon: url(abs) };
     }
+    // logos (captions.js "logo", a brand plate's "logo", theme.logo.src) go to the page as data URLs, not file URLs: an
+    // image from a file taints the canvas, and the face check (getImageData) then throws and stops the render
+    const MIME = { svg: 'image/svg+xml', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' };
+    const dataUrl = abs => { const m = MIME[(abs.split('.').pop() || '').toLowerCase()]; return m ? `data:${m};base64,${readFileSync(abs).toString('base64')}` : null; };
+    let TH = {}; try { const g = {}; new Function('window', readFileSync(join(ROOT, 'theme.js'), 'utf8'))(g); TH = g.THEME || {}; } catch {}
+    const DATAURLS = {};
+    for (const ref of [CAP.logo, CAP.theme && CAP.theme.logo && CAP.theme.logo.src, TH.logo && TH.logo.src, ...(CAP.flips || []).map(f => f && f.logo)]) {
+      if (typeof ref !== 'string' || !ref || /^(data|https?|file):/i.test(ref) || DATAURLS[ref]) continue;
+      const abs = isAbsolute(ref) ? ref : join(ROOT, ref);
+      if (!existsSync(abs)) { console.warn(`logo ${ref}: no such file`); continue; }
+      const u = dataUrl(abs); if (u) DATAURLS[ref] = u; else console.warn(`logo ${ref}: not an .svg, .png, .webp or .jpg`);
+    }
+    // graphic images (icons, screens) the same way; a screen recording's frames stay files (they never meet the face check)
+    for (const a of Object.values(assets)) for (const k of ['icon', 'src']) if (a[k] && a[k].startsWith('file:')) { const u = dataUrl(fileURLToPath(a[k])); if (u) a[k] = u; }
     const F = join(KIT, 'fonts');
     const GJ = JSON.parse(readFileSync(join(KIT, 'graphics.json'), 'utf8'));
     const defaults = Object.fromEntries(GJ.graphics.map(g => [g.mode, g.defaults || {}])), panelModes = GJ.graphics.filter(g => g.mode >= 11).map(g => g.mode);
-    writeFileSync(join(ROOT, 'gfx.js'), 'window.GFX=' + JSON.stringify({ fonts: { serif: url(join(F, 'InstrumentSerif-Italic.ttf')), label: url(join(F, 'ArchivoBlack-Regular.ttf')), mono: url(join(F, 'RedHatMono-VF.ttf')), slam: url(join(F, 'Anton-Regular.ttf')), code: url(join(F, 'JetBrainsMono-VF.ttf')) }, defaults, autoBehindY: GJ.autoBehindY, panelModes, assets }) + ';\n');
+    writeFileSync(join(ROOT, 'gfx.js'), 'window.GFX=' + JSON.stringify({ fonts: { serif: url(join(F, 'InstrumentSerif-Italic.ttf')), label: url(join(F, 'ArchivoBlack-Regular.ttf')), mono: url(join(F, 'RedHatMono-VF.ttf')), slam: url(join(F, 'Anton-Regular.ttf')), code: url(join(F, 'JetBrainsMono-VF.ttf')) }, defaults, autoBehindY: GJ.autoBehindY, panelModes, assets }) + ';\nwindow.DATAURLS=' + JSON.stringify(DATAURLS) + ';\n');
     if (Object.keys(assets).length) console.log('graphics assets', Object.keys(assets).length);
   }
 }
@@ -106,7 +120,9 @@ if (!only && process.env.FACECHECK !== '0' && (await p.evaluate(() => !!(window.
   }
   const lay = await p.evaluate(() => (window.__layout ? window.__layout() : { elements: [] }));
   const moved = lay.elements.filter(e => /face/.test(e.action)).map(e => ({ kind: e.kind, start: e.start, text: e.text, action: e.action, move: e.move || null }));
-  const fc = { samples: n, withFace, faceSafe: !!lay.faceSafe, overlapMoments: new Set(hits.map(h => h.t)).size, elements: [...els.values()], moved, hits: hits.slice(0, 200) };
+  const tainted = await p.evaluate(() => !!window.__faceTainted);
+  if (tainted) console.warn('WARNING: an image from a file is drawn with the text, so the face check could not read every moment. Pass images as data URLs.');
+  const fc = { samples: n, withFace, ...(tainted ? { tainted: true } : {}), faceSafe: !!lay.faceSafe, overlapMoments: new Set(hits.map(h => h.t)).size, elements: [...els.values()], moved, hits: hits.slice(0, 200) };
   writeFileSync(join(ROOT, 'facecheck.json'), JSON.stringify(fc, null, 1) + '\n');
   console.log(`face check: ${fc.overlapMoments} of ${withFace} moments with text on the face zone (${fc.elements.length} element${fc.elements.length === 1 ? '' : 's'}); layout moved ${moved.filter(m => !/hide/.test(m.action)).length} and hid ${moved.filter(m => /hide/.test(m.action)).length} for the face (facecheck.json)`);
   for (const e of fc.elements) console.warn(`WARNING: ${e.kind} "${e.text}" at ${e.start}s covers the face zone at ${e.moments} moment${e.moments === 1 ? '' : 's'} (up to ${e.maxPx} px)`);

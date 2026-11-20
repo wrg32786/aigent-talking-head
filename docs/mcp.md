@@ -40,6 +40,9 @@
 | `suggest_broll` | proposes | ideas per beat (`clip`, `query` or `card`, and `place`) that wait on the B-roll step for the user to approve or dismiss |
 | `fill_slot` | changes a slot | put a clip on a beat, change its place, offset, length or in point, or clear it. `generate` only asks: the user sees the estimate and approves on the page |
 | `broll_providers` | reads | each provider key as set or not and where from (env or Studio settings), never the key; which sources are on; whether generating is allowed |
+| `reopen_reel` | restores `jobs/<job>/reel-vN.build/` into `build/` | brings back the build behind a finished reel (cut.json, captions.js, choices) after a later Draft replaced it; the build it replaces is kept as `draft-<time>.build/`. Then edit and run the reel with `--rebuild` |
+| `cut_range` | writes `jobs/<job>/manual-cuts.json` | cut a stretch out of a clip (`job`, `clip`, `from`, `to` in clip seconds, or take seconds with `source: true`); it applies on the next draft as a jump with short audio fades |
+| `find_noises` | reads the clips' audio | short non-speech sounds (0.08 to 0.3 s) inside pauses: clip, times, the words around them and a ready `cut_range` call |
 | `setup_status` | reads what is installed | each dependency (Node packages, Python and requirements, ffmpeg, Chrome, the Whisper model, yt-dlp, instaloader, the effects pass and the person mask weights, the humanizer skill, the Studio page) as ready or missing with its one fix, plus `forUser`, the plain-words list of what only the user can do. Run `npm run setup:all` for the rest |
 | `studio_takes` | reads or writes the session | takes filmed with Record now (file, thumbnail, seconds, status, kept); keep, unkeep or discard one |
 
