@@ -28,6 +28,13 @@
 | `list_scripts` | reads `jobs/.studio/scripts/<job>/` | the user's scripts: title, words, seconds at its WPM, sections, who wrote it |
 | `get_script` | reads one script | full text with `[hook]`, `[body]`, `[cta]` and `[pause]` marks |
 | `write_script` | writes one script | creates or replaces a script; the page shows it at once. Run a humanizer skill on the draft first (`skills/humanizer`) |
+| `set_output` | changes the Cut step's choice | what to make from the take: format (short, long, square), length (short, medium, long), kind (full, clips, both), split, clips, goal (organic, ad), adCuts, cta, and under More aspect, seconds, clipSeconds, max; returns the one-line summary |
+| `get_cuts` | reads the Cut step | the take, its length, the choice and summary, the transcript as numbered sentences with times, and the candidates with ranges, score, reason and keep; `find: true` runs the rules first |
+| `set_cuts` | replaces the candidates | your picks, `[{ kind, ranges: [[start, end]], score, reason, label }]`, labelled as scored by you |
+| `render_cuts` | renders | every kept candidate (or `ids`) as its own video, one after another |
+| `get_lines` | reads the Lines view | every line of the take with its number, times on the audio, length, text, keep and hint (retake or fragment, and why), the bites so far and the clean take |
+| `set_bites` | replaces the bites | your picks, `[{ name, lines: [line numbers in play order], reason }]`, plus `keep` per line, `clean: true` for the clean take, `replace: false` to add; labelled as picked by you |
+| `render_bites` | renders | every bite (or `ids`) as its own video; `file: true` only joins the lines into one plain file |
 | `setup_status` | reads what is installed | each dependency (Node packages, Python and requirements, ffmpeg, Chrome, the Whisper model, yt-dlp, instaloader, the effects pass and the person mask weights, the humanizer skill, the Studio page) as ready or missing with its one fix, plus `forUser`, the plain-words list of what only the user can do. Run `npm run setup:all` for the rest |
 | `studio_takes` | reads or writes the session | takes filmed with Record now (file, thumbnail, seconds, status, kept); keep, unkeep or discard one |
 

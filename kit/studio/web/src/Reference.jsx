@@ -55,6 +55,7 @@ export function Reference({ CAT, V, s, apply, patch }) {
     </ol>
     {r.status === 'uploaded' && <Button id="ref-go" variant="secondary" label="Break down the file" isDisabled={running} onClick={() => api('/api/reference', {}).then(apply).catch(() => {})} />}
     <span id="ref-status" className="sr" role="status">{r.status === 'running' ? 'Breaking it down' : r.status === 'ready' ? 'Reference ready' : ''}</span>
+    {(r.file || r.out) && <PullScript V={V} s={s} apply={apply} />}
     {r.extracted ? <Breakdown CAT={CAT} V={V} s={s} apply={apply} patch={patch} /> : !q.length && <div id="ref-empty" className="empty-art"><Icon n="film" /><p>Add a link to see its shots, beats and effects.</p></div>}
   </section>;
 }
@@ -141,6 +142,22 @@ function Swap({ CAT, sw, s, apply, patch }) {
         </li>)}</ol>
       </div>
     </div>
+  </div>;
+}
+// the reference's own words as a script (hook, body and CTA marked), and the same script rewritten for your topic
+function PullScript({ V, s, apply }) {
+  const [topic, setTopic] = useState(''), [busy, setBusy] = useState(false);
+  const pulled = (V.scripts || []).find(x => x.by === 'reference transcript'), rf = s.reference.file, tx = rf ? (s.tx || {})[rf] : null;
+  const pull = () => api('/api/reference/script', {}).then(j => { apply(j); toast(j.transcribing ? 'Transcribing the reference first' : 'Script pulled into Scripts', true); }).catch(() => {});
+  const adapt = async e => { e.preventDefault(); if (!topic.trim() || !pulled) return; setBusy(true);
+    try { const j = await api('/api/scripts/adapt', { id: pulled.id, topic }); apply(j); toast(j.via === 'agent' ? 'Sent to your agent. The adapted script shows up in Scripts.' : 'Adapted script saved in Scripts', true); setTopic(''); } catch {} finally { setBusy(false); } };
+  return <div className="pull glass-card" id="pull-script">
+    <div className="row"><Button id="pull-script-btn" variant="secondary" size="sm" label={pulled ? 'Pull the script again' : 'Pull script'} icon={<Icon n="script" />} isLoading={tx && tx.status === 'running'} onClick={pull} />
+      <span className="fine">{tx && tx.status === 'running' ? `Transcribing the reference${tx.total ? `, part ${Math.min(tx.done + 1, tx.total)} of ${tx.total}` : ''}` : pulled ? `In Scripts: "${pulled.title}", ${pulled.words} words` : 'Its words go into Scripts with the hook, body and CTA marked.'}</span></div>
+    {pulled && <form className="row" onSubmit={adapt}><label className="sr" htmlFor="adapt-topic">Your topic</label>
+      <input id="adapt-topic" className="grow" placeholder="Your topic, e.g. meal prep for busy parents" value={topic} onChange={e => setTopic(e.target.value)} />
+      <Button id="adapt-btn" type="submit" size="sm" variant="primary" label="Adapt to my topic" isLoading={busy} isDisabled={!canWrite(V.env) || !topic.trim()} /></form>}
+    {pulled && !canWrite(V.env) && <p className="fine">{NO_WRITER}</p>}
   </div>;
 }
 // one click installs a missing tool with the kit's own Python (POST /api/tools/install runs kit/setup.mjs --only ytdlp),

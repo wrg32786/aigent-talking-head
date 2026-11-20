@@ -6,6 +6,7 @@ import { aigentTheme } from './theme.js';
 import { api, toast, onToast, STEPS, Icon, IconBtn, cap1 } from './lib.jsx';
 import { Footage } from './Footage.jsx';
 import { Reference } from './Reference.jsx';
+import { Cut } from './Cut.jsx';
 import { Style } from './Style.jsx';
 import { Render } from './Render.jsx';
 import { Chat } from './Chat.jsx';
@@ -74,7 +75,7 @@ export function App() {
 
   const s = V.state, t = V.task, running = t && t.status === 'running';
   const picksAny = Object.values(s.picks).some(p => p.allow.length || p.deny.length);
-  const done = { footage: !!(s.footage.length || s.clips), reference: !!s.reference.extracted, style: !!(s.pack || picksAny), render: !!(V.outputs || []).length };
+  const done = { footage: !!(s.footage.length || s.clips), cut: !!(V.cut && V.cut.candidates && V.cut.candidates.length), reference: !!s.reference.extracted, style: !!(s.pack || picksAny), render: !!(V.outputs || []).length };
   const i = STEPS.indexOf(step);
   const openConnect = () => { setSettingsOpen(false); setChatOpen(false); setConnectOpen(true); };
   const openSetup = () => { setSettingsOpen(false); setSetupOpen(true); };
@@ -108,6 +109,7 @@ export function App() {
       <div className="layout">
         <main id="main" data-step={step} ref={mainRef}>
           <Footage {...ctx} hidden={step !== 'footage'} onLive={setRecLive} />
+          {step === 'cut' && <Cut {...ctx} />}
           {step === 'reference' && <Reference {...ctx} />}
           <Style {...ctx} hidden={step !== 'style'} tab={tab} setTab={pickTab} />
           <Render {...ctx} hidden={step !== 'render'} />

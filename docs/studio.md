@@ -10,7 +10,7 @@ That starts Studio on http://127.0.0.1:4757 and opens your browser. `--port <n>`
 
 ![Studio on a laptop: the Style step with the effects grid, the picks tray at the bottom, and the chat with Claude Code connected and listening](studio/desktop.png)
 
-Four steps across the top: Footage, Reference, Style, Render. Each one is its own screen with Back and Next at the bottom, and a step shows a check when it is done. The chat sits on the right (behind the chat button on a phone). Dark is the default; switch to light with the sun button or in Settings.
+Five steps across the top: Footage, Cut, Reference, Style, Render. Each one is its own screen with Back and Next at the bottom, and a step shows a check when it is done. The chat sits on the right (behind the chat button on a phone). Dark is the default; switch to light with the sun button or in Settings.
 
 ![Studio in the light theme: the Reference step with a breakdown](studio/light.png)
 
@@ -77,6 +77,71 @@ No category is empty today, so none is hidden. These are thin, or are things peo
 - **Sound design: ducking controls.** Ducking is automatic; there is no per-clip control.
 - Thin today: Lower thirds and name tags (7) and Overlays and textures (7).
 
+## Cut
+
+The Cut step comes right after Footage. It asks what to make from the take, finds the best parts, and lets you trim them by hand. Code: `kit/studio/cut.mjs` (the choice and the candidates), `kit/studio/media.mjs` (preview copies, waveform, transcripts), `kit/studio/cut-run.mjs` (cutting and the 16:9 pass).
+
+![The Cut step: the summary line, the Format, Length, Output and Goal cards, and Find cuts](studio/cut-desktop.png)
+
+**What to make.** Four rows of big cards, with smart defaults from the take's length (up to 2 min: one full short; up to 10 min: clips; longer: a long form edit plus 5 clips), so you can just hit Next. A line at the top sums it up, for example "Both: 1 full edit (~10 min) + 5 short clips, for organic", and **Smart pick** puts the defaults back.
+
+| Row | Cards | Notes |
+|---|---|---|
+| Format | Short (Reels, Shorts, TikTok, 9:16), Long form (YouTube, 16:9), Square post (1:1) | A custom aspect (9:16, 16:9, 1:1, 4:5) is under More |
+| Length | Short, Medium, Long | Relative to the format: 15-30 s, 30-60 s, 60-90 s for shorts; 3-5 min, 8-12 min, 15+ min for long form; 15-30 s, 30-60 s, 60-120 s for square. Exact seconds are under More |
+| Output | Full edit, Clips, Both | Both is one best-version full edit plus N clips (the + and - buttons). "Split into parts of ~length" is a box under Full edit |
+| Goal | Organic, Ad | Ad: a hook in the first 1 to 2 s, tighter cuts (`--tighten 0.25`), a CTA end card with your text, captions kept inside the platform safe area, no long intro, and an optional pair of 15 s and 30 s ad cuts. Organic: story pacing, and short clips that loop back to their first line score higher |
+
+**Find cuts.** Transcribes the take (once, cached) and lists candidates: the full edit (the best version near your length, or its parts), clips, and ad cuts. Each shows the words, the times, the length, a score from 0 to 100 and why. Who scored them is shown under the buttons:
+
+- **Your terminal agent**, when it is the chat backend and connected: it gets a Studio message ("Pick the cuts for ...") and answers with `get_cuts` and `set_cuts`. The rules' picks show until it does.
+- **An API or local model** (Settings): it rescores the rules' picks and its name shows.
+- **The rules**, when there is neither: hooks (a question, a number, "here is", "the secret"), a clean start and end on a sentence, few fillers and pauses, a call to action for ads, a loop for organic shorts.
+
+![Cut candidates on the take's timeline: the full edit and clips as colored blocks, filler words and pauses marked on the waveform](studio/cut-timeline.png)
+
+**The timeline.** Under the list, the take's waveform with filler words (red ticks) and long pauses (grey bands), and a lane per kind with each candidate as a colored block. Drag a block's edge to trim it; drag on an empty part of a lane, or select words in the transcript and press **Add as a clip**, to add your own. Click a block or its play button to preview just that part. In the list: **Keep** or **Dropped**, move up and down, and remove the ones you added.
+
+**Cut points on the audio.** Transcript word times are often a little off, so every cut also looks at the audio. Studio reads the take's loudness every 10 ms (cached next to the waveform) and works out what quiet means for this take from its room tone and its speech. An end moves to the first quiet stretch of 70 ms or more after the last word, plus 40 ms; a start moves to the quiet just before the first word, minus 40 ms. If the transcript says the word ended but the audio is still loud, the audio wins (within 0.35 s, or up to 1 s when the word clearly runs on); if the audio went quiet before the transcript says, the cut moves back to it. A cut never goes into the next word, a short stop inside a word (a "t" or "p") does not count as the end, the breath after a line stays out, and with no clear dip it takes the quietest spot nearby. This applies to every cut: the rules', your agent's, a model's, and the ones you add or trim (an edit with `snap: false` keeps your exact times). Without ffmpeg the cuts stay on the transcript times.
+
+![Show cut points: the transcript times as dashed ticks on each region and a table of every cut with the word, the transcript and audio times, the shift and why](studio/cut-points.png)
+
+Tick **Show cut points** under the timeline to see them: a dashed tick where the transcript put each edge, and for the selected candidate a table with the edge, the word, the transcript time, the audio time, the cut (click to hear it), the shift and why, for example "audio: the word ran past the transcript".
+
+**Render.** **Render N** renders every kept candidate as its own video, one after another, in `jobs/<job>-<id>/` (the cut itself is in `inbox/studio/<job>/cuts/`). Shorts and square posts go through the full reel edit with the session's style and the platform export; ads also get the end card. They show on the Render step under "From the Cut step".
+
+**Long form.** The engine renders 9:16, so a Long form output is a plain edit for now: the cut joined with short fades, centered over a blurred copy of itself at 1920x1080, loudness-normalized to -14 LUFS. No captions or graphics yet.
+
+**Long takes.** Transcription runs 2 minutes at a time (`kit/studio/tx_chunks.py`, faster-whisper `small.en`, `TX_MODEL` picks another) with progress on the page, saves after each chunk and picks up where it stopped. Transcripts, waveforms and preview copies are cached by file (path, size and time) in `jobs/.studio/media/`. Uploaded, recorded and linked footage all work the same.
+
+### Lines and bites
+
+For a long recording, under the player. It opens by itself for takes over 3 minutes; click **Lines and bites** to open it for a shorter one.
+
+![Lines and bites: every line with its number, play button, text, length and Keep switch, and bites on the right: the clean take and one picked by the agent, with their lines in order](studio/lines-bites.png)
+
+- **Lines.** Every line of the take, one per sentence, with its number, a play button, the text, the length and a **Keep** or **Retake** switch. Times sit on the quiet in the audio, like the cuts. A line is marked a likely retake only when a later line within 2 minutes says most of it again (70% of its words, not counting openers like "so" or "we know how to") and is not much shorter. Lines under 0.6 s, or two words that stop mid-thought, are marked fragments. Both start as Retake, and one click brings them back. **Show** filters to kept lines or to retakes and fragments.
+- **Bites.** Tick lines (from anywhere in the take, in the order you want them), name the bite and press **Make a bite**. In a bite, drag a line or use the arrows to reorder it, and the x takes it out. **Play** plays the lines back to back. **Render** sends it through the reel edit as a short clip (in `jobs/<job>-<bite>/`). **Save as one file** only joins the lines into `inbox/studio/<job>/cuts/<bite>.mp4`, with no edit. **Render all** does every bite.
+- **One clean take.** Makes a bite of every kept line in the take's order: the whole thing without the retakes and fragments. It renders with the Output choice (a plain 16:9 edit for Long form), or **Save as one file** gives you the joined take as it is.
+- **Your agent.** **Ask my agent to pick** sends it a Studio message. It reads the lines with `get_lines`, marks retakes with `keep`, and sends named bites with `set_bites` (line numbers in play order, plus `clean: true` for the clean take). Its bites show as **By** its name, and the chat says what it picked. You can still rename, reorder, play and render them. `render_bites` renders from the agent.
+
+API: `GET /api/lines?path=`, `POST /api/lines` (`keep`, or `action`: add, update, remove, move, clean, set), `POST /api/lines/render` (`ids`, `only: "file"`).
+
+**Agents.** `set_output` sets the choice, `get_cuts` reads the take, the transcript as numbered sentences and the candidates (`find: true` runs the rules first), `set_cuts` sends your picks (time ranges, a score and a reason each), `render_cuts` renders them. API: `GET /api/cut`, `POST /api/cut/output`, `/api/cut/find`, `/api/cut/edit`, `/api/cut/set`, `/api/cut/render`, `POST /api/cut/transcribe`, `GET /api/cut/transcript?path=`.
+
+## Footage player
+
+Click a clip in the Footage step to play it above the list. With more than one clip, each shows its place in the order: drag a clip onto another, or use its arrows, to move it, and the x removes one while the rest stay in order. The draft uses that order (`POST /api/footage/move`).
+
+![The footage player: the take, the waveform with the playhead, and the transcript with the current word lit](studio/player-desktop.png)
+
+- Click the picture or the play button, or press Space, to play and pause. J and L jump 5 s back and forward, K pauses, the arrow keys move 1 s.
+- Click or drag on the waveform to scrub.
+- **Show transcript** transcribes the clip; the current word lights up as it plays and a click on a word jumps there. Select a few words to make a clip from them on the Cut step.
+- Files over 300 MB, and ones a browser cannot play (.mkv, .avi, HEVC and other codecs), play from a 540p H.264 preview copy made once in the background. The page says when it is playing one.
+
+API: `GET /api/footage/info?path=` (length, size, codec, preview copy status), `/api/footage/proxy?path=`, `/api/footage/peaks?path=`.
+
 ## Record now
 
 Film takes in the Footage step with this computer's camera and mic. Click **Record now**, then **Turn on camera**; the browser asks once for the camera and mic.
@@ -128,9 +193,10 @@ The Scripts area in the Footage step holds what you will say on camera, per reel
 - **Marks.** A line that is only `[hook]`, `[body]` or `[cta]` starts a section; the stats show when each starts. `[pause]` anywhere is a breath: it adds 1.5 s and the teleprompter holds there.
 - **Ask for one.** Type a request under the editor ("write a 30 s script on cold showers", "rewrite this tighter") and it goes to whoever answers the chat. After a reference breakdown, **Write script from this reference** sends your agent a Studio message with the teardown, so the script follows the reference's hook, pacing and beat times.
 - **Who writes.** Your terminal agent writes with `write_script` and runs a humanizer skill on every draft first: its own if it has one, otherwise the bundled `skills/humanizer` ([blader/humanizer](https://github.com/blader/humanizer), MIT, by Siqi Chen). With an API key or a local model, the Studio chat writes the script itself and follows a short form of the same rules (`HUMANIZER_RULES` in `kit/studio/scripts.mjs`); em dashes are removed either way. In keywords mode the page says in one line that writing scripts needs an agent, an API key or a local model.
+- **From a reference.** **Pull script** on the Reference step puts a reference's own words in Scripts: `[hook]` for its opening seconds, `[body]`, `[cta]` when it ends by asking for something, and `[pause]` at gaps over 1.2 s. The words come from its teardown, or Studio transcribes it. **Adapt to my topic** rewrites it for your topic in the same structure, with about the same lines, pauses and pacing: your agent gets the ask and saves it with `write_script` after the humanizer, or the API or local model writes it with the humanizer rules. The original stays next to it.
 - **Read it.** **Read it in Record** opens the recorder with that script in the teleprompter (see [Record now](#record-now)).
 
-API: `GET /api/scripts`, `GET /api/scripts/get?id=`, `POST /api/scripts` (create, or replace with `id`), `POST /api/scripts/action` (`delete`, `duplicate`, `rename`), `POST /api/scripts/from-reference`. MCP: `list_scripts`, `get_script`, `write_script`.
+API: `GET /api/scripts`, `GET /api/scripts/get?id=`, `POST /api/scripts` (create, or replace with `id`), `POST /api/scripts/action` (`delete`, `duplicate`, `rename`), `POST /api/reference/script` (pull), `POST /api/scripts/adapt` (`{ id, topic }`), `POST /api/scripts/from-reference`. MCP: `list_scripts`, `get_script`, `write_script`.
 
 ## Footage from a link
 

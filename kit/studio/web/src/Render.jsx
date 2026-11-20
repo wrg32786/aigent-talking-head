@@ -54,6 +54,7 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
         <figcaption><span>{o.split('/').pop()}</span><a className="btn ghost sm" href={file(o) + '?download'} download={o.split('/').pop()}><Icon n="download" />Download</a></figcaption></figure>)
         : <div className="empty-art"><Icon n="film" /><p>{s.job ? 'Your reels show up here.' : 'Name the reel at the top to start.'}</p></div>}
     </div>
+    <CutOutputs V={V} s={s} />
     {!hidden && <Compare V={V} s={s} apply={apply} />}
     <Receipt r={receipt} />
     <Cleanup V={V} s={s} apply={apply} drafted={drafted} />
@@ -98,4 +99,13 @@ function Choices({ CAT, x, setX, setReceipt, dirty, setDirty, s, patch }) {
       </tbody></table></Wrap></>}
     <div className="row"><Button id="apply-choices" variant="secondary" size="sm" label="Apply my edits" isDisabled={!dirty} onClick={applyEdits} /><span className="fine">Edits win over locks. Render to see them.</span></div>
   </>;
+}
+
+// what the Cut step rendered: one row per kept cut with its own video
+function CutOutputs({ V, s }) {
+  const done = ((V.cut && V.cut.candidates) || []).filter(c => c.outputs && c.outputs.length);
+  if (!done.length) return null;
+  return <section className="cut-outs" id="cut-outputs" aria-labelledby="h-cut-outs"><h3 id="h-cut-outs" className="lbl">From the Cut step</h3>
+    <div className="outputs">{done.map(c => { const o = c.outputs[0]; return <figure key={c.id} className="glass-card" data-id={c.id}><video src={file(o) + '?v=' + s.rev + '#t=1.2'} controls preload="metadata" aria-label={c.label} />
+      <figcaption><span>{c.label}</span><a className="btn ghost sm" href={file(o) + '?download'} download={o.split('/').pop()}><Icon n="download" />Download</a></figcaption></figure>; })}</div></section>;
 }

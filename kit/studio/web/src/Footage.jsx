@@ -5,6 +5,7 @@ import { api, file, toast, Icon, IconBtn } from './lib.jsx';
 import { upload } from './upload.js';
 import { Recorder } from './Recorder.jsx';
 import { Scripts } from './Scripts.jsx';
+import { Player, clock } from './Player.jsx';
 
 export function Dropzone({ id, inputId, kind, s, apply, accept, multiple, big, children, label }) {
   const input = useRef(null); const [over, setOver] = useState(false);
@@ -51,6 +52,11 @@ export function FootageLink({ s, apply }) {
 
 export function Footage({ V, s, apply, hidden, onLive }) {
   const [readId, setReadId] = useState(null);
+  const [playing, setPlaying] = useState(null), drag = useRef(null), [over, setOver] = useState(null);
+  // reorder in place: drag a clip onto another, or the arrow buttons; the draft uses this order
+  const move = (f, to) => api('/api/footage/move', { path: f, to }).then(apply).catch(() => {});
+  const secs = Object.fromEntries(((V.cut && V.cut.footage) || []).map(x => [x.path, x.seconds]));
+  const showing = playing && s.footage.includes(playing) ? playing : null;
   const [rec, setRec] = useState(() => localStorage.getItem('studio.rec.open') === '1' || /record/.test(location.hash));
   const open = v => { localStorage.setItem('studio.rec.open', v ? '1' : '0'); setRec(v); };
   const needJob = () => { if (s.job) return false; toast('Name the reel first (top left)'); document.getElementById('job')?.focus(); return true; };
@@ -67,13 +73,28 @@ export function Footage({ V, s, apply, hidden, onLive }) {
       </div>}
     {!rec && <FootageLink s={s} apply={apply} />}
     <Scripts V={V} s={s} apply={apply} onRead={id => { if (needJob()) return; setReadId(id); open(true); requestAnimationFrame(() => document.getElementById('recorder')?.scrollIntoView({ block: 'start', behavior: 'smooth' })); }} />
+    {showing && <Player path={showing} tx={(s.tx || {})[showing]} onClose={() => setPlaying(null)} />}
     <ul id="footage" className="clips">
       {s.clips && <li className="note">Using the clips folder {s.clips}</li>}
-      {s.footage.map(f => <li key={f} className="glass-card">
-        <video src={file(f) + '#t=0.5'} muted preload="metadata" aria-label={f} />
+      {s.footage.map((f, k) => <li key={f} data-path={f} className={'glass-card' + (showing === f ? ' on' : '') + (over === k ? ' drop-to' : '')} draggable={s.footage.length > 1}
+        onDragStart={e => { drag.current = k; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', f); }}
+        onDragOver={e => { if (drag.current == null) return; e.preventDefault(); setOver(k); }} onDragLeave={() => setOver(o => (o === k ? null : o))}
+        onDrop={e => { if (drag.current == null) return; e.preventDefault(); const from = drag.current; drag.current = null; setOver(null); if (from !== k) move(s.footage[from], k); }}
+        onDragEnd={() => { drag.current = null; setOver(null); }}>
+        {s.footage.length > 1 && <span className="clip-n mono" aria-hidden="true">{k + 1}</span>}
+        <button type="button" className="clip-play" aria-label={'Play ' + f.split('/').pop()} onClick={() => setPlaying(showing === f ? null : f)}>
+          <video src={file(f) + '#t=0.5'} muted preload="metadata" aria-label={f} tabIndex={-1} />
+          <span className="clip-ov" aria-hidden="true"><Icon n="play" /></span>{secs[f] ? <span className="clip-dur mono">{clock(secs[f])}</span> : null}
+        </button>
         <span className="cap">{f.split('/').pop()}</span>
+        {s.footage.length > 1 && <span className="clip-mv">
+          <IconBtn n="left" label={'Move ' + f.split('/').pop() + ' earlier'} disabled={k === 0} onClick={() => move(f, k - 1)} />
+          <IconBtn n="right" label={'Move ' + f.split('/').pop() + ' later'} disabled={k === s.footage.length - 1} onClick={() => move(f, k + 1)} />
+        </span>}
         <IconBtn n="x" label={'Remove ' + f.split('/').pop()} onClick={() => api('/api/footage/remove', { path: f }).then(apply)} />
       </li>)}
     </ul>
+    {s.footage.length > 0 && !s.clips && <label className="tick as-is"><input type="checkbox" id="as-is" checked={!!s.asIs} onChange={e => api('/api/state', { asIs: e.target.checked }).then(apply).catch(() => {})} />
+      Already cut: use each file as it is<span className="fine"> (one clip per file, in this order, no second cut)</span></label>}
   </section>;
 }
