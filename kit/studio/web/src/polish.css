@@ -73,7 +73,7 @@
 @media (max-width: 640px) { .btabs .tab { padding: 6px 10px; } .btabs .tab .ic { display: none; } }
 
 /* ---------- switch (Headless UI Switch) ---------- */
-/* proportions adapted from "tame-moth-5" by Galahhad on Uiverse.io (MIT): 2.875em by 1.5em track, 1.125em knob */
+/* sizes and colours: the Liquid glass pill in liquid.css */
 .toggle-field { display: flex; align-items: flex-start; gap: var(--space-3); }
 .toggle { --w: 2.875em; --h: 1.5em; --k: 1.125em; position: relative; flex: none; width: var(--w); height: var(--h); margin-top: 1px; border-radius: 999px; border: 1px solid var(--input); background: var(--muted); padding: 0; transition: background var(--motion) var(--ease-ui), border-color var(--motion); }
 .toggle .knob { position: absolute; top: calc((var(--h) - var(--k)) / 2 - 1px); left: calc((var(--h) - var(--k)) / 2 - 1px); width: var(--k); height: var(--k); border-radius: 50%; background: var(--foreground); box-shadow: var(--shadow-2, none); transition: transform var(--motion) var(--ease-spring-3, ease); }
@@ -89,9 +89,7 @@
 .fold2-i { transition: transform var(--motion) var(--ease-ui); opacity: .6; } .fold2-h[data-open] .fold2-i { transform: rotate(180deg); }
 .fold2-b { padding: 0 16px 16px; } .fold2-b[data-open] { animation: fade-in var(--motion) var(--ease-ui); }
 
-/* ---------- spinner ---------- */
-/* adapted from "tiny-jellyfish-70" by AqFox on Uiverse.io (MIT): a double border with one solid side, turning */
-.spin { display: inline-block; flex: none; width: 22px; height: 22px; border: 5px double var(--primary); border-left-style: solid; border-radius: 50%; animation: spin .75s linear infinite; }
+/* ---------- spinner: the ring from the Liquid glass look, in liquid.css ---------- */
 .boot { display: flex; align-items: center; gap: 12px; }
 .fb-loading { display: grid; place-items: center; min-height: 160px; }
 
@@ -147,3 +145,4 @@ main[data-step="render"] { animation: step-in-6 var(--motion-slow) var(--ease-ou
 .fold > :not(summary) { margin: 0 16px 16px; }
 .fold[open] > :not(summary) { animation: fade-in var(--motion) var(--ease-ui); }
 @media (prefers-reduced-motion: reduce) { .fold > summary::after { transition: none; } .fold[open] > :not(summary) { animation: none; } }
+.flink > .row > .astryx-button { flex: none; }

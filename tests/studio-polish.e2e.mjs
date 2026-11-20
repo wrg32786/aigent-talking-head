@@ -43,6 +43,7 @@ try {
     }
     if (shots) { await pg.goto(url + '/#step=style', { waitUntil: 'networkidle' }); await pg.waitForTimeout(600); await pg.screenshot({ path: join(shots, 'top-phone.png'), clip: { x: 0, y: 0, width: 375, height: 260 } }); }
     await pg.setViewportSize({ width: 1280, height: 860 });
+    if (shots) { await pg.goto(url + '/#step=style', { waitUntil: 'networkidle' }); await pg.waitForTimeout(900); await pg.screenshot({ path: join(shots, 'liquid-glass.png') }); }
   });
 
   await t('More menu: keyboard opens it, arrows move, Enter runs Connect agent; the theme item flips the theme', async () => {

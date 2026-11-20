@@ -57,10 +57,10 @@ Build tools in `kit/studio/web` (Vite, `@vitejs/plugin-react`, `@astryxdesign/bu
 | Where in Studio | Snippet | Author | What was taken |
 | --- | --- | --- | --- |
 | Theme button (moon and sun trade places) | `Toggle-switches/Creatlydev_massive-quail-70.html` | Creatlydev | Two icons stacked in one grid cell, one turning out with `rotate(360deg) scale(0)` as the other turns in after a short delay |
-| Already cut switch | `Toggle-switches/Galahhad_tame-moth-5.html` | Galahhad | Track and knob proportions (2.875em by 1.5em, a 1.125em knob centred by an offset) |
-| Spinner (loading Studio, loading folders) | `loaders/AqFox_tiny-jellyfish-70.html` | AqFox | A turning circle with a `double` border and one `solid` side |
 | Hover lift on packs, effect tiles and agent cards | `Buttons/AndrewHeinke_pink-lion-94.html` | AndrewHeinke | Five stacked shadows that double in offset and blur |
 | The ring on the Next button on hover | `Buttons/AnthonyPreite_kind-fish-73.html` | AnthonyPreite | A 400% wide gradient sliding behind the edge, shown on hover |
+
+Beyond those named snippets, the **Liquid glass** look (`kit/studio/web/src/liquid.css`) is direction A of the Studio style gallery made for Will in this project. Its token block (panel glass, blur and border, the mint glow, the pill toggle, the pill segmented control, the glow slider, the input with Browse, the dropdown, the clip card, the ring loader and the chat bubbles) is carried over with the same names. The gallery's own credits say its control treatments follow general Uiverse Galaxy patterns (MIT: pill toggle, glow slider, ring spinner) and use Open Props tokens (MIT); no single snippet was copied for those. The body face is Hanken Grotesk (OFL, `kit/fonts/HankenGrotesk-VF.ttf`, listed above), served from the kit, never from a font CDN.
 
 Not used: animate.css (Hippocratic License 2.1, not on this repo's list). The entrance and exit motion is Open Props' keyframes and our own.
 
