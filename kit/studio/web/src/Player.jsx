@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { ProgressBar } from '@astryxdesign/core/ProgressBar';
 import { api, file, toast, Icon, IconBtn } from './lib.jsx';
+import { snapToWords } from './snap.js';
 
 export const clock = t => { const s = Math.max(0, Math.floor(+t || 0)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, r = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(r).padStart(2, '0'); };
 const nice = n => n == null ? '' : n >= 1e9 ? (n / 1e9).toFixed(1) + ' GB' : Math.round(n / 1e6) + ' MB';
@@ -53,15 +54,6 @@ export function useScrub(dur, seek) {
   };
 }
 
-// a dragged stretch snapped to whole words: the start goes to the start of the word it lands in (or the next word, in
-// a gap), the end to the end of the word it lands in (or the word before, in a gap). Never starts or ends mid-word.
-export function snapToWords(words, a, b) {
-  if (!words || !words.length) return [a, b];
-  const lo = Math.min(a, b), hi = Math.max(a, b);
-  let s = words.find(w => w[1] > lo); let e = [...words].reverse().find(w => w[0] < hi);
-  if (!s || !e || e[1] <= s[0]) return null;
-  return [s[0], e[1]];
-}
 export const DRAG_MIN = 0.25;
 
 export function Player({ path, tx, onClose, playerRef, onAddRange, apply, children }) {

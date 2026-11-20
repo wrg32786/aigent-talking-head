@@ -31,6 +31,7 @@ import { capture as capturePage } from '../capture.mjs';
 import { findChrome } from '../chrome.mjs';
 import { mount as mountBroll } from './broll-api.mjs';
 import * as PIECES from './pieces.mjs';
+import * as WIZ from './wizards.mjs';
 import { mount as mountFolders } from './folders.mjs';
 import { mount as mountPost } from './post-api.mjs';
 
@@ -1176,6 +1177,27 @@ async function api(req, res, u) {
     C.catalog({ fresh: true });
     const st = update(x => { x.pack = name; });
     return json(res, 200, { ok: true, pack: name, path: `packs/local/${name}/pack.json`, ...view(st) });
+  }
+  if (p === '/api/wizard' && M === 'GET') return json(res, 200, { wizards: WIZ.WIZARDS, goals: WIZ.GOALS, clipCounts: WIZ.CLIP_COUNTS });
+  if (p === '/api/wizard' && M === 'POST') {
+    // one wizard step (or all of them at once): reel { goal, look, choose }, clips { clips, ads }, reference { url }
+    const b = await readBody(req), s0 = C.load(), w = WIZ.plan(b, C.catalog().packs.map(x => x.name)); if (w.errs.length) return json(res, 400, { error: w.errs.join('; ') });
+    const rel = cutSource(s0, b.path), done = []; let next = null, pending = null, note = null;
+    if ((w.wizard !== 'reference') && !rel) return json(res, 400, { error: 'add footage first, on the Footage step' });
+    const setOut = o => { const r = CUT.normalize(outputOf(C.load()), o); if (r.errs.length) throw new Error(r.errs.join('; ')); update(x => { x.output = r.output; if (!x.cut || x.cut.source !== rel) x.cut = { source: rel, candidates: [], scoredBy: null }; }); };
+    if (w.goal) { setOut(WIZ.GOALS[w.goal].out); done.push(`goal: ${WIZ.GOALS[w.goal].label}`); next = 'look'; }
+    if (w.look) { update(x => { C.applyPatch(x, { pack: w.look }); }); done.push(`look: ${w.look}`); next = 'choose'; }
+    if (w.choose) {
+      if (!(await linesOf(rel))) { if (!MEDIA.transcript(rel)) startTranscribe(rel, () => findCuts(rel, 'auto').catch(e => console.error(e.message))); pending = 'transcript'; next = 'cut'; note = 'Transcribing the take first. Let AI choose on Cut when it is ready.'; }
+      else { update(st => { const r = CUT.range(outputOf(st)), mn = r[0], mx = r[1] == null ? r[0] * 1.33 : r[1], ch = PIECES.choose(piecesOf(st, rel).pieces, { min: mn, max: mx });
+        st.pieces = st.pieces || {}; st.pieces[rel] = { ...piecesState(st, rel), ids: ch.ids, reasons: ch.reasons, by: 'ai' }; note = `Picked ${ch.ids.length} pieces, ${Math.round(ch.seconds)} s, for your Combo. Draft it in Finish.`; });
+        done.push('combo: AI chose'); next = 'finish'; }
+    }
+    if (w.wizard === 'clips') { setOut(WIZ.clipsOutput(w.clips, w.ads)); done.push(`clips: ${w.clips}${w.ads ? ' with ad cuts' : ''}`); next = 'cut';
+      if (!MEDIA.transcript(rel)) { update(x => { x.cut = { source: rel, candidates: [], scoredBy: null, pending: 'transcript' }; }); startTranscribe(rel, () => findCuts(rel, 'auto').catch(e => console.error(e.message))); pending = 'transcript'; note = `Transcribing, then finding ${w.clips} clips on whole words.`; }
+      else { await findCuts(rel, 'auto'); note = `Found the clips on whole words. Check them on Cut.`; } }
+    if (w.wizard === 'reference') { update(st => { C.applyPatch(st, { reference: { mode: 'all' } }); }); const added = addLinks([w.url]); done.push('reference: reading it, Use all'); next = 'reference'; note = 'Reading the reference. Use all is on.'; if (!added.length) note = 'That link is already in.'; }
+    return json(res, 200, { ...view(C.load()), wizard: { done, next, pending, note } });
   }
   if (p === '/api/chat/apply' && M === 'POST') {
     // Apply on an agent's answer: the change it suggested (studio_reply suggest), made only when the user says so

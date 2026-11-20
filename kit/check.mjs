@@ -264,6 +264,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-look.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { lkerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio Look tests (tests/studio-look.test.mjs: 9 layers with every option in exactly one, no duplicates, the badges, Clear reference as one undo, Save as a Look with the reference, MCP clear_reference and save_look)', errs: lkerrs, warns: [] });
+    const auerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-agent-ux.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { auerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio agent and review tests (tests/studio-agent-ux.test.mjs: waveform select on whole words, notes on a stretch, Ask my agent with the step, Apply on a suggested change, the wizards, MCP run_wizard and studio_reply suggest)', errs: auerrs, warns: [] });
     const pcerrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-pieces.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { pcerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
