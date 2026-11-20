@@ -2,6 +2,19 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.8.0 (unreleased)
+
+Release notes: [docs/releases/v1.8.0.md](docs/releases/v1.8.0.md).
+
+- **Studio: the top bar always fits.** In 1.7.1 the right side of the header ran 162 px off a 1280 px laptop screen and 50 px off a phone, which could push Settings out of reach. Now only the current step shows its name below 1500 px wide (every step keeps a tooltip and a full screen reader name, "2. Cut, done"), the setup pill shows just the count, Connect agent shrinks to its plug below 1320 px, the task badge only shows while something runs, and on a phone the steps get their own row. Checked at 1600, 1280, 1024, 820 and 375 px on all six steps: no sideways scroll.
+- **More menu.** A three-dot menu in the header with Connect agent, Setup check, API keys and providers and the theme. Keyboard: Enter or Space opens it, arrow keys move, Enter picks, Escape closes.
+- **Less text on the page.** The longer explanations under Footage from a link, the Clean-up pass and Record screen moved into small **i** hints that open on click.
+- **Accessible pieces from Headless UI** (`@headlessui/react` 2.2.10, MIT): the More menu, the hints, the B-roll fill tabs (arrow keys move between them, and they now show on tablets and phones too, where 1.7.x hid them), the **Already cut** switch, the Log and Command folds on Render and the Save as pack popover. Styled with Studio's own CSS, no Tailwind.
+- **One motion language from Open Props** (`open-props` 1.7.23, MIT: easings, shadows and animations only). Steps rise in, menus, hints and popovers fade and scale in and out, folds open with a fade, and the theme button turns its moon into a sun. `prefers-reduced-motion` turns all of it off (the spinner only slows down). animate.css was not used: its Hippocratic License 2.1 is not on this repo's license list.
+- **Uiverse.io styles, adapted and credited** (MIT, see THIRD_PARTY.md): the theme icon swap (Creatlydev), the switch proportions (Galahhad), the spinner (AqFox), the hover lift on packs, tiles and agent cards (AndrewHeinke) and the ring on Next (AnthonyPreite).
+- **Build.** The Studio license check also accepts 0BSD (Zero-Clause BSD, no conditions), for `tslib`, which Headless UI pulls in through React Aria. The page grows by about 39 KB gzipped of JavaScript (300 KB to 339 KB) and 4.6 KB gzipped of CSS.
+- **Tests.** `tests/studio-polish.e2e.mjs` in `npm run smoke`: the top bar fits at five widths on every step with Settings and More on screen, the More menu by keyboard (open, arrows, Enter runs Connect agent), the theme from the menu and the button, hints open and close with Escape, and reduced motion turns the step entrance off. The B-roll, cut, connect, record and folder browser tests pass unchanged.
+
 ## 1.7.1 (unreleased)
 
 Release notes: [docs/releases/v1.7.1.md](docs/releases/v1.7.1.md).

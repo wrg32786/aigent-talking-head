@@ -6,6 +6,7 @@ import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/Segme
 import { api, file, toast, pickState, isPaused, Icon, IconBtn, KIND_NAME } from './lib.jsx';
 import { upload } from './upload.js';
 import { WordsBrands } from './Brands.jsx';
+import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react';
 
 export function Style({ CAT, s, apply, patch, reloadCat, hidden, tab, setTab }) {
   return <>
@@ -25,11 +26,11 @@ function Packs({ CAT, s, apply, patch, reloadCat, hidden }) {
     <header className="sh"><h2 id="h-look">Style</h2><p className="sub">Start from a pack, then pick the effects you want.</p></header>
     <div className="block glass-card">
       <div className="bh"><h3>Pack</h3>
-        <details className="pop" id="save-pop"><summary className="btn ghost sm">Save as pack</summary>
-          <form className="popover glass" id="save-pack" onSubmit={save}><label className="lbl" htmlFor="pack-name">Pack name</label>
+        <Popover className="pop" id="save-pop"><PopoverButton className="btn ghost sm" id="save-pop-btn">Save as pack</PopoverButton>
+          <PopoverPanel anchor={{ to: 'bottom end', gap: 8, padding: 8 }} className="popover glass pop-panel" transition><form id="save-pack" onSubmit={save}><label className="lbl" htmlFor="pack-name">Pack name</label>
             <div className="row"><input id="pack-name" placeholder="my-look" pattern="[a-z0-9][a-z0-9\-]{1,40}" required value={name} onChange={e => setName(e.target.value)} /><Button type="submit" size="sm" variant="primary" label="Save" /></div>
-            <span id="pack-msg" className="fine" role="status">{msg}</span></form>
-        </details>
+            <span id="pack-msg" className="fine" role="status">{msg}</span></form></PopoverPanel>
+        </Popover>
       </div>
       <div id="packs" className="packs" role="radiogroup" aria-label="Style pack">
         {packs.map(p => <button key={p.name || 'none'} className="pack" type="button" role="radio" aria-checked={String((s.pack || null) === p.name)} title={p.description || (p.label || '').split(':')[0]} onClick={() => patch({ pack: p.name })}>

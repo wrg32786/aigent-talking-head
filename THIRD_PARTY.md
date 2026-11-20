@@ -35,7 +35,7 @@ What this repo ships from other projects, and what it only took ideas from. Lice
 
 ## Bundled in the Studio page
 
-The Studio page (`kit/studio/public`, built from `kit/studio/web`) bundles these npm packages. Full license texts are generated into `kit/studio/public/THIRD_PARTY_LICENSES.txt` on every build, and the build refuses any package that is not MIT, ISC, BSD or Apache-2.0.
+The Studio page (`kit/studio/public`, built from `kit/studio/web`) bundles these npm packages. Full license texts are generated into `kit/studio/public/THIRD_PARTY_LICENSES.txt` on every build, and the build refuses any package that is not MIT, ISC, BSD (including 0BSD) or Apache-2.0.
 
 | Package | Source | License |
 | --- | --- | --- |
@@ -44,8 +44,25 @@ The Studio page (`kit/studio/public`, built from `kit/studio/web`) bundles these
 | `@stylexjs/stylex` 0.19.2, `styleq` 0.2.1 (Astryx's styling runtime) | facebook/stylex, necolas/styleq | MIT |
 | `lucide-react` 1.76.0 (icons used by the Astryx Neutral theme) | lucide-icons/lucide | ISC |
 | `intl-messageformat` 11.2.15 and `@formatjs/*` (Astryx's message strings) | formatjs/formatjs | BSD-3-Clause (intl-messageformat), MIT |
+| `@headlessui/react` 2.2.10 (behavior of the More menu, hints, B-roll tabs, the Already cut switch, the Log and Command folds, the Save as pack popover; no Tailwind, styled in `polish.css`) | [tailwindlabs/headlessui](https://github.com/tailwindlabs/headlessui), Copyright (c) 2020 Tailwind Labs | MIT |
+| Headless UI's own dependencies: `@floating-ui/*`, `tabbable`, `@tanstack/react-virtual`, `use-sync-external-store`, `clsx`, `@swc/helpers`; `@react-aria/focus`, `@react-aria/interactions`, `react-aria`, `react-stately`, `@react-types/shared` and `@internationalized/*`; `aria-hidden`; `tslib` | floating-ui/floating-ui, focus-trap/tabbable, TanStack/virtual, facebook/react, lukeed/clsx, swc-project/swc, adobe/react-spectrum, theKashey/aria-hidden, microsoft/tslib | MIT; Apache-2.0 (the React Aria, React Stately, `@react-types` and `@internationalized` packages, `@swc/helpers`); 0BSD (tslib, Zero-Clause BSD: no conditions) |
+| `open-props` 1.7.23, only `easings`, `shadows` and `animations` (custom properties such as `--ease-out-3`, `--ease-spring-3`, `--shadow-2`, and the `fade-in` and `spin` keyframes) | [argyleink/open-props](https://github.com/argyleink/open-props), Copyright (c) 2021 Adam Argyle | MIT |
 
 Build tools in `kit/studio/web` (Vite, `@vitejs/plugin-react`, `@astryxdesign/build`, Babel, the StyleX compiler) are only used to make the page and are not shipped.
+
+## Component styles adapted from Uiverse.io
+
+[Uiverse Galaxy](https://github.com/uiverse-io/galaxy) is MIT ("Copyright (c) 2023 Uiverse.io"), and each snippet carries a "From Uiverse.io by <author>" line. These were adapted, not pasted: the colours are Studio's tokens, the sizes and timings are ours, and each rule in `kit/studio/web/src/polish.css` names its source.
+
+| Where in Studio | Snippet | Author | What was taken |
+| --- | --- | --- | --- |
+| Theme button (moon and sun trade places) | `Toggle-switches/Creatlydev_massive-quail-70.html` | Creatlydev | Two icons stacked in one grid cell, one turning out with `rotate(360deg) scale(0)` as the other turns in after a short delay |
+| Already cut switch | `Toggle-switches/Galahhad_tame-moth-5.html` | Galahhad | Track and knob proportions (2.875em by 1.5em, a 1.125em knob centred by an offset) |
+| Spinner (loading Studio, loading folders) | `loaders/AqFox_tiny-jellyfish-70.html` | AqFox | A turning circle with a `double` border and one `solid` side |
+| Hover lift on packs, effect tiles and agent cards | `Buttons/AndrewHeinke_pink-lion-94.html` | AndrewHeinke | Five stacked shadows that double in offset and blur |
+| The ring on the Next button on hover | `Buttons/AnthonyPreite_kind-fish-73.html` | AnthonyPreite | A 400% wide gradient sliding behind the edge, shown on hover |
+
+Not used: animate.css (Hippocratic License 2.1, not on this repo's list). The entrance and exit motion is Open Props' keyframes and our own.
 
 ## Adapted from Will's other work
 

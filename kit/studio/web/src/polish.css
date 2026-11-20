@@ -1,0 +1,136 @@
+/* Studio polish (1.8.0). Loaded after studio.css.
+   Motion and depth tokens come from Open Props (MIT, Adam Argyle): --ease-*, --ease-spring-*, --shadow-*, fade-in and
+   scale-up keyframes. Behavior of the More menu, hints, tabs, the switch and the folds comes from Headless UI (MIT,
+   Tailwind Labs); the look is all here. A few component styles are adapted from Uiverse.io snippets (MIT, credited by
+   author in THIRD_PARTY.md and next to each rule below). Everything that moves stops under prefers-reduced-motion. */
+
+[data-theme="dark"], :root { --shadow-color: 220 40% 2%; --shadow-strength: 25%; }
+[data-theme="light"] { --shadow-color: 30 30% 30%; --shadow-strength: 4%; }
+:root {
+  --motion-fast: .16s; --motion: .26s; --motion-slow: .42s;
+  --ease-ui: var(--ease-out-3, cubic-bezier(0, 0, .3, 1));
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  /* layered depth, adapted from "space-btn" by AndrewHeinke on Uiverse.io (MIT): five doubling shadows */
+  --shadow-stack: 0 1px 1px hsl(var(--shadow-color) / calc(var(--shadow-strength) + 4%)), 0 2px 2px hsl(var(--shadow-color) / calc(var(--shadow-strength) + 2%)),
+    0 4px 4px hsl(var(--shadow-color) / var(--shadow-strength)), 0 8px 8px hsl(var(--shadow-color) / var(--shadow-strength)), 0 16px 16px hsl(var(--shadow-color) / var(--shadow-strength));
+}
+
+/* ---------- top bar: one line that always fits ---------- */
+.top { gap: var(--space-3); }
+.stepper { flex: 1 1 auto; min-width: 0; display: flex; justify-content: center; }
+.stepper ol { flex-wrap: nowrap; }
+.stepper button { white-space: nowrap; }
+.stepper li + li::before { width: 18px; }
+.topr { flex: none; gap: 2px; }
+.setup-pill, .connect-btn, #taskpill { white-space: nowrap; flex: none; }
+#taskpill.idle { display: none; }
+.setup-pill .sp-n { font-variant-numeric: tabular-nums; }
+@media (max-width: 1500px) { .stepper li:not(:has([aria-current="step"])) .sl { display: none; } .stepper li:not(:has([aria-current="step"])) button { padding: 6px; } }
+@media (max-width: 1320px) { .connect-btn .cb-l, .setup-pill .sp-l { display: none; } .connect-btn { padding: 0 10px; } .setup-pill { padding: 0 9px; } }
+@media (max-width: 1180px) { .stepper [aria-current="step"] .sl { display: inline; } }
+@media (max-width: 760px) { .stepper .sl { display: none !important; } }
+/* phone: the steps get their own row under the name and the buttons */
+@media (max-width: 640px) {
+  :root { --top: 96px; }
+  .top { flex-wrap: wrap; align-content: center; row-gap: 4px; padding: 4px 10px; height: var(--top); }
+  .stepper { order: 3; flex-basis: 100%; }
+  .stepper ol { width: 100%; justify-content: space-between; }
+  .stepper li { flex: 1; } .stepper li:first-child { flex: none; }
+  .stepper li + li::before { flex: 1; width: auto; margin: 0 4px 0 0; }
+  .stepper button { padding: 2px; }
+}
+
+/* ---------- theme button: moon and sun trade places with a turn ---------- */
+/* adapted from "massive-quail-70" by Creatlydev on Uiverse.io (MIT): two icons stacked in one cell, rotate(360deg) scale(0) */
+.theme-btn > .ic { grid-area: 1 / 1; transition: transform .5s var(--ease-spring-3, ease), opacity var(--motion) var(--ease-ui); }
+.theme-btn[data-mode="dark"] .tm-moon, .theme-btn[data-mode="light"] .tm-sun { transform: rotate(360deg) scale(0); opacity: 0; }
+.theme-btn[data-mode="dark"] .tm-sun, .theme-btn[data-mode="light"] .tm-moon { transition-delay: .12s; }
+
+/* ---------- More menu and hint popovers (Headless UI Menu and Popover) ---------- */
+.menu-panel, .hint-panel { z-index: 60; border-radius: 14px; box-shadow: var(--glass-hi), var(--shadow-4, var(--shadow)); outline: none;
+  transition: opacity var(--motion-fast) var(--ease-ui), transform var(--motion-fast) var(--ease-ui); transform-origin: top right; }
+.menu-panel[data-closed], .hint-panel[data-closed], .pop-panel[data-closed] { opacity: 0; transform: translateY(-4px) scale(.97); }
+.menu-panel { min-width: 230px; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+.menu-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 8px 10px; border: 0; border-radius: 9px; background: transparent; text-align: left; font-size: 14px; font-weight: 550; color: var(--foreground); }
+.menu-item .ic { width: 17px; height: 17px; color: var(--muted-foreground); }
+.menu-item[data-focus], .menu-item:hover { background: var(--muted); } .menu-item[data-focus] .ic { color: var(--primary); }
+.menu-item small { margin-left: auto; color: var(--muted-foreground); font-size: 12px; }
+.hint { display: inline-flex; vertical-align: middle; }
+.hint-btn { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 0; background: transparent; color: var(--muted-foreground); transition: color var(--motion-fast), background var(--motion-fast); }
+.hint-btn .ic { width: 16px; height: 16px; }
+.hint-btn:hover, .hint-btn[data-open] { color: var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); }
+.hint-panel { width: min(300px, calc(100vw - 24px)); padding: 12px 14px; font-size: 13px; line-height: 1.5; color: var(--foreground); }
+.pop-panel { position: absolute; z-index: 60; transition: opacity var(--motion-fast) var(--ease-ui), transform var(--motion-fast) var(--ease-ui); }
+
+/* ---------- tabs (Headless UI TabGroup) ---------- */
+.btabs .tabs { display: flex !important; }
+.tab { transition: background var(--motion-fast) var(--ease-ui), color var(--motion-fast) var(--ease-ui), box-shadow var(--motion-fast); }
+.tab .ic { width: 15px; height: 15px; }
+.tab[data-selected] { background: var(--foreground); color: var(--background); box-shadow: var(--shadow-2, none); }
+.tab:focus { outline: none; } .tab[data-focus] { outline: 2px solid var(--ring); outline-offset: 2px; }
+.btab-panels > [data-headlessui-state] { animation: fade-in var(--motion) var(--ease-ui); }
+@media (max-width: 900px) { .btabs .tabs { flex-wrap: wrap; overflow: visible; } }
+@media (max-width: 640px) { .btabs .tab { padding: 6px 10px; } .btabs .tab .ic { display: none; } }
+
+/* ---------- switch (Headless UI Switch) ---------- */
+/* proportions adapted from "tame-moth-5" by Galahhad on Uiverse.io (MIT): 2.875em by 1.5em track, 1.125em knob */
+.toggle-field { display: flex; align-items: flex-start; gap: var(--space-3); }
+.toggle { --w: 2.875em; --h: 1.5em; --k: 1.125em; position: relative; flex: none; width: var(--w); height: var(--h); margin-top: 1px; border-radius: 999px; border: 1px solid var(--input); background: var(--muted); padding: 0; transition: background var(--motion) var(--ease-ui), border-color var(--motion); }
+.toggle .knob { position: absolute; top: calc((var(--h) - var(--k)) / 2 - 1px); left: calc((var(--h) - var(--k)) / 2 - 1px); width: var(--k); height: var(--k); border-radius: 50%; background: var(--foreground); box-shadow: var(--shadow-2, none); transition: transform var(--motion) var(--ease-spring-3, ease); }
+.toggle[data-checked] { background: var(--primary); border-color: transparent; } .toggle[data-checked] .knob { transform: translateX(calc(var(--w) - var(--h))); background: var(--primary-foreground); }
+.toggle:focus { outline: none; } .toggle[data-focus] { outline: 2px solid var(--ring); outline-offset: 2px; }
+.toggle-text { display: flex; flex-direction: column; gap: 2px; } .toggle-l { font-weight: 600; cursor: pointer; } .toggle-text .fine { margin: 0; }
+.as-is { margin-top: var(--space-3); }
+
+/* ---------- folds (Headless UI Disclosure) ---------- */
+.fold2 { margin-top: var(--space-3); border: 1px solid var(--border); border-radius: 14px; background: var(--card); overflow: hidden; }
+.fold2-h { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 12px 16px; border: 0; background: transparent; font-weight: 650; font-size: 14px; text-align: left; }
+.fold2-h:hover { background: color-mix(in srgb, var(--muted) 60%, transparent); }
+.fold2-i { transition: transform var(--motion) var(--ease-ui); opacity: .6; } .fold2-h[data-open] .fold2-i { transform: rotate(180deg); }
+.fold2-b { padding: 0 16px 16px; } .fold2-b[data-open] { animation: fade-in var(--motion) var(--ease-ui); }
+
+/* ---------- spinner ---------- */
+/* adapted from "tiny-jellyfish-70" by AqFox on Uiverse.io (MIT): a double border with one solid side, turning */
+.spin { display: inline-block; flex: none; width: 22px; height: 22px; border: 5px double var(--primary); border-left-style: solid; border-radius: 50%; animation: spin .75s linear infinite; }
+.boot { display: flex; align-items: center; gap: 12px; }
+.fb-loading { display: grid; place-items: center; min-height: 160px; }
+
+/* ---------- motion: steps rise in, cards lift ---------- */
+@keyframes step-in { from { opacity: 0; transform: translateY(10px); } }
+main[data-step] .step[data-step] { animation: step-in var(--motion-slow) var(--ease-out-4, ease-out) backwards; }
+.glass-card { transition: box-shadow var(--motion) var(--ease-ui), border-color var(--motion) var(--ease-ui), transform var(--motion) var(--ease-ui); }
+.pack, .tile, .agent-grid > * { transition: transform var(--motion) var(--ease-spring-2, ease), box-shadow var(--motion) var(--ease-ui); }
+@media (hover: hover) { .pack:hover, .tile:hover, .agent-grid > *:hover { transform: translateY(-2px); box-shadow: var(--shadow-stack); } }
+
+/* the main Next button: a slow moving ring on hover */
+/* adapted from "kind-fish-73" by AnthonyPreite on Uiverse.io (MIT): a 400% gradient sliding behind the edge */
+#next { position: relative; isolation: isolate; transition: transform var(--motion-fast) var(--ease-ui); }
+#next::before { content: ""; position: absolute; inset: -3px; border-radius: inherit; padding: 2px; z-index: -1; pointer-events: none;
+  background: linear-gradient(90deg, var(--primary), color-mix(in srgb, var(--primary) 30%, #fff) 25%, var(--primary) 50%); background-size: 400%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: 0; transition: opacity var(--motion-slow) var(--ease-ui); animation: ring-slide 12s linear infinite; }
+#next:hover::before, #next:focus-visible::before { opacity: 1; }
+#next:active { transform: scale(.98); }
+@keyframes ring-slide { 50% { background-position: 400% 0; } }
+
+/* ---------- spacing rhythm ---------- */
+.sh { margin-bottom: var(--space-1); } .sh .sub { margin-top: var(--space-1); }
+.block + .block { margin-top: var(--space-4); }
+.bh { gap: var(--space-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  main[data-step] .step[data-step], .btab-panels > *, .fold2-b[data-open], #next::before { animation: none !important; }
+  .menu-panel, .hint-panel, .pop-panel, .theme-btn > .ic, .toggle, .toggle .knob, .tab, .glass-card, .pack, .tile { transition: none !important; }
+  .pack:hover, .tile:hover, .agent-grid > *:hover { transform: none; }
+  .spin { animation: spin 2s linear infinite !important; }
+}
+.flink > .row { flex-wrap: nowrap; } .flink > .row input { min-width: 0; }
+/* the remaining native folds (Picks and why, More) match the Disclosure folds: chevron on the right */
+.fold > summary { justify-content: space-between; padding: 12px 16px; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::before { display: none; }
+.fold > summary::after { content: ""; width: 7px; height: 7px; margin-right: 4px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: translateY(-2px) rotate(45deg); transition: transform var(--motion) var(--ease-ui); opacity: .6; }
+.fold[open] > summary::after { transform: translateY(2px) rotate(-135deg); }
+.fold > :not(summary) { margin: 0 16px 16px; }
+.fold[open] > :not(summary) { animation: fade-in var(--motion) var(--ease-ui); }
+@media (prefers-reduced-motion: reduce) { .fold > summary::after { transition: none; } .fold[open] > :not(summary) { animation: none; } }

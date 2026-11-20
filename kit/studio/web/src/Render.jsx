@@ -4,6 +4,7 @@ import { ProgressBar } from '@astryxdesign/core/ProgressBar';
 import { NeedFix } from './Setup.jsx';
 import { api, file, toast, fmtS, cap1, Icon } from './lib.jsx';
 import { Compare, Cleanup, Receipt } from './Review.jsx';
+import { Fold } from './ui.jsx';
 
 export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
   const t = V.task, c = V.compose, running = t && t.status === 'running';
@@ -60,8 +61,8 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
     <Cleanup V={V} s={s} apply={apply} drafted={drafted} />
     <details className="fold glass-card" id="choices-fold" ref={foldRef}><summary>Picks and why</summary>
       <div id="choices" className="choices"><Choices CAT={CAT} x={choices} setX={setChoices} setReceipt={setReceipt} dirty={dirty} setDirty={setDirty} s={s} patch={patch} /></div></details>
-    <details className="fold glass-card"><summary>Log</summary><pre id="log" className="log" aria-live="off" ref={logRef}>{log}</pre></details>
-    <details className="fold glass-card"><summary>Command</summary><pre id="cmd" className="cmd" aria-label="The command Studio will run">{cmd}</pre></details>
+    <Fold id="log-fold" title="Log"><pre id="log" className="log" aria-live="off" ref={logRef}>{log}</pre></Fold>
+    <Fold id="cmd-fold" title="Command"><pre id="cmd" className="cmd" aria-label="The command Studio will run">{cmd}</pre></Fold>
   </section>;
 }
 

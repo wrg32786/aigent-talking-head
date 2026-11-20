@@ -463,6 +463,17 @@ A double-click app with no installer at all is planned: [docs/desktop-app-plan.m
 - One task runs at a time; Cancel stops it.
 - `STUDIO_REEL_ARGS` and `STUDIO_TEARDOWN_ARGS` add flags to every draft or teardown (for example `--engine lite --no-asr`). `STUDIO_TEARDOWN` and `STUDIO_SETUP` swap the teardown and setup scripts (the tests use stand-ins).
 
+### The top bar
+
+<img src="studio/more-menu.png" width="520" alt="The top bar with numbered steps, the setup pill, Connect agent, theme, Settings and the More menu open with Connect agent, Setup check, API keys and providers and the theme">
+<img src="studio/top-phone.png" width="260" alt="The top bar on a phone: the reel name and buttons on the first row and the six steps on a second row">
+
+The top bar always fits on one line: on a laptop only the current step shows its name (the others show their number, and hovering a step still names it), the setup pill shows just the count of what is missing, and Connect agent shrinks to its plug. **More** (the three dots) holds Connect agent, Setup check, API keys and providers and the theme, and works with the keyboard: Enter or Space opens it, the arrow keys move, Enter picks, Escape closes. On a phone the steps get their own row under the reel name.
+
+Longer explanations sit behind a small **i** next to the thing they explain (Footage from a link, Clean-up pass, Record screen in B-roll); click it to read, Escape or a click elsewhere closes it.
+
+<img src="studio/hint.png" width="420" alt="A hint opened next to the footage link box: Public share links only. Private links need a login, so download those and drop the file in.">
+
 ## Design
 
 The page is React 19 with [Astryx](https://github.com/meta/astryx) components (MIT, Meta): buttons, badges, switches, segmented controls, progress bars, status dots, the keyboard hint and the settings drawer. Its theme (`kit/studio/web/src/theme.js`) extends Astryx Neutral with the AIgent palette: warm ink and paper neutrals, one cyan accent, Anton for headings, Hanken Grotesk and JetBrains Mono from the kit's fonts. Effect tiles, the shot timeline and the chat are drawn for Studio.
@@ -473,10 +484,12 @@ The page is React 19 with [Astryx](https://github.com/meta/astryx) components (M
 
 - **Settings, Look, Glass panels** turns every panel solid (saved in the browser).
 - `prefers-reduced-transparency` gets solid panels automatically, and so do browsers without `backdrop-filter`.
-- `prefers-reduced-motion` stops transitions and the preview loops (or pause them with the button above the grid).
+- `prefers-reduced-motion` stops transitions and the preview loops (or pause them with the button above the grid), and turns off the step entrance, the menu and hint fades, the theme icon turn and the hover lift; the spinner slows down instead of stopping, so you can still see something is loading.
 
 **Contrast with glass.** Glass opacity is set so text clears 4.5:1 even in the worst case, with pure white footage right behind a dark panel or pure black behind a light one: body text 11.2:1 and secondary text 4.7:1 in dark, 14.5:1 and 5.6:1 in light. Accent text on light glass uses a deeper teal (5.5:1 on a picked chip). Cards over the ambient light measure 12.9:1 and 5.3:1 in dark, 17.0:1 and 6.6:1 in light.
 
 Rules it keeps: the cyan accent marks only the primary action, the current step and what is picked; one dark fade sits under tile names so they read on any preview frame. Keyboard: Tab through everything, arrow keys move between effect tabs, F forbids a tile, / jumps to search, Escape closes the chat sheet and the drawer, and focus stays on the same tile when the page updates. Controls are at least 44 px on touch screens and text at least 12 px.
 
-Credits: Astryx and React are bundled (both MIT). The token names and component shapes first followed [shadcn/ui](https://github.com/shadcn-ui/ui) (MIT) and the dismissal and focus behavior [vercel-labs/ui](https://github.com/vercel-labs/ui) (Apache-2.0), with no code copied from either. Checked against [ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) and [Anti-Slop](https://github.com/miqdadbadjuber/Anti-Slop) (both MIT), used as guidance only. See THIRD_PARTY.md.
+**Motion and accessible pieces (1.8.0).** [Headless UI](https://github.com/tailwindlabs/headlessui) (MIT) gives the More menu, the hints, the B-roll tabs, the Already cut switch, the Log and Command folds and the Save as pack popover their keyboard and focus behavior; the look is Studio's own CSS (`kit/studio/web/src/polish.css`, no Tailwind). [Open Props](https://github.com/argyleink/open-props) (MIT) supplies the easing curves, shadows and the fade keyframes, so every step, menu and fold moves with the same timing. A few component styles (the theme icon swap, the switch proportions, the spinner, the hover lift and the ring on Next) are adapted from [Uiverse.io](https://uiverse.io) snippets (MIT), each credited by author in [THIRD_PARTY.md](../THIRD_PARTY.md).
+
+Credits: Astryx and React are bundled (both MIT). Headless UI and Open Props are bundled too (both MIT). The token names and component shapes first followed [shadcn/ui](https://github.com/shadcn-ui/ui) (MIT) and the dismissal and focus behavior [vercel-labs/ui](https://github.com/vercel-labs/ui) (Apache-2.0), with no code copied from either. Checked against [ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) and [Anti-Slop](https://github.com/miqdadbadjuber/Anti-Slop) (both MIT), used as guidance only. See THIRD_PARTY.md.

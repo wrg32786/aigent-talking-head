@@ -1,6 +1,7 @@
 // Folder fields for Settings: type a full path, or Browse. Browse asks the local server to open this computer's own
 // folder dialog (Explorer, Finder, zenity or kdialog) and fills in the full path. When there is no dialog (or with
 // Folder list) the page shows its own folder browser, backed by /api/folders: folder names only, never files.
+import { Spinner } from './ui.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { Icon, IconBtn, toast } from './lib.jsx';
@@ -49,6 +50,7 @@ export function FolderBrowser({ start, title, onClose, onPick }) {
   return <dialog ref={ref} className="fb glass" id="folder-browser" aria-labelledby="fb-h" onClose={onClose} onCancel={e => { e.preventDefault(); ref.current.close(); }}
     onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); } }}>
     <header className="fb-h"><h2 id="fb-h">{title}</h2><IconBtn n="x" label="Close the folder list" onClick={() => ref.current.close()} /></header>
+    {!v && !err && <div className="fb-loading"><Spinner label="Loading folders" /></div>}
     {v && <>
       <ul className="fb-places" aria-label="Places">{v.places.map(x => <li key={x.id}><button type="button" className={'chip' + (x.path === v.path ? ' on' : '')} data-place={x.id} onClick={() => go(x.path)}>{x.label}</button></li>)}</ul>
       <div className="fb-bar">
