@@ -503,6 +503,7 @@ try {
   });
   step('render overlay frames (2 s)', () => {
  run(node, [join(KIT, 'render.mjs'), '2'], build); const n = readdirSync(join(build, 'ovl')).length; if (n !== 48) fail('frames ' + n); });
+  step('fast frame capture: in-page PNG frames match screenshots on every layer, two pages, fallback on an error (tests/framecap.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'framecap.e2e.mjs')], dirname(KIT)); });
   step('sfx pack manifest + auto-pick', () => {
     const v = SFXPLAN.validateManifest();
     if (v.errs.length) fail('sfx.json: ' + v.errs.join('; '));

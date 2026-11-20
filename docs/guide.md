@@ -178,7 +178,8 @@ Agents: start at [AGENTS.md](../AGENTS.md).
 | `kit/tx.py` | Word timings for each take; flags repeated words. |
 | `kit/timeline.mjs` | Maps segment word times onto the output clock and prints the seams. |
 | `kit/overlay.html` | Caption layer, driven by `captions.js` and styled by `theme.js`. |
-| `kit/render.mjs` | Renders the overlay to PNG frames (24 fps) or to stills. Run it from `build/`. |
+| `kit/render.mjs` | Renders the overlay to PNG frames (24 fps) or to stills. Run it from `build/`. Chrome encodes the frames itself, up to 3 pages at once ([rendering.md](rendering.md)). |
+| `kit/framecap.mjs`, `kit/render-bench.mjs` | The fast frame capture, and its bench: `node kit/render-bench.mjs --assemble` times both captures on a 30 s reel and checks the frames match. |
 | `kit/assemble.cjs` | The cut. Any number of segments from any source, cover-cropped to 1080x1920, zoom punch, glitch seams or named transitions, titles behind the person, overlay, locked-set and pack sounds (both ducked under the voice), ducked bed, -14 LUFS. |
 | `kit/sfx-plan.cjs` | Pack manifest, validation, and effect-hit auto-pick. |
 | `kit/fs.mjs` | Freesound search, CC0 only. |

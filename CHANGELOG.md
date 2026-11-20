@@ -2,6 +2,17 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.12.0 (unreleased)
+
+Release notes: [docs/releases/v1.12.0.md](docs/releases/v1.12.0.md). Overlay frames render about 5x faster.
+
+- **In-page PNG frames.** `kit/render.mjs` no longer screenshots every frame. Chrome copies the overlay canvas and encodes it to PNG on up to 3 worker threads while the page draws the next frame, and up to 3 pages draw at once (`kit/framecap.mjs`: about one page per 3 CPU threads, about 600 MB of free memory each; `RENDER_PAGES=<n>` overrides). The frame folders and names are unchanged, so assemble.cjs, fx.cjs and the rest read them as before. Stills use it too. Each page draws the reel once at 5 moments a second first and waits for the fonts and images that started loading.
+- **Screenshots stay as the fallback.** `RENDER_CAPTURE=screenshot` keeps the old path. When the fast path cannot start, or fails part way (an image from a file on the canvas), render.mjs says so and that page uses screenshots from that frame on. Each run prints a `capture:` line with the frame count, time, frames per second, the path used and the page count.
+- **Why PNG, not WebCodecs video.** The idea is motlab's (MIT): encode inside Chrome instead of screenshotting. Chrome's `VideoEncoder` cannot keep alpha (`alpha: 'keep'` unsupported for VP8, VP9, AV1 and H.264 in Chrome 156), and the layers need it, so the frames stay lossless PNG. See [docs/rendering.md](docs/rendering.md).
+- **Measured** (`node kit/render-bench.mjs --assemble`, 30 s reel, 1080x1920, 3 layers, 2160 frames, on a cloud VM with an 8-thread Xeon, 15.6 GB and no GPU): frame capture 160.8 s to 28.2 s, render.mjs 163.1 s to 30.7 s (5.3x), render plus assemble 206.1 s to 74.1 s (2.8x). All 2160 frames pixel identical to the screenshot frames; finished reels SSIM 1.000000. Frame folders are about twice the size on disk (Chrome's PNG encoder compresses less).
+- **Fix: captions over a screen recording.** A screen recording's frames go to the page as data URLs (up to 96 MB), like logos. As files they tainted the canvas, so the layout pass could not move a caption clear of the card and it was drawn over the recording.
+- **Bench and tests.** `kit/render-bench.mjs` times both captures on a representative reel, compares every frame (md5, then SSIM for any that differ) and prints what WebCodecs alpha support this Chrome has. `tests/framecap.e2e.mjs` (in `npm run smoke`): three layers with a logo plate and a screen recording, one page, two pages and a forced failure part way (`RENDER_CAPTURE_FAIL_AT`), all against the screenshot frames (identical, or SSIM 0.995 or more over grey, since Chrome now and then draws a soft shadow a shade differently with either path), plus stills, and the page and worker counts.
+
 ## 1.11.1 (unreleased)
 
 Release notes: [docs/releases/v1.11.1.md](docs/releases/v1.11.1.md). Render lives in one place: the Render step.
