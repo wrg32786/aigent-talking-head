@@ -24,10 +24,14 @@ const ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const stateDir = () => resolve(process.env.STUDIO_DIR || join(ROOT, 'jobs', '.studio'));
 export const settingsPath = () => join(stateDir(), 'settings.json');
 
+export const GEN_IDS = ['higgsfield', 'google', 'openai', 'replicate', 'fal'];
 export const AGENT_IDS = ['claude', 'codex', 'cursor', 'gemini', 'opencode', 'windsurf', 'generic'];
-export function defaults() { return { downloads: null, renders: null, actionNotes: true, agent: null, chat: { backend: 'agent', baseUrl: null, model: null } }; }
+// broll: { library: the b-roll folder (default <kit>/broll-library), generate: paid generating is allowed (off by
+// default), models: { higgsfield, google, openai, replicate, fal } the model each provider uses }
+export const BROLL_DEFAULTS = { library: null, generate: false, provider: null, models: {} };
+export function defaults() { return { downloads: null, renders: null, actionNotes: true, agent: null, chat: { backend: 'agent', baseUrl: null, model: null }, broll: { ...BROLL_DEFAULTS } }; }
 export function loadFile() {
-  try { const j = JSON.parse(readFileSync(settingsPath(), 'utf8')); const d = defaults(); return { ...d, ...j, chat: { ...d.chat, ...(j.chat || {}) } }; }
+  try { const j = JSON.parse(readFileSync(settingsPath(), 'utf8')); const d = defaults(); return { ...d, ...j, chat: { ...d.chat, ...(j.chat || {}) }, broll: { ...d.broll, ...(j.broll || {}), models: { ...((j.broll || {}).models || {}) } } }; }
   catch { return defaults(); }
 }
 // the file plus the environment, with where each value came from
@@ -35,7 +39,8 @@ export function load(env = process.env) {
   const f = loadFile(), from = {};
   const pick = (k, envKey, v) => { if (env[envKey]) { from[k] = 'env ' + envKey; return env[envKey]; } from[k] = v != null ? 'settings' : 'default'; return v; };
   const s = { downloads: pick('downloads', 'STUDIO_DOWNLOADS', f.downloads), renders: pick('renders', 'STUDIO_RENDERS', f.renders), actionNotes: f.actionNotes !== false, agent: AGENT_IDS.includes(f.agent) ? f.agent : null,
-    chat: { backend: pick('backend', 'STUDIO_CHAT', f.chat.backend) || 'agent', baseUrl: pick('baseUrl', 'STUDIO_LOCAL_URL', f.chat.baseUrl), model: pick('model', 'STUDIO_MODEL', f.chat.model) } };
+    chat: { backend: pick('backend', 'STUDIO_CHAT', f.chat.backend) || 'agent', baseUrl: pick('baseUrl', 'STUDIO_LOCAL_URL', f.chat.baseUrl), model: pick('model', 'STUDIO_MODEL', f.chat.model) },
+    broll: { library: pick('brollLibrary', 'STUDIO_BROLL_LIBRARY', f.broll.library), generate: f.broll.generate === true, provider: f.broll.provider || null, models: f.broll.models || {} } };
   if (!BACKENDS.includes(s.chat.backend)) s.chat.backend = 'agent';
   return { ...s, from };
 }
@@ -60,7 +65,14 @@ export function update(p) {
     if (p.chat.baseUrl !== undefined) { const u = String(p.chat.baseUrl || '').trim(); if (u && !/^https?:\/\/[^\s]+$/.test(u)) errs.push('chat.baseUrl: an http(s) address, like http://127.0.0.1:11434/v1'); else f.chat.baseUrl = u ? u.replace(/\/$/, '') : null; }
     if (p.chat.model !== undefined) f.chat.model = p.chat.model ? String(p.chat.model).slice(0, 120) : null;
   }
-  for (const k of Object.keys(p)) if (!['downloads', 'renders', 'chat', 'actionNotes', 'agent'].includes(k)) errs.push(`unknown setting "${k}" (downloads, renders, actionNotes, agent, chat)`);
+  if (p.broll) {
+    const b = p.broll;
+    if (b.library !== undefined) { const c = checkFolder(b.library); if (!c.ok) errs.push(`broll.library: ${c.error}`); else f.broll.library = c.path; }
+    if (b.generate !== undefined) { if (typeof b.generate !== 'boolean') errs.push('broll.generate: true or false'); else f.broll.generate = b.generate; }
+    if (b.provider !== undefined) { if (b.provider !== null && !GEN_IDS.includes(b.provider)) errs.push(`broll.provider: ${GEN_IDS.join(', ')} or null`); else f.broll.provider = b.provider; }
+    if (b.models !== undefined) { if (!b.models || typeof b.models !== 'object') errs.push('broll.models: { provider: model }'); else for (const [k, v] of Object.entries(b.models)) { if (!GEN_IDS.includes(k)) errs.push(`broll.models: no provider ${k}`); else if (v && !/^[\w.\-/:@]{1,120}$/.test(String(v))) errs.push(`broll.models.${k}: a model id like owner/name`); else f.broll.models[k] = v ? String(v) : null; } }
+  }
+  for (const k of Object.keys(p)) if (!['downloads', 'renders', 'chat', 'actionNotes', 'agent', 'broll'].includes(k)) errs.push(`unknown setting "${k}" (downloads, renders, actionNotes, agent, chat, broll)`);
   if (errs.length) return { errs, settings: load() };
   mkdirSync(stateDir(), { recursive: true });
   const tmp = settingsPath() + '.tmp'; writeFileSync(tmp, JSON.stringify(f, null, 2) + '\n'); renameSync(tmp, settingsPath());

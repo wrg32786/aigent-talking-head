@@ -41,7 +41,7 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
   }
   // font lockup overrides from cut.json ("lockup" for the job, "hero" per flip start) -> lockover.js
   { let C = {}; try { C = JSON.parse(readFileSync(join(ROOT, 'cut.json'), 'utf8')); } catch {}
-    writeFileSync(join(ROOT, 'lockover.js'), 'window.LOCKOVER=' + JSON.stringify({ lockup: C.lockup || null, hero: C.hero || null, titleLayer: C.titleLayer || null, inserts: (C.inserts || []).map(s => ({ at: +s.at, dur: +s.dur, y: s.y, tint: s.tint, line: s.line, arc: s.arc })) }) + ';\n'); }
+    writeFileSync(join(ROOT, 'lockover.js'), 'window.LOCKOVER=' + JSON.stringify({ lockup: C.lockup || null, hero: C.hero || null, titleLayer: C.titleLayer || null, inserts: (C.inserts || []).filter(s => !s.place || s.place === 'full').map(s => ({ at: +s.at, dur: +s.dur, y: s.y, tint: s.tint, line: s.line, arc: s.arc })) }) + ';\n'); }
   if (!existsSync(join(ROOT, 'fxzones.js'))) writeFileSync(join(ROOT, 'fxzones.js'), 'window.FXZONES=[];\n');
   // graphics (modes 10, 11, 19 and 26): icon and screen images as file URLs; a screen recording becomes a short frame list
   // (build/gfx/, 12 fps) so the card can play it frame-accurately. Fonts for the ordinal word, the label, the code

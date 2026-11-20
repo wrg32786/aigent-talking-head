@@ -13,7 +13,7 @@ const BACKENDS = [
   ['keywords', 'Keywords', 'No model'],
 ];
 
-export function Settings({ V, apply, open, setOpen, theme, setTheme, glass, setGlass, openConnect, openSetup }) {
+export function Settings({ V, apply, open, setOpen, theme, setTheme, glass, setGlass, openConnect, openSetup, openKeys }) {
   const e = V.env, st = e.settings;
   const [f, setF] = useState(null), [models, setModels] = useState([]), [localMsg, setLocalMsg] = useState(''), [msg, setMsg] = useState('');
   useEffect(() => {
@@ -38,7 +38,7 @@ export function Settings({ V, apply, open, setOpen, theme, setTheme, glass, setG
     if (!r.ok) { setMsg(j.error); return; }
     apply(j); setOpen(false); toast('Settings saved', true);
   };
-  const keyNote = k => e.keys[k] ? `${k === 'anthropic' ? 'ANTHROPIC' : 'OPENAI'}_API_KEY is set.` : `Set ${k === 'anthropic' ? 'ANTHROPIC' : 'OPENAI'}_API_KEY before starting Studio.`;
+  const keyNote = k => e.keys[k] ? 'Key set.' : 'Add the key in API keys and providers below, or set ' + (k === 'anthropic' ? 'ANTHROPIC' : 'OPENAI') + '_API_KEY.';
   return <Drawer id="settings" className="settings-sheet" isOpen={open} onOpenChange={setOpen} side="end" width={440} label="Settings" padding={0} experimental={{ isFullWidthOnMobile: true }}>
     {f && <form id="settings-form" onSubmit={ev => { ev.preventDefault(); save(); }}>
       <header className="sheet-h"><h2 id="h-settings">Settings</h2><IconBtn n="x" label="Close settings" onClick={() => setOpen(false)} /></header>
@@ -59,6 +59,10 @@ export function Settings({ V, apply, open, setOpen, theme, setTheme, glass, setG
           </div>}
           {f.backend === 'agent' && <div className="row"><Button id="settings-connect" variant="secondary" size="sm" label="Connect agent" onClick={openConnect} /><span className="fine">{e.agent && e.agent.connected ? `${e.agent.name} connected` : 'No agent connected yet'}</span></div>}
           <Switch id="action-notes" label="Note terminal edits here" description="One line, never the terminal conversation" value={f.actionNotes} onChange={v => set('actionNotes', v)} />
+        </fieldset>
+        <fieldset><legend>API keys and providers</legend>
+          <div className="row"><Button id="settings-keys" variant="secondary" size="sm" label="API keys and providers" onClick={openKeys} /><span className="fine" id="keys-summary">{(() => { const k = V.broll ? V.broll.sources.filter(x => x.on && !['upload', 'library', 'screen'].includes(x.id)).map(x => x.name) : []; return k.length ? `On: ${k.join(', ')}` : 'Pexels, Pixabay, Higgsfield, OpenAI, Anthropic, Google, Replicate, fal'; })()}</span></div>
+          <p className="fine">Stock footage and b-roll generators with your own keys. Keys stay on this computer.</p>
         </fieldset>
         <fieldset><legend>Folders</legend>
           <label className="lbl" htmlFor="set-downloads">Reference downloads</label>

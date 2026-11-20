@@ -190,10 +190,28 @@ if (panelsOn) {
 // picture and any titles, and the captions draw on top of it. "in" is where to start in the clip; "bw" makes it black
 // and white. Captions in the oneword look move up into the insert's open space ("y", default 640) and can take a
 // "tint" to match its light.
+// "place" (Studio's b-roll lane, kit/studio/broll-run.mjs): "full" (the default, as above), "top" (split: the insert fills the top half and you
+// fill the bottom half, cropped around "faceY", default 0.4 of the frame height) or "pip" (a 16:9 box "pipW" wide,
+// default 460, with a thin white edge, top right; "pipX" and "pipY" move it). A still picture ("image": true, or a
+// .jpg, .png or .webp file) holds for the span with a slow push in.
 (C.inserts || []).forEach((s, k) => {
-  const n = inp('-i', s.file), a0 = +s.at, d = +s.dur, i0 = +(s.in || 0);
-  f.push(`[${n}:v]trim=${i0}:${(i0 + d).toFixed(3)},${V},scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1${s.bw ? ',hue=s=0' : ''},setpts=PTS+${a0}/TB[ins${k}]`,
-    `[${vcur}][ins${k}]overlay=eof_action=pass:enable='between(t,${a0},${(a0 + d).toFixed(3)})'[vi${k}]`);
+  const a0 = +s.at, d = +s.dur, i0 = +(s.in || 0), place = ['top', 'pip'].includes(s.place) ? s.place : 'full';
+  const still = s.image === true || /\.(jpe?g|png|webp)$/i.test(String(s.file));
+  const pw = Math.round((+s.pipW || 460) / 2) * 2, ph = Math.round(pw * 9 / 32) * 2;
+  const [W, H] = place === 'top' ? [1080, 960] : place === 'pip' ? [pw, ph] : [1080, 1920];
+  const n = still ? inp('-loop', '1', '-framerate', '24', '-t', (d + 0.5).toFixed(3), '-i', s.file) : inp('-i', s.file);
+  const fit = still ? `scale=${Math.round(W * 1.1 / 2) * 2}:${Math.round(H * 1.1 / 2) * 2}:force_original_aspect_ratio=increase,crop=${Math.round(W * 1.1 / 2) * 2}:${Math.round(H * 1.1 / 2) * 2},zoompan=z='1+0.08*on/${Math.max(1, Math.round(d * 24))}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=24`
+    : `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`;
+  const src = still ? `[${n}:v]${V},${fit}` : `[${n}:v]trim=${i0}:${(i0 + d).toFixed(3)},${V},${fit}`;
+  const on = `enable='between(t,${a0},${(a0 + d).toFixed(3)})'`;
+  f.push(`${src},setsar=1${s.bw ? ',hue=s=0' : ''}${place === 'pip' ? ',pad=iw+8:ih+8:4:4:white' : ''},setpts=PTS+${a0}/TB[ins${k}]`);
+  if (place === 'top') {
+    const y = Math.max(0, Math.min(960, Math.round((s.faceY != null ? +s.faceY : 0.4) * 1920 - 480)));
+    f.push(`[${vcur}]split[vs${k}a][vs${k}b]`, `[vs${k}b]crop=1080:960:0:${y}[spk${k}]`, `[vs${k}a][spk${k}]overlay=0:960:${on}[vt${k}]`, `[vt${k}][ins${k}]overlay=0:0:eof_action=pass:${on}[vi${k}]`);
+  } else if (place === 'pip') {
+    const x = s.pipX != null ? Math.round(+s.pipX) : 1080 - pw - 8 - 44, y = s.pipY != null ? Math.round(+s.pipY) : 170;
+    f.push(`[${vcur}][ins${k}]overlay=${x}:${y}:eof_action=pass:${on}[vi${k}]`);
+  } else f.push(`[${vcur}][ins${k}]overlay=eof_action=pass:${on}[vi${k}]`);
   vcur = `vi${k}`;
 });
 // The caption layer and the glitch shake go on in a second pass when there are captions. In one graph, the caption

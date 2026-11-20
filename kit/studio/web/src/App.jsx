@@ -3,7 +3,9 @@ import { Theme } from '@astryxdesign/core/theme';
 import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';
 import { aigentTheme } from './theme.js';
-import { api, toast, onToast, STEPS, Icon, IconBtn, cap1 } from './lib.jsx';
+import { api, toast, onToast, STEPS, stepName, Icon, IconBtn, cap1 } from './lib.jsx';
+import { BRoll } from './BRoll.jsx';
+import { Keys } from './Keys.jsx';
 import { Footage } from './Footage.jsx';
 import { Reference } from './Reference.jsx';
 import { Cut } from './Cut.jsx';
@@ -31,6 +33,7 @@ export function App() {
   const [glass, setGlassState] = useState(document.documentElement.dataset.glass !== 'off');
   const [chatOpen, setChatOpen] = useState(/chat/.test(location.hash));
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [keysOpen, setKeysOpen] = useState(/keys/.test(location.hash));
   const [connectOpen, setConnectOpen] = useState(/connect/.test(location.hash));
   const [setupOpen, setSetupOpen] = useState(/setup/.test(location.hash));
   const [log, setLog] = useState('');
@@ -75,11 +78,12 @@ export function App() {
 
   const s = V.state, t = V.task, running = t && t.status === 'running';
   const picksAny = Object.values(s.picks).some(p => p.allow.length || p.deny.length);
-  const done = { footage: !!(s.footage.length || s.clips), cut: !!(V.cut && V.cut.candidates && V.cut.candidates.length), reference: !!s.reference.extracted, style: !!(s.pack || picksAny), render: !!(V.outputs || []).length };
+  const done = { footage: !!(s.footage.length || s.clips), cut: !!(V.cut && V.cut.candidates && V.cut.candidates.length), reference: !!s.reference.extracted, style: !!(s.pack || picksAny), broll: !!(V.broll && V.broll.beats && V.broll.beats.some(b => b.slot)), render: !!(V.outputs || []).length };
   const i = STEPS.indexOf(step);
   const openConnect = () => { setSettingsOpen(false); setChatOpen(false); setConnectOpen(true); };
   const openSetup = () => { setSettingsOpen(false); setSetupOpen(true); };
-  const ctx = { CAT, V, s, apply, patch, go, reloadCat, setLog, log, openConnect, openSetup };
+  const openKeys = () => { setSettingsOpen(false); setKeysOpen(true); };
+  const ctx = { CAT, V, s, apply, patch, go, reloadCat, setLog, log, openConnect, openSetup, openKeys };
   const env = V.env, a = env.agent || {}, agentState = env.backend !== 'agent' ? 'alt' : a.listening ? 'on' : a.connected ? 'busy' : 'off';
   const pill = !t ? 'Ready' : running ? `${cap1(t.kind)} running` : t.status === 'failed' ? `${cap1(t.kind)} failed` : `${cap1(t.kind)} ${t.status}`;
 
@@ -93,7 +97,7 @@ export function App() {
         <nav className="stepper" aria-label="Steps"><ol id="stepper">
           {STEPS.map((st, k) => <li key={st} className={done[st] ? 'done' : ''}>
             <button type="button" data-step={st} aria-current={st === step ? 'step' : 'false'} onClick={() => go(st, true)}>
-              <span className="sn">{done[st] && st !== step ? <Icon n="check" /> : k + 1}</span><span className="sl">{cap1(st)}</span>
+              <span className="sn">{done[st] && st !== step ? <Icon n="check" /> : k + 1}</span><span className="sl">{stepName(st)}</span>
             </button></li>)}
         </ol></nav>
         <div className="topr">
@@ -112,11 +116,12 @@ export function App() {
           {step === 'cut' && <Cut {...ctx} />}
           {step === 'reference' && <Reference {...ctx} />}
           <Style {...ctx} hidden={step !== 'style'} tab={tab} setTab={pickTab} />
+          {step === 'broll' && <BRoll {...ctx} />}
           <Render {...ctx} hidden={step !== 'render'} />
           <footer className="stepnav glass" id="stepnav">
             <span style={{ visibility: i ? 'visible' : 'hidden' }}><Button id="prev" variant="ghost" label="Back" icon={<Icon n="left" />} onClick={() => go(STEPS[Math.max(0, i - 1)], true)} /></span>
             <PicksTray s={s} patch={patch} />
-            {i < STEPS.length - 1 ? <Button id="next" variant="primary" label={cap1(STEPS[i + 1])} endContent={<Icon n="right" />} onClick={() => go(STEPS[i + 1], true)} /> : <span className="nextpad" />}
+            {i < STEPS.length - 1 ? <Button id="next" variant="primary" label={stepName(STEPS[i + 1])} endContent={<Icon n="right" />} onClick={() => go(STEPS[i + 1], true)} /> : <span className="nextpad" />}
           </footer>
         </main>
         <Chat {...ctx} open={chatOpen} setOpen={setChatOpen} agentState={agentState} />
@@ -124,6 +129,7 @@ export function App() {
       <Settings {...ctx} open={settingsOpen} setOpen={setSettingsOpen} theme={theme} setTheme={setTheme} glass={glass} setGlass={setGlass} />
       <Connect {...ctx} open={connectOpen} setOpen={setConnectOpen} />
       <SetupCheck open={setupOpen} setOpen={setSetupOpen} />
+      <Keys {...ctx} open={keysOpen} setOpen={setKeysOpen} />
       <Toast />
     </Theme>
   );

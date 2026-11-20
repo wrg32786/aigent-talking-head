@@ -24,8 +24,9 @@ Five steps across the top: Footage, Cut, Reference, Style, Render. Each one is i
    - **Pack.** Pick a style pack from the row of previews. Your picks add to it. "Save as pack" writes `packs/local/<name>/pack.json` (validated, gitignored) so you can reuse the look with `--pack <name>`.
    - **Effects.** Every effect the engine has, as a grid of looping previews, in tabs by type (table below). Click a tile to pick it; press F, right-click it, or use its forbid button (the circle with a line) to forbid it. Hover or focus a tile for its description in a hover card instead of text on every tile. Picking any of a kind means only your picks of that kind are used; forbidding one leaves the rest. Some kinds take one choice (caption style, look, theme). Press / to search. The pause button switches to stills and is on by default when your system asks for reduced motion. Small labels mark tiles with a still preview ("still"), graphics that only appear when you say the matching words ("your words"), and options set elsewhere ("info"). Your picks collect in the tray at the bottom; click one to drop it.
    - **Sound and pace.** A bed by energy (auto, low, mid, high), a named bed with a play button, no music, or your own upload. Sound effects on or off, sparse sounds (the density cap), how tight to cut pauses, and zoom punches.
-4. **Chat.** Type "calm and cinematic, no glitch, typewriter titles". See [Chat](#chat).
-5. **Render.** Draft runs `npm run reel ... --draft` and shows the choices table: every transition, finish, title and graphic per beat, with why it was picked. Change any cell and apply; the change is pinned. Render builds the reel (and the export size you picked) with progress, then plays it with a download link.
+4. **B-roll.** One slot per beat of the draft: fill it from your library, an upload, stock, a card, a screen recording or a generate, and pick full cutaway, split top panel or picture in picture. See [B-roll](#b-roll).
+5. **Chat.** Type "calm and cinematic, no glitch, typewriter titles". See [Chat](#chat).
+6. **Render.** Draft runs `npm run reel ... --draft` and shows the choices table: every transition, finish, title and graphic per beat, with why it was picked. Change any cell and apply; the change is pinned. Render builds the reel (and the export size you picked) with progress, then plays it with a download link.
 
 ![The effects menu on the Transitions tab: preview tiles with glitch forbidden and whip picked, and a hover card with the description of dip-black](studio/menu.png)
 
@@ -242,6 +243,14 @@ The settings button (top right, the sliders) opens a side sheet and saves to `jo
 
 Theme (dark or light) and Glass panels (on, or solid panels for older computers) live under Look and are saved in the browser, not in the file.
 
+### API keys and providers
+
+![API keys and providers: Pexels saved on this computer and tested, other providers not set, with Get a key and Docs links](studio/broll-keys.png)
+
+**API keys and providers** (in Settings, and on the B-roll step) has one row per provider: Pexels and Pixabay (free stock), Higgsfield, OpenAI, Google, Replicate and fal (generate, paid on your account) and Anthropic (text: b-roll ideas and the chat). Each row says whether a key is set and where from (the environment, or saved on this computer), never a character of it. Paste a key and **Save**, **Test key** (one documented, free call: Pexels and Pixabay search one result, Higgsfield asks a free estimate, OpenAI, Anthropic and Google list models, Replicate reads the account; fal documents no check, so it says so), **Remove**, or follow **Get a key** and **Docs**.
+
+Keys are saved in `jobs/.studio/keys.json` (next to the session, `STUDIO_DIR` moves it), written owner-only (chmod 600), in a folder git ignores. A key in the environment wins: `PEXELS_API_KEY`, `PIXABAY_API_KEY`, `HF_API_KEY_ID` and `HF_API_KEY_SECRET`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` or `GOOGLE_API_KEY`, `REPLICATE_API_TOKEN`, `FAL_KEY`. Keys are never logged, never sent to the page and never given to your agent: `broll_providers` says only set or not and where from. A saved OpenAI or Anthropic key also answers the Studio chat. The sheet also lists which b-roll sources are on, the **Allow generating** switch with a model per provider, and the b-roll library folder.
+
 Folders must be full paths; Studio makes them if needed and checks it can write there before saving. The `studio_settings` MCP tool reads and changes the same file.
 
 ## Chat
@@ -318,6 +327,42 @@ Studio also speaks [AG-UI](https://github.com/ag-ui-protocol/ag-ui) (MIT), the o
 
 Like the rest of Studio, both endpoints answer on localhost only and refuse cross-site browser posts. Tool calls are not mapped: the agent's tools are its MCP tools, and AG-UI clients see their effect as state deltas.
 
+## B-roll
+
+![The B-roll step: three beats, beat 2 filled with a clip as a split top panel, the placement, timing and fill tabs below](studio/broll-lane.png)
+
+The B-roll step sits between Style and Render. Its beats come from the draft: each segment of `build/cut.json`, with the caption words that fall in it, so draft first. Click a beat to fill it. The voice keeps running under every insert; the insert's own sound is dropped.
+
+| Fill from | What it does |
+|---|---|
+| Library | Your b-roll folder, reused by every job. Search names and tags (orientation, dark or bright, colour, still or moving, short or long, the source's own tags). |
+| Upload | A video (mp4, mov, webm, m4v, mkv) or a picture (jpg, png, webp), copied into the library. |
+| Stock | Pexels or Pixabay with your own free key. Words, orientation and longest length; hover to preview; **Use** downloads the file nearest 1080p into the library with its license and credit. |
+| Make | A chart, counter, quote, code card, terminal card or your own HTML and CSS scene, rendered here with headless Chrome (JavaScript off, no network). |
+| Record | Your screen with `getDisplayMedia`, with an optional round webcam bubble, saved as a screen recording. |
+| Generate | A provider with your own key, off until you allow it (below). |
+
+**Placement:** **Full cutaway** covers the frame. **Split top panel** puts the clip in the top half and you in the bottom half, cropped around your face. **Picture in picture** puts a small framed 16:9 box at the top right. **Starts** is seconds into the beat (a short lead in by default), **Length** is up to 3.5 s by default and never past the beat or the clip, **From** is the clip's in point. A still picture holds with a slow push in.
+
+**Ideas:** your agent's suggestions (`suggest_broll`) and **Suggest** (the rules: each beat's two strongest words as a search, skipping the hook and filled beats) wait on the beat with **Approve** and **Dismiss**. Approve uses the idea's clip, makes its card, or takes the best library match, else the top stock result.
+
+**Render** puts the lane into `build/cut.json` as inserts (`kit/studio/broll-run.mjs apply`; inserts from a recipe or `--broll` stay) and writes `jobs/<job>/credits.txt`: each clip with its source, author, link and license, generated clips with the provider, model and prompt, and "Videos provided by Pexels" or "Videos from Pixabay" when used.
+
+**Library:** `broll-library/` in the kit by default (git ignores it), or **B-roll library folder** in API keys and providers, or `STUDIO_BROLL_LIBRARY`. The index is `library.json` in that folder, so the library moves with it. Stock media is never committed.
+
+### Generate
+
+Off by default. Turn on **Allow generating** in API keys and providers and add a provider key. **Estimate cost** shows the price (from the provider when it says, else a stated rule), and the clip is only made after you click **Generate for $X**. It runs in the background and lands on the beat. Your agent can only ask: `fill_slot` with `generate` adds an ask to the step with the estimate, for you to approve or decline. Generated pictures become a short clip with a slow push in.
+
+| Provider | Makes | Status |
+|---|---|---|
+| Higgsfield | video and images | Verified against [its API docs](https://docs.higgsfield.ai): `Authorization: Key <id>:<secret>`, the free `POST /estimate/<model>` for the price, a queued request polled on its `status_url` until completed (failed and nsfw are not charged; outputs keep 7 days). Default models: Kling 2.5 Turbo Pro text to video, Soul v2 for images. |
+| Google (Gemini) | video | Gemini Omni Flash through `POST /v1beta/interactions`. Not verified: no live run; about $0.07 a second at 720p from Google's pricing page. |
+| OpenAI | images | `gpt-image-2.5` images. Price not verified. The Sora video API closed on 2026-09-24. |
+| Replicate | what the model makes | You name the model (owner/name). Cost per model. Not verified. |
+| fal | what the model makes | You name the model. Cost per model. Not verified. |
+| Runway, Veo, Kling, Sora | | Listed, not wired: Runway's API is documented but not in this version; Veo's preview ended 2026-10-22 (use Google); Kling runs through Higgsfield; Sora closed. |
+
 ## Render
 
 ![The Render step: Redraft and Render buttons, the export size, the finished reel and its export with download links, and the picks folded below](studio/render.png)
@@ -392,6 +437,7 @@ A double-click app with no installer at all is planned: [docs/desktop-app-plan.m
 
 - The session lives in `jobs/.studio/state.json` (`STUDIO_DIR` moves it). Uploads go to `inbox/studio/<job>/` (recorded takes in its `takes/` folder) and `teardown-in/studio/<job>/`, drafts to `jobs/<job>/`, teardowns to `teardown/studio-<job>/`. All gitignored.
 - The server listens on 127.0.0.1 only, refuses other Host headers (so a web page can't reach it by DNS rebinding) and cross-site posts, and serves files only from the kit's media folders.
+- API keys stay in `jobs/.studio/keys.json` (owner-only) or the environment and never leave the server: the page and the agent see set or not. B-roll stock and generated media go to the b-roll library, never the repo. Agent-made cards render with JavaScript off and no network; web captures take public pages only.
 - One task runs at a time; Cancel stops it.
 - `STUDIO_REEL_ARGS` and `STUDIO_TEARDOWN_ARGS` add flags to every draft or teardown (for example `--engine lite --no-asr`). `STUDIO_TEARDOWN` and `STUDIO_SETUP` swap the teardown and setup scripts (the tests use stand-ins).
 

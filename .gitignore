@@ -61,3 +61,6 @@ packs/local/
 # per-machine agent setup written by npm run studio:connect
 /.claude/settings.local.json
 /.cursor/mcp.json
+
+# your b-roll library (stock, generated and your own clips; never committed)
+broll-library/

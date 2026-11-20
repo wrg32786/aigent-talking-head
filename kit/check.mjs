@@ -216,6 +216,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-cut.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { uerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio cut tests (tests/studio-cut.test.mjs: output choice, candidates, chunked transcription, cut edits, MCP cut tools, model scoring, pull and adapt a script)', errs: uerrs, warns: [] });
+    const berrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-broll.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { berrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio b-roll tests (tests/studio-broll.test.mjs: API keys never shown, Pexels, Pixabay and Higgsfield against a mock, library, lane and placements, credits, generate approval, MCP b-roll tools)', errs: berrs, warns: [] });
     const ses = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-session.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { ses.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }

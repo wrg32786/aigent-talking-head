@@ -35,6 +35,11 @@
 | `get_lines` | reads the Lines view | every line of the take with its number, times on the audio, length, text, keep and hint (retake or fragment, and why), the bites so far and the clean take |
 | `set_bites` | replaces the bites | your picks, `[{ name, lines: [line numbers in play order], reason }]`, plus `keep` per line, `clean: true` for the clean take, `replace: false` to add; labelled as picked by you |
 | `render_bites` | renders | every bite (or `ids`) as its own video; `file: true` only joins the lines into one plain file |
+| `list_broll` | reads the B-roll step | every beat of the draft (number, times, caption words), what fills it and how it sits (full cutaway, split top panel, picture in picture), pending ideas and generate asks, the sources that are on, and the library (`q` searches it) |
+| `add_broll` | adds to the library | one of: `card` (chart, counter, quote, code, terminal or an HTML scene, made on this computer), `url` (a scrolled capture of a public page), `stock` (top Pexels or Pixabay result, with the user's key) or `file`; `beat` and `place` also put it on a beat |
+| `suggest_broll` | proposes | ideas per beat (`clip`, `query` or `card`, and `place`) that wait on the B-roll step for the user to approve or dismiss |
+| `fill_slot` | changes a slot | put a clip on a beat, change its place, offset, length or in point, or clear it. `generate` only asks: the user sees the estimate and approves on the page |
+| `broll_providers` | reads | each provider key as set or not and where from (env or Studio settings), never the key; which sources are on; whether generating is allowed |
 | `setup_status` | reads what is installed | each dependency (Node packages, Python and requirements, ffmpeg, Chrome, the Whisper model, yt-dlp, instaloader, the effects pass and the person mask weights, the humanizer skill, the Studio page) as ready or missing with its one fix, plus `forUser`, the plain-words list of what only the user can do. Run `npm run setup:all` for the rest |
 | `studio_takes` | reads or writes the session | takes filmed with Record now (file, thumbnail, seconds, status, kept); keep, unkeep or discard one |
 
