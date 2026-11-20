@@ -12,6 +12,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { chromium } from 'playwright-core';
 import { findChrome } from '../kit/chrome.mjs';
+import { patient } from './fixtures/patient.mjs';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const STATE = mkdtempSync(join(tmpdir(), 'studio-record-e2e-')), JOB = 'record-e2e-' + process.pid;
@@ -22,7 +23,7 @@ const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data',
 const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json();
 let n = 0; const t = async (name, fn) => { await fn(); n++; console.log('ok ' + name); };
 
-const browser = await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required', ...(process.env.FAKE_VIDEO ? ['--use-file-for-fake-video-capture=' + process.env.FAKE_VIDEO] : [])] });
+const browser = patient(await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required', ...(process.env.FAKE_VIDEO ? ['--use-file-for-fake-video-capture=' + process.env.FAKE_VIDEO] : [])] }));
 try {
   await api('/api/state', { job: JOB });
   await t('record a take with the fake camera: countdown, 9:16 crop, mp4, in the footage', async () => {
