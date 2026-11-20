@@ -51,9 +51,10 @@ try {
     await pg.focus('#more-open'); await pg.keyboard.press('Enter');
     await pg.waitForSelector('#more-connect'); if (shots) { await pg.waitForTimeout(300); await pg.screenshot({ path: join(shots, 'more-menu.png'), clip: { x: 560, y: 0, width: 720, height: 280 } }); }
     const items = await pg.$$eval('.menu-item span', x => x.map(e => e.textContent));
-    assert.deepStrictEqual(items.slice(0, 3), ['Connect agent', 'Setup check', 'API keys and providers']);
+    assert.deepStrictEqual(items.slice(0, 5), ['New video', 'Open a past video', 'Connect agent', 'Setup check', 'API keys and providers']);
     const active = () => pg.evaluate(() => document.querySelector('.menu-item[data-focus]')?.id); // the menu keeps focus and points at the item
-    assert.strictEqual(await active(), 'more-connect'); // Enter opens on the first item
+    assert.strictEqual(await active(), 'more-new-video'); // Enter opens on the first item
+    await pg.keyboard.press('ArrowDown'); await pg.keyboard.press('ArrowDown'); assert.strictEqual(await active(), 'more-connect');
     await pg.keyboard.press('ArrowDown'); assert.strictEqual(await active(), 'more-setup');
     await pg.keyboard.press('ArrowUp'); await pg.keyboard.press('Enter');
     await pg.waitForSelector('#connect-install'); await pg.waitForFunction(() => !document.querySelector('#more-connect'));

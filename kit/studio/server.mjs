@@ -128,7 +128,7 @@ function view(s) {
 // what a finished draft says (a draft is a plan: no video until Render)
 const DRAFT_DONE = 'Plan ready, no video yet. Press Render.';
 // ---------- tasks (one at a time) ----------
-let task = null, seq = 0;
+let task = null, seq = 0, activeRequests = 0;
 function runTask(kind, steps, done, hooks = {}) {
   if (task && task.status === 'running') throw Object.assign(new Error(`busy: ${task.kind} is running`), { code: 409 });
   task = { id: ++seq, kind, status: 'running', startedAt: Date.now(), lines: [], proc: null };
@@ -163,6 +163,22 @@ function runTask(kind, steps, done, hooks = {}) {
     if (me.status === 'running') { me.status = 'done'; try { me.result = (await done(out)) || {}; } catch (e) { me.status = 'failed'; log('error: ' + e.message); }  if (me.status === 'done' && kind === 'draft') log(DRAFT_DONE); }
   })().finally(() => { me.endedAt = Date.now(); if (hooks.end) try { hooks.end(me.status, me.lines); } catch (e) { log('error: ' + e.message); } update(s => { s.task = { id: me.id, kind, status: me.status }; s.outputs = C.outputsOf(s); }); send('task', { id: me.id, status: me.status }); setImmediate(pump); });
   return me;
+}
+
+// ---------- switching videos ----------
+// what would be cut off by switching now: a task, a download, a take being saved, a transcript, a generation
+function busyWith(s) {
+  if (activeRequests) return 'Studio is still saving a change';
+  if (task && task.status === 'running') return `${task.kind === 'draft' ? 'A draft' : task.kind === 'render' ? 'A render' : 'A ' + task.kind} is running`;
+  return C.videoBusy(s);
+}
+// { name, keepLook } starts a new video; { open: job } opens a past one (kit/studio/core.mjs switchVideo). The current
+// video's session is saved first; nothing on disk is deleted.
+function switchVideo(o = {}) {
+  const busy = busyWith(C.load());
+  if (busy) throw Object.assign(new Error(`${busy}. Cancel it or let it finish, then switch videos.`), { code: 409 });
+  task = null; // do not show the previous video's finished draft or render
+  let r; const s = update(st => { r = C.switchVideo(st, o); }); return { s, r };
 }
 
 // ---------- the kit's commands, from the session ----------
@@ -940,6 +956,10 @@ async function api(req, res, u) {
   if (p === '/api/agent' && M === 'GET') return json(res, 200, { agent: CH.presence(), ...CH.peek() });
   // for the Claude Code hook (kit/studio/hooks/studio-pending.mjs): a cheap peek, nothing is marked seen
   if (p === '/api/agent/pending' && M === 'GET') { const q = CH.peek(); return json(res, 200, { ...q, notice: CH.notice(q) }); }
+  // New video and Open a past video (kit/studio/core.mjs: freshSession, openSession). Nothing on disk is deleted.
+  if (p === '/api/videos' && M === 'GET') { const s = C.load(); return json(res, 200, { videos: C.listVideos(s.job), current: s.job, busy: busyWith(s) }); }
+  if (p === '/api/videos/new' && M === 'POST') { const b = await readBody(req); const { s, r } = switchVideo({ name: b.name, keepLook: b.keepLook !== false }); return json(res, 200, { ...view(s), video: r }); }
+  if (p === '/api/videos/open' && M === 'POST') { const b = await readBody(req); const { s, r } = switchVideo({ open: String(b.job || '') }); return json(res, 200, { ...view(s), video: r }); }
   if (p === '/api/reset' && M === 'POST') { const s = C.defaultState(), o = C.load(); s.rev = o.rev; s.chatSeq = o.chatSeq || 0; s.refSeq = o.refSeq || 0; C.save(s); pushState(); return json(res, 200, view(s)); }
   return json(res, 404, { error: 'no such endpoint' });
 }
@@ -990,7 +1010,12 @@ const server = http.createServer(async (req, res) => {
       const ka = setInterval(() => res.write(': ka\n\n'), 20e3); req.on('close', () => { clearInterval(ka); aguiClients.delete(c); }); return;
     }
     if (u.pathname === '/api/agui' && req.method === 'POST') return await aguiRun(req, res);
-    if (u.pathname.startsWith('/api/')) return await api(req, res, u);
+    if (u.pathname.startsWith('/api/')) {
+      // Requests which await work may still write the old edit when they finish. Do not switch underneath them.
+      const changing = req.method !== 'GET' && !u.pathname.startsWith('/api/videos/') && u.pathname !== '/api/task/cancel';
+      if (changing) activeRequests++;
+      try { return await api(req, res, u); } finally { if (changing) activeRequests--; }
+    }
     if (u.pathname === '/' || u.pathname === '/index.html') return serveFile(req, res, join(STUDIO, 'public', 'index.html'));
     if (/^\/(favicon\.svg|assets\/[\w.-]+\.(js|css))$/.test(u.pathname)) return serveFile(req, res, join(STUDIO, 'public', u.pathname.slice(1)));
     if (u.pathname.startsWith('/files/')) {
@@ -1025,6 +1050,8 @@ server.on('error', async e => {
   console.error(`Port ${PORT} is in use by another program. Start Studio on another port: npm run studio -- --port 4758`);
   process.exit(1);
 });
+// a task, download, transcript or generate still marked running was cut off when Studio last stopped
+if (C.settleStale(C.load())) update(st => { C.settleStale(st); });
 // a take still marked recording or converting was cut off when Studio last stopped
 { const s0 = C.load(); if ((s0.takes || []).some(t => t.status === 'recording' || t.status === 'converting')) update(st => { for (const t of st.takes) if (t.status === 'recording' || t.status === 'converting') Object.assign(t, { status: 'failed', error: 'Studio stopped while this take was being saved' }); }); }
 server.listen(PORT, HOST, () => {

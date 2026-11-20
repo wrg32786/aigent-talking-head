@@ -2,7 +2,7 @@
 // same npm run reel arguments you could type yourself. No network, no keys; the server (kit/studio/server.mjs) and the
 // MCP server (kit/mcp.mjs) both use this file, so the UI and an assistant always see and edit the same thing.
 //   state file: jobs/.studio/state.json (or STUDIO_DIR); the server watches it and pushes changes to the page.
-import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, readdirSync, statSync } from 'fs';
 import { dirname, join, resolve, relative, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
@@ -461,4 +461,127 @@ export function jobDir(s) { return s.job ? join(ROOT, 'jobs', s.job) : null; }
 export function outputsOf(s) {
   const d = jobDir(s); if (!d || !existsSync(d)) return [];
   return readdirSync(d).filter(f => /^reel(-fx)?-v\d+(-[a-z0-9]+)?\.mp4$/.test(f)).sort((a, b) => (+(b.match(/v(\d+)/) || [0, 0])[1]) - (+(a.match(/v(\d+)/) || [0, 0])[1]) || a.localeCompare(b)).map(f => `jobs/${s.job}/${f}`);
+}
+
+// ---------- videos: start fresh, open a past one ----------
+// A "video" is a job. Starting fresh never deletes a file: the old job's footage (inbox/studio/<job>), renders and
+// reel-vN.build snapshots stay where they are, and its session is saved to jobs/.studio/videos/<job>.json so opening
+// it again puts you back where you were. What carries over: your words (glossary) and the counters; with
+// keepLook, the look too (pack, picks, music, sound, pace, export, brand logos). Keys, settings and the agent
+// connection live in other files and are never touched here.
+export const LOOK_KEYS = ['pack', 'picks', 'music', 'sound', 'pace', 'export', 'brands'];
+const KEEP_KEYS = ['format', 'version', 'rev', 'updated', 'chatSeq', 'refSeq', 'importSeq', 'commentSeq', 'videoSeq', 'glossary'];
+const VIDEO_EXT = /\.(mp4|mov|m4v|webm|mkv)$/i;
+export const videosDir = () => join(stateDir(), 'videos');
+const videoPath = job => join(videosDir(), job + '.json');
+export const jobName = raw => String(raw || '').trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 49).replace(/-+$/, '');
+const clone = x => JSON.parse(JSON.stringify(x));
+// the part of a session that belongs to its video (everything but your words and the counters)
+export function videoSession(s) { const o = {}; for (const [k, v] of Object.entries(s)) if (!KEEP_KEYS.includes(k)) o[k] = clone(v); o.task = null; o.savedAt = new Date().toISOString(); return o; }
+export function saveVideo(s) {
+  if (!s.job || !JOB_RE.test(s.job)) return null;
+  mkdirSync(videosDir(), { recursive: true });
+  const f = videoPath(s.job), tmp = f + '.tmp'; writeFileSync(tmp, JSON.stringify(videoSession(s), null, 2)); renameSync(tmp, f);
+  return f;
+}
+export function savedVideo(job) { try { return JOB_RE.test(job) ? JSON.parse(readFileSync(videoPath(job), 'utf8')) : null; } catch { return null; } }
+// a clean board for a new job, built from s (s is changed in place and returned)
+export function freshSession(s, { job = null, keepLook = true } = {}) {
+  const d = defaultState(), keep = {};
+  for (const k of KEEP_KEYS) if (s[k] !== undefined) keep[k] = s[k];
+  const look = {}; if (keepLook) for (const k of LOOK_KEYS) if (s[k] !== undefined) look[k] = clone(s[k]);
+  for (const k of Object.keys(s)) delete s[k];
+  Object.assign(s, d, keep, look, { job: job || null });
+  // Clip-specific pause exceptions are edit decisions, not a reusable pace setting.
+  if (s.pace.keepPauses) delete s.pace.keepPauses;
+  return s;
+}
+// what a past job has on disk when Studio never saved its session (an older install, or a job made with npm run reel)
+export function videoFromDisk(job) {
+  const inbox = join(ROOT, 'inbox', 'studio', job), footage = [];
+  if (existsSync(inbox)) for (const f of readdirSync(inbox).sort()) if (VIDEO_EXT.test(f)) footage.push(`inbox/studio/${job}/${f}`);
+  const takes = join(inbox, 'takes');
+  if (existsSync(takes)) for (const f of readdirSync(takes).sort()) if (/^take-\d+\.mp4$/.test(f)) footage.push(`inbox/studio/${job}/takes/${f}`);
+  const clips = !footage.length && existsSync(join(ROOT, 'jobs', job, 'clips', 'clips.json')) ? `jobs/${job}/clips` : null;
+  return { footage, clips };
+}
+// open a past job: its saved session, or what is on disk. The look stays as it is when nothing was saved.
+export function openSession(s, job) {
+  const saved = savedVideo(job);
+  if (saved) {
+    const keep = {}; for (const k of KEEP_KEYS) if (s[k] !== undefined) keep[k] = s[k];
+    for (const k of Object.keys(s)) delete s[k];
+    const d = defaultState();
+    Object.assign(s, d, saved, keep, { job, task: null, reference: { ...d.reference, ...(saved.reference || {}) } });
+    delete s.savedAt;
+    return { restored: true };
+  }
+  freshSession(s, { job, keepLook: true });
+  Object.assign(s, videoFromDisk(job));
+  return { restored: false };
+}
+const mtime = p => { try { return statSync(p).mtimeMs; } catch { return 0; } };
+// every past video: jobs/<job>, inbox/studio/<job> and saved sessions, newest first, with how many reels each has
+export function listVideos(current = null, { limit = Infinity } = {}) {
+  const names = new Set();
+  const add = (dir, strip) => { if (!existsSync(dir)) return; for (const e of readdirSync(dir, { withFileTypes: true })) { const n = strip ? e.name.replace(/\.json$/, '') : e.name; if ((strip ? e.isFile() && e.name.endsWith('.json') : e.isDirectory()) && JOB_RE.test(n)) names.add(n); } };
+  add(join(ROOT, 'jobs'), false); add(join(ROOT, 'inbox', 'studio'), false); add(videosDir(), true);
+  if (current) names.add(current);
+  const out = [];
+  for (const job of names) {
+    const saved = savedVideo(job);
+    const at = Math.max(mtime(join(ROOT, 'jobs', job)), mtime(join(ROOT, 'inbox', 'studio', job)), saved && saved.savedAt ? Date.parse(saved.savedAt) || 0 : 0);
+    const outputs = outputsOf({ job }).length;
+    const footage = saved ? (saved.footage || []).length : videoFromDisk(job).footage.length;
+    out.push({ job, at: at ? new Date(at).toISOString() : null, outputs, footage, saved: !!saved, current: job === current });
+  }
+  out.sort((a, b) => (b.current - a.current) || (Date.parse(b.at || 0) || 0) - (Date.parse(a.at || 0) || 0) || a.job.localeCompare(b.job));
+  return out.slice(0, limit);
+}
+// Persisted work which still owns this board. Used by the server and by MCP when Studio is closed.
+export function videoBusy(s) {
+  if (s.task && s.task.status === 'running') return `A ${s.task.kind || 'task'} is running`;
+  if ((s.imports || []).some(x => x.status === 'downloading')) return 'A footage link is still downloading';
+  if ((s.takes || []).some(t => t.status === 'recording' || t.status === 'converting')) return 'A take is still being saved';
+  if (Object.values(s.tx || {}).some(x => x && x.status === 'running')) return 'A transcript is still running';
+  if (Object.values(s.broll || {}).some(b => b && (b.gens || []).some(g => g.status === 'running'))) return 'A B-roll clip is still generating';
+  return null;
+}
+// work Studio was doing when it last stopped can never finish: mark it, so it does not block switching videos forever
+export function settleStale(s) {
+  let n = 0; const stop = (x, status, error) => { Object.assign(x, { status, ...(error ? { error } : {}) }); n++; };
+  if (s.task && s.task.status === 'running') stop(s.task, 'cancelled');
+  for (const x of s.imports || []) if (x.status === 'downloading') stop(x, 'failed', 'Studio stopped during this download');
+  for (const x of Object.values(s.tx || {})) if (x && x.status === 'running') stop(x, 'failed', 'Studio stopped during this transcript');
+  for (const b of Object.values(s.broll || {})) for (const g of (b && b.gens) || []) if (g.status === 'running') stop(g, 'failed', 'Studio stopped while this was generating');
+  return n;
+}
+const taken = j => existsSync(join(ROOT, 'jobs', j)) || existsSync(join(ROOT, 'inbox', 'studio', j)) || !!savedVideo(j);
+export function freeName(base) { if (!taken(base)) return base; for (let i = 2; i < 1000; i++) { const n = `${base.slice(0, 44)}-${i}`; if (!taken(n)) return n; } return base.slice(0, 40) + '-' + Date.now().toString(36); }
+// the one switch the page, the server and the MCP tools share: checks the name, saves the current video's session,
+// then starts fresh or opens. Changes s in place; returns { job, restored?, note }. Throws (with .code) when refused.
+export function switchVideo(s, { name, keepLook = true, open } = {}, { checkBusy = true } = {}) {
+  const fail = (msg, code) => { throw Object.assign(new Error(msg), { code }); };
+  const busy = checkBusy && videoBusy(s); if (busy) fail(`${busy}. Cancel it or let it finish, then switch videos.`, 409);
+  let job;
+  if (open !== undefined && open !== null) {
+    job = jobName(open);
+    if (!job || !listVideos(s.job).some(v => v.job === job)) fail(`no video named "${open}"`, 404);
+    if (job === s.job) return { job, restored: true, note: `${job} is already open` };
+  } else {
+    const raw = name === undefined || name === null ? '' : String(name);
+    job = raw.trim() ? jobName(raw) : freeName('video-' + new Date().toISOString().slice(0, 10));
+    if (!job || !JOB_RE.test(job)) fail('name: use letters, numbers and dashes', 400);
+    if (job === s.job || taken(job)) fail(`"${job}" is already a video. Open it from the list, or pick another name.`, 409);
+  }
+  const from = s.job;
+  if (from) saveVideo(s);
+  let note, restored;
+  if (open !== undefined && open !== null) { restored = openSession(s, job).restored; note = `Opened ${job}${restored ? '' : ' (its footage and reels; it had no saved session)'}`; }
+  else { freshSession(s, { job, keepLook: keepLook !== false }); note = `Started a new video: ${job}${keepLook !== false ? ', kept the look' : ''}`; }
+  if (from) note += `. ${from} is saved: More, Open a past video brings it back.`;
+  s.videoSeq = (s.videoSeq || 0) + 1;
+  applyPatch(s, { reply: note, kind: 'action', from: 'studio' });
+  saveVideo(s); // reserve even an empty new video, and let the list find it before any upload
+  return { job, restored, note };
 }

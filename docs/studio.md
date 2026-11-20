@@ -462,9 +462,25 @@ irm https://raw.githubusercontent.com/wrg32786/aigent-talking-head/main/install/
 
 A double-click app with no installer at all is planned: [docs/desktop-app-plan.md](desktop-app-plan.md).
 
+## New video
+
+<img src="studio/new-video.png" width="560" alt="The New video dialog: a name field showing it will be saved as next-reel, Keep my look switched on, and Open a past video, Cancel and Start fresh">
+
+When a reel is done, **New video** clears the board for the next one. Open it with the **+** next to the reel name, or **More**, New video. Give the new reel a name (it is cleaned the same way as the name field: lowercase letters, numbers and dashes; leave it empty for `video-<date>`) and press **Start fresh**. You land on Footage with an empty board: no footage, cuts, reference, b-roll, review notes, draft or chat.
+
+**Keep my look** is on by default and keeps the pack, style picks, music, sound, pace, export size and brand logos for the new reel. Turn it off to go back to the defaults too. Your words (the glossary), API keys, settings and your agent's connection never change.
+
+Nothing is deleted. The old reel's files stay where they were (`inbox/studio/<job>/`, `jobs/<job>/` with its renders and `reel-vN.build/` saves), and its whole session is saved to `jobs/.studio/videos/<job>.json`.
+
+<img src="studio/new-video-open.png" width="560" alt="Open a past video: launch-teaser, Nov 20, 1 reel">
+
+**More**, Open a past video (or the link at the bottom of New video) lists your past reels, newest first, with the date and how many reels each has. Pick one and Studio puts you back where you left it. A job Studio never saved (made before 1.11.0, or with `npm run reel`) opens with its footage and its reels, so Outputs and **Edit this reel** work. The reel you leave is saved first, so you can switch back and forth.
+
+Studio will not switch while a draft, render, download, take, transcript or b-roll generate is running: cancel it or let it finish. Your agent does the same with `new_video`, `open_video` and `list_videos` (see [mcp.md](mcp.md)); when it switches, the page follows to Footage.
+
 ## Files and safety
 
-- The session lives in `jobs/.studio/state.json` (`STUDIO_DIR` moves it). Uploads go to `inbox/studio/<job>/` (recorded takes in its `takes/` folder) and `teardown-in/studio/<job>/`, drafts to `jobs/<job>/`, teardowns to `teardown/studio-<job>/`. All gitignored.
+- The session lives in `jobs/.studio/state.json` (`STUDIO_DIR` moves it); each past video's session in `jobs/.studio/videos/<job>.json`. Uploads go to `inbox/studio/<job>/` (recorded takes in its `takes/` folder) and `teardown-in/studio/<job>/`, drafts to `jobs/<job>/`, teardowns to `teardown/studio-<job>/`. All gitignored.
 - The server listens on 127.0.0.1 only, refuses other Host headers (so a web page can't reach it by DNS rebinding) and cross-site posts, and serves files only from the kit's media folders.
 - API keys stay in `jobs/.studio/keys.json` (owner-only) or the environment and never leave the server: the page and the agent see set or not. B-roll stock and generated media go to the b-roll library, never the repo. Agent-made cards render with JavaScript off and no network; web captures take public pages only.
 - One task runs at a time; Cancel stops it.
@@ -475,7 +491,7 @@ A double-click app with no installer at all is planned: [docs/desktop-app-plan.m
 <img src="studio/more-menu.png" width="520" alt="The top bar with numbered steps, the setup pill, Connect agent, theme, Settings and the More menu open with Connect agent, Setup check, API keys and providers and the theme">
 <img src="studio/top-phone.png" width="260" alt="The top bar on a phone: the reel name and buttons on the first row and the six steps on a second row">
 
-The top bar always fits on one line: on a laptop only the current step shows its name (the others show their number, and hovering a step still names it), the setup pill shows just the count of what is missing, and Connect agent shrinks to its plug. **More** (the three dots) holds Connect agent, Setup check, API keys and providers and the theme, and works with the keyboard: Enter or Space opens it, the arrow keys move, Enter picks, Escape closes. On a phone the steps get their own row under the reel name.
+The top bar always fits on one line: on a laptop only the current step shows its name (the others show their number, and hovering a step still names it), the setup pill shows just the count of what is missing, and Connect agent shrinks to its plug. **More** (the three dots) holds New video, Open a past video, Connect agent, Setup check, API keys and providers and the theme, and works with the keyboard: Enter or Space opens it, the arrow keys move, Enter picks, Escape closes. On a phone the steps get their own row under the reel name.
 
 Longer explanations sit behind a small **i** next to the thing they explain (Footage from a link, Clean-up pass, Record screen in B-roll); click it to read, Escape or a click elsewhere closes it.
 

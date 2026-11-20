@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { Theme } from '@astryxdesign/core/theme';
 import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';
@@ -21,6 +21,7 @@ import { Connect } from './Connect.jsx';
 import wordmarkDark from './brand/aigent-wordmark-for-dark.svg';
 import wordmarkLight from './brand/aigent-wordmark-for-white.svg';
 import { SetupCheck } from './Setup.jsx';
+import { NewVideo, cleanJob } from './NewVideo.jsx';
 
 const hashStep = () => (location.hash.match(/step=([a-z]+)/) || [])[1];
 const hashMenu = () => (location.hash.match(/menu=([a-z-]+)/) || [])[1];
@@ -41,16 +42,22 @@ export function App() {
   const [keysOpen, setKeysOpen] = useState(/keys/.test(location.hash));
   const [connectOpen, setConnectOpen] = useState(/connect/.test(location.hash));
   const [setupOpen, setSetupOpen] = useState(/setup/.test(location.hash));
+  const [videoMode, setVideoMode] = useState(/new-video/.test(location.hash) ? 'new' : null);
   const [log, setLog] = useState('');
   const [recLive, setRecLive] = useState(null);
   const mainRef = useRef(null);
 
-  const seen = useRef({ boot: null, seq: 0 });
+  const seen = useRef({ boot: null, seq: 0, video: null });
   const apply = useCallback(v => {
     if (!v || !v.state) return v;
     const k = seen.current;
     if (v.seq && v.boot === k.boot && v.seq < k.seq) return v; // an older reply than what is on screen
-    if (v.seq) seen.current = { boot: v.boot, seq: v.seq };
+    const video = v.state.videoSeq || 0;
+    if (k.video !== null && video !== k.video) {
+      setStep('footage'); localStorage.setItem('studio.step', 'footage'); history.replaceState(null, '', '#step=footage');
+      setLog(''); setRecLive(null); // a task log and a recorder status belong to the previous board
+    }
+    if (v.seq) seen.current = { boot: v.boot, seq: v.seq, video };
     setV(v); return v;
   }, []);
   const patch = useCallback(p => api('/api/state', p).then(apply), [apply]);
@@ -105,7 +112,7 @@ export function App() {
       <div className="ambient" aria-hidden="true" />
       <header className="top glass">
         <div className="brand"><img className="wm wm-dark" src={wordmarkDark} alt="AIgent" width="127" height="59" /><img className="wm wm-light" src={wordmarkLight} alt="AIgent" width="127" height="59" /><span className="bname">Studio</span></div>
-        <JobName s={s} patch={patch} />
+        <div className="jobrow"><JobName s={s} patch={patch} /><IconBtn id="new-video-open" n="plus" className="nv-btn" label="New video" aria-haspopup="dialog" onClick={() => setVideoMode('new')} /></div>
         <nav className="stepper" aria-label="Steps"><ol id="stepper">
           {STEPS.map((st, k) => <li key={st} className={done[st] ? 'done' : ''}>
             <button type="button" data-step={st} aria-current={st === step ? 'step' : 'false'} title={stepName(st)} aria-label={`${k + 1}. ${stepName(st)}${done[st] && st !== step ? ', done' : ''}`} onClick={() => go(st, true)}>
@@ -121,6 +128,8 @@ export function App() {
           <button className="icon-btn fab" id="chat-open" type="button" aria-controls="chat" aria-expanded={String(chatOpen)} aria-label="Open chat" onClick={() => setChatOpen(true)}><Icon n="chat" /><span className={'dot ' + agentState} id="fab-dot" aria-hidden="true" /></button>
           <IconBtn id="open-settings" n="sliders" label="Settings" aria-haspopup="dialog" onClick={() => setSettingsOpen(true)} />
           <MoreMenu id="more-open" label="More" items={[
+            { id: 'more-new-video', label: 'New video', icon: 'plus', onClick: () => setVideoMode('new') },
+            { id: 'more-open-video', label: 'Open a past video', icon: 'film', onClick: () => setVideoMode('open') },
             { id: 'more-connect', label: 'Connect agent', icon: 'plug', onClick: openConnect },
             { id: 'more-setup', label: 'Setup check', icon: 'check', onClick: openSetup },
             { id: 'more-keys', label: 'API keys and providers', icon: 'link', onClick: openKeys },
@@ -130,6 +139,8 @@ export function App() {
       </header>
       <div className="layout">
         <main id="main" data-step={step} ref={mainRef}>
+          {/* a new or opened video remounts the steps, so no step keeps the last board's local picks */}
+          <Fragment key={'v' + (s.videoSeq || 0)}>
           <Footage {...ctx} hidden={step !== 'footage'} onLive={setRecLive} />
           {step === 'cut' && <Cut {...ctx} />}
           {step === 'reference' && <Reference {...ctx} />}
@@ -137,18 +148,20 @@ export function App() {
           {step === 'broll' && <BRoll {...ctx} />}
           <Render {...ctx} hidden={step !== 'render'} />
           {step === 'post' && <Post {...ctx} />}
+          </Fragment>
           <footer className="stepnav glass" id="stepnav">
             <span style={{ visibility: i ? 'visible' : 'hidden' }}><Button id="prev" variant="ghost" label="Back" icon={<Icon n="left" />} onClick={() => go(STEPS[Math.max(0, i - 1)], true)} /></span>
             <PicksTray s={s} patch={patch} />
             {i < STEPS.length - 1 ? <Button id="next" variant="primary" label={stepName(STEPS[i + 1])} endContent={<Icon n="right" />} onClick={() => go(STEPS[i + 1], true)} /> : <span className="nextpad" />}
           </footer>
         </main>
-        <Chat {...ctx} open={chatOpen} setOpen={setChatOpen} agentState={agentState} />
+        <Chat key={s.videoSeq || 0} {...ctx} open={chatOpen} setOpen={setChatOpen} agentState={agentState} />
       </div>
       <Settings {...ctx} open={settingsOpen} setOpen={setSettingsOpen} theme={theme} setTheme={setTheme} glass={glass} setGlass={setGlass} />
       <Connect {...ctx} open={connectOpen} setOpen={setConnectOpen} />
       <SetupCheck open={setupOpen} setOpen={setSetupOpen} />
       <Keys {...ctx} open={keysOpen} setOpen={setKeysOpen} />
+      <NewVideo {...ctx} mode={videoMode} setMode={setVideoMode} />
       <Toast />
     </Theme>
   );
@@ -158,7 +171,7 @@ function JobName({ s, patch }) {
   const [val, setVal] = useState(s.job || '');
   const focused = useRef(false);
   useEffect(() => { if (!focused.current) setVal(s.job || ''); }, [s.job]);
-  const commit = () => { const j = val.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || null; if (j === (s.job || null)) { setVal(s.job || ''); return; } patch({ job: j }).catch(() => {}); };
+  const commit = () => { const j = cleanJob(val) || null; if (j === (s.job || null)) { setVal(s.job || ''); return; } patch({ job: j }).catch(() => {}); };
   return <label className="job"><span className="sr">Job name</span>
     <input id="job" name="job" placeholder="name-your-reel" autoComplete="off" spellCheck="false" aria-describedby="job-hint" value={val}
       onFocus={() => { focused.current = true; }} onBlur={() => { focused.current = false; }}
