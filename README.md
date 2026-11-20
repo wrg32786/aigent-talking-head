@@ -135,6 +135,10 @@ Then run `npm run studio` (or click the icon). Without an agent the chat works o
 
 <img src="docs/studio/broll-lane.png" width="520" alt="The B-roll step: one slot per beat, a clip on beat 2 as a split top panel, with placement, timing and the fill tabs"> <img src="docs/studio/broll-keys.png" width="300" alt="API keys and providers: Pexels saved and tested, other providers not set">
 
+**Post to Buffer.** The last step sends the finished reel to your Buffer account, one post per channel: Instagram Reels, TikTok, YouTube Shorts, LinkedIn, X, Facebook Reels and Threads. Posts are saved as Buffer drafts unless you pick queue, a time, or post now (which asks you to tick a box first). Buffer fetches the video from a public link, so Studio uploads it to your Cloudflare R2 bucket or your Cloudinary account, or you paste your own link. It re-encodes to H.264 when needed and skips channels the reel is too long for, with the reason. Your Buffer key stays on your computer and your agent can do the same with the `buffer_post_reel` tool. Details: [docs/posting.md](docs/posting.md).
+
+<img src="docs/studio/post-channels.png" width="420" alt="The Post step, Channels: the reel, four Buffer channels with Facebook Reels marked Will be skipped for a 1 min 40 s reel, and the caption"> <img src="docs/studio/post-send.png" width="420" alt="The Post step, Send: Drafts picked, Send to Buffer as drafts, and the result for each channel">
+
 **Review your edit.** The Reference step lists the reference's parts with times (hook, cuts, titles, b-roll, CTA), each with the matching Studio picks one click away. In the Render step you can watch your reel beside the reference or under it with an opacity slider, on one clock; click or drag a box on a frame to send your agent a comment with the frame and the time; run a clean-up pass that lists long pauses, filler words and retakes from the Whisper word timings to keep or remove before a redraft; and read the edit receipt, every pick and its reason in plain words. Details: [docs/studio.md](docs/studio.md#review-your-edit).
 
 <img src="docs/studio/compare-desktop.png" width="420" alt="Show original: the reference and your reel side by side on one clock"> <img src="docs/studio/cleanup-desktop.png" width="420" alt="Clean-up pass: a filler word, a long pause and a retake, each with Keep or Remove">
@@ -380,7 +384,7 @@ The CLI may print a one-line star reminder after your first successful render, a
 
 ## Cite this
 
-> Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.9.0) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
+> Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.10.0) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
 
 Machine-readable metadata is in [CITATION.cff](CITATION.cff), and GitHub shows it under "Cite this repository".
 
@@ -392,6 +396,7 @@ Machine-readable metadata is in [CITATION.cff](CITATION.cff), and GitHub shows i
 - [User guide](docs/guide.md): what you get, the effects pass, looks, caption styles and fonts, edit rules, themes, manual steps, the file map and brand presets.
 - [Reel.md recipe spec](docs/reel-md.md) and [example recipes](examples/recipes/).
 - [Teardown guide and accuracy notes](docs/teardown.md).
+- [Posting to Buffer](docs/posting.md): the Post step, R2 and Cloudinary hosting, per-channel limits.
 - [MCP server setup](docs/mcp.md).
 - [Full FAQ](docs/faq.md).
 - [Notes for agents working in this repo](AGENTS.md), how to [contribute or support the project](CONTRIBUTING.md), and the [changelog](CHANGELOG.md).

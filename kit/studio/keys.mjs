@@ -32,6 +32,13 @@ export const PROVIDERS = [
     test: { method: 'GET', path: '/v1/account', auth: k => ({ Authorization: 'Bearer ' + k }) } },
   { id: 'fal', name: 'fal', group: 'generate', for: 'Generate b-roll with a model you pick on fal (paid)', env: ['FAL_KEY'], base: 'https://queue.fal.run', get: 'https://fal.ai/dashboard/keys', docs: 'https://docs.fal.ai/model-apis/model-endpoints/queue',
     test: null }, // fal documents no key-check endpoint, so Test key says so instead of spending a request
+  // Posting (the Post step, kit/studio/post.mjs): your own Buffer key, and where the video is hosted so Buffer can fetch it
+  { id: 'buffer', name: 'Buffer', group: 'post', for: 'Send reels to Buffer as drafts or scheduled posts (your account, every plan)', env: ['BUFFER_API_KEY'], base: 'https://api.buffer.com', get: 'https://publish.buffer.com/settings/api', docs: 'https://developers.buffer.com/guides/getting-started.html', free: true,
+    test: { run: async (key, o) => (await import('./post.mjs')).testBuffer(key, o) } },
+  { id: 'r2', name: 'Cloudflare R2', group: 'post', for: 'Host the video for Buffer in your R2 bucket (an R2 API token with Object Read and Write)', env: ['R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY'], pair: ['Access key ID', 'Secret access key'], base: 'https://r2.cloudflarestorage.com', get: 'https://dash.cloudflare.com/?to=/:account/r2/api-tokens', docs: 'https://developers.cloudflare.com/r2/api/s3/api/',
+    test: { run: async (key, o) => (await import('./post.mjs')).testHost('r2', o) } },
+  { id: 'cloudinary', name: 'Cloudinary', group: 'post', for: 'Host the video for Buffer on Cloudinary (API key and secret; or only an unsigned upload preset in the Post step)', env: ['CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'], pair: ['API key', 'API secret'], base: 'https://api.cloudinary.com', get: 'https://console.cloudinary.com/settings/api-keys', docs: 'https://cloudinary.com/documentation/upload_images#uploading_with_a_direct_call_to_the_rest_api',
+    test: { run: async (key, o) => (await import('./post.mjs')).testHost('cloudinary', o) } },
 ];
 export const byId = id => PROVIDERS.find(p => p.id === id);
 export const baseOf = (p, env = process.env) => (env['STUDIO_API_BASE_' + p.id.toUpperCase()] || p.base).replace(/\/$/, '');
@@ -78,7 +85,8 @@ export async function test(id, { env = process.env, fetchImpl = fetch, value } =
   if (!p.test) return { ok: null, note: `${p.name} has no documented key check, so the key is saved but not tested. A generate shows any key error.` };
   const t = p.test, path = typeof t.path === 'function' ? t.path(key) : t.path;
   let r, res;
-  try {
+  if (t.run) { try { r = await t.run(key, { env, fetchImpl }); } catch (e) { r = { ok: false, error: scrub(e.message, key) }; } }
+  else try {
     const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 15000);
     res = await fetchImpl(baseOf(p, env) + path, { method: t.method, headers: { ...t.auth(key), ...(t.body ? { 'content-type': 'application/json' } : {}) }, body: t.body ? JSON.stringify(t.body) : undefined, signal: ctl.signal });
     clearTimeout(timer);

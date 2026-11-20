@@ -29,6 +29,7 @@ import { capture as capturePage } from '../capture.mjs';
 import { findChrome } from '../chrome.mjs';
 import { mount as mountBroll } from './broll-api.mjs';
 import { mount as mountFolders } from './folders.mjs';
+import { mount as mountPost } from './post-api.mjs';
 
 const require = createRequire(import.meta.url);
 const K = require('../packs.cjs');
@@ -580,6 +581,7 @@ let chromeSeen = null; const chromeOk = () => { if (chromeSeen == null) { try { 
 // Settings folder fields: the native folder dialog, the in-page folder list, New folder and Open folder (kit/studio/folders.mjs)
 const FOLDERS = mountFolders({ ROOT, json, readBody, extraFolders: () => { const st = S.load(); return [st.downloads, st.renders, st.broll && st.broll.library, join(ROOT, 'teardown-in', 'studio'), join(ROOT, 'jobs')]; },
   ensure: [join(ROOT, 'teardown-in', 'studio'), join(ROOT, 'jobs')] });
+const POSTR = mountPost({ ROOT, C, json, readBody });
 const BRL = mountBroll({ ROOT, C, update, json, readBody, serveFile: (...a) => serveFile(...a), CH, capturePage, chromeOk });
 function serveFile(req, res, file) {
   let st; try { st = statSync(file); } catch { return json(res, 404, { error: 'not found' }); }
@@ -725,6 +727,7 @@ async function api(req, res, u) {
   }
   if (await FOLDERS(p, M, u, req, res)) return;
   if (await BRL.route(p, M, u, req, res)) return;
+  if (await POSTR.route(p, M, u, req, res)) return;
   if (p === '/api/lines' && M === 'GET') return json(res, 200, await linesView(C.load(), u.searchParams.get('path')));
   if (p === '/api/lines' && M === 'POST') { const b = await readBody(req); const r = await editLines(b); return json(res, 200, { lines: r.view, ...view(r.s) }); }
   if (p === '/api/lines/render' && M === 'POST') {

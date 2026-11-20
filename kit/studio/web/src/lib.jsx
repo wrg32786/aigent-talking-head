@@ -14,7 +14,7 @@ export async function api(path, body, method) {
   return j;
 }
 
-export const STEPS = ['footage', 'cut', 'reference', 'style', 'broll', 'render'];
+export const STEPS = ['footage', 'cut', 'reference', 'style', 'broll', 'render', 'post'];
 export const STEP_LABEL = { broll: 'B-roll' };
 export const stepName = st => STEP_LABEL[st] || cap1(st);
 export const SITE = { youtube: 'YouTube', 'youtube-shorts': 'Shorts', tiktok: 'TikTok', x: 'X', vimeo: 'Vimeo', instagram: 'Instagram', file: 'File', other: 'Link' };
