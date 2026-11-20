@@ -27,9 +27,9 @@ function sourceValues(ref, flagName) {
 function scriptFlags(src) {
   const flags = new Map(); // name -> { valued, default }
   const add = (n, valued, def) => { const f = flags.get(n) || { valued: false, def: undefined }; if (valued) f.valued = true; if (def !== undefined) f.def = def; flags.set(n, f); };
-  for (const m of src.matchAll(/\b(flag|opt)\(\s*'([a-z0-9-]+)'\s*(?:,\s*([^)]*))?\)/g)) {
+  for (const m of src.matchAll(/\b(flag|opt|many)\(\s*'([a-z0-9-]+)'\s*(?:,\s*([^)]*))?\)/g)) {
     const lit = m[3] && /^('[^']*'|-?\d+(\.\d+)?)$/.test(m[3].trim()) ? m[3].trim().replace(/^'|'$/g, '') : undefined;
-    add(m[2], m[1] === 'opt', lit);
+    add(m[2], m[1] !== 'flag', lit); // many(k): a repeatable valued flag
   }
   for (const m of src.matchAll(/argv\.(?:includes|indexOf)\(\s*'--([a-z0-9-]+)'\s*\)/g)) add(m[1], false);
   return flags;

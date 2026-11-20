@@ -7,6 +7,9 @@ const DEF={fontCss:null,colors:{accent:'#ffd400',text:'#ffffff',ink:'#111111',mu
  fonts:{caption:{family:'"Helvetica Neue", Arial, "Liberation Sans", sans-serif',weight:700,size:76},display:{family:'"Arial Narrow", "Liberation Sans Narrow", "Helvetica Neue", Arial, sans-serif',hero:900,sticker:800,kicker:700,tracking:-0.01}},logo:null};
 const merge=(a,b)=>{if(!b||typeof b!=='object')return a;const o=Array.isArray(a)?[...a]:{...a};for(const k in b)o[k]=(b[k]&&typeof b[k]==='object'&&!Array.isArray(b[k])&&a&&typeof a[k]==='object'&&a[k])?merge(a[k],b[k]):b[k];return o};
 const CAP=window.CAPTIONS||{flips:[]};
+// keepCase (kit/glossary.cjs): words with their own casing ("AIgent", "ChatGPT", "claude.ai") stay as written when a
+// caps display face or a title sets the rest in capitals
+{const KC=(CAP.keepCase||[]).filter(w=>typeof w==='string'&&w.trim());if(KC.length){const up=String.prototype.toUpperCase,esc=x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),RX=KC.map(w=>[new RegExp('(^|[^\\p{L}\\p{N}])'+esc(up.call(w))+'(?=[^\\p{L}\\p{N}]|$)','gu'),w]);String.prototype.toUpperCase=function(){let x=up.call(this);for(const [r,w] of RX)x=x.replace(r,(m,a)=>a+w);return x}}}
 const TH=merge(merge(DEF,window.THEME),CAP.theme);
 // Font pairing (kit/fonts/pairings.json; render.mjs writes fonts.js): display -> hero words, titles, stickers;
 // secondary -> body words, captions, pills; script -> the accent word. Missing roles keep the theme's fonts.
@@ -113,8 +116,10 @@ function card(dt){const s=.55+.45*backOut(cl(dt/.22)),W=880,H=330,cx=540,cy=Y-10
 ctx.globalAlpha=cl(dt/.25);ctx.fillStyle=CY;ctx.fillRect(-40,-H/2+42,80,6);ctx.font=fnt(K,46);ctx.letterSpacing='0px';ctx.fillStyle=MU;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText((CAP.card&&CAP.card.kicker)||'',0,-H/2+92);ctx.restore();
 ctx.save();ctx.translate(cx,cy);ctx.scale(s,s);ctx.translate(-cx,-cy);spray((CAP.card&&CAP.card.title)||'',fit([(CAP.card&&CAP.card.title)||' '],G,170,800),cx,cy+48,dt-.08,4242,.4);ctx.restore()}
 // Logo plate: square plate (theme plate colour) with the logo on it. Logo file comes from captions.js "logo" or theme.logo.src.
+// A keyword logo (kit/brands.cjs: the flip has its own "logo") is a smaller plate high in the frame, on a white plate so
+// the mark keeps its own colours ("plate", "size" and "y" (0 to 1) change it).
 const LOGO=CAP.logo||(TH.logo&&TH.logo.src)||null;const SK=new Image();if(LOGO)SK.src=LOGO;
-function logoPlate(dt){if(!LOGO||!SK.naturalWidth)return;const s=.4+.6*backOut(cl(dt/.2)),w=620,h=w*(SK.naturalHeight/SK.naturalWidth||.325),pad=46;ctx.save();ctx.translate(540,Y);ctx.rotate(.035+Math.exp(-7*dt)*Math.sin(dt*26)*.05);ctx.scale(s,s);shadow(ctx,70);ctx.fillStyle=TH.colors.plate;ctx.fillRect(-w/2-pad,-h/2-pad,w+2*pad,h+2*pad);ctx.shadowColor='transparent';if(SK.complete)ctx.drawImage(SK,-w/2,-h/2,w,h);ctx.restore()}
+function logoPlate(dt,c){const o=(c&&c[4])||{},own=!!o.logo,im=own?gimg(o.logo):SK;if(!im||!im.naturalWidth)return;const s=.4+.6*backOut(cl(dt/.2)),w=o.size||(own?320:620),h=w*(im.naturalHeight/im.naturalWidth||.325),pad=own?30:46,y=own?(o.y!=null?+o.y:.2)*1920:Y;ctx.save();ctx.translate(540,y);ctx.rotate(.035+Math.exp(-7*dt)*Math.sin(dt*26)*.05);ctx.scale(s,s);shadow(ctx,70);ctx.fillStyle=own?(o.plate||'#ffffff'):TH.colors.plate;ctx.fillRect(-w/2-pad,-h/2-pad,w+2*pad,h+2*pad);ctx.shadowColor='transparent';if(im.complete)ctx.drawImage(im,-w/2,-h/2,w,h);ctx.restore()}
 // Kinetic title. Our own code; entrance ideas (stagger, slam with overshoot, blur rise, elastic, flip, pop zoom) follow
 // common kinetic-type recipes such as nexu-io/motion-anything (Apache-2.0, reference only; see THIRD_PARTY.md).
 const elastic=x=>x<=0?0:x>=1?1:Math.pow(2,-10*x)*Math.sin((x*10-.75)*2.094)+1;const overshoot=(x,o)=>{const c=o*10.5;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2)};
@@ -470,6 +475,7 @@ function caption(c,t){const st=c[4].style||CSTYLE;if(st==='one-word'&&OWSEQ)retu
 const GX=window.GFX||{},GXA=GX.assets||{},GXF=GX.fonts||{},GIMG={},IMGP=[];
 for(const [fam,u,st] of [['ATH Gfx Serif',GXF.serif,'italic'],['ATH Gfx Label',GXF.label,'normal'],['ATH Gfx Mono',GXF.mono,'normal'],['ATH Gfx Slam',GXF.slam,'normal'],['ATH Gfx Code',GXF.code,'normal']])if(u){const ff=new FontFace(fam,`url("${u}")`,{style:st,...(fam==='ATH Gfx Code'?{weight:'100 800'}:{})});document.fonts.add(ff);FACES.push(ff.load().catch(()=>console.warn('font failed',fam)))}
 const gimg=u=>{if(!u)return null;if(GIMG[u])return GIMG[u];const i=new Image();IMGP.push(new Promise(r=>{i.onload=r;i.onerror=r}));i.src=u;GIMG[u]=i;return i};
+for(const c of flips)if(c[3]===5&&c[4].logo)gimg(c[4].logo); // keyword logos load before the first frame
 for(const a of Object.values(GXA)){gimg(a.icon);gimg(a.src);(a.frames||[]).forEach(gimg)}
 const gxa=c=>GXA[c[3]+'@'+c[0]]||{};
 const SERIF=s=>`italic 400 ${s}px "ATH Gfx Serif", Georgia, "Times New Roman", serif`,LABELF=s=>`400 ${s}px "ATH Gfx Label", "Arial Black", Impact, sans-serif`;
@@ -1236,7 +1242,7 @@ else if(m===1)spray(c[2],fit([c[2]],G,200,960),540,Y,dt,31*(Math.round(c[0]*10)+
 else if(m===2)sticker(c[2],fit([c[2]],F,150,860),540,Y,dt,Math.round(c[0]*10)+1,F);
 else if(m===3){const cu=CAP.countUp||{to:20,suffix:''},fs=fit([cu.to+cu.suffix],G,200,960),n=Math.min(cu.to,Math.round(cu.to*cl(dt/.3))),pop=.72+.28*backOut(cl(dt/.2));ctx.translate(540,Y);ctx.scale(pop,pop);ctx.translate(-540,-Y);glyphs(n+cu.suffix,fs,540,Y,dt+.2,CY,true,G)}
 else if(m===4)card(dt);
-else if(m===5)logoPlate(dt);
+else if(m===5)logoPlate(dt,c);
 else if(m===6){sticker(c[2],fit(c[2].split('|'),F,170,700),540,Y-20,dt,7,F);const cta=CAP.cta||{};if(cta.sub&&t>=cta.subAt)glyphs(cta.sub,62,540,Y+210,t-cta.subAt,IV,true)}
 ctx.restore()}
 if(LAYER!=='panels'&&(CAPBEH?LAYER!=='front':LAYER!=='titles')&&(!only||only.some(c=>c[3]===0)))oneWordSeq(t,only)}

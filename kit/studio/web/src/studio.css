@@ -690,3 +690,9 @@ ol.conn-steps > li::before { content: counter(cs); position: absolute; left: 0; 
 .rp-wbar .rp-read { flex-basis: auto; }
 .rec-bar .rec-live.reh ~ .rec-format { display: none; }
 .conn-docs a + a { margin-left: 2px; }
+
+/* Words and brands */
+#glossary { width: 100%; font: inherit; resize: vertical; }
+.brand-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.brand-list li { display: flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px; border: 1px solid var(--border); border-radius: 999px; }
+.brand-list img { background: #fff; border-radius: 4px; padding: 2px; max-width: 90px; object-fit: contain; }
