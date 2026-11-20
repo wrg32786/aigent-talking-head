@@ -1,5 +1,6 @@
 // The Cut step: what to make from the take (format, length, output, goal, with smart defaults), then the candidates
-// on the take's timeline to keep, drop, trim, reorder or add to, and one button that renders every kept one.
+// on the take's timeline to keep, drop, trim, reorder or add to. Nothing renders here: the kept cuts and bites render
+// on the Render step, the one place that makes videos.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';
@@ -152,7 +153,6 @@ export function Cut({ V, s, apply, go }) {
   const scored = cut.pending === 'agent' ? 'Your agent is picking. These are the rules picks until it answers.' : cut.pending === 'model' ? 'A model is scoring them.' : cut.pending === 'transcript' ? null
     : cut.scoredBy ? (cut.scoredBy === 'rules' ? 'Scored by the rules (connect your agent or a model to score with AI)' : `Scored by ${cut.scoredBy}`) : null;
   const renderedFor = c => (c.outputs || [])[0];
-  const cutsRun = running && t.kind === 'cuts';
   if (!s.footage.length) return <section className="step" id="s-cut" data-step="cut" aria-labelledby="h-cut">
     <header className="sh"><h2 id="h-cut">Cut</h2><p className="sub">What to make from your take.</p></header>
     <div className="empty-art"><Icon n="film" /><p>Add footage first.</p><Button variant="secondary" label="Go to Footage" onClick={() => go('footage', true)} /></div></section>;
@@ -166,15 +166,13 @@ export function Cut({ V, s, apply, go }) {
     <Picker cut={cut} set={set} key={src} />
     <div className="runbar glass-card">
       <Button id="cut-find" size="lg" variant={cut.candidates.length ? 'secondary' : 'primary'} label={cut.candidates.length ? 'Find again' : 'Find cuts'} isLoading={tx && tx.status === 'running'} onClick={find} />
-      <Button id="cut-render" size="lg" variant={cut.candidates.length ? 'primary' : 'secondary'} label={kept.length ? `Render ${kept.length}` : 'Render'} isDisabled={!kept.length || running} onClick={() => api('/api/cut/render', {}).then(j => { apply(j); toast(`Rendering ${j.plan.length} video${j.plan.length > 1 ? 's' : ''}`, true); }).catch(() => {})} />
-      {cutsRun && <Button variant="ghost" label="Cancel" onClick={() => api('/api/task/cancel', {}).then(apply)} />}
       <span className="fine" id="cut-scored">{scored}</span>
+      {kept.length > 0 && <span className="fine" id="cut-hint">{`${kept.length} kept. ${kept.length > 1 ? 'They render' : 'It renders'} at the end, on the Render step.`}</span>}
     </div>
     {tx && tx.status === 'running' && <div className="tx-run" id="cut-tx"><ProgressBar label="Transcribing the take" value={tx.total ? Math.round(100 * tx.done / tx.total) : undefined} isIndeterminate={!tx.total} />
       <span className="fine">Transcribing{tx.total ? ` part ${Math.min(tx.done + 1, tx.total)} of ${tx.total}` : ''}, then finding cuts. Safe to leave this page.</span></div>}
     {tx && tx.status === 'failed' && <p className="err" role="alert">{tx.error}</p>}
     {tx && tx.status === 'failed' && tx.fix && <FixActions V={V} id={tx.fix} apply={apply} />}
-    {cutsRun && <div id="cut-progress"><ProgressBar label="Rendering the cuts" isIndeterminate /></div>}
     <div className="cut-grid">
       <div className="cut-play">{src && <Player path={src} tx={tx} playerRef={player} onAddRange={r => add(r, 'clip')} />}</div>
       <div className="cut-list">
@@ -182,7 +180,7 @@ export function Cut({ V, s, apply, go }) {
           : <div className="empty-art"><Icon n="grid" /><p>{tx && tx.status === 'running' ? 'Cuts show up here when the transcript is done.' : 'Find cuts to see the candidates, with their times, score and why.'}</p></div>}
       </div>
     </div>
-    {src && <Lines s={s} src={src} player={player} apply={apply} running={running} t={t} backend={V.env && V.env.backend} open={dur >= 180} key={'lines-' + src} />}
+    {src && <Lines s={s} src={src} player={player} apply={apply} t={t} backend={V.env && V.env.backend} open={dur >= 180} key={'lines-' + src} />}
     {src && dur > 0 && (cut.candidates.length > 0 || tr) && <Timeline cut={cut} peaks={peaks} marks={(tr && tr.marks) || []} now={now} dur={dur} sel={sel} setSel={setSel} onSeek={seek} onEdit={edit} onAdd={add} />}
   </section>;
 }

@@ -1,6 +1,7 @@
 // The Lines view on the Cut step: a long take as its lines (text, length, play, keep or retake), grouped into named
-// bites you can reorder, play, render or save as one file, plus one clean take of the whole thing. Your agent can do
-// the picking (get_lines and set_bites over MCP) and its bites show here as picked by it.
+// bites you can reorder and play, plus one clean take of the whole thing. Bites render on the Render step (Render.jsx),
+// the one place that makes videos. Your agent can do the picking (get_lines and set_bites over MCP) and its bites show
+// here as picked by it.
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';
@@ -10,7 +11,7 @@ import { clock } from './Player.jsx';
 const len = t => (t < 60 ? (+t).toFixed(1) + ' s' : clock(t));
 const ASK = 'Pick bites from my take on the Cut step: read get_lines, mark retakes and fragments with keep, and send named bites with set_bites (each one complete thought with a strong first line, lines in the order they should play). Also make the clean take with clean true.';
 
-export function Lines({ s, src, player, apply, running, t, backend, open: open0 }) {
+export function Lines({ s, src, player, apply, t, backend, open: open0 }) {
   const [lv, setLv] = useState(null), [sel, setSel] = useState([]), [name, setName] = useState(''), [show, setShow] = useState('all');
   const [open, setOpen] = useState(open0), [playing, setPlaying] = useState(null);
   const ls = JSON.stringify(((s.lines || {})[src]) || null), txs = ((s.tx || {})[src] || {}).status;
@@ -23,7 +24,6 @@ export function Lines({ s, src, player, apply, running, t, backend, open: open0 
   const play = (id, ranges) => { if (!player.current || !ranges.length) return; if (playing === id) { seq.current = null; setPlaying(null); player.current.seek(player.current.now()); return; }
     seq.current = { ranges, k: 0 }; setPlaying(id); player.current.play(ranges[0][0], ranges[0][1]); };
   const post = b => api('/api/lines', { path: src, ...b }).then(j => { setLv(j.lines); apply(j); return j; });
-  const render = (ids, only) => api('/api/lines/render', { path: src, ids, only }).then(j => { apply(j); toast(only ? 'Saving the file' : `Rendering ${j.plan.length} video${j.plan.length > 1 ? 's' : ''}`, true); }).catch(() => {});
   if (!lv || !src) return null;
   const head = <button type="button" className="lines-h" id="lines-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
     <Icon n={open ? 'down' : 'right'} /><b>Lines and bites</b>
@@ -35,7 +35,6 @@ export function Lines({ s, src, player, apply, running, t, backend, open: open0 
   const selSecs = sel.reduce((a, id) => a + (byId[id] ? byId[id].seconds : 0), 0);
   const toggle = id => setSel(x => (x.includes(id) ? x.filter(y => y !== id) : x.concat(id)));
   const make = () => post({ action: 'add', name: name.trim() || undefined, lines: sel }).then(() => { setSel([]); setName(''); toast('Bite made', true); }).catch(() => {});
-  const busy = running && t && t.kind === 'bites';
   return <div className="lines glass-card" id="lines">
     {head}
     <div className="lines-bar">
@@ -63,15 +62,15 @@ export function Lines({ s, src, player, apply, running, t, backend, open: open0 
           <input id="bite-name" placeholder="Name it (optional)" value={name} onChange={e => setName(e.target.value)} maxLength={60} />
           <Button id="bite-add" size="sm" label="Make a bite" isDisabled={!sel.length} onClick={make} />
         </div>
-        {lv.bites.length > 0 && <div className="row"><Button id="bites-render" size="sm" variant="primary" label={`Render all ${lv.bites.length}`} isDisabled={running} onClick={() => render(null)} />{busy && <span className="fine">Rendering...</span>}</div>}
-        <ol className="bite-list" aria-label="Bites">{lv.bites.map((b, i) => <Bite key={b.id} b={b} byId={byId} first={i === 0} last={i === lv.bites.length - 1} running={running} playing={playing === b.id}
-          onPlay={() => play(b.id, b.ranges)} onPost={x => post({ id: b.id, ...x }).catch(() => {})} onRender={only => render([b.id], only)} />)}</ol>
+        {lv.bites.length > 0 && <p className="fine" id="bites-hint">{`Your ${lv.bites.length > 1 ? lv.bites.length + ' bites render' : 'bite renders'} at the end, on the Render step.`}</p>}
+        <ol className="bite-list" aria-label="Bites">{lv.bites.map((b, i) => <Bite key={b.id} b={b} byId={byId} first={i === 0} last={i === lv.bites.length - 1} playing={playing === b.id}
+          onPlay={() => play(b.id, b.ranges)} onPost={x => post({ id: b.id, ...x }).catch(() => {})} />)}</ol>
       </div>
     </div>
   </div>;
 }
 
-function Bite({ b, byId, first, last, running, playing, onPlay, onPost, onRender }) {
+function Bite({ b, byId, first, last, playing, onPlay, onPost }) {
   const [nm, setNm] = useState(b.name), drag = useRef(null);
   useEffect(() => setNm(b.name), [b.name]);
   const move = (k, j) => { if (j < 0 || j >= b.lines.length) return; const a = b.lines.slice(), [x] = a.splice(k, 1); a.splice(j, 0, x); onPost({ action: 'update', lines: a }); };
@@ -99,8 +98,6 @@ function Bite({ b, byId, first, last, running, playing, onPlay, onPost, onRender
     {b.lines.length > MAX && <button type="button" className="linkish fine" onClick={() => setAll(!all)}>{all ? 'Show fewer' : `Show all ${b.lines.length} lines`}</button>}
     <div className="bite-a">
       <Button size="sm" variant="secondary" label={playing ? 'Stop' : 'Play'} onClick={onPlay} />
-      <Button size="sm" variant="primary" label="Render" isDisabled={running} onClick={() => onRender()} />
-      <Button size="sm" variant="ghost" label="Save as one file" isDisabled={running} onClick={() => onRender('file')} />
       {out && <a className="fine" href={file(out)} target="_blank" rel="noreferrer">{out.split('/').pop()}</a>}
       {!out && b.file && <a className="fine" href={file(b.file)} target="_blank" rel="noreferrer" download>{b.id}.mp4</a>}
     </div>

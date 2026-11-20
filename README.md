@@ -87,7 +87,7 @@ Then run `npm run studio` (or click the icon). Without an agent the chat works o
 
 **Cut.** Tell Studio what to make from the take with big cards: a Short (Reels, Shorts, TikTok), a Long form YouTube video or a Square post, short, medium or long, one full edit, clips or both, organic or an ad. It picks smart defaults from the take, so you can just hit Next. **Find cuts** lists the best parts with the words, times, a score and why (picked by your agent, a model, or simple rules, and it says which), as colored blocks on the take's timeline to trim, keep, drop or add to, then renders every kept one in one go. Each cut lands on the quiet in the audio after the last word, so no word is clipped. For a long recording, **Lines and bites** lists every line with keep or retake: group lines into named bites in any order, make one clean take of the whole thing, and render or save each one (your agent can do the picking). Click any clip in Footage to play it with a waveform and a transcript you can click. On the Reference step, **Pull script** puts the reference's words in your Scripts with the hook, body and CTA marked, and **Adapt to my topic** rewrites it for yours. [More](docs/studio.md#cut).
 
-<img src="docs/studio/cut-desktop.png" width="520" alt="Studio Cut step: the summary line, cards for format, length, output and goal, and the Find cuts and Render buttons">
+<img src="docs/studio/cut-desktop.png" width="520" alt="Studio Cut step: the summary line, cards for format, length, output and goal, Find cuts, and how many cuts you kept">
 <img src="docs/studio/cut-timeline.png" width="520" alt="Cut candidates as colored blocks on lanes under the take's waveform, with filler words marked">
 
 **Record now.** No clip yet? Film it in the Footage step with your computer's camera and mic. Pick the camera and mic, choose 9:16 (the default), 16:9 or 1:1, and record with a 3, 2, 1 countdown, pause and a timer. Framing guides show where your head goes so titles can sit behind it and captions below, and an optional teleprompter scrolls your script near the lens. Every take is listed with a thumbnail: keep it, drop it from the edit, or retake. A kept take is converted to an mp4 and joins your footage right away, and your agent gets a one-line note ("New take recorded: 42 s"). The recording is sent to Studio in small pieces as you film, so a long take is not lost to one failed upload, and nothing leaves your computer. Browsers only allow the camera on a secure page, which `http://127.0.0.1` is. On a phone, open Studio on the phone itself or over https; Studio never opens itself to your network.
@@ -384,7 +384,7 @@ The CLI may print a one-line star reminder after your first successful render, a
 
 ## Cite this
 
-> Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.11.0) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
+> Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.11.1) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
 
 Machine-readable metadata is in [CITATION.cff](CITATION.cff), and GitHub shows it under "Cite this repository".
 
