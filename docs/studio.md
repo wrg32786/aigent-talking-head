@@ -369,6 +369,8 @@ Off by default. Turn on **Allow generating** in API keys and providers and add a
 
 Draft first. "Picks and why" opens with each pick per beat and the reason. The log and the exact command are folded below it. Render then builds the reel, applies your choices edits, and lists every output (`reel-vN.mp4` and the export) with a player and a download link. The effects pass (camera moves, person-mask effects) runs when the effects venv is set up (`npm run effects:setup`); without it, Studio says which picked effects were skipped. When the draft tightened pauses, **Pauses cut** lists each one with **Keep this pause** (`pace.keepPauses`, `--keep-pauses clip@seconds`). A cancel that lands after the render wrote its video keeps the video; the task ends done.
 
+When the reel puts titles or captions behind you, Render first checks free memory against the person mask (birefnet-portrait needs about 8.8 GB). If there is not enough, it says how much is free and offers **Titles in front** (no mask), **Lighter mask** (MediaPipe, about 0.5 GB, rougher edge) or **Try anyway**. Every caption and title is also kept off your face; the log shows `face check: N of M moments`. See docs/guide.md, Face keep-out and the person mask.
+
 ## Review your edit
 
 Five tools in the Reference and Render steps help you see what changed and say what to change next. They read files the kit already writes (the teardown's `Reel.md`, the draft's `clips.json` and `choices.json`), so nothing goes online.

@@ -1,7 +1,7 @@
 // One-time setup for the effects pass: a Python venv at effects/.venv with the vendored requirements
 // (numpy, opencv-python, pillow, mediapipe; about 150 MB) plus rembg + onnxruntime (the DirectML build on Windows) for the BiRefNet
 // person-mask backend (another ~390 MB of packages). Safe to re-run. Prints READY.   npm run effects:setup
-// Pass --birefnet to also download the birefnet-general-lite weights (~214 MB) into rembg's cache.
+// Pass --birefnet to also download the birefnet-portrait weights (~928 MB), the default person mask (kit/mask.py), into rembg's cache.
 // Python: set PYTHON, else the first of python3.12, python3.11, python3.13, python3.10, python3 (py -3 on Windows).
 // rembg needs Python 3.11+; on 3.10 the MediaPipe mask still works and birefnet is skipped.
 import { execFileSync } from 'child_process';
@@ -28,10 +28,10 @@ const installRembg = () => {
   const before = dirSize(VENV);
   run(venvPython, ['-m', 'pip', 'install', '-q', '-r', MASK_REQ]);
   if (!rembgOk(venvPython)) console.warn('note: rembg/onnxruntime installed but imports fail; person mask will use MediaPipe');
-  else console.log('rembg+onnxruntime ready, added ~' + mb(Math.max(0, dirSize(VENV) - before)) + ' (packages only; birefnet-general-lite weights are ~214 MB on first use)');
+  else console.log('rembg+onnxruntime ready, added ~' + mb(Math.max(0, dirSize(VENV) - before)) + ' (packages only; the birefnet-portrait mask weights are ~928 MB on first use or with --birefnet)');
 };
 const downloadModel = () => {
-  if (!rembgOk(venvPython)) { console.error('cannot download birefnet-general-lite: rembg is not importable'); process.exit(1); }
+  if (!rembgOk(venvPython)) { console.error('cannot download the BiRefNet weights: rembg is not importable'); process.exit(1); }
   run(venvPython, [join(HERE, '..', 'kit', 'mask.py'), '--download']);
 };
 if (fileURLToPath(import.meta.url) === process.argv[1]) {

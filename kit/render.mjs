@@ -94,6 +94,23 @@ console.log('theme', await p.evaluate(() => window.__theme));
     console.log('boxes', ts.length, 'moments -> boxes.json'); await b.close(); process.exit(0);
   }
 }
+// face check (kit/facezone.py -> captions.js faceTrack): at 8 moments a second, every caption, title and kinetic word is
+// drawn alone with its layout and the letter pixels inside the face zone are counted. facecheck.json; npm run verify fails
+// on any hit, reel.cjs prints the count. FACECHECK=0 skips it.
+if (!only && process.env.FACECHECK !== '0' && (await p.evaluate(() => !!(window.CAPTIONS && window.CAPTIONS.faceTrack && window.__faceInk)))) {
+  const step = 1 / 8, hits = [], els = new Map(); let n = 0, withFace = 0;
+  for (let t = 0; t < DUR; t += step) {
+    const r = await p.evaluate(t => window.__faceInk(t), +t.toFixed(3)); n++;
+    if (!r) continue; withFace++;
+    for (const h of r.hits) { if (h.px < 200) continue; hits.push({ t: +t.toFixed(2), ...h }); const k = h.mode + '@' + h.start; els.set(k, { kind: h.kind, mode: h.mode, start: h.start, text: h.text, moments: ((els.get(k) || {}).moments || 0) + 1, maxPx: Math.max(h.px, (els.get(k) || {}).maxPx || 0) }); }
+  }
+  const lay = await p.evaluate(() => (window.__layout ? window.__layout() : { elements: [] }));
+  const moved = lay.elements.filter(e => /face/.test(e.action)).map(e => ({ kind: e.kind, start: e.start, text: e.text, action: e.action, move: e.move || null }));
+  const fc = { samples: n, withFace, faceSafe: !!lay.faceSafe, overlapMoments: new Set(hits.map(h => h.t)).size, elements: [...els.values()], moved, hits: hits.slice(0, 200) };
+  writeFileSync(join(ROOT, 'facecheck.json'), JSON.stringify(fc, null, 1) + '\n');
+  console.log(`face check: ${fc.overlapMoments} of ${withFace} moments with text on the face zone (${fc.elements.length} element${fc.elements.length === 1 ? '' : 's'}); layout moved ${moved.filter(m => !/hide/.test(m.action)).length} and hid ${moved.filter(m => /hide/.test(m.action)).length} for the face (facecheck.json)`);
+  for (const e of fc.elements) console.warn(`WARNING: ${e.kind} "${e.text}" at ${e.start}s covers the face zone at ${e.moments} moment${e.moments === 1 ? '' : 's'} (up to ${e.maxPx} px)`);
+}
 // Behind-head titles (mode 7, layer behind) get their own layer, ovlt/, so assemble.cjs can draw them behind the person; ovl/ then
 // holds front titles, partner words and captions. Stills always show every layer together.
 const titles = await p.evaluate(() => window.__titles || []);

@@ -28,6 +28,9 @@ Third-party files keep their own terms:
   Installed by npm run effects:setup, not vendored.
 - onnxruntime (pip): ONNX Runtime by Microsoft (https://github.com/microsoft/onnxruntime), MIT,
   Copyright (c) Microsoft Corporation. Installed by npm run effects:setup, not vendored.
+- birefnet-portrait weights (default person mask) and birefnet-general weights (optional): BiRefNet by ZhengPeng
+  (https://github.com/ZhengPeng7/BiRefNet), MIT, Copyright (c) 2024 ZhengPeng. Downloaded into rembg's cache from
+  rembg's v0.0.0 release (BiRefNet-portrait-epoch_150.onnx, BiRefNet-general-epoch_244.onnx). Not in git.
 - birefnet-general-lite weights: BiRefNet by ZhengPeng (https://github.com/ZhengPeng7/BiRefNet), MIT,
   Copyright (c) 2024 ZhengPeng. Downloaded on first use into rembg's cache from rembg's v0.0.0 release
   (BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx, md5 4fab47adc4ff364be1713e97b7e66334). Not in git.
