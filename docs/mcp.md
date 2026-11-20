@@ -23,6 +23,8 @@
 | `studio_wait_for_message` | long-polls the Studio chat (default 45 s) | the lines the user typed in the Studio page since you last read, marked seen, plus the session context; the page shows you as listening while it waits |
 | `studio_get_pending` | checks the Studio chat without waiting | the same, for the start of each turn while you work in the terminal |
 | `studio_reply` | writes to the Studio chat only | your answer to Studio message ids (`replyTo`), with an optional `patch`; those messages show as answered |
+| `clear_reference` | changes the look | take the reference off with every pick Use parts added (and the Look or bed it set), as one undo; `undo: true` puts it back |
+| `save_look` | adds a Look | save the current Look (pack, layer picks and the reference's look when one is in use) as `packs/local/<name>`; `fromReference: true` for a reference set to Use all or Off |
 | `studio_add_reference_url` | POSTs to the running Studio | queues reference links to download and tear down |
 | `studio_get_reference_teardown` | reads the session | the reference queue and each teardown summary (cuts, pace, BPM, beats, energy, captions, detected effects, menu suggestions) |
 | `studio_settings` | reads or writes `jobs/.studio/settings.json` | download folder, renders folder, chat backend, action notes |

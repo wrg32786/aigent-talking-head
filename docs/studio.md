@@ -22,15 +22,41 @@ Six steps across the top: Footage, Cut, Look, B-roll, Finish, Post. Each one is 
 2. **Reference.** Paste one or more links (Enter adds them, Shift+Enter starts another line) or upload a file. Links can be YouTube (and Shorts), TikTok, X, Vimeo, a direct video file (.mp4, .mov, .m4v, .webm), or one public Instagram post. Studio downloads each into your download folder, breaks it down, and shows what it found: length, cut times and pace, music BPM, beats and energy, caption style, titles, transitions, finishes, graphics and effects, plus suggestions mapped to the effects menu that you can click to pick. The chat gets the same teardown. See [Reference links](#reference-links). Then choose:
    - **Influence:** the reference becomes soft defaults on top of the pack you picked (the pack's locks stay). Saved as a local pack, `ref-<job>`.
    - **Recreate:** the draft uses the reference's Reel.md as the recipe (`--recipe`), so its shots, titles and look are copied as closely as the engine can.
-3. **Style.** Three parts on one screen:
-   - **Pack.** Pick a style pack from the row of previews. Your picks add to it. "Save as pack" writes `packs/local/<name>/pack.json` (validated, gitignored) so you can reuse the look with `--pack <name>`.
-   - **Effects.** Every effect the engine has, as a grid of looping previews, in tabs by type (table below). Click a tile to pick it; press F, right-click it, or use its forbid button (the circle with a line) to forbid it. Hover or focus a tile for its description in a hover card instead of text on every tile. Picking any of a kind means only your picks of that kind are used; forbidding one leaves the rest. Some kinds take one choice (caption style, look, theme). Press / to search. The pause button switches to stills and is on by default when your system asks for reduced motion. Small labels mark tiles with a still preview ("still"), graphics that only appear when you say the matching words ("your words"), and options set elsewhere ("info"). Your picks collect in the tray at the bottom; click one to drop it.
-   - **Sound and pace.** A bed by energy (auto, low, mid, high), a named bed with a play button, no music, or your own upload. Sound effects on or off, sparse sounds (the density cap), how tight to cut pauses, and zoom punches.
+3. **Look.** One Look sets every layer; change any layer and a badge says where each choice came from. See [Look and its 9 layers](#look-and-its-9-layers).
+   - **Looks.** One row: the built-in packs and the Looks you saved. **Save as a new Look** writes `packs/local/<name>/pack.json` (validated, gitignored) so you can reuse it with `--pack <name>`; with a reference in use, its look is saved too.
+   - **The reference card**, when a reference is broken down: **Use all** (recreate), **Use parts** (influence, soft defaults), **Off**, **Save as a Look** and **Clear reference**.
+   - **Layers.** Every effect the engine has, as looping previews, in 9 layers. Click a tile to pick it; press F, right-click it, or use its forbid button to forbid it. Hover or focus a tile for its description. Search looks across every layer. Music, sound effects and pace sit in the Music and SFX layer.
 4. **B-roll.** One slot per beat of the draft: fill it from your library, an upload, stock, a card, a screen recording or a generate, and pick full cutaway, split top panel or picture in picture. See [B-roll](#b-roll).
 5. **Chat.** Type "calm and cinematic, no glitch, typewriter titles". See [Chat](#chat).
 6. **Render.** Draft runs `npm run reel ... --draft` and shows the choices table: every transition, finish, title and graphic per beat, with why it was picked. Change any cell and apply; the change is pinned. Render builds the reel (and the export size you picked) with progress, then plays it with a download link.
 
 ![The effects menu on the Transitions tab: preview tiles with glitch forbidden and whip picked, and a hover card with the description of dip-black](studio/menu.png)
+
+## Look and its 9 layers
+
+![The Look step: a row of Looks, the Hormozi hook reference card with Use all, Use parts and Off, and the Graphics layer with a REF badge on lower-third](studio/look-layers.png)
+
+The Look step used to show 17 tabs where 58 options sat in two or three. It now shows 9 layers, and every option lives in exactly one (`layers` in `kit/studio/categories.json`, computed by `layersOf` in `kit/studio/core.mjs`):
+
+| Layer | What is in it |
+| --- | --- |
+| Text | captions (styles, entrances, caption looks), titles and kinetic words (split-flap, keyword caption, LED sign, backdrop word...), the title layer behind your head |
+| Fonts | the font pairs |
+| Graphics | lower thirds and name tags, stickers and callouts, data and info cards, intros, chapters and CTAs |
+| Transitions | all the seams, the glitch, blur, pixelate, warp, zoom blur and light leak ones too |
+| Color and finish | grades and themes, grain, vignette, scan lines, noise, chroma and the glitches that are not seams |
+| Motion | camera moves and zoom punch, speed and time, you and the room (spotlight, slow push, orbit) |
+| Music and SFX | beds, energy, sound effects, the sound cap, beat sync and pace, with the music panel |
+| B-roll | how b-roll sits: split, match cut, phone fan, carousel, screen card |
+| Layout | frames, split screens and grids around you |
+
+`layerOrder` says which layer claims an option first when two tabs share it, `owners` moves one to a named layer, and `hidden` drops a second name for the same thing (`oneword`, which is `one-word`). `tests/studio-look.test.mjs` (in `npm run check`) fails when an option lands in no layer or in two.
+
+**Badges.** A tile says where its choice came from: **YOU** (your pick), **REF** (the reference suggests it, or Use parts added it) or **LOOK** (the Look sets it).
+
+**Clear reference** takes the reference off and every pick Use parts added with it, and puts back the Look or bed it changed. Your own picks stay. It is one undo: **Undo** under the Looks row puts it all back (`POST /api/reference/clear`, `{ undo: true }`; `clear_reference` for your agent). Nothing on disk is deleted: the reference stays in the Reference list.
+
+**Save as a Look** on the reference card saves the reference's look as a Look of its own, beside the built-in ones (`POST /api/pack/save { fromReference }`; `save_look`). Save as a new Look keeps the reference's look too when one is in use.
 
 ## Words and brands
 

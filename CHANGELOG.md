@@ -2,6 +2,19 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.16.0 (unreleased)
+
+Release notes: [docs/releases/v1.16.0.md](docs/releases/v1.16.0.md). The redesign, part 4: one Look in 9 layers.
+
+- **9 layers, no duplicates.** The Look step's 17 tabs (58 options in two or three) are 9 layers: Text, Fonts, Graphics, Transitions, Color and finish, Motion, Music and SFX, B-roll, Layout, and every option lives in exactly one (`layers`, `layerOrder`, `owners` and `hidden` in `kit/studio/categories.json`, `layersOf` in `kit/studio/core.mjs`). Groups inside a layer keep the old tab names as headings. `oneword` (a second name for `one-word`) is hidden. Search looks across every layer. An old `#tab=captions` link opens the layer that holds it.
+- **Source badges.** Each tile says where its choice came from: YOU, REF (the reference suggests it or Use parts added it) or LOOK (the Look sets it). `look` in the view (`lookSources`).
+- **One row of Looks.** The packs are Looks, built in or saved (and saved from a reference). **Save as a new Look** keeps the reference's look when one is in use (it used to drop it).
+- **The reference card** on Look: Use all, Use parts, Off, **Save as a Look** and **Clear reference**. Clear takes the reference and every pick Use parts added, and the Look or bed it set, as one undo; Undo puts it all back (`POST /api/reference/clear`). Use parts now records what it added.
+- **Music and SFX** is one layer: the bed, energy, sound effects and pace panel sits with the beds and sounds, instead of a second Sound and pace block.
+- **MCP.** New `clear_reference` and `save_look`; `studio_get_state` with `catalog` lists the options by layer.
+- **Tests and docs.** `tests/studio-look.test.mjs` (in `npm run check`): 9 layers with every option once, the plan's homes for the old duplicates, a map that loses an option fails, badges, Clear reference and Undo, Save as a Look, the MCP tools. `tests/studio-look.e2e.mjs` (in `npm run smoke`): the step in Chrome, every option once across the tabs, badges, Clear and Undo, Save as a Look, the phone. `docs/studio.md` (Look and its 9 layers), `docs/mcp.md`, `AGENTS.md`, the Studio skill.
+- **Smoke.** The Studio Chrome tests run two at a time (`SMOKE_E2E_JOBS`), so the CI smoke job stays inside its time limit.
+
 ## 1.15.0 (unreleased)
 
 Release notes: [docs/releases/v1.15.0.md](docs/releases/v1.15.0.md). The redesign, part 3: pieces, your combo and the Outputs library.
