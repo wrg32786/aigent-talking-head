@@ -14,6 +14,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { chromium } from 'playwright-core';
 import { findChrome } from '../kit/chrome.mjs';
+import { patient } from './fixtures/patient.mjs';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const TMP = mkdtempSync(join(tmpdir(), 'studio-post-e2e-')), JOB = 'post-e2e-' + process.pid, jobDir = join(ROOT, 'jobs', JOB);
@@ -49,7 +50,7 @@ const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), 
 const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out.slice(-400)))); });
 const post = (p, b) => fetch(url + p, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) });
 await post('/api/settings', { chat: { backend: 'keywords' } }); await post('/api/state', { job: JOB });
-const browser = await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox'] });
+const browser = patient(await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox'] }));
 const snap = async (pg, name, sel) => { if (!shots) return; await pg.waitForTimeout(500); if (sel) await pg.locator(sel).screenshot({ path: join(shots, name) }); else await pg.screenshot({ path: join(shots, name) }); };
 try {
   const errs = [], ctx = await browser.newContext({ viewport: { width: 1280, height: 1100 } }), pg = await ctx.newPage();

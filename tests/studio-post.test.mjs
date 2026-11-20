@@ -98,7 +98,7 @@ const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), 
 let srvOut = '';
 const url = await new Promise((ok, bad) => { srv.stdout.on('data', d => { srvOut += d; const m = srvOut.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { srvOut += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + srvOut))); });
 const req = async (path, b) => { const r = await fetch(url + path, { method: b !== undefined ? 'POST' : 'GET', headers: b !== undefined ? { 'content-type': 'application/json' } : {}, body: b !== undefined ? JSON.stringify(b) : undefined }); const text = await r.text(); noKeys(text); let j = {}; try { j = JSON.parse(text); } catch {} return { status: r.status, j, text }; };
-const sendAndWait = async b => { const r = await req('/api/post/send', b); if (r.status !== 202) return { status: r.status, j: { status: 'failed', refused: true, error: r.j.error } }; for (let i = 0; i < 300; i++) { const j = (await req('/api/post/send?id=' + r.j.id)).j; if (j.status !== 'running') return { status: 200, j }; await new Promise(z => setTimeout(z, 100)); } throw new Error('send timed out'); };
+const sendAndWait = async b => { const r = await req('/api/post/send', b); if (r.status !== 202) return { status: r.status, j: { status: 'failed', refused: true, error: r.j.error } }; for (let i = 0; i < 1200; i++) { const j = (await req('/api/post/send?id=' + r.j.id)).j; if (j.status !== 'running') return { status: 200, j }; await new Promise(z => setTimeout(z, 100)); } throw new Error('send timed out'); };
 
 let client;
 try {

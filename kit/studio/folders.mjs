@@ -124,7 +124,8 @@ on error number -128
   return ""
 end try`;
 export function dialogCommand() {
-  if (process.env.STUDIO_FOLDER_DIALOG) return [process.env.STUDIO_FOLDER_DIALOG, []]; // tests: a command that prints a path
+  const hook = process.env.STUDIO_FOLDER_DIALOG; // tests: a command that prints a path (a .mjs runs with this node, so it works on Windows too)
+  if (hook) return /\.m?js$/i.test(hook) ? [process.execPath, [hook]] : [hook, []];
   if (IS_WIN()) return ['powershell.exe', ['-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-Command', PS]];
   if (IS_MAC()) return ['osascript', ['-e', OSA]];
   if (!process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) return null;

@@ -12,6 +12,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { chromium } from 'playwright-core';
 import { findChrome } from '../kit/chrome.mjs';
+import { patient } from './fixtures/patient.mjs';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const TMP = mkdtempSync(join(tmpdir(), 'studio-polish-e2e-'));
@@ -20,7 +21,7 @@ let n = 0; const t = async (name, fn) => { await fn(); n++; console.log('ok ' + 
 const env = { ...process.env, CI: '1', STUDIO_DIR: join(TMP, 'studio'), STUDIO_CHAT: '' };
 const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), '--port', '0', '--no-open'], { cwd: ROOT, env });
 const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out.slice(-400)))); });
-const browser = await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox'] });
+const browser = patient(await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox'] }));
 const STEPS = ['footage', 'cut', 'reference', 'style', 'broll', 'render', 'post'];
 try {
   await fetch(url + '/api/settings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat: { backend: 'keywords' } }) });

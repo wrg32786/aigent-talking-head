@@ -20,6 +20,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { chromium } from 'playwright-core';
 import { findChrome } from '../kit/chrome.mjs';
+import { patient } from './fixtures/patient.mjs';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const STATE = mkdtempSync(join(tmpdir(), 'studio-broll-e2e-')), LIB = join(STATE, 'lib'), JOB = 'broll-e2e-' + process.pid;
@@ -71,7 +72,7 @@ const shot = async (page, sel, name) => {
 };
 const beatOf = async n => (await api('/api/broll')).beats[n - 1];
 
-const browser = await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--auto-accept-this-tab-capture', '--auto-select-desktop-capture-source=Entire screen', '--enable-usermedia-screen-capturing'] });
+const browser = patient(await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--auto-accept-this-tab-capture', '--auto-select-desktop-capture-source=Entire screen', '--enable-usermedia-screen-capturing'] }));
 try {
   await api('/api/settings', { chat: { backend: 'keywords' } });
   await api('/api/state', { job: JOB, sound: { sfx: 'off' }, music: { bed: 'none' } });
