@@ -29,9 +29,13 @@ export const AGENT_IDS = ['claude', 'codex', 'cursor', 'gemini', 'opencode', 'wi
 // broll: { library: the b-roll folder (default <kit>/broll-library), generate: paid generating is allowed (off by
 // default), models: { higgsfield, google, openai, replicate, fal } the model each provider uses }
 export const BROLL_DEFAULTS = { library: null, generate: false, provider: null, models: {} };
-export function defaults() { return { downloads: null, renders: null, actionNotes: true, agent: null, chat: { backend: 'agent', baseUrl: null, model: null }, broll: { ...BROLL_DEFAULTS } }; }
+// post: the Post step (kit/studio/post.mjs). host: r2 | cloudinary | url; r2 and cloudinary hold only what is not secret
+// (the keys live in keys.json); channels: the Buffer channel ids picked last time; youtubeCategory: the Shorts category id
+export const POST_DEFAULTS = { host: null, r2: { account: null, bucket: null, publicBase: null, prefix: null }, cloudinary: { cloud: null, preset: null, folder: null }, channels: [], youtubeCategory: '22' };
+const postOf = j => { const p = (j && j.post) || {}; return { ...POST_DEFAULTS, ...p, r2: { ...POST_DEFAULTS.r2, ...(p.r2 || {}) }, cloudinary: { ...POST_DEFAULTS.cloudinary, ...(p.cloudinary || {}) }, channels: Array.isArray(p.channels) ? p.channels : [] }; };
+export function defaults() { return { downloads: null, renders: null, actionNotes: true, agent: null, chat: { backend: 'agent', baseUrl: null, model: null }, broll: { ...BROLL_DEFAULTS }, post: postOf({}) }; }
 export function loadFile() {
-  try { const j = JSON.parse(readFileSync(settingsPath(), 'utf8')); const d = defaults(); return { ...d, ...j, chat: { ...d.chat, ...(j.chat || {}) }, broll: { ...d.broll, ...(j.broll || {}), models: { ...((j.broll || {}).models || {}) } } }; }
+  try { const j = JSON.parse(readFileSync(settingsPath(), 'utf8')); const d = defaults(); return { ...d, ...j, chat: { ...d.chat, ...(j.chat || {}) }, broll: { ...d.broll, ...(j.broll || {}), models: { ...((j.broll || {}).models || {}) } }, post: postOf(j) }; }
   catch { return defaults(); }
 }
 // the file plus the environment, with where each value came from
@@ -40,7 +44,7 @@ export function load(env = process.env) {
   const pick = (k, envKey, v) => { if (env[envKey]) { from[k] = 'env ' + envKey; return env[envKey]; } from[k] = v != null ? 'settings' : 'default'; return v; };
   const s = { downloads: pick('downloads', 'STUDIO_DOWNLOADS', f.downloads), renders: pick('renders', 'STUDIO_RENDERS', f.renders), actionNotes: f.actionNotes !== false, agent: AGENT_IDS.includes(f.agent) ? f.agent : null,
     chat: { backend: pick('backend', 'STUDIO_CHAT', f.chat.backend) || 'agent', baseUrl: pick('baseUrl', 'STUDIO_LOCAL_URL', f.chat.baseUrl), model: pick('model', 'STUDIO_MODEL', f.chat.model) },
-    broll: { library: pick('brollLibrary', 'STUDIO_BROLL_LIBRARY', f.broll.library), generate: f.broll.generate === true, provider: f.broll.provider || null, models: f.broll.models || {} } };
+    broll: { library: pick('brollLibrary', 'STUDIO_BROLL_LIBRARY', f.broll.library), generate: f.broll.generate === true, provider: f.broll.provider || null, models: f.broll.models || {} }, post: postOf(f) };
   if (!BACKENDS.includes(s.chat.backend)) s.chat.backend = 'agent';
   return { ...s, from };
 }
@@ -72,7 +76,26 @@ export function update(p) {
     if (b.provider !== undefined) { if (b.provider !== null && !GEN_IDS.includes(b.provider)) errs.push(`broll.provider: ${GEN_IDS.join(', ')} or null`); else f.broll.provider = b.provider; }
     if (b.models !== undefined) { if (!b.models || typeof b.models !== 'object') errs.push('broll.models: { provider: model }'); else for (const [k, v] of Object.entries(b.models)) { if (!GEN_IDS.includes(k)) errs.push(`broll.models: no provider ${k}`); else if (v && !/^[\w.\-/:@]{1,120}$/.test(String(v))) errs.push(`broll.models.${k}: a model id like owner/name`); else f.broll.models[k] = v ? String(v) : null; } }
   }
-  for (const k of Object.keys(p)) if (!['downloads', 'renders', 'chat', 'actionNotes', 'agent', 'broll'].includes(k)) errs.push(`unknown setting "${k}" (downloads, renders, actionNotes, agent, chat, broll)`);
+  if (p.post) {
+    const q = p.post, o = f.post = postOf(f), str = (v, re, max = 200) => v == null || v === '' ? null : re.test(String(v).trim()) ? String(v).trim().slice(0, max) : undefined;
+    if (q.host !== undefined) { if (q.host !== null && !['r2', 'cloudinary', 'url'].includes(q.host)) errs.push('post.host: r2, cloudinary, url or null'); else o.host = q.host; }
+    if (q.r2) {
+      const r = q.r2;
+      if (r.account !== undefined) { const v = str(r.account, /^[a-f0-9]{32}$/i); if (v === undefined) errs.push('post.r2.account: the 32-character account ID from the Cloudflare dashboard'); else o.r2.account = v; }
+      if (r.bucket !== undefined) { const v = str(r.bucket, /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/); if (v === undefined) errs.push('post.r2.bucket: lowercase letters, numbers and dashes'); else o.r2.bucket = v; }
+      if (r.publicBase !== undefined) { const v = str(r.publicBase, /^https:\/\/[^\s?#]+$/); if (v === undefined) errs.push('post.r2.publicBase: the bucket\'s public https:// address (r2.dev or your own domain)'); else o.r2.publicBase = v ? v.replace(/\/$/, '') : null; }
+      if (r.prefix !== undefined) { const v = str(r.prefix, /^[\w./-]{1,80}$/); if (v === undefined) errs.push('post.r2.prefix: a folder name like reels'); else o.r2.prefix = v; }
+    }
+    if (q.cloudinary) {
+      const c = q.cloudinary;
+      if (c.cloud !== undefined) { const v = str(c.cloud, /^[\w-]{1,80}$/); if (v === undefined) errs.push('post.cloudinary.cloud: your cloud name'); else o.cloudinary.cloud = v; }
+      if (c.preset !== undefined) { const v = str(c.preset, /^[\w-]{1,80}$/); if (v === undefined) errs.push('post.cloudinary.preset: an upload preset name'); else o.cloudinary.preset = v; }
+      if (c.folder !== undefined) { const v = str(c.folder, /^[\w./-]{1,80}$/); if (v === undefined) errs.push('post.cloudinary.folder: a folder name like reels'); else o.cloudinary.folder = v; }
+    }
+    if (q.channels !== undefined) { if (!Array.isArray(q.channels)) errs.push('post.channels: a list of Buffer channel ids'); else o.channels = q.channels.map(String).filter(x => /^[\w-]{1,64}$/.test(x)).slice(0, 30); }
+    if (q.youtubeCategory !== undefined) { if (!/^\d{1,3}$/.test(String(q.youtubeCategory))) errs.push('post.youtubeCategory: a YouTube category id like 22'); else o.youtubeCategory = String(q.youtubeCategory); }
+  }
+  for (const k of Object.keys(p)) if (!['downloads', 'renders', 'chat', 'actionNotes', 'agent', 'broll', 'post'].includes(k)) errs.push(`unknown setting "${k}" (downloads, renders, actionNotes, agent, chat, broll, post)`);
   if (errs.length) return { errs, settings: load() };
   mkdirSync(stateDir(), { recursive: true });
   const tmp = settingsPath() + '.tmp'; writeFileSync(tmp, JSON.stringify(f, null, 2) + '\n'); renameSync(tmp, settingsPath());

@@ -64,7 +64,7 @@ function list(dir) {
 function reopen(dir, which) {
   const v = vOf(which); if (!v) throw new Error('which reel? v3 or reel-v3.mp4');
   const src = snapDir(dir, v);
-  if (!fs.existsSync(path.join(src, 'cut.json'))) throw new Error(`reel-v${v} has no saved build (reels rendered before 1.9.1 were not saved)`);
+  if (!fs.existsSync(path.join(src, 'cut.json'))) throw new Error(`reel-v${v} has no saved build (reels rendered before 1.10.1 were not saved)`);
   const build = path.join(dir, 'build');
   let backup = null;
   if (fs.existsSync(path.join(build, 'cut.json'))) backup = save(dir, null, { name: `draft-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.build` });

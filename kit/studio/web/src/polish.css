@@ -103,12 +103,14 @@ main[data-step] .step[data-step] { animation: none; }
 @keyframes step-in-4 { from { opacity: 0; transform: translateY(10px); } }
 @keyframes step-in-5 { from { opacity: 0; transform: translateY(10px); } }
 @keyframes step-in-6 { from { opacity: 0; transform: translateY(10px); } }
+@keyframes step-in-7 { from { opacity: 0; transform: translateY(10px); } }
 main[data-step="footage"] { animation: step-in-1 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
 main[data-step="cut"] { animation: step-in-2 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
 main[data-step="reference"] { animation: step-in-3 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
 main[data-step="style"] { animation: step-in-4 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
 main[data-step="broll"] { animation: step-in-5 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
 main[data-step="render"] { animation: step-in-6 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+main[data-step="post"] { animation: step-in-7 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
 .glass-card { transition: box-shadow var(--motion) var(--ease-ui), border-color var(--motion) var(--ease-ui), transform var(--motion) var(--ease-ui); }
 .pack, .tile, .agent-grid > * { transition: box-shadow var(--motion) var(--ease-ui), border-color var(--motion) var(--ease-ui); }
 /* brand: nothing moves on hover, only light and colour change */
@@ -146,3 +148,41 @@ main[data-step="render"] { animation: step-in-6 var(--motion-slow) var(--ease-ca
 .fold[open] > :not(summary) { animation: fade-in var(--motion) var(--ease-ui); }
 @media (prefers-reduced-motion: reduce) { .fold > summary::after { transition: none; } .fold[open] > :not(summary) { animation: none; } }
 .flink > .row > .astryx-button { flex: none; }
+
+/* Post step (Post.jsx): three small parts, one card at a time */
+.post-parts { list-style: none; display: flex; gap: 6px; padding: 0; margin: 0 0 14px; flex-wrap: wrap; }
+.post-parts button { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--border); background: transparent; color: var(--muted-foreground); padding: 6px 12px 6px 6px; min-height: 36px; border-radius: 999px; font: inherit; font-size: 14px; cursor: pointer; transition: background var(--motion-fast) var(--ease-ui), color var(--motion-fast) var(--ease-ui); }
+.post-parts button .sn { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border); font-size: 12px; }
+.post-parts button .sn .ic { width: 14px; height: 14px; }
+.post-parts button[aria-current="step"] { color: var(--foreground); background: var(--muted); }
+.post-parts button[aria-current="step"] .sn { background: var(--primary); color: var(--primary-foreground); border-color: transparent; }
+.post-parts button:disabled { opacity: .5; cursor: not-allowed; }
+.post-connect, .post-compose { display: flex; flex-direction: column; gap: 14px; max-width: 760px; }
+.post-card { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+.post-card h3.lbl { margin: 0; display: inline-flex; align-items: center; gap: 6px; }
+.post-card .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.post-card .row h3 { flex: 1; }
+.post-fields { display: flex; flex-direction: column; gap: 10px; }
+.post-card input:not([type=checkbox]), .post-card select, .post-card textarea { min-height: 34px; border-radius: 8px; border: 1px solid var(--input); background: var(--background); color: var(--foreground); padding: 6px 10px; font: inherit; font-size: 14px; }
+.post-card textarea { resize: vertical; }
+.post-card .col { display: flex; flex-direction: column; gap: 4px; }
+.post-reel-row { display: flex; gap: 12px; align-items: center; }
+.post-reel-row video { width: 64px; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 8px; background: var(--muted); }
+.post-ch-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.post-ch-list li { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; transition: border-color var(--motion-fast) var(--ease-ui); }
+.post-ch-list li.on { border-color: color-mix(in srgb, var(--primary) 60%, transparent); }
+.post-ch-list label { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.post-ch-list input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--primary); }
+.post-ch-list .pc-n { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.post-ch-list .pc-n .fine, .post-ch-list .pc-why { margin: 0; }
+.post-ch-list .pc-why { margin-top: 6px; padding-left: 28px; }
+#post-caption-count { margin: 0; text-align: right; } #post-caption-count.over { color: var(--destructive, #c0392b); }
+.post-confirm { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.post-confirm input { width: 18px; height: 18px; accent-color: var(--primary); }
+.post-res-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.post-res-list li { display: grid; grid-template-columns: 18px auto 1fr; gap: 8px; align-items: baseline; font-size: 14px; }
+.post-res-list li.ok .ic { color: var(--success); } .post-res-list li.bad .ic { color: var(--destructive, #c0392b); }
+.post-res-list .fine { margin: 0; }
+.post-nav { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+#post-empty { padding: 28px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+@media (max-width: 640px) { .post-card { padding: 12px; } .post-res-list li { grid-template-columns: 18px 1fr; } .post-res-list li .fine { grid-column: 2; } }

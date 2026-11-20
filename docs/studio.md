@@ -268,6 +268,8 @@ Theme (dark or light) and Glass panels (on, or solid panels for older computers)
 
 Keys are saved in `jobs/.studio/keys.json` (next to the session, `STUDIO_DIR` moves it), written owner-only (chmod 600), in a folder git ignores. A key in the environment wins: `PEXELS_API_KEY`, `PIXABAY_API_KEY`, `HF_API_KEY_ID` and `HF_API_KEY_SECRET`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` or `GOOGLE_API_KEY`, `REPLICATE_API_TOKEN`, `FAL_KEY`. Keys are never logged, never sent to the page and never given to your agent: `broll_providers` says only set or not and where from. A saved OpenAI or Anthropic key also answers the Studio chat. The sheet also lists which b-roll sources are on, the **Allow generating** switch with a model per provider, and the b-roll library folder.
 
+The Posting group holds your Buffer key and the keys for the video host (Cloudflare R2, Cloudinary) used by the [Post step](posting.md). Their environment names are `BUFFER_API_KEY`, `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`, and `CLOUDINARY_API_KEY` and `CLOUDINARY_API_SECRET`.
+
 Folders must be full paths; Studio makes them if needed and checks it can write there before saving. The `studio_settings` MCP tool reads and changes the same file.
 
 ## Chat
