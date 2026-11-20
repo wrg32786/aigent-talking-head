@@ -123,6 +123,10 @@ Then run `npm run studio` (or click the icon). Without an agent the chat works o
 
 <img src="docs/studio/settings.png" width="720" alt="Studio settings in a side sheet: who answers the chat with a local model picked, the action note switch, the reference downloads and finished reels folders, and the theme">
 
+**B-roll.** A step between Style and Render gives every beat a slot: fill it from your library, an upload, free stock (Pexels or Pixabay with your own key), a chart, counter, quote, code or terminal card made on your computer, a screen recording, or a generator with your own key (off until you allow it; every generate shows the cost and waits for your click). Pick full cutaway, split top panel or picture in picture. Your agent can suggest shots for you to approve. Render writes `credits.txt`. **API keys and providers** in Settings keeps every key on your computer (owner-only, never shown again, never given to the agent). See [B-roll](docs/studio.md#b-roll).
+
+<img src="docs/studio/broll-lane.png" width="520" alt="The B-roll step: one slot per beat, a clip on beat 2 as a split top panel, with placement, timing and the fill tabs"> <img src="docs/studio/broll-keys.png" width="300" alt="API keys and providers: Pexels saved and tested, other providers not set">
+
 **Review your edit.** The Reference step lists the reference's parts with times (hook, cuts, titles, b-roll, CTA), each with the matching Studio picks one click away. In the Render step you can watch your reel beside the reference or under it with an opacity slider, on one clock; click or drag a box on a frame to send your agent a comment with the frame and the time; run a clean-up pass that lists long pauses, filler words and retakes from the Whisper word timings to keep or remove before a redraft; and read the edit receipt, every pick and its reason in plain words. Details: [docs/studio.md](docs/studio.md#review-your-edit).
 
 <img src="docs/studio/compare-desktop.png" width="420" alt="Show original: the reference and your reel side by side on one clock"> <img src="docs/studio/cleanup-desktop.png" width="420" alt="Clean-up pass: a filler word, a long pause and a retake, each with Keep or Remove">
@@ -171,9 +175,9 @@ Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FRE
 | Editing principles built in: mixed serif and sans, titles placed around the head, colour and chapter cards, music by energy, mapped and capped sounds, punch-ins, no dead air | 7, all in `--preset magazine` | [Guide](docs/guide.md#editing-principles-built-in), [effects menu](docs/effects.md#editing-principles) |
 | Sound effects and CC0 music beds, beat-synced | 37 and 11 | [Music beds](kit/music/README.md) |
 | Export presets: TikTok, Reels, Shorts, 4:5, 1:1 | 5 | [Quick start](#quick-start) |
-| Studio: a local page for reference links and teardowns, the Cut step (what to make, candidate cuts on a timeline, batch render), the visual effects menu, a chat your agent answers, draft and render | 1 | [docs/studio.md](docs/studio.md) |
+| Studio: a local page for reference links and teardowns, the Cut step (what to make, candidate cuts on a timeline, batch render), the visual effects menu, a B-roll step (library, Pexels and Pixabay, cards, screen recording, generate with your own keys), a chat your agent answers, draft and render | 1 | [docs/studio.md](docs/studio.md) |
 | Agent skills, installed with `npx skills add wrg32786/aigent-talking-head` | 8 | [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) |
-| MCP tools: menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify, and twenty-two for Studio, scripts, cuts and bites | 33 | [MCP setup](docs/mcp.md) |
+| MCP tools: menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify, and twenty-seven for Studio, scripts, cuts, bites and b-roll | 38 | [MCP setup](docs/mcp.md) |
 
 Also: a `plan` step that proposes graphics from your transcript, a layout pass that stops overlaps, `verify` with a contact sheet, [Reel.md recipes](#reelmd-recipes) you can share, and [teardowns](#remake-a-reel-you-like) that turn a reel you like into a recipe. `npm run menu` prints every option.
 
@@ -368,7 +372,7 @@ The CLI may print a one-line star reminder after your first successful render, a
 
 ## Cite this
 
-> Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.5.0) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
+> Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.6.0) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
 
 Machine-readable metadata is in [CITATION.cff](CITATION.cff), and GitHub shows it under "Cite this repository".
 

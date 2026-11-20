@@ -24,6 +24,10 @@ import * as CL from './cloud.mjs';
 import * as SETUP from '../setup.mjs';
 import * as CUT from './cut.mjs';
 import * as MEDIA from './media.mjs';
+import * as KEYS from './keys.mjs';
+import { capture as capturePage } from '../capture.mjs';
+import { findChrome } from '../chrome.mjs';
+import { mount as mountBroll } from './broll-api.mjs';
 
 const require = createRequire(import.meta.url);
 const K = require('../packs.cjs');
@@ -64,6 +68,7 @@ function setupBrief() {
 }
 // a draft or render that cannot work: the one-line fix now, instead of a failure later
 function needFor(kind) {
+  if (process.env.STUDIO_REEL) return null; // a stand-in engine (the tests) needs none of the engine's tools
   const b = setupBrief(), miss = b ? b.missing : {};
   if (!miss.ffmpeg && !F.tools().ffmpeg) miss.ffmpeg = { label: 'ffmpeg', fix: 'npm run setup:all' };
   const need = kind === 'render' ? ['ffmpeg', 'python', 'chrome', 'npm'] : ['ffmpeg', 'python', 'npm'];
@@ -97,18 +102,19 @@ function addFootageLink(raw) {
 }
 
 function env() {
-  const st = S.load(), backend = st.chat.backend, p = backend === 'agent' || backend === 'keywords' ? null : LLM.provider(process.env, st.chat);
+  const st = S.load(), backend = st.chat.backend, p = backend === 'agent' || backend === 'keywords' ? null : LLM.provider(KEYS.envWithKeys(), st.chat);
   const t = F.tools();
   return { llm: p ? `${p.name}${p.model ? ' (' + p.model + ')' : ''}` : null, backend, agent: CH.presence(), effectsReady: existsSync(join(ROOT, 'effects', '.venv')), port: PORT,
     settings: { downloads: st.downloads, renders: st.renders, actionNotes: st.actionNotes, agent: st.agent, chat: st.chat, from: st.from, defaultDownloads: 'teardown-in/studio/<job>/ (in the kit, not shared)', defaultRenders: 'jobs/<job>/ (in the kit)' },
-    keys: { anthropic: !!process.env.ANTHROPIC_API_KEY, openai: !!process.env.OPENAI_API_KEY }, localPresets: S.LOCAL_PRESETS,
+    keys: { anthropic: KEYS.isSet('anthropic'), openai: KEYS.isSet('openai') }, broll: st.broll, localPresets: S.LOCAL_PRESETS,
     tools: { ytdlp: t.ytdlp ? t.ytdlp.version : null, instaloader: t.instaloader, ffmpeg: t.ffmpeg }, install: F.INSTALL, setup: setupBrief() };
 }
 function view(s) {
   let comp; try { comp = C.compose(s, { refPack: refPackName(s) }); } catch (e) { comp = { args: [], errs: [e.message], notes: [] }; }
   let scripts = []; try { scripts = SC.list(s.job); } catch {}
   let cut = null; try { cut = cutView(s); } catch (e) { cut = { error: e.message, candidates: [] }; }
-  return { state: s, compose: comp, outputs: C.outputsOf(s), scripts, cut, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
+  let broll = null; try { broll = BRL.view(s); } catch (e) { broll = { error: e.message, beats: [] }; }
+  return { state: s, compose: comp, outputs: C.outputsOf(s), scripts, cut, broll, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
 }
 
 // ---------- tasks (one at a time) ----------
@@ -165,7 +171,7 @@ function draftSteps(s) {
   // takes filmed from a script: hand the script to Whisper as a hint (TX_PROMPT, kit/tx.py and kit/clip.py), so captions spell its words
   const said = (s.takes || []).filter(t => t.script && t.script.text && s.footage.includes(t.file)).map(t => t.script.text.replace(/\[[a-z]+\]/gi, ' ').replace(/\s+/g, ' ').trim());
   const stepEnv = said.length && !process.env.TX_PROMPT ? { TX_PROMPT: [...new Set(said)].join(' ').slice(0, 800) } : {};
-  return { steps: [['kit/reel.cjs', [...src, '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])], stepEnv]], lockString: comp.lockString, txPrompt: stepEnv.TX_PROMPT || null };
+  return { steps: [[process.env.STUDIO_REEL || 'kit/reel.cjs', [...src, '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])], stepEnv]], lockString: comp.lockString, txPrompt: stepEnv.TX_PROMPT || null };
 }
 function renderSteps(s) {
   if (!s.job || !existsSync(join(ROOT, 'jobs', s.job, 'build', 'cut.json'))) throw Object.assign(new Error('make a draft first'), { code: 400 });
@@ -173,7 +179,10 @@ function renderSteps(s) {
   const args = ['--rebuild', '--name', s.job, '--json'];
   if (comp.lockString && comp.lockString !== s.lockedAtDraft) args.push('--lock', comp.lockString);
   if (s.export) args.push('--export', s.export);
-  const steps = [['kit/reel.cjs', args]];
+  // the b-roll lane goes into cut.json first (kit/studio/broll-run.mjs), with credits.txt for the clips it uses
+  const bp = BRL.plan(s), steps = [];
+  if (bp) { const f = join('jobs', s.job, 'broll.json'); writeFileSync(join(ROOT, f), JSON.stringify(bp, null, 1)); steps.push(['kit/studio/broll-run.mjs', ['apply', '--name', s.job, '--plan', f]]); }
+  steps.push([process.env.STUDIO_REEL || 'kit/reel.cjs', args]);
   let fx = null;
   if (comp.effects.length && env().effectsReady) {
     const ch = readChoices(s); fx = C.fxPlan(ch, comp.effects);
@@ -257,13 +266,13 @@ async function findCuts(rel, scorer = 'auto') {
   const s = C.load(), o = outputOf(s), words = wordsOf(rel); if (!words) throw Object.assign(new Error('transcribe the footage first'), { code: 400 });
   const env = await energyOf(rel), cands = CUT.candidates(words, o, { duration: durOf(rel) }).map(c => snapOne(c, words, env, durOf(rel)));
   const summary = CUT.summary(o, durOf(rel)), st = S.load(), a = CH.presence();
-  const who = scorer !== 'auto' ? scorer : st.chat.backend === 'agent' && a.connected ? 'agent' : LLM.provider(process.env, st.chat) ? 'model' : 'rules';
+  const who = scorer !== 'auto' ? scorer : st.chat.backend === 'agent' && a.connected ? 'agent' : LLM.provider(KEYS.envWithKeys(), st.chat) ? 'model' : 'rules';
   update(x => { x.cut = { source: rel, summary, candidates: cands, scoredBy: 'rules', pending: who === 'rules' ? null : who, at: Date.now() }; });
   if (who === 'agent') {
     const line = `${CTA_LINE} for "${summary}": ${cands.length} candidates from the rules are on the Cut step. Read them and the transcript with get_cuts, then send your picks with set_cuts (time ranges in seconds, a 0 to 100 score and a short reason each). ${o.goal === 'ad' ? 'It is an ad: hook in the first 1 to 2 s, tight pacing, a clear call to action at the end, no long intro.' : 'It is organic: story pacing, a strong first line, short clips that loop back to the start.'}`;
     update(x => { C.applyPatch(x, { say: line, from: 'ui', toAgent: true, attach: { kind: 'cut', source: rel } }); });
   } else if (who === 'model') {
-    LLM.complete('You score cuts of a talking-head video. Reply with JSON only.', CUT.scorePrompt(cands, o), process.env, st.chat, { maxTokens: 1500 })
+    LLM.complete('You score cuts of a talking-head video. Reply with JSON only.', CUT.scorePrompt(cands, o), KEYS.envWithKeys(), st.chat, { maxTokens: 1500 })
       .then(r => { const re = CUT.applyScores(cands, r.text); update(x => { if (!x.cut || x.cut.source !== rel) return; if (re) { x.cut.candidates = re.map(c => ({ ...c, keep: (x.cut.candidates.find(y => y.id === c.id) || c).keep })); x.cut.scoredBy = r.model || r.provider; } x.cut.pending = null; if (!re) x.cut.note = 'The model reply had no scores, so the rules scores stay.'; }); })
       .catch(e => update(x => { if (x.cut && x.cut.source === rel) { x.cut.pending = null; x.cut.note = `The model failed (${e.message}), so the rules scores stay.`; } }));
   }
@@ -418,9 +427,9 @@ async function adaptScript(s, id, topic) {
     update(x => { C.applyPatch(x, { say: line, from: 'ui', toAgent: true, attach: { kind: 'adapt', script: sc.id, topic } }); });
     return { via: 'agent', queued: true, agent: a };
   }
-  if (!LLM.provider(process.env, st.chat)) throw Object.assign(new Error('Adapting a script needs your terminal agent, an API key or a local model (Settings).'), { code: 400 });
+  if (!LLM.provider(KEYS.envWithKeys(), st.chat)) throw Object.assign(new Error('Adapting a script needs your terminal agent, an API key or a local model (Settings).'), { code: 400 });
   const r = await LLM.complete('You rewrite talking-head scripts. ' + SC.SCRIPT_FORMAT + ' Write it so it sounds human: ' + SC.HUMANIZER_RULES.join(' ') + ' Reply with JSON only: {"title": "...", "text": "..."}.',
-    `${ADAPT_RULES}\nNew topic: ${topic}\nScript:\n${sc.text}`, process.env, st.chat, { maxTokens: 2500 });
+    `${ADAPT_RULES}\nNew topic: ${topic}\nScript:\n${sc.text}`, KEYS.envWithKeys(), st.chat, { maxTokens: 2500 });
   let j; try { j = JSON.parse(String(r.text).match(/\{[\s\S]*\}/)[0]); } catch { throw Object.assign(new Error('the model did not send a script back'), { code: 502 }); }
   const out = SC.write(s.job, { title: String(j.title || `${sc.title} (adapted)`).slice(0, 100), text: String(j.text || '').replace(/\u2014/g, ', '), wpm: sc.wpm, by: r.model || r.provider, from: `adapted from ${sc.id}` });
   update(x => { x.scriptsAt = Date.now(); });
@@ -511,10 +520,10 @@ async function chatTurn(text, offline, attach) {
   update(s => { C.applyPatch(s, { say: text, from: 'ui', attach }); });
   const s = C.load(), cat = C.catalog();
   let reply, patch, via;
-  const prov = backend === 'keywords' ? null : LLM.provider(process.env, st.chat);
+  const prov = backend === 'keywords' ? null : LLM.provider(KEYS.envWithKeys(), st.chat);
   if (prov) {
     try {
-      const r = await LLM.chat(text, s, cat, process.env, st.chat, SC.list(s.job)); reply = r.reply; patch = r.patch; via = r.provider;
+      const r = await LLM.chat(text, s, cat, KEYS.envWithKeys(), st.chat, SC.list(s.job)); reply = r.reply; patch = r.patch; via = r.provider;
       if (r.script && r.script.text && s.job) { const sc = SC.write(s.job, { id: r.script.id && SC.list(s.job).some(x => x.id === r.script.id) ? r.script.id : undefined, title: r.script.title, text: String(r.script.text).replace(/\u2014/g, ', '), by: r.model || r.provider }); update(x => { x.scriptsAt = Date.now(); }); reply = (reply ? reply + ' ' : '') + `Saved as the script "${sc.title}" (${sc.words} words, about ${sc.seconds} s).`; }
     }
     catch (e) { const v = C.vibes(text, s, cat); patch = v.patch; via = 'keywords'; reply = `The ${prov.name} chat failed (${e.message}), so I used the keyword matcher. ` + (v.said.length ? 'Changed: ' + v.said.join('; ') + '.' : 'Nothing matched.'); }
@@ -536,6 +545,8 @@ const readBody = (req, max = 2e6) => new Promise((ok, bad) => { let b = ''; req.
 const readRaw = (req, max) => new Promise((ok, bad) => { const parts = []; let n = 0; req.on('data', d => { n += d.length; if (n > max) { bad(Object.assign(new Error('chunk too big'), { code: 413 })); req.destroy(); } else parts.push(d); }); req.on('end', () => ok(Buffer.concat(parts))); req.on('error', bad); });
 const safeName = n => basename(String(n || 'file')).replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+/, '').slice(0, 80) || 'file';
 
+let chromeSeen = null; const chromeOk = () => { if (chromeSeen == null) { try { chromeSeen = !!findChrome(); } catch { chromeSeen = false; } } return chromeSeen; };
+const BRL = mountBroll({ ROOT, C, update, json, readBody, serveFile: (...a) => serveFile(...a), CH, capturePage, chromeOk });
 function serveFile(req, res, file) {
   let st; try { st = statSync(file); } catch { return json(res, 404, { error: 'not found' }); }
   if (!st.isFile()) return json(res, 404, { error: 'not found' });
@@ -668,6 +679,7 @@ async function api(req, res, u) {
     runTask('cuts', () => r.steps, () => ({ cuts: r.plan.map(x => ({ ...x, outputs: C.outputsOf({ job: x.job }) })), copiedTo: copyRenders(r.plan.flatMap(x => C.outputsOf({ job: x.job }).slice(0, 1))) }));
     return json(res, 202, { plan: r.plan, ...view(C.load()) });
   }
+  if (await BRL.route(p, M, u, req, res)) return;
   if (p === '/api/lines' && M === 'GET') return json(res, 200, await linesView(C.load(), u.searchParams.get('path')));
   if (p === '/api/lines' && M === 'POST') { const b = await readBody(req); const r = await editLines(b); return json(res, 200, { lines: r.view, ...view(r.s) }); }
   if (p === '/api/lines/render' && M === 'POST') {
