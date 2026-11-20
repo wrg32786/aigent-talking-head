@@ -27,8 +27,9 @@ export const settingsPath = () => join(stateDir(), 'settings.json');
 export const GEN_IDS = ['higgsfield', 'google', 'openai', 'replicate', 'fal'];
 export const AGENT_IDS = ['claude', 'codex', 'cursor', 'gemini', 'opencode', 'windsurf', 'generic'];
 // broll: { library: the b-roll folder (default <kit>/broll-library), generate: paid generating is allowed (off by
-// default), models: { higgsfield, google, openai, replicate, fal } the model each provider uses }
-export const BROLL_DEFAULTS = { library: null, generate: false, provider: null, models: {} };
+// default), models: { higgsfield, google, openai, replicate, fal } the model each provider uses, auto: b-roll picks
+// itself after each draft (null means on, unless STUDIO_BROLL_AUTO=0) }
+export const BROLL_DEFAULTS = { library: null, generate: false, provider: null, models: {}, auto: null };
 // post: the Post step (kit/studio/post.mjs). host: r2 | cloudinary | url; r2 and cloudinary hold only what is not secret
 // (the keys live in keys.json); channels: the Buffer channel ids picked last time; youtubeCategory: the Shorts category id
 export const POST_DEFAULTS = { host: null, r2: { account: null, bucket: null, publicBase: null, prefix: null }, cloudinary: { cloud: null, preset: null, folder: null }, channels: [], youtubeCategory: '22' };
@@ -44,7 +45,7 @@ export function load(env = process.env) {
   const pick = (k, envKey, v) => { if (env[envKey]) { from[k] = 'env ' + envKey; return env[envKey]; } from[k] = v != null ? 'settings' : 'default'; return v; };
   const s = { downloads: pick('downloads', 'STUDIO_DOWNLOADS', f.downloads), renders: pick('renders', 'STUDIO_RENDERS', f.renders), actionNotes: f.actionNotes !== false, agent: AGENT_IDS.includes(f.agent) ? f.agent : null,
     chat: { backend: pick('backend', 'STUDIO_CHAT', f.chat.backend) || 'agent', baseUrl: pick('baseUrl', 'STUDIO_LOCAL_URL', f.chat.baseUrl), model: pick('model', 'STUDIO_MODEL', f.chat.model) },
-    broll: { library: pick('brollLibrary', 'STUDIO_BROLL_LIBRARY', f.broll.library), generate: f.broll.generate === true, provider: f.broll.provider || null, models: f.broll.models || {} }, post: postOf(f) };
+    broll: { library: pick('brollLibrary', 'STUDIO_BROLL_LIBRARY', f.broll.library), generate: f.broll.generate === true, provider: f.broll.provider || null, models: f.broll.models || {}, auto: typeof f.broll.auto === 'boolean' ? f.broll.auto : null }, post: postOf(f) };
   if (!BACKENDS.includes(s.chat.backend)) s.chat.backend = 'agent';
   return { ...s, from };
 }
@@ -72,6 +73,7 @@ export function update(p) {
   if (p.broll) {
     const b = p.broll;
     if (b.library !== undefined) { const c = checkFolder(b.library); if (!c.ok) errs.push(`broll.library: ${c.error}`); else f.broll.library = c.path; }
+    if (b.auto !== undefined) { if (b.auto !== null && typeof b.auto !== 'boolean') errs.push('broll.auto: true, false or null'); else f.broll.auto = b.auto; }
     if (b.generate !== undefined) { if (typeof b.generate !== 'boolean') errs.push('broll.generate: true or false'); else f.broll.generate = b.generate; }
     if (b.provider !== undefined) { if (b.provider !== null && !GEN_IDS.includes(b.provider)) errs.push(`broll.provider: ${GEN_IDS.join(', ')} or null`); else f.broll.provider = b.provider; }
     if (b.models !== undefined) { if (!b.models || typeof b.models !== 'object') errs.push('broll.models: { provider: model }'); else for (const [k, v] of Object.entries(b.models)) { if (!GEN_IDS.includes(k)) errs.push(`broll.models: no provider ${k}`); else if (v && !/^[\w.\-/:@]{1,120}$/.test(String(v))) errs.push(`broll.models.${k}: a model id like owner/name`); else f.broll.models[k] = v ? String(v) : null; } }

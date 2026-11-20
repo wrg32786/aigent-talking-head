@@ -1,6 +1,8 @@
-// The B-roll step: one slot per beat of the draft. Fill a slot from the library, an upload, stock (Pexels, Pixabay),
-// a card made here, a screen recording or a generate, and set how it sits: full cutaway, split top panel or picture
-// in picture. Ideas from your agent (or the rules) wait here for Approve or Dismiss.
+// The B-roll step: spots on the drafted reel (a long take splits into spots of about 7 s), already picked from what
+// you said after every draft. Swap a spot from the library, an upload, stock (Pexels, Pixabay), a card made here, a
+// screen recording or a generate, and set how it sits: full cutaway, split top panel or picture in picture. Ideas
+// from your agent (or the rules) say why and wait for Approve or Keep empty. Raw uploads are cut into pieces first,
+// and testimonial pieces can play in your reel with their own sound.
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';
@@ -10,7 +12,7 @@ import { Hint } from './ui.jsx';
 import { FixActions } from './Fix.jsx';
 
 const TAB_ICON = { library: 'grid', upload: 'upload', stock: 'search', make: 'spark', record: 'camera', generate: 'film' };
-const TABS = [['library', 'Library'], ['upload', 'Upload'], ['stock', 'Stock'], ['make', 'Make'], ['record', 'Record'], ['generate', 'Generate']];
+const TABS = [['library', 'Library'], ['upload', 'Your uploads'], ['stock', 'Stock'], ['make', 'Made card'], ['record', 'Screen'], ['generate', 'AI generate']];
 const t1 = x => (+x).toFixed(1);
 const money = e => (e && e.usd != null ? `$${(+e.usd).toFixed(2)}` : 'cost unknown');
 const STOP = new Set('the a an and or but so of to in on at for with by from is are was were be it its this that i you we they my your our just really very like about into than then there here what when where which who how all can will would not now used every'.split(' '));
@@ -33,22 +35,30 @@ function Library({ fill }) {
   </div>;
 }
 
-function Upload({ beat, done }) {
-  const [busy, setBusy] = useState(false);
+const RAW_LABEL = { transcribing: 'Listening for words', cutting: 'Cutting into pieces', done: 'Cut', failed: 'Could not cut' };
+function Upload({ beat, done, B, V }) {
+  const [busy, setBusy] = useState(false), [type, setType] = useState('lifestyle'), [raw, setRaw] = useState(false);
   const send = async files => {
     setBusy(true);
-    for (const f of files) { const r = await fetch(`/api/broll/upload?name=${encodeURIComponent(f.name)}&beat=${beat.n}`, { method: 'POST', body: f }); const j = await r.json().catch(() => ({})); if (!r.ok) { toast(j.error || 'upload failed'); break; } done(j); }
+    for (const f of files) { const isRaw = raw && /^video\//.test(f.type || 'video/'), r = await fetch(`/api/broll/upload?name=${encodeURIComponent(f.name)}&type=${type}${isRaw ? '&raw=1' : `&beat=${beat.n}`}`, { method: 'POST', body: f }); const j = await r.json().catch(() => ({})); if (!r.ok) { toast(j.error || 'upload failed'); break; } done(j); if (isRaw) toast('Cutting it into pieces on whole words. They land in your library.', true); }
     setBusy(false);
   };
-  return <div className="bpanel" id="bp-upload"><label className="drop"><input type="file" id="broll-file" accept="video/*,image/*" multiple hidden onChange={e => send([...e.target.files])} />
-    <Icon n="upload" /><span>{busy ? 'Adding...' : 'Choose a video or picture'}</span><small className="fine">Goes into your library, then onto beat {beat.n}.</small></label></div>;
+  const raws = (B.raws || []).filter(x => x.status !== 'done' || Date.now() - x.at < 6e5);
+  return <div className="bpanel" id="bp-upload">
+    <div className="row up-opts"><label className="inl"><span className="fine">It is</span><select id="up-type" value={type} onChange={e => { setType(e.target.value); if (e.target.value === 'testimonial') setRaw(true); }}>{Object.entries(B.types || {}).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+      <label className="tick"><input type="checkbox" id="up-raw" checked={raw} onChange={e => setRaw(e.target.checked)} />It is raw: cut it into pieces first</label>
+      <Hint id="up-raw-hint" label="About raw uploads">Studio listens for the words and cuts the clip the same way as your footage: every edge in a pause, never mid-word, retakes left out. Each piece lands in your library with its words as tags. Testimonial pieces can play in your reel with their own sound.</Hint></div>
+    <label className="drop"><input type="file" id="broll-file" accept="video/*,image/*" multiple hidden onChange={e => send([...e.target.files])} />
+      <Icon n="upload" /><span>{busy ? 'Adding...' : 'Choose a video or picture'}</span><small className="fine">{raw ? 'Cut into pieces, then into your library.' : `Goes into your library, then onto spot ${beat.n}.`}</small></label>
+    {raws.length > 0 && <ul className="raws" id="up-raws">{raws.map(x => <li key={x.id} className={'raw ' + x.status} data-id={x.id}><b>{x.name}</b><span className="fine">{RAW_LABEL[x.status] || x.status}{x.pieces && x.pieces.length ? `, ${x.pieces.length} piece${x.pieces.length === 1 ? '' : 's'}` : ''}{x.error ? `: ${x.error}` : ''}</span>{x.fix && x.fix.length > 0 && <FixActions V={V} id={x.fix[0]} />}</li>)}</ul>}
+  </div>;
 }
 
 function Stock({ beat, V, fill, openKeys }) {
   const on = V.broll.sources.filter(s => (s.id === 'pexels' || s.id === 'pixabay') && s.on).map(s => s.id);
-  const [prov, setProv] = useState(on[0] || 'pexels'), [q, setQ] = useState(queryOf(beat.text)), [ori, setOri] = useState('portrait'), [max, setMax] = useState('');
+  const [prov, setProv] = useState(on[0] || 'pexels'), [q, setQ] = useState((beat.idea && beat.idea.query) || queryOf(beat.text)), [ori, setOri] = useState('portrait'), [max, setMax] = useState('');
   const [res, setRes] = useState(null), [busy, setBusy] = useState(false), [adding, setAdding] = useState(null);
-  useEffect(() => setQ(queryOf(beat.text)), [beat.n]);
+  useEffect(() => setQ((beat.idea && beat.idea.query) || queryOf(beat.text)), [beat.n]);
   if (!on.length) return <div className="bpanel" id="bp-stock"><p className="fine">Stock search needs your free Pexels key (or Pixabay). It stays on this computer.</p><Button id="stock-keys" size="sm" variant="secondary" label="Add a key" onClick={openKeys} /></div>;
   const search = async () => { setBusy(true); try { const j = await api(`/api/broll/stock?provider=${prov}&q=${encodeURIComponent(q)}&orientation=${ori}${max ? '&max=' + max : ''}`); setRes(j.results); } catch {} setBusy(false); };
   const add = async it => { setAdding(it.id); try { const j = await api('/api/broll/stock/add', { provider: prov, item: it, beat: beat.n }); fill(null, j); } catch {} setAdding(null); };
@@ -71,8 +81,8 @@ function Stock({ beat, V, fill, openKeys }) {
 
 const CARD_KINDS = [['chart', 'Chart'], ['counter', 'Counter'], ['quote', 'Quote'], ['code', 'Code'], ['terminal', 'Terminal'], ['html', 'HTML scene']];
 function Make({ beat, fill, V }) {
-  const agentOk = (V.broll.sources.find(s => s.id === 'agent') || {}).on;
-  const [kind, setKind] = useState('counter'), [f, setF] = useState({}), [busy, setBusy] = useState(false);
+  const agentOk = (V.broll.sources.find(s => s.id === 'agent') || {}).on, card = beat.idea && beat.idea.card;
+  const [kind, setKind] = useState(card ? card.kind : 'counter'), [f, setF] = useState(card ? { ...card, lines: Array.isArray(card.lines) ? card.lines.join('\n') : card.lines } : {}), [busy, setBusy] = useState(false);
   const set = (k, v) => setF(x => ({ ...x, [k]: v }));
   const spec = () => {
     if (kind === 'chart') return { kind, title: f.title, unit: f.unit, bars: String(f.bars || '').split('\n').map(l => { const m = l.split(/[,:]\s*/); return { label: m[0], value: +m[1] }; }).filter(b => b.label && Number.isFinite(b.value)) };
@@ -163,65 +173,97 @@ function Generate({ beat, V, done, openKeys }) {
   </div>;
 }
 
+const clock = x => { const t = Math.max(0, Math.round(+x || 0)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
+const SRC = { library: 'Library', upload: 'Upload', pexels: 'Stock', pixabay: 'Stock', agent: 'Card', screen: 'Screen rec', capture: 'Web capture', generate: 'AI gen' };
+const spotTitle = b => b.slot ? (b.slot.clip.source === 'agent' ? b.slot.clip.name : `${SRC[b.slot.clip.source] || cap1(b.slot.clip.source)}: ${b.slot.clip.name}`) : b.idea ? b.idea.idea : b.ref ? 'Reference b-roll' : 'Empty';
+
+// testimonial pieces from raw uploads, played in your reel with their own sound after the piece you pick
+function Testimonials({ B, V, after }) {
+  const pieces = ((V.combo && V.combo.pieces) || []).filter(x => x.kind !== 'testimonial'), on = Object.fromEntries((B.cutins || []).map(x => [x.clip.id, x]));
+  const set = async (clip, o) => { try { after(await api('/api/broll/cutin', { clip, ...o })); } catch {} };
+  if (!(B.testimonials || []).length) return null;
+  return <div className="testis glass" id="broll-testimonials">
+    <div className="bp-h"><b>Testimonials</b><span className="fine">They play in your reel with their own sound, between your pieces. Draft again to hear them.</span></div>
+    <ul>{B.testimonials.map(c => { const x = on[c.id]; return <li key={c.id} data-id={c.id} className={x ? 'on' : ''}>
+      <span className="ts-t"><b>{c.name}</b><span className="fine">{c.raw && c.raw.seconds ? `${t1(c.raw.seconds)} s` : ''}{c.raw && c.raw.text && !c.raw.text.startsWith(c.name) ? ` · "${c.raw.text.slice(0, 80)}"` : ''}</span></span>
+      {!pieces.length ? <span className="fine">Keep pieces on the Cut step first.</span>
+        : x ? <><label className="inl"><span className="fine">After</span><select className="ts-after" value={x.after || ''} onChange={e => set(c.id, { after: e.target.value || null })}><option value="">Before my last piece</option>{pieces.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select></label>
+          <Button size="sm" variant="ghost" label="Take out" onClick={() => set(c.id, { remove: true })} /></>
+        : <Button className="ts-add" size="sm" variant="secondary" label="Play in my reel" icon={<Icon n="plus" />} onClick={() => set(c.id, {})} />}
+    </li>; })}</ul>
+  </div>;
+}
+
 export function BRoll({ V, apply, go, openKeys }) {
   const B = V.broll || { beats: [], sources: [], asks: [], gens: [], generate: { providers: [] }, library: {} };
-  const [sel, setSel] = useState(null), [tab, setTab] = useState('library'), [busy, setBusy] = useState('');
+  const [sel, setSel] = useState(null), [tab, setTab] = useState('library'), [busy, setBusy] = useState(''), [addAt, setAddAt] = useState(null);
   const beat = B.beats.find(b => b.n === sel) || null;
-  useEffect(() => { if (!beat && B.beats.length) setSel((B.beats.find(b => b.idea) || B.beats.find(b => !b.slot && b.n > 1) || B.beats[0]).n); }, [B.beats.length]);
+  useEffect(() => { if (!beat && B.beats.length) setSel((B.beats.find(b => b.idea) || B.beats.find(b => b.slot) || B.beats[0]).n); }, [B.beats.length]);
   // a reply can land after a newer live update (an agent's idea, a clear from the API). Merging it into this render's V
   // with seq 0 used to put the older lane back on screen, so ask for a fresh view instead: it carries a seq, and apply
   // drops it if something newer is already showing.
   const after = j => { if (j && (j.state || j.broll)) api('/api/state').then(apply).catch(() => {}); };
   const fill = async (o, j) => { if (j) return after(j); try { after(await api('/api/broll/slot', { beat: beat.n, ...o })); } catch {} };
   const idea = async (n, action) => { setBusy('idea' + n); try { after(await api('/api/broll/idea', { beat: n, action })); } catch {} setBusy(''); };
-  const suggest = async () => { setBusy('suggest'); try { const j = await api('/api/broll/suggest', {}); after(j); toast(j.count ? `${j.count} ideas to approve` : 'No new ideas. Fill a beat by hand.', !!j.count); } catch {} setBusy(''); };
+  const suggest = async () => { setBusy('suggest'); try { const j = await api('/api/broll/suggest', {}); after(j); toast(j.count ? `${j.count} idea${j.count === 1 ? '' : 's'} to approve` : 'Every spot that needs b-roll has some. Add a spot or swap one.', !!j.count); } catch {} setBusy(''); };
+  const auto = async on => { try { after(await api('/api/broll/auto', { on })); } catch {} };
+  const addSpot = async e => { e.preventDefault(); try { after(await api('/api/broll/spot', { at: +addAt })); setAddAt(null); } catch {} };
   const ask = async (a, yes) => {
     if (!yes) { try { after(await api('/api/broll/ask', { action: 'decline', id: a.id })); } catch {} return; }
     const r = await fetch('/api/broll/generate', { method: 'POST', headers: { 'content-type': 'application/json', 'x-studio-page': '1' }, body: JSON.stringify({ ...a, ask: a.id, confirm: true }) });
     const j = await r.json().catch(() => ({})); if (!r.ok) toast(j.error || 'generate failed'); else after(j);
   };
-  const L = B.length || 1;
+  const L = B.length || 1, filled = B.beats.filter(b => b.slot).length, waiting = B.beats.filter(b => b.idea && !b.slot).length;
   return <section className="step" id="s-broll" data-step="broll" aria-labelledby="h-broll">
-    <header className="sh"><h2 id="h-broll">B-roll</h2><p className="sub">One slot per beat. Pick a clip and how it sits: full cutaway, split top panel or picture in picture. Your voice keeps running underneath.</p></header>
-    <div className="row broll-bar"><Button id="broll-suggest" size="sm" variant="secondary" label="Suggest" icon={<Icon n="spark" />} isDisabled={!B.draft} isLoading={busy === 'suggest'} onClick={suggest} />
-      <Button id="open-keys" size="sm" variant="ghost" label="API keys and providers" icon={<Icon n="plug" />} onClick={openKeys} /></div>
-    <ul className="src-strip" id="broll-src">{B.sources.map(x => <li key={x.id} className={x.on ? 'on' : ''} title={x.note}>{x.on ? <Icon n="check" /> : <Icon n="minus" />}{x.name}</li>)}</ul>
+    <header className="sh"><h2 id="h-broll">B-roll</h2><p className="sub">{B.auto ? 'Picked for you from what you said, after every draft. Click a spot to swap, change or remove it.' : 'Spots on your draft. Suggest picks from what you said; click a spot to fill it.'}</p></header>
+    <div className="row broll-bar"><Button id="broll-suggest" size="sm" variant="primary" label="Suggest b-roll again" icon={<Icon n="spark" />} isDisabled={!B.draft} isLoading={busy === 'suggest'} onClick={suggest} />
+      <Button id="broll-add-spot" size="sm" variant="secondary" label="Add a spot" icon={<Icon n="plus" />} isDisabled={!B.draft} onClick={() => setAddAt(addAt == null ? (beat ? +((beat.start + beat.end) / 2).toFixed(1) : 1) : null)} />
+      <label className="tick" title="After every draft, Studio fills spots from your library, free stock when you set a key, and cards made from your words. Generating always asks first."><input type="checkbox" id="broll-auto" checked={!!B.auto} onChange={e => auto(e.target.checked)} />Picks itself after each draft</label>
+      <span className="grow" /><Button id="open-keys" size="sm" variant="ghost" label="API keys and providers" icon={<Icon n="plug" />} onClick={openKeys} /></div>
+    {addAt != null && <form className="row add-spot" id="add-spot" onSubmit={addSpot}><label className="inl"><span className="fine">New spot at</span><input id="add-spot-at" type="number" min={0.5} max={Math.max(1, L - 0.5)} step={0.1} value={addAt} onChange={e => setAddAt(e.target.value)} /><span className="fine">s</span></label>
+      <Button id="add-spot-go" type="submit" size="sm" variant="secondary" label="Add" /><Button size="sm" variant="ghost" label="Cancel" onClick={() => setAddAt(null)} /></form>}
     {B.asks.length > 0 && <div className="asks" id="broll-asks">{B.asks.map(a => <div key={a.id} className="ask" data-id={a.id}>
-      <span><b>{a.by}</b> asks to generate{a.beat != null ? ` for beat ${a.beat}` : ''} with {a.provider}: "{a.prompt}" <Badge label={money(a.estimate)} variant="warning" /></span>
+      <span><b>{a.by}</b> asks to generate{a.beat != null ? ` for spot ${a.beat}` : ''} with {a.provider}: "{a.prompt}" <Badge label={money(a.estimate)} variant="warning" /></span>
       <Button size="sm" variant="primary" label={`Approve ${money(a.estimate)}`} onClick={() => ask(a, true)} /><Button size="sm" variant="ghost" label="Decline" onClick={() => ask(a, false)} /></div>)}</div>}
     {B.gens.filter(g => g.status !== 'done').map(g => <p key={g.id} className={'gen-st ' + g.status} data-id={g.id}>{g.status === 'running' ? `Generating with ${g.provider}${g.phase ? ' (' + g.phase.replace('_', ' ') + ')' : ''}: "${g.prompt.slice(0, 60)}"` : `Generate failed: ${g.error}`}</p>)}
-    {!B.draft ? <div className="empty-art" id="broll-empty"><Icon n="film" /><p>The beats come from a draft. Make one on the Finish step, then come back.</p><Button id="broll-to-render" variant="secondary" size="sm" label="Go to Finish" onClick={() => go('finish', true)} /></div>
+    {!B.draft ? <div className="empty-art" id="broll-empty"><Icon n="film" /><p>The spots come from a draft. Draft on the Finish step and b-roll picks itself from what you said.</p><Button id="broll-to-render" variant="secondary" size="sm" label="Go to Finish" onClick={() => go('finish', true)} /></div>
       : <>
-        <div className="blane" id="broll-lane" role="list">
-          {B.beats.map(b => <button key={b.n} type="button" role="listitem" className={'beat' + (b.n === sel ? ' sel' : '') + (b.slot ? ' filled' : '') + (b.idea ? ' has-idea' : '')} data-beat={b.n} style={{ flexGrow: Math.max(1, b.seconds) }} onClick={() => setSel(b.n)} aria-pressed={String(b.n === sel)}>
-            <span className="bn">{b.n}</span><span className="bt">{t1(b.start)} s</span>
-            {b.slot ? <span className="bslot"><img src={b.slot.clip.thumb || ''} alt="" /><em>{b.slot.place === 'full' ? 'Full' : b.slot.place === 'top' ? 'Split' : 'PiP'}</em></span> : <span className="bempty"><Icon n="plus" /></span>}
-            <span className="btx">{b.text || 'No words'}</span>
+        <div className="blane spots" id="broll-lane" role="list" aria-label="Spots">
+          {B.beats.map(b => <button key={b.n} type="button" role="listitem" className={'beat spot' + (b.n === sel ? ' sel' : '') + (b.slot ? ' filled' : '') + (b.idea ? ' has-idea' : '') + (b.ref ? ' ref' : '')} data-beat={b.n} style={{ flexGrow: Math.max(1, b.seconds) }} onClick={() => setSel(b.n)} aria-pressed={String(b.n === sel)}>
+            <span className="sp-top"><span className="bt">{clock(b.slot ? b.slot.at : b.start)}</span>{b.ref && <em className="sp-ref" title={b.ref.detail}>REF</em>}{b.slot && b.slot.by && b.slot.by !== 'you' && <em className="sp-by">{b.slot.by === 'Studio' ? 'picked' : b.slot.by}</em>}</span>
+            {b.slot ? <span className="bslot"><img src={b.slot.clip.thumb || ''} alt="" /><em>{b.slot.place === 'full' ? 'Full' : b.slot.place === 'top' ? 'Split' : 'PiP'}</em></span> : null}
+            <span className="sp-t">{spotTitle(b)}</span>
+            <span className="btx">{b.text ? `"${b.text.length > 64 ? b.text.slice(0, 62) + '...' : b.text}"` : 'No words'}</span>
           </button>)}
         </div>
         <div className="blane-scale" aria-hidden="true">{B.beats.map(b => <i key={b.n} style={{ left: (b.start / L * 100) + '%' }} />)}</div>
         {beat && <div className="beat-panel glass" id="beat-panel">
-          <div className="bp-h"><b>Beat {beat.n}</b><span className="fine">{t1(beat.start)} to {t1(beat.end)} s · "{beat.text}"</span></div>
-          {beat.idea && <div className="idea" id="beat-idea"><Icon n="spark" /><span><b>{beat.idea.by}</b> suggests: {beat.idea.idea}{beat.idea.place ? ` (${B.places[beat.idea.place].toLowerCase()})` : ''}</span>
-            <Button id="idea-approve" size="sm" variant="primary" label="Approve" isLoading={busy === 'idea' + beat.n} onClick={() => idea(beat.n, 'approve')} /><Button id="idea-dismiss" size="sm" variant="ghost" label="Dismiss" onClick={() => idea(beat.n, 'dismiss')} /></div>}
+          <div className="bp-h"><b>Spot {beat.n} at {clock(beat.start)}</b><span className="fine">{t1(beat.start)} to {t1(beat.end)} s · "{beat.text}"</span></div>
+          {beat.ref && <p className="fine sp-refnote" id="spot-ref"><Icon n="film" />The reference cuts to b-roll here{beat.ref.detail ? `: ${beat.ref.detail}` : ''}.</p>}
+          {beat.idea && <div className="idea" id="beat-idea"><Icon n="spark" /><span><b>{beat.idea.by === 'the rules' || beat.idea.by === 'Studio' ? 'Picked from your words' : beat.idea.by}</b>: {beat.idea.idea}{beat.idea.place ? ` (${B.places[beat.idea.place].toLowerCase()})` : ''}{beat.idea.why && <small className="why" id="idea-why">{beat.idea.why}</small>}</span>
+            <Button id="idea-approve" size="sm" variant="primary" label="Use it" isLoading={busy === 'idea' + beat.n} onClick={() => idea(beat.n, 'approve')} /><Button id="idea-dismiss" size="sm" variant="ghost" label="Keep empty" onClick={() => idea(beat.n, 'dismiss')} /></div>}
           {beat.slot && <div className="slot-set" id="slot-set">
             <div className="slot-prev">{beat.slot.clip.kind === 'video' ? <video src={beat.slot.clip.url + '#t=' + beat.slot.in} muted playsInline preload="metadata" controls /> : <img src={beat.slot.clip.url} alt="" />}</div>
             <div className="col">
-              <span className="fine">{beat.slot.clip.name} · {beat.slot.clip.source}{beat.slot.by && beat.slot.by !== 'you' ? ` · placed by ${beat.slot.by}` : ''}</span>
+              <span className="fine">{beat.slot.clip.name} · {beat.slot.clip.source}{beat.slot.by && beat.slot.by !== 'you' ? ` · ${beat.slot.by === 'Studio' ? 'picked from your words' : 'placed by ' + beat.slot.by}` : ''}</span>
+              <span className="lbl">How it sits</span>
               <div className="seg-row" role="radiogroup" aria-label="Placement">{Object.entries(B.places).map(([k, l]) => <button key={k} type="button" role="radio" id={'place-' + k} aria-checked={String(beat.slot.place === k)} className={'chip place ' + k + (beat.slot.place === k ? ' on' : '')} onClick={() => fill({ clip: beat.slot.clip.id, place: k })}><i aria-hidden="true" />{l}</button>)}</div>
+              <span className="lbl">Timing</span>
               <div className="row">
                 <label className="inl"><span className="fine">Starts</span><input id="slot-offset" type="number" step={0.1} min={0} max={beat.seconds} defaultValue={beat.slot.offset} key={'o' + beat.n + beat.slot.offset} onBlur={e => fill({ clip: beat.slot.clip.id, offset: +e.target.value })} /><span className="fine">s in</span></label>
                 <label className="inl"><span className="fine">Length</span><input id="slot-dur" type="number" step={0.1} min={0.4} max={beat.seconds} defaultValue={beat.slot.dur} key={'d' + beat.n + beat.slot.dur} onBlur={e => fill({ clip: beat.slot.clip.id, dur: +e.target.value })} /><span className="fine">s</span></label>
                 {beat.slot.clip.kind === 'video' && <label className="inl"><span className="fine">From</span><input id="slot-in" type="number" step={0.1} min={0} defaultValue={beat.slot.in} key={'i' + beat.n + beat.slot.in} onBlur={e => fill({ clip: beat.slot.clip.id, in: +e.target.value })} /><span className="fine">s of the clip</span></label>}
-                <Button id="slot-clear" size="sm" variant="ghost" label="Clear" icon={<Icon n="trash" />} onClick={() => fill({ clear: true })} />
               </div>
+              {beat.slot.why && <><span className="lbl">Why this</span><p className="fine why" id="slot-why">{beat.slot.why}</p></>}
+              <div className="row"><Button id="slot-clear" size="sm" variant="secondary" label="Remove" icon={<Icon n="trash" />} onClick={() => fill({ clear: true })} /></div>
               {beat.slot.clip.license && <span className="fine">{beat.slot.clip.author && beat.slot.clip.author.name ? `By ${beat.slot.clip.author.name}. ` : ''}{beat.slot.clip.license.name}</span>}
             </div></div>}
+          <span className="lbl opt-h">Options for this spot</span>
           <TabGroup className="btabs" selectedIndex={TABS.findIndex(([k]) => k === tab)} onChange={i => setTab(TABS[i][0])}>
             <TabList className="tabs" aria-label="Fill from">{TABS.map(([k, l]) => <Tab key={k} id={'btab-' + k} className={({ selected }) => 'tab' + (selected ? ' on' : '')}><Icon n={TAB_ICON[k]} />{l}</Tab>)}</TabList>
             <TabPanels className="btab-panels">
               <TabPanel><Library fill={fill} /></TabPanel>
-              <TabPanel><Upload beat={beat} done={after} /></TabPanel>
+              <TabPanel><Upload beat={beat} done={after} B={B} V={V} /></TabPanel>
               <TabPanel><Stock beat={beat} V={V} fill={fill} openKeys={openKeys} /></TabPanel>
               <TabPanel><Make beat={beat} V={V} fill={fill} /></TabPanel>
               <TabPanel><Record beat={beat} done={after} /></TabPanel>
@@ -229,7 +271,8 @@ export function BRoll({ V, apply, go, openKeys }) {
             </TabPanels>
           </TabGroup>
         </div>}
-        <p className="fine" id="broll-note">{B.beats.filter(b => b.slot).length} of {B.beats.length} beats have b-roll. Render puts them in and writes credits.txt next to the reel. Library: {B.library.count} clips in {B.library.dir}.</p>
+        <Testimonials B={B} V={V} after={after} />
+        <p className="fine" id="broll-note">{filled} of {B.beats.length} spots have b-roll{waiting ? `, ${waiting} waiting for you` : ''}. Render puts them in and writes credits.txt next to the reel. Library: {B.library.count} clips in {B.library.dir}.</p>
       </>}
   </section>;
 }

@@ -152,15 +152,17 @@ try {
     const lib = (await req('/api/broll/library?q=laptop')).j.clips; assert.ok(lib.length);
     const id = await req('/api/broll/ideas', { by: 'claude-code', ideas: [{ beat: 3, idea: 'The laptop shot from Pexels', clip: lib[0].id, place: 'full' }, { beat: 1, idea: 'A counter card', card: { kind: 'counter', to: 12 } }] });
     assert.strictEqual(id.status, 200, id.text); assert.strictEqual(id.j.broll.beats[2].idea.by, 'Claude Code');
-    assert.ok(id.j.state.chat.some(m => /suggested b-roll for 2 beats/.test(m.text || '')));
+    assert.ok(id.j.state.chat.some(m => /suggested b-roll for 2 spots/.test(m.text || '')));
     assert.strictEqual((await req('/api/broll/ideas', { ideas: [{ beat: 2, card: { kind: 'html', html: '<script>x</script>' } }] })).status, 400);
     assert.strictEqual(id.j.broll.beats[2].slot, null, 'nothing placed before approve');
     const ap = await req('/api/broll/idea', { beat: 3, action: 'approve' }); assert.strictEqual(ap.status, 200, ap.text); assert.strictEqual(ap.j.broll.beats[2].slot.clip.id, lib[0].id); assert.strictEqual(ap.j.broll.beats[2].idea, null);
     const dm = await req('/api/broll/idea', { beat: 1, action: 'dismiss' }); assert.strictEqual(dm.j.broll.beats[0].idea, null);
     await req('/api/broll/slot', { beat: 3, clear: true });
-    const sg = await req('/api/broll/suggest', {}); assert.strictEqual(sg.status, 200); const i3 = sg.j.broll.beats[2].idea; assert.ok(i3 && i3.query === 'revenue doubled', JSON.stringify(sg.j.broll.beats[2]));
-    assert.strictEqual(sg.j.broll.beats[0].idea, null, 'not on the hook'); assert.strictEqual(sg.j.broll.beats[1].idea, null, 'not on a filled beat');
-    await req('/api/broll/idea', { beat: 3, action: 'dismiss' });
+    const sg = await req('/api/broll/suggest', { all: true }); assert.strictEqual(sg.status, 200); const i3 = sg.j.broll.beats[2].idea; assert.ok(i3 && i3.query === 'revenue doubled', JSON.stringify(sg.j.broll.beats[2]));
+    assert.deepStrictEqual([i3.card && i3.card.kind, i3.card && i3.card.to, i3.card && i3.card.suffix], ['counter', 2, 'x'], '"doubled" is a 2x counter card'); assert.ok(/doubled/.test(i3.why));
+    const i1 = sg.j.broll.beats[0].idea; assert.ok(i1 && i1.offset >= 1.2, 'the first spot gets an idea too, after the hook shows the face'); assert.strictEqual(sg.j.broll.beats[1].idea, null, 'not on a filled spot');
+    const sparse = await req('/api/broll/suggest', {}); assert.strictEqual(sparse.j.count, 0, 'one every 6 s: the filled spot at 3.5 s leaves no room in a 9 s reel');
+    await req('/api/broll/idea', { beat: 3, action: 'dismiss' }); await req('/api/broll/idea', { beat: 1, action: 'dismiss' });
   });
   await t('render plan: broll-run puts the lane into cut.json (paths from build/), keeps other inserts, writes and removes credits.txt', async () => {
     const lib = BR.load().clips, pex = lib.find(c => c.source === 'pexels');

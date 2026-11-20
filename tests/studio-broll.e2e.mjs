@@ -55,7 +55,7 @@ const mock = http.createServer((req, res) => {
 await new Promise(r => mock.listen(0, '127.0.0.1', r)); mockUrl = `http://127.0.0.1:${mock.address().port}`;
 
 const env = { ...process.env, CI: '1', STUDIO_DIR: STATE, STUDIO_BROLL_LIBRARY: LIB, STUDIO_CHAT: '', ANTHROPIC_API_KEY: '', OPENAI_API_KEY: '', PEXELS_API_KEY: '', PIXABAY_API_KEY: '', HF_API_KEY_ID: '', HF_API_KEY_SECRET: '',
-  STUDIO_REEL: 'tests/fixtures/fake-reel.mjs', STUDIO_API_BASE_PEXELS: mockUrl, STUDIO_API_BASE_HIGGSFIELD: mockUrl };
+  STUDIO_REEL: 'tests/fixtures/fake-reel.mjs', STUDIO_BROLL_AUTO: '0', STUDIO_API_BASE_PEXELS: mockUrl, STUDIO_API_BASE_HIGGSFIELD: mockUrl };
 const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), '--port', '0', '--no-open'], { cwd: ROOT, env });
 let out = '';
 const url = await new Promise((ok, bad) => { srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out))); });
