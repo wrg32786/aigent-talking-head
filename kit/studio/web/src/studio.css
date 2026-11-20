@@ -350,7 +350,7 @@ main[data-step="style"] .picks { display: flex; }
   .td-body > img, .td-body > .empty-art { order: 2; }
   .job input { width: 100%; min-width: 0; }
   .job { flex: 1; min-width: 0; }
-  .stepper { margin: 0; } .stepper button { padding: 4px; min-height: 36px; } .stepper li + li::before { width: 6px; margin-right: 2px; }
+  .stepper { margin: 0; } .stepper ol { gap: 1px; } .stepper button { padding: 2px; min-height: 36px; } .stepper .sn { width: 22px; height: 22px; } .stepper li + li::before { width: 3px; margin-right: 1px; }
   .topr .icon-btn { width: 36px; } #theme { display: none; }
   .sh h2 { font-size: 28px; }
   .block { padding: 14px; }
