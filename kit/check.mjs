@@ -188,6 +188,10 @@ if (target) {
     try { execFileSync(process.execPath, [tp], { cwd: ROOT, stdio: 'pipe' }); }
     catch (e) { terrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 6).join(' | ')); }
     results.push({ label: 'pack tests (tests/packs.test.cjs)', errs: terrs, warns: [] });
+    const perrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'cut-points.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
+    catch (e) { perrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 6).join(' | ')); }
+    results.push({ label: 'cut point tests (tests/cut-points.test.cjs: audio envelope, word ends, lead-ins, tighten)', errs: perrs, warns: [] });
     const serrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { serrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }

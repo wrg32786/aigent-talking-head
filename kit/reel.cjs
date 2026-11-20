@@ -44,8 +44,9 @@
 //          --caption-outline none|thin|thick  --caption-shadow none|soft  --caption-case upper|lower|as-said  the one-word look
 //          --caption-layer front|behind|auto  captions under the person where they overlap the head (auto = behind at the top)
 //          --panel-layer front|behind|auto  screen cards behind the head where it reaches into them (auto = behind)
-//          --tighten <s> / --no-tighten  no dead air: cut every pause inside a line longer than <s> seconds to a jump
-//            (keeps 0.12 s of breath; each jump gets the punch toggle). On at 0.3 in the magazine preset.
+//          --tighten <s> / --no-tighten  no dead air: cut every pause inside a line longer than <s> seconds to a jump,
+//            measured on the audio (kit/cutpoints.cjs: at least 0.12 s of breath kept, never mid-word; each jump gets the
+//            punch toggle). On at 0.3 in the magazine preset.
 //          --music-energy low|mid|high|auto  pick a library bed by energy (auto reads your pace); --bed still wins
 //          --no-bed  no music bed, even when the pack, preset or recipe names one
 //          --cards auto|off  colour cards on short lines to land and numbered chapter cards on a list (kit/cards.cjs),
@@ -61,6 +62,8 @@
 //          --as-is  the files are already cut: one clip per file, in the order given (clip.py --whole). Without it,
 //            several files that each start and end on speech are used whole too, and files with a clips.json beside
 //            them (a clip.py folder) are reused as they are.
+//          --words <words.json>  word times you already have ({ "<file name>": [[start, end, word]] }, Studio's
+//            transcript): clip.py uses them instead of running Whisper again (one transcript per take)
 //          --order auto|files|script  several files: takes of one script (best take per sentence) or different clips
 //            (the order given); auto decides from how many sentences the files share
 //          --keep-pauses "clip-003@2.72,clip-005@1.1"  with --tighten, leave these pauses (clip id @ clip seconds, as
@@ -92,7 +95,7 @@ const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
+const VALUED = new Set(['words', 'pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const JSON_OUT = flag('json');
@@ -105,6 +108,7 @@ const VIDEO = /\.(mov|mp4|m4v|mkv|webm|avi)$/i;
 const PY = process.env.PYTHON || [path.join(ROOT, '.venv', 'Scripts', 'python.exe'), path.join(ROOT, '.venv', 'bin', 'python')].find(f => fs.existsSync(f)) || (process.platform === 'win32' ? 'py' : 'python3');
 const GL = require('./glossary.cjs');
 const BR = require('./brands.cjs');
+const CP = require('./cutpoints.cjs');
 const many = k => argv.flatMap((a, i) => (a === '--' + k && argv[i + 1] && !argv[i + 1].startsWith('--') ? [argv[i + 1]] : []));
 
 let srcs = positional.slice();
@@ -229,7 +233,7 @@ if (!flag('rebuild')) {
     const cjOld = path.join(clipsDir, 'clips.json'), pendingOld = fs.existsSync(cjOld) && (() => { try { return !!JSON.parse(fs.readFileSync(cjOld, 'utf8')).pending; } catch { return true; } })();
     if (fs.existsSync(cjOld) && !pendingOld && !flag('force')) console.log('clips/ already exists, reusing it (pass --force to re-clip)');
     else if (reusePrecut(srcs, clipsDir)) console.log(`clips: ${srcs.length} file${srcs.length === 1 ? '' : 's'} already cut by clip.py (clips.json beside them), used as they are, in the order given`);
-    else sh(PY, [path.join(KIT, 'clip.py'), ...srcs.map(f => path.resolve(f)), '--out', clipsDir, '--vertical', '--cropx', opt('cropx', '0.5'), ...(opt('model') ? ['--model', opt('model')] : []), ...(opt('hook') ? ['--hook', opt('hook')] : []), ...(flag('as-is') ? ['--whole'] : []), ...(opt('order') ? ['--order', opt('order')] : [])], job);
+    else sh(PY, [path.join(KIT, 'clip.py'), ...srcs.map(f => path.resolve(f)), '--out', clipsDir, '--vertical', '--cropx', opt('cropx', '0.5'), ...(opt('model') ? ['--model', opt('model')] : []), ...(opt('hook') ? ['--hook', opt('hook')] : []), ...(opt('words') ? ['--words', path.resolve(opt('words'))] : []), ...(flag('as-is') ? ['--whole'] : []), ...(opt('order') ? ['--order', opt('order')] : [])], job);
   }
   const cjPath = path.join(clipsDir, 'clips.json'), cjAll = JSON.parse(fs.readFileSync(cjPath, 'utf8'));
   if (cjAll.pending) die(`${cjPath} is from a clip.py run that did not finish. Run it again (or pass --force).`);
@@ -249,29 +253,26 @@ if (!flag('rebuild')) {
   // 2. cut.json from every keep clip, in order; a glitch hit and a woosh on each seam
   const rel = p => path.relative(build, path.isAbsolute(p) ? p : path.join(path.dirname(clipsDir), p)).split(path.sep).join('/');
   // no dead air (--tighten <s>, or the preset's "tighten"): a pause inside a line longer than that cuts to a jump. The
-  // word times say where you stop and start; 0.16 s of breath stays after the last word and 0.08 s before the next, so
-  // the jump keeps a 0.24 s pause (more than a cut between lines, so it never reads as a line cut off). A pause where
-  // less than 0.2 s would go stays. Every cut pause is listed in cut.json "tightened" and choices.json "pauses";
+  // pause is measured on the clip's audio, not the word times (kit/cutpoints.cjs, the cut-point module every path
+  // uses): the cut goes 180 ms after the last sound (an s or th tail counts as sound) and the clip resumes 110 ms before
+  // the next one, so a word is never clipped and at least 120 ms of breath stays. A pause where less than 0.2 s would
+  // go stays. Every cut pause is listed in cut.json "tightened" and choices.json "pauses";
   // --keep-pauses clip-003@2.72 (or the clean-up plan's "keepPauses") leaves one uncut.
   const TIGHT = flag('no-tighten') ? false : opt('tighten') != null ? +opt('tighten') : (preset && preset.tighten != null ? preset.tighten : false);
   if (TIGHT !== false && !(TIGHT >= 0.15 && TIGHT <= 2)) die('--tighten must be the longest pause to keep, 0.15 to 2 seconds');
   const KEEPP = {};
   for (const x of [...String(opt('keep-pauses') || '').split(','), ...Object.entries((CLEAN && CLEAN.keepPauses) || {}).flatMap(([id, ts]) => [].concat(ts).map(t => `${id}@${t}`))]) { const m = /^\s*([\w-]+)@([\d.]+)\s*$/.exec(x); if (m) (KEEPP[m[1]] = KEEPP[m[1]] || []).push(+m[2]); }
-  const TIGHTENED = [];
+  const TIGHTENED = [], SPANS = new Map();
   const spansOf0 = c => {
     const dur = +(+c.dur).toFixed(3), ws = (c.words || []).filter(w => w[1] > w[0]);
     if (!TIGHT || ws.length < 2) return [[0, dur]];
-    const out = []; let a = 0;
-    for (let i = 0; i < ws.length - 1; i++) {
-      const b = ws[i][1] + 0.16, n = ws[i + 1][0] - 0.08;
-      if (ws[i + 1][0] - ws[i][1] > TIGHT && n - b >= 0.2 && b - a >= 0.35) {
-        if ((KEEPP[c.id] || []).some(t => Math.abs(t - +b.toFixed(2)) < 0.15 || (t >= ws[i][1] - 0.05 && t <= ws[i + 1][0]))) continue;
-        out.push([a, b]); a = n;
-        if (!TIGHTENED.some(x => x.clip === c.id && x.at === +b.toFixed(2))) TIGHTENED.push({ clip: c.id, at: +b.toFixed(2), resume: +n.toFixed(2), gap: +(ws[i + 1][0] - ws[i][1]).toFixed(2), after: String(ws[i][2]).slice(0, 24) });
-      }
-    }
-    out.push([a, dur]);
-    return out.map(([x, y]) => [+x.toFixed(3), +y.toFixed(3)]).filter(([x, y]) => y - x > 0.05);
+    if (SPANS.has(c.id)) return SPANS.get(c.id);
+    const env = CP.envelopeSync(path.join(clipsDir, path.basename(c.file)));
+    if (!env) { console.log(`no dead air: ${c.id} has no readable audio, its pauses stay`); SPANS.set(c.id, [[0, dur]]); return [[0, dur]]; }
+    const keepIt = (at, i, L, N) => (KEEPP[c.id] || []).some(t => Math.abs(t - at) < 0.15 || (t >= L[1] - 0.05 && t <= N[0]));
+    const r = CP.tightenSpans(ws, env, TIGHT, { range: [0, dur], dur, keep: keepIt });
+    for (const x of r.cuts) if (!TIGHTENED.some(y => y.clip === c.id && y.at === x.at)) TIGHTENED.push({ clip: c.id, at: x.at, resume: x.resume, gap: x.gap, after: x.after });
+    SPANS.set(c.id, r.spans); return r.spans;
   };
   const cutsOf = c => (CLEAN && CLEAN.cuts && Array.isArray(CLEAN.cuts[c.id]) ? CLEAN.cuts[c.id] : []).filter(x => Array.isArray(x) && +x[1] > +x[0]);
   const spansOf = c => {

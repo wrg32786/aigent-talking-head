@@ -148,6 +148,10 @@ try {
     assert.ok(Math.abs(+c1.format.duration - want) < 0.6, `extract ${c1.format.duration} vs ${want}`);
     assert.ok(!existsSync(join(ROOT, 'jobs', `${JOB}-c3`)), 'the dropped one is not rendered');
     const log = readFileSync(join(ROOT, 'jobs', `${JOB}-c1`, 'fake-reel.log'), 'utf8'); assert.ok(/--export shorts/.test(log) && !/--draft/.test(log), log);
+    // what you made in Cut reaches the reel as it is: --as-is, and a clips.json beside the files with each one's words
+    assert.ok(/--as-is/.test(log), 'rendered as already cut: ' + log);
+    const cj = JSON.parse(readFileSync(join(ROOT, 'inbox', 'studio', JOB, 'cuts', 'clips.json'), 'utf8')), e1 = cj.clips.find(x => x.file === 'cuts/c1.mp4');
+    assert.ok(cj.precut && e1 && Array.isArray(e1.words) && e1.words.length && Math.abs(e1.dur - want) < 0.05, JSON.stringify(e1).slice(0, 300));
     await pg.goto(url + '/#step=render', { waitUntil: 'networkidle' });
     await pg.waitForSelector('#cut-outputs figure');
     assert.strictEqual(await pg.$$eval('#cut-outputs figure', x => x.length), 3);
@@ -187,13 +191,13 @@ try {
       { kind: 'part', label: 'Split', ranges: [[0.95, 2.25], [6.3, 7.55]] }] });
     const [a, b, c, d] = x.cut.candidates, end = k => k.cuts.find(p => p.edge === 'end'), start = k => k.cuts.find(p => p.edge === 'start');
     assert.ok(a.snapped && b.snapped && c.snapped && d.snapped, 'all snapped');
-    // "two" really ends at 2.40: the cut is after it, before the breath at 2.70
-    assert.ok(a.ranges[0][1] >= 2.4 && a.ranges[0][1] < 2.6, 'early end ' + JSON.stringify(end(a))); assert.ok(/ran past/.test(end(a).by), end(a).by);
-    // "four" really ends at 4.80, not 5.10
-    assert.ok(b.ranges[0][1] >= 4.8 && b.ranges[0][1] < 4.95, 'late end ' + JSON.stringify(end(b))); assert.ok(/ended before/.test(end(b).by), end(b).by);
-    // "five" really starts at 6.00, not 6.30
-    assert.ok(c.ranges[0][0] <= 6.0 && c.ranges[0][0] > 5.85, 'late start ' + JSON.stringify(start(c))); assert.ok(/started before/.test(start(c).by), start(c).by);
-    assert.ok(c.ranges[0][1] >= 7.5 && c.ranges[0][1] <= 7.65, 'end of the last word ' + c.ranges[0][1]);
+    // "two" really ends at 2.40: the cut is at least 120 ms after it, at least 60 ms before the breath at 2.70
+    assert.ok(a.ranges[0][1] >= 2.52 && a.ranges[0][1] <= 2.64, 'early end ' + JSON.stringify(end(a))); assert.ok(/ran past/.test(end(a).by), end(a).by);
+    // "four" really ends at 4.80, not 5.10 (cut 120 to 250 ms after it)
+    assert.ok(b.ranges[0][1] >= 4.92 && b.ranges[0][1] <= 5.05, 'late end ' + JSON.stringify(end(b))); assert.ok(/ended before/.test(end(b).by), end(b).by);
+    // "five" really starts at 6.00, not 6.30 (cut 60 to 150 ms before it)
+    assert.ok(c.ranges[0][0] <= 5.94 && c.ranges[0][0] >= 5.85, 'late start ' + JSON.stringify(start(c))); assert.ok(/started before/.test(start(c).by), start(c).by);
+    assert.ok(c.ranges[0][1] >= 7.62 && c.ranges[0][1] <= 7.75, 'end of the last word ' + c.ranges[0][1]);
     assert.strictEqual(d.cuts.length, 4, 'a split has a start and an end per part'); assert.deepStrictEqual(d.ranges, [a.ranges[0], c.ranges[0]]);
     // a trim snaps too, and snap: false keeps it exact
     const tr = await api('/api/cut/edit', { id: a.id, ranges: [[0.95, 1.5]] }); assert.ok(tr.cut.candidates[0].ranges[0][1] >= 1.6, 'a trim into "One" goes to its end: ' + tr.cut.candidates[0].ranges[0][1]);

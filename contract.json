@@ -1,7 +1,7 @@
 {
   "contract": 1,
   "name": "aigent-talking-head",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "summary": "Turn a phone clip into a captioned, styled 9:16 talking-head reel, locally.",
   "skill": "skills/aigent-talking-head/SKILL.md",
   "invoke": "npm run <command> -- <args>  (from the repo root; or node <script> <args>)",
@@ -120,6 +120,7 @@
         { "name": "cropx", "type": "number", "default": "0.5", "description": "horizontal crop centre, 0 to 1 (0.4 puts the face left of centre)" },
         { "name": "model", "type": "string", "default": "small.en (or TX_MODEL)", "description": "Whisper model for clip.py: small.en is fast on a CPU; large-v3 is the most accurate and slow, a ~3 GB download the first time (a notice prints before any download)" },
         { "name": "hook", "type": "string", "default": null, "description": "take to use for the first sentence" },
+        { "name": "words", "type": "string", "default": null, "description": "word times you already have ({ file name: [[start, end, word]] }, Studio's transcript); clip.py uses them instead of running Whisper again" },
         { "name": "broll", "type": "path", "default": null, "description": "folder of your own cutaway clips" },
         { "name": "bed", "type": "string", "default": null, "description": "a bed name from npm run music, or an audio file path" },
         { "name": "bed-start", "type": "number", "default": null, "description": "seconds into the bed to start" },

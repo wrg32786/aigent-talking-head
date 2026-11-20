@@ -1,6 +1,7 @@
 // The Cut step's render helpers, run as steps of Studio's "cuts" task (kit/studio/server.mjs):
 //   node kit/studio/cut-run.mjs extract --src <video> --ranges 1.2-5.3,7-9.5 --out <file.mp4>
-//       the kept time ranges of a take joined into one file (re-encoded, the source frame size)
+//       the kept time ranges of a take joined into one file (re-encoded, the source frame size). The ranges are cut
+//       points from kit/cutpoints.cjs, in quiet, so the 10 ms fades only touch silence
 //   node kit/studio/cut-run.mjs long --src <file.mp4> --name <job>
 //       a long form (16:9) video: 1920x1080 with the take fitted over a blurred fill, loudness -14 LUFS,
 //       written to jobs/<job>/reel-vN.mp4
@@ -27,7 +28,7 @@ if (cmd === 'extract') {
   const audio = hasAudio(src), parts = [], labels = [];
   ranges.forEach(([a, b], k) => {
     parts.push(`[0:v]trim=${a}:${b},setpts=PTS-STARTPTS[v${k}]`); labels.push(`[v${k}]`);
-    if (audio) { parts.push(`[0:a]atrim=${a}:${b},asetpts=PTS-STARTPTS,afade=t=in:d=0.03,afade=t=out:st=${Math.max(0, b - a - 0.04)}:d=0.04[a${k}]`); labels.push(`[a${k}]`); }
+    if (audio) { parts.push(`[0:a]atrim=${a}:${b},asetpts=PTS-STARTPTS,afade=t=in:d=0.01,afade=t=out:st=${Math.max(0, b - a - 0.01)}:d=0.01[a${k}]`); labels.push(`[a${k}]`); }
   });
   const graph = parts.join(';') + `;${labels.join('')}concat=n=${ranges.length}:v=1:a=${audio ? 1 : 0}[v]${audio ? '[a]' : ''}`;
   ff(['-i', src, '-filter_complex', graph, '-map', '[v]', ...(audio ? ['-map', '[a]', '-c:a', 'aac', '-b:a', '192k'] : []), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out]);

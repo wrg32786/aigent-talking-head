@@ -6,6 +6,7 @@
 //   ranges, a 0 to 100 score and the reason, scored by these rules. An agent (MCP set_cuts) or a model (rescore) can
 //   score them instead; scoredBy says which one did.
 // Pure functions: the server (kit/studio/server.mjs), the MCP tools and the tests share them.
+import CP from '../cutpoints.cjs';
 
 export const FORMATS = {
   short: { label: 'Short', sub: 'Reels, Shorts, TikTok', aspect: '9:16', export: 'shorts', lengths: { short: [15, 30], medium: [30, 60], long: [60, 90] } },
@@ -280,75 +281,16 @@ export function scriptFrom(words) {
 }
 
 // ---------- cut points on the audio ----------
-// The transcript says roughly where each word ends; the audio says exactly. snapRanges() moves every cut start and
-// end to the quiet just outside the words it keeps: an end goes to the first energy dip after the last word (so a
-// word is never clipped mid-syllable and the breath after it is left out), a start to the last dip before the first
-// word. When the transcript and the audio disagree, the audio wins inside a small window. env is the loudness
-// envelope from media.mjs energy(): { hop: seconds per value, rms: [0..1] }.
-export const SNAP = { window: 0.35, pad: 0.04, hold: 0.07, lead: 0.25 };
-function floorOf(rms) {
-  const v = rms.filter(x => x > 0).sort((a, b) => a - b); if (!v.length) return 0;
-  return v[Math.floor(v.length * 0.1)]; // the quiet floor: the 10th percentile
-}
-// the level that counts as quiet: well under speech, a little over the room tone
-export function quietLevel(env) {
-  const v = env.rms.slice().sort((a, b) => a - b), speech = v[Math.floor(v.length * 0.7)] || 0, fl = floorOf(env.rms);
-  return Math.max(fl * 2.5, Math.min(speech * 0.22, fl + (speech - fl) * 0.3), 0.004);
-}
-const at = (env, t) => env.rms[Math.max(0, Math.min(env.rms.length - 1, Math.round(t / env.hop)))] || 0;
-// first time in [a, b] where the level stays under q for `hold` seconds (dir 1 forward, -1 backward)
-function quietRun(env, a, b, q, hold, dir) {
-  const h = env.hop, n = Math.max(1, Math.round(hold / h)), lo = Math.max(0, Math.round(a / h)), hi = Math.min(env.rms.length - 1, Math.round(b / h));
-  if (dir > 0) { for (let i = lo; i <= hi; i++) { let ok = true; for (let k = 0; k < n && ok; k++) ok = (env.rms[i + k] ?? 0) < q; if (ok) return i * h; } }
-  else { for (let i = hi; i >= lo; i--) { let ok = true; for (let k = 0; k < n && ok; k++) ok = (env.rms[i - k] ?? 0) < q; if (ok) return (i + 1) * h; } }
-  return null;
-}
-// the quietest spot in [a, b] on a 50 ms average, so a short stop inside a word does not look like the end
-function minIn(env, a, b) { const h = env.hop, k = Math.max(1, Math.round(0.025 / h)); let best = a, m = Infinity;
-  for (let t = a; t <= b + 1e-9; t += h) { let s = 0, n = 0; for (let j = -k; j <= k; j++) { s += at(env, t + j * h); n++; } if (s / n < m) { m = s / n; best = t; } } return best; }
-const r2 = x => +(+x).toFixed(2);
-// snap one range; returns { range, points: [{ edge, transcript, audio, cut, by }] }
-export function snapRange([a, b], words, env, dur, o = {}) {
-  const { window: W, pad, hold, lead } = { ...SNAP, ...o }, q = quietLevel(env), D = dur || env.rms.length * env.hop;
-  const inside = (words || []).filter(w => w[1] > a + 0.02 && w[0] < b - 0.02);
-  const first = inside[0], last = inside[inside.length - 1];
-  const prev = first ? words[words.indexOf(first) - 1] : null, next = last ? words[words.indexOf(last) + 1] : null;
-  const points = [];
-  // the end: from the last kept word's end, forward to the first quiet run, never into the next word
-  let end = b;
-  if (last) {
-    const t = last[1], limit = Math.min(D, t + W, next ? Math.max(t, next[0] - 0.02) : Infinity);
-    const from = Math.max(last[0] + (t - last[0]) * 0.5, t - lead), loud = at(env, t) >= q, dip = quietRun(env, from, limit, q, hold, 1);
-    let au = dip, by = 'quiet';
-    // still talking at the window's edge: look further (up to 1 s, never into the next word) before settling for the quietest spot
-    if (au == null) { const far = Math.min(D, t + 1, next ? Math.max(t, next[0] - 0.02) : Infinity); au = quietRun(env, limit, far, q, hold, 1); if (au != null) by = 'later'; }
-    if (au == null) { au = minIn(env, from, limit); by = 'lowest'; }
-    end = Math.min(D, au + pad, next ? Math.max(au, next[0] - 0.01) : Infinity);
-    points.push({ edge: 'end', word: last[2], transcript: r2(t), audio: r2(au), cut: r2(end), by: by === 'later' ? 'audio: the word ran well past the transcript' : by === 'quiet' ? (loud && au > t + 0.03 ? 'audio: the word ran past the transcript' : au < t - 0.03 ? 'audio: the word ended before the transcript' : 'audio dip after the word') : 'no clear dip, the quietest spot', shift: r2(end - t) });
-  }
-  // the start: from the first kept word's start, back to the last quiet run, never into the word before
-  let start = a;
-  if (first) {
-    const t = first[0], limit = Math.max(0, t - W, prev ? Math.min(t, prev[1] + 0.02) : 0);
-    const to = Math.min(first[1] - (first[1] - t) * 0.5, t + lead), dip = quietRun(env, limit, to, q, hold, -1);
-    let au = dip, by = 'quiet';
-    if (au == null) { const far = Math.max(0, t - 1, prev ? Math.min(t, prev[1] + 0.02) : 0); au = quietRun(env, far, limit, q, hold, -1); if (au != null) by = 'later'; }
-    if (au == null) { au = minIn(env, limit, to); by = 'lowest'; }
-    start = Math.max(0, au - pad, prev ? Math.min(au, prev[1] + 0.01) : 0);
-    points.unshift({ edge: 'start', word: first[2], transcript: r2(t), audio: r2(au), cut: r2(start), by: by === 'later' ? 'audio: the word started well before the transcript' : by === 'quiet' ? (at(env, t) >= q && au < t - 0.03 ? 'audio: the word started before the transcript' : 'audio dip before the word') : 'no clear dip, the quietest spot', shift: r2(start - t) });
-  }
-  if (!(end - start >= 0.3)) return { range: [r2(a), r2(b)], points: points.map(p => ({ ...p, cut: p.edge === 'start' ? r2(a) : r2(b), by: 'kept as is (too short to snap)' })) };
-  return { range: [r2(start), r2(end)], points };
-}
-// snap every range of a candidate; debug goes in cuts (one entry per start and end)
-export function snapRanges(ranges, words, env, dur, o) {
-  if (!env || !env.rms || !env.rms.length) return { ranges, cuts: null };
-  const out = ranges.map(r => snapRange(r, words, env, dur, o));
-  return { ranges: out.map(x => x.range), cuts: out.flatMap((x, k) => x.points.map(p => ({ ...p, part: k }))) };
-}
+// One module decides every cut point in the kit (kit/cutpoints.cjs): the transcript says roughly where each word is,
+// the audio says exactly, read on the whole band and on the s, f and th band. An end goes at least 120 ms after the
+// last sound, a start at least 60 ms before the first, both only inside a real pause; never mid-word. env is the
+// envelope from media.mjs energy() (kit/cutpoints.cjs envelopeOf).
+export const SNAP = CP.SNAP;
+export const snapRange = (r, words, env, dur, o) => CP.snapRange(r, words, env, dur, o);
+export const snapRanges = (ranges, words, env, dur, o) => CP.snapRanges(ranges, words, env, dur, o);
 export function snapCandidate(c, words, env, dur, o) {
   const s = snapRanges(c.ranges, words, env, dur, o); if (!s.cuts) return { ...c, snapped: false };
-  return { ...c, ranges: s.ranges, seconds: lengthOf({ ranges: s.ranges }), cuts: s.cuts, snapped: true };
+  return { ...c, ranges: s.ranges, seconds: lengthOf({ ranges: s.ranges }), cuts: s.cuts, snapped: true, unsure: s.cuts.filter(p => p.sure === false).length };
 }
 
 // ---------- the Lines view: every line of a long take, keep or retake, grouped into named bites ----------
@@ -389,3 +331,12 @@ export function biteRanges(ids, L) {
 // one clean take: every kept line in the take's order
 export const cleanTake = (L, keep) => L.filter(l => keepOf(l, keep)).map(l => l.id);
 export const keepOf = (l, keep) => (keep && l.id in keep ? !!keep[l.id] : l.hint !== 'retake' && l.hint !== 'fragment');
+// the ranges a render extracts for a piece: its snapped ranges as they are, touching ones joined (no second cut)
+export const renderRanges = c => CP.mergeRanges((c.ranges || []).filter(([a, b]) => b > a).map(([a, b]) => [+a, +b]));
+// the words of a piece in its own clock (its ranges joined back to back), for the clips.json a render hands to
+// kit/reel.cjs with the file: the reel uses these words and never transcribes or cuts the piece again
+export function clipWords(words, ranges) {
+  const out = []; let off = 0;
+  for (const [a, b] of ranges) { for (const w of words || []) if (w[1] > a + 0.01 && w[0] < b - 0.01) out.push([+(Math.max(w[0], a) - a + off).toFixed(3), +(Math.min(w[1], b) - a + off).toFixed(3), String(w[2])]); off += b - a; }
+  return out;
+}
