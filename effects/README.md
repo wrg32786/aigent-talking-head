@@ -3,7 +3,7 @@
 51 starter video effects from [claude-video-effects](https://github.com/Vibha-Ramprakash/claude-video-effects) by Vibha Ramprakash, run as a second pass over a reel you already cut and captioned. The effects follow your face and can sit behind your head. Your captions are added back on top afterwards, and the audio is exactly the reel's.
 
 - **Pick:** [CATALOG.md](CATALOG.md) lists every effect by moment (hook, claim, list, reveal, proof, objection, CTA, transition), energy, needs, duration and caption compatibility, plus menu presets. The machine-readable version is [catalog.json](catalog.json). `npm run menu` prints the full option menu (effects plus finishes, looks, fonts, themes, transitions, SFX and beds). The labelled gallery is [showcase/index.html](../showcase/index.html) (`npm run showcase` rebuilds it). Offer 2 or 3 effects per moment and point the user at the showcase so nothing stays hidden.
-- **Set up once:** `npm run effects:setup` (a Python venv at `effects/.venv`, about 150 MB: numpy, opencv-python, pillow, mediapipe, plus rembg + onnxruntime for the BiRefNet person mask, another ~390 MB). `npm run effects:setup -- --birefnet` also downloads the birefnet-general-lite weights (~214 MB) into rembg's cache. The person mask itself is `kit/mask.py` (`--model birefnet` or `mediapipe`).
+- **Set up once:** `npm run effects:setup` (a Python venv at `effects/.venv`, about 150 MB: numpy, opencv-python, pillow, mediapipe, plus rembg + onnxruntime for the BiRefNet person mask, another ~390 MB). `npm run effects:setup -- --birefnet` also downloads the birefnet-portrait weights (~928 MB), the default person mask, into rembg's cache. The person mask itself is `kit/mask.py` (default birefnet-portrait; `--model birefnet-general`, `birefnet-lite` or `mediapipe`); see docs/guide.md, Face keep-out and the person mask. In the effects pass, plain `birefnet` still means birefnet-general-lite, since the effects matte every frame.
 - **Run:** `npm run fx -- --name <job> --plan fx.json --still 1.2,6.5` for check frames, then without `--still` for `jobs/<job>/reel-fx-vN.mp4`. `npm run fx -- --list` prints the menu. Plan format: see the header of `kit/fx.cjs`.
 
 ## How the upstream code is included
@@ -21,8 +21,8 @@ The effects sit behind and around the speaker, so the cut-out edge shows in ever
 | `--mask` | Edge | Speed at 1080x1920 |
 |---|---|---|
 | `mediapipe` (default) | Soft, a ragged fringe round hats and hair | about 250 frames a second |
-| `birefnet` (birefnet-general-lite) | Clean | 0.98 s a frame on an Intel Arc GPU, 4.2 s on CPU |
-| `birefnet-portrait` | Cleanest, keeps hair curls | 1.94 s a frame on the same GPU, 8.8 s on CPU |
+| `birefnet` (birefnet-general-lite) | Clean | 0.98 s a frame on an Intel Arc GPU, 6.6 s on CPU (8 cores), 6.6 GB peak memory |
+| `birefnet-portrait` | Cleanest, keeps hair curls | 1.94 s a frame on the same GPU, 9.0 s on CPU (8 cores), 7.5 GB peak memory for one frame, 8.0 GB for a whole mask run |
 
 - Both BiRefNet mattes come from rembg through `kit/mask_refine.py`: the same models, GPU session and cleanup (hole fill, speck removal, guided edge, flow-guided temporal smoothing) as `kit/mask.py`, so titles and effects get one cut-out.
 - ONNX Runtime uses the GPU when it has a provider for it. On Windows `npm run effects:setup` installs the DirectML build, which runs on any DirectX 12 card.

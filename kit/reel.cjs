@@ -16,7 +16,9 @@
 //            muse = pill captions + titles; classic = the original captions + spray hero word; one-word = one big word at a time)
 //          --style kinetic|oneword|classic|pill|hormozi|karaoke|one-word (override the caption style)  --no-titles  --fonts modern|druk|elegant|editorial|<any name in kit/fonts/pairings.json>|<local> (a,b,c cycles them, one per title)
 //          --no-punch (no zoom punch)  --no-mask (skip the person mask; titles already default to the front)
-//          --mask birefnet|mediapipe (person-mask backend; default mediapipe, fast. birefnet is the quality option, slow on CPU)
+//          --mask birefnet-portrait|birefnet-general|birefnet-lite|mediapipe (person-mask backend; default birefnet-portrait,
+//          the second of BiRefNet's three tiers, keyframed and cached, kit/mask.py; mediapipe is the fast preview)
+//          --no-face-safe (keep the face check but do not move text off the face)  --no-face-zone (skip face detection)
 //          --draft (stop after captions.js so you can edit it)  --rebuild (re-render + re-assemble an edited job)
 //          --broll <folder> (cutaways from your own clips, voice running on)  --bed <name from npm run music> or --bed music.wav  --bed-start 0  --logo logo.svg  --jobs <dir> (default jobs/)  --force
 //          --sfx off  (skip locked-set sounds on this draft; also used by npm run fx)
@@ -554,11 +556,45 @@ if (cut.sfxMap) {
   } }
 // copy lint and title/sound rules: printed, not blocking (npm run check -- <name> and npm run verify fail on errors)
 try { sh(process.execPath, [path.join(KIT, 'check.mjs'), build, '--warn-only'], build); } catch {}
+// base.mp4 (the graded picture alone, BASEONLY) is made once per picture: the face zone and the person mask both read it,
+// and a rebuild that only changes captions, titles, sounds or layers reuses it (base.sig: the cut without those keys)
+const LAYER_KEYS = new Set(['overlay', 'titles', 'mask', 'maskModel', 'person', 'panels', 'headMask', 'sfx', 'sfxHits', 'sfxMap', 'sfxCap', 'bed', 'bedStart', 'bedVol', 'bedNoFade', 'bedFadeOut', 'export', 'behindMax', 'maskClear']);
+const baseSig = () => { const c = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8')); const pic = Object.fromEntries(Object.entries(c).filter(([k]) => !LAYER_KEYS.has(k)));
+  const files = [...new Set([...(c.segs || []), ...(c.inserts || [])].map(s => s.file).filter(Boolean))].map(f => { try { const st = fs.statSync(path.resolve(build, f)); return [f, st.size, Math.round(st.mtimeMs)]; } catch { return [f]; } });
+  return require('crypto').createHash('sha1').update(JSON.stringify([pic, files])).digest('hex'); };
+const ensureBase = () => { const bf = path.join(build, 'base.mp4'), sf = path.join(build, 'base.sig'), sig = baseSig();
+  if (fs.existsSync(bf) && fs.existsSync(sf) && fs.readFileSync(sf, 'utf8') === sig) { console.log('base.mp4: picture unchanged, reused'); return; }
+  sh(process.execPath, [path.join(KIT, 'assemble.cjs'), 'base.mp4'], build, { BASEONLY: '1' }); fs.writeFileSync(sf, sig); };
+// face keep-out (Will, 2026-11-19): find the face in every moment of the picture (kit/facezone.py, YuNet, cached) and hand
+// the zone to the layout pass, so no caption, title or kinetic word lands on the eyes, nose, mouth or chin. --no-face-safe
+// keeps the zone for the check (facecheck.json) but does not move anything.
+{ const capF = path.join(build, 'captions.js');
+  if (fs.existsSync(capF) && !flag('no-face-zone')) {
+    const fxPyF = path.join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+    try {
+      ensureBase();
+      execFileSync(fs.existsSync(fxPyF) ? fxPyF : PY, [path.join(KIT, 'facezone.py'), 'base.mp4', 'facezone.json'], { cwd: build, stdio: 'inherit', env: { ...process.env, PYTHONUTF8: '1' } });
+      const fz = JSON.parse(fs.readFileSync(path.join(build, 'facezone.json'), 'utf8')), caps = R.readCaptions(capF);
+      caps.faceTrack = { fps: fz.fps, zones: fz.zones };
+      if (flag('no-face-safe')) caps.faceSafe = false;
+      fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
+    } catch (e) { console.warn('note: face zone skipped (' + String(e.message).split('\n')[0] + '); captions are not kept off the face this run'); }
+  } }
 sh(process.execPath, [path.join(KIT, 'render.mjs'), LEN.toFixed(2)], build);
 // screen cards behind the head render to ovlp/; assemble.cjs needs to know (with the head mask below, else in front)
 { let lj = {}; try { lj = JSON.parse(fs.readFileSync(path.join(build, 'layers.json'), 'utf8')); } catch {}
   const want = lj.panels === 'behind' ? 'ovlp/%04d.png' : undefined;
   if (cut.panels !== want) { if (want) cut.panels = want; else { delete cut.panels; delete cut.headMask; } fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); } }
+// --no-mask on a rebuild (Studio's "Titles in front" when memory is short): drop the mask from this job, so everything
+// that would sit behind the head draws in front and no mask is made
+if (flag('rebuild') && flag('no-mask') && (cut.mask || cut.headMask || cut.person)) {
+  delete cut.mask; delete cut.maskModel; delete cut.person; delete cut.headMask;
+  fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
+  console.log('titles in front: no person mask this render (--no-mask); remove the flag and set "mask": "mask.mkv" in cut.json to put it back');
+}
+// memory for the mask (kit/memcheck.cjs; kit/mask.py checks again before it loads the model)
+if (cut.titles && cut.mask) { const mc = require('./memcheck.cjs').renderCheck(build, { model: opt('mask') });
+  if (mc.needed) console.log(mc.ok ? `memory: ${mc.freeGB} GB free, the ${mc.model} mask needs about ${mc.needGB} GB` : `WARNING: ${mc.message} (--no-mask puts titles in front; --mask mediapipe is the lighter mask)`); }
 // person mask only for titles that sit behind the head (needs npm run effects:setup)
 if (cut.titles && cut.mask) {
   const capsNow = R.readCaptions(path.join(build, 'captions.js'));
@@ -582,7 +618,7 @@ if (cut.titles && cut.mask) {
     const spec = R.maskSpec(cut, { model: opt('mask') });
     if (!fs.existsSync(fxPy)) { console.warn('WARNING: some titles, captions or graphics are set to sit behind your head (behind, or auto), but the person mask is not set up, so they stay in front. Set it up once with: npm run effects:setup'); process.env.MASK_WARNED = '1'; }
     else {
-      sh(process.execPath, [path.join(KIT, 'assemble.cjs'), 'base.mp4'], build, { BASEONLY: '1' }); // BASEONLY already drops sfx and bed
+      ensureBase(); // BASEONLY drops sfx and bed; reused when the picture has not changed
       const win = behind.map(t => `${Math.max(0, t.start - 0.1).toFixed(2)}-${Math.min(LEN, t.end + 0.1).toFixed(2)}`).join(',');
       const maskArgs = [path.join(KIT, 'mask.py'), 'base.mp4', spec.file || 'mask.mkv', ...(win ? ['--windows', win] : []), ...(spec.model ? ['--model', spec.model] : []), ...(spec.person ? ['--person', spec.person] : [])];
       sh(fxPy, maskArgs, build);

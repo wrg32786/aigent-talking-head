@@ -1078,6 +1078,28 @@ try {
     if (diff(frame('fin-plain.mp4', 0.8), frame('fin-look.mp4', 0.8)) < 0.5) fail('finish did not change the picture');
     writeFileSync(join(b, 'cut.json'), JSON.stringify(cut));
   });
+  step('face keep-out: the layout moves captions and titles off the face zone, the face check counts what is left', () => {
+    // a still face in the middle of the frame (kit/facezone.py output shape), a caption and a behind title stacked over it
+    const zone = [300, 520, 780, 1060, 440], faceTrack = { fps: 8, size: [1080, 1920], zones: Array(16).fill(zone) };
+    const flips = [{ start: 0, end: 0.9, mode: 0, text: 'so here is the thing', y: 860 }, { start: 0.9, end: 2, mode: 7, text: 'copy the|Source code', layer: 'behind', y: 640 }];
+    const one = (name, extra) => { const d = join(work, name); mkdirSync(d, { recursive: true });
+      writeFileSync(join(d, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify({ captionStyle: 'phrase', fonts: 'theme', faceTrack, flips, ...extra }) + ';\n');
+      run(node, [join(KIT, 'render.mjs'), '2'], d, { THEME: 'aigent', FONTS: 'theme' });
+      return JSON.parse(readFileSync(join(d, 'facecheck.json'), 'utf8')); };
+    const off = one('face-off', { faceSafe: false }), on = one('face-on', {});
+    if (!(off.overlapMoments > 0)) fail('with faceSafe false the stacked text should cover the face: ' + JSON.stringify(off).slice(0, 300));
+    if (on.overlapMoments !== 0 || !on.faceSafe) fail('face-safe layout left text on the face: ' + JSON.stringify(on).slice(0, 400));
+    if (!on.moved.length) fail('the layout should report what it moved for the face');
+    // the zone itself, and a clip with no face gives no zones
+    const fpy = existsSync(fxPy) ? fxPy : (process.env.PYTHON || 'python3');
+    let cv = false; try { run(fpy, ['-c', 'import cv2, numpy']); cv = true; } catch {}
+    if (!cv) { console.log('  (facezone.py checks skipped: no OpenCV)'); return; }
+    run(fpy, [join(dirname(KIT), 'tests', 'test_facezone.py')], work);
+    run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=s=540x960:r=24:d=1', '-pix_fmt', 'yuv420p', 'noface.mp4'], work);
+    run(fpy, [join(KIT, 'facezone.py'), 'noface.mp4', 'noface-zone.json'], work);
+    const z = JSON.parse(readFileSync(join(work, 'noface-zone.json'), 'utf8'));
+    if (!z.zones.length || z.zones.some(Boolean)) fail('a clip with no face should give empty zones: ' + JSON.stringify(z).slice(0, 200));
+  });
   {
     const py = process.env.PYTHON || (process.platform === 'win32' ? 'py' : 'python3');
     let has = false;

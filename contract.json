@@ -1,7 +1,7 @@
 {
   "contract": 1,
   "name": "aigent-talking-head",
-  "version": "1.4.0",
+  "version": "1.7.0",
   "summary": "Turn a phone clip into a captioned, styled 9:16 talking-head reel, locally.",
   "skill": "skills/aigent-talking-head/SKILL.md",
   "invoke": "npm run <command> -- <args>  (from the repo root; or node <script> <args>)",
@@ -99,8 +99,10 @@
         { "name": "caption-layer", "type": "enum", "values": ["front", "behind", "auto"], "values_from": "kit/reelmd.cjs CAPTION_LOOK", "default": "auto for top captions, front otherwise", "description": "captions under the person where they overlap the head; auto puts top captions behind" },
         { "name": "panel-layer", "type": "enum", "values": ["front", "behind", "auto"], "values_from": "kit/reelmd.cjs CAPTION_LOOK", "default": "auto", "description": "screen cards behind the head where it reaches into them; auto means behind" },
         { "name": "caption-entrance", "type": "enum", "values": ["pop", "unfurl", "cascade", "orbit", "warp", "crystallize", "compute", "levitate", "undulate", "typewriter"], "values_from": "kit/reelmd.cjs CAPTION_LOOK", "default": "pop", "description": "how kinetic hero words enter, letter by letter (rewritten from the MIT SwiftUI thinking-text catalog)" },
-        { "name": "mask", "type": "enum", "values": ["birefnet", "birefnet-general-lite", "birefnet-portrait", "mediapipe"], "values_from": "kit/rules.cjs MASK_MODELS", "default": "mediapipe", "description": "person-mask backend for titles behind the head" },
+        { "name": "mask", "type": "enum", "values": ["birefnet", "birefnet-portrait", "birefnet-general", "birefnet-lite", "birefnet-general-lite", "mediapipe"], "values_from": "kit/rules.cjs MASK_MODELS", "default": "birefnet-portrait", "description": "person-mask backend for anything behind the head (birefnet-portrait, keyframed and cached; mediapipe is the fast preview)" },
         { "name": "no-mask", "type": "boolean", "default": false, "description": "skip the person mask" },
+        { "name": "no-face-safe", "type": "boolean", "default": false, "description": "keep the face check (facecheck.json) but do not move captions, titles or kinetic words off the face" },
+        { "name": "no-face-zone", "type": "boolean", "default": false, "description": "skip face detection (kit/facezone.py): no face keep-out and no face check" },
         { "name": "no-punch", "type": "boolean", "default": false, "description": "no zoom punch on cuts" },
         { "name": "tighten", "type": "number", "default": "off (0.3 in the magazine preset)", "description": "no dead air: cut every pause inside a line longer than this many seconds to a jump (0.15 to 2)" },
         { "name": "no-tighten", "type": "boolean", "default": false, "description": "keep every pause, even when the preset tightens" },
@@ -268,8 +270,8 @@
         { "name": "out", "type": "path", "default": "<video>_fx.mp4 or <video>_check.png", "description": "direct mode output" },
         { "name": "jobs", "type": "path", "default": "jobs/" },
         { "name": "captions", "type": "enum", "values": ["on", "off"], "default": null, "description": "force captions on or off for every effect" },
-        { "name": "mask", "type": "enum", "values": ["birefnet", "birefnet-general-lite", "birefnet-portrait", "mediapipe"], "values_from": "kit/rules.cjs MASK_MODELS", "default": "mediapipe" },
-        { "name": "matte", "type": "enum", "values": ["birefnet", "birefnet-general-lite", "birefnet-portrait", "mediapipe"], "values_from": "kit/rules.cjs MASK_MODELS", "default": "mediapipe", "description": "same as --mask" },
+        { "name": "mask", "type": "enum", "values": ["birefnet", "birefnet-portrait", "birefnet-general", "birefnet-lite", "birefnet-general-lite", "mediapipe"], "values_from": "kit/rules.cjs MASK_MODELS", "default": "mediapipe" },
+        { "name": "matte", "type": "enum", "values": ["birefnet", "birefnet-portrait", "birefnet-general", "birefnet-lite", "birefnet-general-lite", "mediapipe"], "values_from": "kit/rules.cjs MASK_MODELS", "default": "mediapipe", "description": "same as --mask" },
         { "name": "allow-demo-copy", "type": "boolean", "default": false, "description": "fill neutral [placeholders] for missing copy, for a quick look only" },
         { "name": "pill", "type": "boolean", "default": false, "description": "turn on the upstream Edited by pill on glass-widgets" },
         { "name": "sfx", "type": "enum", "values": ["off"], "default": null, "description": "no pack sounds" },
@@ -417,7 +419,7 @@
     {
       "name": "setup:all",
       "script": "kit/setup.mjs",
-      "summary": "Install everything the kit can use, up front: Node packages, the Python venv and requirements, yt-dlp and instaloader, ffmpeg and Chrome (with --yes, through the package manager when that needs no password), the Whisper model, the effects pass, the humanizer skill and the Studio page. Safe to run again; it only does what is missing. Prints a summary and what only the user can do. --check only reports (the same list as Studio's Setup check and the MCP setup_status tool).",
+      "summary": "Install everything the kit can use, up front: Node packages, the Python venv and requirements, yt-dlp and instaloader, ffmpeg and Chrome (with --yes, through the package manager when that needs no password), the Whisper model, the effects pass and the person mask weights, the humanizer skill and the Studio page. Safe to run again; it only does what is missing. Prints a summary and what only the user can do. --check only reports (the same list as Studio's Setup check and the MCP setup_status tool).",
       "flags": [
         { "name": "check", "type": "boolean", "default": false, "description": "only report each dependency as ready or missing with its fix; exit 1 when a core one is missing" },
         { "name": "yes", "type": "boolean", "default": false, "description": "also install ffmpeg and Chrome with Homebrew, winget or the system package manager (never asks for a password)" },
@@ -603,7 +605,7 @@
       "summary": "One-time venv for the effects pass and the person mask (several hundred MB).",
       "positional": [],
       "flags": [
-        { "name": "birefnet", "type": "boolean", "default": false, "description": "also download the BiRefNet weights (about 214 MB)" }
+        { "name": "birefnet", "type": "boolean", "default": false, "description": "also download the default BiRefNet weights (birefnet-portrait, about 928 MB)" }
       ],
       "outputs": ["effects/.venv"],
       "success": "prints READY",

@@ -7,6 +7,13 @@ import { Compare, Cleanup, Receipt } from './Review.jsx';
 
 export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
   const t = V.task, c = V.compose, running = t && t.status === 'running';
+  const [mem, setMem] = useState(null);
+  // a render that needs the person mask checks free memory first (kit/memcheck.cjs); short, the server answers 409 with
+  // the numbers and the ways out, shown here: titles in front, the lighter mask, or try anyway
+  const doRender = memory => { setLog(''); setMem(null);
+    fetch('/api/render', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(memory ? { memory } : {}) })
+      .then(async r => { const j = await r.json().catch(() => ({})); if (r.status === 409 && j.memory) return setMem(j.memory); if (!r.ok) return toast(j.error || `request failed (${r.status})`); apply(j); if (j.effectsSkipped) toast(j.effectsSkipped); })
+      .catch(e => toast(String(e.message || e))); };
   const [choices, setChoices] = useState(null), [receipt, setReceipt] = useState(null), [dirty, setDirty] = useState(false), [now, setNow] = useState(Date.now());
   const foldRef = useRef(null), logRef = useRef(null), last = useRef(''), loadedFor = useRef(null);
   const loadChoices = async () => { const j = await api('/api/choices').catch(() => ({})); setChoices(j.choices || null); setReceipt(j.receipt || null); setDirty(false); if (j.choices && foldRef.current) foldRef.current.open = true; };
@@ -32,11 +39,14 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
       <Button id="draft" size="lg" variant={drafted ? 'secondary' : 'primary'} label={drafted ? 'Redraft' : 'Draft'} isDisabled={running || !s.job || (!s.footage.length && !s.clips)}
         onClick={() => { setChoices(null); setReceipt(null); setLog(''); api('/api/draft', {}).then(apply).catch(() => {}); }} />
       <Button id="render" size="lg" variant={drafted ? 'primary' : 'secondary'} label="Render" isDisabled={running || !s.job}
-        onClick={() => { setLog(''); api('/api/render', {}).then(j => { apply(j); if (j.effectsSkipped) toast(j.effectsSkipped); }).catch(() => {}); }} />
+        onClick={() => doRender()} />
       {running && <Button id="cancel" variant="ghost" label="Cancel" onClick={() => api('/api/task/cancel', {}).then(apply)} />}
       <label className="exp"><span className="lbl">Export</span><select id="export" value={s.export || ''} onChange={e => patch({ export: e.target.value || null })}><option value="">Just the reel</option>{CAT.exports.map(x => <option key={x} value={x}>{x}</option>)}</select></label>
       <span id="elapsed" className="fine">{elapsed}</span>
     </div>
+    {mem && !running && <div id="mem-short" className="notes glass-card" role="alert"><p>{mem.message}</p>
+      <div className="row">{(mem.options || []).map(o => <Button key={o.id} id={'mem-' + o.id} size="sm" variant={o.id === 'front' ? 'primary' : o.id === 'light' ? 'secondary' : 'ghost'} label={o.label} onClick={() => doRender(o.id)} />)}</div>
+      <p className="fine">{(mem.options || []).map(o => `${o.label}: ${o.detail}`).join(' ')}</p></div>}
     {running && <div id="progress"><ProgressBar label={`${cap1(t.kind)} running`} isLabelHidden isIndeterminate /></div>}
     <div id="notes" className="notes">{notes.map((n, i) => <p key={i}>{n}</p>)}</div>
     <div id="outputs" className="outputs">
