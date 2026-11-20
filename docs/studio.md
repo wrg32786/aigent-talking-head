@@ -16,7 +16,7 @@ Four steps across the top: Footage, Reference, Style, Render. Each one is its ow
 
 ## What you can do
 
-1. **Footage.** Drag clips onto the page or pick files (mp4, mov, m4v, webm, mkv). They go to `inbox/studio/<job>/`. An assistant can also point the session at a clips folder (`clips` in `studio_set_selections`). Or film it now with **Record now** (see [Record now](#record-now)).
+1. **Footage.** Drag clips onto the page or pick files (mp4, mov, m4v, webm, mkv), or paste a public Dropbox or Google Drive share link or a plain video URL (see [Footage from a link](#footage-from-a-link)). They go to `inbox/studio/<job>/`. An assistant can also point the session at a clips folder (`clips` in `studio_set_selections`). Or film it now with **Record now** (see [Record now](#record-now)).
 2. **Reference.** Paste one or more links (Enter adds them, Shift+Enter starts another line) or upload a file. Links can be YouTube (and Shorts), TikTok, X, Vimeo, a direct video file (.mp4, .mov, .m4v, .webm), or one public Instagram post. Studio downloads each into your download folder, breaks it down, and shows what it found: length, cut times and pace, music BPM, beats and energy, caption style, titles, transitions, finishes, graphics and effects, plus suggestions mapped to the effects menu that you can click to pick. The chat gets the same teardown. See [Reference links](#reference-links). Then choose:
    - **Influence:** the reference becomes soft defaults on top of the pack you picked (the pack's locks stay). Saved as a local pack, `ref-<job>`.
    - **Recreate:** the draft uses the reference's Reel.md as the recipe (`--recipe`), so its shots, titles and look are copied as closely as the engine can.
@@ -82,7 +82,17 @@ Film takes in the Footage step with this computer's camera and mic. Click **Reco
 - **Mirror preview.** Flips only the preview, like a mirror. The take is saved the right way round.
 - **Framing guides.** Rule-of-thirds lines, a head zone and the caption band. Keep your head in the zone: kinetic titles can then sit behind your head and captions sit below it, inside the reels safe area from `kit/exports.json`.
 - **Countdown.** 3, 2, 1 before it records (a switch turns it off). Then pause, resume and stop, with a timer.
-- **Teleprompter.** Pick a script from the Scripts area (or paste one). It sits in a band at the top of the preview, near the lens, so your eyes stay close to the camera. It is paced by a timer at your words per minute (60 to 260) on the take's own clock: it starts when recording starts, after the countdown, and stops when you pause. The current line is highlighted, a `[pause]` mark holds its line 1.5 s longer, and you can set the text size and mirror the text for a beam-splitter rig. Keys while the recorder is on screen: Space records or stops, P pauses or resumes, up and down change the pace by 10 WPM, left and right move a line. Voice-follow pacing is not used: Chrome's speech recognition sends the audio to a server, and Studio keeps everything on this computer.
+- **Teleprompter.** Pick a script from the Scripts area (or paste one). It sits in a band at the top of the preview, near the lens, so your eyes stay close to the camera, and it scrolls smoothly at your speed: each line takes as long as it takes to say at your words per minute, and a `[pause]` mark holds its line 1.5 s longer. It starts when recording starts, after the countdown, and stops when you pause. The current line is highlighted; set the text size and mirror the text for a beam-splitter rig. Voice-follow pacing is not used: Chrome's speech recognition sends the audio to a server, and Studio keeps everything on this computer.
+- **Speed while it scrolls.** A speed bar sits right under the text: minus and plus (10 WPM a step), a slider, and the speed as WPM with a slow, normal or fast label (under 130 is slow, 130 to 175 normal, above that fast). The up and down arrow keys do the same. Changing it mid-take speeds up or slows down from where you are, with no jump. Studio remembers the speed in this browser.
+- **Rehearse.** With the teleprompter on, **Rehearse** scrolls the script with nothing recorded, camera on or off. Pause, resume and stop it yourself (Space pauses it too). Starting a take ends a rehearsal.
+- **Pop out.** The arrow button on the speed bar (or **Pop out the teleprompter** on the right) opens the teleprompter in its own small window that you can drag next to your camera and resize. In Chrome and Edge it is a Document Picture-in-Picture window, which stays on top of other apps; in other browsers it is a normal window (allow pop-ups for Studio if the browser blocks it). It is the same teleprompter, not a copy: the script, speed, current line, mirror and text size, rehearse, the countdown, recording, pause and stop are shared, and the controls in either window work. Close it, or click **Back to page**, and the teleprompter returns to the page.
+- **Keys** while the recorder is on screen (in the pop-out too): Space records or stops (or pauses a rehearsal), P pauses or resumes, up and down change the speed, left and right move a line.
+
+<p>
+<img src="studio/teleprompter-speed.png" width="520" alt="Rehearsing in Record now: the teleprompter text scrolls at the top of the preview, with the speed bar under it showing minus, a slider, plus, 150 WPM and Normal, and the pop-out button; Rehearsing, not recording, next to the record button">
+<img src="studio/teleprompter-popout.png" width="300" alt="The teleprompter pop-out window: Rehearsing, text size and Mirror at the top, the script in large type with the current line bright, and the speed bar with Stop at the bottom">
+</p>
+
 - **Takes remember their script.** A take filmed with the teleprompter on keeps a copy of the script text. `studio_takes` shows it, and the next draft passes it to Whisper as a hint (`TX_PROMPT`, read by `kit/tx.py` and `kit/clip.py`), so names and unusual words in your captions come out spelled the way the script has them.
 - **Takes.** Each take is listed with a thumbnail and its length. A new take is kept and in the footage as soon as it is saved. The switch takes it out of the edit or puts it back, **Retake** throws away the last take and records again, and the bin deletes a take's files.
 
@@ -112,6 +122,20 @@ The Scripts area in the Footage step holds what you will say on camera, per reel
 - **Read it.** **Read it in Record** opens the recorder with that script in the teleprompter (see [Record now](#record-now)).
 
 API: `GET /api/scripts`, `GET /api/scripts/get?id=`, `POST /api/scripts` (create, or replace with `id`), `POST /api/scripts/action` (`delete`, `duplicate`, `rename`), `POST /api/scripts/from-reference`. MCP: `list_scripts`, `get_script`, `write_script`.
+
+## Footage from a link
+
+![The Footage step: a link box under the drop zone, a Google Drive file downloaded into the footage, and a private link that says it needs a login](studio/footage-link.png)
+
+Paste a link in the box under **Drop video here** and click **Add**. Studio downloads it into `inbox/studio/<job>/` and adds it to the footage, the same as an upload, with its size and a progress bar while it comes in. No account sign-in is involved.
+
+- **Dropbox.** A shared file link (`dropbox.com/s/...` or `dropbox.com/scl/fi/...?rlkey=...`). Studio asks Dropbox for the file itself with `dl=1`.
+- **Google Drive.** A shared file link (`drive.google.com/file/d/<id>/view`, `open?id=` or `uc?id=`). Studio uses Drive's `uc?export=download` link. A file too big for Drive's virus scan answers with a "can't scan this file" page first; Studio reads its confirm form and goes on to the file (its own code, no extra library).
+- **Plain video URLs** that answer with a video file (mp4, mov, m4v, webm, mkv).
+- **What fails, and the line it shows.** A private, expired or sign-in link: "This link needs a login. Make it public or download it and drop the file in." A folder link, a link that opens a web page, or a file that is not a video each say so. Folder links are not supported yet: share the file itself.
+- **Limits.** 20 GB per file (`STUDIO_FOOTAGE_MAX_BYTES`). A download can be cancelled; a failed one can be dismissed. A file never overwrites another with the same name.
+
+The page uses `POST /api/footage/url { url }` and `POST /api/footage/import { id, action: cancel | dismiss }`; progress is in the session's `imports` list. Code: `kit/studio/cloud.mjs`, tested against a local mock of Dropbox and Drive in `tests/studio-connect.test.mjs` (no real Dropbox or Drive in CI).
 
 ## Reference links
 
@@ -160,26 +184,41 @@ Every backend gets the session and the reference teardown, so "use the transitio
 
 ![Studio chat with Claude Code connected and listening: page messages marked answered, an action note for an edit made from the terminal](studio/chat-agent.png)
 
-You tell your agent, in its terminal: **"Set up Studio from AGENTS.md and run the Studio chat loop."** It installs what is missing, registers the kit's MCP server in its own config (`npm run studio:connect -- claude`, `codex` or `cursor`), asks you to restart it once so the tools load, starts Studio (`studio_start`), opens the page, and listens. The steps per agent are in [AGENTS.md](../AGENTS.md#studio-set-it-up-and-be-the-agent-in-it) and the loop is in [skills/aigent-studio/SKILL.md](../skills/aigent-studio/SKILL.md).
+You tell your agent, in its terminal: **"Set up Studio from AGENTS.md and run the Studio chat loop."** It runs `npm run setup:all` (everything installs up front; it tells you only what it cannot do itself), registers the kit's MCP server in its own config (the [Connect agent](#connect-agent) sheet shows the same lines), asks you to restart it once so the tools load, starts Studio (`studio_start`), opens the page, and listens. The steps per agent are in [AGENTS.md](../AGENTS.md#studio-set-it-up-and-be-the-agent-in-it) and the loop is in [skills/aigent-studio/SKILL.md](../skills/aigent-studio/SKILL.md).
 
-By hand, per agent:
+### Connect agent
 
-```
-# Claude Code (in the kit folder)
-claude mcp add aigent-talking-head -e PYTHON=$PWD/.venv/bin/python -- node $PWD/kit/mcp.mjs
-npm run studio:connect -- claude        # same, plus the Studio hook in .claude/settings.local.json
+<p>
+<img src="studio/connect-desktop.png" width="520" alt="The Connect agent sheet: waiting for your agent, a grid of agents with Claude Code picked, and numbered steps with the claude mcp add command and the hook command filled in with this install's paths, each with a copy button">
+<img src="studio/connect-phone.png" width="200" alt="Connect agent on a phone: the same agent grid and steps as a full-screen sheet">
+</p>
 
-# Codex: ~/.codex/config.toml
-[mcp_servers.aigent-talking-head]
-command = "node"
-args = ["/path/to/aigent-talking-head/kit/mcp.mjs"]
-tool_timeout_sec = 300
+**Connect agent** in the top bar (also in the empty chat and in Settings) opens a sheet where you pick your agent: Claude Code, Codex CLI, Cursor (CLI and IDE), Gemini CLI, OpenCode, Windsurf or another MCP app, or Other / generic MCP. For the one you pick it shows exactly what to do, each with a copy button:
 
-# Cursor: .cursor/mcp.json in the kit, or ~/.cursor/mcp.json
-{ "mcpServers": { "aigent-talking-head": { "command": "node", "args": ["/path/to/aigent-talking-head/kit/mcp.mjs"] } } }
-```
+1. The one line that adds the Studio MCP server, or the config to paste, with the real absolute paths of this install filled in (Node, `kit/mcp.mjs` and the kit's Python). The server writes these itself, so they are right for your computer.
+2. For Claude Code, the hook install (`node kit/studio/connect.mjs claude --user`).
+3. Restart the agent once.
+4. The one sentence to say to it: "Run the Studio chat loop".
 
-Then, in the agent: "Run the Studio chat loop."
+**Let my agent set it up** gives one prompt to paste into any agent instead: it points the agent at AGENTS.md with the paths, and the agent registers itself and starts listening.
+
+The sheet shows the connection live: "Waiting for your agent", then "Connected: Claude Code, busy in the terminal" or "Connected: Claude Code, listening" in green as soon as it connects. Studio remembers the agent you picked (`agent` in `jobs/.studio/settings.json`). The page reads `GET /api/connect`; the commands come from `kit/studio/agents.mjs`, which `npm run studio:connect` also uses.
+
+<img src="studio/connect-connected.png" width="520" alt="Connect agent after the agent connected: a green check with Connected: Claude Code, listening, and the Let my agent set it up prompt">
+
+**What each command is based on.** Checked against each agent's own docs on 2026-11-19:
+
+| Agent | What Studio shows | Source | Checked |
+|---|---|---|---|
+| Claude Code | `claude mcp add --env PYTHON=... --transport stdio --scope user aigent-talking-head -- <node> <kit>/kit/mcp.mjs`, then the hook | [code.claude.com/docs/en/mcp](https://code.claude.com/docs/en/mcp) (`--env` before the name needs another option between, so `--transport stdio` sits there; `--` separates the server command), [hooks](https://code.claude.com/docs/en/hooks) | yes |
+| Codex CLI | `codex mcp add aigent-talking-head --env PYTHON=... -- <node> <kit>/kit/mcp.mjs`, or `[mcp_servers.aigent-talking-head]` with `command`, `args`, `env`, `tool_timeout_sec = 300` in `~/.codex/config.toml` | [developers.openai.com/codex/mcp](https://developers.openai.com/codex/mcp) | yes |
+| Cursor (CLI and IDE) | `mcpServers` JSON in `~/.cursor/mcp.json` (or `.cursor/mcp.json` in a project); the `agent` CLI reads the same file (`agent mcp list`) | [cursor.com/docs/context/mcp](https://cursor.com/docs/context/mcp), [cursor.com/docs/cli/mcp](https://cursor.com/docs/cli/mcp) | yes |
+| Gemini CLI | `gemini mcp add --scope user -e PYTHON=... aigent-talking-head <node> <kit>/kit/mcp.mjs`, or `mcpServers` in `~/.gemini/settings.json` | [gemini-cli docs/tools/mcp-server.md](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md) | yes |
+| OpenCode | `opencode mcp add aigent-talking-head --global --env PYTHON=... -- <node> <kit>/kit/mcp.mjs`, or `mcp.servers` with `type: "local"`, `command` as an array and `environment` in `opencode.jsonc` | [opencode.ai/docs/mcp-servers](https://opencode.ai/docs/mcp-servers/) | yes |
+| Windsurf or another MCP app | the common `mcpServers` JSON | [docs.windsurf.com/windsurf/cascade/mcp](https://docs.windsurf.com/windsurf/cascade/mcp) now opens the Devin Local docs, which name `~/.config/devin/mcp_config.json` but do not show its format | **not verified**: marked in the sheet |
+| Other / generic MCP | the stdio command and the `mcpServers` JSON | [modelcontextprotocol.io: connect local servers](https://modelcontextprotocol.io/docs/develop/connect-local-servers) | yes |
+
+By hand, from the kit folder, `npm run studio:connect -- claude` (or `codex`, `cursor`, `print`) still writes the config for you.
 
 **Two channels, one agent.** The Studio chat shows only the Studio conversation: what you type in the page, the agent's answers to it, and short action notes. Your terminal conversation stays in the terminal and is never copied into Studio. Edits are shared: whatever the agent changes, from either conversation, updates the page live. When it changes the edit because you asked in the terminal, Studio shows a one-line note such as "Claude Code: picked transition whip (from the terminal)." Turn those notes off in Settings.
 
@@ -248,9 +287,15 @@ On a phone the two videos stay side by side at half width and the lists stack: [
 
 Studio is meant for a laptop, and it works at phone width: numbered steps in the header, a drop-down for the effect tabs, three tiles per row with the forbid button always shown, the chat as a full-screen sheet behind the chat button (its dot shows the agent status), and no sideways scrolling.
 
+## Setup check
+
+Everything the kit can use is installed up front by `npm run setup:all` (the one-line installers run it too, and your agent runs it during setup): Node packages, the Python venv and `requirements.txt`, yt-dlp and instaloader, ffmpeg and ffprobe, Chrome, the Whisper model (small.en, about 470 MB), the effects pass (MediaPipe, OpenCV, rembg; `npm run effects:setup`), the humanizer skill and the Studio page. It is safe to stop and run again: each step checks first and only does what is missing, and it ends with a summary of what was installed, already there, skipped, failed or needs you. `--skip model,effects` leaves out the big downloads; `--yes` lets it install ffmpeg and Chrome with Homebrew, winget, or apt, dnf or pacman when that needs no password. When it would need your password it does not ask; it prints the line for you to run ("Installing ffmpeg and ffprobe needs your password: run sudo apt-get install -y ffmpeg").
+
+**Setup check** in Settings (and the amber "missing" pill in the top bar, when something Studio needs is missing) lists each one as ready or missing, what it is for, and the one fix with a copy button. `npm run setup:all -- --check` prints the same list, and agents get it from the MCP tool `setup_status`, which also returns `forUser`: the plain-words lines for what only you can do. Features say what they need instead of failing later: Draft and Render refuse with the fix when ffmpeg, Python or Chrome is missing, Record now says when takes cannot be saved as mp4, and reference links say when yt-dlp or instaloader is missing.
+
 ## Setup without a terminal
 
-The one-line installers check for Git, Node.js, ffmpeg, Python and Chrome, offer to install what is missing, set everything up, and put a "Talking Head Studio" launcher on your desktop. Running them again updates the kit. Details and what to tell your AI assistant: [docs/setup-with-ai.md](setup-with-ai.md).
+The one-line installers check for Git, Node.js, ffmpeg, Python and Chrome, offer to install what is missing, set everything up with `npm run setup:all` (add `--minimal` or `-Minimal` to skip the Whisper model and the effects pass), and put a "Talking Head Studio" launcher on your desktop. Running them again updates the kit. Details and what to tell your AI assistant: [docs/setup-with-ai.md](setup-with-ai.md).
 
 macOS or Linux (Terminal):
 

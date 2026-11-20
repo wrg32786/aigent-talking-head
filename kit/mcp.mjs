@@ -4,7 +4,7 @@
 // Tools: menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify. Each runs the matching npm command from the repo root with
 // --json where the command has it and returns the log tail plus the JSON result (structuredContent).
 // Studio tools: studio_start, studio_get_state, studio_set_selections, studio_run, studio_wait_for_message, studio_get_pending,
-// studio_reply, studio_add_reference_url, studio_get_reference_teardown, studio_settings, studio_takes; list_scripts, get_script, write_script (Studio scripts). They read and write the same
+// studio_reply, studio_add_reference_url, studio_get_reference_teardown, studio_settings, studio_takes; list_scripts, get_script, write_script (Studio scripts); setup_status (what is installed and the fix for what is not). They read and write the same
 // session as the Studio page (npm run studio, kit/studio/core.mjs), so you and the user see and change the same picks; the
 // page updates live. The Studio chat is its own channel (kit/studio/channel.mjs): answer page messages with studio_reply,
 // keep the terminal conversation in the terminal.
@@ -22,6 +22,7 @@ import * as Settings from './studio/settings.mjs';
 import * as Launch from './studio/launch.mjs';
 import * as Record from './studio/record.mjs';
 import * as Scripts from './studio/scripts.mjs';
+import * as Setup from './setup.mjs';
 
 const KIT = dirname(fileURLToPath(import.meta.url)), ROOT = dirname(KIT);
 const C = JSON.parse(readFileSync(join(ROOT, 'contract.json'), 'utf8'));
@@ -191,7 +192,10 @@ TOOLS.push(
     inputSchema: { type: 'object', properties: { id: { type: 'string' }, title: { type: 'string' }, text: { type: 'string' }, wpm: { type: 'integer', minimum: 60, maximum: 260 }, from: { type: 'string', description: 'what it was written from, e.g. a reference url or "topic: ..."' }, job: { type: 'string' } }, required: ['text'], additionalProperties: false },
     direct: a => { const s = Studio.load(), job = a.job || s.job; if (!job) throw new Error('no job: name the reel in Studio first or give job');
       const sc = Scripts.write(job, { id: a.id, title: a.title, text: String(a.text).replace(/\u2014/g, ', '), wpm: a.wpm, from: a.from, by: Channel.prettyName(agentName()) });
-      if (job === s.job) { s.scriptsAt = Date.now(); Studio.save(s); } return { script: sc }; } }
+      if (job === s.job) { s.scriptsAt = Date.now(); Studio.save(s); } return { script: sc }; } },
+  { name: 'setup_status', description: 'What the kit has installed: each dependency (Node packages, Python venv and requirements, ffmpeg, Chrome, the Whisper model, yt-dlp, instaloader, the effects pass, the humanizer skill, the Studio page) as ready or missing, the feature it is for and the one fix command, plus forUser: the plain-words list of things only the user can do (for example "Installing ffmpeg needs your password: run sudo apt-get install -y ffmpeg"). Run npm run setup:all yourself for everything else, then tell the user only the forUser lines. Same list as the Setup check in Studio.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    direct: () => Setup.status() }
 );
 for (const t of TOOLS) if (t.name.startsWith('studio_') && t.direct && !t._wrapped) { const d = t.direct; t.direct = a => { seen(); return d(a); }; t._wrapped = true; }
 

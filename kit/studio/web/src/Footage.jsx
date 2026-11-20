@@ -1,4 +1,6 @@
 import { useRef, useState } from 'react';
+import { Button } from '@astryxdesign/core/Button';
+import { ProgressBar } from '@astryxdesign/core/ProgressBar';
 import { api, file, toast, Icon, IconBtn } from './lib.jsx';
 import { upload } from './upload.js';
 import { Recorder } from './Recorder.jsx';
@@ -13,6 +15,37 @@ export function Dropzone({ id, inputId, kind, s, apply, accept, multiple, big, c
     onDrop={e => { e.preventDefault(); setOver(false); upload(kind, [...e.dataTransfer.files], s, apply); }}>
     {children}
     <input type="file" id={inputId} ref={input} accept={accept} multiple={multiple} hidden onClick={e => e.stopPropagation()} onChange={e => { upload(kind, [...e.target.files], s, apply); e.target.value = ''; }} />
+  </div>;
+}
+
+const SITES = { dropbox: 'Dropbox', drive: 'Google Drive', direct: 'Link' };
+export const bytes = n => n == null ? '' : n >= 1e9 ? (n / 1e9).toFixed(2) + ' GB' : n >= 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1e3)) + ' KB';
+// paste a public Dropbox or Google Drive share link, or a direct video URL; the server downloads it into the footage
+export function FootageLink({ s, apply }) {
+  const [url, setUrl] = useState(''), [busy, setBusy] = useState(false);
+  const add = async ev => {
+    ev.preventDefault(); const u = url.trim(); if (!u) return;
+    if (!s.job) { toast('Name the reel first (top left)'); document.getElementById('job')?.focus(); return; }
+    setBusy(true); try { apply(await api('/api/footage/url', { url: u })); setUrl(''); } catch {} finally { setBusy(false); }
+  };
+  const items = (s.imports || []).slice().reverse();
+  return <div className="flink glass-card" id="footage-link-box">
+    <form className="row" onSubmit={add}>
+      <Icon n="link" className="fl-ic" />
+      <label className="sr" htmlFor="footage-link">Footage link</label>
+      <input id="footage-link" className="grow" type="url" inputMode="url" placeholder="Paste a Dropbox or Google Drive link, or a video URL" spellCheck="false" autoComplete="off" value={url} onChange={e => setUrl(e.target.value)} />
+      <Button id="footage-link-add" type="submit" variant="secondary" label="Add" isLoading={busy} />
+    </form>
+    <p className="fine">Public share links only. Private links need a login, so download those and drop the file in.</p>
+    {items.length > 0 && <ul className="imports" id="imports">
+      {items.map(x => <li key={x.id} className={'imp ' + x.status} data-status={x.status}>
+        <span className="imp-h"><b>{x.name || SITES[x.site]}</b><span className="fine">{SITES[x.site]}{x.status === 'downloading' ? `, ${bytes(x.received)}${x.size ? ' of ' + bytes(x.size) : ''}` : x.status === 'ready' ? `, ${bytes(x.size)}, in your footage` : ''}</span></span>
+        {x.status === 'downloading' && <ProgressBar label={`Downloading ${x.name || 'the file'}`} isLabelHidden value={x.size ? Math.round(100 * x.received / x.size) : undefined} isIndeterminate={!x.size} />}
+        {x.status === 'failed' && <span className="err" role="alert">{x.error}</span>}
+        <span className="imp-a">{x.status === 'downloading' ? <IconBtn n="x" label="Cancel the download" onClick={() => api('/api/footage/import', { id: x.id, action: 'cancel' }).then(apply).catch(() => {})} />
+          : <IconBtn n="x" label="Dismiss" onClick={() => api('/api/footage/import', { id: x.id, action: 'dismiss' }).then(apply).catch(() => {})} />}</span>
+      </li>)}
+    </ul>}
   </div>;
 }
 
@@ -32,6 +65,7 @@ export function Footage({ V, s, apply, hidden, onLive }) {
           <Icon n="camera" className="di" /><strong>Record now</strong><span>Camera and mic on this computer</span>
         </button>
       </div>}
+    {!rec && <FootageLink s={s} apply={apply} />}
     <Scripts V={V} s={s} apply={apply} onRead={id => { if (needJob()) return; setReadId(id); open(true); requestAnimationFrame(() => document.getElementById('recorder')?.scrollIntoView({ block: 'start', behavior: 'smooth' })); }} />
     <ul id="footage" className="clips">
       {s.clips && <li className="note">Using the clips folder {s.clips}</li>}

@@ -7,6 +7,7 @@
 //   STUDIO_MODEL      the model name for the API or local backend
 // actionNotes (default true): when your terminal agent changes the edit from the terminal conversation, Studio shows a
 // one-line action note in the page chat ("Changed transitions to whip, from the terminal"). Never conversation text.
+// agent: the terminal agent picked in the Connect agent dialog (claude, codex, cursor, gemini, opencode, windsurf, generic).
 // Keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, LOCAL_LLM_API_KEY) are read from the environment only, never saved here.
 import { accessSync, constants, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs';
 import { dirname, isAbsolute, join, resolve } from 'path';
@@ -23,7 +24,8 @@ const ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const stateDir = () => resolve(process.env.STUDIO_DIR || join(ROOT, 'jobs', '.studio'));
 export const settingsPath = () => join(stateDir(), 'settings.json');
 
-export function defaults() { return { downloads: null, renders: null, actionNotes: true, chat: { backend: 'agent', baseUrl: null, model: null } }; }
+export const AGENT_IDS = ['claude', 'codex', 'cursor', 'gemini', 'opencode', 'windsurf', 'generic'];
+export function defaults() { return { downloads: null, renders: null, actionNotes: true, agent: null, chat: { backend: 'agent', baseUrl: null, model: null } }; }
 export function loadFile() {
   try { const j = JSON.parse(readFileSync(settingsPath(), 'utf8')); const d = defaults(); return { ...d, ...j, chat: { ...d.chat, ...(j.chat || {}) } }; }
   catch { return defaults(); }
@@ -32,7 +34,7 @@ export function loadFile() {
 export function load(env = process.env) {
   const f = loadFile(), from = {};
   const pick = (k, envKey, v) => { if (env[envKey]) { from[k] = 'env ' + envKey; return env[envKey]; } from[k] = v != null ? 'settings' : 'default'; return v; };
-  const s = { downloads: pick('downloads', 'STUDIO_DOWNLOADS', f.downloads), renders: pick('renders', 'STUDIO_RENDERS', f.renders), actionNotes: f.actionNotes !== false,
+  const s = { downloads: pick('downloads', 'STUDIO_DOWNLOADS', f.downloads), renders: pick('renders', 'STUDIO_RENDERS', f.renders), actionNotes: f.actionNotes !== false, agent: AGENT_IDS.includes(f.agent) ? f.agent : null,
     chat: { backend: pick('backend', 'STUDIO_CHAT', f.chat.backend) || 'agent', baseUrl: pick('baseUrl', 'STUDIO_LOCAL_URL', f.chat.baseUrl), model: pick('model', 'STUDIO_MODEL', f.chat.model) } };
   if (!BACKENDS.includes(s.chat.backend)) s.chat.backend = 'agent';
   return { ...s, from };
@@ -52,12 +54,13 @@ export function update(p) {
   const f = loadFile(), errs = [];
   for (const k of ['downloads', 'renders']) if (p[k] !== undefined) { const c = checkFolder(p[k]); if (!c.ok) errs.push(`${k}: ${c.error}`); else f[k] = c.path; }
   if (p.actionNotes !== undefined) { if (typeof p.actionNotes !== 'boolean') errs.push('actionNotes: true or false'); else f.actionNotes = p.actionNotes; }
+  if (p.agent !== undefined) { if (p.agent !== null && !AGENT_IDS.includes(p.agent)) errs.push(`agent: ${AGENT_IDS.join(', ')} or null`); else f.agent = p.agent; }
   if (p.chat) {
     if (p.chat.backend !== undefined) { if (!BACKENDS.includes(p.chat.backend)) errs.push(`chat.backend: ${BACKENDS.join(', ')}`); else f.chat.backend = p.chat.backend; }
     if (p.chat.baseUrl !== undefined) { const u = String(p.chat.baseUrl || '').trim(); if (u && !/^https?:\/\/[^\s]+$/.test(u)) errs.push('chat.baseUrl: an http(s) address, like http://127.0.0.1:11434/v1'); else f.chat.baseUrl = u ? u.replace(/\/$/, '') : null; }
     if (p.chat.model !== undefined) f.chat.model = p.chat.model ? String(p.chat.model).slice(0, 120) : null;
   }
-  for (const k of Object.keys(p)) if (!['downloads', 'renders', 'chat', 'actionNotes'].includes(k)) errs.push(`unknown setting "${k}" (downloads, renders, actionNotes, chat)`);
+  for (const k of Object.keys(p)) if (!['downloads', 'renders', 'chat', 'actionNotes', 'agent'].includes(k)) errs.push(`unknown setting "${k}" (downloads, renders, actionNotes, agent, chat)`);
   if (errs.length) return { errs, settings: load() };
   mkdirSync(stateDir(), { recursive: true });
   const tmp = settingsPath() + '.tmp'; writeFileSync(tmp, JSON.stringify(f, null, 2) + '\n'); renameSync(tmp, settingsPath());

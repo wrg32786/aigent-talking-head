@@ -13,7 +13,7 @@ const BACKENDS = [
   ['keywords', 'Keywords', 'No model'],
 ];
 
-export function Settings({ V, apply, open, setOpen, theme, setTheme, glass, setGlass }) {
+export function Settings({ V, apply, open, setOpen, theme, setTheme, glass, setGlass, openConnect, openSetup }) {
   const e = V.env, st = e.settings;
   const [f, setF] = useState(null), [models, setModels] = useState([]), [localMsg, setLocalMsg] = useState(''), [msg, setMsg] = useState('');
   useEffect(() => {
@@ -57,6 +57,7 @@ export function Settings({ V, apply, open, setOpen, theme, setTheme, glass, setG
               <Button id="find-models" variant="secondary" size="sm" label="Find models" onClick={findModels} /></div>
             <p className="fine" id="local-msg" role="status">{localMsg}</p>
           </div>}
+          {f.backend === 'agent' && <div className="row"><Button id="settings-connect" variant="secondary" size="sm" label="Connect agent" onClick={openConnect} /><span className="fine">{e.agent && e.agent.connected ? `${e.agent.name} connected` : 'No agent connected yet'}</span></div>}
           <Switch id="action-notes" label="Note terminal edits here" description="One line, never the terminal conversation" value={f.actionNotes} onChange={v => set('actionNotes', v)} />
         </fieldset>
         <fieldset><legend>Folders</legend>
@@ -69,6 +70,9 @@ export function Settings({ V, apply, open, setOpen, theme, setTheme, glass, setG
         <fieldset><legend>Look</legend>
           <div id="theme-seg"><SegmentedControl label="Theme" value={theme} onChange={setTheme} size="sm"><SegmentedControlItem value="dark" label="Dark" /><SegmentedControlItem value="light" label="Light" /></SegmentedControl></div>
           <Switch id="glass" label="Glass panels" description="Off uses solid panels. Faster on older computers." value={glass} onChange={setGlass} />
+        </fieldset>
+        <fieldset><legend>Setup</legend>
+          <div className="row"><Button id="settings-setup" variant="secondary" size="sm" label="Setup check" onClick={openSetup} /><span className="fine">{e.setup ? (e.setup.ready ? (Object.keys(e.setup.missing).length ? `Ready. ${Object.keys(e.setup.missing).length} optional extra${Object.keys(e.setup.missing).length > 1 ? 's' : ''} missing.` : 'Everything is installed.') : 'Something needed is missing.') : 'Checking'}</span></div>
         </fieldset>
         <p id="settings-msg" className="fine" role="status">{msg}</p>
       </div>

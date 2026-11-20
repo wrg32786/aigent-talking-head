@@ -159,6 +159,20 @@ if (target) {
     for (const f of ['skills/aigent-talking-head/SKILL.md', 'contract.json', 'CONTRIBUTING.md']) if (existsSync(join(ROOT, f)) && readFileSync(join(ROOT, f), 'utf8').includes('\u2014')) errs.push(`${f} has an em dash`);
     results.push({ label: 'SKILL.md and contract.json copy', errs, warns: [] });
   }
+  // releases: the package.json version has a CHANGELOG section and plain-words notes in docs/releases (kit/release-notes.mjs)
+  {
+    const errs = [];
+    const { section, draft } = await import('./release-notes.mjs');
+    const ver = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version;
+    const log = readFileSync(join(ROOT, 'CHANGELOG.md'), 'utf8');
+    const items = section(log, ver);
+    if (!items || !items.length) errs.push(`CHANGELOG.md has no "## ${ver}" section with entries`);
+    else if (!draft(log, ver, ['docs/x.png']).includes(`raw.githubusercontent.com/wrg32786/aigent-talking-head/v${ver}/docs/x.png`)) errs.push('release:notes draft does not link screenshots from the tag');
+    const notes = join(ROOT, 'docs', 'releases', `v${ver}.md`);
+    if (!existsSync(notes)) errs.push(`docs/releases/v${ver}.md is missing (npm run release:notes -- --write, then edit it)`);
+    for (const f of existsSync(join(ROOT, 'docs', 'releases')) ? readdirSync(join(ROOT, 'docs', 'releases')) : []) if (readFileSync(join(ROOT, 'docs', 'releases', f), 'utf8').includes('\u2014')) errs.push(`docs/releases/${f} has an em dash`);
+    results.push({ label: `release ${ver}: CHANGELOG section and docs/releases/v${ver}.md`, errs, warns: [] });
+  }
   // style packs (packs/), locks and the choices table: shipped packs valid with previews, docs/packs.md lists each
   {
     const req = createRequire(import.meta.url);
@@ -188,6 +202,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-scripts.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { cerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio script tests (tests/studio-scripts.test.mjs: scripts API, MCP script tools, model-written scripts, takes with scripts)', errs: cerrs, warns: [] });
+    const kerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-connect.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { kerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio connect tests (tests/studio-connect.test.mjs: Dropbox, Drive and direct footage links against a mock server, Connect agent commands, setup check)', errs: kerrs, warns: [] });
     const verrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-review.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { verrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }

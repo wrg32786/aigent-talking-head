@@ -1,7 +1,7 @@
 {
   "name": "aigent-talking-head",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.4.0",
   "description": "Talking-head video pipeline: raw footage or HeyGen takes to a captioned, themed 9:16 reel.",
   "type": "commonjs",
   "engines": {
@@ -44,7 +44,9 @@
     "studio": "node kit/studio/server.mjs",
     "studio:build": "node kit/studio/build.mjs",
     "studio:agent": "node kit/studio/launch.mjs",
-    "studio:connect": "node kit/studio/connect.mjs"
+    "studio:connect": "node kit/studio/connect.mjs",
+    "setup:all": "node kit/setup.mjs",
+    "release:notes": "node kit/release-notes.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
