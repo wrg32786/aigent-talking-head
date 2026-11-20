@@ -278,3 +278,75 @@ export function scriptFrom(words) {
   if (ctaAt >= 0) lines.push('[cta]', S[ctaAt].text);
   return lines.join('\n');
 }
+
+// ---------- cut points on the audio ----------
+// The transcript says roughly where each word ends; the audio says exactly. snapRanges() moves every cut start and
+// end to the quiet just outside the words it keeps: an end goes to the first energy dip after the last word (so a
+// word is never clipped mid-syllable and the breath after it is left out), a start to the last dip before the first
+// word. When the transcript and the audio disagree, the audio wins inside a small window. env is the loudness
+// envelope from media.mjs energy(): { hop: seconds per value, rms: [0..1] }.
+export const SNAP = { window: 0.35, pad: 0.04, hold: 0.07, lead: 0.25 };
+function floorOf(rms) {
+  const v = rms.filter(x => x > 0).sort((a, b) => a - b); if (!v.length) return 0;
+  return v[Math.floor(v.length * 0.1)]; // the quiet floor: the 10th percentile
+}
+// the level that counts as quiet: well under speech, a little over the room tone
+export function quietLevel(env) {
+  const v = env.rms.slice().sort((a, b) => a - b), speech = v[Math.floor(v.length * 0.7)] || 0, fl = floorOf(env.rms);
+  return Math.max(fl * 2.5, Math.min(speech * 0.22, fl + (speech - fl) * 0.3), 0.004);
+}
+const at = (env, t) => env.rms[Math.max(0, Math.min(env.rms.length - 1, Math.round(t / env.hop)))] || 0;
+// first time in [a, b] where the level stays under q for `hold` seconds (dir 1 forward, -1 backward)
+function quietRun(env, a, b, q, hold, dir) {
+  const h = env.hop, n = Math.max(1, Math.round(hold / h)), lo = Math.max(0, Math.round(a / h)), hi = Math.min(env.rms.length - 1, Math.round(b / h));
+  if (dir > 0) { for (let i = lo; i <= hi; i++) { let ok = true; for (let k = 0; k < n && ok; k++) ok = (env.rms[i + k] ?? 0) < q; if (ok) return i * h; } }
+  else { for (let i = hi; i >= lo; i--) { let ok = true; for (let k = 0; k < n && ok; k++) ok = (env.rms[i - k] ?? 0) < q; if (ok) return (i + 1) * h; } }
+  return null;
+}
+// the quietest spot in [a, b] on a 50 ms average, so a short stop inside a word does not look like the end
+function minIn(env, a, b) { const h = env.hop, k = Math.max(1, Math.round(0.025 / h)); let best = a, m = Infinity;
+  for (let t = a; t <= b + 1e-9; t += h) { let s = 0, n = 0; for (let j = -k; j <= k; j++) { s += at(env, t + j * h); n++; } if (s / n < m) { m = s / n; best = t; } } return best; }
+const r2 = x => +(+x).toFixed(2);
+// snap one range; returns { range, points: [{ edge, transcript, audio, cut, by }] }
+export function snapRange([a, b], words, env, dur, o = {}) {
+  const { window: W, pad, hold, lead } = { ...SNAP, ...o }, q = quietLevel(env), D = dur || env.rms.length * env.hop;
+  const inside = (words || []).filter(w => w[1] > a + 0.02 && w[0] < b - 0.02);
+  const first = inside[0], last = inside[inside.length - 1];
+  const prev = first ? words[words.indexOf(first) - 1] : null, next = last ? words[words.indexOf(last) + 1] : null;
+  const points = [];
+  // the end: from the last kept word's end, forward to the first quiet run, never into the next word
+  let end = b;
+  if (last) {
+    const t = last[1], limit = Math.min(D, t + W, next ? Math.max(t, next[0] - 0.02) : Infinity);
+    const from = Math.max(last[0] + (t - last[0]) * 0.5, t - lead), loud = at(env, t) >= q, dip = quietRun(env, from, limit, q, hold, 1);
+    let au = dip, by = 'quiet';
+    // still talking at the window's edge: look further (up to 1 s, never into the next word) before settling for the quietest spot
+    if (au == null) { const far = Math.min(D, t + 1, next ? Math.max(t, next[0] - 0.02) : Infinity); au = quietRun(env, limit, far, q, hold, 1); if (au != null) by = 'later'; }
+    if (au == null) { au = minIn(env, from, limit); by = 'lowest'; }
+    end = Math.min(D, au + pad, next ? Math.max(au, next[0] - 0.01) : Infinity);
+    points.push({ edge: 'end', word: last[2], transcript: r2(t), audio: r2(au), cut: r2(end), by: by === 'later' ? 'audio: the word ran well past the transcript' : by === 'quiet' ? (loud && au > t + 0.03 ? 'audio: the word ran past the transcript' : au < t - 0.03 ? 'audio: the word ended before the transcript' : 'audio dip after the word') : 'no clear dip, the quietest spot', shift: r2(end - t) });
+  }
+  // the start: from the first kept word's start, back to the last quiet run, never into the word before
+  let start = a;
+  if (first) {
+    const t = first[0], limit = Math.max(0, t - W, prev ? Math.min(t, prev[1] + 0.02) : 0);
+    const to = Math.min(first[1] - (first[1] - t) * 0.5, t + lead), dip = quietRun(env, limit, to, q, hold, -1);
+    let au = dip, by = 'quiet';
+    if (au == null) { const far = Math.max(0, t - 1, prev ? Math.min(t, prev[1] + 0.02) : 0); au = quietRun(env, far, limit, q, hold, -1); if (au != null) by = 'later'; }
+    if (au == null) { au = minIn(env, limit, to); by = 'lowest'; }
+    start = Math.max(0, au - pad, prev ? Math.min(au, prev[1] + 0.01) : 0);
+    points.unshift({ edge: 'start', word: first[2], transcript: r2(t), audio: r2(au), cut: r2(start), by: by === 'later' ? 'audio: the word started well before the transcript' : by === 'quiet' ? (at(env, t) >= q && au < t - 0.03 ? 'audio: the word started before the transcript' : 'audio dip before the word') : 'no clear dip, the quietest spot', shift: r2(start - t) });
+  }
+  if (!(end - start >= 0.3)) return { range: [r2(a), r2(b)], points: points.map(p => ({ ...p, cut: p.edge === 'start' ? r2(a) : r2(b), by: 'kept as is (too short to snap)' })) };
+  return { range: [r2(start), r2(end)], points };
+}
+// snap every range of a candidate; debug goes in cuts (one entry per start and end)
+export function snapRanges(ranges, words, env, dur, o) {
+  if (!env || !env.rms || !env.rms.length) return { ranges, cuts: null };
+  const out = ranges.map(r => snapRange(r, words, env, dur, o));
+  return { ranges: out.map(x => x.range), cuts: out.flatMap((x, k) => x.points.map(p => ({ ...p, part: k }))) };
+}
+export function snapCandidate(c, words, env, dur, o) {
+  const s = snapRanges(c.ranges, words, env, dur, o); if (!s.cuts) return { ...c, snapped: false };
+  return { ...c, ranges: s.ranges, seconds: lengthOf({ ranges: s.ranges }), cuts: s.cuts, snapped: true };
+}

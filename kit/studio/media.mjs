@@ -92,3 +92,22 @@ export function transcribe(rel, { onProgress = () => {}, onDone = () => {}, chun
   return { status: 'running' };
 }
 export function stopAll() { for (const p of [...running.values(), ...txJobs.values()]) try { p.kill(); } catch {} }
+
+// the loudness envelope for cut points: RMS every 10 ms of an 8 kHz mono copy, 0 to 1 (the take's loudest = 1)
+export function energy(rel) {
+  const f = cacheFile(rel, '.rms.json'), c = readJson(f); if (c) return Promise.resolve(c);
+  if (peakJobs.has(f)) return peakJobs.get(f);
+  if (!ff().ffmpeg) return Promise.resolve(null);
+  const job = new Promise(ok => {
+    const p = spawn('ffmpeg', ['-v', 'error', '-i', resolve(ROOT, rel), '-vn', '-ac', '1', '-ar', '8000', '-f', 's16le', '-']);
+    const bufs = []; p.stdout.on('data', d => bufs.push(d)); p.on('error', () => ok(null));
+    p.on('close', () => {
+      const b = Buffer.concat(bufs), samples = Math.floor(b.length / 2), per = 80; if (!samples) return ok(null);
+      const out = []; let top = 0;
+      for (let k = 0; k * per < samples; k++) { let s2 = 0, n = 0; for (let i = k * per; i < Math.min(samples, (k + 1) * per); i++) { const v = b.readInt16LE(i * 2) / 32768; s2 += v * v; n++; } const r = Math.sqrt(s2 / n); out.push(r); if (r > top) top = r; }
+      const r = { hop: 0.01, rms: out.map(v => +(v / (top || 1)).toFixed(4)) };
+      writeFileSync(f, JSON.stringify(r)); ok(r);
+    });
+  }).finally(() => peakJobs.delete(f));
+  peakJobs.set(f, job); return job;
+}

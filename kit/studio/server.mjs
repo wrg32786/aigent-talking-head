@@ -249,10 +249,13 @@ function startTranscribe(rel, then) {
   });
 }
 const wordsOf = rel => { const t = MEDIA.transcript(rel); return t ? t.words : null; };
+// cut points on the audio: every start and end moves to the quiet next to its words (kit/studio/cut.mjs snapRanges)
+const energyOf = rel => MEDIA.energy(rel).catch(() => null);
+const snapOne = (c, words, env, dur) => (env ? CUT.snapCandidate(c, words || [], env, dur) : c);
 const CTA_LINE = 'Pick the cuts';
 async function findCuts(rel, scorer = 'auto') {
   const s = C.load(), o = outputOf(s), words = wordsOf(rel); if (!words) throw Object.assign(new Error('transcribe the footage first'), { code: 400 });
-  const cands = CUT.candidates(words, o, { duration: durOf(rel) });
+  const env = await energyOf(rel), cands = CUT.candidates(words, o, { duration: durOf(rel) }).map(c => snapOne(c, words, env, durOf(rel)));
   const summary = CUT.summary(o, durOf(rel)), st = S.load(), a = CH.presence();
   const who = scorer !== 'auto' ? scorer : st.chat.backend === 'agent' && a.connected ? 'agent' : LLM.provider(process.env, st.chat) ? 'model' : 'rules';
   update(x => { x.cut = { source: rel, summary, candidates: cands, scoredBy: 'rules', pending: who === 'rules' ? null : who, at: Date.now() }; });
@@ -266,27 +269,32 @@ async function findCuts(rel, scorer = 'auto') {
   }
   return who;
 }
-function editCut(b) {
+async function editCut(b) {
+  const c0 = C.load().cut, env = c0 && b.snap !== false && (b.add || b.ranges) ? await energyOf(c0.source) : null;
   return update(x => {
     const c = x.cut; if (!c) throw Object.assign(new Error('find cuts first'), { code: 400 });
     const dur = durOf(c.source), list = c.candidates;
     if (b.add) {
       const ranges = CUT.cleanRanges(b.add.ranges, dur), kind = ['full', 'part', 'clip', 'ad'].includes(b.add.kind) ? b.add.kind : 'clip';
       const n = 1 + list.filter(y => /^m\d+$/.test(y.id)).length, words = wordsOf(c.source) || [];
-      list.push({ id: 'm' + n, kind, label: b.add.label ? String(b.add.label).slice(0, 60) : `Your ${kind === 'clip' ? 'clip' : kind} ${n}`, ranges, seconds: CUT.lengthOf({ ranges }), score: null, reason: 'Added by you', text: CUT.textIn(words, ranges), keep: true, order: list.length, by: 'you' });
+      list.push(snapOne({ id: 'm' + n, kind, label: b.add.label ? String(b.add.label).slice(0, 60) : `Your ${kind === 'clip' ? 'clip' : kind} ${n}`, ranges, seconds: CUT.lengthOf({ ranges }), score: null, reason: 'Added by you', text: CUT.textIn(words, ranges), keep: true, order: list.length, by: 'you' }, words, env, dur));
       return;
     }
     const k = list.findIndex(y => y.id === b.id); if (k < 0) throw Object.assign(new Error(`no candidate ${b.id}`), { code: 404 });
     const it = list[k];
-    if (b.ranges) { it.ranges = CUT.cleanRanges(b.ranges, dur); it.seconds = CUT.lengthOf(it); it.text = CUT.textIn(wordsOf(c.source) || [], it.ranges) || it.text; it.trimmed = true; }
+    if (b.ranges) {
+      const w = wordsOf(c.source) || []; it.ranges = CUT.cleanRanges(b.ranges, dur); delete it.cuts; it.snapped = false;
+      Object.assign(it, snapOne(it, w, env, dur)); it.seconds = CUT.lengthOf(it); it.text = CUT.textIn(w, it.ranges) || it.text; it.trimmed = true;
+    }
     if (b.keep !== undefined) it.keep = !!b.keep;
     if (b.remove) list.splice(k, 1);
     if (b.move) { const ord = list.slice().sort((p, q) => p.order - q.order), i = ord.indexOf(it), j = Math.max(0, Math.min(ord.length - 1, i + (b.move > 0 ? 1 : -1))); ord.splice(i, 1); ord.splice(j, 0, it); ord.forEach((y, n) => { y.order = n; }); }
   });
 }
 // the agent's picks (MCP set_cuts): replace the candidates, scored by the agent
-function setCuts(b) {
+async function setCuts(b) {
   const s = C.load(), c = s.cut, rel = cutSource(s, b.source); if (!rel) throw Object.assign(new Error('add footage first'), { code: 400 });
+  const env = b.snap === false ? null : await energyOf(rel);
   if (!Array.isArray(b.candidates) || !b.candidates.length) throw Object.assign(new Error('candidates: [{ kind, ranges: [[start, end]], score, reason }]'), { code: 400 });
   const dur = durOf(rel), words = wordsOf(rel) || [], n = {};
   const list = b.candidates.slice(0, 40).map((x, k) => {
@@ -295,7 +303,7 @@ function setCuts(b) {
     const id = kind === 'full' && n.full === 1 ? 'full' : { full: 'f', part: 'p', clip: 'c', ad: 'ad' }[kind] + n[kind];
     return { id, kind, label: String(x.label || (kind === 'part' ? `Part ${n[kind]}` : kind === 'clip' ? `Clip ${n[kind]}` : kind === 'ad' ? `Ad cut ${n[kind]}` : 'Full edit')).slice(0, 60), ranges, seconds: CUT.lengthOf({ ranges }),
       score: x.score == null ? null : Math.max(0, Math.min(100, Math.round(+x.score))), reason: String(x.reason || '').replace(/\u2014/g, ', ').slice(0, 200), text: CUT.textIn(words, ranges), keep: x.keep !== false, order: k };
-  });
+  }).map(c => snapOne(c, words, env, dur));
   const by = CH.prettyName(String(b.by || CH.presence().client || 'your agent'));
   return update(x => { x.cut = { source: rel, summary: CUT.summary(outputOf(x), dur), candidates: list, scoredBy: by, pending: null, at: Date.now() }; C.applyPatch(x, { reply: `${by} picked ${list.length} cut${list.length > 1 ? 's' : ''} on the Cut step.`, from: 'assistant', kind: 'action' }); });
 }
@@ -592,8 +600,8 @@ async function api(req, res, u) {
     if (!MEDIA.transcript(rel)) { update(x => { x.cut = { source: rel, candidates: [], scoredBy: null, pending: 'transcript' }; }); startTranscribe(rel, () => findCuts(rel, b.scorer || 'auto').catch(e => console.error(e.message))); return json(res, 202, { transcribing: true, ...view(C.load()) }); }
     const who = await findCuts(rel, b.scorer || 'auto'); return json(res, 200, { scorer: who, ...view(C.load()) });
   }
-  if (p === '/api/cut/edit' && M === 'POST') { const b = await readBody(req); return json(res, 200, view(editCut(b))); }
-  if (p === '/api/cut/set' && M === 'POST') { const b = await readBody(req); return json(res, 200, view(setCuts(b))); }
+  if (p === '/api/cut/edit' && M === 'POST') { const b = await readBody(req); return json(res, 200, view(await editCut(b))); }
+  if (p === '/api/cut/set' && M === 'POST') { const b = await readBody(req); return json(res, 200, view(await setCuts(b))); }
   if (p === '/api/cut/render' && M === 'POST') {
     const b = await readBody(req), miss = needFor('render'); const s = C.load(); const r = cutSteps(s, Array.isArray(b.ids) ? b.ids : null); if (miss) return json(res, 400, { error: miss, setup: true });
     runTask('cuts', () => r.steps, () => ({ cuts: r.plan.map(x => ({ ...x, outputs: C.outputsOf({ job: x.job }) })), copiedTo: copyRenders(r.plan.flatMap(x => C.outputsOf({ job: x.job }).slice(0, 1))) }));

@@ -6,10 +6,12 @@
 // - batch render: kept cuts become their own videos (a stand-in for the engine, tests/fixtures/fake-reel.mjs, with the
 //   real extract), a long form one through the real 16:9 pass (1920x1080), an ad one with the CTA end card
 // - Reference: Pull script puts the reference's words in Scripts with [hook], [body] and [cta]
+// - cut points on the audio: a synthetic clip with tone "words" at known times, a breath and room tone, and a transcript
+//   that is off on purpose; every cut lands in the real gap, and the timeline shows where and why
 // Needs Chrome and ffmpeg. Run: node tests/studio-cut.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
 import assert from 'assert';
 import { spawn, execFileSync } from 'child_process';
-import { mkdtempSync, rmSync, readFileSync, existsSync, readdirSync } from 'fs';
+import { mkdtempSync, rmSync, readFileSync, existsSync, readdirSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -31,7 +33,15 @@ ff(['-loop', '1', '-framerate', '12', '-i', IMG, '-f', 'lavfi', '-i', tone(112),
 ff(['-f', 'lavfi', '-i', 'testsrc2=s=640x360:d=4:r=24', '-f', 'lavfi', '-i', 'sine=d=4', '-c:v', 'mpeg4', '-c:a', 'aac', MKV]);
 ff(['-loop', '1', '-framerate', '12', '-i', IMG, '-f', 'lavfi', '-i', tone(20), '-t', '20', '-vf', 'scale=360:640,format=yuv420p', '-c:v', 'libx264', '-preset', 'ultrafast', '-c:a', 'aac', '-shortest', REF]);
 
-const env = { ...process.env, CI: '1', STUDIO_DIR: STATE, STUDIO_CHAT: '', ANTHROPIC_API_KEY: '', OPENAI_API_KEY: '', STUDIO_TX: 'tests/fixtures/fake-tx.mjs', FAKE_TX_DELAY: '300', STUDIO_REEL: 'tests/fixtures/fake-reel.mjs' };
+// the synthetic speech clip: tone bursts are the words (real times below), a soft noise breath at 2.70-2.95, room tone
+const SYN = join(STATE, 'syn.mp4'), REAL = [[1.0, 1.6], [1.75, 2.4], [3.3, 4.0], [4.1, 4.8], [6.0, 6.7], [6.8, 7.5]];
+const burst = REAL.map(([a, b]) => `between(t,${a},${b})`).join('+');
+ff(['-f', 'lavfi', '-i', 'color=c=0x303840:s=360x640:r=12:d=9', '-f', 'lavfi', '-i', `aevalsrc='0.5*sin(2*PI*200*t)*(${burst})+0.25*(random(0)-0.5)*between(t,2.7,2.95)+0.006*(random(1)-0.5)':s=48000:d=9`,
+  '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-shortest', SYN]);
+// what the "transcriber" says: "two" ends 0.15 s early, "four" ends 0.3 s late (in the silence), "five" starts 0.3 s late
+const TXW = join(STATE, 'words.json');
+writeFileSync(TXW, JSON.stringify({ 'synthetic-speech': { duration: 9, words: [[1.0, 1.6, 'One'], [1.75, 2.25, 'two.'], [3.3, 4.0, 'Three'], [4.1, 5.1, 'four.'], [6.3, 6.7, 'Five'], [6.8, 7.5, 'six.']] } }));
+const env = { ...process.env, FAKE_TX_WORDS: TXW, CI: '1', STUDIO_DIR: STATE, STUDIO_CHAT: '', ANTHROPIC_API_KEY: '', OPENAI_API_KEY: '', STUDIO_TX: 'tests/fixtures/fake-tx.mjs', FAKE_TX_DELAY: '300', STUDIO_REEL: 'tests/fixtures/fake-reel.mjs' };
 const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), '--port', '0', '--no-open'], { cwd: ROOT, env });
 const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out))); });
 const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json();
@@ -164,6 +174,39 @@ try {
     const text = (await api('/api/scripts/get?id=' + sc.id)).script.text; assert.ok(/^\[hook\]/.test(text) && /\[body\]/.test(text) && /\[cta\]/.test(text), text.slice(0, 300));
     assert.ok(await pg.$('#adapt-topic'), 'the adapt box shows');
     if (shots) { await pg.fill('#adapt-topic', 'meal prep for busy parents'); await shot(pg, '#pull-script', 'pull-script.png'); }
+  });
+  await t('cut points on the audio: the transcript is off, every cut lands in the real gap after the word, and the timeline shows why', async () => {
+    const syn = (await upload('footage', SYN, 'synthetic speech.mp4')).path; assert.ok(/synthetic-speech/.test(syn), syn);
+    await api('/api/cut/output', { format: 'short', kind: 'clips', clips: 1, seconds: null, length: 'short', goal: 'organic', cta: null });
+    await api('/api/cut/find', { path: syn, scorer: 'rules' });
+    await until(async () => { const x = await api('/api/cut'); return x.source === syn && x.candidates.length ? x : null; }, 30000);
+    const x = await api('/api/cut/set', { source: syn, by: 'test', candidates: [
+      { kind: 'clip', label: 'Early end', ranges: [[0.95, 2.25]] }, { kind: 'clip', label: 'Late end', ranges: [[3.25, 5.1]] }, { kind: 'clip', label: 'Late start', ranges: [[6.3, 7.55]] },
+      { kind: 'part', label: 'Split', ranges: [[0.95, 2.25], [6.3, 7.55]] }] });
+    const [a, b, c, d] = x.cut.candidates, end = k => k.cuts.find(p => p.edge === 'end'), start = k => k.cuts.find(p => p.edge === 'start');
+    assert.ok(a.snapped && b.snapped && c.snapped && d.snapped, 'all snapped');
+    // "two" really ends at 2.40: the cut is after it, before the breath at 2.70
+    assert.ok(a.ranges[0][1] >= 2.4 && a.ranges[0][1] < 2.6, 'early end ' + JSON.stringify(end(a))); assert.ok(/ran past/.test(end(a).by), end(a).by);
+    // "four" really ends at 4.80, not 5.10
+    assert.ok(b.ranges[0][1] >= 4.8 && b.ranges[0][1] < 4.95, 'late end ' + JSON.stringify(end(b))); assert.ok(/ended before/.test(end(b).by), end(b).by);
+    // "five" really starts at 6.00, not 6.30
+    assert.ok(c.ranges[0][0] <= 6.0 && c.ranges[0][0] > 5.85, 'late start ' + JSON.stringify(start(c))); assert.ok(/started before/.test(start(c).by), start(c).by);
+    assert.ok(c.ranges[0][1] >= 7.5 && c.ranges[0][1] <= 7.65, 'end of the last word ' + c.ranges[0][1]);
+    assert.strictEqual(d.cuts.length, 4, 'a split has a start and an end per part'); assert.deepStrictEqual(d.ranges, [a.ranges[0], c.ranges[0]]);
+    // a trim snaps too, and snap: false keeps it exact
+    const tr = await api('/api/cut/edit', { id: a.id, ranges: [[0.95, 1.5]] }); assert.ok(tr.cut.candidates[0].ranges[0][1] >= 1.6, 'a trim into "One" goes to its end: ' + tr.cut.candidates[0].ranges[0][1]);
+    const ex = await api('/api/cut/edit', { id: a.id, ranges: [[0.95, 2.25]], snap: false }); assert.deepStrictEqual(ex.cut.candidates[0].ranges, [[0.95, 2.25]]); assert.ok(!ex.cut.candidates[0].cuts);
+    await api('/api/cut/edit', { id: a.id, ranges: [[0.95, 2.25]] });
+    // the timeline: Show cut points draws the transcript times and lists each cut with why
+    await pg.goto(url + '/#step=cut', { waitUntil: 'networkidle' });
+    await pg.waitForSelector('#cut-timeline .region');
+    await pg.check('#cut-debug');
+    await pg.waitForSelector('#cut-points tbody tr');
+    assert.ok((await pg.$$('#cut-timeline .cp-tx')).length >= 8, 'transcript ticks on the lanes');
+    const rows = await pg.$$eval('#cut-points tbody tr', r => r.map(x => x.textContent)); assert.ok(rows.length === 2 && /two\./.test(rows[1]) && /ran past/.test(rows[1]), rows.join(' | '));
+    await pg.locator('#cut-candidates li[data-id="' + b.id + '"]').click({ position: { x: 6, y: 6 } });
+    await pg.waitForFunction(() => /Late end/.test(document.querySelector('#cut-points').textContent));
+    if (shots) await shot(pg, '#cut-timeline', 'cut-points.png');
   });
   assert.deepStrictEqual(errs.filter(e => !/favicon/.test(e)), []);
   await pg.close();

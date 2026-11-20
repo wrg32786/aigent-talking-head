@@ -1,6 +1,7 @@
 // A stand-in for kit/studio/tx_chunks.py in the tests (STUDIO_TX): the same <video> <out.json> --chunk N arguments and
 // the same "progress <done> <total>" lines and JSON, with made-up word times for a talk about filming reels.
 // FAKE_TX_DELAY waits between chunks (ms), FAKE_TX_FAIL exits with an error, FAKE_TX_SECONDS sets the length.
+// FAKE_TX_WORDS is a JSON file of { "<part of a file name>": { duration, words: [[start, end, word]] } } for exact words.
 import { writeFileSync, readFileSync, renameSync } from 'fs';
 
 const [src, out] = process.argv.slice(2), chunk = +(process.argv[process.argv.indexOf('--chunk') + 1] || 120);
@@ -26,7 +27,12 @@ for (let k = 0; ; k++) {
   t += k % 7 === 6 ? 1.6 : 0.35; // a long pause now and then
   if (secs ? t > secs - 2 : k >= LINES.length - 1) break;
 }
-const duration = +(secs || t + 0.6).toFixed(2), total = Math.max(1, Math.ceil(duration / chunk));
+let duration = +(secs || t + 0.6).toFixed(2);
+if (process.env.FAKE_TX_WORDS) {
+  const map = JSON.parse(readFileSync(process.env.FAKE_TX_WORDS, 'utf8')), k = Object.keys(map).find(k => src.includes(k));
+  if (k) { words.length = 0; words.push(...map[k].words); duration = map[k].duration; }
+}
+const total = Math.max(1, Math.ceil(duration / chunk));
 let st; try { st = JSON.parse(readFileSync(out, 'utf8')); } catch { st = { file: src, duration, chunk, total, done: [], words: [], model: 'fake' }; }
 const save = () => { writeFileSync(out + '.tmp', JSON.stringify(st)); renameSync(out + '.tmp', out); };
 const wait = ms => new Promise(r => setTimeout(r, ms));

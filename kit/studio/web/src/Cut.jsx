@@ -50,6 +50,7 @@ function Picker({ cut, set }) {
 
 // the take's timeline: waveform, clean-up marks, playhead, one lane per kind with draggable regions
 function Timeline({ cut, peaks, marks, now, dur, sel, setSel, onSeek, onEdit, onAdd }) {
+  const [debug, setDebug] = useState(false);
   const kinds = [...new Set(cut.candidates.map(c => c.kind))];
   const lanes = kinds.length ? kinds : ['clip'];
   const pct = t => (dur ? (t / dur) * 100 : 0) + '%';
@@ -83,14 +84,33 @@ function Timeline({ cut, peaks, marks, now, dur, sel, setSel, onSeek, onEdit, on
             title={`${c.label}: ${clock(r[0])} to ${clock(r[1])}`} onClick={() => { setSel(c.id); onSeek(r[0], true, c); }}>
             <i className="edge a" onPointerDown={e => startEdge(e, c, ri, 'a')} aria-label={`Trim the start of ${c.label}`} />
             {ri === 0 && <span className="rg-l">{c.label}</span>}
+            {debug && (c.cuts || []).filter(p => p.part === ri).map(p => <i key={p.edge} className={'cp-tx ' + p.edge} aria-hidden="true"
+              style={{ left: `${((p.transcript - r[0]) / Math.max(0.01, r[1] - r[0])) * 100}%` }} title={`${p.edge}: transcript ${secs(p.transcript)}, cut ${secs(p.cut)}`} />)}
             <i className="edge b" onPointerDown={e => startEdge(e, c, ri, 'b')} aria-label={`Trim the end of ${c.label}`} />
           </div>))}
         {drag && !drag.id && drag.lane === k && Math.abs(drag.to - drag.from) > 0.2 && <div className="region new" style={{ left: pct(Math.min(drag.from, drag.to)), width: pct(Math.abs(drag.to - drag.from)) }} />}
         <i className="playhead" style={{ left: pct(now) }} aria-hidden="true" />
       </div>
     </div>)}
+    <div className="tl-dbg"><label className="tick"><input type="checkbox" id="cut-debug" checked={debug} onChange={e => setDebug(e.target.checked)} />Show cut points</label>
+      <span className="fine">Each cut snaps to the quiet in the audio next to its words{cut.candidates.some(c => c.snapped) ? '' : ' (no audio envelope yet)'}.</span></div>
+    {debug && <CutPoints c={cut.candidates.find(c => c.id === sel) || cut.candidates[0]} onSeek={onSeek} />}
     <p className="fine tl-help">Drag a region's edge to trim it. Drag on an empty part of a lane to add your own. Red ticks are filler words, grey bands are long pauses.</p>
   </div>;
+}
+
+const secs = t => (t == null ? '' : (+t).toFixed(2) + ' s');
+// where each cut landed and why: the transcript time, the audio dip, the cut, and the shift between them
+function CutPoints({ c, onSeek }) {
+  if (!c) return null;
+  if (!c.cuts || !c.cuts.length) return <p className="fine" id="cut-points">{c.label}: no cut points on the audio (no envelope, or the range has no words).</p>;
+  return <div className="cut-points" id="cut-points"><b>{c.label}</b>
+    <table><thead><tr><th>Edge</th><th>Word</th><th>Transcript</th><th>Audio</th><th>Cut</th><th>Shift</th><th>Why</th></tr></thead>
+      <tbody>{c.cuts.map((p, i) => <tr key={i} data-edge={p.edge}>
+        <td>{c.ranges.length > 1 ? `${cap1(p.edge)} ${p.part + 1}` : cap1(p.edge)}</td><td>"{p.word}"</td>
+        <td className="mono">{secs(p.transcript)}</td><td className="mono">{secs(p.audio)}</td>
+        <td className="mono"><button type="button" className="linkish" onClick={() => onSeek(Math.max(0, p.cut - (p.edge === 'end' ? 1.5 : 0)), false)} aria-label={`Seek near the ${p.edge} cut`}>{secs(p.cut)}</button></td>
+        <td className="mono">{p.shift > 0 ? '+' : ''}{(+p.shift).toFixed(2)}</td><td>{p.by}</td></tr>)}</tbody></table></div>;
 }
 
 function Candidate({ c, sel, setSel, onEdit, onPreview, first, last, rendered }) {
@@ -98,7 +118,7 @@ function Candidate({ c, sel, setSel, onEdit, onPreview, first, last, rendered })
   return <li className={'cand k-' + c.kind + (c.keep ? '' : ' off') + (sel ? ' sel' : '')} data-id={c.id} onClick={() => setSel(c.id)}>
     <span className="cd-dot" aria-hidden="true" />
     <div className="cd-main">
-      <div className="cd-h"><b>{c.label}</b><span className="mono fine">{span}, {fmtS(c.seconds * 1000)}</span>{c.score != null && <span className="score" title="Score out of 100">{c.score}</span>}{c.trimmed && <Badge label="Trimmed" variant="neutral" />}</div>
+      <div className="cd-h"><b>{c.label}</b><span className="mono fine">{span}, {fmtS(c.seconds * 1000)}</span>{c.score != null && <span className="score" title="Score out of 100">{c.score}</span>}{c.trimmed && <Badge label="Trimmed" variant="neutral" />}{c.snapped && <span className="fine snap-b" title="Cut points snapped to the audio">on the audio</span>}</div>
       <p className="cd-why">{c.reason}</p>
       <p className="cd-tx">"{c.text}"</p>
       {rendered && <a className="cd-out" href={file(rendered)} target="_blank" rel="noreferrer"><Icon n="film" />{rendered.split('/').slice(-2).join('/')}</a>}
