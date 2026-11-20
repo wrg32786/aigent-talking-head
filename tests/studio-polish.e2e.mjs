@@ -47,8 +47,13 @@ try {
   });
 
   await t('More menu: keyboard opens it, arrows move, Enter runs Connect agent; the theme item flips the theme', async () => {
+    // a hash change moves focus to the step heading on the next frame (App go(step, true)); let that land first, or it
+    // can take focus off the More button between focus() and Enter on a slow runner
     await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' });
-    await pg.focus('#more-open'); await pg.keyboard.press('Enter');
+    await pg.waitForFunction(() => document.querySelector('main').dataset.step === 'footage' && document.activeElement && document.activeElement.id === 'h-footage');
+    await pg.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await pg.focus('#more-open'); assert.strictEqual(await pg.evaluate(() => document.activeElement.id), 'more-open');
+    await pg.keyboard.press('Enter');
     await pg.waitForSelector('#more-connect'); if (shots) { await pg.waitForTimeout(300); await pg.screenshot({ path: join(shots, 'more-menu.png'), clip: { x: 560, y: 0, width: 720, height: 280 } }); }
     const items = await pg.$$eval('.menu-item span', x => x.map(e => e.textContent));
     assert.deepStrictEqual(items.slice(0, 3), ['Connect agent', 'Setup check', 'API keys and providers']);

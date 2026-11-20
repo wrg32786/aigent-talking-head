@@ -135,6 +135,7 @@ try {
     await api('/api/broll/slot', { beat: 1, clear: true });
     const lib = (await api('/api/broll/library?q=counter')).clips; assert.ok(lib.length);
     await api('/api/broll/ideas', { by: 'claude-code', ideas: [{ beat: 1, idea: 'The $1,200 counter card', clip: lib[0].id, place: 'full' }] });
+    await pg.waitForSelector('#broll-lane .beat[data-beat="1"].has-idea:not(.filled)'); // the live update reached the page
     await pg.click('#broll-lane .beat[data-beat="1"]'); await pg.waitForSelector('#beat-idea');
     assert.ok(/Claude Code/.test(await pg.textContent('#beat-idea')));
     await shot(pg, '#beat-panel', 'broll-idea.png');
@@ -154,6 +155,23 @@ try {
     await pg.click('#gen-est'); await pg.waitForSelector('#gen-confirm'); assert.strictEqual(await pg.textContent('#gen-cost'), '$0.42');
     await shot(pg, '#beat-panel', 'broll-generate.png');
     await pg.click('#gen-go'); await until(async () => { const b = await beatOf(1); return b.slot && b.slot.clip.source === 'generate'; }, 30000);
+  });
+  await t('a late reply never puts an older lane back over a newer live update (the ideas race)', async () => {
+    // hold the page's own answer until an agent's idea has landed by the live update, then let it through: the page must
+    // keep the idea (it used to merge the older answer over it and the idea vanished until the next change)
+    let release; const gate = new Promise(r => { release = r; });
+    await pg.route('**/api/broll/slot', async r => { const res = await r.fetch(); const body = await res.body(); await gate; await r.fulfill({ response: res, body }); });
+    await pg.click('#broll-lane .beat[data-beat="2"]'); await pg.waitForSelector('#place-full');
+    const answered = pg.waitForResponse(r => r.url().endsWith('/api/broll/slot'));
+    await pg.click('#place-full'); await until(async () => (await beatOf(2)).slot.place === 'full');
+    const lib = (await api('/api/broll/library?q=counter')).clips;
+    await api('/api/broll/ideas', { by: 'claude-code', ideas: [{ beat: 3, idea: 'A late reply check', clip: lib[0].id, place: 'pip' }] });
+    await pg.waitForSelector('#broll-lane .beat[data-beat="3"].has-idea');
+    release(); await answered; await pg.unroute('**/api/broll/slot');
+    await pg.evaluate(() => new Promise(r => { let k = 0; const f = () => (++k < 4 ? requestAnimationFrame(f) : r()); requestAnimationFrame(f); }));
+    await pg.waitForFunction(() => document.querySelector('#broll-lane .beat[data-beat="3"]').classList.contains('has-idea') && document.querySelector('#place-full').getAttribute('aria-checked') === 'true', null, { timeout: 5000 });
+    await api('/api/broll/idea', { beat: 3, action: 'dismiss' }); await api('/api/broll/slot', { beat: 2, place: 'top' });
+    await until(async () => !(await beatOf(3)).idea && (await beatOf(2)).slot.place === 'top');
   });
   await t('Record screen with the webcam bubble (when this Chrome can share a screen)', async () => {
     await pg.click('#broll-lane .beat[data-beat="2"]'); await pg.click('#btab-record'); await pg.waitForSelector('#rec-screen');
