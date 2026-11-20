@@ -1,5 +1,6 @@
 // Setup: install everything the kit can use, up front, and say what is left for the user.
-//   npm run setup:all [-- --yes] [--skip effects,model] [--json]   install what is missing, then print a summary
+//   npm run setup:all [-- --yes] [--skip effects,model] [--only ytdlp] [--json]   install what is missing, then print a summary
+//     (--only: just those steps; Studio's Install button runs --only ytdlp for yt-dlp and instaloader)
 //   npm run setup:all -- --check [--json]                         only report (Studio's Setup check and the MCP
 //                                                                  setup_status tool use the same list)
 // Safe to run again and to stop halfway: every step first checks whether its thing is already there, so a second run
@@ -137,7 +138,8 @@ export function install({ yes = false, skip = [], log = console.log } = {}) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const argv = process.argv.slice(2), flag = k => argv.includes('--' + k);
   const opt = k => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : undefined; };
-  const VALUED = new Set(['skip']), json = flag('json'), skipArg = opt('skip') || '';
+  const VALUED = new Set(['skip', 'only']), json = flag('json'), STEP_IDS = ['npm', 'python', 'ytdlp', 'ffmpeg', 'chrome', 'model', 'effects', 'humanizer', 'studio'];
+  const only = (opt('only') || '').split(',').map(x => x.trim()).filter(Boolean), skipArg = only.length ? STEP_IDS.filter(x => !only.includes(x)).join(',') : opt('skip') || '';
   if (flag('check')) {
     const s = status();
     if (json) console.log(JSON.stringify(s, null, 2));

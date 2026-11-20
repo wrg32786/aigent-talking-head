@@ -50,14 +50,18 @@ export function take(limit = 20) {
 // is applied first; names the engine does not have are refused and nothing is changed.
 export function reply({ text, replyTo, patch, agent } = {}) {
   const s = C.load();
-  if (patch && Object.keys(patch).length) { const r = C.applyPatch(s, patch); if (r.errs.length) return { errs: r.errs }; var log = r.log; }
+  // a patch that changes nothing says so (noChange), so an agent never tells the user it did something it did not
+  let log = [], noChange = false;
+  if (patch && Object.keys(patch).length) { const r = C.applyPatch(s, patch); if (r.errs.length) return { errs: r.errs }; log = r.log; noChange = !!r.noop; }
   const ids = [].concat(replyTo || []).map(Number).filter(Boolean);
   const target = ids.length ? ids : unanswered(s).map(m => m.id);
   if (text) C.applyPatch(s, { reply: String(text), from: prettyName(agent), replyTo: target[target.length - 1] || undefined, kind: 'reply' });
+  // the page shows it too, so the user is never told about a change that did not happen
+  if (noChange) C.applyPatch(s, { reply: 'Studio: that change did nothing (it was already set that way).', from: 'Studio', kind: 'action' });
   const at = new Date().toISOString();
   for (const m of s.chat) if (target.includes(m.id) && m.role === 'user' && m.to === 'agent') { m.status = 'answered'; m.answeredAt = at; }
   C.save(s);
-  return { errs: [], changed: log || [], answered: target };
+  return { errs: [], changed: log, answered: target, ...(noChange ? { noChange: true, note: 'The patch changed nothing: those settings were already set, or the field does nothing. Do not tell the user it changed.' } : {}) };
 }
 // a one-line action note for an edit made from another channel (the terminal). Never conversation text.
 export function actionNote(s, changes, agent) {

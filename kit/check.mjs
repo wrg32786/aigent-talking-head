@@ -178,6 +178,8 @@ if (target) {
     const req = createRequire(import.meta.url);
     results.push({ label: 'locks self-test (kit/locks.cjs)', errs: req('./locks.cjs').selfTest(), warns: [] });
     results.push({ label: 'choices self-test (kit/choices.cjs)', errs: req('./choices.cjs').selfTest(), warns: [] });
+    results.push({ label: 'glossary self-test (kit/glossary.cjs)', errs: req('./glossary.cjs').selfTest(), warns: [] });
+    results.push({ label: 'keyword logos self-test (kit/brands.cjs)', errs: req('./brands.cjs').selfTest(), warns: [] });
     const K = req('./packs.cjs'), errs = K.selfTest(), doc = join(ROOT, 'docs', 'packs.md');
     if (!existsSync(doc)) errs.push('docs/packs.md is missing; run npm run pack:preview -- --docs-only');
     else { const md = readFileSync(doc, 'utf8'); for (const p of K.shipped()) { if (!md.includes(`### ${p.name} `)) errs.push(`docs/packs.md is missing pack ${p.name}`); if (md.includes('\u2014')) { errs.push('docs/packs.md has an em dash'); break; } } }
@@ -210,6 +212,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-review.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { verrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio review tests (tests/studio-review.test.mjs: what to swap, clean-up pass, edit receipt, preview comments)', errs: verrs, warns: [] });
+    const ses = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-session.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { ses.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio session tests (tests/studio-session.test.mjs: footage patch, no-op replies, one bed, your words, keyword logos, Instagram by yt-dlp, Install, late cancel)', errs: ses, warns: [] });
   }
   {
     const star = createRequire(import.meta.url)('./star.cjs');

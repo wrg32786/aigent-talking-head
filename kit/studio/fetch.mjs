@@ -13,14 +13,17 @@ import { basename, dirname, join, resolve, delimiter, extname } from 'path';
 import { fileURLToPath } from 'url';
 
 const KIT = dirname(dirname(fileURLToPath(import.meta.url)));
-const PY = process.env.PYTHON || (process.platform === 'win32' ? 'py' : 'python3');
+// the kit's Python: PYTHON, else the kit's .venv (where the installer put yt-dlp and instaloader), else the system one.
+// Studio started with npm run studio has no PYTHON set; looking only at the system Python said "not installed".
+const ROOT = dirname(KIT);
+const PY = process.env.PYTHON || [join(ROOT, '.venv', 'Scripts', 'python.exe'), join(ROOT, '.venv', 'bin', 'python')].find(f => existsSync(f)) || (process.platform === 'win32' ? 'py' : 'python3');
 export const MAX_BYTES = 1024 ** 3;
 export const DEFAULT_MAX_SECONDS = +(process.env.STUDIO_REF_MAX_SECONDS || 90);
 const IG_POST = /^https?:\/\/(?:www\.|m\.)?instagram\.com\/(?:[A-Za-z0-9._]+\/)?(?:reels?|p|tv)\/([A-Za-z0-9_-]{5,})\/?(?:[?#].*)?$/;
 const DIRECT = ['.mp4', '.mov', '.m4v', '.webm'];
 export const INSTALL = {
   ytdlp: 'yt-dlp is not installed. It is optional and free: pip install yt-dlp (or python -m pip install yt-dlp), or get the standalone program from https://github.com/yt-dlp/yt-dlp#installation and put it on your PATH (or set YTDLP to its path). Then add the link again.',
-  instaloader: 'Instagram links need instaloader, an optional extra (MIT): pip install instaloader. It fetches one public post anonymously; it never logs in.',
+  instaloader: 'Instagram links need instaloader or yt-dlp, optional extras: pip install instaloader yt-dlp (or the Install button in Studio). Both fetch one public post anonymously; nothing logs in.',
   ffmpeg: 'ffmpeg is needed to join video and audio and to trim long videos. Install it from https://ffmpeg.org/download.html.',
 };
 
@@ -57,7 +60,7 @@ export function tools({ fresh = false } = {}) {
 }
 export function missingFor(c, t = tools()) {
   if (c.via === 'yt-dlp' && !t.ytdlp) return INSTALL.ytdlp;
-  if (c.via === 'instaloader' && !t.instaloader) return INSTALL.instaloader;
+  if (c.via === 'instaloader' && !t.instaloader && !t.ytdlp) return INSTALL.instaloader;
   return null;
 }
 
@@ -95,9 +98,10 @@ async function direct(url, out, say) {
   await new Promise((ok, bad) => { w.end(ok); w.on('error', bad); });
   return { title: decodeURIComponent(basename(new URL(url).pathname)) };
 }
-function ytdlp(url, out, max, say, sections = true) {
+function ytdlp(url, out, max, say, sections = true, anon = false) {
   const t = tools(), base = out.replace(/\.mp4$/, '');
-  const args = ['--no-playlist', '--newline', '--progress', '--no-warnings', '--max-filesize', '1G', '--restrict-filenames',
+  // anon (Instagram): no config file, no cookies, no browser cookies, so it can never log in
+  const args = [...(anon ? ['--ignore-config', '--no-cookies', '--no-cookies-from-browser'] : []), '--no-playlist', '--newline', '--progress', '--no-warnings', '--max-filesize', '1G', '--restrict-filenames',
     '-f', 'bv*[height<=720]+ba/b[height<=720]/bv*+ba/b', '-o', base + '.%(ext)s',
     '--print', 'before_dl:title %(title)s', '--print', 'after_move:file %(filepath)s',
     '--progress-template', 'download:progress %(progress._percent_str)s'];
@@ -137,6 +141,18 @@ function instagram(c, out, say) {
   return { title: `Instagram ${c.id}` };
 }
 
+// Instagram: instaloader first; if it is missing or Instagram refuses it ("Fetching Post metadata failed"), yt-dlp,
+// anonymously. Both errors are kept, so the row shows what really happened.
+async function instagramAny(c, out, max, say) {
+  const t = tools(); let first = null;
+  if (t.instaloader) { try { return instagram(c, out, say); } catch (e) { first = e; } }
+  if (!t.ytdlp) throw first || new Error(INSTALL.instaloader);
+  say(first ? `instaloader failed (${first.message.replace(/ Nothing was logged in to\.$/, '')}); trying yt-dlp, anonymously` : 'instaloader is not installed; fetching with yt-dlp, anonymously');
+  for (const f of readdirSync(dirname(out))) if (f.startsWith(basename(out, '.mp4') + '.')) rmSync(join(dirname(out), f), { force: true });
+  try { const r = await ytdlp(c.url, out, max, say, false, true); return { title: r.title || `Instagram ${c.id}` }; }
+  catch (e) { throw new Error(first ? `instaloader: ${first.message.replace(/ Nothing was logged in to\.$/, '')}; yt-dlp: ${e.message}. Nothing was logged in to.` : `yt-dlp: ${e.message}. Nothing was logged in to.`); }
+}
+
 // download one link to out (an .mp4 path); returns { file, site, title, seconds, trimmed }
 export async function download(url, out, { maxSeconds = DEFAULT_MAX_SECONDS, say = () => {} } = {}) {
   const c = classify(url); if (!c.ok) throw new Error(c.error);
@@ -144,7 +160,7 @@ export async function download(url, out, { maxSeconds = DEFAULT_MAX_SECONDS, say
   mkdirSync(dirname(out), { recursive: true }); rmSync(out, { force: true });
   say(`downloading from ${c.site} (${c.via})`); say('progress 0%');
   let info;
-  try { info = c.via === 'direct' ? await direct(c.url, out, say) : c.via === 'instaloader' ? instagram(c, out, say)
+  try { info = c.via === 'direct' ? await direct(c.url, out, say) : c.via === 'instaloader' ? await instagramAny(c, out, maxSeconds, say)
       // a partial download (first N seconds) goes through ffmpeg, which some hosts refuse; then fetch it all and trim here
       : await ytdlp(c.url, out, maxSeconds, say).catch(e => { if (!tools().ffmpeg || !/ffmpeg|403|Forbidden/i.test(e.message)) throw e; say('partial download refused, fetching the whole video and trimming it here'); for (const f of readdirSync(dirname(out))) if (f.startsWith(basename(out, '.mp4') + '.')) rmSync(join(dirname(out), f), { force: true }); return ytdlp(c.url, out, maxSeconds, say, false); }); }
   catch (e) { rmSync(out, { force: true }); throw e; }
