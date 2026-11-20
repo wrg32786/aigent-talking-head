@@ -6,7 +6,16 @@ import { clock } from './Review.jsx';
 
 const DOT = { on: 'success', busy: 'warning', off: 'error', alt: 'neutral' };
 
-export function Chat({ V, s, apply, open, setOpen, agentState, openConnect }) {
+// Apply on an answer that carries a suggested change (studio_reply suggest): the change is made only on that click
+function Suggest({ m, apply, go }) {
+  const g = m.suggest, [busy, setBusy] = useState(false);
+  const doIt = async () => { setBusy(true); try { apply(await api('/api/chat/apply', { id: m.id })); toast('Applied', true); if (g.step) go(g.step, true); } catch {} finally { setBusy(false); } };
+  return <span className="sg-row">{m.applied ? <span className="sg-done fine"><Icon n="check" />Applied</span>
+    : <Button className="sg-apply" size="sm" variant="primary" label={g.label || 'Apply'} isLoading={busy} onClick={doIt} />}
+    {g.step && <Button className="sg-show" size="sm" variant="ghost" label="Show me" onClick={() => go(g.step, true)} />}</span>;
+}
+
+export function Chat({ V, s, apply, go, open, setOpen, agentState, openConnect }) {
   const e = V.env, a = e.agent || {}, backend = e.backend, name = a.name || 'Your agent';
   const ol = useRef(null), input = useRef(null), fab = useRef(null), atBottom = useRef(true);
   const [text, setText] = useState(''), [busy, setBusy] = useState(false);
@@ -36,8 +45,8 @@ export function Chat({ V, s, apply, open, setOpen, agentState, openConnect }) {
     <ol id="msgs" className="msgs" aria-live="polite" ref={ol} onScroll={ev => { const o = ev.currentTarget; atBottom.current = o.scrollHeight - o.scrollTop - o.clientHeight < 40; }}>
       {s.chat.length ? s.chat.map((m, i) => m.kind === 'action' ? <li key={i} className="action">{m.text}</li>
         : m.role === 'user' ? <li key={i} className={'user' + (m.attach && m.attach.kind === 'comment' ? ' comment' : '')}>{m.attach && m.attach.kind === 'comment' ? <>
-          {m.attach.frame && <img className="cm-thumb" src={file(m.attach.frame)} alt={`Your reel at ${clock(m.attach.t)}, with the spot marked`} />}<span className="cm-at">Comment at {clock(m.attach.t)}</span>{m.attach.note}</> : m.attach && m.attach.kind === 'fix' ? `Please install ${m.attach.label} for Studio.` : m.text}{m.to === 'agent' && <span className={'meta ' + (m.status || '')}>{m.status === 'answered' && <Icon n="check" />}{MSG_STATUS[m.status] || m.status}</span>}</li>
-        : <li key={i} className="assistant"><span className="who">{m.from === 'keywords' ? 'Studio' : (m.from && m.from !== 'agent' ? m.from : name)}</span>{m.text}</li>) : empty}
+          {m.attach.frame && <img className="cm-thumb" src={file(m.attach.frame)} alt={`Your reel at ${clock(m.attach.t)}, with the spot marked`} />}<span className="cm-at">{m.attach.end != null ? `Note on ${clock(m.attach.t)} to ${clock(m.attach.end)}` : `Comment at ${clock(m.attach.t)}`}</span>{m.attach.note}</> : m.attach && m.attach.kind === 'fix' ? `Please install ${m.attach.label} for Studio.` : m.text}{m.to === 'agent' && <span className={'meta ' + (m.status || '')}>{m.status === 'answered' && <Icon n="check" />}{MSG_STATUS[m.status] || m.status}</span>}</li>
+        : <li key={i} className="assistant"><span className="who">{m.from === 'keywords' ? 'Studio' : (m.from && m.from !== 'agent' ? m.from : name)}</span>{m.text}{m.suggest && <Suggest m={m} apply={apply} go={go} />}</li>) : empty}
       {waiting.length > 0 && backend === 'agent' && <li className="typing" aria-label="waiting for your agent"><i /><i /><i />{waiting.some(m => m.status === 'seen') ? `${name} is on it` : a.connected ? `${name} reads it at its next step` : 'Waiting for your agent to connect'}</li>}
     </ol>
     <form id="chatform" className="composer" onSubmit={send}>

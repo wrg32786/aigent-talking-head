@@ -15,6 +15,7 @@ export function Compare({ V, s, apply }) {
   const [pick, setPick] = useState(outs[0] || ''), [mode, setMode] = useState(hasRef ? 'side' : 'build'), [op, setOp] = useState(50), [off, setOff] = useState(0);
   const [t, setT] = useState(0), [dur, setDur] = useState(0), [playing, setPlaying] = useState(false), [refSound, setRefSound] = useState(false);
   const [draw, setDraw] = useState(false), [box, setBox] = useState(null), [note, setNote] = useState(''), [sending, setSending] = useState(false);
+  const [from, setFrom] = useState(0), [end, setEnd] = useState(null);
   const bv = useRef(null), rv = useRef(null), layer = useRef(null), drag = useRef(null);
   useEffect(() => { if (!outs.includes(pick)) setPick(outs[0] || ''); }, [outs.join('|')]);
   // one clock: the build leads, the reference follows at the offset
@@ -25,7 +26,10 @@ export function Compare({ V, s, apply }) {
   const play = () => { const b = bv.current, r = rv.current; if (!b) return; if (b.paused) { sync(true); b.play().catch(() => {}); r && r.play().catch(() => {}); setPlaying(true); setDraw(false); } else { b.pause(); r && r.pause(); setPlaying(false); } };
   const seek = x => { const b = bv.current; if (!b) return; b.currentTime = x; setT(x); sync(true); };
   const ended = () => { rv.current && rv.current.pause(); setPlaying(false); };
-  const startComment = () => { const b = bv.current; if (b && !b.paused) { b.pause(); rv.current && rv.current.pause(); setPlaying(false); } setDraw(true); setBox(null); setNote(''); };
+  const startComment = () => { const b = bv.current; if (b && !b.paused) { b.pause(); rv.current && rv.current.pause(); setPlaying(false); } setDraw(true); setBox(null); setNote(''); setFrom(b ? b.currentTime : t); setEnd(null); };
+  // a stretch, not one frame: play or scrub on to where it should stop, Mark the end, and the frame goes back to the start
+  const markEnd = () => { const b = bv.current; if (!b) return; if (!b.paused) { b.pause(); rv.current && rv.current.pause(); setPlaying(false); }
+    const e = b.currentTime; if (e <= from + 0.05) { toast('Play or scrub past the start first, then Mark the end'); return; } setEnd(e); seek(from); };
   const pt = e => { const r = layer.current.getBoundingClientRect(); return [Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), Math.max(0, Math.min(1, (e.clientY - r.top) / r.height))]; };
   const down = e => { e.preventDefault(); layer.current.setPointerCapture(e.pointerId); const [x, y] = pt(e); drag.current = [x, y]; setBox({ x, y, w: 0, h: 0 }); };
   const move = e => { if (!drag.current) return; const [x0, y0] = drag.current, [x, y] = pt(e); setBox({ x: Math.min(x0, x), y: Math.min(y0, y), w: Math.abs(x - x0), h: Math.abs(y - y0) }); };
@@ -41,7 +45,7 @@ export function Compare({ V, s, apply }) {
   const send = async e => {
     e.preventDefault(); if (!note.trim()) { toast('Say what should change'); return; }
     setSending(true);
-    try { const j = await api('/api/comment', { text: note.trim(), t: bv.current ? bv.current.currentTime : t, region: box, video: pick, image: frame() }); apply(j); toast(j.via === 'agent' ? 'Sent to your agent with the frame' : 'Sent to the chat', true); setDraw(false); setBox(null); setNote(''); }
+    try { const j = await api('/api/comment', { text: note.trim(), t: end != null ? from : bv.current ? bv.current.currentTime : t, ...(end != null ? { end } : {}), region: box, video: pick, image: frame() }); apply(j); toast(j.via === 'agent' ? 'Sent to your agent with the frame' : 'Sent to the chat', true); setDraw(false); setBox(null); setNote(''); setEnd(null); }
     catch {} finally { setSending(false); }
   };
   const BoxMark = () => box && (box.w > 0.02 || box.h > 0.02 ? <span className="cm-box" style={{ left: `${box.x * 100}%`, top: `${box.y * 100}%`, width: `${box.w * 100}%`, height: `${box.h * 100}%` }} /> : <span className="cm-dot" style={{ left: `${box.x * 100}%`, top: `${box.y * 100}%` }} />);
@@ -77,10 +81,11 @@ export function Compare({ V, s, apply }) {
     <div className="cm-row">
       {!draw ? <Button id="comment-start" variant="secondary" size="sm" label="Comment on this frame" icon={<Icon n="chat" />} onClick={startComment} />
         : <form className="cm-form" onSubmit={send}>
-          <p className="fine" id="cm-hint">{box ? `At ${clock(bv.current ? bv.current.currentTime : t)}. ${box.w > 0.02 || box.h > 0.02 ? 'Box drawn.' : 'Spot marked.'} Drag again to change it.` : `At ${clock(bv.current ? bv.current.currentTime : t)}. Click a spot or drag a box on your reel, or send it for the whole frame.`}</p>
+          <p className="fine" id="cm-hint">{end != null ? `From ${clock(from)} to ${clock(end)}. ` : ''}{box ? `At ${clock(end != null ? from : bv.current ? bv.current.currentTime : t)}. ${box.w > 0.02 || box.h > 0.02 ? 'Box drawn.' : 'Spot marked.'} Drag again to change it.` : `At ${clock(bv.current ? bv.current.currentTime : t)}. Click a spot or drag a box on your reel, or send it for the whole frame.`}</p>
           <label className="sr" htmlFor="comment-text">What should change here</label>
           <textarea id="comment-text" rows={2} value={note} placeholder="Make this title smaller" onChange={e => setNote(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.form.requestSubmit(); } if (e.key === 'Escape') setDraw(false); }} />
-          <div className="row"><Button id="comment-send" type="submit" variant="primary" size="sm" label="Send to chat" isLoading={sending} /><Button variant="ghost" size="sm" label="Cancel" onClick={() => { setDraw(false); setBox(null); }} /></div>
+          <div className="row"><Button id="comment-send" type="submit" variant="primary" size="sm" label="Send to chat" isLoading={sending} />
+            {end == null ? <Button id="comment-end" variant="ghost" size="sm" label="Mark the end here" onClick={markEnd} /> : <Button id="comment-end-clear" variant="ghost" size="sm" label="Just this frame" onClick={() => setEnd(null)} />}<Button variant="ghost" size="sm" label="Cancel" onClick={() => { setDraw(false); setBox(null); }} /></div>
         </form>}
     </div>
   </div>;

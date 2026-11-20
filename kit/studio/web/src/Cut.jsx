@@ -176,7 +176,7 @@ export function Cut({ V, s, apply, go }) {
       <button type="button" role="tab" id="cut-mode-cuts" aria-selected={piecesOn ? 'false' : 'true'} className="tab" onClick={() => setMode('cuts')}>Cuts and lines</button>
     </div>}
     {piecesOn ? <div className="pz-layout">
-      <div className="cut-play">{src && <Player path={src} tx={tx} playerRef={player} onAddRange={r => add(r, 'clip')} />}</div>
+      <div className="cut-play">{src && <Player apply={apply} path={src} tx={tx} playerRef={player} onAddRange={r => add(r, 'clip')} />}</div>
       <Pieces V={V} apply={apply} player={player} src={src} />
     </div> : <>
     <div className="runbar glass-card">
@@ -190,7 +190,7 @@ export function Cut({ V, s, apply, go }) {
     {tx && tx.status === 'failed' && <p className="err" role="alert">{tx.error}</p>}
     {tx && tx.status === 'failed' && tx.fix && <FixActions V={V} id={tx.fix} apply={apply} />}
     <div className="cut-grid">
-      <div className="cut-play">{src && <Player path={src} tx={tx} playerRef={player} onAddRange={r => add(r, 'clip')} />}</div>
+      <div className="cut-play">{src && <Player apply={apply} path={src} tx={tx} playerRef={player} onAddRange={r => add(r, 'clip')} />}</div>
       <div className="cut-list">
         {cut.candidates.length ? <ol className="cands" id="cut-candidates" aria-label="Cuts">{cut.candidates.map((c, i) => <Candidate key={c.id} c={c} sel={sel === c.id} setSel={setSel} onEdit={edit} onPreview={preview} first={i === 0} last={i === cut.candidates.length - 1} rendered={renderedFor(c)} />)}</ol>
           : <div className="empty-art"><Icon n="grid" /><p>{tx && tx.status === 'running' ? 'Cuts show up here when the transcript is done.' : 'Find cuts to see the candidates, with their times, score and why.'}</p></div>}

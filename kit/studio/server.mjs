@@ -1155,7 +1155,7 @@ async function api(req, res, u) {
       update(st => { st.commentSeq = n; });
     }
     // a time range (end after t) is a note on a stretch of the reel or the take, not one frame
-    const end = b.end != null && +b.end > t + 0.05 ? +(+b.end).toFixed(2) : null, source = typeof b.source === 'string' && /^inbox\/studio\/[\w.-]+\/[\w./-]+$/.test(b.source) && !b.source.includes('..') ? b.source : null;
+    const end = b.end != null && +b.end > t + 0.05 ? +(+b.end).toFixed(2) : null, source = typeof b.source === 'string' && okFootage(s, b.source) ? b.source : null;
     const line = RV.commentLine({ text, t, end, region: rg, video: video || source, frame });
     return json(res, 200, await chatTurn(line, false, { kind: 'comment', t: +t.toFixed(2), ...(end != null ? { end } : {}), region: rg, video: video || source, frame, note: text }));
   }

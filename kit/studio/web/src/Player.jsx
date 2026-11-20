@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { ProgressBar } from '@astryxdesign/core/ProgressBar';
-import { api, file, Icon, IconBtn } from './lib.jsx';
+import { api, file, toast, Icon, IconBtn } from './lib.jsx';
 
 export const clock = t => { const s = Math.max(0, Math.floor(+t || 0)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, r = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(r).padStart(2, '0'); };
 const nice = n => n == null ? '' : n >= 1e9 ? (n / 1e9).toFixed(1) + ' GB' : Math.round(n / 1e6) + ' MB';
@@ -53,7 +53,18 @@ export function useScrub(dur, seek) {
   };
 }
 
-export function Player({ path, tx, onClose, playerRef, onAddRange, children }) {
+// a dragged stretch snapped to whole words: the start goes to the start of the word it lands in (or the next word, in
+// a gap), the end to the end of the word it lands in (or the word before, in a gap). Never starts or ends mid-word.
+export function snapToWords(words, a, b) {
+  if (!words || !words.length) return [a, b];
+  const lo = Math.min(a, b), hi = Math.max(a, b);
+  let s = words.find(w => w[1] > lo); let e = [...words].reverse().find(w => w[0] < hi);
+  if (!s || !e || e[1] <= s[0]) return null;
+  return [s[0], e[1]];
+}
+export const DRAG_MIN = 0.25;
+
+export function Player({ path, tx, onClose, playerRef, onAddRange, apply, children }) {
   const { info, peaks, src, proxy } = useMedia(path);
   const t = useTranscript(path, tx);
   const vid = useRef(null), box = useRef(null);
@@ -72,8 +83,20 @@ export function Player({ path, tx, onClose, playerRef, onAddRange, children }) {
     };
     document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey);
   });
-  const scrub = useScrub(dur, seek);
   const words = (t && t.words) || [];
+  // the waveform: click or a short drag seeks, a drag longer than a quarter second selects that stretch on whole words
+  const drag = useRef(null), [wsel, setWsel] = useState(null), [note, setNote] = useState(null), [sending, setSending] = useState(false);
+  const atX = (e, el) => { const r = el.getBoundingClientRect(); return Math.max(0, Math.min(dur, ((e.clientX - r.left) / r.width) * dur)); };
+  const scrub = {
+    onPointerDown: e => { if (e.target.closest('[data-region]') || !dur) return; e.currentTarget.setPointerCapture(e.pointerId); const x = atX(e, e.currentTarget); drag.current = { a: x, sel: false }; seek(x); },
+    onPointerMove: e => { const d = drag.current; if (!d) return; const x = atX(e, e.currentTarget);
+      if (d.sel || Math.abs(x - d.a) > DRAG_MIN) { d.sel = true; setWsel([Math.min(d.a, x), Math.max(d.a, x)]); setSel(null); } else seek(x); },
+    onPointerUp: e => { const d = drag.current; drag.current = null; if (!d || !d.sel) return; const x = atX(e, e.currentTarget);
+      const r = snapToWords(words, d.a, x); if (!r) { setWsel(null); return; } setWsel(r); setSel(r); setNote(null); seek(r[0]); },
+  };
+  const clearSel = () => { setSel(null); setWsel(null); setNote(null); getSelection().removeAllRanges(); };
+  const sendNote = async ev => { ev.preventDefault(); if (!note || !note.trim()) { toast('Say what should change'); return; } setSending(true);
+    try { const j = await api('/api/comment', { text: note.trim(), t: sel[0], end: sel[1], source: path }); apply && apply(j); toast(j.via === 'agent' ? 'Sent to your agent' : 'Sent to the chat', true); clearSel(); } catch {} finally { setSending(false); } };
   const curWord = useMemo(() => { let lo = 0, hi = words.length - 1, k = -1; while (lo <= hi) { const m = (lo + hi) >> 1; if (words[m][0] <= now) { k = m; lo = m + 1; } else hi = m - 1; } return k; }, [now, words]);
   const trRef = useRef(null);
   useEffect(() => { const el = trRef.current && trRef.current.querySelector('.w.now'); if (el && playing) el.scrollIntoView({ block: 'nearest' }); }, [curWord, playing]);
@@ -81,7 +104,7 @@ export function Player({ path, tx, onClose, playerRef, onAddRange, children }) {
   const onSelect = () => {
     const s = getSelection(); if (!s || s.isCollapsed || !trRef.current || !trRef.current.contains(s.anchorNode)) { setSel(null); return; }
     const ws = [...trRef.current.querySelectorAll('.w')].filter(el => s.containsNode(el, true)); if (ws.length < 2) { setSel(null); return; }
-    setSel([+ws[0].dataset.a, +ws[ws.length - 1].dataset.b]);
+    setSel([+ws[0].dataset.a, +ws[ws.length - 1].dataset.b]); setWsel(null);
   };
   const txRun = tx && tx.status === 'running';
   return <div className="player glass-card" id="player" ref={box} data-path={path}>
@@ -96,6 +119,7 @@ export function Player({ path, tx, onClose, playerRef, onAddRange, children }) {
       <span className="mono pl-time" id="player-time">{clock(now)} / {clock(dur)}</span>
       <div className="scrub" id="player-scrub" role="slider" tabIndex={0} aria-label="Position" aria-valuemin={0} aria-valuemax={Math.round(dur)} aria-valuenow={Math.round(now)} aria-valuetext={clock(now)} {...scrub}>
         <Wave peaks={peaks} height={44} />
+        {(wsel || sel) && dur > 0 && (r => <i className="scrub-sel" id="scrub-sel" data-a={r[0].toFixed(2)} data-b={r[1].toFixed(2)} style={{ left: (r[0] / dur) * 100 + '%', width: ((r[1] - r[0]) / dur) * 100 + '%' }} aria-hidden="true" />)(wsel || sel)}
         {children}
         <i className="playhead" style={{ left: (dur ? (now / dur) * 100 : 0) + '%' }} aria-hidden="true" />
       </div>
@@ -106,6 +130,14 @@ export function Player({ path, tx, onClose, playerRef, onAddRange, children }) {
         : txRun ? <div className="tx-run"><ProgressBar label="Transcribing" value={tx.total ? Math.round(100 * tx.done / tx.total) : undefined} isIndeterminate={!tx.total} /><span className="fine">Transcribing{tx.total ? `, part ${Math.min(tx.done + 1, tx.total)} of ${tx.total}` : ''}. Long takes go a chunk at a time and pick up where they stopped.</span></div>
         : <div className="row"><Button id="player-tx" size="sm" variant="secondary" label="Show transcript" onClick={() => api('/api/cut/transcribe', { path }).catch(() => {})} /><span className="fine">{tx && tx.status === 'failed' ? tx.error : 'Whisper on this computer. Click a word to jump there.'}</span></div>}
     </div>
-    {sel && onAddRange && <div className="pl-sel"><span className="fine">{clock(sel[0])} to {clock(sel[1])}</span><Button id="add-selection" size="sm" variant="primary" label="Add as a clip" onClick={() => { onAddRange([[Math.max(0, sel[0] - 0.1), sel[1] + 0.1]]); setSel(null); getSelection().removeAllRanges(); }} /></div>}
+    {sel && <div className="pl-sel" id="pl-sel"><span className="fine" id="pl-sel-at">{clock(sel[0])} to {clock(sel[1])}{words.length ? ', on whole words' : ''}</span>
+      <Button id="play-selection" size="sm" variant="ghost" label="Play it" onClick={() => play(sel[0], sel[1])} />
+      {onAddRange && <Button id="add-selection" size="sm" variant="primary" label="Add as a clip" onClick={() => { onAddRange([[Math.max(0, sel[0] - 0.1), sel[1] + 0.1]]); clearSel(); }} />}
+      {apply && note == null && <Button id="note-selection" size="sm" variant="secondary" label="Note for my agent" icon={<Icon n="chat" />} onClick={() => { setNote(''); setTimeout(() => document.getElementById('sel-note')?.focus(), 0); }} />}
+      <IconBtn n="x" label="Clear the selection" onClick={clearSel} />
+      {note != null && <form className="sel-note" onSubmit={sendNote}><label className="sr" htmlFor="sel-note">What should change in this stretch</label>
+        <input id="sel-note" value={note} onChange={e => setNote(e.target.value)} placeholder="Tighten this part" onKeyDown={e => e.key === 'Escape' && setNote(null)} />
+        <Button id="sel-note-send" type="submit" size="sm" variant="primary" label="Send" isLoading={sending} /></form>}
+    </div>}
   </div>;
 }
