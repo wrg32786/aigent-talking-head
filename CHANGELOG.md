@@ -2,6 +2,15 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.11.1 (unreleased)
+
+Release notes: [docs/releases/v1.11.1.md](docs/releases/v1.11.1.md). Render lives in one place: the Render step.
+
+- **The Cut step only chooses.** Its **Render N** button is gone, and so are the Lines and bites **Render all N**, each bite's **Render** and **Save as one file**. Cut is keep, drop, trim and order. Under Find cuts it says how many you kept and that they render at the end, on the Render step; the bites list says the same. The rendered file link on a cut or a bite stays.
+- **From the Cut step, on the Render step.** One card says what you kept ("3 kept cuts and 2 bites") with **Render my N cuts** and **Render my N bites**, each one as its own reel with your look. Folded under **More ways to save**: **Save each cut as a plain clip**, **Save each bite as one file**, and one row per cut and bite with **Render** and **Plain clip** for just that one, plus a download link once the file exists. Rendered bites now show under "From the Cut step" next to the rendered cuts. Draft reads **Draft whole take** when you kept cuts or made bites.
+- **Plain clips for cuts.** `POST /api/cut/render` takes `only: "file"`, like `/api/lines/render`: it runs only the extract, so each kept cut lands in `inbox/studio/<job>/cuts/<id>.mp4` with no reel edit. The cut view carries `file` when that clip exists. MCP `render_cuts` takes `file: true`. Every endpoint and agent tool works as before.
+- **Tests and docs.** `tests/studio-cut.e2e.mjs` checks that nothing on the Cut step renders or saves a file, renders the kept cuts from the Render step, saves a plain clip without running the reel edit, and saves a bite as one file from the fold. docs/studio.md (Cut, Lines and bites, Render), docs/mcp.md, AGENTS.md and the Studio skill say where things render now. New screenshots: `docs/studio/cut-desktop.png`, `lines-bites.png` and `render-from-cut.png`.
+
 ## 1.11.0 (unreleased)
 
 Release notes: [docs/releases/v1.11.0.md](docs/releases/v1.11.0.md).

@@ -298,7 +298,7 @@ const subJob = (job, id) => `${String(job).slice(0, 48 - id.length)}-${id}`;
 function cutView(s) {
   const src = cutSource(s), o = outputOf(s), secs = src ? durOf(src) : 0, c = s.cut && s.cut.source === src ? s.cut : null;
   const tx = src ? (s.tx || {})[src] || (MEDIA.transcript(src) ? { status: 'ready' } : null) : null;
-  const cands = c ? (c.candidates || []).slice().sort((a, b) => a.order - b.order).map(x => ({ ...x, job: s.job ? subJob(s.job, x.id) : null, outputs: s.job ? C.outputsOf({ job: subJob(s.job, x.id) }) : [] })) : [];
+  const cands = c ? (c.candidates || []).slice().sort((a, b) => a.order - b.order).map(x => ({ ...x, job: s.job ? subJob(s.job, x.id) : null, outputs: s.job ? C.outputsOf({ job: subJob(s.job, x.id) }) : [], file: s.job && existsSync(join(ROOT, `inbox/studio/${s.job}/cuts/${x.id}.mp4`)) ? `inbox/studio/${s.job}/cuts/${x.id}.mp4` : null })) : [];
   const formats = Object.fromEntries(Object.entries(CUT.FORMATS).map(([k, f]) => [k, { label: f.label, sub: f.sub, aspect: f.aspect, lengths: Object.fromEntries(CUT.LENGTHS.map(l => [l, CUT.lengthLabel(k, l)])) }]));
   return { formats, footage: s.footage.filter(f => existsSync(join(ROOT, f))).map(f => ({ path: f, seconds: durOf(f) })), source: src, seconds: secs, output: o, summary: CUT.summary(o, secs), candidates: cands, scoredBy: c ? c.scoredBy : null, pending: c ? c.pending || null : null, outputOf: c ? c.summary : null, tx };
 }
@@ -753,7 +753,9 @@ async function api(req, res, u) {
   if (p === '/api/cut/set' && M === 'POST') { const b = await readBody(req); return json(res, 200, view(await setCuts(b))); }
   if (p === '/api/cut/render' && M === 'POST') {
     const b = await readBody(req), miss = needFor('render'); const s = C.load(); const r = cutSteps(s, Array.isArray(b.ids) ? b.ids : null); if (miss) return json(res, 400, miss);
-    runTask('cuts', () => r.steps, () => ({ cuts: r.plan.map(x => ({ ...x, outputs: C.outputsOf({ job: x.job }) })), copiedTo: copyRenders(r.plan.flatMap(x => C.outputsOf({ job: x.job }).slice(0, 1))) }));
+    // only: 'file' saves each kept cut as a plain clip (the extract, no edit), like the bites below
+    const steps = b.only === 'file' ? r.steps.filter(x => x[1][0] === 'extract') : r.steps;
+    runTask('cuts', () => steps, () => ({ cuts: r.plan.map(x => ({ ...x, outputs: C.outputsOf({ job: x.job }) })), copiedTo: b.only === 'file' ? [] : copyRenders(r.plan.flatMap(x => C.outputsOf({ job: x.job }).slice(0, 1))) }));
     return json(res, 202, { plan: r.plan, ...view(C.load()) });
   }
   if (await FOLDERS(p, M, u, req, res)) return;
