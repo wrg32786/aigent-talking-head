@@ -4,6 +4,7 @@ import { Button } from '@astryxdesign/core/Button';
 import { Switch } from '@astryxdesign/core/Switch';
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
 import { toast, IconBtn } from './lib.jsx';
+import { FolderField } from './Folders.jsx';
 
 const BACKENDS = [
   ['agent', 'Terminal agent', 'Claude Code, Codex, Cursor or any MCP client'],
@@ -65,11 +66,9 @@ export function Settings({ V, apply, open, setOpen, theme, setTheme, glass, setG
           <p className="fine">Stock footage and b-roll generators with your own keys. Keys stay on this computer.</p>
         </fieldset>
         <fieldset><legend>Folders</legend>
-          <label className="lbl" htmlFor="set-downloads">Reference downloads</label>
-          <input id="set-downloads" placeholder={st.defaultDownloads} spellCheck="false" autoComplete="off" value={f.downloads} onChange={ev => set('downloads', ev.target.value)} />
-          <label className="lbl" htmlFor="set-renders">Copy finished reels to</label>
-          <input id="set-renders" placeholder={'none: reels stay in ' + st.defaultRenders} spellCheck="false" autoComplete="off" value={f.renders} onChange={ev => set('renders', ev.target.value)} />
-          <p className="fine">Full paths. Empty uses the default.</p>
+          <FolderField id="set-downloads" label="Reference downloads" value={f.downloads} onChange={v => set('downloads', v)} placeholder={st.defaultDownloads} defaultPath={st.defaultDownloadsPath} />
+          <FolderField id="set-renders" label="Copy finished reels to" value={f.renders} onChange={v => set('renders', v)} placeholder={'none: reels stay in ' + st.defaultRenders} defaultPath={st.defaultRendersPath} />
+          <p className="fine">Browse, or type a full path. Empty uses the default.</p>
         </fieldset>
         <fieldset><legend>Look</legend>
           <div id="theme-seg"><SegmentedControl label="Theme" value={theme} onChange={setTheme} size="sm"><SegmentedControlItem value="dark" label="Dark" /><SegmentedControlItem value="light" label="Light" /></SegmentedControl></div>

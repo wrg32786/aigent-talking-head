@@ -998,6 +998,7 @@ try {
   step('Studio Connect agent, teleprompter speed and pop-out, footage from a link, in Chrome (tests/studio-connect.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-connect.e2e.mjs')], dirname(KIT)); });
   step('Studio Cut step in Chrome: footage player, output picker, cut timeline, batch render, pull script (tests/studio-cut.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-cut.e2e.mjs')], dirname(KIT)); });
   step('Studio B-roll step in Chrome: lane, placements, API keys, stock, cards, ideas, generate and screen recording against mocks, assemble placements (tests/studio-broll.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-broll.e2e.mjs')], dirname(KIT)); });
+  step('Studio folder fields in Chrome: Browse, the folder list, New folder, Use this folder, Open folder, Reset, the one-line install in Connect agent (tests/studio-folders.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-folders.e2e.mjs')], dirname(KIT)); });
   step('Studio review tools in Chrome: what to swap, show original, comments, clean-up pass, edit receipt (tests/studio-review.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-review.e2e.mjs')], dirname(KIT)); });
   step('check.mjs flags em dashes and banned phrases in captions', () => {
     const b = join(work, 'jobs', 'muse', 'build');

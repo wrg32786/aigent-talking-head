@@ -82,7 +82,7 @@ Build tools in `kit/studio/web` (Vite, `@vitejs/plugin-react`, `@astryxdesign/bu
 
 - **Title entrances** (`kit/overlay.html`): the eight entrance styles were written from scratch for canvas (`drop` takes the falling-letters idea from tuzhechen2005's kinetic-reel, below), with [nexu-io/motion-anything](https://github.com/nexu-io/motion-anything) (Apache-2.0) as a visual reference only.
 
-- **Reel.md** (`docs/reel-md.md`, `kit/reelmd.cjs`): the idea of a shareable Markdown recipe an agent reads and remakes came from [OpenMotion](https://github.com/nexu-io/openmotion)'s Motion.md, and the one-line agent install (`INSTALL.md`) and `npx skills add` packaging follow its quick start. OpenMotion is Apache-2.0. No OpenMotion text or code was copied; the format, parser and docs here are new.
+- **Reel.md** (`docs/reel-md.md`, `kit/reelmd.cjs`): the idea of a shareable Markdown recipe an agent reads and remakes came from [OpenMotion](https://github.com/nexu-io/openmotion)'s Motion.md, and the one-line agent installs (`INSTALL.md`, `docs/install.md`) and `npx skills add` packaging follow its quick start. OpenMotion is Apache-2.0. No OpenMotion text or code was copied; the format, parser and docs here are new.
 - **VIDEO.md compatibility**: a Reel.md uses the card fields and the `videomd-timeline` line syntax of [VIDEO.md](https://github.com/videomd/videomd) (spec and reference validator, Apache-2.0, Copyright the VIDEO.md authors), and `npm run reelmd -- package` writes a VIDEO.md package. The syntax was implemented from the spec; no VIDEO.md code is included.
 
 ## Installed at setup, not vendored
