@@ -922,3 +922,23 @@ dialog.fb::backdrop { background: rgb(0 0 0 / .45); -webkit-backdrop-filter: blu
 .fb-path { flex: 1; min-width: 0; font-size: 12px; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 480px) { .fb-f { flex-wrap: wrap; } .fb-path { flex-basis: 100%; } }
 .conn-install { margin: 0 0 14px; } .conn-install .fine { margin: 0 0 6px; }
+
+/* ---------- New video (NewVideo.jsx): one small dialog, start fresh or open a past one ---------- */
+.jobrow { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.jobrow .nv-btn { width: 32px; min-height: 32px; flex: none; color: var(--muted-foreground); }
+.jobrow .nv-btn:hover, .jobrow .nv-btn:focus-visible { color: var(--foreground); }
+dialog.nv { width: min(440px, calc(100vw - 24px)); }
+.nv-b { display: flex; flex-direction: column; gap: 10px; padding: 4px 14px 12px; }
+.nv-b > .fine { margin: 0; }
+.nv-name { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; }
+.nv-name input { min-height: 38px; border-radius: 10px; border: 1px solid var(--input); background: var(--background); color: var(--foreground); padding: 0 10px; font: inherit; font-weight: 600; }
+.nv-name input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+#nv-name-hint { margin: -4px 0 2px; font-size: 12px; }
+.nv-list { max-height: 340px; min-height: 120px; }
+.nv-list button { display: grid; grid-template-columns: 18px 1fr auto; }
+.nv-list button:disabled { opacity: .5; cursor: default; }
+.nv-m { color: var(--muted-foreground); font-size: 12px; white-space: nowrap; }
+.nv-busy { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 14px 8px; padding: 8px 10px; border-radius: 10px; font-size: 13px; background: color-mix(in srgb, var(--warning, #f5a524) 14%, transparent); }
+.nv-busy .ic { width: 16px; height: 16px; flex: none; }
+.fb-f .grow { flex: 1 1 auto; font-size: 13px; }
+@media (max-width: 640px) { .jobrow { flex: 1; } .jobrow .job { flex: 1; } }

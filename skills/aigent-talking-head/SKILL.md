@@ -189,6 +189,7 @@ Render with `--export` (not just `npm run export`) so the layout pass moves titl
 - `jobs/<name>/clips/`: `clips.json` and `clips.md` (best take per sentence, retakes flagged).
 - `jobs/<name>/build/`: `cut.json`, `captions.js`, `theme.js` and overlay frames. These are the source of truth after a draft: edit them, then `--rebuild`.
 - `jobs/<name>/reel-vN.build/`: the build behind each exported reel. A new Draft replaces `build/`; `npm run reopen -- <job> v3` (MCP `reopen_reel`) brings reel-v3's build back, keeps the one it replaces as `draft-<time>.build/`, then edit and `--rebuild`. `npm run reels -- <job>` lists them.
+- `jobs/.studio/videos/<job>.json`: a Studio video's saved session. MCP `new_video {name, keepLook}` clears the Studio board for a new reel (never deletes files; refused while a task runs), `open_video {job}` goes back to one, `list_videos` lists them.
 - `jobs/<name>/manual-cuts.json`: stretches cut by hand (a cough, a click). `npm run cut -- noises <job>` (MCP `find_noises`) lists short sounds in the pauses; `npm run cut -- add <job> <clip> <from> <to>` (MCP `cut_range`) cuts one, with short fades, on the next draft.
 - `jobs/<name>/reel-vN.mp4` and `reel-fx-vN.mp4`: numbered, earlier versions kept.
 - `jobs/<name>/reel-vN-<export>.mp4` with `--export`.

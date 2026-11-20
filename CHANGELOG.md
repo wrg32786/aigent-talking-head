@@ -2,6 +2,17 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.11.0 (unreleased)
+
+Release notes: [docs/releases/v1.11.0.md](docs/releases/v1.11.0.md).
+
+- **Studio: New video.** A small **+** next to the reel name, and **New video** at the top of the More menu, open one small dialog: a name for the next reel (cleaned like the name field; empty gives `video-<date>`), **Keep my look** (on by default: pack, style picks, music, sound, pace, export and brand logos; off resets them to the defaults too), Start fresh and Cancel. Start fresh clears the footage, clips, cuts, transcripts, reference, b-roll, review, clean-up, draft state, task and chat for the new job and lands on Footage. Your words (glossary), keys, settings and the agent connection are untouched. A name already used by a job is refused. Kept pauses (clip specific) are not carried over.
+- **Nothing is deleted.** The old job's `inbox/studio/<job>/`, `jobs/<job>/` renders and `reel-vN.build/` saves stay, and its whole session is saved to `jobs/.studio/videos/<job>.json` (`kit/studio/core.mjs`: `saveVideo`, `freshSession`, `openSession`, `switchVideo`, `listVideos`).
+- **Open a past video.** More, Open a past video (or the link in the New video dialog) lists past jobs from `jobs/`, `inbox/studio/` and saved sessions, newest first, with the date and reel count. Opening one restores its saved session; a job Studio never saved loads its footage (`inbox/studio/<job>/` videos and recorded takes, or `jobs/<job>/clips`) and its reels, so Outputs and **Edit this reel** work. The current video is saved first, so switching back restores where you were.
+- **Refused while busy.** Switching is refused (409, with the reason) while a draft, render or reference task, a footage download, a take being saved, a transcript, a b-roll generate or another change request is running; the dialog says so and offers Cancel it for a running task. A task, download, transcript or generate still marked running when Studio starts (cut off by a restart) is settled first, so it never blocks switching.
+- **Server and MCP.** `GET /api/videos`, `POST /api/videos/new {name, keepLook}` and `POST /api/videos/open {job}`. New MCP tools `list_videos`, `new_video {name, keepLook}` and `open_video {job}` go through the running Studio, or change the saved session when Studio is not running. A switch made by the agent moves the open page to Footage too, and every step remounts so none keeps the last board's local picks.
+- **Docs and tests.** A New video section in [docs/studio.md](docs/studio.md#new-video), the MCP table, AGENTS.md and both Studio skills. `tests/studio-videos.test.mjs` (in `npm run check`): look kept or reset, chat cleared, nothing deleted, names cleaned and taken names refused, per-job sessions restored, a never-saved job opened from disk, refused while a download runs, and the MCP tools. `tests/studio-videos.e2e.mjs` (in `npm run smoke`) walks the dialog in Chrome in both themes. The More menu keyboard test in `tests/studio-polish.e2e.mjs` now expects New video and Open a past video first.
+
 ## 1.10.2 (unreleased)
 
 Release notes: [docs/releases/v1.10.2.md](docs/releases/v1.10.2.md). Studio never shows a terminal command for an install or a fix.

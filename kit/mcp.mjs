@@ -4,7 +4,7 @@
 // Tools: menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify. Each runs the matching npm command from the repo root with
 // --json where the command has it and returns the log tail plus the JSON result (structuredContent).
 // Studio tools: studio_start, studio_get_state, studio_set_selections, studio_run, studio_wait_for_message, studio_get_pending,
-// studio_reply, studio_add_reference_url, studio_get_reference_teardown, studio_settings, studio_takes; list_scripts, get_script, write_script (Studio scripts); set_output, get_cuts, set_cuts, render_cuts, get_lines, set_bites, render_bites (the Cut step); list_broll, add_broll, suggest_broll, fill_slot, broll_providers (the B-roll step; keys are never shown, only whether each is set); buffer_channels, buffer_post_reel (the Post step: a rendered reel to Buffer, drafts by default); reopen_reel, cut_range, find_noises (edit a finished reel, cut a stretch out of a clip); setup_status (what is installed and the fix for what is not). They read and write the same
+// studio_reply, studio_add_reference_url, studio_get_reference_teardown, studio_settings, studio_takes; list_scripts, get_script, write_script (Studio scripts); set_output, get_cuts, set_cuts, render_cuts, get_lines, set_bites, render_bites (the Cut step); list_broll, add_broll, suggest_broll, fill_slot, broll_providers (the B-roll step; keys are never shown, only whether each is set); buffer_channels, buffer_post_reel (the Post step: a rendered reel to Buffer, drafts by default); list_videos, new_video, open_video (clear the board for a new video, or go back to a past one; nothing is deleted); reopen_reel, cut_range, find_noises (edit a finished reel, cut a stretch out of a clip); setup_status (what is installed and the fix for what is not). They read and write the same
 // session as the Studio page (npm run studio, kit/studio/core.mjs), so you and the user see and change the same picks; the
 // page updates live. The Studio chat is its own channel (kit/studio/channel.mjs): answer page messages with studio_reply,
 // keep the terminal conversation in the terminal.
@@ -145,6 +145,17 @@ async function studioGet(a, path) {
   catch { throw new Error(`Studio is not running on port ${studioPort(a)}. Start it with studio_start (or npm run studio:agent).`); }
   const j = await r.json(); if (!r.ok) throw new Error(j.error || `Studio said ${r.status}`); return j;
 }
+// new_video and open_video: through the running Studio (it knows what is running), else on the saved session file
+async function videoSwitch(a, path, body) {
+  let r;
+  try { r = await studioPost(a, path, body); }
+  catch (e) {
+    if (!/not running/.test(e.message)) throw e;
+    const s = Studio.load(); Studio.settleStale(s); const v = Studio.switchVideo(s, path.endsWith('/open') ? { open: body.job } : body, { checkBusy: false }); Studio.save(s);
+    return { ...v, job: s.job, footage: s.footage, outputs: Studio.outputsOf(s), note: v.note + ' (Studio is not running; the saved session changed)' };
+  }
+  return { ...r.video, job: r.state.job, footage: r.state.footage, outputs: r.outputs, step: 'footage' };
+}
 const CHANNEL_RULE = 'The Studio page chat is a separate channel from your terminal conversation: answer Studio messages with studio_reply (they show only in Studio), answer terminal messages in the terminal, and never paste terminal discussion into Studio unless the user asks.';
 TOOLS.push(
   { name: 'studio_start', description: 'Start Studio in the background if it is not running (same as npm run studio:agent), open it in the user\'s browser, and return its URL. Then call studio_wait_for_message to listen to the Studio chat. ' + CHANNEL_RULE,
@@ -265,6 +276,15 @@ TOOLS.push(
     direct: async a => { const S = (await import('./snapshots.cjs')).default, dir = S.jobDir(a.job); if (!existsSync(dir)) throw new Error('no job ' + a.job);
       if (!a.reel) return { job: a.job, reels: S.list(dir) };
       return { job: a.job, ...S.reopen(dir, a.reel), then: `render with rebuild true and name ${a.job}` }; } },
+  { name: 'list_videos', description: 'Every past Studio video (job) with its last change, how many reels it has, how much footage, and whether Studio saved its session (so opening it puts the user back where they were). The open one is marked current.',
+    inputSchema: { type: 'object', properties: { port: { type: 'number' } }, additionalProperties: false },
+    direct: async a => { try { const r = await studioGet(a, '/api/videos'); return { current: r.current, busy: r.busy, videos: r.videos }; } catch (e) { if (!/not running/.test(e.message)) throw e; const s = Studio.load(); return { current: s.job, videos: Studio.listVideos(s.job), note: 'Studio is not running; this is the saved session.' }; } } },
+  { name: 'new_video', description: 'Clear the Studio board and start a new video (same as New video in Studio). Never deletes a file: the current job\'s footage, renders and saved builds stay, and its session is saved so open_video brings it back. Resets footage, clips, cuts, reference, b-roll, review and the draft for the new job. keepLook (default true) keeps the pack, picks, music, sound, pace, export and brand logos; false resets them too. The old video\'s chat stays with it; the new chat starts empty. Your words, keys, settings and the agent connection are never touched. name is sanitized like the job field (lowercase, dashes); leave it out for video-<date>. Refused while a draft, render, download or take is running: cancel or wait, then call again.',
+    inputSchema: { type: 'object', properties: { name: { type: 'string' }, keepLook: { type: 'boolean', default: true }, port: { type: 'number' } }, additionalProperties: false },
+    direct: async a => videoSwitch(a, '/api/videos/new', { name: a.name, keepLook: a.keepLook !== false }) },
+  { name: 'open_video', description: 'Open a past Studio video (job) from list_videos. When Studio saved its session, everything comes back where the user left it (footage, cuts, look, b-roll); otherwise its footage and reels load, so Outputs and Edit this reel work. The current video is saved first. Never deletes anything.',
+    inputSchema: { type: 'object', properties: { job: { type: 'string' }, port: { type: 'number' } }, required: ['job'], additionalProperties: false },
+    direct: async a => videoSwitch(a, '/api/videos/open', { job: a.job }) },
   { name: 'cut_range', description: 'Cut a stretch out of one clip of a drafted job: a noise between two sentences, a cough, a false start that no word or retake switch reaches. job, clip (the clip id in clips.json, e.g. clip-004), from and to in that clip\'s seconds (the clock of its words in clips.json), or source true for the take\'s own seconds. Saved in jobs/<job>/manual-cuts.json on the take\'s clock, so it survives a redraft; the next draft makes it a jump with short audio fades. find_noises lists short sounds worth cutting. Then draft again (the same clips: clips jobs/<job>/clips) and render.',
     inputSchema: { type: 'object', properties: { job: { type: 'string' }, clip: { type: 'string' }, from: { type: 'number' }, to: { type: 'number' }, source: { type: 'boolean' }, note: { type: 'string' }, clips: { type: 'string', description: 'the clips folder when it is not jobs/<job>/clips (a Studio session clips folder)' } }, required: ['job', 'clip', 'from', 'to'], additionalProperties: false },
     direct: async a => { const M = (await import('./manual-cuts.cjs')).default, dir = join(ROOT, 'jobs', a.job); if (!existsSync(dir)) throw new Error('no job ' + a.job);
