@@ -1010,6 +1010,7 @@ try {
   step('Studio polish in Chrome: the top bar fits at five widths, the More menu by keyboard, hints, theme, reduced motion (tests/studio-polish.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-polish.e2e.mjs')], dirname(KIT)); });
   step('Studio Post step in Chrome: Connect (Buffer key, R2 host), channels with length limits, drafts by default, post now needs a tick, against mocks (tests/studio-post.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-post.e2e.mjs')], dirname(KIT)); });
   step('Studio New video in Chrome: start fresh keeps the look, nothing deleted, open a past video restores it, More menu (tests/studio-videos.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-videos.e2e.mjs')], dirname(KIT)); });
+  step('Studio fix buttons in Chrome: no terminal command on the page, Install, Send and Copy for my agent, the toast and Setup check (tests/studio-fixes.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-fixes.e2e.mjs')], dirname(KIT)); });
   step('Studio review tools in Chrome: what to swap, show original, comments, clean-up pass, edit receipt (tests/studio-review.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-review.e2e.mjs')], dirname(KIT)); });
   step('check.mjs flags em dashes and banned phrases in captions', () => {
     const b = join(work, 'jobs', 'muse', 'build');

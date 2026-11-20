@@ -5,12 +5,13 @@ export const isPaused = () => localStorage.getItem('studio.paused') ? localStora
 
 const toastSubs = new Set();
 export const onToast = fn => { toastSubs.add(fn); return () => toastSubs.delete(fn); };
-export const toast = (msg, ok) => toastSubs.forEach(fn => fn({ msg, ok, at: Date.now() }));
+// fix: fix ids (kit/studio/fixes.mjs) from an error; the toast then shows the fix buttons instead of a command
+export const toast = (msg, ok, fix) => toastSubs.forEach(fn => fn({ msg, ok, fix: fix ? [].concat(fix) : null, at: Date.now() }));
 
 export async function api(path, body, method) {
   const r = await fetch(path, { method: method || (body === undefined ? 'GET' : 'POST'), headers: body !== undefined ? { 'content-type': 'application/json' } : {}, body: body !== undefined ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) { toast(j.error || `request failed (${r.status})`); throw new Error(j.error || r.status); }
+  if (!r.ok) { toast(j.error || `request failed (${r.status})`, false, j.fix); throw new Error(j.error || r.status); }
   return j;
 }
 

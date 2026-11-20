@@ -64,7 +64,7 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     });
   }
   async function makeCard(spec, extra = {}) {
-    if (!chromeOk()) throw bad('Agent-made b-roll needs Chrome (npm run setup:all)');
+    if (!chromeOk()) throw bad('Agent-made B-roll needs Chrome, and it is not installed.', 400, { fix: ['chrome'] });
     if (!MAKE.KINDS.includes(spec.kind)) throw bad(`kind: ${MAKE.KINDS.join(', ')}`);
     const r = await MAKE.make(spec);
     return BR.add(r.file, { move: true, name: `${spec.kind}-${randomBytes(2).toString('hex')}.mp4`, title: spec.title && spec.kind !== 'chart' ? String(spec.title) : MAKE.titleOf(spec), source: 'agent', tags: [spec.kind, ...(extra.tags || [])], ...extra });

@@ -7,7 +7,7 @@
 // Run: node tests/studio-folders.test.mjs   (npm run check runs it too)
 import assert from 'assert';
 import { spawn } from 'child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname, sep } from 'path';
 import { fileURLToPath } from 'url';
@@ -23,9 +23,10 @@ const F = await import('../kit/studio/folders.mjs');
 let n = 0; const t = async (name, fn) => { await fn(); n++; console.log('ok ' + name); };
 
 const env = { ...process.env, CI: '1', STUDIO_DIR: join(TMP, 'studio'), STUDIO_HOME: HOME, STUDIO_FOLDERS_NO_OPEN: '1', STUDIO_CHAT: '', STUDIO_AGENT_CLIENT: '', DISPLAY: '', WAYLAND_DISPLAY: '' };
-const PICKED = join(HOME, 'Projects', 'reels'), fake = join(TMP, 'fake-dialog.sh'), cancel = join(TMP, 'cancel-dialog.sh');
-writeFileSync(fake, `#!/bin/sh\nprintf '%s' "$STUDIO_PICK_START|$STUDIO_PICK_TITLE" > "${join(TMP, 'dialog-args')}"\nprintf '%s\\n' "${PICKED}"\n`); chmodSync(fake, 0o755);
-writeFileSync(cancel, '#!/bin/sh\nexit 1\n'); chmodSync(cancel, 0o755);
+// the native dialog stand-ins are small node scripts, so they run on Windows as well as macOS and Linux
+const PICKED = join(HOME, 'Projects', 'reels'), fake = join(TMP, 'fake-dialog.mjs'), cancel = join(TMP, 'cancel-dialog.mjs');
+writeFileSync(fake, `import { writeFileSync } from 'fs';\nwriteFileSync(${JSON.stringify(join(TMP, 'dialog-args'))}, process.env.STUDIO_PICK_START + '|' + process.env.STUDIO_PICK_TITLE);\nprocess.stdout.write(${JSON.stringify(PICKED)} + '\\n');\n`);
+writeFileSync(cancel, 'process.exit(1);\n');
 const start = extra => new Promise((ok, bad) => {
   const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), '--port', '0', '--no-open'], { cwd: ROOT, env: { ...env, ...extra } });
   let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok({ srv, url: m[1] }); }); srv.stderr.on('data', d => { out += d; });

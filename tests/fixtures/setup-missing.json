@@ -1,0 +1,140 @@
+{
+ "ready": false,
+ "items": [
+  {
+   "id": "node",
+   "label": "Node.js 18+",
+   "need": "core",
+   "feature": "everything",
+   "status": "ready",
+   "detail": "ok",
+   "fix": null,
+   "user": false
+  },
+  {
+   "id": "npm",
+   "label": "Node packages",
+   "need": "core",
+   "feature": "MCP tools, rendering, Studio",
+   "status": "ready",
+   "detail": "ok",
+   "fix": null,
+   "user": false
+  },
+  {
+   "id": "python",
+   "label": "Python venv and requirements",
+   "need": "core",
+   "feature": "transcribing, beats, teardown",
+   "status": "ready",
+   "detail": "ok",
+   "fix": null,
+   "user": false
+  },
+  {
+   "id": "ffmpeg",
+   "label": "ffmpeg and ffprobe",
+   "need": "core",
+   "feature": "drafts, renders, Record now takes, trimming",
+   "status": "missing",
+   "detail": "not found",
+   "fix": "sudo apt-get install -y ffmpeg",
+   "user": true
+  },
+  {
+   "id": "chrome",
+   "label": "Chrome or Chromium",
+   "need": "core",
+   "feature": "rendering titles and graphics",
+   "status": "missing",
+   "detail": "not found",
+   "fix": "sudo apt-get install -y chromium",
+   "user": true
+  },
+  {
+   "id": "model",
+   "label": "Whisper model (small.en)",
+   "need": "feature",
+   "feature": "the first transcription",
+   "status": "ready",
+   "detail": "ok",
+   "fix": null,
+   "user": false
+  },
+  {
+   "id": "ytdlp",
+   "label": "yt-dlp",
+   "need": "feature",
+   "feature": "YouTube, TikTok, X and Vimeo reference links",
+   "status": "missing",
+   "detail": "not found",
+   "fix": "python -m pip install yt-dlp",
+   "user": false
+  },
+  {
+   "id": "instaloader",
+   "label": "instaloader",
+   "need": "feature",
+   "feature": "Instagram reference links (anonymous)",
+   "status": "ready",
+   "detail": "ok",
+   "fix": null,
+   "user": false
+  },
+  {
+   "id": "effects",
+   "label": "Effects pass (MediaPipe, OpenCV, rembg)",
+   "need": "feature",
+   "feature": "film effects and the person mask",
+   "status": "missing",
+   "detail": "not found",
+   "fix": "npm run effects:setup",
+   "user": false
+  },
+  {
+   "id": "mask",
+   "label": "Person mask weights (birefnet-portrait)",
+   "need": "feature",
+   "feature": "titles and captions behind your head",
+   "status": "ready",
+   "detail": "ok",
+   "fix": null,
+   "user": false
+  },
+  {
+   "id": "rea",
+   "label": "rea-video (reference breakdown)",
+   "need": "feature",
+   "feature": "reading a reference",
+   "status": "missing",
+   "detail": "not found",
+   "fix": "npm run setup:all -- --only rea",
+   "user": false
+  },
+  {
+   "id": "humanizer",
+   "label": "Humanizer skill",
+   "need": "feature",
+   "feature": "scripts your agent writes",
+   "status": "ready",
+   "detail": "ok",
+   "fix": null,
+   "user": false
+  },
+  {
+   "id": "studio",
+   "label": "Studio page",
+   "need": "core",
+   "feature": "Studio",
+   "status": "ready",
+   "detail": "ok",
+   "fix": null,
+   "user": false
+  }
+ ],
+ "missing": 5,
+ "forUser": [
+  "Installing ffmpeg and ffprobe needs your password: run sudo apt-get install -y ffmpeg"
+ ],
+ "lastRun": null
+}

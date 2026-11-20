@@ -251,7 +251,7 @@ export function compose(s, { refPack = null } = {}) {
   if (Array.isArray(s.brands) && s.brands.length) args.push('--brands', JSON.stringify(s.brands.map(b => ({ word: b.word, logo: KIT_BRANDS.includes(b.logo) ? join(ROOT, b.logo) : join(brandsDir(), b.logo) }))));
   if (s.export) args.push('--export', s.export);
   const fx = s.picks.effect ? s.picks.effect.allow.filter(x => !s.picks.effect.deny.includes(x)) : [];
-  if (fx.length) notes.push(`effects for the effects pass: ${fx.join(', ')} (run after the reel; needs npm run effects:setup)`);
+  if (fx.length) notes.push(`effects for the effects pass: ${fx.join(', ')} (run after the reel; needs the effects pass set up)`);
   if ((s.picks.effect || {}).deny?.length) notes.push(`forbidden effects: ${s.picks.effect.deny.join(', ')}`);
   const errs = L.validate(locks);
   const lockString = lockStringOf(locks);

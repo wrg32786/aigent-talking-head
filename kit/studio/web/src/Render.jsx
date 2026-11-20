@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { ProgressBar } from '@astryxdesign/core/ProgressBar';
-import { NeedFix } from './Setup.jsx';
+import { NeedFix } from './Fix.jsx';
+import { copyText } from './Connect.jsx';
 import { api, file, toast, fmtS, cap1, Icon } from './lib.jsx';
 import { Compare, Cleanup, Receipt } from './Review.jsx';
 import { Fold } from './ui.jsx';
@@ -13,7 +14,7 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
   // the numbers and the ways out, shown here: titles in front, the lighter mask, or try anyway
   const doRender = memory => { setLog(''); setMem(null);
     fetch('/api/render', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(memory ? { memory } : {}) })
-      .then(async r => { const j = await r.json().catch(() => ({})); if (r.status === 409 && j.memory) return setMem(j.memory); if (!r.ok) return toast(j.error || `request failed (${r.status})`); apply(j); if (j.effectsSkipped) toast(j.effectsSkipped); })
+      .then(async r => { const j = await r.json().catch(() => ({})); if (r.status === 409 && j.memory) return setMem(j.memory); if (!r.ok) return toast(j.error || `request failed (${r.status})`, false, j.fix); apply(j); if (j.effectsSkipped) toast(j.effectsSkipped, false, j.fix); })
       .catch(e => toast(String(e.message || e))); };
   const [choices, setChoices] = useState(null), [receipt, setReceipt] = useState(null), [dirty, setDirty] = useState(false), [now, setNow] = useState(Date.now());
   const foldRef = useRef(null), logRef = useRef(null), last = useRef(''), loadedFor = useRef(null);
@@ -25,10 +26,10 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
   useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [log]);
 
   const src = s.clips ? `--clips ${s.clips}` : s.footage.map(f => /\s/.test(f) ? JSON.stringify(f) : f).join(' ') || '<your clip>';
-  const cmd = `npm run reel -- ${src} --name ${s.job || '<job>'} --draft ${(c.args || []).map(a => /[\s;]/.test(a) ? JSON.stringify(a) : a).join(' ')}`;
+  // the reel as an instruction for an agent (Copy or Send in the For your agent fold); the page never shows the command
+  const forAgent = `In my aigent-talking-head folder, make this reel by running npm run reel -- ${src} --name ${s.job || '<job>'} --draft ${(c.args || []).map(a => /[\s;]/.test(a) ? JSON.stringify(a) : a).join(' ')} and tell me when it is done.`;
   const notes = [...(c.notes || []), ...(c.errs || []).map(e => 'Problem: ' + e)];
   if (s.reference.mode === 'recreate' && s.reference.out) notes.unshift(`Recreate: follows ${s.reference.out}/Reel.md; the recipe sets the look.`);
-  if (c.effects && c.effects.length && !V.env.effectsReady) notes.push('Effects are picked but not set up on this computer (npm run effects:setup). The reel renders without them.');
   const drafted = !!choices;
   // a draft is a plan, not a video: say so when it ends, so it never reads like a finished render
   const planReady = t && !running && t.kind === 'draft' && t.status === 'done';
@@ -42,7 +43,8 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
 
   return <section className="step" id="s-render" data-step="render" aria-labelledby="h-render" hidden={hidden}>
     <header className="sh"><h2 id="h-render">Render</h2><p className="sub">Draft plans the reel, Render makes the video.</p></header>
-    <NeedFix V={V} ids={['ffmpeg', 'python', 'chrome', 'npm']} what="Drafting and rendering" />
+    <NeedFix V={V} ids={['ffmpeg', 'python', 'chrome', 'npm']} what="Drafting and rendering" apply={apply} />
+    {c.effects && c.effects.length > 0 && !V.env.effectsReady && <NeedFix V={V} ids={['effects']} what="The effects you picked" apply={apply} />}
     {keptCuts.length > 0 && <div id="kept-cuts" className="notes glass-card" role="note"><p>You kept {keptCuts.length} cut{keptCuts.length > 1 ? 's' : ''} on the Cut step. They render from there, each as its own reel. Draft below plans one reel from the whole take.</p>
       <div className="row"><Button id="render-kept" size="sm" variant="primary" label={`Render my ${keptCuts.length} cut${keptCuts.length > 1 ? 's' : ''}`} isDisabled={running} onClick={renderCuts} /></div></div>}
     <div className="runbar glass-card">
@@ -71,7 +73,8 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
     <details className="fold glass-card" id="choices-fold" ref={foldRef}><summary>Picks and why</summary>
       <div id="choices" className="choices"><Choices CAT={CAT} x={choices} setX={setChoices} setReceipt={setReceipt} dirty={dirty} setDirty={setDirty} s={s} patch={patch} /></div></details>
     <Fold id="log-fold" title="Log"><pre id="log" className="log" aria-live="off" ref={logRef}>{log}</pre></Fold>
-    <Fold id="cmd-fold" title="Command"><pre id="cmd" className="cmd" aria-label="The command Studio will run">{cmd}</pre></Fold>
+    <Fold id="cmd-fold" title="For your agent"><div className="row" id="cmd"><span className="fine grow">Your agent can make this same reel from its terminal.</span>
+      <Button id="cmd-copy" size="sm" variant="secondary" label="Copy for my agent" icon={<Icon n="copy" />} onClick={() => copyText(forAgent, 'Copied. Paste it into your agent.')} /></div></Fold>
   </section>;
 }
 

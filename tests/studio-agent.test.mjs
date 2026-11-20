@@ -63,9 +63,9 @@ try {
     const [a, b, c, d] = r.j.added;
     assert.strictEqual(a.status, 'failed'); assert.ok(/not a link/.test(a.error));
     assert.strictEqual(b.status, 'failed'); assert.ok(/one post/.test(b.error));
-    assert.strictEqual(c.status, 'failed'); assert.ok(/yt-dlp/.test(c.error) && /pip install yt-dlp/.test(c.error));
+    assert.strictEqual(c.status, 'failed'); assert.ok(/yt-dlp/.test(c.error) && !/pip install|npm run/.test(c.error)); assert.strictEqual(c.fix, 'ytdlp');
     assert.strictEqual(d.status, 'queued'); assert.strictEqual(d.site, 'file');
-    const done = await until(async () => { const s = (await req('/api/state')).j.state; const it = s.reference.queue.find(x => x.id === d.id); return it.status === 'ready' || it.status === 'failed' ? s : null; });
+    const done = await until(async () => { const s = (await req('/api/state')).j.state; const it = s.reference.queue.find(x => x.id === d.id); return it.status === 'ready' || it.status === 'failed' ? s : null; }, 120e3); // a download and a teardown: slow on a busy or Windows machine
     const it = done.reference.queue.find(x => x.id === d.id);
     assert.strictEqual(it.status, 'ready', it.error);
     assert.ok(it.file.startsWith(DL) && existsSync(it.file), 'saved in the download folder from settings');
@@ -76,7 +76,7 @@ try {
   });
   await t('reference links: a page that is not a video fails clearly; retry and remove work', async () => {
     const r = await req('/api/reference/url', { url: `${MEDIA}/page.mp4` }), id = r.j.added[0].id;
-    const it = await until(async () => { const x = (await req('/api/state')).j.state.reference.queue.find(q => q.id === id); return x.status === 'failed' ? x : null; });
+    const it = await until(async () => { const x = (await req('/api/state')).j.state.reference.queue.find(q => q.id === id); return x.status === 'failed' ? x : null; }, 60e3);
     assert.ok(/not a video/.test(it.error), it.error);
     assert.strictEqual((await req('/api/reference/item', { id, action: 'remove' })).status, 200);
     assert.ok(!(await req('/api/state')).j.state.reference.queue.some(q => q.id === id));
@@ -124,7 +124,7 @@ try {
     const last = s.chat.at(-1); assert.strictEqual(last.role, 'assistant'); assert.strictEqual(last.replyTo, w.messages[0].id); assert.strictEqual(last.channel, 'studio');
     // listening: the page sees the agent waiting, and a new page line comes back within a second or two
     const waiting = call('studio_wait_for_message', { timeout_s: 20 });
-    await until(async () => (await req('/api/state')).j.env.agent.listening, 8000);
+    await until(async () => (await req('/api/state')).j.env.agent.listening);
     const t0 = Date.now(); await req('/api/chat', { text: 'add the film grain finish' });
     const w2 = await waiting; assert.ok(/film grain/.test(w2.messages[0].text)); assert.ok(Date.now() - t0 < 3000, 'answered within seconds');
     const none = await call('studio_wait_for_message', { timeout_s: 1 }); assert.strictEqual(none.timedOut, true);
@@ -153,7 +153,7 @@ try {
     const sse = (text, out) => { for (const c of text.split('\n\n')) { const d = c.split('\n').find(l => l.startsWith('data: ')); if (d) out.push(JSON.parse(d.slice(6))); } };
     const obs = fetch(url + '/api/agui/events', { signal: ac.signal }).then(async r => { const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '';
       for (;;) { const { value, done } = await rd.read(); if (done) break; buf += dec.decode(value, { stream: true }); const i = buf.lastIndexOf('\n\n'); if (i >= 0) { sse(buf.slice(0, i), events); buf = buf.slice(i + 2); } } }).catch(() => {});
-    await sleep(400);
+    await until(() => events.length >= 2); // the first two events, not a fixed wait
     assert.deepStrictEqual(events.slice(0, 2).map(e => e.type), ['STATE_SNAPSHOT', 'MESSAGES_SNAPSHOT']);
     const call = async (name, args = {}) => { const r = await client.callTool({ name, arguments: args }); if (r.isError) throw new Error(r.content[0].text); return r.structuredContent; };
     const waiting = call('studio_wait_for_message', { timeout_s: 20 });
@@ -165,7 +165,9 @@ try {
     assert.strictEqual(types[0], 'RUN_STARTED'); assert.strictEqual(types.at(-1), 'RUN_FINISHED'); assert.strictEqual(evs.at(-1).result.status, 'answered');
     assert.strictEqual(evs.find(e => e.type === 'TEXT_MESSAGE_CONTENT').delta, 'Punchier now.');
     assert.strictEqual(evs.find(e => e.type === 'STATE_SNAPSHOT').snapshot.music.energy, 'high');
-    await sleep(1500); ac.abort(); await obs;
+    // wait for the observer to see the whole answer, then close it (a fixed 1.5 s was too short on a slow machine)
+    await until(() => events.some(e => e.type === 'CUSTOM' && e.name === 'studio.message_status' && e.value.status === 'answered') && events.filter(e => e.type === 'STATE_DELTA').flatMap(e => e.delta).some(o => o.path === '/music/energy' && o.value === 'high')).catch(() => {});
+    ac.abort(); await obs;
     const ot = events.map(e => e.type);
     assert.ok(ot.includes('STATE_DELTA') && ot.includes('TEXT_MESSAGE_START') && ot.includes('MESSAGES_SNAPSHOT'), ot.join(','));
     assert.ok(events.some(e => e.type === 'CUSTOM' && e.name === 'studio.message_status' && e.value.status === 'answered'), ot.join(','));

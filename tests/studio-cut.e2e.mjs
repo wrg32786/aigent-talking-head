@@ -19,6 +19,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { chromium } from 'playwright-core';
 import { findChrome } from '../kit/chrome.mjs';
+import { patient } from './fixtures/patient.mjs';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const STATE = mkdtempSync(join(tmpdir(), 'studio-cut-e2e-')), JOB = 'cut-e2e-' + process.pid;
@@ -58,7 +59,7 @@ const shot = async (page, sel, name) => {
 };
 const subs = () => readdirSync(join(ROOT, 'jobs')).filter(d => d.startsWith(JOB + '-'));
 
-const browser = await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required'] });
+const browser = patient(await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required'] }));
 try {
   await api('/api/settings', { chat: { backend: 'keywords' } });
   await api('/api/state', { job: JOB, sound: { sfx: 'off' }, music: { bed: 'none' } });

@@ -7,6 +7,7 @@ import { Badge } from '@astryxdesign/core/Badge';
 import { TabGroup, TabList, Tab, TabPanels, TabPanel } from '@headlessui/react';
 import { api, toast, cap1, Icon, IconBtn } from './lib.jsx';
 import { Hint } from './ui.jsx';
+import { FixActions } from './Fix.jsx';
 
 const TAB_ICON = { library: 'grid', upload: 'upload', stock: 'search', make: 'spark', record: 'camera', generate: 'film' };
 const TABS = [['library', 'Library'], ['upload', 'Upload'], ['stock', 'Stock'], ['make', 'Make'], ['record', 'Record'], ['generate', 'Generate']];
@@ -84,7 +85,7 @@ function Make({ beat, fill, V }) {
   const go = async () => { setBusy(true); try { const j = await api('/api/broll/make', { spec: { ...spec(), seconds: +(f.seconds || 3) }, beat: beat.n }); fill(null, j); toast('Card made', true); } catch {} setBusy(false); };
   const inp = (k, ph, type) => <input id={'mk-' + k} type={type || 'text'} placeholder={ph} value={f[k] || ''} onChange={e => set(k, e.target.value)} />;
   const ta = (k, ph) => <textarea id={'mk-' + k} rows={4} placeholder={ph} value={f[k] || ''} onChange={e => set(k, e.target.value)} />;
-  if (!agentOk) return <div className="bpanel" id="bp-make"><p className="fine">Cards render with Chrome on this computer. Install it with <code>npm run setup:all</code>.</p></div>;
+  if (!agentOk) return <div className="bpanel" id="bp-make"><p className="fine">Cards render with Chrome on this computer, and it is not installed yet.</p><FixActions V={V} id="chrome" /></div>;
   return <div className="bpanel" id="bp-make">
     <div className="seg-row" role="radiogroup" aria-label="Card">{CARD_KINDS.map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={String(kind === k)} className={'chip' + (kind === k ? ' on' : '')} id={'mk-kind-' + k} onClick={() => setKind(k)}>{l}</button>)}</div>
     <div className="mk-form">
@@ -92,7 +93,7 @@ function Make({ beat, fill, V }) {
       {kind === 'counter' && <><div className="row">{inp('prefix', 'Prefix ($)')}{inp('to', 'Counts to', 'number')}{inp('suffix', 'Suffix (k, %)')}</div>{inp('label', 'Label, for example saved a month')}</>}
       {kind === 'quote' && <>{ta('text', 'The quote')}{inp('author', 'Who said it')}</>}
       {kind === 'code' && <>{inp('title', 'File name')}{ta('code', 'The code')}</>}
-      {kind === 'terminal' && <>{inp('title', 'Window title')}{ta('lines', '$ npm run studio\nStudio on http://127.0.0.1:4757')}</>}
+      {kind === 'terminal' && <>{inp('title', 'Window title')}{ta('lines', '$ ls\nreel.mp4  notes.md')}</>}
       {kind === 'html' && <>{ta('html', '<h1>Your scene</h1> (no scripts)')}{ta('css', 'h1 { animation: in 1s both } @keyframes in { from { opacity: 0 } }')}</>}
       <div className="row"><label className="inl"><span className="fine">Seconds</span><input id="mk-seconds" type="number" min={1} max={8} step={0.5} value={f.seconds || 3} onChange={e => set('seconds', e.target.value)} /></label>
         <Button id="mk-go" variant="primary" size="sm" label="Make card" isLoading={busy} onClick={go} /></div>
@@ -167,7 +168,10 @@ export function BRoll({ V, apply, go, openKeys }) {
   const [sel, setSel] = useState(null), [tab, setTab] = useState('library'), [busy, setBusy] = useState('');
   const beat = B.beats.find(b => b.n === sel) || null;
   useEffect(() => { if (!beat && B.beats.length) setSel((B.beats.find(b => b.idea) || B.beats.find(b => !b.slot && b.n > 1) || B.beats[0]).n); }, [B.beats.length]);
-  const after = j => { if (j && j.state) apply({ ...V, seq: 0, state: j.state, broll: j.broll }); else if (j && j.broll) apply({ ...V, seq: 0, broll: j.broll }); };
+  // a reply can land after a newer live update (an agent's idea, a clear from the API). Merging it into this render's V
+  // with seq 0 used to put the older lane back on screen, so ask for a fresh view instead: it carries a seq, and apply
+  // drops it if something newer is already showing.
+  const after = j => { if (j && (j.state || j.broll)) api('/api/state').then(apply).catch(() => {}); };
   const fill = async (o, j) => { if (j) return after(j); try { after(await api('/api/broll/slot', { beat: beat.n, ...o })); } catch {} };
   const idea = async (n, action) => { setBusy('idea' + n); try { after(await api('/api/broll/idea', { beat: n, action })); } catch {} setBusy(''); };
   const suggest = async () => { setBusy('suggest'); try { const j = await api('/api/broll/suggest', {}); after(j); toast(j.count ? `${j.count} ideas to approve` : 'No new ideas. Fill a beat by hand.', !!j.count); } catch {} setBusy(''); };
