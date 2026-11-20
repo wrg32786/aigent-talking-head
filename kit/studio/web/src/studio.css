@@ -1064,8 +1064,8 @@ dialog.outputs .fb-h { align-items: flex-start; } dialog.outputs .fb-h > div:fir
 .src-you { color: var(--primary); background: color-mix(in srgb, var(--primary) 14%, transparent); }
 .src-ref { color: #e0a33a; background: color-mix(in srgb, #e0a33a 14%, transparent); }
 .src-look { color: #a78bfa; background: color-mix(in srgb, #a78bfa 14%, transparent); }
-[data-theme="light"] .src-ref { color: #9a6408; } [data-theme="light"] .src-look { color: #6d4fd1; }
-.tile .src { position: absolute; top: 9px; right: 36px; z-index: 2; pointer-events: none; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+[data-theme="light"] .src-ref { color: #9a6408; } [data-theme="light"] .src-look { color: #6d4fd1; } [data-theme="light"] .tile .src-ref { color: #f5b748; } [data-theme="light"] .tile .src-look { color: #c4b5fd; } .tile .src-you { color: #5ff0d6; }
+.tile .src { position: absolute; top: 9px; right: 36px; z-index: 2; background: rgba(0, 0, 0, .66); pointer-events: none; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 .ref-card { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 12px; padding: 12px 14px; border-radius: 14px; border: 1px dashed color-mix(in srgb, #e0a33a 55%, transparent); }
 .ref-card .rc-t { flex: 1 1 260px; display: flex; flex-direction: column; gap: 2px; min-width: 0; } .ref-card .rc-t b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ref-card .seg { display: inline-flex; } .ref-card .seg button { font: inherit; font-size: 12px; padding: 5px 12px; border: 0; background: transparent; cursor: pointer; }
