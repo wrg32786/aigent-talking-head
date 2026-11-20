@@ -25,11 +25,12 @@
 #      sentence that take shared, so separate takes per beat and full repeat takes both come out in order.
 #      --hook <file> picks the first sentence from that take when it has one (film the hook on your most extreme
 #      angle and name that file). Each clip records its "take" (source file).
-#   4. Sets each clip's ends from the AUDIO, not the word stamps. The head starts in the silence just before the
-#      first word (a few frames of lead, never dead air, never mid-sentence, never after the first word starts). The
-#      tail ends when the voice stops (level AND the band above 4 kHz, so a soft "s" or a trailing vowel is not read as
-#      silence) plus --hold (0.35 s), never running into the next line's first word. A piece under 0.5 s (often the
-#      end of a word Whisper wrote twice, "more.") is joined to the line before it.
+#   4. Sets each clip's ends from the AUDIO through kit/cutpoints.cjs, the one cut-point module every Studio path
+#      uses. A word counts as sounding when its level OR the 3.5 to 12 kHz band is 12 dB over the room, so a soft
+#      "s" is not read as silence. The head starts at least 70 ms (target 110 ms) before the first word sounds (--lead),
+#      the tail at least 130 ms (target 180 ms) after the last sound (--hold), never running into the next line. With
+#      no pause to cut in, the piece runs on to the next pause (up to 2 s) instead of cutting a word (needs node on PATH).
+#      A piece under 0.5 s (often the end of a word Whisper wrote twice, "more.") is joined to the line before it.
 #      Several files that are already cut (each starts and ends on speech and runs under a minute) are used whole.
 #   5. Writes clips.json and clips.md (id, take, source in/out, duration, text, status) as soon as the lines are known,
 #      with "pending": true until the clips exist, so picking can start while they encode. Then exports
@@ -53,8 +54,9 @@ ap.add_argument("--hook", default=None, help="take to use for the first sentence
 ap.add_argument("--vertical", action="store_true")
 ap.add_argument("--cropx", type=float, default=0.5)
 ap.add_argument("--min", type=float, default=3.0)
-ap.add_argument("--lead", type=float, default=0.12)
-ap.add_argument("--hold", type=float, default=0.35)
+ap.add_argument("--lead", type=float, default=None, help="seconds of quiet before the first sound (default 0.11, at least 0.07)")
+ap.add_argument("--hold", type=float, default=None, help="seconds kept after the last sound (default 0.18, at least 0.13)")
+ap.add_argument("--plan-only", action="store_true", help="write clips.json and clips.md, encode nothing (the cut bench)")
 ap.add_argument("--whole", action="store_true", help="each file is already one clip: no splitting, no retakes, order kept")
 ap.add_argument("--order", choices=["auto", "files", "script"], default="auto")
 ap.add_argument("--encoder", default=os.environ.get("CLIP_ENCODER", "auto"))
@@ -66,15 +68,31 @@ MULTI = len(a.src) > 1
 def run(cmd):
     return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
-def silences(src, dur, af):
-    r = run(["ffmpeg", "-v", "info", "-i", src, "-vn", "-af", af, "-f", "null", "-"])
-    starts = [float(x) for x in re.findall(r"silence_start: (-?[0-9.]+)", r.stderr)]
-    ends = [float(x) for x in re.findall(r"silence_end: ([0-9.]+)", r.stderr)]
-    return list(zip(starts, ends + [dur] * (len(starts) - len(ends))))
+# cut points come from the kit's one cut-point module (kit/cutpoints.cjs), the same one Studio's Cut step, Lines,
+# bites and tighten use: Whisper words plus the audio (whole band and the s, f, th band), never mid-word
+CUTPOINTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cutpoints.cjs")
+def snap(src, words, ranges):
+    import tempfile
+    opts = {}
+    if a.lead is not None: opts["leadTarget"] = max(0.07, a.lead)
+    if a.hold is not None: opts["tailTarget"] = max(0.13, a.hold)
+    fd, tmp = tempfile.mkstemp(suffix=".json"); os.close(fd)
+    try:
+        json.dump({"words": [[w["s"], w["e"], w["w"]] for w in words], "ranges": ranges, "opts": opts}, open(tmp, "w", encoding="utf-8"))
+        r = run([os.environ.get("NODE", "node"), CUTPOINTS, "snap", src, tmp])
+    finally:
+        os.remove(tmp)
+    if r.returncode:
+        sys.exit("cut points (kit/cutpoints.cjs): " + (r.stderr or r.stdout or "failed").strip()[-300:])
+    return json.loads(r.stdout)
 
 # 1. words, per take
 model = None
 given = json.load(open(a.words, encoding="utf-8")) if a.words else None
+# the same Whisper settings as Studio's transcript (kit/studio/tx_chunks.py): voice activity detection on, so a long
+# pause never becomes one 12 s word that hides a sentence break
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "studio"))
+from tx_chunks import VAD
 # one clear line before a model download (faster-whisper caches models under the Hugging Face hub folder)
 SIZES = {"tiny": "75 MB", "base": "145 MB", "small": "460 MB", "medium": "1.5 GB", "large": "3 GB", "distil": "1.5 GB", "turbo": "1.6 GB"}
 def notice_download(name):
@@ -100,7 +118,7 @@ def words_of(src):
         from faster_whisper import WhisperModel
         notice_download(a.model)
         model = WhisperModel(a.model, device="cpu", compute_type="int8")
-    segs, _ = model.transcribe(src, language="en", word_timestamps=True, vad_filter=False, condition_on_previous_text=False, initial_prompt=os.environ.get("TX_PROMPT") or None)
+    segs, _ = model.transcribe(src, language="en", word_timestamps=True, vad_filter=True, vad_parameters=VAD, condition_on_previous_text=False, initial_prompt=os.environ.get("TX_PROMPT") or None)
     return [{"s": w.start, "e": w.end, "w": w.word.strip(), "p": float(getattr(w, "probability", 0.9) or 0.9)} for g in segs for w in g.words if w.word.strip()]
 
 norm = lambda s: [re.sub(r"[^a-z0-9']", "", x["w"].lower()) for x in s]
@@ -140,10 +158,7 @@ for ti, src in enumerate(a.src):
     words = words_of(src)
     if not words:
         print(f"{src}: no speech found, skipped"); continue
-    # silence map of the whole file (the audio decides clip ends)
-    sil = silences(src, dur, "silencedetect=n=-35dB:d=0.15")
-    # the band above 4 kHz: an "s", "f" or "th" at the end of a word sits under the level threshold but not here
-    hf = silences(src, dur, "highpass=f=4000,highpass=f=4000,silencedetect=n=-50dB:d=0.12")
+    words = [w for w in words if w["e"] >= w["s"]]
     # 2. sentences
     sents, cur = [], []
     for wi, w in enumerate(words):
@@ -170,7 +185,7 @@ for ti, src in enumerate(a.src):
     for i in range(len(sents) - 2, -1, -1):
         if status[i] == "keep" and len(sents[i]) <= 5 and status[i + 1] == "retake" and sents[i + 1][0]["s"] - sents[i][-1]["e"] < 1.0:
             status[i], retake_of[i] = "retake", retake_of[i + 1]
-    takes.append({"src": src, "dur": dur, "sil": sil, "hf": hf, "sents": sents, "status": status, "retake_of": retake_of, "G": G,
+    takes.append({"src": src, "dur": dur, "words": words, "sents": sents, "status": status, "retake_of": retake_of, "G": G,
                   "precut": precut(words, dur), "whole": a.whole})
 if not takes:
     sys.exit("no speech found")
@@ -281,10 +296,6 @@ while k < len(groups):
         p["sents"] += g["sents"]; p["sent"] = g["sent"]; groups.pop(k)
     else:
         k += 1
-sent2clip = {}
-for k, g in enumerate(groups):
-    for si in g["sents"]:
-        sent2clip[(g["take"], si)] = k
 def clip_of(c):
     if c is None: return None
     ti, si = c
@@ -292,26 +303,32 @@ def clip_of(c):
         si += 1
     return sent2clip.get((ti, si))
 
-def head(T, t, prev_end):
-    # start inside the silence that ends nearest before t, a few frames before speech resumes; never after the first
-    # word starts (a clip that starts at 0.05 when the word starts at 0.00 shaves it)
-    cands = [e for s, e in T["sil"] if e <= t + 0.25 and e >= prev_end]
-    speech = max(cands) if cands else t
-    return max(0, min(max(prev_end + 0.05, min(t, speech) - a.lead), t - 0.02))
-
-def voice_stop(T, t):
-    # the voice stops where the level drops AND the band above 4 kHz goes quiet: a soft "s" or a trailing vowel sits
-    # under the level threshold. The high band only moves the stop later, by up to 0.5 s (room hiss never ends).
-    cands = [s for s, e in T["sil"] if s >= t - 0.3]
-    stop = min(cands) if cands else t
-    hf = [s for s, e in T.get("hf", []) if s >= stop - 0.05]
-    if hf and min(hf) - stop <= 0.5:
-        stop = max(stop, min(hf))
-    return max(t, stop)
-
-def tail(T, t, next_start):
-    # end when the voice stops after the last word, plus the hold, never into the next line's first word
-    return min(voice_stop(T, t) + a.hold, next_start - 0.05, T["dur"])
+# 4. clip ends from the audio (kit/cutpoints.cjs), every clip of a take in one call. Two clips back to back in one
+#    take with no pause between them to cut in (the end had to move past the next clip's first word) are one clip.
+def ends():
+    while True:
+        cut = {}
+        for ti, T in enumerate(takes):
+            ks = [k for k, g in enumerate(groups) if g["take"] == ti and not g.get("whole")]
+            if not ks:
+                continue
+            rs = [[T["sents"][groups[k]["sents"][0]][0]["s"], T["sents"][groups[k]["sents"][-1]][-1]["e"]] for k in ks]
+            for k, r in zip(ks, snap(T["src"], T["words"], rs)):
+                cut[k] = tuple(r["range"])
+        merged = False
+        for k in range(len(groups) - 1):
+            g, h = groups[k], groups[k + 1]
+            if (k in cut and k + 1 in cut and g["take"] == h["take"] and h["sents"][0] == g["sents"][-1] + 1 and g["status"] == h["status"]
+                    and cut[k][1] > cut[k + 1][0]):
+                g["sents"] += h["sents"]; g["sent"] = h["sent"]; groups.pop(k + 1); merged = True
+                break
+        if not merged:
+            return cut
+CUTS = ends()
+sent2clip = {}
+for k, g in enumerate(groups):
+    for si in g["sents"]:
+        sent2clip[(g["take"], si)] = k
 
 # 4 + 5. ends from audio, then clips.json and clips.md right away (picking can start while the clips encode), then export
 CUTOFF = re.compile(r"(-|\u2014|\u2013|\.\.\.|\u2026)$")
@@ -319,9 +336,7 @@ out, md, jobs = [], ["| id | take | src in-out | dur | status | text |", "|---|-
 for k, g in enumerate(groups):
     T = takes[g["take"]]; S = T["sents"]; first, last = g["sents"][0], g["sents"][-1]
     ws = [w for si in g["sents"] for w in S[si]]
-    prev_end = S[first - 1][-1]["e"] if first else -1.0
-    next_start = S[last + 1][0]["s"] if last + 1 < len(S) else T["dur"]
-    s, e = (0.0, T["dur"]) if g.get("whole") else (head(T, ws[0]["s"], prev_end), tail(T, ws[-1]["e"], next_start))
+    s, e = (0.0, T["dur"]) if g.get("whole") else (max(0.0, CUTS[k][0]), min(T["dur"], CUTS[k][1]))
     d = round(e - s, 3)
     text = " ".join(w["w"] for w in ws)
     st = g["status"]
@@ -349,6 +364,10 @@ def write_list(pending):
     json.dump({**meta, "clips": out}, open(os.path.join(a.out, "clips.json"), "w", encoding="utf-8"), indent=1)
     open(os.path.join(a.out, "clips.md"), "w", encoding="utf-8").write("\n".join(md) + "\n")
 write_list(True)
+if a.plan_only:
+    write_list(False)
+    print(f"clips.json and clips.md written ({len(out)} lines); --plan-only, nothing encoded", flush=True)
+    sys.exit(0)
 print(f"clips.json and clips.md written ({len(out)} lines); encoding the clips now", flush=True)
 
 # export: several clips at once, on a hardware encoder when one works here (it falls back to x264 per clip)

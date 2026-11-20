@@ -15,6 +15,9 @@ import { fileURLToPath } from 'url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import * as CUT from '../kit/studio/cut.mjs';
+import CP from '../kit/cutpoints.cjs';
+import SP from './fixtures/speech.cjs';
+const { speech } = SP;
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const STATE = mkdtempSync(join(tmpdir(), 'studio-cut-test-')), JOB = 'cut-test-' + process.pid;
@@ -93,35 +96,24 @@ try {
     assert.ok(/\n\[body\]\n/.test(s) && /\[pause\]/.test(s) && /\n\[cta\]\nFollow for more tips\.$/.test(s), s);
   });
 
-  // a loudness envelope (10 ms) with speech where `spans` say, room tone elsewhere, and optional breaths
-  const envOf = (secs, spans, breaths = [], dips = []) => {
-    const rms = Array.from({ length: Math.round(secs / 0.01) }, (_, i) => { const t = i * 0.01;
-      if (dips.some(([a, b]) => t >= a && t < b)) return 0.01;
-      if (spans.some(([a, b]) => t >= a && t < b)) return 0.7 + 0.2 * Math.sin(t * 40);
-      if (breaths.some(([a, b]) => t >= a && t < b)) return 0.12; return 0.008; });
-    return { hop: 0.01, rms };
-  };
-  await t('cut points: an end goes to the dip after the last word, the audio wins when the transcript is early or late', async () => {
-    // audio: "one" 1.00-1.60, "two" 2.00-2.40, then "three" 3.20-3.70
-    const env = envOf(5, [[1, 1.6], [2, 2.4], [3.2, 3.7]]);
-    const early = CUT.snapRange([0.9, 1.5], [[1.0, 1.45, 'one'], [2.0, 2.4, 'two']], env, 5);
-    assert.ok(Math.abs(early.range[1] - 1.64) < 0.03, 'transcript ended early, the word ran on: ' + early.range[1]);
-    assert.ok(/ran past/.test(early.points.find(p => p.edge === 'end').by), JSON.stringify(early.points));
-    const late = CUT.snapRange([1.9, 2.7], [[2.0, 2.65, 'two'], [3.2, 3.7, 'three']], env, 5);
-    assert.ok(Math.abs(late.range[1] - 2.44) < 0.03, 'transcript ended late, cut at the real end: ' + late.range[1]);
-    assert.ok(/ended before/.test(late.points.find(p => p.edge === 'end').by));
-    const st = late.points.find(p => p.edge === 'start'); assert.ok(Math.abs(late.range[0] - 1.96) < 0.03 && st.cut === late.range[0], JSON.stringify(st));
+  // cut points come from kit/cutpoints.cjs (tests/cut-points.test.cjs covers it); here, that the Cut step uses it
+  const envOf = (secs, parts) => CP.envelopeFromSamples(speech(secs, parts));
+  await t('cut points: Cut step candidates snap to the audio, the s tail is kept, the debug says why', async () => {
+    const env = envOf(5, { voiced: [[1, 1.5], [2, 2.4], [3.2, 3.7]], hiss: [[1.5, 1.65]] });
+    const words = [[1.0, 1.45, 'this'], [2.0, 2.4, 'two'], [3.2, 3.7, 'three']];
+    const r = CUT.snapRange([0.9, 1.45], words, env, 5);
+    assert.ok(r.range[1] >= 1.65 + 0.12 && r.range[1] <= 2.0 - 0.06, 'kept the s: ' + r.range[1]);
+    assert.ok(/ran past/.test(r.points.find(p => p.edge === 'end').by), JSON.stringify(r.points));
+    assert.ok(r.range[0] <= 1.0 - 0.06 && r.range[0] >= 0.85, 'started before the voice: ' + r.range[0]);
+    const s = CUT.snapRanges([[0.9, 1.45], [2.0, 2.4]], words, env, 5); assert.strictEqual(s.cuts.length, 4); assert.deepStrictEqual(s.cuts.map(c => c.part), [0, 0, 1, 1]);
+    assert.deepStrictEqual(CUT.snapRanges([[1, 2]], words, null, 5), { ranges: [[1, 2]], cuts: null }, 'no envelope: unchanged');
+    const c = CUT.snapCandidate({ id: 'c1', ranges: [[0.9, 1.45]] }, words, env, 5); assert.ok(c.snapped && c.cuts.length === 2 && c.seconds === CUT.lengthOf(c) && c.unsure === 0);
+    const L = CUT.lines(words.map(w => [...w.slice(0, 2), w[2] + '.']), env, 5); assert.ok(L[0].end >= 1.77 && L[1].start <= 1.94, JSON.stringify(L));
   });
-  await t('cut points: the breath after a word is left out, a short stop inside a word does not count, never into the next word', async () => {
-    const env = envOf(8, [[1, 2], [2.9, 3.5], [5, 5.8], [5.84, 6.4]], [[2.3, 2.6]], [[1.5, 1.54]]);
-    const words = [[1.0, 1.45, 'stopping'], [1.6, 2.0, 'here.'], [2.9, 3.5, 'Next'], [5.0, 5.8, 'tight'], [5.84, 6.4, 'pair']];
-    const b = CUT.snapRange([0.9, 2.1], words, env, 8); assert.ok(b.range[1] < 2.1 && b.range[1] >= 2.0, 'cut before the breath at 2.3: ' + b.range[1]);
-    const stop = CUT.snapRange([0.9, 1.5], [[1.0, 1.45, 'stopping'], [3, 3.5, 'x']], env, 8); assert.ok(stop.range[1] >= 2.0, 'a 40 ms stop is not the end of the word: ' + stop.range[1]);
-    const tight = CUT.snapRange([4.9, 5.8], words, env, 8), e = tight.points.find(p => p.edge === 'end');
-    assert.ok(tight.range[1] <= 5.84 && /quietest/.test(e.by), JSON.stringify(e));
-    const s = CUT.snapRanges([[0.9, 2.1], [2.8, 3.6]], words, env, 8); assert.strictEqual(s.cuts.length, 4); assert.deepStrictEqual(s.cuts.map(c => c.part), [0, 0, 1, 1]);
-    assert.deepStrictEqual(CUT.snapRanges([[1, 2]], words, null, 8), { ranges: [[1, 2]], cuts: null }, 'no envelope: unchanged');
-    const c = CUT.snapCandidate({ id: 'c1', ranges: [[0.9, 2.1]] }, words, env, 8); assert.ok(c.snapped && c.cuts.length === 2 && c.seconds === CUT.lengthOf(c));
+  await t('a render hands the reel its words: clip words follow the joined ranges, touching ranges join', async () => {
+    const w = [[1, 1.4, 'a'], [1.5, 1.9, 'b'], [3, 3.4, 'c']];
+    assert.deepStrictEqual(CUT.clipWords(w, [[0.9, 2.0], [2.9, 3.5]]), [[0.1, 0.5, 'a'], [0.6, 1, 'b'], [1.2, 1.6, 'c']]);
+    assert.deepStrictEqual(CUT.renderRanges({ ranges: [[1, 2], [2, 3], [4, 5]] }), [[1, 3], [4, 5]]);
   });
 
   await t('line hints: a retake needs most of the line said again soon after; a list sharing an opener is not one; fragments flagged', async () => {

@@ -602,6 +602,10 @@ try {
     const py = process.env.PYTHON || (process.platform === 'win32' ? 'py' : 'python3');
     run(py, [join(dirname(KIT), 'tests', 'test_clip.py')], work);
   });
+  step('cut accuracy on synthetic speech (tests/cut-accuracy/synthetic.mjs): 0 mid-word cuts, lead-in >= 60 ms, tail >= 120 ms on every path', () => {
+    const py = process.env.PYTHON || (process.platform === 'win32' ? 'py' : 'python3');
+    run(node, [join(dirname(KIT), 'tests', 'cut-accuracy', 'synthetic.mjs')], dirname(KIT), { PYTHON: py });
+  });
   step('reel.cjs --look muse: punch, big punches, titles (7 entrances, no repeats), pills, few sounds, mask, render', () => {
     const clips = join(work, 'clips-muse'); mkdirSync(clips);
     const lines = ['Stop editing reels by hand.', 'Record one take on your phone.', 'Drop the file in the inbox.', 'Ask your agent for the reel.'];

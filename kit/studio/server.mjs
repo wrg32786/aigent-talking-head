@@ -181,7 +181,18 @@ function draftSteps(s) {
   // takes filmed from a script: hand the script to Whisper as a hint (TX_PROMPT, kit/tx.py and kit/clip.py), so captions spell its words
   const said = (s.takes || []).filter(t => t.script && t.script.text && s.footage.includes(t.file)).map(t => t.script.text.replace(/\[[a-z]+\]/gi, ' ').replace(/\s+/g, ' ').trim());
   const stepEnv = said.length && !process.env.TX_PROMPT ? { TX_PROMPT: [...new Set(said)].join(' ').slice(0, 800) } : {};
-  return { steps: [[process.env.STUDIO_REEL || 'kit/reel.cjs', [...src, '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])], stepEnv]], lockString: comp.lockString, txPrompt: stepEnv.TX_PROMPT || null };
+  // one transcript per take: when Studio already has the words of every file (the Cut step's), clip.py uses them
+  // instead of running Whisper again, so the draft cuts on the same words as Cut and Lines (not with a script hint)
+  let wordsArg = [];
+  if (src === s.footage && !stepEnv.TX_PROMPT) {
+    const tx = s.footage.map(f => [f, MEDIA.transcript(f)]);
+    if (tx.length && tx.every(([, t]) => t && t.words && t.words.length) && new Set(tx.map(([f]) => basename(f))).size === tx.length) {
+      const wf = `inbox/studio/${s.job}/words.json`; mkdirSync(join(ROOT, 'inbox', 'studio', s.job), { recursive: true });
+      writeFileSync(join(ROOT, wf), JSON.stringify(Object.fromEntries(tx.map(([f, t]) => [basename(f), t.words]))));
+      wordsArg = ['--words', wf];
+    }
+  }
+  return { steps: [[process.env.STUDIO_REEL || 'kit/reel.cjs', [...src, ...wordsArg, '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])], stepEnv]], lockString: comp.lockString, txPrompt: stepEnv.TX_PROMPT || null };
 }
 function renderSteps(s) {
   if (!s.job || !existsSync(join(ROOT, 'jobs', s.job, 'build', 'cut.json'))) throw Object.assign(new Error('make a draft first'), { code: 400 });
@@ -397,17 +408,26 @@ function cutSteps(s, ids, over) {
   const base = comp.args.slice(); const e = base.indexOf('--export'); if (e >= 0) base.splice(e, 2);
   const tight = o.goal === 'ad' && !base.includes('--tighten') && !base.includes('--no-tighten') ? ['--tighten', '0.25'] : [];
   const REEL = process.env.STUDIO_REEL || 'kit/reel.cjs', steps = [], plan = [];
+  // every piece is extracted on its snapped ranges, then handed to the reel as already cut: a clips.json beside the
+  // files carries each one's words (from the one transcript of the take), and --as-is keeps it whole. Nothing is
+  // transcribed or cut a second time, so what you made in Cut is what reaches the reel.
+  const words = wordsOf(src) || [], cutsDir = join(ROOT, `inbox/studio/${s.job}/cuts`), cj = join(cutsDir, 'clips.json');
+  let prev = []; try { prev = JSON.parse(readFileSync(cj, 'utf8')).clips || []; } catch {}
+  const entries = keep.map((x, k) => { const ranges = CUT.renderRanges(x), w = CUT.clipWords(words, ranges), d = +ranges.reduce((a, [p, q]) => a + q - p, 0).toFixed(3);
+    return { id: `clip-${String(k + 1).padStart(3, '0')}`, file: `cuts/${x.id}.mp4`, take: src.split('/').pop(), ranges, src_in: ranges[0][0], src_out: ranges[ranges.length - 1][1], dur: d, status: 'keep', text: w.map(y => y[2]).join(' '), words: w }; });
+  mkdirSync(cutsDir, { recursive: true });
+  writeFileSync(cj, JSON.stringify({ src, takes: [src.split('/').pop()], order: 'files', precut: true, clips: [...prev.filter(y => !entries.some(e => e.file === y.file)), ...entries] }, null, 1));
   for (const x of keep) {
     const sub = subJob(s.job, x.id), file = `inbox/studio/${s.job}/cuts/${x.id}.mp4`;
     const asClip = x.kind === 'ad' || (x.kind === 'clip' && (o.kind === 'both' || o.format !== 'long'));
     const aspect = asClip ? (o.format === 'square' ? '1:1' : '9:16') : CUT.aspectOf(o), exp = asClip ? CUT.exportOf(o, 'clip') : CUT.exportOf(o);
-    steps.push(['kit/studio/cut-run.mjs', ['extract', '--src', src, '--ranges', x.ranges.map(r => r.join('-')).join(','), '--out', file]]);
+    steps.push(['kit/studio/cut-run.mjs', ['extract', '--src', src, '--ranges', CUT.renderRanges(x).map(r => r.join('-')).join(','), '--out', file]]);
     if (aspect === '16:9') steps.push(['kit/studio/cut-run.mjs', ['long', '--src', file, '--name', sub]]);
     else if (o.goal === 'ad') {
-      steps.push([REEL, [file, '--name', sub, '--force', '--draft', '--json', ...base, ...tight]]);
+      steps.push([REEL, [file, '--as-is', '--name', sub, '--force', '--draft', '--json', ...base, ...tight]]);
       steps.push(['kit/studio/cut-run.mjs', ['cta', '--name', sub, '--text', o.cta || 'Learn more']]);
       steps.push([REEL, ['--rebuild', '--name', sub, '--json', ...(exp ? ['--export', exp] : [])]]);
-    } else steps.push([REEL, [file, '--name', sub, '--force', '--json', ...base, ...(exp ? ['--export', exp] : [])]]);
+    } else steps.push([REEL, [file, '--as-is', '--name', sub, '--force', '--json', ...base, ...(exp ? ['--export', exp] : [])]]);
     plan.push({ id: x.id, job: sub, aspect, export: exp });
   }
   return { steps, plan };

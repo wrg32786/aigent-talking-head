@@ -87,7 +87,8 @@ class ClipTests(unittest.TestCase):
         cj = self.run_clip(["a.mp4"], {"a.mp4": w}, "--min", "0.5")
         first = cj["clips"][0]
         self.assertEqual(first["text"], "You need that anymore.")
-        self.assertGreaterEqual(first["src_out"], 2.3 + 0.2, f"cut inside the word's tail: {first['src_out']}")
+        # kit/cutpoints.cjs: at least 120 ms after the last sound, the "s" in the band above 3.5 kHz included
+        self.assertGreaterEqual(first["src_out"], 2.3 + 0.12, f"cut inside the word's tail: {first['src_out']}")
         self.assertLessEqual(first["src_out"], 4.0 - 0.05, "ran into the next line")
 
     def test_piece_under_half_a_second_joins_the_line_before(self):
@@ -142,7 +143,7 @@ class ClipTests(unittest.TestCase):
     def test_retakes_need_most_of_the_line(self):
         w = words_for([
             (0.5, "We don't write code, but we know how to talk to the AI."),
-            (4.5, "We know how to get it to execute things."),
+            (4.8, "We know how to get it to execute things."),
             (8.0, "We know how to get things done with it."),
             (11.5, "We know how to build systems."),
             (14.0, "Hopefully you just finished the..."),
@@ -158,6 +159,17 @@ class ClipTests(unittest.TestCase):
         self.assertTrue(st["Hopefully you just finished the..."].startswith("retake"), st)
         long = [k for k in st if k.startswith("This long line")][0]
         self.assertTrue(st[long].startswith("keep"), st[long])
+
+    def test_lines_with_no_pause_to_cut_in_are_one_clip(self):
+        # 0.13 s between two lines: no room for 120 ms after the last sound and 60 ms before the next, so a cut there
+        # would clip a word. The two lines stay one clip; a real pause (0.6 s) still splits.
+        w = words_for([(0.5, "First line is here."), (1.83, "Second line runs on."), (3.6, "Third line after a pause.")])
+        make_video(self.dir / "a.mp4", 6.0, tones_for(w))
+        cj = self.run_clip(["a.mp4"], {"a.mp4": w}, "--min", "0.5", "--plan-only")
+        texts = [c["text"] for c in cj["clips"]]
+        self.assertEqual(texts, ["First line is here. Second line runs on.", "Third line after a pause."], texts)
+        self.assertLessEqual(cj["clips"][0]["src_out"], 3.6 - 0.06)
+        self.assertGreaterEqual(cj["clips"][0]["src_out"], 1.83 + 3 * 0.3 + 0.27 + 0.12)
 
     def test_fragments_are_marked(self):
         w = words_for([(0.5, "A full sentence that is long enough."), (5.0, "Okay."), (8.0, "And then I thi-"), (11.0, "Back to the real point now.")])
