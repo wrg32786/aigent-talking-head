@@ -271,10 +271,14 @@ if (!flag('rebuild')) {
     if (!env) { console.log(`no dead air: ${c.id} has no readable audio, its pauses stay`); SPANS.set(c.id, [[0, dur]]); return [[0, dur]]; }
     const keepIt = (at, i, L, N) => (KEEPP[c.id] || []).some(t => Math.abs(t - at) < 0.15 || (t >= L[1] - 0.05 && t <= N[0]));
     const r = CP.tightenSpans(ws, env, TIGHT, { range: [0, dur], dur, keep: keepIt });
-    for (const x of r.cuts) if (!TIGHTENED.some(y => y.clip === c.id && y.at === x.at)) TIGHTENED.push({ clip: c.id, at: x.at, resume: x.resume, gap: x.gap, after: x.after });
+    for (const x of r.cuts) if (!TIGHTENED.some(y => y.clip === c.id && y.at === x.at)) TIGHTENED.push({ clip: c.id, at: x.at, resume: x.resume, gap: x.gap, after: x.after, ...(x.noise ? { noise: x.noise } : {}) });
     SPANS.set(c.id, r.spans); return r.spans;
   };
-  const cutsOf = c => (CLEAN && CLEAN.cuts && Array.isArray(CLEAN.cuts[c.id]) ? CLEAN.cuts[c.id] : []).filter(x => Array.isArray(x) && +x[1] > +x[0]);
+  // cuts by hand (kit/manual-cuts.cjs, the cut_range tool): source seconds in jobs/<job>/manual-cuts.json, so they
+  // survive a redraft that re-cuts the clips
+  const MC = require('./manual-cuts.cjs'), MANUAL = MC.read(job);
+  if (MANUAL.length) console.log(`cuts by hand: ${MANUAL.length} (${path.relative(ROOT, MC.fileOf(job))})`);
+  const cutsOf = c => [...(CLEAN && CLEAN.cuts && Array.isArray(CLEAN.cuts[c.id]) ? CLEAN.cuts[c.id] : []), ...MC.forClip(MANUAL, c)].filter(x => Array.isArray(x) && +x[1] > +x[0]);
   const spansOf = c => {
     let out = spansOf0(c);
     for (const [a, b] of cutsOf(c)) out = out.flatMap(([x, y]) => +b <= x || +a >= y ? [[x, y]] : [[x, +a], [+b, y]].filter(([p, q]) => q - p > 0.05));
@@ -289,7 +293,7 @@ if (!flag('rebuild')) {
   }
   const segs = [], clipStart = [];
   keep.forEach((c, ci) => { clipStart.push(segs.length); spansOf(c).forEach(([a, b], k) => segs.push({ file: rel(path.join(clipsDir, path.basename(c.file))), in: a, out: b, ...(k ? { jump: true } : {}), ...(ci === 0 && k === 0 ? { fadeIn: 0.25 } : {}) })); });
-  if (TIGHT) { const was = keep.reduce((a, c) => a + +c.dur, 0), now = segs.reduce((a, s) => a + s.out - s.in, 0), n = segs.filter(s => s.jump).length; console.log(`no dead air: ${n} pause${n === 1 ? '' : 's'} over ${TIGHT} s cut to jumps (${(was - now).toFixed(1)} s shorter)`); }
+  if (TIGHT) { const was = keep.reduce((a, c) => a + +c.dur, 0), now = segs.reduce((a, s) => a + s.out - s.in, 0), n = segs.filter(s => s.jump).length; console.log(`no dead air: ${n} pause${n === 1 ? '' : 's'} over ${TIGHT} s cut to jumps (${(was - now).toFixed(1)} s shorter)${TIGHTENED.some(x => x.noise) ? `, ${TIGHTENED.filter(x => x.noise).length} with a short noise inside it cut too` : ''}`); }
   // big punch on the cut after the hook and the cut into the payoff (with 3+ clips); a jump inside a line keeps the toggle
   const wantPunch = flag('no-punch') ? false : (preset && preset.punch === false ? false : true);
   if (wantPunch && keep.length >= 3) { segs[clipStart[1]].bigPunch = true; segs[clipStart[keep.length - 1]].bigPunch = true; }
@@ -370,7 +374,7 @@ if (!flag('rebuild')) {
   // 3. captions from the clips' word times
   const logo = opt('logo');
   if (logo) fs.copyFileSync(path.resolve(logo), path.join(build, path.basename(logo)));
-  sh(process.execPath, [path.join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--force', ...(cut.hits && cut.hits.length === 0 ? ['--no-glitch'] : []), ...(TITLES ? ['--titles'] : look === 'oneword' ? [] : ['--hero']), ...(look === 'oneword' ? ['--cards'] : []), '--style', STYLE, ...(FONTS ? ['--fonts', FONTS] : []), ...(logo ? ['--logo', path.basename(logo)] : [])], build);
+  sh(process.execPath, [path.join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--force', ...(cut.hits && cut.hits.length === 0 ? ['--no-glitch'] : []), ...(TITLES ? ['--titles'] : look === 'oneword' ? [] : ['--hero']), ...(look === 'oneword' ? ['--cards'] : []), '--style', STYLE, ...(FONTS ? ['--fonts', FONTS] : []), ...(logo ? ['--logo', path.basename(logo)] : []), ...(LOCKS.titleWords ? ['--title-words', LOCKS.titleWords] : [])], build);
   // captions and titles in the words you mean: the recipe's Aliases, and numbers Whisper split at the comma ("10 ,000")
   // and the glossary (kit/glossary.cjs): brand words, with their own casing kept under a caps display face
   { const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), n = S.meantFlips(caps.flips) + GL.applyFlips(caps.flips, GLOSS);
@@ -761,8 +765,11 @@ if (cut.export && X.get(cut.export)) {
   execFileSync('ffmpeg', X.ffmpegArgs(cut.export, out, exported, LEN), { stdio: 'inherit' });
   console.log(`export ${cut.export}: ${exported}`);
 }
+// everything this reel was made from, kept beside it (jobs/<job>/reel-vN.build/), so a later Draft cannot erase it
+// and the reel can be reopened (kit/snapshots.cjs, Studio "Edit this reel", the reopen_reel tool)
+let snapshot = null; try { snapshot = require('./snapshots.cjs').save(job, out); if (snapshot) console.log(`saved the build behind this reel: ${path.relative(job, snapshot)} (reopen: npm run reopen -- ${name} v${v})`); } catch (e) { console.warn('note: could not save the build behind this reel: ' + e.message); }
 let LAY = null; try { LAY = JSON.parse(fs.readFileSync(path.join(build, 'layout.json'), 'utf8')); } catch {}
 const lay = LAY ? { moved: LAY.elements.filter(e => e.action === 'shift').length, hidden: LAY.elements.filter(e => e.action === 'hide').length, safeArea: LAY.elements.filter(e => e.action === 'safe-area').length } : null;
 console.log(`\nReel: ${out}${exported ? '\nExport: ' + exported : ''}\nCheck it: npm run verify -- ${name}${cut.export ? ' --export ' + cut.export : ''} (contact sheet, ffprobe, loudness, mask, overlap${cut.export ? ', safe area' : ''}), watch it, read clips/clips.md for skipped retakes, then edit build/captions.js or build/cut.json and run: npm run reel -- --rebuild --name ${name}`);
 try { require('./star.cjs').maybePrompt({ json: JSON_OUT }); } catch {}
-if (JSON_OUT) console.log(JSON.stringify({ ok: true, job: name, dir: job, reel: out, export: exported, exportPreset: cut.export || null, seconds: +LEN.toFixed(2), layout: lay, verify: `npm run verify -- ${name}${cut.export ? ' --export ' + cut.export : ''} --json` }));
+if (JSON_OUT) console.log(JSON.stringify({ ok: true, job: name, dir: job, reel: out, export: exported, exportPreset: cut.export || null, seconds: +LEN.toFixed(2), layout: lay, verify: `npm run verify -- ${name}${cut.export ? ' --export ' + cut.export : ''} --json`, snapshot: snapshot ? path.relative(job, snapshot) : null }));

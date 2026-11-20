@@ -153,7 +153,7 @@ try {
   await t('setup: the status lists each dependency with its fix; the user list is plain words; setup_status over MCP; Studio serves it', async () => {
     const r = spawnSync(process.execPath, [join(ROOT, 'kit', 'setup.mjs'), '--check', '--json'], { cwd: ROOT, encoding: 'utf8', env });
     const s = JSON.parse(r.stdout);
-    assert.deepStrictEqual(s.items.map(x => x.id), ['node', 'npm', 'python', 'ffmpeg', 'chrome', 'model', 'ytdlp', 'instaloader', 'effects', 'mask', 'humanizer', 'studio']);
+    assert.deepStrictEqual(s.items.map(x => x.id), ['node', 'npm', 'python', 'ffmpeg', 'chrome', 'model', 'ytdlp', 'instaloader', 'effects', 'mask', 'rea', 'humanizer', 'studio']);
     for (const x of s.items) { assert.ok(['ready', 'missing'].includes(x.status)); if (x.status === 'missing') assert.ok(x.fix, x.id + ' has a fix'); }
     assert.strictEqual(r.status, s.ready ? 0 : 1);
     const api = await until(async () => (await req('/api/setup')).j.items && (await req('/api/setup')).j);

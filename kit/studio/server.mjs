@@ -32,6 +32,7 @@ import { mount as mountFolders } from './folders.mjs';
 import { mount as mountPost } from './post-api.mjs';
 
 const require = createRequire(import.meta.url);
+const SNAP = require('../snapshots.cjs');
 const K = require('../packs.cjs');
 const MC = require('../memcheck.cjs');
 const { ROOT, KIT, STUDIO } = C;
@@ -120,9 +121,12 @@ function view(s) {
   let scripts = []; try { scripts = SC.list(s.job); } catch {}
   let cut = null; try { cut = cutView(s); } catch (e) { cut = { error: e.message, candidates: [] }; }
   let broll = null; try { broll = BRL.view(s); } catch (e) { broll = { error: e.message, beats: [] }; }
-  return { seq: ++viewSeq, boot: BOOT, state: s, compose: comp, outputs: C.outputsOf(s), scripts, cut, broll, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
+  let reopenable = []; try { reopenable = s.job ? SNAP.list(join(ROOT, 'jobs', s.job)).filter(x => x.snapshot).map(x => `jobs/${s.job}/${x.reel}`) : []; } catch {}
+  return { seq: ++viewSeq, boot: BOOT, state: s, compose: comp, outputs: C.outputsOf(s), reopenable, scripts, cut, broll, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
 }
 
+// what a finished draft says (a draft is a plan: no video until Render)
+const DRAFT_DONE = 'Plan ready, no video yet. Press Render.';
 // ---------- tasks (one at a time) ----------
 let task = null, seq = 0;
 function runTask(kind, steps, done, hooks = {}) {
@@ -156,7 +160,7 @@ function runTask(kind, steps, done, hooks = {}) {
       }
       if (code !== 0) { me.status = 'failed'; me.result = { code }; break; }
     }
-    if (me.status === 'running') { me.status = 'done'; try { me.result = (await done(out)) || {}; } catch (e) { me.status = 'failed'; log('error: ' + e.message); } }
+    if (me.status === 'running') { me.status = 'done'; try { me.result = (await done(out)) || {}; } catch (e) { me.status = 'failed'; log('error: ' + e.message); }  if (me.status === 'done' && kind === 'draft') log(DRAFT_DONE); }
   })().finally(() => { me.endedAt = Date.now(); if (hooks.end) try { hooks.end(me.status, me.lines); } catch (e) { log('error: ' + e.message); } update(s => { s.task = { id: me.id, kind, status: me.status }; s.outputs = C.outputsOf(s); }); send('task', { id: me.id, status: me.status }); setImmediate(pump); });
   return me;
 }
@@ -764,8 +768,8 @@ async function api(req, res, u) {
   // Install next to a "not installed" pill: the same pip line as setup (kit/setup.mjs --only), in the kit's Python, then
   // a fresh look at the tools, so the page updates without a restart
   if (p === '/api/tools/install' && M === 'POST') {
-    const b = await readBody(req), step = { ytdlp: 'ytdlp', instaloader: 'ytdlp', model: 'model', effects: 'effects' }[b.tool];
-    if (!step) return json(res, 400, { error: 'tool: ytdlp, instaloader, model or effects' });
+    const b = await readBody(req), step = { ytdlp: 'ytdlp', instaloader: 'ytdlp', model: 'model', effects: 'effects', rea: 'rea' }[b.tool];
+    if (!step) return json(res, 400, { error: 'tool: ytdlp, instaloader, model, effects or rea' });
     runTask('install', () => [[process.env.STUDIO_SETUP || 'kit/setup.mjs', ['--only', step]]], () => { const t = F.tools({ fresh: true }); setupStatus(true); return { tool: b.tool, ytdlp: t.ytdlp ? t.ytdlp.version : null, instaloader: t.instaloader }; });
     return json(res, 202, view(C.load()));
   }
@@ -815,7 +819,7 @@ async function api(req, res, u) {
     const s = C.load(); const d = draftSteps(s); // checks the footage first, so an empty job says that before a missing tool
     const miss = needFor('draft'); if (miss) return json(res, 400, { error: miss, setup: true });
     update(st => { st.lockedAtDraft = d.lockString || ''; });
-    runTask('draft', () => d.steps, () => ({ choices: !!readChoices(C.load()) }));
+    runTask('draft', () => d.steps, () => ({ choices: !!readChoices(C.load()), note: DRAFT_DONE }));
     return json(res, 202, view(C.load()));
   }
   if (p === '/api/render' && M === 'POST') {
@@ -829,6 +833,15 @@ async function api(req, res, u) {
     if (b.memory === 'anyway') r.steps[0][2] = { ...(r.steps[0][2] || {}), MASK_FORCE: '1' };
     runTask('render', () => r.steps, () => { const st = C.load(), outputs = C.outputsOf(st); return { outputs, copiedTo: copyRenders(outputs), fx: r.fx, effects: r.effects }; });
     return json(res, 202, { ...view(C.load()), fx: r.fx, effectsSkipped: r.effects.length && !r.fx ? 'effects need npm run effects:setup' : null });
+  }
+  // Edit this reel: the build behind a finished reel back into build/ (kit/snapshots.cjs); the build it replaces is saved
+  if (p === '/api/reopen' && M === 'POST') {
+    const b = await readBody(req), s = C.load();
+    if (!s.job) return json(res, 400, { error: 'name the job first' });
+    if (task && task.status === 'running') return json(res, 409, { error: 'wait for the running task to finish' });
+    let r; try { r = SNAP.reopen(join(ROOT, 'jobs', s.job), String(b.reel || '').split('/').pop()); } catch (e) { return json(res, 400, { error: e.message }); }
+    update(st => { if (S.load().actionNotes !== false) C.applyPatch(st, { reply: `${r.reel} is back in the editor. Change the picks, then Render makes the next version.${r.backup ? ' The draft it replaced is saved as ' + r.backup + '.' : ''}`, from: 'Studio', kind: 'action' }); });
+    return json(res, 200, { reopened: r, ...view(C.load()) });
   }
   if (p === '/api/task/cancel' && M === 'POST') { if (task && task.status === 'running') { task.cancel = true; task.proc && task.proc.kill('SIGTERM'); } return json(res, 200, view(C.load())); }
   if (p === '/api/choices' && M === 'GET') { const s = C.load(), ch = readChoices(s); return json(res, 200, { choices: ch, receipt: receiptOf(s, ch) }); }
@@ -870,7 +883,7 @@ async function api(req, res, u) {
     const note = `Clean-up: ${removed.filter(x => x.type === 'silence').length} pauses, ${removed.filter(x => x.type === 'filler').length} filler words and ${items.filter(x => x.type === 'take').length - pl.keep.length} retakes left out, ${pl.saved} s shorter. ${b.redraft === false ? 'Used on the next draft.' : 'Redrafting.'}`;
     update(st => { st.cleanup = { on: true, silence: sil || (st.cleanup && st.cleanup.silence) || 0.7, decisions: dec, footage: footageKey(st), at: new Date().toISOString(), saved: pl.saved };
       if (S.load().actionNotes !== false) C.applyPatch(st, { reply: note, from: 'Studio', kind: 'action' }); });
-    if (b.redraft !== false) { const s = C.load(), d = draftSteps(s); update(st => { st.lockedAtDraft = d.lockString || ''; }); runTask('draft', () => d.steps, () => ({ choices: !!readChoices(C.load()), cleanup: pl })); }
+    if (b.redraft !== false) { const s = C.load(), d = draftSteps(s); update(st => { st.lockedAtDraft = d.lockString || ''; }); runTask('draft', () => d.steps, () => ({ choices: !!readChoices(C.load()), cleanup: pl, note: DRAFT_DONE })); }
     return json(res, 202, { ...cleanupView(C.load()), plan: pl, ...view(C.load()) });
   }
   // comment on the preview: a click or a box on a frame, sent to whoever answers the chat, with the frame saved in the job

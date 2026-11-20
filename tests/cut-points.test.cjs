@@ -107,4 +107,57 @@ t('a long take: every cut of every sentence passes the acceptance margins', () =
   }
 });
 
+// session report 2 (Will's from-the-heart take): Whisper stretched a word across each long pause, so a pause cutter
+// that trusts word gaps saw none. These rebuild the three spots and the clipped "AI." from the measured times.
+const spansClean = (env, words, r, why) => r.spans.forEach((s, k) => clean(env, words, s, `${why} span ${k}`));
+t('report 2 B: "30" starts while "From" still sounds, real sound 1.58 s later; tighten finds the pause on the audio', () => {
+  // "From" sounds 0.5-1.16, Whisper puts "30" at 1.0-3.14, its sound starts 2.74 (26.28-28.42 / 28.02 in the take)
+  const env = envOf(6, { voiced: [[0.5, 1.16], [2.74, 3.14], [3.2, 3.9]] });
+  const words = [[0.5, 1.0, 'From'], [1.0, 3.14, '30'], [3.2, 3.9, 'websites']];
+  const r = CP.tightenSpans(words, env, 0.2, { range: [0.4, 4.1], dur: 6 });
+  assert.strictEqual(r.cuts.length, 1, JSON.stringify(r));
+  const kept = r.spans.reduce((x, [a, b]) => x + b - a, 0); assert.ok(4.1 - 0.4 - kept > 1.2, 'over 1.2 s of the 1.58 s pause is gone: ' + JSON.stringify(r));
+  spansClean(env, [[0.5, 1.16, 'From'], [2.74, 3.14, '30'], [3.2, 3.9, 'websites']], r, '"30"');
+  assert.deepStrictEqual(CP.retime([words[1]], env)[0].slice(0, 1).map(x => Math.round(x * 10) / 10), [2.7], '"30" retimed to its sound');
+});
+t('report 2 B: "show" stretched over 1.59 s of silence, and a 1.3 s word with a late onset (under the old 1.5 s rule)', () => {
+  let env = envOf(6, { voiced: [[0.5, 1.2], [2.79, 3.1], [3.15, 3.8]] });
+  let r = CP.tightenSpans([[0.5, 1.2, 'helping'], [1.22, 3.02, 'show'], [3.05, 3.8, 'them']], env, 0.2, { range: [0.4, 4.0], dur: 6 });
+  assert.strictEqual(r.cuts.length, 1); assert.ok(r.cuts[0].resume - r.cuts[0].at > 1.2, JSON.stringify(r));
+  spansClean(env, [[0.5, 1.2, 'helping'], [2.79, 3.1, 'show'], [3.15, 3.8, 'them']], r, '"show"');
+  env = envOf(6, { voiced: [[0.5, 1.1], [2.0, 2.4], [2.45, 2.9]] });
+  r = CP.tightenSpans([[0.5, 1.1, 'you.'], [1.12, 2.42, 'So'], [2.45, 2.9, 'join']], env, 0.2, { range: [0.4, 3.1], dur: 6 });
+  assert.strictEqual(r.cuts.length, 1); assert.ok(r.cuts[0].resume - r.cuts[0].at >= 0.55, JSON.stringify(r));
+  spansClean(env, [[0.5, 1.1, 'you.'], [2.0, 2.4, 'So'], [2.45, 2.9, 'join']], r, 'late onset');
+});
+t('report 2 B + D: "help you." [noise] "So join": the pause and the 0.25 s noise inside it go together', () => {
+  // quiet 1.1-1.48, a 0.25 s noise 1.48-1.73 (818.98-819.23), quiet to 2.5 (820.11), Whisper "So" 1.72-3.1
+  const env = envOf(6, { voiced: [[0.5, 1.1], [2.5, 2.9], [2.95, 3.4]], breath: [[1.48, 1.73]] });
+  const words = [[0.5, 1.1, 'you.'], [1.72, 3.1, 'So'], [3.1, 3.4, 'join']];
+  const r = CP.tightenSpans(words, env, 0.2, { range: [0.4, 3.6], dur: 6 });
+  assert.strictEqual(r.cuts.length, 1, JSON.stringify(r));
+  const [c] = r.cuts; assert.ok(c.at < 1.45 && c.resume > 1.75 && c.noise && c.noise.length === 1, 'the noise is inside the cut: ' + JSON.stringify(c));
+  spansClean(env, [[0.5, 1.1, 'you.'], [2.5, 2.9, 'So'], [2.95, 3.4, 'join']], r, 'noise');
+  const nz = CP.noisesIn(words, env, [0.4, 3.6]); assert.strictEqual(nz.length, 1); assert.ok(Math.abs(nz[0].from - 1.48) < 0.04 && Math.abs(nz[0].to - 1.73) < 0.04, JSON.stringify(nz));
+  assert.ok(!CP.tightenSpans(words, env, 0.2, { range: [0.4, 3.6], dur: 6 }, { noises: false }).cuts.some(x => x.noise), 'noises: false leaves it');
+});
+t('report 2: a short word alone in a pause ("a") is a word, not a noise', () => {
+  const env = envOf(6, { voiced: [[0.5, 1.1], [1.5, 1.7], [2.2, 2.8]] });
+  const words = [[0.5, 1.1, 'and'], [1.48, 1.72, 'a'], [2.2, 2.8, 'thing']];
+  assert.strictEqual(CP.noisesIn(words, env, [0.4, 3]).length, 0);
+  const r = CP.tightenSpans(words, env, 0.2, { range: [0.4, 3], dur: 6 }); spansClean(env, words, r, '"a"');
+  assert.ok(r.spans.some(([a, b]) => a < 1.5 && b > 1.7), 'the word stays: ' + JSON.stringify(r));
+});
+t('report 2 C: "AI." runs 0.39 s past Whisper, the next line starts 0.76 s after Whisper says; the end waits for the sound', () => {
+  // Whisper: "AI." ends 1.58 (148.58), next line 1.80 (148.80); sound runs to 1.97 (148.97), next sound 2.56 (149.56)
+  const env = envOf(5, { voiced: [[1.0, 1.97], [2.56, 3.2]] });
+  const words = [[1.0, 1.58, 'AI.'], [1.80, 3.2, 'So']];
+  const r = CP.snapRange([0.9, 1.58], words, env, 5), e = r.points.find(p => p.edge === 'end');
+  assert.ok(r.range[1] >= 1.97 + 0.12 && r.range[1] <= 2.56 - 0.06, 'whole word plus a tail, not capped at 1.80: ' + JSON.stringify(r));
+  assert.ok(!e.extended && e.sure, 'a sure audio end, not an extension: ' + JSON.stringify(e));
+  clean(env, [[1.0, 1.97, 'AI.'], [2.56, 3.2, 'So']], r.range, '"AI."');
+  // the start of the next line follows its sound too, not Whisper's early 1.80
+  const n = CP.snapRange([1.8, 3.2], words, env, 5); assert.ok(n.range[0] >= 1.97 + 0.05 && n.range[0] <= 2.56 - 0.06, JSON.stringify(n));
+});
+
 console.log(`\ncut points: ${n} tests passed`);

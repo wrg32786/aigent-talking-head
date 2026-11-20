@@ -258,7 +258,7 @@ export function compose(s, { refPack = null } = {}) {
   if (lockString) args.push('--lock', lockString);
   return { args, locks, lockString, notes, effects: fx, errs, bed: s.music.bed === 'upload' ? (s.music.upload ? basename(s.music.upload) : null) : s.music.bed };
 }
-const KEBAB = { maxTitles: 'max-titles', captionEntrance: 'caption-entrance' };
+const KEBAB = { maxTitles: 'max-titles', titleWords: 'title-words', captionEntrance: 'caption-entrance' };
 export function lockStringOf(l) {
   const parts = [];
   for (const [k, v] of Object.entries(l || {})) {

@@ -20,7 +20,7 @@ export const stepName = st => STEP_LABEL[st] || cap1(st);
 export const SITE = { youtube: 'YouTube', 'youtube-shorts': 'Shorts', tiktok: 'TikTok', x: 'X', vimeo: 'Vimeo', instagram: 'Instagram', file: 'File', other: 'Link' };
 export const STATUS = { queued: 'Waiting', downloading: 'Downloading', tearing: 'Breaking down', ready: 'Ready', failed: 'Failed', cancelled: 'Cancelled' };
 export const KIND_NAME = { transition: 'transition', entrance: 'title entrance', captionEntrance: 'caption entrance', captionStyle: 'caption style', graphic: 'graphic', effect: 'effect', finish: 'finish', font: 'font pairing', look: 'look', theme: 'theme', titleLayer: 'title layer', bed: 'music bed', sfx: 'sound', beatSync: 'beat sync', editing: 'editing' };
-export const MODE_TIP = { influence: 'Borrows its style as soft defaults. Your picks still win.', recreate: 'Follows its shots, titles and cards with your clip.', off: 'The reference is ignored.' };
+export const MODE_TIP = { influence: 'Borrows its picks as soft defaults. It does not copy the look (Recreate does). Your picks still win.', recreate: 'Follows its shots, titles and cards with your clip.', off: 'The reference is ignored.' };
 export const MSG_STATUS = { queued: 'Queued', seen: 'Seen', answered: 'Answered' };
 export const SETUP_LINE = 'Set up Studio from AGENTS.md and run the Studio chat loop';
 export const pickState = (s, it) => { if (it && it.kind === 'bed') return s.music && s.music.bed === it.id ? 'allow' : null; const p = s.picks[it.kind === 'editing' ? 'editing' : it.kind]; if (!p) return null; return p.allow.includes(it.id) ? 'allow' : p.deny.includes(it.id) ? 'deny' : null; };

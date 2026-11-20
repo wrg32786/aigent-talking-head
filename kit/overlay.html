@@ -33,6 +33,25 @@ function mkSet(p){const fonts=pairFonts(p),d=fonts.display,c=fonts.caption,sc=fo
 function use(s){if(PN===s.name)return;PN=s.name;TH.fonts=s.fonts;({DF,TRK,F,G,K,S,SCF,LK}=s)}
 const SETS={},BASE=mkSet(FP);SETS[BASE.name]=BASE;use(BASE);
 const CYC=(window.FONTSETS||[]).map(p=>{const s=mkSet(p.display||p.secondary||p.script?p:null);return SETS[s.name]||(SETS[s.name]=s)});
+// A capital I inside a word ("AIgent", "OpenAI", "AI") in a sans face is a plain bar, the same as a lowercase l, so
+// "AIgent" read as "Algent" (session report 2, H). Such an I gets two short serifs, drawn with the same fill or stroke
+// as the word. Left as they are: a word that starts with I ("In", "It", "I"), all-caps words of 4+ letters, serif
+// faces, and in the display face (titles, hero words) an I after a capital. Words drawn letter by letter are followed
+// through the letter drawn just before.
+(()=>{const P=CanvasRenderingContext2D.prototype,F=P.fillText,K=P.strokeText,RX=/[A-Za-z]I/g,LAST=new WeakMap();
+ const serif=f=>/serif/i.test(String(f).replace(/sans-serif/ig,'')),disp=f=>{const d=window.THEME&&THEME.fonts&&THEME.fonts.display&&THEME.fonts.display.family;return!!(d&&String(f).includes(String(d).split(',')[0].trim()))};
+ const bars=(c,txt,k,x,y)=>{const W=c.measureText(txt).width,al=c.textAlign,dir=c.direction==='rtl',x0=al==='center'?x-W/2:(al==='right'||(al==='end'&&!dir)||(al==='start'&&dir))?x-W:x;
+  const mI=c.measureText('I'),sw=Math.max(1,(mI.actualBoundingBoxRight+mI.actualBoundingBoxLeft)||mI.width*.3),top=y-mI.actualBoundingBoxAscent,bot=y+mI.actualBoundingBoxDescent,hw=Math.min(sw*1.35,mI.width*.5+sw*.2),th=Math.max(1,sw*.8);
+  const cx=x0+(k?c.measureText(txt.slice(0,k)).width:0)+mI.width/2;return[[cx-hw,top,hw*2,th],[cx-hw,bot-th,hw*2,th]]};
+ const spots=(c,txt,x,y,kind)=>{if(typeof txt!=='string'||!txt)return null;const key=kind,last=(LAST.get(c)||{})[key];
+  const prev=last&&last.font===c.font&&last.single?last.ch:'';(LAST.get(c)||LAST.set(c,{}).get(c))[key]={ch:txt[txt.length-1],font:c.font,single:txt.length===1};
+  if(txt.indexOf('I')<0||serif(c.font))return null;const D=disp(c.font),out=[];
+  if(txt==='I'){if(/[a-z]/.test(prev)||(/[A-Z]/.test(prev)&&!D))return bars(c,txt,0,x,y);return null}
+  for(const w of txt.matchAll(/[A-Za-z]+/g)){const word=w[0];if(!/[a-z]/.test(word)&&word.length>3)continue;for(const m of word.matchAll(RX)){if(D&&/[A-Z]/.test(m[0][0]))continue;out.push(w.index+m.index+1)}}
+  return out.length?out.flatMap(k=>bars(c,txt,k,x,y)):null};
+ P.fillText=function(t,x,y,mw){F.call(this,t,x,y,mw);if(mw!=null)return;const r=spots(this,t,x,y,'f');if(r)for(const b of r)this.fillRect(...b)};
+ P.strokeText=function(t,x,y,mw){K.call(this,t,x,y,mw);if(mw!=null)return;const r=spots(this,t,x,y,'s');if(r)for(const b of r)this.strokeRect(...b)};
+ window.__serifI=(txt,font)=>{const c=document.createElement('canvas').getContext('2d');c.font=font||'76px sans-serif';let n=0;for(const ch of txt)n+=(spots(c,ch,0,100,'f')||[]).length/2;const c2=document.createElement('canvas').getContext('2d');c2.font=c.font;return[n,(spots(c2,txt,0,100,'f')||[]).length/2]}})();
 let ctx=document.getElementById('c').getContext('2d'); // let: graphics motion blur draws sub-frames on a scratch canvas
 const mk=()=>{const c=document.createElement('canvas');c.width=1080;c.height=1920;return c};const TC=mk(),MC=mk(),T=TC.getContext('2d'),M=MC.getContext('2d');
 const Y=CAP.captionY||1300; // caption band: chest, below the face box. Measure the face per take; text never covers the face.
@@ -118,7 +137,8 @@ ctx.save();ctx.translate(cx,cy);ctx.scale(s,s);ctx.translate(-cx,-cy);spray((CAP
 // Logo plate: square plate (theme plate colour) with the logo on it. Logo file comes from captions.js "logo" or theme.logo.src.
 // A keyword logo (kit/brands.cjs: the flip has its own "logo") is a smaller plate high in the frame, on a white plate so
 // the mark keeps its own colours ("plate", "size" and "y" (0 to 1) change it).
-const LOGO=CAP.logo||(TH.logo&&TH.logo.src)||null;const SK=new Image();if(LOGO)SK.src=LOGO;
+const DU=u=>(window.DATAURLS&&window.DATAURLS[u])||u; // logos as data URLs (render.mjs): a file image taints the canvas
+const LOGO=CAP.logo||(TH.logo&&TH.logo.src)||null;const SK=new Image();if(LOGO)SK.src=DU(LOGO);
 function logoPlate(dt,c){const o=(c&&c[4])||{},own=!!o.logo,im=own?gimg(o.logo):SK;if(!im||!im.naturalWidth)return;const s=.4+.6*backOut(cl(dt/.2)),w=o.size||(own?320:620),h=w*(im.naturalHeight/im.naturalWidth||.325),pad=own?30:46,y=own?(o.y!=null?+o.y:.2)*1920:Y;ctx.save();ctx.translate(540,y);ctx.rotate(.035+Math.exp(-7*dt)*Math.sin(dt*26)*.05);ctx.scale(s,s);shadow(ctx,70);ctx.fillStyle=own?(o.plate||'#ffffff'):TH.colors.plate;ctx.fillRect(-w/2-pad,-h/2-pad,w+2*pad,h+2*pad);ctx.shadowColor='transparent';if(im.complete)ctx.drawImage(im,-w/2,-h/2,w,h);ctx.restore()}
 // Kinetic title. Our own code; entrance ideas (stagger, slam with overshoot, blur rise, elastic, flip, pop zoom) follow
 // common kinetic-type recipes such as nexu-io/motion-anything (Apache-2.0, reference only; see THIRD_PARTY.md).
@@ -474,7 +494,7 @@ function caption(c,t){const st=c[4].style||CSTYLE;if(st==='one-word'&&OWSEQ)retu
 // without one the kit draws a neutral glyph or placeholder window.
 const GX=window.GFX||{},GXA=GX.assets||{},GXF=GX.fonts||{},GIMG={},IMGP=[];
 for(const [fam,u,st] of [['ATH Gfx Serif',GXF.serif,'italic'],['ATH Gfx Label',GXF.label,'normal'],['ATH Gfx Mono',GXF.mono,'normal'],['ATH Gfx Slam',GXF.slam,'normal'],['ATH Gfx Code',GXF.code,'normal']])if(u){const ff=new FontFace(fam,`url("${u}")`,{style:st,...(fam==='ATH Gfx Code'?{weight:'100 800'}:{})});document.fonts.add(ff);FACES.push(ff.load().catch(()=>console.warn('font failed',fam)))}
-const gimg=u=>{if(!u)return null;if(GIMG[u])return GIMG[u];const i=new Image();IMGP.push(new Promise(r=>{i.onload=r;i.onerror=r}));i.src=u;GIMG[u]=i;return i};
+const gimg=u=>{if(!u)return null;if(GIMG[u])return GIMG[u];const i=new Image();IMGP.push(new Promise(r=>{i.onload=r;i.onerror=r}));i.src=(window.DATAURLS&&window.DATAURLS[u])||u;GIMG[u]=i;return i};
 for(const c of flips)if(c[3]===5&&c[4].logo)gimg(c[4].logo); // keyword logos load before the first frame
 for(const a of Object.values(GXA)){gimg(a.icon);gimg(a.src);(a.frames||[]).forEach(gimg)}
 const gxa=c=>GXA[c[3]+'@'+c[0]]||{};
@@ -1222,7 +1242,7 @@ window.__faceInk=t=>{const z=faceAt(t);if(!z)return null;const q={x0:Math.floor(
  for(const c of flips){if(!isText(c)||t<c[0]||t>=c[1])continue;const keep=ctx,L=LAYER;MSX.setTransform(1,0,0,1,0,0);MSX.globalAlpha=1;MSX.clearRect(0,0,270,480);MSX.setTransform(.25,0,0,.25,0,0);ctx=MSX;LAYER='all';
   try{flip(t,[c])}catch(e){}finally{ctx=keep;LAYER=L}
   if(cardAt(t))continue; // on a full colour card there is no face to cover
-  const d=MSX.getImageData(q.x0,q.y0,Math.max(1,q.x1-q.x0),Math.max(1,q.y1-q.y0)).data;let n=0;for(let i=3;i<d.length;i+=4)if(d[i]>96)n++;
+  let d;try{d=MSX.getImageData(q.x0,q.y0,Math.max(1,q.x1-q.x0),Math.max(1,q.y1-q.y0)).data}catch(e){window.__faceTainted=true;continue}/* a file image tainted it: report, never stop the render */let n=0;for(let i=3;i<d.length;i+=4)if(d[i]>96)n++;
   if(n)out.push({kind:kindOf(c),mode:c[3],start:c[0],text:String(c[2]||'').slice(0,40),px:n*16})}
  return{zone:z,hits:out}};
 // every element on screen at t, each measured alone with its layout applied (hidden ones report no box)

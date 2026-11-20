@@ -119,14 +119,28 @@ function activity(env, o = SNAP) {
 }
 const sounding = (env, x, r = 0.012) => { const A = activity(env); for (let i = A.i(x - r); i <= A.i(x + r); i++) if (A.act[i]) return true; return false; };
 
-// words that cannot be right are re-timed from the audio first: a word over 1.5 s (a pause swallowed into it) starts
-// at its first sound and ends at its last
+// words that cannot be right are re-timed from the audio first. Whisper often stretches a word across a pause: it
+// starts the word while the word before is still sounding (or in the quiet after it) and the real sound comes 0.9 to
+// 1.6 s later, or it runs a word's end on into the pause. So:
+//   a word with a quiet run of HIDDEN (0.35 s) or more inside it keeps only the side with more sound (a late onset
+//   starts the word at its sound, a stretched end ends it at its last sound)
+//   a word over 1.5 s starts at its first sound and ends at its last
+const HIDDEN = 0.35;
+function quietRuns(A, i0, i1) { const out = []; for (let i = i0; i <= i1;) { if (A.act[i]) { i++; continue; } let j = i; while (j + 1 <= i1 && !A.act[j + 1]) j++; out.push([i, j]); i = j + 1; } return out; }
 function retime(words, env) {
   if (!isEnv(env)) return words;
-  const A = activity(env);
+  const A = activity(env), hidN = Math.round(HIDDEN / env.hop);
   return words.map(w => {
-    if (!(w[1] - w[0] > 1.5)) return w;
-    let i0 = A.i(w[0]), i1 = A.i(w[1]); while (i0 < i1 && !A.act[i0]) i0++; while (i1 > i0 && !A.act[i1]) i1--;
+    if (!(w[1] - w[0] >= HIDDEN + 0.05)) return w;
+    let i0 = A.i(w[0]), i1 = A.i(w[1]);
+    // the longest quiet run inside the word
+    const runs = quietRuns(A, i0, i1).filter(([a, b]) => b - a + 1 >= hidN && a > i0 && b < i1);
+    if (runs.length) {
+      const [qa, qb] = runs.reduce((x, y) => (y[1] - y[0] > x[1] - x[0] ? y : x));
+      let before = 0, after = 0; for (let i = i0; i < qa; i++) before += A.act[i]; for (let i = qb + 1; i <= i1; i++) after += A.act[i];
+      if (after >= before) i0 = qb + 1; else i1 = qa - 1;
+    } else if (!(w[1] - w[0] > 1.5)) return w;
+    while (i0 < i1 && !A.act[i0]) i0++; while (i1 > i0 && !A.act[i1]) i1--;
     return i1 > i0 ? [+A.t(i0).toFixed(3), +(A.t(i1) + 0.01).toFixed(3), ...w.slice(2)] : w;
   });
 }
@@ -205,26 +219,54 @@ function snapRanges(ranges, words, env, dur, o) {
   return { ranges: mergeRanges(out.map(x => x.range)), cuts: out.flatMap((x, k) => x.points.map(p => ({ ...p, part: k }))) };
 }
 
-// tighten (no dead air): every pause inside [a, b] longer than maxPause becomes a jump. The cut goes 180 ms after the
-// last sound (at least 120 ms of breath) and the piece resumes 110 ms before the next sound, both from the audio.
-// keep(at, i) true leaves that pause. Returns { spans: [[x, y]], cuts: [{ at, resume, gap, after, i }] }.
+// pauses inside [a0, b0] from the AUDIO, not the word gaps: Whisper stretches words over pauses, so a pause can sit
+// inside a "word". Each quiet run between two sounds is a pause. A short sound no word sits on (under 0.3 s, quiet of
+// at least 0.3 s on both sides: a click, a lip smack, a chair) joins the two quiet runs into one pause and is listed in
+// "noises", so tighten cuts it out with the silence. Returns [{ pEnd, nOn, noises: [[from, to]], L, N, i }].
+const NOISE = { max: 0.3, quiet: 0.3, overlap: 0.4 };
+function wordOn(W, x, y) { const d = y - x; return W.some(w => Math.min(w[1], y) - Math.max(w[0], x) > NOISE.overlap * d); }
+function pausesIn(words, env, [a0, b0], o = SNAP, { noises = true } = {}) {
+  const W = retime((words || []).filter(w => w[1] > w[0]), env), { gaps } = activity(env, o), out = [];
+  for (const g of gaps) {
+    if (!Number.isFinite(g.pEnd) || !Number.isFinite(g.nOn) || g.pEnd < a0 || g.nOn > b0) continue;
+    const l = out[out.length - 1];
+    if (noises && l && g.pEnd - l.nOn <= NOISE.max && l.nOn - l.lastQ >= NOISE.quiet && g.nOn - g.pEnd >= NOISE.quiet && !wordOn(W, l.nOn, g.pEnd)) {
+      l.noises.push([r3(l.nOn), r3(g.pEnd)]); l.lastQ = g.pEnd; l.nOn = g.nOn; continue;
+    }
+    out.push({ pEnd: g.pEnd, nOn: g.nOn, lastQ: g.pEnd, noises: [] });
+  }
+  return out.map(({ lastQ, ...p }) => {
+    let i = -1; for (let k = 0; k < W.length; k++) if (W[k][0] < p.pEnd + 0.01) i = k; else break;
+    return { ...p, i, L: W[i] || [a0, a0, ''], N: W.slice(i + 1).find(w => w[1] > p.nOn - 0.01) || [b0, b0, ''] };
+  });
+}
+// short sounds no word sits on (80 ms to 0.3 s), inside the pauses of [a0, b0] (for the agent: "a noise at 819.0")
+function noisesIn(words, env, range, o = SNAP) {
+  if (!isEnv(env)) return [];
+  const D = env.seconds, [a0, b0] = range || [0, D];
+  return pausesIn(words, env, [a0, b0], o).flatMap(p => p.noises.filter(([f, t]) => t - f >= 0.08).map(([from, to]) => ({ from, to, seconds: r3(to - from), after: String(p.L[2] || '').slice(0, 24), before: String(p.N[2] || '').slice(0, 24) })));
+}
+
+// tighten (no dead air): every pause inside [a, b] longer than maxPause becomes a jump. Pauses come from the audio
+// (pausesIn: a pause Whisper hid inside a stretched word counts, a click inside a pause goes with it). The cut goes
+// 180 ms after the last sound (at least 120 ms of breath, and 60 ms past a fading tail) and the piece resumes 110 ms
+// before the next sound (40 ms before a soft start), both from the audio.
+// keep(at, i, L, N) true leaves that pause. Returns { spans: [[x, y]], cuts: [{ at, resume, gap, after, i, noise? }] }.
 function tightenSpans(words, env, maxPause, { range, keep, dur } = {}, opts = {}) {
   const o = { ...SNAP, ...opts }, D = dur || (isEnv(env) ? env.seconds : 0), [a0, b0] = range || [0, D];
   if (!maxPause || !isEnv(env)) return { spans: [[a0, b0]], cuts: [] };
-  const W = retime((words || []).filter(w => w[1] > w[0] && w[0] >= a0 - 0.05 && w[1] <= b0 + 0.05), env), { gaps } = activity(env, o), spans = [], cuts = [];
-  let a = a0, gi = 0;
-  for (let i = 0; i < W.length - 1; i++) {
-    const L = W[i], N = W[i + 1];
-    // the longest quiet run between the two words (the transcript may be a little early or late on either side)
-    let g = null;
-    while (gi < gaps.length && gaps[gi].nOn < L[1] - 0.08) gi++;
-    for (let k = gi; k < gaps.length && gaps[k].pEnd < N[0] + 0.15; k++) { const x = gaps[k]; if (x.nOn > L[1] - 0.08 && (!g || x.nOn - x.pEnd > g.nOn - g.pEnd)) g = x; }
-    if (!g || !Number.isFinite(g.pEnd) || !Number.isFinite(g.nOn) || g.nOn - g.pEnd <= maxPause) continue;
-    const at = g.pEnd + o.tailTarget, resume = g.nOn - o.leadTarget;
+  const A = activity(env, o), spans = [], cuts = [];
+  let a = a0;
+  for (const p of pausesIn((words || []).filter(w => w[1] > w[0] && w[0] >= a0 - 0.05 && w[1] <= b0 + 0.05), env, [a0, b0], o, { noises: opts.noises !== false })) {
+    if (p.nOn - p.pEnd <= maxPause) continue;
+    let at = p.pEnd + o.tailTarget, resume = p.nOn - o.leadTarget;
+    // a fading tail after the last loud frame / a soft start before the next: keep them too, when the pause has room
+    let j = A.i(p.pEnd); while (j + 1 < A.faint.length && A.faint[j + 1] && A.t(j + 1) < p.nOn) j++; if (A.t(j) + 0.06 > at && A.t(j) + 0.06 < resume - 0.2) at = A.t(j) + 0.06;
+    j = A.i(p.nOn); while (j - 1 >= 0 && A.faint[j - 1] && A.t(j - 1) > at) j--; if (A.t(j) - 0.04 < resume && A.t(j) - 0.04 > at + 0.2) resume = A.t(j) - 0.04;
     if (resume - at < 0.2 || at - a < 0.35 || at > b0 || resume < a0) continue;
-    if (keep && keep(r3(at), i, L, N)) continue;
+    if (keep && keep(r3(at), p.i, p.L, p.N)) continue;
     spans.push([r3(a), r3(at)]); a = resume;
-    cuts.push({ at: r3(at), resume: r3(resume), gap: r3(g.nOn - g.pEnd), after: String(L[2] || '').slice(0, 24), i });
+    cuts.push({ at: r3(at), resume: r3(resume), gap: r3(p.nOn - p.pEnd), after: String(p.L[2] || '').slice(0, 24), i: p.i, ...(p.noises.length ? { noise: p.noises } : {}) });
   }
   spans.push([r3(a), r3(b0)]);
   return { spans: spans.filter(([x, y]) => y - x > 0.05), cuts };
@@ -239,7 +281,7 @@ function edgeReport(env, words, c, edge) {
   return { midWord: !!(w && sounding(env, c)), word: w ? w[2] : null, pad: r3(pad) };
 }
 
-module.exports = { SNAP, ACCEPT, SR, HOP, WIN, EnvBuilder, envelopeFromSamples, envelopeOf, envelopeSync, toJSON, fromJSON, isEnv, activity, sounding, retime, endEdge, startEdge, snapRange, snapRanges, mergeRanges, tightenSpans, edgeReport };
+module.exports = { SNAP, ACCEPT, SR, HOP, WIN, EnvBuilder, envelopeFromSamples, envelopeOf, envelopeSync, toJSON, fromJSON, isEnv, activity, sounding, retime, endEdge, startEdge, snapRange, snapRanges, mergeRanges, tightenSpans, pausesIn, noisesIn, edgeReport, HIDDEN, NOISE };
 
 if (require.main === module) {
   const [cmd, file, inF] = process.argv.slice(2), fs = require('fs');

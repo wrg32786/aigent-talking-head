@@ -1,7 +1,7 @@
 {
   "contract": 1,
   "name": "aigent-talking-head",
-  "version": "1.10.0",
+  "version": "1.10.1",
   "summary": "Turn a phone clip into a captioned, styled 9:16 talking-head reel, locally.",
   "skill": "skills/aigent-talking-head/SKILL.md",
   "invoke": "npm run <command> -- <args>  (from the repo root; or node <script> <args>)",
@@ -661,6 +661,30 @@
       "outputs": ["kit/fonts/examples/"],
       "success": "exit 0",
       "failures": []
+    },
+    {
+      "name": "reels",
+      "script": "kit/snapshots.cjs",
+      "summary": "List a job's reels and which can be reopened. Each export saves the build behind it in jobs/<job>/reel-vN.build/.",
+      "positional": [{ "name": "job", "type": "string", "required": true, "description": "job name under jobs/" }],
+      "flags": [],
+      "outputs": ["stdout: one line per reel"],
+      "success": "exit 0",
+      "failures": ["no job of that name"]
+    },
+    { "name": "reopen", "alias": "reels", "args": ["reopen"] },
+    {
+      "name": "cut",
+      "script": "kit/manual-cuts.cjs",
+      "summary": "Cut a stretch out of a clip by hand (a cough, a click, a false start): add <job> <clip> <from> <to> [--source], list, clear, or noises <job> [clip] to find short non-speech sounds in the pauses. Cuts live in jobs/<job>/manual-cuts.json and apply on the next draft with short fades.",
+      "positional": [
+        { "name": "command", "type": "string", "required": true, "description": "add, list, clear or noises" },
+        { "name": "job", "type": "string", "required": true, "description": "job name under jobs/" }
+      ],
+      "flags": [],
+      "outputs": ["jobs/<job>/manual-cuts.json"],
+      "success": "exit 0",
+      "failures": ["to is not after from", "a span over 30 s", "no job of that name"]
     }
   ]
 }

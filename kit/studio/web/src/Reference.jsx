@@ -85,6 +85,8 @@ function Breakdown({ CAT, V, s, apply, patch }) {
         </SegmentedControl>
       </div>
     </div>
+    {/fallback/.test(engine || '') && <p className="fine ref-engine" id="ref-engine" role="note"><Badge label="Read by the built-in analyzer" variant="warning" /> It is rougher and can miss shots, titles and the grade. <InstallTool tool="rea" V={V} apply={apply} /> rea-video, then add this reference again.</p>}
+    {r.mode === 'influence' && <p className="fine" id="ref-mode-note">Influence borrows its picks. It does not copy the look. Recreate does.</p>}
     <div className="td-body">
       {r.contact ? <img src={file(r.contact)} alt="Contact sheet of the reference, one frame per shot" /> : <div className="empty-art"><Icon n="film" /></div>}
       <div>

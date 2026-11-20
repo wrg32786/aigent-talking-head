@@ -9,6 +9,8 @@
 //                    weighted by the pack's "weights.transitions". Without glitch in the list there is no glitch seam.
 //   titles           title entrances (kit/rules.cjs ENTRANCES). With fewer entrances than titles they repeat in turn.
 //   max-titles       at most n kinetic titles (0 = none); the hook and the payoff are kept first
+//   title-words      one (each title is its key word) or phrase (the beat's last phrase). Default: one for the oneword
+//                    look, phrase for the rest (since 1.7.0). Pin it so the same clips give the same reel.
 //   caption-entrance one caption entrance for the job (pop, unfurl, cascade, ...)
 //   graphics         only these graphics may appear (kit/graphics.json ids)
 //   no-graphics      these graphics never appear
@@ -16,7 +18,7 @@
 //   cards            off = no colour or chapter cards
 //   sfx              off = no sounds on the cuts
 //   punch            off, or a zoom from 0.02 to 0.3
-// In pack.json the same keys are camelCase: transitions, titles, maxTitles, captionEntrance, graphics: { allow, deny },
+// In pack.json the same keys are camelCase: transitions, titles, maxTitles, titleWords, captionEntrance, graphics: { allow, deny },
 // finishes, cards, sfx, punch.
 'use strict';
 const fs = require('fs');
@@ -29,8 +31,8 @@ const TITLE_MODE = 7, CARD_MODE = 8;
 function transitionNames() { return Object.keys(JSON.parse(fs.readFileSync(path.join(KIT, 'transitions.json'), 'utf8')).names || {}); }
 function graphics() { return JSON.parse(fs.readFileSync(path.join(KIT, 'graphics.json'), 'utf8')).graphics; }
 function captionEntrances() { return require('./reelmd.cjs').CAPTION_LOOK['caption-entrance'][1]; }
-const KEYS = ['transitions', 'titles', 'maxTitles', 'captionEntrance', 'graphics', 'finishes', 'cards', 'sfx', 'punch'];
-const FLAG_KEY = { transitions: 'transitions', titles: 'titles', 'max-titles': 'maxTitles', 'caption-entrance': 'captionEntrance', graphics: 'graphics.allow', 'no-graphics': 'graphics.deny', finishes: 'finishes', cards: 'cards', sfx: 'sfx', punch: 'punch' };
+const KEYS = ['transitions', 'titles', 'maxTitles', 'titleWords', 'captionEntrance', 'graphics', 'finishes', 'cards', 'sfx', 'punch'];
+const FLAG_KEY = { transitions: 'transitions', titles: 'titles', 'max-titles': 'maxTitles', 'title-words': 'titleWords', 'caption-entrance': 'captionEntrance', graphics: 'graphics.allow', 'no-graphics': 'graphics.deny', finishes: 'finishes', cards: 'cards', sfx: 'sfx', punch: 'punch' };
 const list = v => String(v).split(',').map(s => s.trim()).filter(Boolean);
 const offish = v => ['off', 'false', 'no', 'none', '0'].includes(String(v).trim().toLowerCase());
 
@@ -46,6 +48,7 @@ function parse(str) {
     const v = m[2].trim();
     if (key === 'maxTitles') out.maxTitles = +v;
     else if (key === 'captionEntrance') out.captionEntrance = v;
+    else if (key === 'titleWords') out.titleWords = v.toLowerCase();
     else if (key === 'cards' || key === 'sfx') out[key] = !offish(v);
     else if (key === 'punch') out.punch = offish(v) ? false : +v;
     else if (key.startsWith('graphics.')) { out.graphics = out.graphics || {}; out.graphics[key.split('.')[1]] = list(v); }
@@ -78,6 +81,7 @@ function validate(l) {
   if (l.transitions && !l.transitions.length) errs.push('locks.transitions is empty; leave it out to let the kit pick');
   for (const e of l.titles || []) if (!R.ENTRANCES.includes(e)) errs.push(`locks.titles: unknown title entrance "${e}" (${R.ENTRANCES.join(', ')})`);
   if (l.maxTitles != null && !(Number.isInteger(+l.maxTitles) && +l.maxTitles >= 0 && +l.maxTitles <= 12)) errs.push('locks.maxTitles must be a whole number from 0 to 12');
+  if (l.titleWords != null && !['one', 'phrase'].includes(l.titleWords)) errs.push('locks.titleWords must be one or phrase');
   if (l.captionEntrance != null && !CE.includes(l.captionEntrance)) errs.push(`locks.captionEntrance: unknown caption entrance "${l.captionEntrance}" (${CE.join(', ')})`);
   if (l.graphics != null) {
     if (typeof l.graphics !== 'object' || Array.isArray(l.graphics)) errs.push('locks.graphics must be { "allow": [...], "deny": [...] }');
@@ -173,6 +177,14 @@ function applyCaptions(locks, caps) {
       log.push(`lock max-titles ${n}: ${drop.length} title${drop.length === 1 ? '' : 's'} removed`);
     }
   }
+  // title-words one: a phrase title becomes its key word (a rebuild with the lock; a draft makes them so from the start)
+  if (locks.titleWords === 'one') {
+    let n = 0;
+    for (const f of flips) { if (f.mode !== TITLE_MODE || f.lockup === false) continue; const ws = String(f.text).split(/\s+/).filter(Boolean); if (ws.length < 2) continue;
+      const h = Array.isArray(f.hero) && ws[f.hero[0]] ? f.hero[0] : ws.reduce((b, w, i) => (w.length > ws[b].length ? i : b), 0);
+      f.text = ws[h].replace(/[^\w'$%-]+$/, ''); f.lockup = false; delete f.hero; n++; }
+    if (n) log.push(`lock title-words one: ${n} title${n === 1 ? '' : 's'} set to the key word`);
+  }
   if (locks.titles && locks.titles.length) {
     const t = flips.filter(f => f.mode === TITLE_MODE).sort((a, b) => a.start - b.start);
     const used = new Set(t.map(f => f.entrance).filter(e => locks.titles.includes(e)));
@@ -200,6 +212,7 @@ function describe(l) {
   if (l.titles) parts.push(`titles ${l.titles.join(', ')}`);
   if (l.maxTitles != null) parts.push(`max ${l.maxTitles} titles`);
   if (l.captionEntrance) parts.push(`caption entrance ${l.captionEntrance}`);
+  if (l.titleWords) parts.push(`titles as ${l.titleWords === 'one' ? 'one word' : 'a phrase'}`);
   if (l.graphics && l.graphics.allow) parts.push(`only graphics ${l.graphics.allow.join(', ')}`);
   if (l.graphics && l.graphics.deny) parts.push(`no ${l.graphics.deny.join(', ')}`);
   if (l.finishes) parts.push(`finishes ${l.finishes.join(', ')}`);
@@ -213,6 +226,9 @@ function describe(l) {
 function selfTest() {
   const errs = [];
   const eq = (a, b, m) => { if (JSON.stringify(a) !== JSON.stringify(b)) errs.push(`${m}: got ${JSON.stringify(a)}, want ${JSON.stringify(b)}`); };
+  { // title-words: pins one word or the phrase, so the same clips give the same reel
+    const l = parse('title-words=one'); eq(l, { titleWords: 'one' }, 'parse title-words'); eq(validate({ titleWords: 'words' }).length, 1, 'title-words one or phrase');
+    const caps = { flips: [{ mode: 7, start: 1, end: 2, text: 'copy the source code', hero: [2] }] }; applyCaptions(l, caps); eq(caps.flips[0].text, 'source', 'title-words one keeps the key word'); }
   try {
     const l = parse('transitions=whip,zoom; titles=typewriter; no-graphics=checklist; max-titles=2; cards=off');
     eq(l, { transitions: ['whip', 'zoom'], titles: ['typewriter'], graphics: { deny: ['checklist'] }, maxTitles: 2, cards: false }, 'parse');

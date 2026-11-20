@@ -224,7 +224,8 @@ The breakdown is visual: four numbers (length, shots, BPM and energy, average sh
 - **Where it goes.** By default `teardown-in/studio/<job>/` in the kit, which git ignores. Pick any folder in [Settings](#settings). Downloads never go into the repo's tracked files, and the teardown (`teardown/studio-<job>-r<id>/`: Reel.md, teardown.md, contact sheet) is gitignored too.
 - **Long videos.** Studio keeps the first 90 seconds for the teardown (`STUDIO_REF_MAX_SECONDS` changes it); with ffmpeg present yt-dlp downloads only that part.
 - **Teardown.** The same `npm run teardown` as the CLI (rea-video when installed, otherwise the built-in analyzer). `STUDIO_TEARDOWN_ARGS` adds flags, for example `--engine lite --no-asr` for speed.
-- **Influence and Recreate** work the same for links and files: Influence makes `packs/local/ref-<job>/` from the teardown, Recreate drafts with its Reel.md.
+- **Influence and Recreate** work the same for links and files: Influence makes `packs/local/ref-<job>/` from the teardown, Recreate drafts with its Reel.md. Influence borrows its picks (transitions, titles, pace). It does not copy the look; Recreate does.
+- **Which engine read it.** When the built-in fallback read the reference, the step says so and offers **Install rea-video** (also an optional step in `npm run setup:all`). The fallback finds fewer shots and no titles. A finish is never taken from a black frame or a shot under 2 s.
 - **Rights.** Only download videos you have the rights to use as a reference, and follow each site's terms. Studio uses a reference to learn its style and structure; your reel is made from your own footage.
 
 ## Settings
@@ -392,6 +393,10 @@ Off by default. Turn on **Allow generating** in API keys and providers and add a
 ![The Render step: Redraft and Render buttons, the export size, the finished reel and its export with download links, and the picks folded below](studio/render.png)
 
 Draft first. "Picks and why" opens with each pick per beat and the reason. The log and the exact command are folded below it. Render then builds the reel, applies your choices edits, and lists every output (`reel-vN.mp4` and the export) with a player and a download link. The effects pass (camera moves, person-mask effects) runs when the effects venv is set up (`npm run effects:setup`); without it, Studio says which picked effects were skipped. When the draft tightened pauses, **Pauses cut** lists each one with **Keep this pause** (`pace.keepPauses`, `--keep-pauses clip@seconds`). A cancel that lands after the render wrote its video keeps the video; the task ends done.
+
+Draft plans the reel; it makes no video. When it ends the step says "Plan ready, no video yet. Press Render." When you kept cuts on the Cut step, the step says so and offers **Render my N cuts**, and Draft reads **Draft whole take** so it is clear it ignores them.
+
+Every export saves the build behind it beside the video (`reel-vN.build/`). A later Draft replaces `build/`, so a finished reel shows **Edit this reel**: it brings that reel's build back (the draft it replaces is kept as `draft-<time>.build/`), then edit and Render. Agents use `reopen_reel` or `npm run reopen -- <job> v3`.
 
 When the reel puts titles or captions behind you, Render first checks free memory against the person mask (birefnet-portrait needs about 8.8 GB). If there is not enough, it says how much is free and offers **Titles in front** (no mask), **Lighter mask** (MediaPipe, about 0.5 GB, rougher edge) or **Try anyway**. Every caption and title is also kept off your face; the log shows `face check: N of M moments`. See docs/guide.md, Face keep-out and the person mask.
 

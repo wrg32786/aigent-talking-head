@@ -191,7 +191,15 @@ if (target) {
     const perrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'cut-points.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
     catch (e) { perrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 6).join(' | ')); }
-    results.push({ label: 'cut point tests (tests/cut-points.test.cjs: audio envelope, word ends, lead-ins, tighten)', errs: perrs, warns: [] });
+    results.push({ label: 'cut point tests (tests/cut-points.test.cjs: audio envelope, word ends, lead-ins, tighten, hidden pauses, noises)', errs: perrs, warns: [] });
+    const snerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'snapshots.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
+    catch (e) { snerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 6).join(' | ')); }
+    results.push({ label: 'reel snapshot tests (tests/snapshots.test.cjs: the build behind each reel, reopen)', errs: snerrs, warns: [] });
+    const mcerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'manual-cuts.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
+    catch (e) { mcerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 6).join(' | ')); }
+    results.push({ label: 'cuts by hand (tests/manual-cuts.test.cjs: a stretch cut out of a clip, the noise finder)', errs: mcerrs, warns: [] });
     const serrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { serrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }

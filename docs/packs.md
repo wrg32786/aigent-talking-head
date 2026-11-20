@@ -80,7 +80,7 @@ Three ways to pin what the kit picks, from lightest to most exact:
    ```
    npm run reel -- inbox/take.mov --pack magazine --lock "transitions=whip,zoom; titles=typewriter; no-graphics=checklist"
    ```
-   Keys: `transitions`, `titles` (title entrances), `max-titles`, `caption-entrance`, `graphics` (only these), `no-graphics`, `finishes` (`none` for no finish), `cards=off`, `sfx=off`, `punch` (`off` or 0.02 to 0.3).
+   Keys: `transitions`, `titles` (title entrances), `max-titles`, `title-words` (`one` or `phrase`), `caption-entrance`, `graphics` (only these), `no-graphics`, `finishes` (`none` for no finish), `cards=off`, `sfx=off`, `punch` (`off` or 0.02 to 0.3).
 2. **See what was picked, then change it.** Every draft writes `jobs/<job>/choices.json` and prints a table: each beat's transition, finish and punch, each title's entrance, place and layer, each graphic, the music and the sounds, with the reason for each pick (locked, from the pack, from the recipe, or the kit's default).
    ```
    npm run choices -- <job>              # print the table again
