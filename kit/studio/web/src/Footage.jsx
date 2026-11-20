@@ -75,7 +75,7 @@ export function Footage({ V, s, apply, hidden, onLive }) {
       </div>}
     {!rec && <FootageLink s={s} apply={apply} />}
     <Scripts V={V} s={s} apply={apply} onRead={id => { if (needJob()) return; setReadId(id); open(true); requestAnimationFrame(() => document.getElementById('recorder')?.scrollIntoView({ block: 'start', behavior: 'smooth' })); }} />
-    {showing && <Player path={showing} tx={(s.tx || {})[showing]} onClose={() => setPlaying(null)} />}
+    {showing && <Player apply={apply} path={showing} tx={(s.tx || {})[showing]} onClose={() => setPlaying(null)} />}
     <ul id="footage" className="clips">
       {s.clips && <li className="note">Using the clips folder {s.clips}</li>}
       {s.footage.map((f, k) => <li key={f} data-path={f} className={'glass-card' + (showing === f ? ' on' : '') + (over === k ? ' drop-to' : '')} draggable={s.footage.length > 1}

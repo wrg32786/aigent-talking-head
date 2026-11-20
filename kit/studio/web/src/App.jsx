@@ -11,6 +11,7 @@ import { Footage } from './Footage.jsx';
 import { Reference } from './Reference.jsx';
 import { Cut } from './Cut.jsx';
 import { Outputs } from './Outputs.jsx';
+import { AskAgent, Wizards } from './Agent.jsx';
 import { Style } from './Style.jsx';
 import { Render } from './Render.jsx';
 import { Post } from './Post.jsx';
@@ -51,6 +52,7 @@ export function App() {
   const [setupOpen, setSetupOpen] = useState(/setup/.test(location.hash));
   const [videoMode, setVideoMode] = useState(/new-video/.test(location.hash) ? 'new' : null);
   const [outputsOpen, setOutputsOpen] = useState(/outputs/.test(location.hash));
+  const [wizOpen, setWizOpen] = useState(/wizards/.test(location.hash));
   const [log, setLog] = useState('');
   const [recLive, setRecLive] = useState(null);
   const mainRef = useRef(null);
@@ -111,7 +113,8 @@ export function App() {
   const openConnect = () => { setSettingsOpen(false); setChatOpen(false); setConnectOpen(true); };
   const openSetup = () => { setSettingsOpen(false); setSetupOpen(true); };
   const openKeys = () => { setSettingsOpen(false); setKeysOpen(true); };
-  const ctx = { CAT, V, s, apply, patch, go, reloadCat, setLog, log, openConnect, openSetup, openKeys };
+  const openChat = () => setChatOpen(true);
+  const ctx = { CAT, V, s, apply, patch, go, reloadCat, setLog, log, openConnect, openSetup, openKeys, openChat };
   const env = V.env, a = env.agent || {}, agentState = env.backend !== 'agent' ? 'alt' : a.listening ? 'on' : a.connected ? 'busy' : 'off';
   const pill = !t ? 'Ready' : running ? `${cap1(t.kind)} running` : t.status === 'failed' ? `${cap1(t.kind)} failed` : `${cap1(t.kind)} ${t.status}`;
 
@@ -131,6 +134,7 @@ export function App() {
         <div className="topr">
           {recLive && step !== 'footage' && <button type="button" className="rec-pill" id="rec-pill" onClick={() => go('footage', true)} aria-label="Recording, go back to the recorder"><i aria-hidden="true" />{recLive.phase === 'paused' ? 'Paused' : recLive.phase === 'saving' ? 'Saving take' : 'Recording'}</button>}
           {env.setup && !env.setup.ready && (() => { const nm = Object.values(env.setup.missing).filter(x => x.need === 'core').length; return <button type="button" className="setup-pill" id="setup-pill" onClick={openSetup} aria-label={`${nm} missing, open Setup check`} title="Setup check"><Icon n="ban" /><span className="sp-n">{nm}</span><span className="sp-l"> missing</span></button>; })()}
+          <button type="button" className="out-btn" id="wizards-open" aria-haspopup="dialog" onClick={() => setWizOpen(true)} title="A guided start"><Icon n="spark" /><span className="ob-l">Wizards</span></button>
           <button type="button" className="out-btn" id="outputs-open" aria-haspopup="dialog" onClick={() => setOutputsOpen(true)} title="Every render, with its settings"><Icon n="film" /><span className="ob-l">Outputs</span></button>
           <button type="button" className={'connect-btn ' + agentState} id="connect-open" aria-haspopup="dialog" onClick={openConnect} title={agentState === 'on' ? `${a.name} connected` : 'Connect your terminal agent'}><Icon n="plug" /><span className="cb-l">{agentState === 'on' || agentState === 'busy' ? (a.name || 'Agent') : 'Connect agent'}</span></button>
           <span id="taskpill" role="status" aria-live="polite" className={t ? '' : 'idle'}>{t ? <Badge label={pill} variant={running ? 'cyan' : t.status === 'failed' ? 'error' : 'neutral'} /> : <span className="sr">{pill}</span>}</span>
@@ -141,6 +145,7 @@ export function App() {
             { id: 'more-new-video', label: 'New video', icon: 'plus', onClick: () => setVideoMode('new') },
             { id: 'more-open-video', label: 'Open a past video', icon: 'film', onClick: () => setVideoMode('open') },
             { id: 'more-outputs', label: 'Outputs', icon: 'film', onClick: () => setOutputsOpen(true) },
+            { id: 'more-wizards', label: 'Wizards', icon: 'spark', onClick: () => setWizOpen(true) },
             { id: 'more-connect', label: 'Connect agent', icon: 'plug', onClick: openConnect },
             { id: 'more-setup', label: 'Setup check', icon: 'check', onClick: openSetup },
             { id: 'more-keys', label: 'API keys and providers', icon: 'link', onClick: openKeys },
@@ -165,6 +170,7 @@ export function App() {
           <footer className="stepnav glass" id="stepnav">
             <span style={{ visibility: i ? 'visible' : 'hidden' }}><Button id="prev" variant="ghost" label="Back" icon={<Icon n="left" />} onClick={() => go(STEPS[Math.max(0, i - 1)], true)} /></span>
             <PicksTray s={s} patch={patch} />
+            <AskAgent step={step} apply={apply} openChat={openChat} />
             {i < STEPS.length - 1 ? <Button id="next" variant="primary" label={stepName(STEPS[i + 1])} endContent={<Icon n="right" />} onClick={() => go(STEPS[i + 1], true)} /> : <span className="nextpad" />}
           </footer>
         </main>
@@ -176,6 +182,7 @@ export function App() {
       <Keys {...ctx} open={keysOpen} setOpen={setKeysOpen} />
       <NewVideo {...ctx} mode={videoMode} setMode={setVideoMode} />
       <Outputs {...ctx} open={outputsOpen} setOpen={setOutputsOpen} />
+      <Wizards {...ctx} open={wizOpen} setOpen={setWizOpen} />
       <Toast V={V} />
     </Theme>
   );

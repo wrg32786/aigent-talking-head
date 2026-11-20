@@ -48,14 +48,23 @@ export function take(limit = 20) {
 }
 // answer in the Studio channel; replyTo marks those page lines answered. A patch (same fields as studio_set_selections)
 // is applied first; names the engine does not have are refused and nothing is changed.
-export function reply({ text, replyTo, patch, agent } = {}) {
+// suggest: a change the user applies with one click (Apply on the answer), never made now: { patch, combo: { ids,
+// reasons }, step, label }. The patch is checked on a copy first, so a bad one is refused before the user sees it.
+export function reply({ text, replyTo, patch, suggest, agent } = {}) {
   const s = C.load();
   // a patch that changes nothing says so (noChange), so an agent never tells the user it did something it did not
   let log = [], noChange = false;
   if (patch && Object.keys(patch).length) { const r = C.applyPatch(s, patch); if (r.errs.length) return { errs: r.errs }; log = r.log; noChange = !!r.noop; }
   const ids = [].concat(replyTo || []).map(Number).filter(Boolean);
   const target = ids.length ? ids : unanswered(s).map(m => m.id);
-  if (text) C.applyPatch(s, { reply: String(text), from: prettyName(agent), replyTo: target[target.length - 1] || undefined, kind: 'reply' });
+  let sg = null;
+  if (suggest && typeof suggest === 'object') {
+    if (suggest.patch) { const copy = JSON.parse(JSON.stringify(s)), r = C.applyPatch(copy, suggest.patch); if (r.errs.length) return { errs: r.errs.map(e => 'suggest: ' + e) }; }
+    sg = { ...(suggest.patch ? { patch: suggest.patch } : {}), ...(suggest.combo && Array.isArray(suggest.combo.ids) ? { combo: { ids: suggest.combo.ids.map(String).slice(0, 60), reasons: suggest.combo.reasons || {} } } : {}),
+      ...(suggest.step ? { step: String(suggest.step) } : {}), label: String(suggest.label || 'Apply').replace(/\u2014/g, ', ').slice(0, 40) };
+    if (!sg.patch && !sg.combo) sg = null;
+  }
+  if (text) { C.applyPatch(s, { reply: String(text), from: prettyName(agent), replyTo: target[target.length - 1] || undefined, kind: 'reply' }); if (sg) s.chat[s.chat.length - 1].suggest = sg; }
   // the page shows it too, so the user is never told about a change that did not happen
   if (noChange) C.applyPatch(s, { reply: 'Studio: that change did nothing (it was already set that way).', from: 'Studio', kind: 'action' });
   const at = new Date().toISOString();

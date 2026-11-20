@@ -19,7 +19,8 @@ Studio is a page on the user's computer (http://127.0.0.1:4757) where they drop 
 1. `studio_start` (or `npm run studio:agent`) and tell the user the URL.
 2. `studio_wait_for_message` (default 45 s). When it returns messages:
    - act on them: `studio_set_selections` (origin studio), `studio_add_reference_url` then `studio_get_reference_teardown`, `studio_run` (draft or render; `from: pieces | take`, `exports`), `get_edit` (what the user is making, from what), `explain` after a draft;
-   - answer each with `studio_reply { replyTo: <id>, text }` (add `patch` to change the edit in the same call). Plain, short sentences.
+   - answer each with `studio_reply { replyTo: <id>, text }` (add `patch` to change the edit in the same call). Plain, short sentences. For a bigger change, or one the user should decide on, send it as `suggest: { patch, combo, step, label }` instead: the page shows an Apply button and nothing changes until they click it.
+   - a message that starts "(On the Cut step)" (or another step) came from **Ask my agent** on that step. A note "from 0:04 to 0:09" is about that stretch of the reel or take; one "at 0:04" is one frame (its `attach` has `t`, `end`, the box and the frame image).
 3. Call `studio_wait_for_message` again. If it timed out, call it again; the page shows you as listening while you wait.
 4. When the user talks to you in the terminal, stop listening and answer there. While you work in the terminal, call `studio_get_pending` at the start of each turn so Studio messages are not missed. In Claude Code the Studio hook also tells you when Studio messages are waiting.
 5. Stop the loop when the user says so in either channel.
@@ -59,6 +60,10 @@ After a render, `buffer_channels` lists the user's Buffer channels with each net
 When the user wants to start the next reel ("new video", "start fresh", "clear the board"), call `new_video` with the name they gave (`keepLook` stays true unless they want the default look back). It clears footage, cuts, reference, b-roll, the draft and the chat for the new job and deletes no files; the old video's session is saved, and `list_videos` and `open_video` bring it back. It is refused while a draft, render, download or take is running: ask the user whether to cancel it, then call it again.
 
 The user can film takes in the Footage step (Record now). A saved take is already in the footage, and the Studio chat shows an action note such as "New take recorded: 42 s (take 3)" in `recentStudioChat`. `studio_takes` lists them (file, seconds, status, kept, and the script it was read from, which the next draft also hands to Whisper so captions spell its words) and keeps, unkeeps or discards one; discard deletes the files, so only do it when the user asks. You can't film for the user: the camera only runs in their browser.
+
+## Wizards
+
+`run_wizard` does what the Wizards dialog does: `{ wizard: reel, goal: grow | sell | teach | clean, look, choose: true }` (any of them, in one call or one at a time), `{ wizard: clips, clips, ads }` (finds them on whole words), `{ wizard: reference, url }` (Use all). When the user presses **Let my agent decide** in a wizard, you get a message asking you to make that choice: make it with `run_wizard` or suggest it with `studio_reply suggest`.
 
 ## Rules
 

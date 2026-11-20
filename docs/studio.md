@@ -188,7 +188,9 @@ Click a clip in the Footage step to play it above the list. With more than one c
 ![The footage player: the take, the waveform with the playhead, and the transcript with the current word lit](studio/player-desktop.png)
 
 - Click the picture or the play button, or press Space, to play and pause. J and L jump 5 s back and forward, K pauses, the arrow keys move 1 s.
-- Click or drag on the waveform to scrub.
+- Click or drag on the waveform to scrub. Drag further than a quarter second and it selects that stretch instead, snapped to whole words: the start moves to the start of the word it lands in (or the next word, in a pause), the end to the end of its word (or the word before). A selection never starts or ends mid-word. **Play it** plays just that stretch, **Add as a clip** makes it a cut on the Cut step, and **Note for my agent** sends it to the chat with the take, the from and to times and your words (`POST /api/comment { t, end, source }`).
+
+<img src="studio/wave-select.png" width="620" alt="The footage player with a stretch selected on the waveform, from 0:01 to 0:03 on whole words, and Play it, Add as a clip and a note for the agent">
 - **Show transcript** transcribes the clip; the current word lights up as it plays and a click on a word jumps there. Select a few words to make a clip from them on the Cut step.
 - Files over 300 MB, and ones a browser cannot play (.mkv, .avi, HEVC and other codecs), play from a 540p H.264 preview copy made once in the background. The page says when it is playing one.
 
@@ -333,6 +335,14 @@ The Studio chat is answered by one of these, picked in Settings:
 - **Keywords only.** No model: vibe words (calm, calmer, cinematic, hype, fast, clean, magazine, techy, retro, silent and more, in `kit/studio/vibes.json`), pack and effect names, "no ..." to forbid, and "the transitions from the reference" (or titles, captions, grade, graphics, effects, music, beats, or everything).
 
 Every backend gets the session and the reference teardown, so "use the transitions from this reference but calmer" works in each, and every change is checked against the engine's names before it is applied.
+
+### Ask my agent and Apply (1.17.0)
+
+**Ask my agent** sits in the bar at the bottom of every step, next to Next. It opens a few prompts for that step ("Pick the strongest hook" on Cut, "Make it calmer" on Look, "Check the draft for me" on Finish) and a box for your own words. The message goes to the Studio chat with the step in front ("(On the Cut step) Pick the strongest hook"), and the chat opens (`POST /api/chat { text, step }`).
+
+When your agent answers with a change for you to decide on, the answer carries an **Apply** button (and **Show me**, which opens the step). Nothing changes until you click it; then it says Applied and the chat notes what changed. The agent sends it with `studio_reply { text, suggest: { patch, combo, step, label } }`: `patch` is any `studio_set_selections` change, `combo` a Combo of piece ids from `get_pieces`. A suggested patch with a bad name is refused before you see it. `POST /api/chat/apply { id }` applies one, once.
+
+<img src="studio/apply.png" width="360" alt="The chat with an agent answer, The magazine Look fits this hook, and its Use magazine and Show me buttons">
 
 ## Your terminal agent in Studio
 
@@ -488,7 +498,7 @@ Five tools in Look (the Reference view) and Finish help you see what changed and
 
 <img src="studio/compare-desktop.png" width="620" alt="Show original: the reference and your reel side by side at the same moment, with one play button, one scrubber, a start offset and a sound checkbox">
 
-**Comment on the preview.** Press **Comment on this frame**: the reel pauses and you click a spot or drag a box on it, then type what should change ("move this title up"). It goes to the Studio chat as one message with the reel name, the time, the spot or box in percent of the frame, and a saved copy of the frame with your mark on it (`jobs/<job>/comments/comment-N.jpg`). Your terminal agent gets the frame path and the box in the message's `attach` field (`studio_wait_for_message`, `studio_get_pending`), so it can open the image and act on it. With a model or keywords answering the chat, the same line goes to them.
+**Comment on the preview.** Press **Comment on this frame**: the reel pauses and you click a spot or drag a box on it, then type what should change ("move this title up"). For a stretch rather than one frame, scrub or play on to where it should end and press **Mark the end here**: the note says "from 0:04 to 0:09" and the frame goes back to the start (**Just this frame** undoes it). It goes to the Studio chat as one message with the reel name, the time, the spot or box in percent of the frame, and a saved copy of the frame with your mark on it (`jobs/<job>/comments/comment-N.jpg`). Your terminal agent gets the frame path and the box in the message's `attach` field (`studio_wait_for_message`, `studio_get_pending`), so it can open the image and act on it. With a model or keywords answering the chat, the same line goes to them.
 
 <img src="studio/comment-desktop.png" width="620" alt="Commenting: a red box drawn over the head in your reel, the time of the frame, and a text box with Move this title up a little">
 
@@ -500,7 +510,7 @@ Five tools in Look (the Reference view) and Finish help you see what changed and
 
 <img src="studio/receipt-desktop.png" width="620" alt="Edit receipt: the look, the clean-up, each beat with its time, transition, finish and reason, and each title with its entrance and reason">
 
-API: `GET /api/reference/video` (the session's reference file, with range requests), `GET /api/cleanup?silence=`, `POST /api/cleanup` (`decisions`, `silence`, `redraft`, or `on: false`), `POST /api/comment` (`text`, `t`, `region` as 0 to 1 fractions, `video`, `image` as a data URL), and `GET /api/choices` now returns `receipt`. The state carries `swap` (the parts list) and `cleanupReady`. The logic lives in `kit/studio/review.mjs`.
+API: `GET /api/reference/video` (the session's reference file, with range requests), `GET /api/cleanup?silence=`, `POST /api/cleanup` (`decisions`, `silence`, `redraft`, or `on: false`), `POST /api/comment` (`text`, `t`, `end` for a stretch, `region` as 0 to 1 fractions, `video` or `source` for a take, `image` as a data URL), and `GET /api/choices` now returns `receipt`. The state carries `swap` (the parts list) and `cleanupReady`. The logic lives in `kit/studio/review.mjs`.
 
 On a phone the two videos stay side by side at half width and the lists stack: [screenshot](studio/review-phone.png).
 
@@ -569,6 +579,18 @@ Nothing is deleted. The old reel's files stay where they were (`inbox/studio/<jo
 
 Studio will not switch while a draft, render, download, take, transcript or b-roll generate is running: cancel it or let it finish. Your agent does the same with `new_video`, `open_video` and `list_videos` (see [mcp.md](mcp.md)); when it switches, the page follows to Footage.
 
+## Wizards
+
+**Wizards** in the top bar (and in More) are three guided starts. Each step has **Let my agent decide**, which hands that choice to your agent in the chat.
+
+- **Make a reel from a long take.** What it is for (Grow followers, Sell or sign up, Teach one thing, Full clean take, each setting the output), then a Look, then **Let AI choose** picks the pieces and opens Finish. If the take is not transcribed yet, it transcribes first and opens Cut.
+- **Copy a reference.** Paste a reel link; Studio reads it with Use all on and opens Look, Reference.
+- **Clips and ads from one take.** 3, 5 or 8 clips, with 15 s and 30 s ad cuts if you tick them; it finds them on whole words and opens Cut.
+
+<img src="studio/wizards.png" width="560" alt="The Make a reel wizard, step 1 of 3: Grow followers, Sell or sign up, Teach one thing and Full clean take, and Let my agent decide">
+
+API: `GET /api/wizard` (the wizards, goals and clip counts, from `kit/studio/wizards.mjs`), `POST /api/wizard { wizard: reel, goal, look, choose }`, `{ wizard: clips, clips, ads }`, `{ wizard: reference, url }`. MCP `run_wizard` takes the same.
+
 ## Outputs
 
 <img src="studio/outputs.png" width="720" alt="The Outputs library: v2 and v1 of this video with when each was rendered, its look, length and pieces, b-roll and files, and Re-open, Compare and Files">
@@ -595,7 +617,7 @@ Nothing is deleted from here.
 <img src="studio/more-menu.png" width="520" alt="The top bar with numbered steps, the setup pill, Connect agent, theme, Settings and the More menu open with Connect agent, Setup check, API keys and providers and the theme">
 <img src="studio/top-phone.png" width="260" alt="The top bar on a phone: the reel name and buttons on the first row and the six steps on a second row">
 
-**Outputs** opens the [Outputs library](#outputs). The top bar always fits on one line: on a laptop only the current step shows its name (the others show their number, and hovering a step still names it), the setup pill shows just the count of what is missing, and Connect agent shrinks to its plug. **More** (the three dots) holds New video, Open a past video, Connect agent, Setup check, API keys and providers and the theme, and works with the keyboard: Enter or Space opens it, the arrow keys move, Enter picks, Escape closes. On a phone the steps get their own row under the reel name.
+**Wizards** opens the [wizards](#wizards). **Outputs** opens the [Outputs library](#outputs). The top bar always fits on one line: on a laptop only the current step shows its name (the others show their number, and hovering a step still names it), the setup pill shows just the count of what is missing, and Connect agent shrinks to its plug. **More** (the three dots) holds New video, Open a past video, Connect agent, Setup check, API keys and providers and the theme, and works with the keyboard: Enter or Space opens it, the arrow keys move, Enter picks, Escape closes. On a phone the steps get their own row under the reel name.
 
 Longer explanations sit behind a small **i** next to the thing they explain (Footage from a link, Clean-up pass, Record screen in B-roll); click it to read, Escape or a click elsewhere closes it.
 
