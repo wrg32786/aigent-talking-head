@@ -8,7 +8,7 @@
 import http from 'http';
 import { spawn } from 'child_process';
 import { createHash } from 'crypto';
-import { copyFileSync, createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, watchFile, writeFileSync } from 'fs';
+import { copyFileSync, createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, watchFile, writeFileSync } from 'fs';
 import { join, extname, basename, resolve, sep } from 'path';
 import { createRequire } from 'module';
 import * as C from './core.mjs';
@@ -30,6 +30,7 @@ import * as KEYS from './keys.mjs';
 import { capture as capturePage } from '../capture.mjs';
 import { findChrome } from '../chrome.mjs';
 import { mount as mountBroll } from './broll-api.mjs';
+import * as PIECES from './pieces.mjs';
 import { mount as mountFolders } from './folders.mjs';
 import { mount as mountPost } from './post-api.mjs';
 
@@ -486,13 +487,25 @@ function linesCached(rel) {
   if (!LINES_ASKED.has(rel + key)) { LINES_ASKED.add(rel + key); linesOf(rel).then(() => pushState(true)).catch(() => {}); }
   return null;
 }
+// the pieces of a take (kit/studio/pieces.mjs): its lines with a category, score and topics, and your Combo
+const piecesState = (s, rel) => ((s.pieces || {})[rel]) || { ids: [], reasons: {}, by: null, cats: {} };
+function piecesOf(s, rel = cutSource(s)) {
+  const L = rel ? linesCached(rel) : null; if (!L) return null;
+  const st = piecesState(s, rel), b = PIECES.build(L, { goal: outputOf(s).goal, cats: st.cats || {} }), by = Object.fromEntries(b.pieces.map(p => [p.id, p]));
+  const ids = (st.ids || []).filter(id => by[id]);
+  return { source: rel, cats: PIECES.CATS, topics: b.topics, pieces: b.pieces, combo: { ids, reasons: st.reasons || {}, by: st.by, seconds: +ids.reduce((a, id) => a + by[id].seconds, 0).toFixed(2) } };
+}
 function comboOf(s) {
   const src = cutSource(s); if (!src) return { source: null, pieces: [], seconds: 0, key: '' };
-  const pieces = [], c = s.cut && s.cut.source === src ? s.cut : null;
-  if (c) for (const x of (c.candidates || []).filter(y => y.keep).sort((a, b) => a.order - b.order)) {
+  const pieces = [], c = s.cut && s.cut.source === src ? s.cut : null, ps = piecesState(s, src);
+  // your Combo, when you made one (Let AI choose or Build my own on the Cut step), wins: its pieces in your order,
+  // neighbours in the take joined into one range. Otherwise the kept cuts in order, then your bites.
+  const P = ps.ids && ps.ids.length ? piecesOf(s, src) : null;
+  if (P && P.combo.ids.length) for (const x of PIECES.comboRanges(P.combo.ids, P.pieces)) pieces.push({ kind: 'piece', id: 'pc-' + x.ids.join('-').slice(0, 40), label: x.text.length > 48 ? x.text.slice(0, 46) + '...' : x.text, ranges: x.ranges, cutKind: 'clip', category: x.category, lines: x.ids });
+  else if (c) for (const x of (c.candidates || []).filter(y => y.keep).sort((a, b) => a.order - b.order)) {
     const ranges = CUT.renderRanges(x); if (ranges.length) pieces.push({ kind: 'cut', id: x.id, label: x.label || x.id, ranges, cutKind: x.kind || 'clip' });
   }
-  const ls = linesState(s, src), L = ls.bites.length ? linesCached(src) : null;
+  const ls = linesState(s, src), L = !pieces.some(x => x.kind === 'piece') && ls.bites.length ? linesCached(src) : null;
   if (L) for (const b of ls.bites) { const ranges = CUT.biteRanges(b.lines, L); if (ranges.length) pieces.push({ kind: 'bite', id: b.id, label: b.name || b.id, ranges, cutKind: b.kind === 'full' ? 'full' : 'clip' }); }
   // testimonial pieces from the B-roll step play in the Combo with their own sound, after the piece you picked
   // (else before your last piece, where the proof usually sits)
@@ -554,6 +567,33 @@ function editOf(s, v) {
   };
 }
 
+// ---------- the Outputs library: every version with the settings that made it ----------
+// Each Render writes jobs/<job>/reel-vN.settings.json beside the reel (what Your edit said at that moment, the
+// Combo's pieces and the files), so a version can say how it was made long after the session moved on.
+function saveSettings(s) {
+  const dir = join(ROOT, 'jobs', s.job || '-'); let v = 0; try { v = Math.max(0, ...readdirSync(dir).map(f => +(f.match(/^reel-v(\d+)\.mp4$/) || [0, 0])[1])); } catch {} if (!v) return null;
+  const vw = view(s), e = vw.edit, combo = vw.combo, files = C.outputsOf(s).filter(f => new RegExp(`reel(-fx)?-v${v}(-[a-z0-9]+)?\\.mp4$`).test(f));
+  const out = { version: v, at: new Date().toISOString(), job: s.job, making: e.making.text, format: e.making.format, look: e.look.text, pack: s.pack || null, reference: e.look.reference, from: e.from.text, pieces: combo.pieces.map(x => ({ id: x.id, kind: x.kind, label: x.label, seconds: x.seconds })),
+    broll: e.broll.text, sound: e.sound.text, export: s.export || null, files };
+  try { writeFileSync(join(dir, `reel-v${v}.settings.json`), JSON.stringify(out, null, 1)); } catch {}
+  return out;
+}
+function versionsOf(job) {
+  const dir = join(ROOT, 'jobs', job); if (!existsSync(dir)) return [];
+  const files = C.outputsOf({ job }), snaps = Object.fromEntries((() => { try { return SNAP.list(dir); } catch { return []; } })().map(x => [x.v, x]));
+  const vs = [...new Set(files.map(f => +(f.match(/reel(?:-fx)?-v(\d+)[^/]*$/) || [0, 0])[1]).filter(Boolean))].sort((a, b) => b - a);
+  return vs.map(v => { let st = null; try { st = JSON.parse(readFileSync(join(dir, `reel-v${v}.settings.json`), 'utf8')); } catch {}
+    const fs_ = files.filter(f => new RegExp(`/reel(-fx)?-v${v}(-[a-z0-9]+)?\\.mp4$`).test(f)), main = fs_.find(f => new RegExp(`/reel-v${v}\\.mp4$`).test(f)) || fs_[0];
+    let at = null; try { at = statSync(join(ROOT, main)).mtime.toISOString(); } catch {}
+    return { v, reel: main, files: fs_.map(f => ({ path: f, label: /-fx-/.test(f) ? 'With effects' : new RegExp(`-v${v}\\.mp4$`).test(f) ? 'Reel' : 'Export ' + (f.match(/-v\d+-([a-z0-9]+)\.mp4$/) || [0, ''])[1] })), at: (st && st.at) || at, seconds: main ? +(durOf(main) || 0).toFixed(1) || null : null,
+      settings: st, reopen: !!(snaps[v] && snaps[v].snapshot) }; });
+}
+function outputsLib(s, all) {
+  const out = { job: s.job, versions: s.job ? versionsOf(s.job) : [] };
+  if (all) out.jobs = C.listVideos(s.job).filter(x => x.job !== s.job && x.outputs).slice(0, 60).map(x => { const vs = versionsOf(x.job), last = vs[0];
+    return { job: x.job, at: x.at, versions: vs.length, look: last && last.settings ? last.settings.look : null, seconds: last ? last.seconds : null }; });
+  return out;
+}
 // a reference's words: from its teardown when it has speech, otherwise transcribed here
 function refWords(s) {
   const out = s.reference && s.reference.out; if (out) for (const f of ['speech.json', 'fallback.json', join('videomd', 'breakdown.json')]) {
@@ -954,6 +994,34 @@ async function api(req, res, u) {
     runTask('draft', () => d.steps, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; }); BRL.autoPick(s.job); return { choices: !!readChoices(C.load()), note: DRAFT_DONE, from: d.from }; });
     return json(res, 202, { ...view(C.load()), from: d.from });
   }
+  // ---------- pieces and the Combo (kit/studio/pieces.mjs) ----------
+  if (p === '/api/pieces' && M === 'GET') { const s = C.load(), rel = cutSource(s, u.searchParams.get('path')); if (!rel) return json(res, 400, { error: 'add footage first' });
+    const L = await linesOf(rel); if (!L) return json(res, 200, { source: rel, pending: 'transcript', pieces: [], cats: PIECES.CATS, topics: [], combo: { ids: [], reasons: {}, by: null, seconds: 0 } });
+    return json(res, 200, piecesOf(C.load(), rel)); }
+  if (p === '/api/pieces' && M === 'POST') {
+    // { choose: true } Let AI choose; { ids, reasons, by } your Combo; { add, remove, move: { id, to } } one piece;
+    // { clear: true }; { cats: { <piece id>: category } } move pieces to another category (null puts the rules' back)
+    const b = await readBody(req), s0 = C.load(), rel = cutSource(s0, b.path); if (!rel) return json(res, 400, { error: 'add footage first' });
+    if (!(await linesOf(rel))) return json(res, 400, { error: 'transcribe the footage first (Find cuts or Transcribe on the Cut step)' });
+    const P = piecesOf(s0, rel), by = Object.fromEntries(P.pieces.map(x => [x.id, x])), who = b.by ? CH.prettyName(String(b.by)) : 'you';
+    for (const id of [...(Array.isArray(b.ids) ? b.ids : []), b.add, b.remove, b.move && b.move.id].filter(x => x != null)) if (!by[id]) return json(res, 400, { error: `no piece ${id} (get_pieces lists them)` });
+    if (b.cats) for (const [id, c] of Object.entries(b.cats)) { if (!by[id]) return json(res, 400, { error: `no piece ${id}` }); if (c !== null && !PIECES.CAT_IDS.includes(c)) return json(res, 400, { error: `category: ${PIECES.CAT_IDS.join(', ')}` }); }
+    let note = null;
+    update(st => { st.pieces = st.pieces || {}; const x = st.pieces[rel] = { ...piecesState(st, rel) }; x.ids = [...(x.ids || [])]; x.reasons = { ...(x.reasons || {}) }; x.cats = { ...(x.cats || {}) };
+      if (b.cats) for (const [id, c] of Object.entries(b.cats)) { if (c === null) delete x.cats[id]; else x.cats[id] = c; }
+      if (b.choose) { const r = CUT.range(outputOf(st)), mn = r[0], mx = r[1] == null ? r[0] * 1.33 : r[1];
+        const ch = PIECES.choose(piecesOf(st, rel).pieces, { min: mn, max: mx }); x.ids = ch.ids; x.reasons = ch.reasons; x.by = 'ai'; note = `Picked ${ch.ids.length} pieces, ${Math.round(ch.seconds)} s, for your Combo. Drag to reorder, click x to drop.`; }
+      if (Array.isArray(b.ids)) { x.ids = [...new Set(b.ids.map(String))]; x.reasons = b.reasons && typeof b.reasons === 'object' ? Object.fromEntries(Object.entries(b.reasons).filter(([k]) => x.ids.includes(k)).map(([k, v]) => [k, String(v).replace(/\u2014/g, ', ').slice(0, 160)])) : {}; x.by = who === 'you' ? 'you' : who;
+        if (who !== 'you') C.applyPatch(st, { reply: `${who} set your Combo: ${x.ids.length} piece${x.ids.length === 1 ? '' : 's'}.`, from: 'assistant', kind: 'action' }); }
+      if (b.add != null && !x.ids.includes(b.add)) { x.ids.push(String(b.add)); x.by = x.by === 'ai' ? 'ai, changed by you' : x.by || 'you'; }
+      if (b.remove != null) { x.ids = x.ids.filter(i => i !== b.remove); delete x.reasons[b.remove]; }
+      if (b.move) { const k = x.ids.indexOf(b.move.id); if (k >= 0) { x.ids.splice(k, 1); x.ids.splice(Math.max(0, Math.min(x.ids.length, +b.move.to || 0)), 0, b.move.id); } }
+      if (b.clear) { x.ids = []; x.reasons = {}; x.by = null; }
+      if ((b.add != null || b.remove != null || b.move) && x.by === 'ai') x.by = 'ai, changed by you';
+    });
+    return json(res, 200, { ...piecesOf(C.load(), rel), note, state: C.load() });
+  }
+  if (p === '/api/outputs' && M === 'GET') return json(res, 200, outputsLib(C.load(), u.searchParams.get('all') === '1'));
   if (p === '/api/edit' && M === 'GET') { const v = view(C.load()); return json(res, 200, { edit: v.edit, combo: v.combo, finish: v.state.finish }); }
   if (p === '/api/render' && M === 'POST') {
     // the one Render: the reel (from the draft), and in the same run the exports you ticked in Finish: each piece as its
@@ -977,7 +1045,7 @@ async function api(req, res, u) {
     if (b.memory === 'front') r.steps[0][1].push('--no-mask');
     if (b.memory === 'light') r.steps[0][1].push('--mask', 'mediapipe');
     if (b.memory === 'anyway') r.steps[0][2] = { ...(r.steps[0][2] || {}), MASK_FORCE: '1' };
-    runTask('render', () => [...r.steps, ...xs.steps], () => { const st = C.load(), outputs = C.outputsOf(st); const cuts = xs.plan.map(y => ({ ...y, outputs: C.outputsOf({ job: y.job }) })); return { outputs, cuts, plain: xs.plain || [], copiedTo: copyRenders([...outputs, ...cuts.flatMap(y => y.outputs.slice(0, 1))]), fx: r.fx, effects: r.effects }; });
+    runTask('render', () => [...r.steps, ...xs.steps], () => { const st = C.load(), outputs = C.outputsOf(st); saveSettings(st); const cuts = xs.plan.map(y => ({ ...y, outputs: C.outputsOf({ job: y.job }) })); return { outputs, cuts, plain: xs.plain || [], copiedTo: copyRenders([...outputs, ...cuts.flatMap(y => y.outputs.slice(0, 1))]), fx: r.fx, effects: r.effects }; });
     return json(res, 202, { ...view(C.load()), exports: fin, plan: xs.plan, fx: r.fx, effectsSkipped: r.effects.length && !r.fx ? 'Effects are not set up on this computer, so this reel renders without them.' : null, ...(r.effects.length && !r.fx ? { fix: ['effects'] } : {}) });
   }
   // Edit this reel: the build behind a finished reel back into build/ (kit/snapshots.cjs); the build it replaces is saved

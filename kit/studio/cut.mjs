@@ -114,7 +114,7 @@ export function signals(s) {
   return { hook: HOOK.test(s.text.trim()), question: /\?\s*$/.test(s.text), number: /\b\d|\b(one|two|three|five|ten|hundred|thousand|million)\b/i.test(s.text), cta: CTA.test(s.text),
     weakStart: WEAK_START.test(s.text.trim()), filler: ws.filter(w => FILLER.test(w.replace(/[^a-z]/gi, ''))).length / Math.max(1, ws.length), rate: ws.length / dur, short: ws.length < 4 };
 }
-function sentenceScore(s, goal) {
+export function sentenceScore(s, goal) {
   const g = signals(s); let v = 50;
   if (g.hook) v += 14; if (g.question) v += 8; if (g.number) v += 8; if (g.cta) v += goal === 'ad' ? 10 : 2;
   if (g.weakStart) v -= 6; if (g.short) v -= 8; v -= g.filler * 60;
