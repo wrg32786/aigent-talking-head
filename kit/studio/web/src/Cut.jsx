@@ -175,7 +175,7 @@ export function Cut({ V, s, apply, go }) {
       <button type="button" role="tab" id="cut-mode-pieces" aria-selected={piecesOn ? 'true' : 'false'} className="tab" onClick={() => setMode('pieces')}>Pieces</button>
       <button type="button" role="tab" id="cut-mode-cuts" aria-selected={piecesOn ? 'false' : 'true'} className="tab" onClick={() => setMode('cuts')}>Cuts and lines</button>
     </div>}
-    {piecesOn ? <div className="pc-layout">
+    {piecesOn ? <div className="pz-layout">
       <div className="cut-play">{src && <Player path={src} tx={tx} playerRef={player} onAddRange={r => add(r, 'clip')} />}</div>
       <Pieces V={V} apply={apply} player={player} src={src} />
     </div> : <>

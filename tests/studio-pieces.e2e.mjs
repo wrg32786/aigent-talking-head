@@ -76,8 +76,8 @@ try {
     assert.strictEqual(await pg.getAttribute('#cut-mode-pieces', 'aria-selected'), 'true');
     const cat = Object.fromEntries(P.pieces.map(p => [p.text, p.category]));
     assert.strictEqual(cat[SENT[0]], 'hook'); assert.strictEqual(cat[SENT[2]], 'aside'); assert.strictEqual(cat[SENT[3]], 'proof'); assert.strictEqual(cat[SENT[5]], 'cta');
-    assert.strictEqual(await pg.$('#pieces-grid .pc-cat[data-cat="aside"]'), null, 'asides hidden by default');
-    await pg.click('#pieces-retakes'); await pg.waitForSelector('#pieces-grid .pc-cat[data-cat="aside"] .pc'); await pg.click('#pieces-retakes');
+    assert.strictEqual(await pg.$('#pieces-grid .pz-cat[data-cat="aside"]'), null, 'asides hidden by default');
+    await pg.click('#pieces-retakes'); await pg.waitForSelector('#pieces-grid .pz-cat[data-cat="aside"] .pz'); await pg.click('#pieces-retakes');
     assert.ok(/Empty/.test(await pg.textContent('#combo-sum')));
   });
   await t('Let AI choose: hook first, CTA last, no aside, a reason each; Your edit says picked by AI', async () => {
@@ -86,7 +86,7 @@ try {
     assert.strictEqual(by[c[0]].category, 'hook'); assert.strictEqual(by[c[c.length - 1]].category, 'cta'); assert.ok(!c.some(id => by[id].category === 'aside'));
     assert.strictEqual(await pg.$$eval('#combo-strip .cb-why', x => x.filter(e => e.textContent.length > 5).length), c.length);
     assert.ok(/Picked by AI/.test(await pg.textContent('#combo'))); await pg.waitForFunction(() => /picked by AI/.test(document.querySelector('#your-edit [data-part="from"]').textContent), null, { timeout: 5000 }).catch(async () => assert.fail('Your edit: ' + await pg.textContent('#your-edit [data-part="from"]')));
-    assert.strictEqual(await pg.$$eval('#pieces-grid .pc.in .pc-n', x => x.length), c.length, 'numbered in the grid');
+    assert.strictEqual(await pg.$$eval('#pieces-grid .pz.in .pz-n', x => x.length), c.length, 'numbered in the grid');
     await theme(pg, 'dark'); await shot(pg, '#s-cut', 'redesign-cut-pieces-dark.png');
     await theme(pg, 'light'); await shot(pg, '#s-cut', 'redesign-cut-pieces-light.png'); await theme(pg, 'dark');
   });
