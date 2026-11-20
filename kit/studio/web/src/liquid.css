@@ -7,18 +7,18 @@
 
 :root, [data-theme="dark"] {
   --hairline: rgba(241, 232, 220, 0.14);
-  --lq-bg-image:
-    radial-gradient(ellipse 70% 50% at 8% -10%, rgba(92, 249, 226, 0.18), transparent 55%),
-    radial-gradient(ellipse 50% 40% at 100% 110%, rgba(92, 249, 226, 0.08), transparent 50%),
-    radial-gradient(ellipse 40% 30% at 70% 0%, rgba(241, 232, 220, 0.05), transparent 50%);
+  --lq-bg-image: /* the brand's one warm light: ember as radial light only, never a fill, border or word */
+    radial-gradient(ellipse 60% 50% at 92% 108%, rgba(217, 138, 61, 0.17), transparent 60%),
+    radial-gradient(ellipse 30% 25% at 96% 100%, rgba(226, 150, 72, 0.10), transparent 55%),
+    radial-gradient(ellipse 50% 35% at 10% -10%, rgba(241, 232, 220, 0.04), transparent 55%);
   --panel-bg: rgba(19, 17, 16, 0.58);
   --panel-border: 1px solid rgba(241, 232, 220, 0.14);
   --panel-radius: 2rem; /* Open Props --radius-4 */
-  --panel-shadow: 0 18px 40px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 0 0 1px rgba(92, 249, 226, 0.04);
-  --panel-blur: blur(22px) saturate(1.25);
+  --panel-shadow: var(--shadow-smoke);
+  --panel-blur: blur(22px) saturate(1.35); /* the brand's glass: 22 px blur, 1.35 saturate */
   --card-radius: 14px;
 
-  --btn-radius: 10px;
+  --btn-radius: var(--radius-pill); /* brand: every button, chip and input is a pill */
   --btn-primary-bg: rgba(92, 249, 226, 0.14);
   --btn-primary-fg: #5cf9e2;
   --btn-primary-border: 1px solid rgba(92, 249, 226, 0.5);
@@ -50,7 +50,7 @@
 
   --input-bg: rgba(11, 9, 7, 0.35);
   --input-border: 1px solid rgba(241, 232, 220, 0.16);
-  --input-radius: 10px;
+  --input-radius: var(--radius-pill);
   --input-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 
   --menu-on-bg: rgba(92, 249, 226, 0.14);
@@ -74,58 +74,101 @@
   --bubble-user-who: #5cf9e2;
 }
 [data-theme="light"] {
-  --hairline: rgba(23, 19, 15, 0.12);
+  --hairline: rgba(11, 9, 7, 0.12);
   --lq-bg-image:
-    radial-gradient(ellipse 70% 50% at 8% -10%, rgba(11, 122, 109, 0.14), transparent 55%),
-    radial-gradient(ellipse 50% 40% at 100% 110%, rgba(11, 122, 109, 0.07), transparent 50%),
-    radial-gradient(ellipse 40% 30% at 70% 0%, rgba(230, 140, 60, 0.06), transparent 50%);
+    radial-gradient(ellipse 60% 50% at 92% 108%, rgba(217, 138, 61, 0.16), transparent 60%),
+    radial-gradient(ellipse 30% 25% at 96% 100%, rgba(226, 150, 72, 0.08), transparent 55%),
+    radial-gradient(ellipse 50% 35% at 10% -10%, rgba(255, 255, 255, 0.45), transparent 55%);
   --panel-bg: rgba(255, 253, 250, 0.62);
   --panel-border: 1px solid rgba(23, 19, 15, 0.10);
-  --panel-shadow: 0 18px 40px rgba(60, 40, 20, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 0 0 1px rgba(11, 122, 109, 0.03);
-  --btn-primary-bg: rgba(11, 122, 109, 0.10);
-  --btn-primary-fg: #0b7a6d;
-  --btn-primary-border: 1px solid rgba(11, 122, 109, 0.45);
-  --btn-primary-shadow: 0 0 14px rgba(11, 122, 109, 0.10);
+  --btn-primary-bg: rgba(11, 129, 104, 0.10);
+  --btn-primary-fg: #086553;
+  --btn-primary-border: 1px solid rgba(11, 129, 104, 0.45);
+  --btn-primary-shadow: 0 0 14px rgba(11, 129, 104, 0.10);
   --btn-secondary-bg: rgba(23, 19, 15, 0.04);
   --btn-secondary-fg: #17130f;
   --btn-secondary-border: 1px solid rgba(23, 19, 15, 0.16);
-  --btn-render-bg: linear-gradient(180deg, #14968a, #0b7a6d 55%, #08665b);
+  --btn-render-bg: linear-gradient(180deg, #0b8168, #0a7560 55%, #086553);
   --btn-render-fg: #ffffff;
-  --btn-render-shadow: 0 0 0 1px rgba(11, 122, 109, 0.35), 0 6px 22px rgba(11, 122, 109, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  --btn-render-shadow-sm: 0 0 0 1px rgba(11, 122, 109, 0.3), 0 3px 10px rgba(11, 122, 109, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  --btn-render-shadow: 0 0 0 1px rgba(11, 129, 104, 0.35), 0 6px 22px rgba(11, 129, 104, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  --btn-render-shadow-sm: 0 0 0 1px rgba(11, 129, 104, 0.3), 0 3px 10px rgba(11, 129, 104, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.3);
   --tog-off: rgba(23, 19, 15, 0.14);
-  --tog-on: #0b7a6d;
-  --tog-on-shadow: 0 0 12px rgba(11, 122, 109, 0.35);
+  --tog-on: #0b8168;
+  --tog-on-shadow: 0 0 12px rgba(11, 129, 104, 0.35);
   --tog-knob-bg: #ffffff;
   --tog-border: 1px solid rgba(23, 19, 15, 0.10);
   --seg-bg: rgba(23, 19, 15, 0.04);
   --seg-border: 1px solid rgba(23, 19, 15, 0.10);
-  --seg-on-bg: rgba(11, 122, 109, 0.12);
-  --seg-on-fg: #0b7a6d;
-  --seg-on-shadow: inset 0 0 0 1px rgba(11, 122, 109, 0.35), 0 0 10px rgba(11, 122, 109, 0.08);
-  --sld-fill: #0b7a6d;
+  --seg-on-bg: rgba(11, 129, 104, 0.12);
+  --seg-on-fg: #086553;
+  --seg-on-shadow: inset 0 0 0 1px rgba(11, 129, 104, 0.35), 0 0 10px rgba(11, 129, 104, 0.08);
+  --sld-fill: #0b8168;
   --sld-rest: rgba(23, 19, 15, 0.14);
   --sld-thumb-bg: #ffffff;
-  --sld-thumb-shadow: 0 0 0 4px rgba(11, 122, 109, 0.22), 0 1px 4px rgba(0, 0, 0, 0.2);
+  --sld-thumb-shadow: 0 0 0 4px rgba(11, 129, 104, 0.22), 0 1px 4px rgba(0, 0, 0, 0.2);
   --input-bg: rgba(255, 255, 255, 0.55);
   --input-border: 1px solid rgba(23, 19, 15, 0.16);
   --input-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  --menu-on-bg: rgba(11, 122, 109, 0.10);
-  --menu-on-fg: #0b7a6d;
+  --menu-on-bg: rgba(11, 129, 104, 0.10);
+  --menu-on-fg: #086553;
   --thumb-border: 1px solid rgba(23, 19, 15, 0.10);
   --thumb-shadow: 0 8px 20px rgba(60, 40, 20, 0.16);
   --play-bg: rgba(255, 253, 250, 0.85);
-  --play-fg: #0b7a6d;
-  --play-shadow: 0 4px 14px rgba(11, 122, 109, 0.25);
+  --play-fg: #086553;
+  --play-shadow: 0 4px 14px rgba(11, 129, 104, 0.25);
   --bar-bg: rgba(23, 19, 15, 0.10);
-  --bar-fill: linear-gradient(90deg, #08665b, #0b7a6d);
-  --bar-shadow: 0 0 10px rgba(11, 122, 109, 0.3);
+  --bar-fill: linear-gradient(90deg, #086553, #0b8168);
+  --bar-shadow: 0 0 10px rgba(11, 129, 104, 0.3);
   --bubble-agent-bg: rgba(23, 19, 15, 0.04);
   --bubble-agent-border: 1px solid rgba(23, 19, 15, 0.08);
-  --bubble-user-bg: rgba(11, 122, 109, 0.10);
-  --bubble-user-border: 1px solid rgba(11, 122, 109, 0.22);
-  --bubble-user-who: #0b7a6d;
+  --bubble-user-bg: rgba(11, 129, 104, 0.10);
+  --bubble-user-border: 1px solid rgba(11, 129, 104, 0.22);
+  --bubble-user-who: #086553;
 }
+
+
+/* ---------- The AIgent brand (AIgent Brand Guide: tokens.css, README, Surfaces) ----------
+   The brand's tokens mapped onto Studio's own names, so studio.css, polish.css and this file keep using
+   --background, --foreground, --primary and friends. Dark is Plinth, light is Paper: the brand cream ground
+   with ink text and the deep teal accent (#0b8168), because the bright cyan measures 1.1:1 on cream.
+   Where the teal is small text on cream it uses the brand's accent-hi (#086553) so it clears 4.5:1. */
+@font-face { font-family: "Sofia Sans Extra Condensed"; src: url("/files/kit/fonts/SofiaSansExtraCondensed-VF.ttf") format("truetype"); font-weight: 1 1000; font-display: swap; }
+:root {
+  --font-display: "Sofia Sans Extra Condensed", "Arial Narrow", Impact, sans-serif;
+  --font-sans: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ease-carve: cubic-bezier(0.2, 0.7, 0.1, 1); --ease-brand-out: cubic-bezier(0.16, 1, 0.3, 1); --dur-short: 220ms;
+  --radius-pill: 999px; --radius-inner: 10px; --radius-draft: 14px; --radius-well: 28px;
+  --section-rule: 40px;
+  --ease-ui: var(--ease-brand-out); /* polish.css motion now runs on the brand's ease-out */
+}
+:root, [data-theme="dark"] {
+  --primary-text: #5cf9e2; --focus: #5cf9e2; --text-2: #cdbfae;
+  --ember: #d98a3d; --ember-hot: #e29648; --ember-deep: #b35b20;
+  --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.1), 0 0 0 1px rgb(241 232 220 / 0.14), 0 10px 24px -6px rgb(0 0 0 / 0.6), 0 36px 70px -24px rgb(0 0 0 / 0.85);
+  --shadow-smoke: inset 0 1px 0 rgb(255 255 255 / 0.16), 0 0 0 1px rgb(241 232 220 / 0.14), 0 18px 40px -18px rgb(0 0 0 / 0.7);
+}
+[data-theme="light"] {
+  --primary-text: #086553; --focus: #0b8168; --text-2: #3a3129;
+  --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.8), 0 0 0 1px rgb(11 9 7 / 0.08), 0 10px 24px -6px rgb(60 40 20 / 0.16), 0 36px 70px -24px rgb(60 40 20 / 0.22);
+  --shadow-smoke: inset 0 1px 0 rgb(255 255 255 / 0.85), 0 0 0 1px rgb(11 9 7 / 0.08), 0 18px 40px -18px rgb(60 40 20 / 0.22);
+}
+[data-theme="light"] a, [data-theme="light"] .linkish { color: var(--primary-text); }
+[data-theme="light"] :where(input, textarea)::placeholder { opacity: 1; }
+:focus-visible { outline-color: var(--focus); }
+
+/* the header: the AIgent wordmark (the brand's assets/Marks) with a label beside it.
+   The mark's cap height stays at the brand minimum of 24 px; its file carries its own clear space. */
+.brand .wm { display: block; height: 59px; width: auto; margin: -4px -6px -4px -14px; }
+.brand .wm-light { display: none; }
+[data-theme="light"] .brand .wm-dark { display: none; } [data-theme="light"] .brand .wm-light { display: block; }
+.brand .bname { color: var(--muted-foreground); font: 600 13px/1 var(--font-sans); padding-top: 3px; }
+/* headlines in the brand's display face: uppercase, heavy, tight, and a 40 px accent rule above, as a section opens */
+.sh h2 { font-family: var(--font-display); font-weight: 820; font-size: 44px; line-height: .9; letter-spacing: -0.006em; text-wrap: balance; }
+.sh h2::before { content: ""; display: block; width: var(--section-rule); height: 1px; background: var(--primary); margin-bottom: 10px; }
+.stat b { font-family: var(--font-display); font-weight: 760; font-size: 30px; font-variant-numeric: tabular-nums; }
+.sn, .clip-n, .pct { font-variant-numeric: tabular-nums; }
+.sub, .fine { text-wrap: pretty; }
+textarea { border-radius: var(--radius-draft) !important; } /* pills for one-line fields; a text box gets the brand's draft radius */
 
 /* ---------- page and panels ---------- */
 body { font-feature-settings: "ss01" on, "kern" on; }
@@ -137,7 +180,7 @@ body { font-feature-settings: "ss01" on, "kern" on; }
 .glass-card { border-color: var(--hairline); }
 .fold.glass-card, .fold2, .outputs figure.glass-card, .qi.glass-card { border-radius: var(--card-radius); background: var(--panel-bg); border: var(--panel-border); box-shadow: var(--panel-shadow); }
 /* panel headings, as in A: small caps-style labels */
-.block .bh h3, .review h3, .scripts h3 { font-size: 13px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted-foreground); }
+.block .bh h3, .review h3, .scripts h3 { font-family: var(--font-display); font-size: 17px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted-foreground); } /* the brand eyebrow caps */
 .lbl { font-size: 12px; font-weight: 600; letter-spacing: 0.03em; color: var(--muted-foreground); }
 
 /* ---------- buttons (Astryx Button): primary is A's Render reel, secondary is A's Preview ---------- */
@@ -214,7 +257,7 @@ select { -webkit-appearance: none; appearance: none; padding-right: 34px; font-w
   select option:checked { background: var(--menu-on-bg); color: var(--menu-on-fg); font-weight: 650; }
   select option::checkmark { display: none; }
 }
-.menu-panel, .hint-panel { background: var(--panel-bg); border: var(--panel-border); border-radius: 14px; -webkit-backdrop-filter: var(--panel-blur); backdrop-filter: var(--panel-blur); }
+.menu-panel, .hint-panel { box-shadow: var(--shadow-card); background: var(--panel-bg); border: var(--panel-border); border-radius: 14px; -webkit-backdrop-filter: var(--panel-blur); backdrop-filter: var(--panel-blur); }
 .menu-item { border-radius: 8px; }
 .menu-item[data-focus] { background: var(--menu-on-bg); color: var(--menu-on-fg); } .menu-item[data-focus] .ic { color: var(--menu-on-fg); }
 
@@ -242,3 +285,4 @@ select { -webkit-appearance: none; appearance: none; padding-right: 34px; font-w
 @media (prefers-reduced-motion: reduce) { .astryx-switch, .astryx-switch-thumb, .astryx-button { transition: none !important; } .spin { animation: spin 2s linear infinite !important; } }
 [data-glass="off"] .block.glass-card, [data-glass="off"] .teardown.glass-card, [data-glass="off"] .runbar.glass-card, [data-glass="off"] .flink.glass-card, [data-glass="off"] .scripts.glass-card, [data-glass="off"] .review.glass-card, [data-glass="off"] .menu-panel, [data-glass="off"] .hint-panel { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--card); }
 [data-glass="off"] .ambient { background: var(--background); }
+.sh h2[tabindex="-1"]:focus { outline: none; } /* focus moved here on a step change; the heading is not a control */

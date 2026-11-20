@@ -79,7 +79,7 @@ The agent clones the kit and installs everything up front with `npm run setup:al
 
 Then run `npm run studio` (or click the icon). Without an agent the chat works on keywords, a local model or an API key.
 
-<img src="docs/studio/desktop.png" width="720" alt="Studio in a browser: four steps across the top, the Style step with style packs and a grid of effect previews, the picks tray floating at the bottom, and the chat in a frosted glass panel on the right with Claude Code connected and listening">
+<img src="docs/studio/desktop.png" width="720" alt="Studio in a browser: the AIgent wordmark and six numbered steps across the top, the Style step with style packs and a grid of effect previews in frosted glass panels, the picks bar at the bottom, and the chat on the right">
 
 **Reference links.** Paste one or more links (YouTube and Shorts, TikTok, X, Vimeo, a direct .mp4, or one public Instagram post) and Studio downloads each to a folder on your computer, shows the progress, and breaks it down: length, shots and cut times, pace, music BPM and energy, caption style, transitions, finishes and graphics. It then suggests matching items from the effects menu. The breakdown goes into the chat, so "use the transitions from the reference but calmer" works. Use it as an influence (soft defaults) or recreate its structure with your clip. Link downloads need [yt-dlp](https://github.com/yt-dlp/yt-dlp), which the installer adds; Instagram uses [instaloader](https://github.com/instaloader/instaloader) anonymously, with no login. Only use videos you have the rights to use as a reference.
 
@@ -129,7 +129,7 @@ Then run `npm run studio` (or click the icon). Without an agent the chat works o
 
 **Settings.** Dark by default, with a light theme. The chat, step bar and settings are frosted glass panels; a switch turns them solid on older computers. Choose who answers the chat (your terminal agent by default, or a local model through Ollama, LM Studio or llama.cpp, the Claude or OpenAI API, or keywords only), where reference downloads go, and where finished reels are copied.
 
-<img src="docs/studio/settings.png" width="720" alt="Studio settings in a side sheet: who answers the chat with a local model picked, the action note switch, the reference downloads and finished reels folders, and the theme">
+<img src="docs/studio/settings.png" width="720" alt="Studio settings in a side sheet: who answers the chat, the terminal note switch, API keys and providers, and the reference downloads and finished reels folders with Browse">
 
 **B-roll.** A step between Style and Render gives every beat a slot: fill it from your library, an upload, free stock (Pexels or Pixabay with your own key), a chart, counter, quote, code or terminal card made on your computer, a screen recording, or a generator with your own key (off until you allow it; every generate shows the cost and waits for your click). Pick full cutaway, split top panel or picture in picture. Your agent can suggest shots for you to approve. Render writes `credits.txt`. **API keys and providers** in Settings keeps every key on your computer (owner-only, never shown again, never given to the agent). See [B-roll](docs/studio.md#b-roll).
 

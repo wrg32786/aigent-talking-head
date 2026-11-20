@@ -103,26 +103,26 @@ main[data-step] .step[data-step] { animation: none; }
 @keyframes step-in-4 { from { opacity: 0; transform: translateY(10px); } }
 @keyframes step-in-5 { from { opacity: 0; transform: translateY(10px); } }
 @keyframes step-in-6 { from { opacity: 0; transform: translateY(10px); } }
-main[data-step="footage"] { animation: step-in-1 var(--motion-slow) var(--ease-out-4, ease-out) backwards; }
-main[data-step="cut"] { animation: step-in-2 var(--motion-slow) var(--ease-out-4, ease-out) backwards; }
-main[data-step="reference"] { animation: step-in-3 var(--motion-slow) var(--ease-out-4, ease-out) backwards; }
-main[data-step="style"] { animation: step-in-4 var(--motion-slow) var(--ease-out-4, ease-out) backwards; }
-main[data-step="broll"] { animation: step-in-5 var(--motion-slow) var(--ease-out-4, ease-out) backwards; }
-main[data-step="render"] { animation: step-in-6 var(--motion-slow) var(--ease-out-4, ease-out) backwards; }
+main[data-step="footage"] { animation: step-in-1 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+main[data-step="cut"] { animation: step-in-2 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+main[data-step="reference"] { animation: step-in-3 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+main[data-step="style"] { animation: step-in-4 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+main[data-step="broll"] { animation: step-in-5 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+main[data-step="render"] { animation: step-in-6 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
 .glass-card { transition: box-shadow var(--motion) var(--ease-ui), border-color var(--motion) var(--ease-ui), transform var(--motion) var(--ease-ui); }
-.pack, .tile, .agent-grid > * { transition: transform var(--motion) var(--ease-spring-2, ease), box-shadow var(--motion) var(--ease-ui); }
-@media (hover: hover) { .pack:hover, .tile:hover, .agent-grid > *:hover { transform: translateY(-2px); box-shadow: var(--shadow-stack); } }
+.pack, .tile, .agent-grid > * { transition: box-shadow var(--motion) var(--ease-ui), border-color var(--motion) var(--ease-ui); }
+/* brand: nothing moves on hover, only light and colour change */
+@media (hover: hover) { .pack:hover, .tile:hover, .agent-grid > *:hover { box-shadow: var(--shadow-stack); border-color: var(--glass-edge, var(--border)); } }
 
-/* the main Next button: a slow moving ring on hover */
-/* adapted from "kind-fish-73" by AnthonyPreite on Uiverse.io (MIT): a 400% gradient sliding behind the edge */
+/* the main Next button: a gradient ring that fades in on hover and focus (held still: the brand moves nothing on hover) */
+/* adapted from "kind-fish-73" by AnthonyPreite on Uiverse.io (MIT): a 400% gradient behind the edge */
 #next { position: relative; isolation: isolate; transition: transform var(--motion-fast) var(--ease-ui); }
 #next::before { content: ""; position: absolute; inset: -3px; border-radius: inherit; padding: 2px; z-index: -1; pointer-events: none;
   background: linear-gradient(90deg, var(--primary), color-mix(in srgb, var(--primary) 30%, #fff) 25%, var(--primary) 50%); background-size: 400%;
   -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
-  opacity: 0; transition: opacity var(--motion-slow) var(--ease-ui); animation: ring-slide 12s linear infinite; }
+  opacity: 0; transition: opacity var(--motion-slow) var(--ease-ui); }
 #next:hover::before, #next:focus-visible::before { opacity: 1; }
 #next:active { transform: scale(.98); }
-@keyframes ring-slide { 50% { background-position: 400% 0; } }
 
 /* ---------- spacing rhythm ---------- */
 .sh { margin-bottom: var(--space-1); } .sh .sub { margin-top: var(--space-1); }
@@ -130,7 +130,7 @@ main[data-step="render"] { animation: step-in-6 var(--motion-slow) var(--ease-ou
 .bh { gap: var(--space-2); }
 
 @media (prefers-reduced-motion: reduce) {
-  main[data-step], .btab-panels > *, .fold2-b[data-open], #next::before { animation: none !important; }
+  main[data-step], .btab-panels > *, .fold2-b[data-open] { animation: none !important; }
   .menu-panel, .hint-panel, .pop-panel, .theme-btn > .ic, .toggle, .toggle .knob, .tab, .glass-card, .pack, .tile { transition: none !important; }
   .pack:hover, .tile:hover, .agent-grid > *:hover { transform: none; }
   .spin { animation: spin 2s linear infinite !important; }

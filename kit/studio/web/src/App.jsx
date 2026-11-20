@@ -16,6 +16,9 @@ import { Settings } from './Settings.jsx';
 import { MoreMenu } from './ui.jsx';
 import { PicksTray } from './Picks.jsx';
 import { Connect } from './Connect.jsx';
+// the AIgent wordmark (from the AIgent brand's assets/Marks): one file per ground, never one colour
+import wordmarkDark from './brand/aigent-wordmark-for-dark.svg';
+import wordmarkLight from './brand/aigent-wordmark-for-white.svg';
 import { SetupCheck } from './Setup.jsx';
 
 const hashStep = () => (location.hash.match(/step=([a-z]+)/) || [])[1];
@@ -93,7 +96,7 @@ export function App() {
       <a className="skip" href="#main">Skip to the editor</a>
       <div className="ambient" aria-hidden="true" />
       <header className="top glass">
-        <div className="brand"><span className="mark" aria-hidden="true" /><span className="bname">AIgent <b>Studio</b></span></div>
+        <div className="brand"><img className="wm wm-dark" src={wordmarkDark} alt="AIgent" width="127" height="59" /><img className="wm wm-light" src={wordmarkLight} alt="AIgent" width="127" height="59" /><span className="bname">Studio</span></div>
         <JobName s={s} patch={patch} />
         <nav className="stepper" aria-label="Steps"><ol id="stepper">
           {STEPS.map((st, k) => <li key={st} className={done[st] ? 'done' : ''}>
