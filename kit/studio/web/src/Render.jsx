@@ -41,7 +41,7 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
   const reopen = o => api('/api/reopen', { reel: o }).then(j => { apply(j); loadChoices(); toast(`${o.split('/').pop()} is back in the editor. Render makes the next version.`, true); }).catch(() => {});
   const canReopen = new Set(V.reopenable || []);
   const outputs = (V.outputs || []).slice(0, 6);
-  const n = combo.pieces.length, fromPieces = combo.from === 'pieces';
+  const n = combo.pieces.length, lineN = combo.pieces.reduce((a, x) => a + (x.kind === 'piece' && x.lines ? x.lines.length : 1), 0), fromPieces = combo.from === 'pieces';
   const setFin = p => patch({ finish: p }).catch(() => {});
   // drafted: the server's record of the last draft (s.drafted) matches what you have now; a session from before 1.13.0
   // has only the draft's choices.json
@@ -62,7 +62,7 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
     <div className="fin-make glass-card" id="fin-make" role="group" aria-labelledby="fin-make-h">
       <h3 className="lbl" id="fin-make-h">Make</h3>
       {n > 0 && <div className="seg" role="radiogroup" aria-label="Draft from" id="fin-from">
-        <button type="button" role="radio" aria-checked={fromPieces} data-from="pieces" onClick={() => setFin({ from: 'pieces' })}>Your {n} piece{n > 1 ? 's' : ''}, {Math.round(combo.seconds)} s</button>
+        <button type="button" role="radio" aria-checked={fromPieces} data-from="pieces" onClick={() => setFin({ from: 'pieces' })}>Your {lineN} piece{lineN > 1 ? 's' : ''}, {Math.round(combo.seconds)} s</button>
         <button type="button" role="radio" aria-checked={!fromPieces} data-from="take" onClick={() => setFin({ from: 'take' })}>The whole take</button>
       </div>}
       <p className="fine" id="fin-from-note">{fromPieces ? 'The reel is your pieces from the Cut step, in your order, already cut. Nothing is cut twice.' : n ? 'The reel is cut from the whole take. Your pieces are left out.' : 'The reel is cut from the whole take. Keep pieces on the Cut step to make it from those.'}</p>
