@@ -134,7 +134,8 @@ function view(s) {
   let reopenable = []; try { reopenable = s.job ? SNAP.list(join(ROOT, 'jobs', s.job)).filter(x => x.snapshot).map(x => `jobs/${s.job}/${x.reel}`) : []; } catch {}
   let combo = { pieces: [], seconds: 0, key: '' }; try { combo = comboOf(s); } catch {}
   let edit = null; try { edit = editOf(s, { combo, cut, broll }); } catch (e) { edit = { error: e.message }; }
-  return { seq: ++viewSeq, boot: BOOT, state: s, compose: comp, outputs: C.outputsOf(s), reopenable, scripts, cut, broll, pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
+  let look = null; try { look = lookSources(s); } catch {}
+  return { seq: ++viewSeq, boot: BOOT, state: s, look, compose: comp, outputs: C.outputsOf(s), reopenable, scripts, cut, broll, pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
 }
 
 // what a finished draft says (a draft is a plan: no video until Render)
@@ -195,8 +196,9 @@ function switchVideo(o = {}) {
 
 // ---------- the kit's commands, from the session ----------
 const refPackName = s => s.reference && s.reference.mode === 'influence' && s.reference.extracted && s.job ? `ref-${s.job}`.slice(0, 48) : null;
-function writeRefPack(s) {
-  const name = refPackName(s); if (!name) return null;
+// force: write it whatever the mode (Save as a Look from a reference used whole, or off)
+function writeRefPack(s, { force = false } = {}) {
+  const name = force ? (s.reference && s.reference.extracted && s.job ? `ref-${s.job}`.slice(0, 48) : null) : refPackName(s); if (!name) return null;
   const pack = C.fitStyle(C.influencePack(s.reference.extracted, s.job, s.pack));
   const errs = K.validate(pack);
   if (errs.length) throw new Error('reference pack: ' + errs.join('; '));
@@ -204,6 +206,20 @@ function writeRefPack(s) {
   writeFileSync(join(dir, 'pack.json'), JSON.stringify(pack, null, 2) + '\n');
   writeFileSync(join(dir, 'README.md'), `# ${name}\n\n${pack.description}\n\nMade by Studio. Use it with npm run reel -- <clip> --pack ${name}.\n`);
   return name;
+}
+// where each option on the Look step came from, for the badges: the Look (the pack's locks and style), the reference
+// (what its teardown suggests, and the picks Use parts added) and you (your own picks)
+function lookSources(s, cat = C.catalog()) {
+  const pack = new Set(), ref = new Set(), add = (set, kind, ids) => { for (const id of [].concat(ids || [])) if (id && cat.items[`${kind}:${id}`]) set.add(`${kind}:${id}`); };
+  let P = null; try { P = s.pack ? K.load(s.pack) : null; } catch {}
+  if (P) { const l = P.locks || {}, st = P.style || {};
+    add(pack, 'transition', l.transitions); add(pack, 'entrance', l.titles); add(pack, 'graphic', l.graphics && l.graphics.allow); add(pack, 'finish', l.finishes); add(pack, 'captionEntrance', l.captionEntrance);
+    add(pack, 'transition', st.transition); add(pack, 'entrance', st.entranceOrder); add(pack, 'finish', st.finishPool); add(pack, 'effect', st.effectsFavourites); add(pack, 'look', st.look); add(pack, 'captionStyle', st.captionStyle); }
+  const ex = s.reference && s.reference.mode !== 'off' ? s.reference.extracted : null;
+  if (ex) { for (const r of Object.keys(C.referencePicks(ex, null, cat))) ref.add(r); add(ref, 'look', ex.look); }
+  const added = new Set((s.reference && s.reference.added) || []);
+  for (const r of added) ref.add(r);
+  return { pack: [...pack], ref: [...ref], added: [...added], packName: s.pack || null, refName: ex ? (ex.name || null) : null };
 }
 function draftSteps(s) {
   if (!s.job) throw Object.assign(new Error('name the job first'), { code: 400 });
@@ -980,13 +996,33 @@ async function api(req, res, u) {
     } else return json(res, 400, { error: 'action: use, retry or remove' });
     return json(res, 200, view(C.load()));
   }
+  if (p === '/api/reference/clear' && M === 'POST') {
+    // Clear reference: the reference and every pick it added go, as one undo ({ undo: true } puts it all back)
+    const b = await readBody(req).catch(() => ({}));
+    if (b.undo) { const s0 = C.load(); if (!s0.undoRef) return json(res, 400, { error: 'nothing to undo' });
+      const st = update(x => { const u = x.undoRef; x.reference = u.reference; x.picks = u.picks; x.pack = u.pack; x.music = u.music; delete x.undoRef; }); return json(res, 200, { ...view(st), note: 'The reference is back, with its picks.' }); }
+    const s0 = C.load(); if (!s0.reference.extracted && !s0.reference.file && !s0.reference.url) return json(res, 400, { error: 'no reference to clear' });
+    let n = 0;
+    const st = update(x => { x.undoRef = JSON.parse(JSON.stringify({ reference: x.reference, picks: x.picks, pack: x.pack || null, music: x.music }));
+      const added = x.reference.added || [], prev = x.reference.prev || {};
+      for (const r of added) { const [k, id] = [r.slice(0, r.indexOf(':')), r.slice(r.indexOf(':') + 1)]; const pk = x.picks[k]; if (pk && pk.allow.includes(id)) { pk.allow = pk.allow.filter(y => y !== id); n++; } }
+      if ('pack' in prev) x.pack = prev.pack; if ('bed' in prev) x.music = { ...x.music, bed: prev.bed };
+      x.reference = { ...x.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null, added: [], prev: null }; });
+    return json(res, 200, { ...view(st), note: `Cleared the reference${n ? ` and the ${n} pick${n === 1 ? '' : 's'} it added` : ''}. Undo puts it back.` });
+  }
   if (p === '/api/reference/apply' && M === 'POST') {
     const s = C.load(), ex = s.reference.extracted; if (!ex) return json(res, 400, { error: 'tear down a reference first' });
     const b = await readBody(req).catch(() => ({})), cat = C.catalog();
     const picks = Array.isArray(b.refs) ? Object.fromEntries(b.refs.filter(r => cat.items[r]).map(r => [r, 'allow'])) : C.referencePicks(ex, b.kinds || null, cat);
     const patch = { picks, ...(ex.music.bed && cat.beds.some(b => b.id === ex.music.bed) ? { music: { bed: ex.music.bed } } : {}), ...(ex.preset && cat.packs.some(x => x.name === ex.preset) ? { pack: ex.preset } : {}) };
     if (Array.isArray(b.refs) || b.kinds) { delete patch.music; delete patch.pack; }
-    const r = C.applyPatch(s, patch); s.reference.applied = true; C.save(s); pushState();
+    // what Use parts adds, so Clear reference can take exactly that back out
+    const had = new Set(Object.entries(s.picks).flatMap(([k, v]) => (v.allow || []).map(id => `${k}:${id}`)));
+    const prev = { pack: s.pack || null, bed: s.music && s.music.bed };
+    const r = C.applyPatch(s, patch); s.reference.applied = true;
+    s.reference.added = [...new Set([...(s.reference.added || []), ...Object.keys(picks).filter(x => !had.has(x))])];
+    s.reference.prev = s.reference.prev || { ...(patch.pack ? { pack: prev.pack } : {}), ...(patch.music ? { bed: prev.bed } : {}) };
+    C.save(s); pushState();
     return json(res, 200, { ...view(s), log: r.log, errs: r.errs });
   }
   if (p === '/api/draft' && M === 'POST') {
@@ -1125,8 +1161,10 @@ async function api(req, res, u) {
     const b = await readBody(req), s = C.load(), name = String(b.name || '').toLowerCase();
     if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(name)) return json(res, 400, { error: 'pack name: lowercase letters, numbers and dashes' });
     if (K.shipped().some(x => x.name === name)) return json(res, 400, { error: `${name} is a shipped pack; pick another name` });
-    const comp = C.compose(s), base = s.pack ? K.load(s.pack) : null;
-    const pack = { format: K.FORMAT, formatVersion: K.FORMAT_VERSION, name, version: '1.0.0', label: String(b.label || `My look (${name})`).slice(0, 80), description: String(b.label || 'Saved from Studio.').slice(0, 200), author: 'you', license: 'Apache-2.0',
+    // a Look saved with a reference in use keeps the reference's look too (its soft defaults as the base)
+    const useRef = b.reference !== false && s.reference.extracted && (b.fromReference || s.reference.mode !== 'off'), ref = useRef ? writeRefPack(s, { force: true }) : null;
+    const comp = C.compose(s, { refPack: ref }), base = ref ? K.load(ref) : s.pack ? K.load(s.pack) : null, refName = ref && s.reference.extracted.name;
+    const pack = { format: K.FORMAT, formatVersion: K.FORMAT_VERSION, name, version: '1.0.0', label: String(b.label || (refName ? `From the reference ${refName}` : `My look (${name})`)).slice(0, 80), description: String(b.label || (refName ? `Saved from Studio with the reference ${refName}.` : 'Saved from Studio.')).slice(0, 200), author: 'you', license: 'Apache-2.0',
       extends: base ? base.extends : 'aigent', style: { ...(base ? base.style || {} : {}), ...(comp.effects.length ? { effectsFavourites: comp.effects } : {}) }, locks: { ...(base ? base.locks || {} : {}), ...comp.locks }, ...(base && base.weights ? { weights: base.weights } : {}) };
     C.fitStyle(pack);
     const errs = K.validate(pack); if (errs.length) return json(res, 400, { error: errs.join('; ') });

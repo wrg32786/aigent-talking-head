@@ -1,5 +1,19 @@
 {
-  "about": "How Studio groups the engine's menu (npm run menu) into tabs. This file only regroups: every entry must name a menu section or an item id the engine already has, and npm run check fails on an unknown one. An item can sit in more than one tab. A tab with no items is hidden in Studio and listed in docs/studio.md as a candidate to build next.",
+  "about": "How Studio groups the engine's menu (npm run menu) into tabs. This file only regroups: every entry must name a menu section or an item id the engine already has, and npm run check fails on an unknown one. An item can sit in more than one tab. A tab with no items is hidden in Studio and listed in docs/studio.md as a candidate to build next. Studio shows the tabs as 9 layers (layers, each a list of tab groups): every option lives in exactly one layer. layerOrder says which layer claims an option first when tabs share it, owners moves one to a named layer, hidden drops a duplicate name. npm run check fails when an option lands in no layer.",
+  "layers": [
+    {"id": "text", "label": "Text", "hint": "Captions (the running words), kinetic words and big titles. Fonts live in Fonts, stickers in Graphics.", "groups": [{"cat": "captions"}, {"cat": "kinetic-text", "notKinds": ["font"], "label": "Titles and kinetic words"}, {"cat": "person", "kinds": ["titleLayer"], "label": "Title layer"}]},
+    {"id": "fonts", "label": "Fonts", "hint": "The type pairs for titles and captions.", "groups": [{"cat": "kinetic-text", "kinds": ["font"], "label": "Font pairs"}]},
+    {"id": "graphics", "label": "Graphics", "hint": "Not text: lower thirds and name tags, stickers and callouts, data cards, logos, CTAs.", "groups": [{"cat": "lower-thirds"}, {"cat": "stickers"}, {"cat": "data"}, {"cat": "intros-ctas"}, {"cat": "motion-graphics", "label": "More graphics"}]},
+    {"id": "transitions", "label": "Transitions", "hint": "The seam between two shots.", "groups": [{"cat": "transitions"}]},
+    {"id": "color", "label": "Color and finish", "hint": "Grades, themes, grain, vignette, scan lines and glitches.", "groups": [{"cat": "color", "notKinds": ["look"]}, {"cat": "overlays"}, {"cat": "glitch"}]},
+    {"id": "motion", "label": "Motion", "hint": "Camera moves, zoom punch, you and the room, speed and time.", "groups": [{"cat": "camera"}, {"cat": "speed-time"}, {"cat": "person"}]},
+    {"id": "audio", "label": "Music and SFX", "hint": "Music beds, energy, sound effects and pace. Ducking under your voice is always on.", "groups": [{"cat": "audio"}]},
+    {"id": "broll", "label": "B-roll", "hint": "How b-roll sits: splits, match cuts, phone fans, carousels, screen cards.", "groups": [{"cat": "broll"}]},
+    {"id": "layout", "label": "Layout", "hint": "Frames, split screens and grids around you.", "groups": [{"cat": "frames"}]}
+  ],
+  "layerOrder": ["transitions", "text", "fonts", "broll", "audio", "motion", "graphics", "color", "layout"],
+  "owners": { "effect:noise": "color", "effect:orbit": "motion" },
+  "hidden": ["look:oneword"],
   "categories": [
     { "id": "transitions", "label": "Transitions", "hint": "The seam between two shots.", "include": [{ "section": "transitions" }] },
     { "id": "kinetic-text", "label": "Kinetic text and title entrances", "hint": "How big titles arrive, where they sit, and the type they use.",

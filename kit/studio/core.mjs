@@ -40,6 +40,22 @@ function previewOf(it) {
   if (still) return { src: still, animated: false, still };
   return null;
 }
+// The 9 layers of the Look step (categories.json layers): the tabs regrouped so every option lives in exactly one
+// layer. A layer is a list of groups (a tab, optionally only some kinds); layerOrder says which layer claims an option
+// first, owners moves one to a named layer, hidden drops a duplicate name. An option that lands nowhere is an error.
+export function layersOf(map, categories, items, errs = []) {
+  const L = map.layers || [], byCat = Object.fromEntries(categories.map(c => [c.id, c])), hidden = new Set(map.hidden || []), owners = map.owners || {};
+  const ids = new Set(L.map(l => l.id)), order = (map.layerOrder || L.map(l => l.id)).filter(id => ids.has(id)).concat(L.map(l => l.id).filter(id => !(map.layerOrder || []).includes(id)));
+  for (const [r, l] of Object.entries(owners)) { if (!items[r]) errs.push(`owners: no option ${r}`); if (!ids.has(l)) errs.push(`owners: ${r} names no layer ${l}`); }
+  for (const r of hidden) if (!items[r]) errs.push(`hidden: no option ${r}`);
+  const at = {}, out = Object.fromEntries(L.map(l => [l.id, { id: l.id, label: l.label, hint: l.hint || '', groups: (l.groups || []).map(g => ({ id: g.cat, label: g.label || (byCat[g.cat] || {}).label || g.cat, items: [] })) }]));
+  for (const lid of order) { const l = L.find(x => x.id === lid);
+    (l.groups || []).forEach((g, gi) => { const c = byCat[g.cat]; if (!c) { errs.push(`layer ${lid}: no tab ${g.cat}`); return; }
+      for (const r of c.items) { const it = items[r]; if (at[r] || hidden.has(r)) continue; if (g.kinds && !g.kinds.includes(it.kind)) continue; if (g.notKinds && g.notKinds.includes(it.kind)) continue;
+        if (owners[r] && owners[r] !== lid) continue; at[r] = lid; out[lid].groups[gi].items.push(r); } }); }
+  if (L.length) for (const c of categories) for (const r of c.items) if (!at[r] && !hidden.has(r)) errs.push(`${r} (tab ${c.id}) is in no layer`);
+  return L.map(l => { const x = out[l.id]; x.groups = x.groups.filter(g => g.items.length); x.items = x.groups.flatMap(g => g.items); x.count = x.items.length; return x; });
+}
 let cached = null;
 export function catalog({ fresh = false } = {}) {
   if (cached && !fresh) return cached;
@@ -71,10 +87,11 @@ export function catalog({ fresh = false } = {}) {
     }
     return { id: c.id, label: c.label, hint: c.hint, items: refs, count: refs.length };
   });
+  const layers = layersOf(map, categories, items, errs);
   const packs = K.list().map(p => ({ name: p.name, label: p.label, description: p.description, version: p.version, shipped: !!p.shipped, locks: L.describe(p.locks || {}),
     preview: p.dir && existsSync(join(p.dir, 'preview.webp')) ? rel(join(p.dir, 'preview.webp')) : null }));
   const beds = JSON.parse(readFileSync(join(KIT, 'music', 'beds.json'), 'utf8'));
-  cached = { categories, items, packs, candidates: map.candidates || [], beds: Object.entries(beds).map(([id, b]) => ({ id, title: b.title, seconds: b.seconds, energy: b.energy, file: rel(join(KIT, 'music', b.file)) })),
+  cached = { categories, layers, items, packs, candidates: map.candidates || [], beds: Object.entries(beds).map(([id, b]) => ({ id, title: b.title, seconds: b.seconds, energy: b.energy, file: rel(join(KIT, 'music', b.file)) })),
     exports: menu.items.filter(i => i.section === 'exports').map(i => i.id), errs };
   return cached;
 }
