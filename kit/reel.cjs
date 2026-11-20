@@ -45,11 +45,24 @@
 //          --tighten <s> / --no-tighten  no dead air: cut every pause inside a line longer than <s> seconds to a jump
 //            (keeps 0.12 s of breath; each jump gets the punch toggle). On at 0.3 in the magazine preset.
 //          --music-energy low|mid|high|auto  pick a library bed by energy (auto reads your pace); --bed still wins
+//          --no-bed  no music bed, even when the pack, preset or recipe names one
 //          --cards auto|off  colour cards on short lines to land and numbered chapter cards on a list (kit/cards.cjs),
 //            plus the number-pop intro on a list. Auto in the magazine preset.
 //          --no-sfx-cap  turn off the sound density cap (on by default: kit/sfx-map.cjs)
 //          --aliases "Gwyn: Guinn, Gwin; aigent: agent"  names Whisper mishears, written your way in captions and titles
 //            (adds to a recipe's ## Aliases)
+//          --glossary <words.json | "chat GBT = ChatGPT; school = Skool after on, in">  brand words fixed in clips.json,
+//            captions and titles every draft, on top of kit/glossary.json and the pack's "glossary" (kit/glossary.cjs);
+//            a word with its own casing ("AIgent") keeps it under a caps display face. Repeatable.
+//          --brands <brands.json>  a logo plate when a word is said ([{ "word": "Skool", "logo": "skool.svg" }],
+//            kit/brands.cjs), on top of the pack's "brands". Only marks you have the right to use.
+//          --as-is  the files are already cut: one clip per file, in the order given (clip.py --whole). Without it,
+//            several files that each start and end on speech are used whole too, and files with a clips.json beside
+//            them (a clip.py folder) are reused as they are.
+//          --order auto|files|script  several files: takes of one script (best take per sentence) or different clips
+//            (the order given); auto decides from how many sentences the files share
+//          --keep-pauses "clip-003@2.72,clip-005@1.1"  with --tighten, leave these pauses (clip id @ clip seconds, as
+//            listed in choices.json "pauses") uncut
 //          --no-boost  skip the legibility pass (on by default: a caption moment under 3:1 gets a denser halo and is drawn again)
 // A title behind the head moves in front when the person mask covers more than 22% of its letters (cut.json "behindMax";
 // kit/cover.py); a face title moves to the slot above the head. Left and right titles keep a 6.5% side margin and shrink to fit.
@@ -77,7 +90,7 @@ const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup']);
+const VALUED = new Set(['pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const JSON_OUT = flag('json');
@@ -86,7 +99,11 @@ const X = require('./exports.cjs');
 const EXPORT = opt('export') ? String(opt('export')).toLowerCase() : null;
 if (EXPORT && !X.get(EXPORT)) die('--export must be ' + X.NAMES.join(', '));
 const VIDEO = /\.(mov|mp4|m4v|mkv|webm|avi)$/i;
-const PY = process.env.PYTHON || (process.platform === 'win32' ? 'py' : 'python3');
+// the kit's Python: PYTHON, else the kit's .venv (where the installer put Whisper, yt-dlp and the rest), else the system one
+const PY = process.env.PYTHON || [path.join(ROOT, '.venv', 'Scripts', 'python.exe'), path.join(ROOT, '.venv', 'bin', 'python')].find(f => fs.existsSync(f)) || (process.platform === 'win32' ? 'py' : 'python3');
+const GL = require('./glossary.cjs');
+const BR = require('./brands.cjs');
+const many = k => argv.flatMap((a, i) => (a === '--' + k && argv[i + 1] && !argv[i + 1].startsWith('--') ? [argv[i + 1]] : []));
 
 let srcs = positional.slice();
 if (opt('clip')) srcs.unshift(opt('clip'));
@@ -161,6 +178,11 @@ if (opt('recipe')) {
   console.log(RM.summary(recipe).split('\n').map(l => 'recipe ' + l).join('\n'));
 }
 setJobAliases(recipe);
+// the glossary and brand logos: the kit's list, the pack's or preset's, then --glossary / --brands (later ones win)
+let GLOSS = [], BRANDS = [];
+try { GLOSS = GL.merge(GL.shipped(), GL.parse(preset && preset.glossary), ...many('glossary').map(v => GL.read(v))); } catch (e) { die('--glossary: ' + e.message); }
+try { BRANDS = [...BR.parse(preset && preset.brands, (pack && pack.dir) || ROOT), ...many('brands').flatMap(v => /^\s*\[/.test(v) ? BR.parse(JSON.parse(v)) : BR.read(v))]; } catch (e) { die('--brands: ' + e.message); }
+{ const bad = BRANDS.filter(b => !fs.existsSync(b.logo) || !BR.IMG.test(b.logo)); if (bad.length) die('brands: logo file missing or not an image: ' + bad.map(b => b.logo).join(', ')); }
 // An explicit --look wins over the preset: its caption style, its titles rule and (oneword) its font cycle come with it.
 const lookFlag = opt('look');
 const look = lookFlag || (preset && preset.look) || 'kinetic';
@@ -176,33 +198,76 @@ const job = path.resolve(opt('jobs', path.join(ROOT, 'jobs')), name), build = pa
 fs.mkdirSync(build, { recursive: true });
 console.log('job:', job);
 
+// files that clip.py already cut (a clips.json beside them lists them): copy them into the job's clips/ as they are,
+// in the order given, instead of cutting them again (a second cut shaves first words)
+function reusePrecut(files, dir) {
+  const found = [];
+  for (const f of files) {
+    const cj = path.join(path.dirname(path.resolve(f)), 'clips.json');
+    let c = null; try { c = (JSON.parse(fs.readFileSync(cj, 'utf8')).clips || []).find(x => path.basename(x.file) === path.basename(f) && Array.isArray(x.words)); } catch {}
+    if (!c) return false;
+    found.push([f, c]);
+  }
+  if (!found.length || path.resolve(dir) === path.dirname(path.resolve(files[0]))) return false;
+  fs.mkdirSync(dir, { recursive: true });
+  const used = new Set(), out = found.map(([f, c], i) => {
+    let name = path.basename(f); if (used.has(name)) name = `${i + 1}-${name}`; used.add(name);
+    fs.copyFileSync(path.resolve(f), path.join(dir, name));
+    return { ...c, id: `clip-${String(i + 1).padStart(3, '0')}`, file: `${path.basename(dir)}/${name}`, take: c.take || path.basename(f), status: 'keep', from: path.resolve(f) };
+  });
+  fs.writeFileSync(path.join(dir, 'clips.json'), JSON.stringify({ src: files.map(f => path.resolve(f)), takes: files.map(f => path.basename(f)), order: 'files', precut: true, clips: out }, null, 1));
+  return true;
+}
 if (!flag('rebuild')) {
   // 1. clips
   let clipsDir = clipsArg ? path.resolve(clipsArg) : path.join(job, 'clips');
   if (!clipsArg) {
     for (const f of srcs) if (!fs.existsSync(f)) die('Not found: ' + f);
-    if (fs.existsSync(path.join(clipsDir, 'clips.json')) && !flag('force')) console.log('clips/ already exists, reusing it (pass --force to re-clip)');
-    else sh(PY, [path.join(KIT, 'clip.py'), ...srcs.map(f => path.resolve(f)), '--out', clipsDir, '--vertical', '--cropx', opt('cropx', '0.5'), ...(opt('model') ? ['--model', opt('model')] : []), ...(opt('hook') ? ['--hook', opt('hook')] : [])], job);
+    // a clips.json still marked pending is from a clip.py run that did not finish: never reuse it
+    const cjOld = path.join(clipsDir, 'clips.json'), pendingOld = fs.existsSync(cjOld) && (() => { try { return !!JSON.parse(fs.readFileSync(cjOld, 'utf8')).pending; } catch { return true; } })();
+    if (fs.existsSync(cjOld) && !pendingOld && !flag('force')) console.log('clips/ already exists, reusing it (pass --force to re-clip)');
+    else if (reusePrecut(srcs, clipsDir)) console.log(`clips: ${srcs.length} file${srcs.length === 1 ? '' : 's'} already cut by clip.py (clips.json beside them), used as they are, in the order given`);
+    else sh(PY, [path.join(KIT, 'clip.py'), ...srcs.map(f => path.resolve(f)), '--out', clipsDir, '--vertical', '--cropx', opt('cropx', '0.5'), ...(opt('model') ? ['--model', opt('model')] : []), ...(opt('hook') ? ['--hook', opt('hook')] : []), ...(flag('as-is') ? ['--whole'] : []), ...(opt('order') ? ['--order', opt('order')] : [])], job);
   }
-  const clips = JSON.parse(fs.readFileSync(path.join(clipsDir, 'clips.json'), 'utf8')).clips;
+  const cjPath = path.join(clipsDir, 'clips.json'), cjAll = JSON.parse(fs.readFileSync(cjPath, 'utf8'));
+  if (cjAll.pending) die(`${cjPath} is from a clip.py run that did not finish. Run it again (or pass --force).`);
+  // brand words the way you write them, in clips.json too (the Studio clips view and the captions both read it)
+  { const gn = GL.applyClips(cjAll, GLOSS); if (gn) { fs.writeFileSync(cjPath, JSON.stringify(cjAll, null, 1)); console.log(`glossary: ${gn} clip${gn === 1 ? '' : 's'} in the words you mean (${GLOSS.length} entries)`); } }
+  const clips = cjAll.clips;
   // --cleanup <file>: the clean-up pass from Studio (kit/studio/review.mjs): spans to cut out of a clip (clip seconds,
   // they become jump cuts like --tighten), retakes to keep after all, and clips to leave out
   let CLEAN = null;
   if (opt('cleanup')) { try { CLEAN = JSON.parse(fs.readFileSync(path.resolve(opt('cleanup')), 'utf8')); } catch (e) { die('--cleanup: ' + e.message); } }
   const inList = (k, c) => !!(CLEAN && Array.isArray(CLEAN[k]) && CLEAN[k].includes(c.id));
-  let keep = clips.filter(c => inList('keep', c) || (!inList('drop', c) && !/^retake/.test(c.status)));
+  let keep = clips.filter(c => inList('keep', c) || (!inList('drop', c) && !/^(retake|fragment)/.test(c.status)));
+  // fragments (under 1 s on their own, or ending on a cut-off word) stay out while there is anything else to use
+  if (!keep.length) keep = clips.filter(c => inList('keep', c) || (!inList('drop', c) && !/^retake/.test(c.status)));
+  else { const fr = clips.filter(c => /^fragment/.test(c.status) && !inList('keep', c)); if (fr.length) console.log(`fragments left out: ${fr.map(c => `${c.id} "${String(c.text).slice(0, 30)}"`).join(', ')} (keep one with the clean-up pass)`); }
   if (!keep.length) die('No keep clips in ' + clipsDir);
   // 2. cut.json from every keep clip, in order; a glitch hit and a woosh on each seam
   const rel = p => path.relative(build, path.isAbsolute(p) ? p : path.join(path.dirname(clipsDir), p)).split(path.sep).join('/');
   // no dead air (--tighten <s>, or the preset's "tighten"): a pause inside a line longer than that cuts to a jump. The
-  // word times say where you stop and start; 0.06 s of breath stays on each side, so the jump keeps a 0.12 s pause.
+  // word times say where you stop and start; 0.16 s of breath stays after the last word and 0.08 s before the next, so
+  // the jump keeps a 0.24 s pause (more than a cut between lines, so it never reads as a line cut off). A pause where
+  // less than 0.2 s would go stays. Every cut pause is listed in cut.json "tightened" and choices.json "pauses";
+  // --keep-pauses clip-003@2.72 (or the clean-up plan's "keepPauses") leaves one uncut.
   const TIGHT = flag('no-tighten') ? false : opt('tighten') != null ? +opt('tighten') : (preset && preset.tighten != null ? preset.tighten : false);
   if (TIGHT !== false && !(TIGHT >= 0.15 && TIGHT <= 2)) die('--tighten must be the longest pause to keep, 0.15 to 2 seconds');
+  const KEEPP = {};
+  for (const x of [...String(opt('keep-pauses') || '').split(','), ...Object.entries((CLEAN && CLEAN.keepPauses) || {}).flatMap(([id, ts]) => [].concat(ts).map(t => `${id}@${t}`))]) { const m = /^\s*([\w-]+)@([\d.]+)\s*$/.exec(x); if (m) (KEEPP[m[1]] = KEEPP[m[1]] || []).push(+m[2]); }
+  const TIGHTENED = [];
   const spansOf0 = c => {
     const dur = +(+c.dur).toFixed(3), ws = (c.words || []).filter(w => w[1] > w[0]);
     if (!TIGHT || ws.length < 2) return [[0, dur]];
     const out = []; let a = 0;
-    for (let i = 0; i < ws.length - 1; i++) { const b = ws[i][1] + 0.06, n = ws[i + 1][0] - 0.06; if (ws[i + 1][0] - ws[i][1] > TIGHT && b - a >= 0.35) { out.push([a, b]); a = n; } }
+    for (let i = 0; i < ws.length - 1; i++) {
+      const b = ws[i][1] + 0.16, n = ws[i + 1][0] - 0.08;
+      if (ws[i + 1][0] - ws[i][1] > TIGHT && n - b >= 0.2 && b - a >= 0.35) {
+        if ((KEEPP[c.id] || []).some(t => Math.abs(t - +b.toFixed(2)) < 0.15 || (t >= ws[i][1] - 0.05 && t <= ws[i + 1][0]))) continue;
+        out.push([a, b]); a = n;
+        if (!TIGHTENED.some(x => x.clip === c.id && x.at === +b.toFixed(2))) TIGHTENED.push({ clip: c.id, at: +b.toFixed(2), resume: +n.toFixed(2), gap: +(ws[i + 1][0] - ws[i][1]).toFixed(2), after: String(ws[i][2]).slice(0, 24) });
+      }
+    }
     out.push([a, dur]);
     return out.map(([x, y]) => [+x.toFixed(3), +y.toFixed(3)]).filter(([x, y]) => y - x > 0.05);
   };
@@ -236,7 +301,8 @@ if (!flag('rebuild')) {
     if (wh.length) sfx.whoosh = wh;
     if (clipSeams.length >= 2) sfx.boom = [[last, 0.55]];
   }
-  const cut = { note: `Drafted by kit/reel.cjs from ${keep.length} keep clips (${clips.length - keep.length} retakes skipped). Edit, then: npm run reel -- --rebuild --name ${name}`, segs, tail: 0.3, punch: wantPunch ? (typeof (preset && preset.punch) === 'number' ? preset.punch : 0.1) : false, hits: [[0.02, 14], ...seams.filter(s => !jumpSeams.has(s)).map(s => [s, 24])], sfx, overlay: 'ovl/%04d.png' };
+  if (TIGHTENED.length) for (const x of TIGHTENED) console.log(`pause cut: ${x.clip} ${x.at}-${x.resume} s (a ${x.gap} s pause after "${x.after}"; keep it with --keep-pauses ${x.clip}@${x.at})`);
+  const cut = { note: `Drafted by kit/reel.cjs from ${keep.length} keep clips (${clips.length - keep.length} retakes skipped). Edit, then: npm run reel -- --rebuild --name ${name}`, segs, tail: 0.3, punch: wantPunch ? (typeof (preset && preset.punch) === 'number' ? preset.punch : 0.1) : false, hits: [[0.02, 14], ...seams.filter(s => !jumpSeams.has(s)).map(s => [s, 24])], sfx, overlay: 'ovl/%04d.png', ...(TIGHTENED.length ? { tightened: TIGHTENED } : {}) };
   if (TITLES) {
     if (flag('no-mask')) Object.assign(cut, { titles: 'ovlt/%04d.png' });
     else {
@@ -248,8 +314,9 @@ if (!flag('rebuild')) {
   // a library name stays a name in cut.json (portable across machines); your own file becomes an absolute path.
   // Music matched to energy: "bed": "auto" (or --music-energy, or the preset's musicEnergy) picks a library bed by
   // energy; auto energy reads your pace (kit/rules.cjs scriptEnergy). --bed always wins.
-  let bed = opt('bed') || (preset && preset.bed) || undefined, energyBed = false;
-  const energyArg = opt('music-energy') || (preset && preset.musicEnergy) || (bed === 'auto' ? 'auto' : undefined);
+  // --no-bed: no music at all, even when the pack or preset names one (Studio's "No music")
+  let bed = flag('no-bed') ? undefined : opt('bed') || (preset && preset.bed) || undefined, energyBed = false;
+  const energyArg = flag('no-bed') ? undefined : opt('music-energy') || (preset && preset.musicEnergy) || (bed === 'auto' ? 'auto' : undefined);
   if (energyArg && !['auto', ...R.ENERGIES].includes(String(energyArg))) die('--music-energy must be low, mid, high or auto');
   if (!opt('bed') && energyArg && (bed === 'auto' || !bed || opt('music-energy'))) {
     const words = []; let off = 0; for (const c of keep) { for (const w of c.words || []) words.push([w[0] + off, w[1] + off]); off += +c.dur; }
@@ -302,7 +369,20 @@ if (!flag('rebuild')) {
   if (logo) fs.copyFileSync(path.resolve(logo), path.join(build, path.basename(logo)));
   sh(process.execPath, [path.join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--force', ...(cut.hits && cut.hits.length === 0 ? ['--no-glitch'] : []), ...(TITLES ? ['--titles'] : look === 'oneword' ? [] : ['--hero']), ...(look === 'oneword' ? ['--cards'] : []), '--style', STYLE, ...(FONTS ? ['--fonts', FONTS] : []), ...(logo ? ['--logo', path.basename(logo)] : [])], build);
   // captions and titles in the words you mean: the recipe's Aliases, and numbers Whisper split at the comma ("10 ,000")
-  { const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), n = S.meantFlips(caps.flips); if (n) { fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); console.log(`captions: ${n} lines in the words you mean (aliases, split numbers)`); } }
+  // and the glossary (kit/glossary.cjs): brand words, with their own casing kept under a caps display face
+  { const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), n = S.meantFlips(caps.flips) + GL.applyFlips(caps.flips, GLOSS);
+    const said = JSON.stringify((caps.flips || []).map(f => [f.text, f.words])), kc = GL.keepCase(GLOSS).filter(w => said.includes(w));
+    if (kc.length) caps.keepCase = kc;
+    if (n || kc.length) { fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); console.log(`captions: ${n} lines in the words you mean (aliases, glossary, split numbers)${kc.length ? '; own casing kept: ' + kc.join(', ') : ''}`); } }
+  // brands (kit/brands.cjs): a logo plate when a listed word is said, about a second, never over a title
+  if (BRANDS.length) {
+    const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), len = segs.reduce((a, s) => a + (s.out - s.in), 0);
+    const busy = (caps.flips || []).filter(f => f.mode === 7 || f.mode === 5).map(f => [f.start, Math.min(f.end, len)]);
+    const bp = BR.plan(S.timeline(segs, build), BRANDS, { busy, total: len });
+    for (const [name, src] of Object.entries(bp.files)) fs.copyFileSync(src, path.join(build, name));
+    if (bp.flips.length) { caps.flips = (caps.flips || []).concat(bp.flips).sort((a, b) => a.start - b.start); fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); }
+    console.log(`brands: ${bp.flips.length ? bp.flips.map(f => `${f.brand} at ${f.start}s`).join(', ') : 'none of ' + BRANDS.map(b => b.word).join(', ') + ' said'}`);
+  }
   if (recipe && recipe.titles.length && TITLES) {
     const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF);
     const rt = RM.titleFlips(recipe);

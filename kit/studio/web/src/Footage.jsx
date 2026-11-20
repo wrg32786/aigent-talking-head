@@ -94,5 +94,7 @@ export function Footage({ V, s, apply, hidden, onLive }) {
         <IconBtn n="x" label={'Remove ' + f.split('/').pop()} onClick={() => api('/api/footage/remove', { path: f }).then(apply)} />
       </li>)}
     </ul>
+    {s.footage.length > 0 && !s.clips && <label className="tick as-is"><input type="checkbox" id="as-is" checked={!!s.asIs} onChange={e => api('/api/state', { asIs: e.target.checked }).then(apply).catch(() => {})} />
+      Already cut: use each file as it is<span className="fine"> (one clip per file, in this order, no second cut)</span></label>}
   </section>;
 }

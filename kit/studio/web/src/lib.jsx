@@ -23,7 +23,7 @@ export const KIND_NAME = { transition: 'transition', entrance: 'title entrance',
 export const MODE_TIP = { influence: 'Borrows its style as soft defaults. Your picks still win.', recreate: 'Follows its shots, titles and cards with your clip.', off: 'The reference is ignored.' };
 export const MSG_STATUS = { queued: 'Queued', seen: 'Seen', answered: 'Answered' };
 export const SETUP_LINE = 'Set up Studio from AGENTS.md and run the Studio chat loop';
-export const pickState = (s, it) => { const p = s.picks[it.kind === 'editing' ? 'editing' : it.kind]; if (!p) return null; return p.allow.includes(it.id) ? 'allow' : p.deny.includes(it.id) ? 'deny' : null; };
+export const pickState = (s, it) => { if (it && it.kind === 'bed') return s.music && s.music.bed === it.id ? 'allow' : null; const p = s.picks[it.kind === 'editing' ? 'editing' : it.kind]; if (!p) return null; return p.allow.includes(it.id) ? 'allow' : p.deny.includes(it.id) ? 'deny' : null; };
 export const fmtS = ms => { const s = Math.round(ms / 1000); return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`; };
 export const cap1 = x => x[0].toUpperCase() + x.slice(1);
 export const grow = t => { if (!t) return; t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight + 2, 160) + 'px'; };

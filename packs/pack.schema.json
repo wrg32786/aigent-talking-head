@@ -271,6 +271,67 @@
         },
         "beatSync": {
           "type": "boolean"
+        },
+        "glossary": {
+          "type": "array",
+          "description": "Words Whisper mishears, written your way every draft: { say, heard: [..], after?: [..], keepCase? } (kit/glossary.cjs).",
+          "items": {
+            "type": "object",
+            "required": [
+              "say",
+              "heard"
+            ],
+            "properties": {
+              "say": {
+                "type": "string"
+              },
+              "heard": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "after": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "keepCase": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "brands": {
+          "type": "array",
+          "description": "A logo when a word is said: { word, logo (a file in the pack), heard?: [..], seconds? } (kit/brands.cjs). Only marks you have the right to use.",
+          "items": {
+            "type": "object",
+            "required": [
+              "word",
+              "logo"
+            ],
+            "properties": {
+              "word": {
+                "type": "string"
+              },
+              "logo": {
+                "type": "string"
+              },
+              "heard": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "seconds": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false
+          }
         }
       }
     },

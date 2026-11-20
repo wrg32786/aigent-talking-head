@@ -35,7 +35,8 @@ const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[
 const VALUED = new Set(['out', 'engine', 'name', 'model', 'url']);
 const pos = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const die = m => { console.error(m); process.exit(1); };
-const PY = process.env.PYTHON || (process.platform === 'win32' ? 'py' : 'python3');
+// the kit's Python: PYTHON, else the kit's .venv, else the system one
+const PY = process.env.PYTHON || [join(ROOT, '.venv', 'Scripts', 'python.exe'), join(ROOT, '.venv', 'bin', 'python')].find(f => existsSync(f)) || (process.platform === 'win32' ? 'py' : 'python3');
 const REA_PKG = 'rea-video[ocr] @ git+https://github.com/JuneYaooo/rea-video';
 
 const pyHas = mod => spawnSync(PY, ['-c', `import ${mod}`], { stdio: 'ignore' }).status === 0;

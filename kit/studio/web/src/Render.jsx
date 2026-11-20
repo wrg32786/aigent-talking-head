@@ -49,7 +49,7 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
     <Receipt r={receipt} />
     <Cleanup V={V} s={s} apply={apply} drafted={drafted} />
     <details className="fold glass-card" id="choices-fold" ref={foldRef}><summary>Picks and why</summary>
-      <div id="choices" className="choices"><Choices CAT={CAT} x={choices} setX={setChoices} setReceipt={setReceipt} dirty={dirty} setDirty={setDirty} /></div></details>
+      <div id="choices" className="choices"><Choices CAT={CAT} x={choices} setX={setChoices} setReceipt={setReceipt} dirty={dirty} setDirty={setDirty} s={s} patch={patch} /></div></details>
     <details className="fold glass-card"><summary>Log</summary><pre id="log" className="log" aria-live="off" ref={logRef}>{log}</pre></details>
     <details className="fold glass-card"><summary>Command</summary><pre id="cmd" className="cmd" aria-label="The command Studio will run">{cmd}</pre></details>
   </section>;
@@ -57,7 +57,7 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
 
 const Wrap = ({ label, children }) => <div className="tablewrap" tabIndex={0} role="region" aria-label={label + ' table'}>{children}</div>;
 
-function Choices({ CAT, x, setX, setReceipt, dirty, setDirty }) {
+function Choices({ CAT, x, setX, setReceipt, dirty, setDirty, s, patch }) {
   if (!x) return <p className="empty">Draft first. Every pick then shows here with its reason.</p>;
   const trans = Object.values(CAT.items).filter(i => i.kind === 'transition').map(i => i.id), ents = Object.values(CAT.items).filter(i => i.kind === 'entrance').map(i => i.id);
   const edit = (list, n, k, v) => { setX({ ...x, [list]: x[list].map(r => r.n === n ? { ...r, [k]: v } : r) }); setDirty(true); };
@@ -82,6 +82,11 @@ function Choices({ CAT, x, setX, setReceipt, dirty, setDirty }) {
       {x.graphics.map(g => <tr key={g.n}><td>{g.n}</td><td>{g.start.toFixed(1)} s</td><td>{g.id}</td><td>{g.text}</td>
         <td><input type="checkbox" checked={g.keep !== false} aria-label={`Keep graphic ${g.n}`} onChange={e => edit('graphics', g.n, 'keep', e.target.checked)} /></td><td className="why">{g.why}</td></tr>)}
     </tbody></table></Wrap></>}
+    {x.pauses && x.pauses.length > 0 && <><h3>Pauses cut</h3><p className="fine">Pace cut these pauses inside a line. Keep one and draft again to hear it.</p>
+      <Wrap label="Pauses cut"><table><thead><tr>{['Clip', 'Pause', 'After', ''].map((h, i) => <th key={i}>{h}</th>)}</tr></thead><tbody>
+        {x.pauses.map(p => { const kept = ((s && s.pace.keepPauses) || []).includes(p.keep); return <tr key={p.keep} data-pause={p.keep}><td>{p.clip}</td><td>{p.gap} s at {p.at} s</td><td>"{p.after}"</td>
+          <td><Button size="sm" variant="ghost" label={kept ? 'Kept, draft again' : 'Keep this pause'} isDisabled={kept || !patch} onClick={() => patch({ pace: { keepPauses: [...((s && s.pace.keepPauses) || []), p.keep] } })} /></td></tr>; })}
+      </tbody></table></Wrap></>}
     <div className="row"><Button id="apply-choices" variant="secondary" size="sm" label="Apply my edits" isDisabled={!dirty} onClick={applyEdits} /><span className="fine">Edits win over locks. Render to see them.</span></div>
   </>;
 }
