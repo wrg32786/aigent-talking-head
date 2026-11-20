@@ -25,6 +25,9 @@ export const LICENSES = {
   agent: { name: 'Made in Studio from your words (yours to use)', url: null },
   capture: { name: 'Capture of a public web page: check that you may show it', url: null },
 };
+// what an upload is (the B-roll step's Upload asks): Suggest puts testimonials and product demos on proof spots and
+// screen recordings on tips, and testimonial pieces from a raw upload can play with their own sound in the Combo
+export const TYPES = ['testimonial', 'product-demo', 'screen-recording', 'lifestyle'];
 export const VIDEO = /\.(mp4|mov|m4v|webm|mkv)$/i, IMAGE = /\.(jpe?g|png|webp)$/i;
 
 export function libDir(env = process.env) {
@@ -85,13 +88,14 @@ export function add(src, m = {}) {
   const c = { id, file: relative(libDir(), file).split('\\').join('/'), name: m.title ? String(m.title).slice(0, 80) : name, source, kind: IMAGE.test(name) ? 'image' : 'video',
     license: m.license || (source === 'upload' || source === 'screen' ? LICENSES.own : source === 'agent' ? LICENSES.agent : source === 'capture' ? LICENSES.capture : { name: 'unknown', url: null }),
     author: m.author || null, sourceUrl: m.sourceUrl || null, tags, ...meta, bytes: statSync(file).size, thumb: thumb(file, id), addedAt: new Date().toISOString(),
-    ...(m.prompt ? { prompt: String(m.prompt).slice(0, 500) } : {}), ...(m.provider ? { provider: m.provider, model: m.model || null } : {}), ...(m.extId ? { extId: String(m.extId) } : {}), usedIn: [] };
+    ...(m.prompt ? { prompt: String(m.prompt).slice(0, 500) } : {}), ...(m.provider ? { provider: m.provider, model: m.model || null } : {}), ...(m.extId ? { extId: String(m.extId) } : {}), ...(m.type && TYPES.includes(m.type) ? { type: m.type } : {}), ...(m.raw ? { raw: m.raw } : {}), usedIn: [] };
   const lib = load(); lib.clips.unshift(c); save(lib); return c;
 }
 export function update(id, p) {
   const lib = load(), c = lib.clips.find(x => x.id === id); if (!c) throw Object.assign(new Error(`no b-roll ${id}`), { code: 404 });
   if (p.name != null) c.name = String(p.name).slice(0, 80);
   if (Array.isArray(p.tags)) c.tags = [...new Set(p.tags.map(x => String(x).toLowerCase().trim()).filter(Boolean))].slice(0, 30);
+  if (p.type !== undefined) { if (p.type !== null && !TYPES.includes(p.type)) throw Object.assign(new Error(`type: ${TYPES.join(', ')} or null`), { code: 400 }); if (p.type) { c.type = p.type; c.tags = [...new Set([p.type, ...(c.tags || []).filter(t => !TYPES.includes(t))])].slice(0, 30); } else delete c.type; }
   if (p.usedIn) c.usedIn = [...new Set([...(c.usedIn || []), p.usedIn])].slice(-50);
   save(lib); return c;
 }

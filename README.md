@@ -131,9 +131,9 @@ Then run `npm run studio` (or click the icon). Without an agent the chat works o
 
 <img src="docs/studio/settings.png" width="720" alt="Studio settings in a side sheet: who answers the chat, the terminal note switch, API keys and providers, and the reference downloads and finished reels folders with Browse">
 
-**B-roll.** A step between Style and Render gives every beat a slot: fill it from your library, an upload, free stock (Pexels or Pixabay with your own key), a chart, counter, quote, code or terminal card made on your computer, a screen recording, or a generator with your own key (off until you allow it; every generate shows the cost and waits for your click). Pick full cutaway, split top panel or picture in picture. Your agent can suggest shots for you to approve. Render writes `credits.txt`. **API keys and providers** in Settings keeps every key on your computer (owner-only, never shown again, never given to the agent). See [B-roll](docs/studio.md#b-roll).
+**B-roll that picks itself.** After every draft, Studio reads what you said and puts b-roll on spots about every 6 to 10 s: a number you say becomes a counter card, a quote a quote card, anything else a clip from your library (or free Pexels or Pixabay stock with your own key). Each spot says why, and you swap, change or remove any of it from your library, an upload, stock, a card, a screen recording or a generator with your own key (off until you allow it; every generate shows the cost and waits for your click). Uploads say what they are (testimonial, product demo, screen recording, lifestyle); raw ones are cut into pieces on whole words first, and a testimonial piece can play in your reel with its own sound. Pick full cutaway, split top panel or picture in picture; credits are written next to the reel.
 
-<img src="docs/studio/broll-lane.png" width="520" alt="The B-roll step: one slot per beat, a clip on beat 2 as a split top panel, with placement, timing and the fill tabs"> <img src="docs/studio/broll-keys.png" width="300" alt="API keys and providers: Pexels saved and tested, other providers not set">
+<img src="docs/studio/broll-spots.png" width="520" alt="The B-roll step: spots picked from what was said, a quote card and a counter card, with How it sits, Timing and Why this"> <img src="docs/studio/broll-keys.png" width="300" alt="API keys and providers: Pexels saved and tested, other providers not set">
 
 **Post to Buffer.** The last step sends the finished reel to your Buffer account, one post per channel: Instagram Reels, TikTok, YouTube Shorts, LinkedIn, X, Facebook Reels and Threads. Posts are saved as Buffer drafts unless you pick queue, a time, or post now (which asks you to tick a box first). Buffer fetches the video from a public link, so Studio uploads it to your Cloudflare R2 bucket or your Cloudinary account, or you paste your own link. It re-encodes to H.264 when needed and skips channels the reel is too long for, with the reason. Your Buffer key stays on your computer and your agent can do the same with the `buffer_post_reel` tool. Details: [docs/posting.md](docs/posting.md).
 
@@ -384,7 +384,7 @@ The CLI may print a one-line star reminder after your first successful render, a
 
 ## Cite this
 
-> Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.13.0) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
+> Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.14.0) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
 
 Machine-readable metadata is in [CITATION.cff](CITATION.cff), and GitHub shows it under "Cite this repository".
 

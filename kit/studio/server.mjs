@@ -494,33 +494,37 @@ function comboOf(s) {
   }
   const ls = linesState(s, src), L = ls.bites.length ? linesCached(src) : null;
   if (L) for (const b of ls.bites) { const ranges = CUT.biteRanges(b.lines, L); if (ranges.length) pieces.push({ kind: 'bite', id: b.id, label: b.name || b.id, ranges, cutKind: b.kind === 'full' ? 'full' : 'clip' }); }
+  // testimonial pieces from the B-roll step play in the Combo with their own sound, after the piece you picked
+  // (else before your last piece, where the proof usually sits)
+  if (pieces.length) for (const t of BRL.cutins(s)) {
+    const at = t.after ? pieces.findIndex(x => x.id === t.after) + 1 : Math.max(1, pieces.length - 1), raw = t.c.raw;
+    pieces.splice(at > 0 ? at : pieces.length, 0, { kind: 'testimonial', id: 't-' + t.c.id, label: t.c.name, ranges: raw.ranges, cutKind: 'clip', source: raw.src });
+  }
   for (const x of pieces) x.seconds = +x.ranges.reduce((a, [p, q]) => a + q - p, 0).toFixed(2);
   const seconds = +pieces.reduce((a, x) => a + x.seconds, 0).toFixed(2);
-  const key = pieces.length ? createHash('sha1').update(JSON.stringify([src, pieces.map(x => [x.kind, x.id, x.ranges])])).digest('hex').slice(0, 12) : '';
+  const key = pieces.length ? createHash('sha1').update(JSON.stringify([src, pieces.map(x => [x.kind, x.id, x.ranges, x.source || null])])).digest('hex').slice(0, 12) : '';
   return { source: src, pieces, seconds, key };
 }
 // what the next Draft is made from: your pieces when you kept any (finish.from auto), or the whole take
 function draftFrom(s, combo = comboOf(s)) {
-  const f = (s.finish && s.finish.from) || 'auto';
-  if (f === 'take') return 'take';
-  if (f === 'pieces') return combo.pieces.length ? 'pieces' : 'take';
-  return combo.pieces.length ? 'pieces' : 'take';
+  const f = (s.finish && s.finish.from) || 'auto', own = combo.pieces.some(x => x.kind !== 'testimonial');
+  return f === 'take' || !own ? 'take' : 'pieces';
 }
 const draftKey = (s, combo = comboOf(s)) => draftFrom(s, combo) === 'pieces' ? 'pieces:' + combo.key : 'take:' + footageKey(s);
 // the pieces as already cut files, with a clips.json beside them that carries each one's words (one transcript)
 function comboFiles(s, combo) {
-  const words = wordsOf(combo.source) || [], cutsDir = join(ROOT, `inbox/studio/${s.job}/cuts`), cj = join(cutsDir, 'clips.json');
+  const W = {}, wordsFor = rel => (W[rel] = W[rel] || wordsOf(rel) || []), words = wordsFor(combo.source), cutsDir = join(ROOT, `inbox/studio/${s.job}/cuts`), cj = join(cutsDir, 'clips.json');
   let prev = []; try { prev = JSON.parse(readFileSync(cj, 'utf8')).clips || []; } catch {}
-  const entries = combo.pieces.map((x, k) => { const w = CUT.clipWords(words, x.ranges);
-    return { id: `clip-${String(k + 1).padStart(3, '0')}`, file: `cuts/${x.id}.mp4`, take: combo.source.split('/').pop(), ranges: x.ranges, src_in: x.ranges[0][0], src_out: x.ranges[x.ranges.length - 1][1], dur: x.seconds, status: 'keep', text: w.map(y => y[2]).join(' '), words: w }; });
+  const entries = combo.pieces.map((x, k) => { const w = CUT.clipWords(x.source ? wordsFor(x.source) : words, x.ranges);
+    return { id: `clip-${String(k + 1).padStart(3, '0')}`, file: `cuts/${x.id}.mp4`, take: (x.source || combo.source).split('/').pop(), ranges: x.ranges, src_in: x.ranges[0][0], src_out: x.ranges[x.ranges.length - 1][1], dur: x.seconds, status: 'keep', text: w.map(y => y[2]).join(' '), words: w }; });
   mkdirSync(cutsDir, { recursive: true });
   writeFileSync(cj, JSON.stringify({ src: combo.source, takes: [combo.source.split('/').pop()], order: 'files', precut: true, clips: [...prev.filter(y => !entries.some(e => e.file === y.file)), ...entries] }, null, 1));
-  const steps = combo.pieces.map(x => ['kit/studio/cut-run.mjs', ['extract', '--src', combo.source, '--ranges', x.ranges.map(r => r.join('-')).join(','), '--out', `inbox/studio/${s.job}/cuts/${x.id}.mp4`]]);
+  const steps = combo.pieces.map(x => ['kit/studio/cut-run.mjs', ['extract', '--src', x.source || combo.source, '--ranges', x.ranges.map(r => r.join('-')).join(','), '--out', `inbox/studio/${s.job}/cuts/${x.id}.mp4`]]);
   return { steps, files: combo.pieces.map(x => `inbox/studio/${s.job}/cuts/${x.id}.mp4`) };
 }
 // the exports of the one Render: each piece as its own reel (clips) or as a plain clip (plain), from the Combo
-function exportSteps(s, combo, { clips, plain }) {
-  const steps = [], plan = [];
+function exportSteps(s, combo0, { clips, plain }) {
+  const steps = [], plan = [], combo = { ...combo0, pieces: combo0.pieces.filter(x => x.kind !== 'testimonial') };
   if (!combo.pieces.length || (!clips && !plain)) return { steps, plan };
   const cand = combo.pieces.map((x, k) => ({ id: x.id, kind: x.cutKind, ranges: x.ranges, keep: true, order: k, label: x.label }));
   const r = cutSteps(s, null, { source: combo.source, candidates: cand });
@@ -544,7 +548,7 @@ function editOf(s, v) {
     making: { text: making, format: fmt, aspect, goal: o.goal, length: (cut.summary && cut.summary.length) || null },
     from: { takes, source: src, seconds: from === 'pieces' ? combo.seconds : (cut.seconds || null), mode: from, pieces: combo.pieces.length, text: from === 'pieces' ? `${combo.pieces.length} piece${combo.pieces.length === 1 ? '' : 's'}, ${Math.round(combo.seconds)} s, in your order` : takes ? `the whole take${takes > 1 ? ` (${takes} files)` : ''}` : 'no footage yet' },
     look: { pack: s.pack || null, reference: ref, picks, text: [s.pack || 'Studio picks', ref ? `reference (${ref})` : null, picks ? `${picks} change${picks === 1 ? '' : 's'} by you` : null].filter(Boolean).join(', ') },
-    broll: { spots, text: spots ? `${spots} spot${spots === 1 ? '' : 's'}` : 'none yet' },
+    broll: { spots, ideas: ((v.broll && v.broll.beats) || []).filter(b => b.idea && !b.slot).length, cutins: combo.pieces.filter(x => x.kind === 'testimonial').length, text: [spots ? `${spots} spot${spots === 1 ? '' : 's'}` : 'none yet', combo.pieces.some(x => x.kind === 'testimonial') ? `${combo.pieces.filter(x => x.kind === 'testimonial').length} testimonial` : null].filter(Boolean).join(', ') },
     sound: { bed: s.music.bed, sfx: s.sound.sfx, text: `${s.music.bed === 'auto' ? 'Music picked for you' : s.music.bed === 'none' ? 'No music' : s.music.bed}, sounds ${s.sound.sfx}` },
     drafted: !!drafted, stale: !!(s.drafted && !drafted && fin.reel), next,
   };
@@ -697,7 +701,13 @@ let chromeSeen = null; const chromeOk = () => { if (chromeSeen == null) { try { 
 const FOLDERS = mountFolders({ ROOT, json, readBody, extraFolders: () => { const st = S.load(); return [st.downloads, st.renders, st.broll && st.broll.library, join(ROOT, 'teardown-in', 'studio'), join(ROOT, 'jobs')]; },
   ensure: [join(ROOT, 'teardown-in', 'studio'), join(ROOT, 'jobs')] });
 const POSTR = mountPost({ ROOT, C, json, readBody });
-const BRL = mountBroll({ ROOT, C, update, json, readBody, serveFile: (...a) => serveFile(...a), CH, capturePage, chromeOk });
+// the reference's b-roll parts, on its own clock as a fraction of its length, become spots (kit/studio/lane.mjs spots)
+const refBroll = s => { if (!s.reference || s.reference.mode === 'off') return []; const sw = swapOf(s); if (!sw || !sw.seconds) return [];
+  return (sw.parts || []).filter(p => p.kind === 'broll').map(p => ({ frac: p.at / sw.seconds, label: p.label, detail: p.detail })); };
+const BRL = mountBroll({ ROOT, C, update, json, readBody, serveFile: (...a) => serveFile(...a), CH, capturePage, chromeOk, refParts: refBroll,
+  transcribe: (rel, done) => { startTranscribe(rel, () => done(null)); if (MEDIA.transcribing(rel)) watchTx(rel, done); }, wordsOf, energyOf });
+// startTranscribe calls back only on success; a raw upload also wants to hear a failure
+function watchTx(rel, done) { const t = setInterval(() => { const x = (C.load().tx || {})[rel]; if (x && x.status === 'failed') { clearInterval(t); done(Object.assign(new Error(x.error || 'transcription failed'), { fix: x.fix })); } else if (!MEDIA.transcribing(rel)) clearInterval(t); }, 500); }
 function serveFile(req, res, file) {
   let st; try { st = statSync(file); } catch { return json(res, 404, { error: 'not found' }); }
   if (!st.isFile()) return json(res, 404, { error: 'not found' });
@@ -941,7 +951,7 @@ async function api(req, res, u) {
     const s = C.load(); const d = draftSteps(s); // checks the footage first, so an empty job says that before a missing tool
     const miss = needFor('draft'); if (miss) return json(res, 400, miss);
     update(st => { st.lockedAtDraft = d.lockString || ''; st.drafted = null; });
-    runTask('draft', () => d.steps, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; }); return { choices: !!readChoices(C.load()), note: DRAFT_DONE, from: d.from }; });
+    runTask('draft', () => d.steps, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; }); BRL.autoPick(s.job); return { choices: !!readChoices(C.load()), note: DRAFT_DONE, from: d.from }; });
     return json(res, 202, { ...view(C.load()), from: d.from });
   }
   if (p === '/api/edit' && M === 'GET') { const v = view(C.load()); return json(res, 200, { edit: v.edit, combo: v.combo, finish: v.state.finish }); }

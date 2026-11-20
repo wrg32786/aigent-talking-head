@@ -2,6 +2,21 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.14.0 (unreleased)
+
+Release notes: [docs/releases/v1.14.0.md](docs/releases/v1.14.0.md). The redesign, part 2: b-roll that picks itself.
+
+- **Spots, not beats.** The B-roll step's slots are spots (`spots` in `kit/studio/lane.mjs`): every draft segment, and a segment longer than 10 s split at a caption end into spots of about 7 s, so a 27 s take is no longer one beat holding every word. A caption split by a spot shows once. **Add a spot** splits a spot at a time (`POST /api/broll/spot { at, remove }`); placed b-roll and ideas stay on their moment (`remap`, slots keep `at`). The reference's b-roll parts (What to swap) become spots at the same point of your reel, tagged REF. The API still says `beat: n`.
+- **B-roll picks itself after every draft** (`autoPick` in `kit/studio/broll-api.mjs`, on by default; **Picks itself after each draft** on the step, `POST /api/broll/auto`, `broll.auto` in settings, `STUDIO_BROLL_AUTO=0` for tests). About one idea every 6 to 10 s, the first spot too (never in its first 1.2 s). A number said becomes a counter card ("312 percent", "$5,000", "doubled" as 2x), a quote a quote card, anything else a search on the strongest nouns (verbs and filler left out). Each idea starts on its word and says why. Studio places what is free: a library clip, stock when a key is set, a card when Chrome is here; a spot with only a search waits, and nothing is ever generated on its own. The chat says how many were placed.
+- **Suggest b-roll again** runs the same rules (`POST /api/broll/suggest { gap, all, fill }`); Suggest no longer skips the first spot.
+- **Approve works with no keys.** Use it tries the idea's clip, its card, a library match, Pexels or Pixabay with a key, then a card made from the spot's words. With no Chrome it says what fixes it and shows the Chrome fix button instead of "Add a Pexels key".
+- **Uploads say what they are**: Testimonial, Product demo, Screen recording or Lifestyle (`type` on the clip and a tag). Suggest puts testimonials and product demos on proof spots (a number or a result), screen recordings on tips as a split, lifestyle on stories.
+- **Raw uploads are cut first.** **It is raw: cut it into pieces first** (on for testimonials) keeps the file in `inbox/studio/<job>/raw/`, transcribes it and cuts it with the Cut step's lines (every edge in the quiet next to its words, never mid-word, retakes and fragments left out) into pieces of 3 to 12 s, each into the library with its words as tags. A raw clip with no speech is split every 5 s.
+- **Testimonials keep their own sound.** **Play in my reel** puts a testimonial piece into the Combo between your pieces (before the last one, or after the one you pick; `POST /api/broll/cutin`). Draft hands it to the reel already cut with its own words, like your pieces. Clips and plain clips exports leave it out. Your edit says "1 testimonial".
+- **The step, simpler.** Spot cards with their time, what is on them (or the idea) and the words; the spot panel has How it sits, Timing, Why this and Remove, then Options for this spot (Library, Your uploads, Stock, Made card, Screen, AI generate). An idea's card opens Made card filled in.
+- **MCP.** New `pick_broll` (the rules, `fill`, `auto`), `add_spot` and `add_testimonial`. `add_broll` takes `type` and `raw`; `suggest_broll` ideas take `why` and `offset`; `list_broll` returns `why`, `ref`, `auto`, raw uploads and testimonials.
+- **Tests and docs.** `tests/studio-spots.test.mjs` (in `npm run check`): spots, Add a spot, reference spots, remap, counters, quotes and noun searches, the first spot, upload kinds, Approve with no key and no Chrome, the MCP schemas. `tests/studio-spots.e2e.mjs` (in `npm run smoke`): b-roll picks itself after a draft, Use it with no key, Add a spot, upload kinds, a raw testimonial cut on whole words and drafted with its own sound, MCP. The B-roll section in docs/studio.md, the MCP table, AGENTS.md and the Studio skill.
+
 ## 1.13.0 (unreleased)
 
 Release notes: [docs/releases/v1.13.0.md](docs/releases/v1.13.0.md). The redesign, part 1: five steps, one Render, Your edit.

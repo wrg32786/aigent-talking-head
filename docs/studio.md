@@ -356,22 +356,37 @@ Like the rest of Studio, both endpoints answer on localhost only and refuse cros
 
 ## B-roll
 
-![The B-roll step: three beats, beat 2 filled with a clip as a split top panel, the placement, timing and fill tabs below](studio/broll-lane.png)
+![The B-roll step: four spots picked from what was said, a quote card on spot 1 as a full cutaway with How it sits, Timing and Why this, and a counter card picked by Studio on the last spot](studio/broll-spots.png)
 
-The B-roll step sits between Style and Render. Its beats come from the draft: each segment of `build/cut.json`, with the caption words that fall in it, so draft first. Click a beat to fill it. The voice keeps running under every insert; the insert's own sound is dropped.
+The B-roll step sits between Look and Finish. Its **spots** come from the draft: every segment of `build/cut.json` is a spot, and a segment longer than 10 s splits at the end of a caption into spots of about 7 s (`spots` in `kit/studio/lane.mjs`), so a long take is no longer one beat holding every word. When the reference cuts to b-roll (its b-roll parts in What to swap), the spot at the same point of your reel splits there and says **REF**. **Add a spot** splits a spot at a time you type; the b-roll already placed stays on the words it was on. The voice keeps running under every insert; the insert's own sound is dropped.
 
-| Fill from | What it does |
+**B-roll picks itself.** After every draft (when **Picks itself after each draft** is on, the default), Studio reads each spot's words and keeps about one idea every 6 to 10 s, the first spot too (never in its first 1.2 s, so the hook shows your face first):
+
+- A number said ("312 percent", "$5,000", "doubled") becomes a **counter card**, a quote ("she told me...") a **quote card**, anything else a search on the spot's strongest nouns (not verbs like follow or make).
+- Your library comes first: a clip whose name or tags match, else an upload of the kind the spot likes (testimonials and product demos on proof spots, screen recordings on tips, lifestyle on stories).
+- Studio puts on what it can place for free: a library clip, Pexels or Pixabay when you set a key, a card when Chrome is here. A spot with only a search waits for you. Generating never runs on its own.
+- Each idea starts on the word it is about and says **why** ("You say "doubled". Show it as a number."). Placed spots say **picked**; the chat says how many were placed.
+
+**Suggest b-roll again** runs the same rules on the empty spots. Click a spot to see **How it sits**, **Timing** and **Why this**, **Use it** or **Keep empty** for an idea, and **Remove** for what is there. **Use it** never needs a key: the idea's clip, its card, a library match, stock with a key, else a card made from the spot's words. With no Chrome it says so and shows the Chrome fix button.
+
+**Options for this spot:**
+
+| Option | What it does |
 |---|---|
-| Library | Your b-roll folder, reused by every job. Search names and tags (orientation, dark or bright, colour, still or moving, short or long, the source's own tags). |
-| Upload | A video (mp4, mov, webm, m4v, mkv) or a picture (jpg, png, webp), copied into the library. |
+| Library | Your b-roll folder, reused by every job. Search names and tags (orientation, dark or bright, colour, still or moving, short or long, the source's own tags, the kind). |
+| Your uploads | A video (mp4, mov, webm, m4v, mkv) or a picture (jpg, png, webp), copied into the library. **It is** asks what it is: Testimonial, Product demo, Screen recording or Lifestyle. **It is raw: cut it into pieces first** (on for testimonials) cuts it before it lands, below. |
 | Stock | Pexels or Pixabay with your own free key. Words, orientation and longest length; hover to preview; **Use** downloads the file nearest 1080p into the library with its license and credit. |
-| Make | A chart, counter, quote, code card, terminal card or your own HTML and CSS scene, rendered here with headless Chrome (JavaScript off, no network). |
-| Record | Your screen with `getDisplayMedia`, with an optional round webcam bubble, saved as a screen recording. |
-| Generate | A provider with your own key, off until you allow it (below). |
+| Made card | A chart, counter, quote, code card, terminal card or your own HTML and CSS scene, rendered here with headless Chrome (JavaScript off, no network). An idea's card opens filled in. |
+| Screen | Your screen with `getDisplayMedia`, with an optional round webcam bubble, saved as a screen recording. |
+| AI generate | A provider with your own key, off until you allow it (below). |
 
-**Placement:** **Full cutaway** covers the frame. **Split top panel** puts the clip in the top half and you in the bottom half, cropped around your face. **Picture in picture** puts a small framed 16:9 box at the top right. **Starts** is seconds into the beat (a short lead in by default), **Length** is up to 3.5 s by default and never past the beat or the clip, **From** is the clip's in point. A still picture holds with a slow push in.
+**Raw uploads are cut first.** A raw upload goes to `inbox/studio/<job>/raw/`, is transcribed, and is cut with the same cutter as your footage (`kit/studio/cut.mjs` lines: every edge in the quiet next to its words, never mid-word, retakes and fragments left out) into pieces of 3 to 12 s. Each piece lands in the library tagged with its words and its kind. A raw clip with no speech is split every 5 s.
 
-**Ideas:** your agent's suggestions (`suggest_broll`) and **Suggest** (the rules: each beat's two strongest words as a search, skipping the hook and filled beats) wait on the beat with **Approve** and **Dismiss**. Approve uses the idea's clip, makes its card, or takes the best library match, else the top stock result.
+**Testimonials keep their own sound.** Testimonial pieces show under **Testimonials**. **Play in my reel** puts one into your Combo between your pieces (before your last piece, or after the one you pick), so it plays with its own voice instead of over yours. Draft again to hear it; Your edit says "1 testimonial". Agents use `add_testimonial`.
+
+**Placement:** **Full cutaway** covers the frame. **Split top panel** puts the clip in the top half and you in the bottom half, cropped around your face. **Picture in picture** puts a small framed 16:9 box at the top right. **Starts** is seconds into the spot (a short lead in by default), **Length** is up to 3.5 s by default and never past the spot or the clip, **From** is the clip's in point.
+
+**Ideas from your agent** (`suggest_broll`, with `why` and `offset`) wait on the spot the same way. The API still calls a spot a beat (`beat: n`), so agents that know `fill_slot` keep working.
 
 **Render** puts the lane into `build/cut.json` as inserts (`kit/studio/broll-run.mjs apply`; inserts from a recipe or `--broll` stay) and writes `jobs/<job>/credits.txt`: each clip with its source, author, link and license, generated clips with the provider, model and prompt, and "Videos provided by Pexels" or "Videos from Pixabay" when used.
 
