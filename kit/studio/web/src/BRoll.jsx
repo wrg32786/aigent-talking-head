@@ -4,8 +4,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';
+import { TabGroup, TabList, Tab, TabPanels, TabPanel } from '@headlessui/react';
 import { api, toast, cap1, Icon, IconBtn } from './lib.jsx';
+import { Hint } from './ui.jsx';
 
+const TAB_ICON = { library: 'grid', upload: 'upload', stock: 'search', make: 'spark', record: 'camera', generate: 'film' };
 const TABS = [['library', 'Library'], ['upload', 'Upload'], ['stock', 'Stock'], ['make', 'Make'], ['record', 'Record'], ['generate', 'Generate']];
 const t1 = x => (+x).toFixed(1);
 const money = e => (e && e.usd != null ? `$${(+e.usd).toFixed(2)}` : 'cost unknown');
@@ -128,8 +131,8 @@ function Record({ beat, done }) {
   return <div className="bpanel" id="bp-record">
     <label className="tick"><input type="checkbox" id="rec-cam" checked={cam} disabled={live} onChange={e => setCam(e.target.checked)} />Webcam bubble</label>
     <div className="row">{live ? <Button id="rec-stop" variant="primary" size="sm" label={`Stop (${secs} s)`} icon={<Icon n="stop" />} onClick={() => R.current.rec.stop()} />
-      : <Button id="rec-screen" variant="primary" size="sm" label={busy ? 'Adding...' : 'Record screen'} isLoading={busy} icon={<Icon n="camera" />} onClick={start} />}</div>
-    <p className="fine">Your browser asks which screen, window or tab to share. Nothing leaves this computer. Your agent can also capture a public web page (add_broll with a url).</p>
+      : <Button id="rec-screen" variant="primary" size="sm" label={busy ? 'Adding...' : 'Record screen'} isLoading={busy} icon={<Icon n="camera" />} onClick={start} />}
+      <Hint id="rec-hint" label="About screen recording">Your browser asks which screen, window or tab to share. Nothing leaves this computer. Your agent can also capture a public web page (add_broll with a url).</Hint></div>
   </div>;
 }
 
@@ -210,13 +213,17 @@ export function BRoll({ V, apply, go, openKeys }) {
               </div>
               {beat.slot.clip.license && <span className="fine">{beat.slot.clip.author && beat.slot.clip.author.name ? `By ${beat.slot.clip.author.name}. ` : ''}{beat.slot.clip.license.name}</span>}
             </div></div>}
-          <div className="tabs" role="tablist" aria-label="Fill from">{TABS.map(([k, l]) => <button key={k} type="button" role="tab" id={'btab-' + k} aria-selected={String(tab === k)} className={'tab' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>{l}</button>)}</div>
-          {tab === 'library' && <Library fill={fill} />}
-          {tab === 'upload' && <Upload beat={beat} done={after} />}
-          {tab === 'stock' && <Stock beat={beat} V={V} fill={fill} openKeys={openKeys} />}
-          {tab === 'make' && <Make beat={beat} V={V} fill={fill} />}
-          {tab === 'record' && <Record beat={beat} done={after} />}
-          {tab === 'generate' && <Generate beat={beat} V={V} done={after} openKeys={openKeys} />}
+          <TabGroup className="btabs" selectedIndex={TABS.findIndex(([k]) => k === tab)} onChange={i => setTab(TABS[i][0])}>
+            <TabList className="tabs" aria-label="Fill from">{TABS.map(([k, l]) => <Tab key={k} id={'btab-' + k} className={({ selected }) => 'tab' + (selected ? ' on' : '')}><Icon n={TAB_ICON[k]} />{l}</Tab>)}</TabList>
+            <TabPanels className="btab-panels">
+              <TabPanel><Library fill={fill} /></TabPanel>
+              <TabPanel><Upload beat={beat} done={after} /></TabPanel>
+              <TabPanel><Stock beat={beat} V={V} fill={fill} openKeys={openKeys} /></TabPanel>
+              <TabPanel><Make beat={beat} V={V} fill={fill} /></TabPanel>
+              <TabPanel><Record beat={beat} done={after} /></TabPanel>
+              <TabPanel><Generate beat={beat} V={V} done={after} openKeys={openKeys} /></TabPanel>
+            </TabPanels>
+          </TabGroup>
         </div>}
         <p className="fine" id="broll-note">{B.beats.filter(b => b.slot).length} of {B.beats.length} beats have b-roll. Render puts them in and writes credits.txt next to the reel. Library: {B.library.count} clips in {B.library.dir}.</p>
       </>}

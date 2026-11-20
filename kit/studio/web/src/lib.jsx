@@ -64,6 +64,10 @@ const P = {
   down: <path d="M5 9l7 7 7-7" />,
   grip: <path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" strokeWidth="3" strokeLinecap="round" />,
   popout: <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />,
+  folder: <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
+  home: <path d="M4 11l8-7 8 7M6 9.5V20h12V9.5M10 20v-5h4v5" />,
+  info: <><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 8h.01" /></>,
+  more: <path d="M6 12h.01M12 12h.01M18 12h.01" strokeWidth="3" />,
   spark: <path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" />,
 };
 export const Icon = ({ n, className }) => <svg className={'ic' + (className ? ' ' + className : '')} viewBox="0 0 24 24" aria-hidden="true">{P[n]}</svg>;

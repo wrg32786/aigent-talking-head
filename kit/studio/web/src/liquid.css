@@ -1,0 +1,288 @@
+/* Liquid glass (1.8.0): the look Will picked, direction A of the Studio style gallery. The tokens below are the
+   gallery's own [data-theme="liquid"] block (css/themes.css there), with the same names, moved onto Studio's
+   elements; the light theme gets the same recipe in ink and deep teal. Frosted panels, soft blur, subtle borders
+   and a quiet mint glow on #5cf9e2. Body face: Hanken Grotesk (OFL), already bundled in kit/fonts.
+   Radius, easing and animation tokens are Open Props (MIT); the control treatments (pill toggle, glow slider,
+   ring loader) follow Uiverse Galaxy patterns (MIT), see THIRD_PARTY.md. Loaded after studio.css and polish.css. */
+
+:root, [data-theme="dark"] {
+  --hairline: rgba(241, 232, 220, 0.14);
+  --lq-bg-image: /* the brand's one warm light: ember as radial light only, never a fill, border or word */
+    radial-gradient(ellipse 60% 50% at 92% 108%, rgba(217, 138, 61, 0.17), transparent 60%),
+    radial-gradient(ellipse 30% 25% at 96% 100%, rgba(226, 150, 72, 0.10), transparent 55%),
+    radial-gradient(ellipse 50% 35% at 10% -10%, rgba(241, 232, 220, 0.04), transparent 55%);
+  --panel-bg: rgba(19, 17, 16, 0.58);
+  --panel-border: 1px solid rgba(241, 232, 220, 0.14);
+  --panel-radius: 2rem; /* Open Props --radius-4 */
+  --panel-shadow: var(--shadow-smoke);
+  --panel-blur: blur(22px) saturate(1.35); /* the brand's glass: 22 px blur, 1.35 saturate */
+  --card-radius: 14px;
+
+  --btn-radius: var(--radius-pill); /* brand: every button, chip and input is a pill */
+  --btn-primary-bg: rgba(92, 249, 226, 0.14);
+  --btn-primary-fg: #5cf9e2;
+  --btn-primary-border: 1px solid rgba(92, 249, 226, 0.5);
+  --btn-primary-shadow: 0 0 16px rgba(92, 249, 226, 0.14);
+  --btn-secondary-bg: rgba(241, 232, 220, 0.06);
+  --btn-secondary-fg: #f1e8dc;
+  --btn-secondary-border: 1px solid rgba(241, 232, 220, 0.16);
+  --btn-render-bg: linear-gradient(180deg, #7dffe9, #5cf9e2 55%, #3ad7c2);
+  --btn-render-fg: #0b0907;
+  --btn-render-shadow: 0 0 0 1px rgba(92, 249, 226, 0.35), 0 0 28px rgba(92, 249, 226, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  --btn-render-shadow-sm: 0 0 0 1px rgba(92, 249, 226, 0.3), 0 0 12px rgba(92, 249, 226, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+
+  --tog-off: rgba(241, 232, 220, 0.16);
+  --tog-on: #5cf9e2;
+  --tog-on-shadow: 0 0 16px rgba(92, 249, 226, 0.45);
+  --tog-knob-bg: #f7f1e8;
+  --tog-border: 1px solid rgba(241, 232, 220, 0.12);
+
+  --seg-bg: rgba(241, 232, 220, 0.06);
+  --seg-border: 1px solid rgba(241, 232, 220, 0.10);
+  --seg-on-bg: rgba(92, 249, 226, 0.16);
+  --seg-on-fg: #5cf9e2;
+  --seg-on-shadow: inset 0 0 0 1px rgba(92, 249, 226, 0.35), 0 0 12px rgba(92, 249, 226, 0.12);
+
+  --sld-fill: #5cf9e2;
+  --sld-rest: rgba(241, 232, 220, 0.16);
+  --sld-thumb-bg: #f1e8dc;
+  --sld-thumb-shadow: 0 0 0 4px rgba(92, 249, 226, 0.28), 0 0 14px rgba(92, 249, 226, 0.5);
+
+  --input-bg: rgba(11, 9, 7, 0.35);
+  --input-border: 1px solid rgba(241, 232, 220, 0.16);
+  --input-radius: var(--radius-pill);
+  --input-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+  --menu-on-bg: rgba(92, 249, 226, 0.14);
+  --menu-on-fg: #5cf9e2;
+
+  --thumb-border: 1px solid rgba(241, 232, 220, 0.12);
+  --thumb-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  --play-bg: rgba(11, 9, 7, 0.72);
+  --play-fg: #5cf9e2;
+  --play-shadow: 0 0 16px rgba(92, 249, 226, 0.3);
+  --dur-bg: rgba(11, 9, 7, 0.78);
+
+  --bar-bg: rgba(241, 232, 220, 0.12);
+  --bar-fill: linear-gradient(90deg, #3ad7c2, #5cf9e2);
+  --bar-shadow: 0 0 12px rgba(92, 249, 226, 0.4);
+
+  --bubble-agent-bg: rgba(241, 232, 220, 0.07);
+  --bubble-agent-border: 1px solid rgba(241, 232, 220, 0.10);
+  --bubble-user-bg: rgba(92, 249, 226, 0.14);
+  --bubble-user-border: 1px solid rgba(92, 249, 226, 0.22);
+  --bubble-user-who: #5cf9e2;
+}
+[data-theme="light"] {
+  --hairline: rgba(11, 9, 7, 0.12);
+  --lq-bg-image:
+    radial-gradient(ellipse 60% 50% at 92% 108%, rgba(217, 138, 61, 0.16), transparent 60%),
+    radial-gradient(ellipse 30% 25% at 96% 100%, rgba(226, 150, 72, 0.08), transparent 55%),
+    radial-gradient(ellipse 50% 35% at 10% -10%, rgba(255, 255, 255, 0.45), transparent 55%);
+  --panel-bg: rgba(255, 253, 250, 0.62);
+  --panel-border: 1px solid rgba(23, 19, 15, 0.10);
+  --btn-primary-bg: rgba(11, 129, 104, 0.10);
+  --btn-primary-fg: #086553;
+  --btn-primary-border: 1px solid rgba(11, 129, 104, 0.45);
+  --btn-primary-shadow: 0 0 14px rgba(11, 129, 104, 0.10);
+  --btn-secondary-bg: rgba(23, 19, 15, 0.04);
+  --btn-secondary-fg: #17130f;
+  --btn-secondary-border: 1px solid rgba(23, 19, 15, 0.16);
+  --btn-render-bg: linear-gradient(180deg, #0b8168, #0a7560 55%, #086553);
+  --btn-render-fg: #ffffff;
+  --btn-render-shadow: 0 0 0 1px rgba(11, 129, 104, 0.35), 0 6px 22px rgba(11, 129, 104, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  --btn-render-shadow-sm: 0 0 0 1px rgba(11, 129, 104, 0.3), 0 3px 10px rgba(11, 129, 104, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  --tog-off: rgba(23, 19, 15, 0.14);
+  --tog-on: #0b8168;
+  --tog-on-shadow: 0 0 12px rgba(11, 129, 104, 0.35);
+  --tog-knob-bg: #ffffff;
+  --tog-border: 1px solid rgba(23, 19, 15, 0.10);
+  --seg-bg: rgba(23, 19, 15, 0.04);
+  --seg-border: 1px solid rgba(23, 19, 15, 0.10);
+  --seg-on-bg: rgba(11, 129, 104, 0.12);
+  --seg-on-fg: #086553;
+  --seg-on-shadow: inset 0 0 0 1px rgba(11, 129, 104, 0.35), 0 0 10px rgba(11, 129, 104, 0.08);
+  --sld-fill: #0b8168;
+  --sld-rest: rgba(23, 19, 15, 0.14);
+  --sld-thumb-bg: #ffffff;
+  --sld-thumb-shadow: 0 0 0 4px rgba(11, 129, 104, 0.22), 0 1px 4px rgba(0, 0, 0, 0.2);
+  --input-bg: rgba(255, 255, 255, 0.55);
+  --input-border: 1px solid rgba(23, 19, 15, 0.16);
+  --input-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --menu-on-bg: rgba(11, 129, 104, 0.10);
+  --menu-on-fg: #086553;
+  --thumb-border: 1px solid rgba(23, 19, 15, 0.10);
+  --thumb-shadow: 0 8px 20px rgba(60, 40, 20, 0.16);
+  --play-bg: rgba(255, 253, 250, 0.85);
+  --play-fg: #086553;
+  --play-shadow: 0 4px 14px rgba(11, 129, 104, 0.25);
+  --bar-bg: rgba(23, 19, 15, 0.10);
+  --bar-fill: linear-gradient(90deg, #086553, #0b8168);
+  --bar-shadow: 0 0 10px rgba(11, 129, 104, 0.3);
+  --bubble-agent-bg: rgba(23, 19, 15, 0.04);
+  --bubble-agent-border: 1px solid rgba(23, 19, 15, 0.08);
+  --bubble-user-bg: rgba(11, 129, 104, 0.10);
+  --bubble-user-border: 1px solid rgba(11, 129, 104, 0.22);
+  --bubble-user-who: #086553;
+}
+
+
+/* ---------- The AIgent brand (AIgent Brand Guide: tokens.css, README, Surfaces) ----------
+   The brand's tokens mapped onto Studio's own names, so studio.css, polish.css and this file keep using
+   --background, --foreground, --primary and friends. Dark is Plinth, light is Paper: the brand cream ground
+   with ink text and the deep teal accent (#0b8168), because the bright cyan measures 1.1:1 on cream.
+   Where the teal is small text on cream it uses the brand's accent-hi (#086553) so it clears 4.5:1. */
+@font-face { font-family: "Sofia Sans Extra Condensed"; src: url("/files/kit/fonts/SofiaSansExtraCondensed-VF.ttf") format("truetype"); font-weight: 1 1000; font-display: swap; }
+:root {
+  --font-display: "Sofia Sans Extra Condensed", "Arial Narrow", Impact, sans-serif;
+  --font-sans: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ease-carve: cubic-bezier(0.2, 0.7, 0.1, 1); --ease-brand-out: cubic-bezier(0.16, 1, 0.3, 1); --dur-short: 220ms;
+  --radius-pill: 999px; --radius-inner: 10px; --radius-draft: 14px; --radius-well: 28px;
+  --section-rule: 40px;
+  --ease-ui: var(--ease-brand-out); /* polish.css motion now runs on the brand's ease-out */
+}
+:root, [data-theme="dark"] {
+  --primary-text: #5cf9e2; --focus: #5cf9e2; --text-2: #cdbfae;
+  --ember: #d98a3d; --ember-hot: #e29648; --ember-deep: #b35b20;
+  --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.1), 0 0 0 1px rgb(241 232 220 / 0.14), 0 10px 24px -6px rgb(0 0 0 / 0.6), 0 36px 70px -24px rgb(0 0 0 / 0.85);
+  --shadow-smoke: inset 0 1px 0 rgb(255 255 255 / 0.16), 0 0 0 1px rgb(241 232 220 / 0.14), 0 18px 40px -18px rgb(0 0 0 / 0.7);
+}
+[data-theme="light"] {
+  --primary-text: #086553; --focus: #0b8168; --text-2: #3a3129;
+  --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.8), 0 0 0 1px rgb(11 9 7 / 0.08), 0 10px 24px -6px rgb(60 40 20 / 0.16), 0 36px 70px -24px rgb(60 40 20 / 0.22);
+  --shadow-smoke: inset 0 1px 0 rgb(255 255 255 / 0.85), 0 0 0 1px rgb(11 9 7 / 0.08), 0 18px 40px -18px rgb(60 40 20 / 0.22);
+}
+[data-theme="light"] a, [data-theme="light"] .linkish { color: var(--primary-text); }
+[data-theme="light"] :where(input, textarea)::placeholder { opacity: 1; }
+:focus-visible { outline-color: var(--focus); }
+
+/* the header: the AIgent wordmark (the brand's assets/Marks) with a label beside it.
+   The mark's cap height stays at the brand minimum of 24 px; its file carries its own clear space. */
+.brand .wm { display: block; height: 59px; width: auto; margin: -4px -6px -4px -14px; }
+.brand .wm-light { display: none; }
+[data-theme="light"] .brand .wm-dark { display: none; } [data-theme="light"] .brand .wm-light { display: block; }
+.brand .bname { color: var(--muted-foreground); font: 600 13px/1 var(--font-sans); padding-top: 3px; }
+/* headlines in the brand's display face: uppercase, heavy, tight, and a 40 px accent rule above, as a section opens */
+.sh h2 { font-family: var(--font-display); font-weight: 820; font-size: 44px; line-height: .9; letter-spacing: -0.006em; text-wrap: balance; }
+.sh h2::before { content: ""; display: block; width: var(--section-rule); height: 1px; background: var(--primary); margin-bottom: 10px; }
+.stat b { font-family: var(--font-display); font-weight: 760; font-size: 30px; font-variant-numeric: tabular-nums; }
+.sn, .clip-n, .pct { font-variant-numeric: tabular-nums; }
+.sub, .fine { text-wrap: pretty; }
+textarea { border-radius: var(--radius-draft) !important; } /* pills for one-line fields; a text box gets the brand's draft radius */
+
+/* ---------- page and panels ---------- */
+body { font-feature-settings: "ss01" on, "kern" on; }
+.ambient { background: var(--lq-bg-image), var(--background); }
+.block.glass-card, .teardown.glass-card, .runbar.glass-card, .flink.glass-card, .scripts.glass-card, .review.glass-card {
+  background: var(--panel-bg); border: var(--panel-border); border-radius: var(--panel-radius); box-shadow: var(--panel-shadow);
+  -webkit-backdrop-filter: var(--panel-blur); backdrop-filter: var(--panel-blur);
+}
+.glass-card { border-color: var(--hairline); }
+.fold.glass-card, .fold2, .outputs figure.glass-card, .qi.glass-card { border-radius: var(--card-radius); background: var(--panel-bg); border: var(--panel-border); box-shadow: var(--panel-shadow); }
+/* panel headings, as in A: small caps-style labels */
+.block .bh h3, .review h3, .scripts h3 { font-family: var(--font-display); font-size: 17px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted-foreground); } /* the brand eyebrow caps */
+.lbl { font-size: 12px; font-weight: 600; letter-spacing: 0.03em; color: var(--muted-foreground); }
+
+/* ---------- buttons (Astryx Button): primary is A's Render reel, secondary is A's Preview ---------- */
+.astryx-button[data-variant="primary"] {
+  background: var(--btn-render-bg); color: var(--btn-render-fg); border: 1px solid transparent; border-radius: var(--btn-radius);
+  box-shadow: var(--btn-render-shadow); font-weight: 700;
+  transition: transform 160ms var(--ease-3), box-shadow 160ms var(--ease-3), filter 160ms var(--ease-3);
+}
+.astryx-button[data-variant="primary"][data-size="sm"] { box-shadow: var(--btn-render-shadow-sm); }
+.astryx-button[data-variant="primary"]:hover:not(:disabled) { filter: brightness(1.06); }
+.astryx-button[data-variant="secondary"] {
+  background: var(--btn-secondary-bg); color: var(--btn-secondary-fg); border: var(--btn-secondary-border); border-radius: var(--btn-radius); font-weight: 650;
+  transition: background 160ms var(--ease-3), border-color 160ms var(--ease-3);
+}
+.astryx-button[data-variant="secondary"]:hover:not(:disabled) { background: color-mix(in srgb, var(--btn-secondary-fg) 10%, transparent); }
+.astryx-button[data-variant="ghost"] { border-radius: var(--btn-radius); }
+.astryx-button:disabled { box-shadow: none; filter: saturate(.4); }
+.icon-btn { border-radius: var(--btn-radius); }
+.icon-btn.primary { background: var(--btn-render-bg); color: var(--btn-render-fg); box-shadow: var(--btn-render-shadow-sm); }
+/* the outlined mint button from A (Save draft) for picked and toggled states */
+.chip.on, .tab[data-selected], .tab[aria-selected="true"] { background: var(--seg-on-bg); color: var(--seg-on-fg); border-color: transparent; box-shadow: var(--seg-on-shadow); }
+.chip { border: 1px solid var(--hairline); background: var(--btn-secondary-bg); }
+.connect-btn { background: var(--btn-secondary-bg); border: var(--btn-secondary-border); }
+.connect-btn.on { border: var(--btn-primary-border); background: var(--btn-primary-bg); box-shadow: var(--btn-primary-shadow); }
+
+/* ---------- toggle: A's pill (Astryx Switch and the Headless UI switch) ---------- */
+.astryx-switch { position: relative; width: 44px; height: 26px; border-radius: 999px; background: var(--tog-off); border: var(--tog-border); box-shadow: none; transition: background 180ms var(--ease-3), box-shadow 180ms var(--ease-3); }
+.astryx-switch[data-checked] { background: var(--tog-on); box-shadow: var(--tog-on-shadow); }
+.astryx-switch-thumb { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 999px; background: var(--tog-knob-bg); box-shadow: 0 1px 3px rgba(0, 0, 0, .35); transform: none; transition: transform 180ms var(--ease-3); }
+.astryx-switch-thumb[data-checked] { transform: translateX(18px); }
+.astryx-switch[data-size="sm"] { width: 38px; height: 22px; } .astryx-switch[data-size="sm"] .astryx-switch-thumb { width: 16px; height: 16px; } .astryx-switch[data-size="sm"] .astryx-switch-thumb[data-checked] { transform: translateX(16px); }
+.toggle { --w: 44px; --h: 26px; --k: 20px; background: var(--tog-off); border: var(--tog-border); }
+.toggle .knob { top: 2px; left: 2px; background: var(--tog-knob-bg); box-shadow: 0 1px 3px rgba(0, 0, 0, .35); transition: transform 180ms var(--ease-3); }
+.toggle[data-checked] { background: var(--tog-on); box-shadow: var(--tog-on-shadow); border: var(--tog-border); }
+.toggle[data-checked] .knob { transform: translateX(18px); background: var(--tog-knob-bg); }
+
+/* ---------- segmented control: A's pill (Astryx SegmentedControl and Studio's own .seg) ---------- */
+.astryx-segmented-control { padding: 3px; gap: 0; background: var(--seg-bg); border: var(--seg-border); border-radius: 999px; box-shadow: none; }
+.astryx-segmented-control-item { border-radius: 999px; color: var(--muted-foreground); font-weight: 600; background: transparent; }
+.astryx-segmented-control-item[data-selected] { background: var(--seg-on-bg); color: var(--seg-on-fg); box-shadow: var(--seg-on-shadow); }
+.astryx-segmented-control-item::before, .astryx-segmented-control-item::after { background: transparent; box-shadow: none; }
+.seg { background: var(--seg-bg); border: var(--seg-border); border-radius: 999px; padding: 3px; }
+.seg button { border-radius: 999px; color: var(--muted-foreground); font-weight: 600; }
+.seg button[aria-pressed="true"], .seg button[aria-checked="true"], .seg button.on { background: var(--seg-on-bg); color: var(--seg-on-fg); box-shadow: var(--seg-on-shadow); }
+.tabs { padding: 3px; gap: 2px; background: var(--seg-bg); border: var(--seg-border); border-radius: 999px; width: max-content; max-width: 100%; }
+.tab { color: var(--muted-foreground); font-weight: 600; }
+
+/* ---------- slider: A's glow track. --fill is set by main.jsx from the value ---------- */
+input[type="range"] { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 999px; outline: none; border: 0; padding: 0; min-height: 0; box-shadow: none;
+  background: linear-gradient(to right, var(--sld-fill) 0 var(--fill, 50%), var(--sld-rest) var(--fill, 50%) 100%); }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 999px; background: var(--sld-thumb-bg); border: none; box-shadow: var(--sld-thumb-shadow); cursor: pointer; }
+input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 999px; background: var(--sld-thumb-bg); border: none; box-shadow: var(--sld-thumb-shadow); cursor: pointer; }
+input[type="range"]:focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; }
+
+input[type="checkbox"]:not([role="switch"]), input[type="radio"] { accent-color: var(--primary); }
+
+/* ---------- inputs, the folder field with Browse, dropdowns ---------- */
+:where(input:not([type=checkbox], [type=radio], [type=range], [type=file]), select, textarea) { background: var(--input-bg); border: var(--input-border); border-radius: var(--input-radius); box-shadow: var(--input-shadow); }
+:where(input:not([type=checkbox], [type=radio], [type=range], [type=file]), select) { min-height: 40px; }
+.job input { background: var(--input-bg); border: var(--input-border); }
+.ff-row { gap: 8px; align-items: stretch; }
+.ff-row .astryx-button { min-height: 40px; padding-inline: 14px; }
+select { -webkit-appearance: none; appearance: none; padding-right: 34px; font-weight: 550; color: var(--foreground); cursor: pointer;
+  background: var(--input-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23a39585' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E") no-repeat right 10px center / 16px; }
+/* where the browser can style the open list (Chrome 135+), it is A's glass menu; elsewhere the system list */
+@supports (appearance: base-select) {
+  select { appearance: base-select; background-image: none; display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; }
+  select::picker-icon { content: ""; width: 16px; height: 16px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23a39585' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E") no-repeat center / 16px; transition: rotate 160ms var(--ease-3); }
+  select:open::picker-icon { rotate: 180deg; }
+  select::picker(select) { appearance: base-select; margin-top: 6px; padding: 4px; color: var(--foreground); background: var(--panel-bg); border: var(--panel-border); border-radius: 14px; box-shadow: var(--panel-shadow);
+    -webkit-backdrop-filter: var(--panel-blur); backdrop-filter: var(--panel-blur); }
+  select option { padding: 8px 10px; border-radius: 8px; font-size: 13.5px; }
+  select option:hover, select option:focus-visible { background: color-mix(in srgb, var(--foreground) 7%, transparent); outline: none; }
+  select option:checked { background: var(--menu-on-bg); color: var(--menu-on-fg); font-weight: 650; }
+  select option::checkmark { display: none; }
+}
+.menu-panel, .hint-panel { box-shadow: var(--shadow-card); background: var(--panel-bg); border: var(--panel-border); border-radius: 14px; -webkit-backdrop-filter: var(--panel-blur); backdrop-filter: var(--panel-blur); }
+.menu-item { border-radius: 8px; }
+.menu-item[data-focus] { background: var(--menu-on-bg); color: var(--menu-on-fg); } .menu-item[data-focus] .ic { color: var(--menu-on-fg); }
+
+/* ---------- clip card: A's thumb, duration pill and round play ---------- */
+.clips li.glass-card { border-radius: 12px; border: var(--thumb-border); box-shadow: var(--thumb-shadow); }
+.clips .clip-ov { position: absolute; left: 50%; top: 50%; width: 36px; height: 36px; margin: -18px 0 0 -18px; border-radius: 999px; display: grid; place-items: center; background: var(--play-bg); color: var(--play-fg); box-shadow: var(--play-shadow); }
+.clips .clip-ov .ic { width: 14px; height: 14px; margin-left: 1px; fill: currentColor; }
+.clips .clip-dur { position: absolute; right: 6px; bottom: 30px; padding: 1px 6px; border-radius: 4px; background: var(--dur-bg); color: #f1e8dc; font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.clips .cap { font-weight: 650; }
+
+/* ---------- progress and loader ---------- */
+[role="progressbar"] { --color-accent: var(--sld-fill); }
+.spin { width: 16px; height: 16px; border: 2px solid color-mix(in srgb, var(--primary) 25%, transparent); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+.boot .spin { width: 22px; height: 22px; }
+
+/* ---------- chat: A's bubbles ---------- */
+.msgs .user { background: var(--bubble-user-bg); border: var(--bubble-user-border); border-radius: 16px; padding: 8px 12px 10px; }
+.msgs .assistant { background: var(--bubble-agent-bg); border: var(--bubble-agent-border); border-radius: 16px; padding: 8px 12px 10px; }
+.msgs .assistant .who { font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-foreground); }
+.composer input, .composer textarea { background: var(--input-bg); border: var(--input-border); border-radius: var(--input-radius); }
+
+@media (prefers-reduced-transparency: reduce) {
+  .block.glass-card, .teardown.glass-card, .runbar.glass-card, .flink.glass-card, .scripts.glass-card, .review.glass-card, .menu-panel, .hint-panel { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--card); }
+}
+@media (prefers-reduced-motion: reduce) { .astryx-switch, .astryx-switch-thumb, .astryx-button { transition: none !important; } .spin { animation: spin 2s linear infinite !important; } }
+[data-glass="off"] .block.glass-card, [data-glass="off"] .teardown.glass-card, [data-glass="off"] .runbar.glass-card, [data-glass="off"] .flink.glass-card, [data-glass="off"] .scripts.glass-card, [data-glass="off"] .review.glass-card, [data-glass="off"] .menu-panel, [data-glass="off"] .hint-panel { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--card); }
+[data-glass="off"] .ambient { background: var(--background); }
+.sh h2[tabindex="-1"]:focus { outline: none; } /* focus moved here on a step change; the heading is not a control */

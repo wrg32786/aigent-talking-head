@@ -8,11 +8,11 @@ npm run studio
 
 That starts Studio on http://127.0.0.1:4757 and opens your browser. `--port <n>` picks another port, `--no-open` skips the browser. Never used a terminal? Run the one-line installer in [Setup](#setup-without-a-terminal) and double-click the "Talking Head Studio" icon it puts on your desktop.
 
-![Studio on a laptop: the Style step with the effects grid, the picks tray at the bottom, and the chat with Claude Code connected and listening](studio/desktop.png)
+![Studio on a laptop: the AIgent wordmark, the Style step with packs and the effects grid, the picks bar at the bottom, and the chat](studio/desktop.png)
 
 Five steps across the top: Footage, Cut, Reference, Style, Render. Each one is its own screen with Back and Next at the bottom, and a step shows a check when it is done. The chat sits on the right (behind the chat button on a phone). Dark is the default; switch to light with the sun button or in Settings.
 
-![Studio in the light theme: the Reference step with a breakdown](studio/light.png)
+![Studio in the light theme, the AIgent cream with deep teal: the Style step](studio/light.png)
 
 ## What you can do
 
@@ -229,7 +229,7 @@ The breakdown is visual: four numbers (length, shots, BPM and energy, average sh
 
 ## Settings
 
-![Settings in a side sheet: who answers the chat with a local model picked, the action note switch, the download folder and the renders folder](studio/settings.png)
+![Settings in a side sheet: who answers the chat, the terminal note switch, API keys and providers, and the folders with Browse](studio/settings.png)
 
 The settings button (top right, the sliders) opens a side sheet and saves to `jobs/.studio/settings.json`, which git ignores. Environment variables win over it.
 
@@ -240,6 +240,22 @@ The settings button (top right, the sliders) opens a side sheet and saves to `jo
 | Reference downloads | `teardown-in/studio/<job>/` in the kit | `STUDIO_DOWNLOADS` |
 | Also copy finished reels to | none (reels stay in `jobs/<job>/`) | `STUDIO_RENDERS` |
 | Action notes from the terminal | on | |
+
+### Picking a folder
+
+![Settings folder fields with Browse, Folder list, Open folder and Reset to default](studio/folder-fields.png)
+
+Each folder field (Reference downloads, Copy finished reels to, and the b-roll library folder under API keys and providers) takes a typed full path, or:
+
+- **Browse** opens your computer's own folder dialog and fills in the full path: File Explorer's folder picker on Windows (PowerShell `FolderBrowserDialog`), Finder's "choose folder" on macOS (`osascript`), zenity or kdialog on Linux. A browser cannot hand a page a full path, so the local server opens the dialog.
+- **Folder list** (and Browse when there is no dialog, for example Linux without zenity or kdialog, or a computer with no screen) opens Studio's own list: quick places (Home, Desktop, Downloads, Videos, Documents, the kit folder, drives and mounted volumes), a clickable path, Up, Home, **New folder** and **Use this folder**.
+- **Open folder** shows the folder (or the default one) in Explorer, Finder or your file manager. **Reset to default** empties the field.
+
+Click Save to keep a change.
+
+![The folder list: quick places, the path, folders and Use this folder](studio/folder-browser.png)
+
+What the folder list can see: folder names only, never files or what is in them, and only under your home folder, the kit, drives (Windows) and mounted volumes (`/Volumes`, `/media`, `/mnt`). Hidden folders (names starting with a dot), AppData, `~/Library` on macOS, the recycle bin and the Windows system folders are never listed or opened. The folder routes (`/api/folders`, `/api/folders/new`, `/api/folders/open`, `/api/folders/pick`) answer only on localhost and only to the Studio page itself (they need the `x-studio-page: 1` header and refuse cross-site requests). Your agent has no folder tools; it sets folders with `studio_settings`.
 
 Theme (dark or light) and Glass panels (on, or solid panels for older computers) live under Look and are saved in the browser, not in the file.
 
@@ -276,6 +292,12 @@ You tell your agent, in its terminal: **"Set up Studio from AGENTS.md and run th
 <img src="studio/connect-desktop.png" width="520" alt="The Connect agent sheet: waiting for your agent, a grid of agents with Claude Code picked, and numbered steps with the claude mcp add command and the hook command filled in with this install's paths, each with a copy button">
 <img src="studio/connect-phone.png" width="200" alt="Connect agent on a phone: the same agent grid and steps as a full-screen sheet">
 </p>
+
+**One line from scratch.** On a computer without the kit, paste this into any agent that runs commands. It follows [docs/install.md](install.md): finds the OS, reuses or clones the kit, runs the installer and `npm run setup:all`, connects itself with the steps below, starts Studio, checks `setup_status` and tells you only what it cannot do. The Connect agent sheet shows the same line at the top.
+
+```
+Read https://github.com/wrg32786/aigent-talking-head/blob/main/docs/install.md and follow it to install, set up and connect Talking Head Studio in this agent, then open Studio.
+```
 
 **Connect agent** in the top bar (also in the empty chat and in Settings) opens a sheet where you pick your agent: Claude Code, Codex CLI, Cursor (CLI and IDE), Gemini CLI, OpenCode, Windsurf or another MCP app, or Other / generic MCP. For the one you pick it shows exactly what to do, each with a copy button:
 
@@ -441,6 +463,17 @@ A double-click app with no installer at all is planned: [docs/desktop-app-plan.m
 - One task runs at a time; Cancel stops it.
 - `STUDIO_REEL_ARGS` and `STUDIO_TEARDOWN_ARGS` add flags to every draft or teardown (for example `--engine lite --no-asr`). `STUDIO_TEARDOWN` and `STUDIO_SETUP` swap the teardown and setup scripts (the tests use stand-ins).
 
+### The top bar
+
+<img src="studio/more-menu.png" width="520" alt="The top bar with numbered steps, the setup pill, Connect agent, theme, Settings and the More menu open with Connect agent, Setup check, API keys and providers and the theme">
+<img src="studio/top-phone.png" width="260" alt="The top bar on a phone: the reel name and buttons on the first row and the six steps on a second row">
+
+The top bar always fits on one line: on a laptop only the current step shows its name (the others show their number, and hovering a step still names it), the setup pill shows just the count of what is missing, and Connect agent shrinks to its plug. **More** (the three dots) holds Connect agent, Setup check, API keys and providers and the theme, and works with the keyboard: Enter or Space opens it, the arrow keys move, Enter picks, Escape closes. On a phone the steps get their own row under the reel name.
+
+Longer explanations sit behind a small **i** next to the thing they explain (Footage from a link, Clean-up pass, Record screen in B-roll); click it to read, Escape or a click elsewhere closes it.
+
+<img src="studio/hint.png" width="420" alt="A hint opened next to the footage link box: Public share links only. Private links need a login, so download those and drop the file in.">
+
 ## Design
 
 The page is React 19 with [Astryx](https://github.com/meta/astryx) components (MIT, Meta): buttons, badges, switches, segmented controls, progress bars, status dots, the keyboard hint and the settings drawer. Its theme (`kit/studio/web/src/theme.js`) extends Astryx Neutral with the AIgent palette: warm ink and paper neutrals, one cyan accent, Anton for headings, Hanken Grotesk and JetBrains Mono from the kit's fonts. Effect tiles, the shot timeline and the chat are drawn for Studio.
@@ -451,10 +484,18 @@ The page is React 19 with [Astryx](https://github.com/meta/astryx) components (M
 
 - **Settings, Look, Glass panels** turns every panel solid (saved in the browser).
 - `prefers-reduced-transparency` gets solid panels automatically, and so do browsers without `backdrop-filter`.
-- `prefers-reduced-motion` stops transitions and the preview loops (or pause them with the button above the grid).
+- `prefers-reduced-motion` stops transitions and the preview loops (or pause them with the button above the grid), and turns off the step entrance, the menu and hint fades, the theme icon turn and the hover lift; the spinner slows down instead of stopping, so you can still see something is loading.
 
 **Contrast with glass.** Glass opacity is set so text clears 4.5:1 even in the worst case, with pure white footage right behind a dark panel or pure black behind a light one: body text 11.2:1 and secondary text 4.7:1 in dark, 14.5:1 and 5.6:1 in light. Accent text on light glass uses a deeper teal (5.5:1 on a picked chip). Cards over the ambient light measure 12.9:1 and 5.3:1 in dark, 17.0:1 and 6.6:1 in light.
 
 Rules it keeps: the cyan accent marks only the primary action, the current step and what is picked; one dark fade sits under tile names so they read on any preview frame. Keyboard: Tab through everything, arrow keys move between effect tabs, F forbids a tile, / jumps to search, Escape closes the chat sheet and the drawer, and focus stays on the same tile when the page updates. Controls are at least 44 px on touch screens and text at least 12 px.
 
-Credits: Astryx and React are bundled (both MIT). The token names and component shapes first followed [shadcn/ui](https://github.com/shadcn-ui/ui) (MIT) and the dismissal and focus behavior [vercel-labs/ui](https://github.com/vercel-labs/ui) (Apache-2.0), with no code copied from either. Checked against [ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) and [Anti-Slop](https://github.com/miqdadbadjuber/Anti-Slop) (both MIT), used as guidance only. See THIRD_PARTY.md.
+**Liquid glass (1.8.0).** The look is direction A of the Studio style gallery (`kit/studio/web/src/liquid.css`, tokens carried over with the gallery's names): frosted panels with a 22 px blur and a one-pixel border, a quiet mint glow on the primary button, switches and the picked segment, pill toggles and segmented controls, a glow slider whose track fills to the value, inputs and drop-downs on a dark well (Chrome 135 and later draws the open drop-down list as glass too), clip cards with a round play button, a ring loader and chat bubbles. The light theme uses the same recipe in ink and deep teal.
+
+**The AIgent brand (1.8.0).** On top of the glass, Studio follows the AIgent brand kit. The header carries the AIgent wordmark, the brand's own SVG marks (`kit/studio/web/src/brand/`: the for-dark file on the dark ground, the for-white file on cream; never one colour, never below 24 px cap height). Dark is the brand's Plinth ground (#0b0907, bone #f1e8dc text, cyan #5cf9e2); light is its Paper ground, the cream #f1e8dc with ink #0b0907 text and deep teal #0b8168, because the bright cyan is 1.1:1 on cream. Step headlines are set in the display face, Sofia Sans Extra Condensed (OFL, `kit/fonts/SofiaSansExtraCondensed-VF.ttf`), uppercase at weight 820 with a 40 px one-pixel accent rule above; panel headings use its eyebrow caps (weight 600, .08em tracking); Hanken Grotesk is the UI face. The wordmark face (Space Grotesk) is not bundled: the marks are outlined vectors and the brand keeps that face for the name only. Ember (#d98a3d) appears only as one warm radial light behind the page. Panels and menus use the brand's card and smoke shadows with a 22 px blur at 1.35 saturation; buttons, chips and one-line fields are pills; motion uses the brand's ease-out and carve curves, and nothing moves on hover (only light and colour change). Panels keep Liquid glass's rounded corners rather than the brand's square cards, since the glass look stays. The brand tokens live under Studio's own names: `studio.css` (colours), `liquid.css` (fonts, ember, shadows, curves, radii, `--primary-text` and `--focus`) and `theme.js` (the same colours for Astryx parts).
+
+Contrast (measured with every step, Settings and the More menu open, in both themes): text on cream is 16.4:1, muted text 5.1:1, white on the teal button 4.8:1 or more. Teal used as small text on cream switches to the brand's accent-hi #086553 (5.8:1 on cream, 5.0:1 on a picked chip), and the light theme's success, error and warning are darkened to #276a17, #b02e23 and #7a5600 (5.3:1 or more on cream). Focus rings are the accent in each theme (3:1 or more against the ground).
+
+**Motion and accessible pieces (1.8.0).** [Headless UI](https://github.com/tailwindlabs/headlessui) (MIT) gives the More menu, the hints, the B-roll tabs, the Already cut switch, the Log and Command folds and the Save as pack popover their keyboard and focus behavior; the look is Studio's own CSS (`kit/studio/web/src/polish.css`, no Tailwind). [Open Props](https://github.com/argyleink/open-props) (MIT) supplies the easing curves, shadows and the fade keyframes, so every step, menu and fold moves with the same timing. A few component styles (the theme icon swap, the switch proportions, the spinner, the layered hover shadow and the ring on Next) are adapted from [Uiverse.io](https://uiverse.io) snippets (MIT), each credited by author in [THIRD_PARTY.md](../THIRD_PARTY.md).
+
+Credits: Astryx and React are bundled (both MIT). Headless UI and Open Props are bundled too (both MIT). The token names and component shapes first followed [shadcn/ui](https://github.com/shadcn-ui/ui) (MIT) and the dismissal and focus behavior [vercel-labs/ui](https://github.com/vercel-labs/ui) (Apache-2.0), with no code copied from either. Checked against [ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) and [Anti-Slop](https://github.com/miqdadbadjuber/Anti-Slop) (both MIT), used as guidance only. See THIRD_PARTY.md.

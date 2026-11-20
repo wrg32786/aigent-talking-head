@@ -13,8 +13,12 @@ import { Style } from './Style.jsx';
 import { Render } from './Render.jsx';
 import { Chat } from './Chat.jsx';
 import { Settings } from './Settings.jsx';
+import { MoreMenu } from './ui.jsx';
 import { PicksTray } from './Picks.jsx';
 import { Connect } from './Connect.jsx';
+// the AIgent wordmark (from the AIgent brand's assets/Marks): one file per ground, never one colour
+import wordmarkDark from './brand/aigent-wordmark-for-dark.svg';
+import wordmarkLight from './brand/aigent-wordmark-for-white.svg';
 import { SetupCheck } from './Setup.jsx';
 
 const hashStep = () => (location.hash.match(/step=([a-z]+)/) || [])[1];
@@ -74,7 +78,7 @@ export function App() {
     return () => { es && es.close(); removeEventListener('hashchange', onHash); document.removeEventListener('keydown', onKey); };
   }, [apply, go]);
 
-  if (!CAT || !V) return <Theme theme={aigentTheme} mode={theme}><div className="boot" role="status"><span className="mark" aria-hidden="true" />Loading Studio</div><Toast /></Theme>;
+  if (!CAT || !V) return <Theme theme={aigentTheme} mode={theme}><div className="boot" role="status"><span className="spin" aria-hidden="true" />Loading Studio</div><Toast /></Theme>;
 
   const s = V.state, t = V.task, running = t && t.status === 'running';
   const picksAny = Object.values(s.picks).some(p => p.allow.length || p.deny.length);
@@ -92,22 +96,28 @@ export function App() {
       <a className="skip" href="#main">Skip to the editor</a>
       <div className="ambient" aria-hidden="true" />
       <header className="top glass">
-        <div className="brand"><span className="mark" aria-hidden="true" /><span className="bname">AIgent <b>Studio</b></span></div>
+        <div className="brand"><img className="wm wm-dark" src={wordmarkDark} alt="AIgent" width="127" height="59" /><img className="wm wm-light" src={wordmarkLight} alt="AIgent" width="127" height="59" /><span className="bname">Studio</span></div>
         <JobName s={s} patch={patch} />
         <nav className="stepper" aria-label="Steps"><ol id="stepper">
           {STEPS.map((st, k) => <li key={st} className={done[st] ? 'done' : ''}>
-            <button type="button" data-step={st} aria-current={st === step ? 'step' : 'false'} onClick={() => go(st, true)}>
+            <button type="button" data-step={st} aria-current={st === step ? 'step' : 'false'} title={stepName(st)} aria-label={`${k + 1}. ${stepName(st)}${done[st] && st !== step ? ', done' : ''}`} onClick={() => go(st, true)}>
               <span className="sn">{done[st] && st !== step ? <Icon n="check" /> : k + 1}</span><span className="sl">{stepName(st)}</span>
             </button></li>)}
         </ol></nav>
         <div className="topr">
           {recLive && step !== 'footage' && <button type="button" className="rec-pill" id="rec-pill" onClick={() => go('footage', true)} aria-label="Recording, go back to the recorder"><i aria-hidden="true" />{recLive.phase === 'paused' ? 'Paused' : recLive.phase === 'saving' ? 'Saving take' : 'Recording'}</button>}
-          {env.setup && !env.setup.ready && <button type="button" className="setup-pill" id="setup-pill" onClick={openSetup}><Icon n="ban" />{Object.values(env.setup.missing).filter(x => x.need === 'core').length} missing</button>}
+          {env.setup && !env.setup.ready && (() => { const nm = Object.values(env.setup.missing).filter(x => x.need === 'core').length; return <button type="button" className="setup-pill" id="setup-pill" onClick={openSetup} aria-label={`${nm} missing, open Setup check`} title="Setup check"><Icon n="ban" /><span className="sp-n">{nm}</span><span className="sp-l"> missing</span></button>; })()}
           <button type="button" className={'connect-btn ' + agentState} id="connect-open" aria-haspopup="dialog" onClick={openConnect} title={agentState === 'on' ? `${a.name} connected` : 'Connect your terminal agent'}><Icon n="plug" /><span className="cb-l">{agentState === 'on' || agentState === 'busy' ? (a.name || 'Agent') : 'Connect agent'}</span></button>
-          <span id="taskpill" role="status" aria-live="polite"><Badge label={pill} variant={running ? 'cyan' : t && t.status === 'failed' ? 'error' : 'neutral'} /></span>
-          <IconBtn id="theme" n={theme === 'dark' ? 'sun' : 'moon'} label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
+          <span id="taskpill" role="status" aria-live="polite" className={t ? '' : 'idle'}>{t ? <Badge label={pill} variant={running ? 'cyan' : t.status === 'failed' ? 'error' : 'neutral'} /> : <span className="sr">{pill}</span>}</span>
+          <button type="button" className="icon-btn theme-btn" id="theme" data-mode={theme} aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} title={theme === 'dark' ? 'Light theme' : 'Dark theme'} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}><Icon n="moon" className="tm-moon" /><Icon n="sun" className="tm-sun" /></button>
           <button className="icon-btn fab" id="chat-open" type="button" aria-controls="chat" aria-expanded={String(chatOpen)} aria-label="Open chat" onClick={() => setChatOpen(true)}><Icon n="chat" /><span className={'dot ' + agentState} id="fab-dot" aria-hidden="true" /></button>
           <IconBtn id="open-settings" n="sliders" label="Settings" aria-haspopup="dialog" onClick={() => setSettingsOpen(true)} />
+          <MoreMenu id="more-open" label="More" items={[
+            { id: 'more-connect', label: 'Connect agent', icon: 'plug', onClick: openConnect },
+            { id: 'more-setup', label: 'Setup check', icon: 'check', onClick: openSetup },
+            { id: 'more-keys', label: 'API keys and providers', icon: 'link', onClick: openKeys },
+            { id: 'more-theme', label: theme === 'dark' ? 'Light theme' : 'Dark theme', icon: theme === 'dark' ? 'sun' : 'moon', onClick: () => setTheme(theme === 'dark' ? 'light' : 'dark') },
+          ]} />
         </div>
       </header>
       <div className="layout">

@@ -16,7 +16,8 @@ for (const d of dirs.sort()) {
   const lf = existsSync(d) && readdirSync(d).find(f => /^licen[cs]e/i.test(f));
   const text = lf ? readFileSync(join(d, lf), 'utf8') : FALLBACK[p.name];
   if (!text) throw new Error(`no license text for ${id}`);
-  if (!/^(MIT|ISC|BSD-[23]-Clause|Apache-2\.0)$/.test(p.license || '')) throw new Error(`${id} has license ${p.license}; only MIT, ISC, BSD or Apache-2.0 may ship`);
+  // 0BSD (Zero-Clause BSD, tslib via Headless UI) is the BSD family with no conditions at all
+  if (!/^(MIT|ISC|0BSD|BSD-[23]-Clause|Apache-2\.0)$/.test(p.license || '')) throw new Error(`${id} has license ${p.license}; only MIT, ISC, BSD or Apache-2.0 may ship`);
   parts.push(`\n==== ${id} (${p.license}) ====\n\n${text.trim()}\n`);
 }
 writeFileSync(new URL('THIRD_PARTY_LICENSES.txt', pub), parts.join(''));

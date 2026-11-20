@@ -220,6 +220,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-cut.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { uerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio cut tests (tests/studio-cut.test.mjs: output choice, candidates, chunked transcription, cut edits, MCP cut tools, model scoring, pull and adapt a script)', errs: uerrs, warns: [] });
+    const fderrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-folders.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { fderrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio folder tests (tests/studio-folders.test.mjs: folder list API, folders only, no secrets or escapes, page header, New folder, Open folder, native dialog hook, the one-line install)', errs: fderrs, warns: [] });
     const berrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-broll.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { berrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
