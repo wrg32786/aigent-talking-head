@@ -10,7 +10,7 @@
 // a face-tracking camera effect (locked-on) and a captions-off effect (checklist) on the one-command reel.
 // The synthetic clip has no face, so this proves the pipeline runs and falls back cleanly, not detection quality.
 // --keep leaves the work folder in place and prints its path.
-import { execFileSync } from 'child_process';
+import { execFileSync, spawn } from 'child_process';
 import { copyFileSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, statSync, existsSync, rmSync, readdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { dirname, join } from 'path';
@@ -1003,20 +1003,32 @@ try {
     } finally { srv.kill(); rmSync(join(dirname(KIT), 'jobs', job), { recursive: true, force: true }); }
     console.log('ok');
   }
-  step('Studio Record now in Chrome with a fake camera and mic (tests/studio-record.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-record.e2e.mjs')], dirname(KIT)); });
-  step('Studio Connect agent, teleprompter speed and pop-out, footage from a link, in Chrome (tests/studio-connect.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-connect.e2e.mjs')], dirname(KIT)); });
-  step('Studio Cut step in Chrome: footage player, output picker, cut timeline, batch render, pull script (tests/studio-cut.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-cut.e2e.mjs')], dirname(KIT)); });
-  step('Studio B-roll step in Chrome: lane, placements, API keys, stock, cards, ideas, generate and screen recording against mocks, assemble placements (tests/studio-broll.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-broll.e2e.mjs')], dirname(KIT)); });
-  step('Studio B-roll that picks itself in Chrome: spots after a draft, the first spot too, cards with no key, Add a spot, upload kinds, a raw testimonial cut on whole words and played in the reel, MCP pick_broll, add_spot, add_testimonial (tests/studio-spots.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-spots.e2e.mjs')], dirname(KIT)); });
-  step('Studio Pieces and Outputs in Chrome: lines sorted by what they do, Let AI choose, Build my own, reorder and drop, the Combo drafts on whole words, the Outputs library with Re-open and Compare, MCP get_pieces, set_combo, choose_combo, list_outputs (tests/studio-pieces.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-pieces.e2e.mjs')], dirname(KIT)); });
-  step('Studio Look in Chrome: one row of Looks, the reference card, 9 layers with every option once, REF, LOOK and YOU badges, Music and SFX as one layer, Clear reference as one undo, Save as a Look (tests/studio-look.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-look.e2e.mjs')], dirname(KIT)); });
-  step('Studio folder fields in Chrome: Browse, the folder list, New folder, Use this folder, Open folder, Reset, the one-line install in Connect agent (tests/studio-folders.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-folders.e2e.mjs')], dirname(KIT)); });
-  step('Studio polish in Chrome: the top bar fits at five widths, the More menu by keyboard, hints, theme, reduced motion (tests/studio-polish.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-polish.e2e.mjs')], dirname(KIT)); });
-  step('Studio Post step in Chrome: Connect (Buffer key, R2 host), channels with length limits, drafts by default, post now needs a tick, against mocks (tests/studio-post.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-post.e2e.mjs')], dirname(KIT)); });
-  step('Studio Finish in Chrome: six steps, Your edit, Draft from your pieces, one Render with clips and plain clips, MCP get_edit and studio_run (tests/studio-finish.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-finish.e2e.mjs')], dirname(KIT)); });
-  step('Studio New video in Chrome: start fresh keeps the look, nothing deleted, open a past video restores it, More menu (tests/studio-videos.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-videos.e2e.mjs')], dirname(KIT)); });
-  step('Studio fix buttons in Chrome: no terminal command on the page, Install, Send and Copy for my agent, the toast and Setup check (tests/studio-fixes.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-fixes.e2e.mjs')], dirname(KIT)); });
-  step('Studio review tools in Chrome: what to swap, show original, comments, clean-up pass, edit receipt (tests/studio-review.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-review.e2e.mjs')], dirname(KIT)); });
+  // the Studio pages in Chrome: each test has its own server, state folder and job names, so they run two at a time
+  // (SMOKE_E2E_JOBS) and report in order. Serially they took about 7 of the CI job's 15 minutes.
+  {
+    const E2E = [
+      ['Studio Record now in Chrome with a fake camera and mic (tests/studio-record.e2e.mjs)', 'studio-record.e2e.mjs'],
+      ['Studio Connect agent, teleprompter speed and pop-out, footage from a link, in Chrome (tests/studio-connect.e2e.mjs)', 'studio-connect.e2e.mjs'],
+      ['Studio Cut step in Chrome: footage player, output picker, cut timeline, batch render, pull script (tests/studio-cut.e2e.mjs)', 'studio-cut.e2e.mjs'],
+      ['Studio B-roll step in Chrome: lane, placements, API keys, stock, cards, ideas, generate and screen recording against mocks, assemble placements (tests/studio-broll.e2e.mjs)', 'studio-broll.e2e.mjs'],
+      ['Studio B-roll that picks itself in Chrome: spots after a draft, the first spot too, cards with no key, Add a spot, upload kinds, a raw testimonial cut on whole words and played in the reel, MCP pick_broll, add_spot, add_testimonial (tests/studio-spots.e2e.mjs)', 'studio-spots.e2e.mjs'],
+      ['Studio Pieces and Outputs in Chrome: lines sorted by what they do, Let AI choose, Build my own, reorder and drop, the Combo drafts on whole words, the Outputs library with Re-open and Compare, MCP get_pieces, set_combo, choose_combo, list_outputs (tests/studio-pieces.e2e.mjs)', 'studio-pieces.e2e.mjs'],
+      ['Studio Look in Chrome: one row of Looks, the reference card, 9 layers with every option once, REF, LOOK and YOU badges, Music and SFX as one layer, Clear reference as one undo, Save as a Look (tests/studio-look.e2e.mjs)', 'studio-look.e2e.mjs'],
+      ['Studio folder fields in Chrome: Browse, the folder list, New folder, Use this folder, Open folder, Reset, the one-line install in Connect agent (tests/studio-folders.e2e.mjs)', 'studio-folders.e2e.mjs'],
+      ['Studio polish in Chrome: the top bar fits at five widths, the More menu by keyboard, hints, theme, reduced motion (tests/studio-polish.e2e.mjs)', 'studio-polish.e2e.mjs'],
+      ['Studio Post step in Chrome: Connect (Buffer key, R2 host), channels with length limits, drafts by default, post now needs a tick, against mocks (tests/studio-post.e2e.mjs)', 'studio-post.e2e.mjs'],
+      ['Studio Finish in Chrome: six steps, Your edit, Draft from your pieces, one Render with clips and plain clips, MCP get_edit and studio_run (tests/studio-finish.e2e.mjs)', 'studio-finish.e2e.mjs'],
+      ['Studio New video in Chrome: start fresh keeps the look, nothing deleted, open a past video restores it, More menu (tests/studio-videos.e2e.mjs)', 'studio-videos.e2e.mjs'],
+      ['Studio fix buttons in Chrome: no terminal command on the page, Install, Send and Copy for my agent, the toast and Setup check (tests/studio-fixes.e2e.mjs)', 'studio-fixes.e2e.mjs'],
+      ['Studio review tools in Chrome: what to swap, show original, comments, clean-up pass, edit receipt (tests/studio-review.e2e.mjs)', 'studio-review.e2e.mjs'],
+    ];
+    const jobs = Math.max(1, +process.env.SMOKE_E2E_JOBS || 2), out = new Array(E2E.length);
+    const one = k => new Promise(done => { const t0 = Date.now(), c = spawn(node, [join(dirname(KIT), 'tests', E2E[k][1])], { cwd: dirname(KIT), stdio: ['ignore', 'pipe', 'pipe'], env: process.env });
+      let log = ''; c.stdout.on('data', d => { log += d; }); c.stderr.on('data', d => { log += d; });
+      c.on('close', code => { out[k] = { code, log, s: Math.round((Date.now() - t0) / 1000) }; done(); }); });
+    let next = 0; await Promise.all(Array.from({ length: Math.min(jobs, E2E.length) }, async () => { while (next < E2E.length) await one(next++); }));
+    for (let k = 0; k < E2E.length; k++) step(E2E[k][0], () => { if (out[k].code !== 0) { process.stderr.write(out[k].log.slice(-6000)); fail(`${E2E[k][1]} exited ${out[k].code}`); } });
+  }
   step('check.mjs flags em dashes and banned phrases in captions', () => {
     const b = join(work, 'jobs', 'muse', 'build');
     const caps = { captionStyle: 'pill', flips: [{ start: 0, end: 1, text: 'This is not a tool but a team', mode: 0 }, { start: 1, end: 2, text: 'Fast \u2014 really fast', mode: 0 }] };
