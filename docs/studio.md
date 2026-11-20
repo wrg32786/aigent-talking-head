@@ -105,11 +105,24 @@ Tick **Show cut points** under the timeline to see them: a dashed tick where the
 
 **Long takes.** Transcription runs 2 minutes at a time (`kit/studio/tx_chunks.py`, faster-whisper `small.en`, `TX_MODEL` picks another) with progress on the page, saves after each chunk and picks up where it stopped. Transcripts, waveforms and preview copies are cached by file (path, size and time) in `jobs/.studio/media/`. Uploaded, recorded and linked footage all work the same.
 
+### Lines and bites
+
+For a long recording, under the player. It opens by itself for takes over 3 minutes; click **Lines and bites** to open it for a shorter one.
+
+![Lines and bites: every line with its number, play button, text, length and Keep switch, and bites on the right: the clean take and one picked by the agent, with their lines in order](studio/lines-bites.png)
+
+- **Lines.** Every line of the take, one per sentence, with its number, a play button, the text, the length and a **Keep** or **Retake** switch. Times sit on the quiet in the audio, like the cuts. A line is marked a likely retake only when a later line within 2 minutes says most of it again (70% of its words, not counting openers like "so" or "we know how to") and is not much shorter. Lines under 0.6 s, or two words that stop mid-thought, are marked fragments. Both start as Retake, and one click brings them back. **Show** filters to kept lines or to retakes and fragments.
+- **Bites.** Tick lines (from anywhere in the take, in the order you want them), name the bite and press **Make a bite**. In a bite, drag a line or use the arrows to reorder it, and the x takes it out. **Play** plays the lines back to back. **Render** sends it through the reel edit as a short clip (in `jobs/<job>-<bite>/`). **Save as one file** only joins the lines into `inbox/studio/<job>/cuts/<bite>.mp4`, with no edit. **Render all** does every bite.
+- **One clean take.** Makes a bite of every kept line in the take's order: the whole thing without the retakes and fragments. It renders with the Output choice (a plain 16:9 edit for Long form), or **Save as one file** gives you the joined take as it is.
+- **Your agent.** **Ask my agent to pick** sends it a Studio message. It reads the lines with `get_lines`, marks retakes with `keep`, and sends named bites with `set_bites` (line numbers in play order, plus `clean: true` for the clean take). Its bites show as **By** its name, and the chat says what it picked. You can still rename, reorder, play and render them. `render_bites` renders from the agent.
+
+API: `GET /api/lines?path=`, `POST /api/lines` (`keep`, or `action`: add, update, remove, move, clean, set), `POST /api/lines/render` (`ids`, `only: "file"`).
+
 **Agents.** `set_output` sets the choice, `get_cuts` reads the take, the transcript as numbered sentences and the candidates (`find: true` runs the rules first), `set_cuts` sends your picks (time ranges, a score and a reason each), `render_cuts` renders them. API: `GET /api/cut`, `POST /api/cut/output`, `/api/cut/find`, `/api/cut/edit`, `/api/cut/set`, `/api/cut/render`, `POST /api/cut/transcribe`, `GET /api/cut/transcript?path=`.
 
 ## Footage player
 
-Click a clip in the Footage step to play it above the list.
+Click a clip in the Footage step to play it above the list. With more than one clip, each shows its place in the order: drag a clip onto another, or use its arrows, to move it, and the x removes one while the rest stay in order. The draft uses that order (`POST /api/footage/move`).
 
 ![The footage player: the take, the waveform with the playhead, and the transcript with the current word lit](studio/player-desktop.png)
 

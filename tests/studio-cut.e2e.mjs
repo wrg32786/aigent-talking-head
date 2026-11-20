@@ -8,6 +8,8 @@
 // - Reference: Pull script puts the reference's words in Scripts with [hook], [body] and [cta]
 // - cut points on the audio: a synthetic clip with tone "words" at known times, a breath and room tone, and a transcript
 //   that is off on purpose; every cut lands in the real gap, and the timeline shows where and why
+// - lines and bites: keep or retake, a bite in your order (arrows and drag), play it, save it as one file, the clean take,
+//   the agent's bites labelled; footage order by drag and arrows, remove in place
 // Needs Chrome and ffmpeg. Run: node tests/studio-cut.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
 import assert from 'assert';
 import { spawn, execFileSync } from 'child_process';
@@ -207,6 +209,54 @@ try {
     await pg.locator('#cut-candidates li[data-id="' + b.id + '"]').click({ position: { x: 6, y: 6 } });
     await pg.waitForFunction(() => /Late end/.test(document.querySelector('#cut-points').textContent));
     if (shots) await shot(pg, '#cut-timeline', 'cut-points.png');
+  });
+  await t('lines and bites: keep or retake a line, group lines into a bite in your order, play it, save it as one file, the clean take', async () => {
+    await pg.click('#lines-toggle'); await pg.waitForSelector('#lines-list li[data-line]');
+    assert.strictEqual((await pg.$$('#lines-list li[data-line]')).length, 3, 'three lines: "One two." "Three four." "Five six."');
+    await pg.click('#keep-l2'); await pg.waitForFunction(() => document.querySelector('#keep-l2').getAttribute('aria-checked') === 'false');
+    await pg.check('#lines-list li[data-line="l3"] input'); await pg.check('#lines-list li[data-line="l1"] input');
+    await pg.fill('#bite-name', 'Five then one'); await pg.click('#bite-add');
+    await pg.waitForSelector('#bites li.bite');
+    const order = () => pg.$$eval('#bites li.bite .bite-lines li', x => x.map(e => e.dataset.line));
+    assert.deepStrictEqual(await order(), ['l3', 'l1'], 'in the order you ticked them');
+    await pg.click('#bites li.bite .bite-lines li[data-line="l3"] [aria-label="Move line 3 down"]');
+    await pg.waitForFunction(() => document.querySelector('#bites li.bite .bite-lines li').dataset.line === 'l1'); assert.deepStrictEqual(await order(), ['l1', 'l3']);
+    await pg.dragAndDrop('#bites li.bite .bite-lines li[data-line="l3"]', '#bites li.bite .bite-lines li[data-line="l1"]');
+    await pg.waitForFunction(() => document.querySelector('#bites li.bite .bite-lines li').dataset.line === 'l3'); 
+    // play: the first line, then the second
+    await pg.click('#bites li.bite .bite-a button:has-text("Play")');
+    await pg.waitForFunction(() => { const v = document.querySelector('#player-video'); return v.currentTime > 6.1 && v.currentTime < 7.6; }, null, { timeout: 8000 });
+    await pg.waitForFunction(() => { const v = document.querySelector('#player-video'); return v.currentTime > 1.0 && v.currentTime < 2.5; }, null, { timeout: 8000 });
+    await pg.click('#bites li.bite .bite-a button:has-text("Stop")');
+    // save as one file: the two lines joined, nothing else
+    await pg.click('#bites li.bite .bite-a button:has-text("Save as one file")');
+    const v = await waitTask(); assert.strictEqual(v.task.status, 'done', JSON.stringify(v.task).slice(0, 600));
+    const L = (await api('/api/lines')).bites[0]; assert.ok(L.file, 'the joined file'); assert.ok(Math.abs(+probe(join(ROOT, L.file)).format.duration - L.seconds) < 0.25, `${L.seconds}`);
+    await pg.waitForSelector(`#bites li.bite a[href*="${L.id}.mp4"]`);
+    // the clean take leaves out line 2 (marked a retake)
+    await pg.click('#lines-clean'); await pg.waitForSelector('#bites li.bite.clean');
+    assert.deepStrictEqual(await pg.$$eval('#bites li.bite.clean .bite-lines li', x => x.map(e => e.dataset.line)), ['l1', 'l3']);
+    // the agent's picks show as its own
+    await api('/api/lines', { action: 'set', by: 'claude-code', bites: [{ name: 'Middle', lines: [2, 3], reason: 'The how-to' }], replace: false });
+    await pg.waitForSelector('#bites li.bite:has-text("By Claude")'); await pg.waitForSelector('#lines-by');
+  });
+  await t('footage order: drag a clip onto another or use the arrows; the draft follows that order', async () => {
+    await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' });
+    const names = () => pg.$$eval('#footage li[data-path]', x => x.map(e => e.dataset.path.split('/').pop()));
+    const n0 = await names(); assert.deepStrictEqual(n0, ['long-take.mp4', 'screen.mkv', 'synthetic-speech.mp4']);
+    await pg.dragAndDrop('#footage li[data-path$="synthetic-speech.mp4"]', '#footage li[data-path$="long-take.mp4"]');
+    await pg.waitForFunction(() => document.querySelector('#footage li[data-path]').dataset.path.endsWith('synthetic-speech.mp4'));
+    await pg.click('[aria-label="Move screen.mkv earlier"]');
+    await until(async () => (await names()).join() === 'synthetic-speech.mp4,screen.mkv,long-take.mp4');
+    assert.deepStrictEqual((await api('/api/state')).state.footage.map(f => f.split('/').pop()), ['synthetic-speech.mp4', 'screen.mkv', 'long-take.mp4']);
+    await pg.click('[aria-label="Remove screen.mkv"]'); await until(async () => (await names()).join() === 'synthetic-speech.mp4,long-take.mp4');
+    if (shots) {
+      // a screenshot of the lines on the long take, with two bites picked by the agent
+      await api('/api/cut/output', { source: take }); await api('/api/lines', { path: take, action: 'set', by: 'claude-code', clean: true, bites: [{ name: 'The morning setup', lines: [4, 5, 6, 7], reason: 'One clear how-to with a strong first line' }, { name: 'Hook: ten minutes', lines: [1, 9, 10, 11] }] });
+      await pg.goto(url + '/#step=cut', { waitUntil: 'networkidle' }); await pg.click('#lines-toggle'); await pg.waitForSelector('#bites li.bite');
+      await pg.check('#lines-list li[data-line="l13"] input'); await pg.check('#lines-list li[data-line="l14"] input'); await pg.$eval('#lines-list', e => { e.scrollTop = 0; });
+      await shot(pg, '#lines', 'lines-bites.png');
+    }
   });
   assert.deepStrictEqual(errs.filter(e => !/favicon/.test(e)), []);
   await pg.close();

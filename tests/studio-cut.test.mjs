@@ -2,6 +2,7 @@
 // from a transcript (best version, parts, clips, ad cuts) with times, scores and reasons, clean-up marks, a script
 // pulled from a transcript; then over the page API with a stand-in transcriber (tests/fixtures/fake-tx.mjs): chunked
 // transcription with progress, find, keep, drop, trim, add, reorder; the MCP tools set_output, get_cuts and set_cuts;
+// lines and bites (keep or retake, bites in your order, the clean take, get_lines and set_bites); footage order;
 // a local model (a fake OpenAI-compatible server) scoring cuts and adapting a script; your agent getting the adapt ask.
 // No ffmpeg or Python needed. Run: node tests/studio-cut.test.mjs   (npm run check runs it too)
 import assert from 'assert';
@@ -123,6 +124,21 @@ try {
     const c = CUT.snapCandidate({ id: 'c1', ranges: [[0.9, 2.1]] }, words, env, 8); assert.ok(c.snapped && c.cuts.length === 2 && c.seconds === CUT.lengthOf(c));
   });
 
+  await t('line hints: a retake needs most of the line said again soon after; a list sharing an opener is not one; fragments flagged', async () => {
+    const W = []; let x = 0; const say = txt => { for (const w of txt.split(' ')) { W.push([+x.toFixed(2), +(x + 0.3).toFixed(2), w]); x += 0.35; } x += 1.2; };
+    ['We know how to talk to the AI.', 'We know how to get it to execute things.', 'We know how to build systems.',
+      'The free product gives you the whole stack and a weekly call.', 'The free product gives you the whole stack, and a weekly call too.',
+      'Pricing is simple for everyone.', 'more.', 'Pricing is simple and fair for every single person who joins the community this year.', 'So, pricing is simple for everyone.'].forEach(say);
+    const H = CUT.lineHints(CUT.sentences(W));
+    assert.deepStrictEqual(H.slice(0, 3).map(h => h.hint), [null, null, null], 'a list that shares "we know how to" is not a retake');
+    assert.strictEqual(H[3].hint, 'retake'); assert.ok(/said again at/.test(H[3].why)); assert.strictEqual(H[4].hint, null, 'the last copy is the keeper');
+    assert.strictEqual(H[5].hint, 'retake', 'said again later as "So, pricing is simple for everyone."');
+    assert.strictEqual(H[6].hint, 'fragment'); assert.strictEqual(H[7].hint, null, 'a long line is never a retake of a much shorter one');
+    const L = CUT.lines(W, null, x); assert.ok(!CUT.keepOf(L[3], {}) && CUT.keepOf(L[3], { l4: true }) && !CUT.keepOf(L[6], {}));
+    assert.deepStrictEqual(CUT.biteRanges(['l3', 'l1', 'l2'], L), [[L[2].start, L[2].end], [L[0].start, L[1].end]]);
+    assert.deepStrictEqual(CUT.cleanTake(L, {}), ['l1', 'l2', 'l3', 'l5', 'l8', 'l9']);
+  });
+
   // ---------- over the page API ----------
   await req('/api/settings', { chat: { backend: 'keywords' } });
   await req('/api/state', { job: JOB });
@@ -174,6 +190,39 @@ try {
     assert.deepStrictEqual(s.candidates.map(x => x.id), ['c1', 'ad1']); assert.ok(!/\u2014/.test(s.candidates[0].reason));
     const c = (await req('/api/cut')).j; assert.ok(/claude/i.test(c.scoredBy), c.scoredBy);
     assert.ok((await req('/api/state')).j.state.chat.some(m => m.kind === 'action' && /picked 2 cuts/.test(m.text)));
+  });
+  await t('lines and bites: every line with keep or retake; bites in your order; the clean take; the agent picks over MCP and the page says so', async () => {
+    let L = (await req('/api/lines')).j; assert.ok(L.lines.length > 20 && L.lines[0].id === 'l1' && L.lines[0].text && L.lines[0].seconds > 0, JSON.stringify(L).slice(0, 300));
+    assert.ok(L.lines.every(l => l.keep) && L.kept === L.lines.length, 'one take with no repeats: every line kept');
+    let r = (await req('/api/lines', { keep: { l3: false } })).j.lines; assert.ok(!r.lines[2].keep && r.kept === L.lines.length - 1, 'mark a retake');
+    r = (await req('/api/lines', { keep: { 3: true } })).j.lines; assert.ok(r.lines[2].keep, 'and back, by number');
+    r = (await req('/api/lines', { action: 'add', name: 'Hook first', lines: ['l5', 'l1', 'l2'] })).j.lines; let b = r.bites.find(x => x.name === 'Hook first');
+    assert.deepStrictEqual(b.lines, ['l5', 'l1', 'l2']); const l = Object.fromEntries(r.lines.map(x => [x.id, x]));
+    assert.deepStrictEqual(b.ranges, [[l.l5.start, l.l5.end], [l.l1.start, l.l2.end]], 'in your order, neighbours joined'); assert.ok(b.by === 'you' && b.seconds > 3);
+    r = (await req('/api/lines', { id: b.id, action: 'update', lines: ['l1', 'l2', 'l5'], name: 'In order' })).j.lines; b = r.bites[0]; assert.ok(b.name === 'In order' && b.lines[0] === 'l1');
+    assert.strictEqual((await req('/api/lines', { action: 'add', lines: ['l9999'] })).status, 400, 'no such line');
+    r = (await req('/api/lines', { action: 'clean' })).j.lines; const take = r.bites[0];
+    assert.ok(take.id === 'take' && take.kind === 'full' && take.lines.length === r.kept && Math.abs(take.seconds - r.cleanTake.seconds) < 0.05, JSON.stringify(r.cleanTake));
+    assert.ok(take.lines.every((x, i) => i === 0 || +x.slice(1) > +take.lines[i - 1].slice(1)), 'the clean take is in the take order');
+    // the agent: get_lines, then set_bites by line numbers; replaces its picks, keeps nothing of yours unless replace is false
+    const names = (await client.listTools()).tools.map(x => x.name); for (const k of ['get_lines', 'set_bites', 'render_bites']) assert.ok(names.includes(k), k);
+    const g = await call('get_lines', {}); assert.ok(g.lines.length === L.lines.length && g.lines[2].n === 3 && 'hint' in g.lines[0] && g.bites.length === 2);
+    const sb = await call('set_bites', { bites: [{ name: 'The setup', lines: [3, 4], reason: 'Clear how-to — short' }, { name: 'Ad', lines: [7, 1] }], keep: { 2: false }, clean: true });
+    assert.deepStrictEqual(sb.bites.map(x => x.name), ['Clean take', 'The setup', 'Ad']); assert.deepStrictEqual(sb.bites[2].lines, ['l7', 'l1']);
+    r = (await req('/api/lines')).j; assert.ok(/claude/i.test(r.by) && r.bites[1].by === r.by && !/—/.test(r.bites[1].reason), r.by);
+    assert.ok(!r.lines[1].keep && !r.bites[0].lines.includes('l2'), 'the agent marked line 2 a retake, so the clean take leaves it out');
+    assert.ok((await req('/api/state')).j.state.chat.some(m => m.kind === 'action' && /picked 2 bites on the Cut step, plus the clean take/.test(m.text)));
+    r = (await req('/api/lines', { id: r.bites[2].id, action: 'move', dir: -1 })).j.lines; assert.strictEqual(r.bites[1].name, 'Ad');
+  });
+  await t('footage order: move a clip in place (by index or the whole order), remove one, the rest stay in order', async () => {
+    for (const nm of ['b.mp4', 'c.mp4']) assert.strictEqual((await req('/api/upload?kind=footage&name=' + nm, 'x', true)).status, 200);
+    let f = (await req('/api/state')).j.state.footage; const [a, b, c] = f; assert.strictEqual(f.length, 3);
+    f = (await req('/api/footage/move', { path: c, to: 0 })).j.state.footage; assert.deepStrictEqual(f, [c, a, b]);
+    f = (await req('/api/footage/move', { path: c, dir: 1 })).j.state.footage; assert.deepStrictEqual(f, [a, c, b]);
+    f = (await req('/api/footage/move', { order: [b, a, c] })).j.state.footage; assert.deepStrictEqual(f, [b, a, c]);
+    assert.strictEqual((await req('/api/footage/move', { order: [a, c] })).status, 400, 'the whole order or nothing');
+    f = (await req('/api/footage/remove', { path: b })).j.state.footage; assert.deepStrictEqual(f, [a, c]);
+    f = (await req('/api/footage/remove', { path: c })).j.state.footage; assert.deepStrictEqual(f, [a]);
   });
   await t('model scoring: a local model re-scores the candidates and the label names it', async () => {
     await req('/api/settings', { chat: { backend: 'local', baseUrl: `http://127.0.0.1:${llm.address().port}/v1`, model: 'fake-scorer' } });

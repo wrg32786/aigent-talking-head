@@ -32,6 +32,9 @@
 | `get_cuts` | reads the Cut step | the take, its length, the choice and summary, the transcript as numbered sentences with times, and the candidates with ranges, score, reason and keep; `find: true` runs the rules first |
 | `set_cuts` | replaces the candidates | your picks, `[{ kind, ranges: [[start, end]], score, reason, label }]`, labelled as scored by you |
 | `render_cuts` | renders | every kept candidate (or `ids`) as its own video, one after another |
+| `get_lines` | reads the Lines view | every line of the take with its number, times on the audio, length, text, keep and hint (retake or fragment, and why), the bites so far and the clean take |
+| `set_bites` | replaces the bites | your picks, `[{ name, lines: [line numbers in play order], reason }]`, plus `keep` per line, `clean: true` for the clean take, `replace: false` to add; labelled as picked by you |
+| `render_bites` | renders | every bite (or `ids`) as its own video; `file: true` only joins the lines into one plain file |
 | `setup_status` | reads what is installed | each dependency (Node packages, Python and requirements, ffmpeg, Chrome, the Whisper model, yt-dlp, instaloader, the effects pass, the humanizer skill, the Studio page) as ready or missing with its one fix, plus `forUser`, the plain-words list of what only the user can do. Run `npm run setup:all` for the rest |
 | `studio_takes` | reads or writes the session | takes filmed with Record now (file, thumbnail, seconds, status, kept); keep, unkeep or discard one |
 

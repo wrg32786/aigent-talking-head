@@ -5,6 +5,7 @@ import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';
 import { ProgressBar } from '@astryxdesign/core/ProgressBar';
 import { api, file, toast, cap1, fmtS, Icon, IconBtn } from './lib.jsx';
+import { Lines } from './Lines.jsx';
 import { Player, useMedia, useTranscript, Wave, clock } from './Player.jsx';
 
 const KIND = { full: 'Full edit', part: 'Parts', clip: 'Clips', ad: 'Ad cuts' };
@@ -179,6 +180,7 @@ export function Cut({ V, s, apply, go }) {
           : <div className="empty-art"><Icon n="grid" /><p>{tx && tx.status === 'running' ? 'Cuts show up here when the transcript is done.' : 'Find cuts to see the candidates, with their times, score and why.'}</p></div>}
       </div>
     </div>
+    {src && <Lines s={s} src={src} player={player} apply={apply} running={running} t={t} backend={V.env && V.env.backend} open={dur >= 180} key={'lines-' + src} />}
     {src && dur > 0 && (cut.candidates.length > 0 || tr) && <Timeline cut={cut} peaks={peaks} marks={(tr && tr.marks) || []} now={now} dur={dur} sel={sel} setSel={setSel} onSeek={seek} onEdit={edit} onAdd={add} />}
   </section>;
 }

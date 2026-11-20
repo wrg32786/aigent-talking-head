@@ -350,3 +350,42 @@ export function snapCandidate(c, words, env, dur, o) {
   const s = snapRanges(c.ranges, words, env, dur, o); if (!s.cuts) return { ...c, snapped: false };
   return { ...c, ranges: s.ranges, seconds: lengthOf({ ranges: s.ranges }), cuts: s.cuts, snapped: true };
 }
+
+// ---------- the Lines view: every line of a long take, keep or retake, grouped into named bites ----------
+const OPENER = /^(so|and|but|ok(ay)?|now|um+|uh+|well|like|you know|i mean|we know how to|i think|the thing is)\b[\s,]*/i;
+const contentWords = t => t.toLowerCase().replace(/[^a-z0-9' ]+/g, ' ').split(/\s+/).filter(w => w && !STOP.has(w));
+// a line is a likely retake only when a later line soon after says most of it again (not one shared phrase), and the
+// later one is not much shorter; very short lines and lines cut off mid-thought are flagged as fragments instead
+export function lineHints(S, { within = 120, overlap = 0.7 } = {}) {
+  return S.map((s, i) => {
+    const secs = s.end - s.start, tail = s.text.trim();
+    if (secs < 0.6 || (s.words <= 2 && !END.test(tail))) return { hint: 'fragment', why: secs < 0.6 ? 'under 0.6 s' : 'a few words, cut off' };
+    const mine = contentWords(s.text.replace(OPENER, '')); if (mine.length < 3) return { hint: null };
+    for (let j = i + 1; j < S.length && S[j].start - s.end <= within; j++) {
+      const o = S[j], theirs = new Set(contentWords(o.text.replace(OPENER, '')));
+      if (theirs.size < mine.length * 0.6 || (o.end - o.start) < secs * 0.6) continue;
+      const shared = mine.filter(w => theirs.has(w)).length / mine.length;
+      if (shared >= overlap) return { hint: 'retake', of: j, why: `said again at ${clock(o.start)} (${Math.round(shared * 100)}% the same words)` };
+    }
+    return { hint: null };
+  });
+}
+// lines with ids l1, l2 ... (stable for a transcript), times snapped to the audio when there is an envelope
+export function lines(words, env, dur) {
+  const S = sentences(words), H = lineHints(S);
+  return S.map((s, i) => {
+    let a = s.start, b = s.end;
+    if (env) { const r = snapRange([a, b], words, env, dur); [a, b] = r.range; }
+    return { id: 'l' + (i + 1), n: i + 1, start: +a.toFixed(2), end: +b.toFixed(2), seconds: +(b - a).toFixed(2), text: s.text, hint: H[i].hint, why: H[i].why || null };
+  });
+}
+// a bite's ranges in its own order (lines can be moved), back-to-back neighbours in order joined into one range
+export function biteRanges(ids, L) {
+  const by = Object.fromEntries(L.map(l => [l.id, l])), out = [];
+  for (const id of ids) { const l = by[id]; if (!l) continue; const last = out[out.length - 1];
+    if (last && last.n + 1 === l.n) { last.r[1] = l.end; last.n = l.n; } else out.push({ n: l.n, r: [l.start, l.end] }); }
+  return out.map(x => x.r);
+}
+// one clean take: every kept line in the take's order
+export const cleanTake = (L, keep) => L.filter(l => keepOf(l, keep)).map(l => l.id);
+export const keepOf = (l, keep) => (keep && l.id in keep ? !!keep[l.id] : l.hint !== 'retake' && l.hint !== 'fragment');

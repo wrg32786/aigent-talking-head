@@ -86,7 +86,7 @@ export function defaultState() {
   return { format: 'aigent-studio', version: 1, rev: 0, job: null, footage: [], clips: null,
     reference: { file: null, url: null, mode: 'influence', status: 'none', out: null, extracted: null, applied: false, queue: [], active: null },
     pack: null, picks: {}, music: { bed: 'auto', energy: 'auto', upload: null }, sound: { sfx: 'on', cap: 'on' }, pace: { tighten: null, punch: 'on' },
-    export: 'reels', chat: [], task: null, outputs: [], takes: [], output: null, cut: null, tx: {} };
+    export: 'reels', chat: [], task: null, outputs: [], takes: [], output: null, cut: null, tx: {}, lines: {} };
 }
 export function load() {
   try { const s = JSON.parse(readFileSync(statePath(), 'utf8')); return { ...defaultState(), ...s, reference: { ...defaultState().reference, ...(s.reference || {}) } }; }

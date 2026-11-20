@@ -307,8 +307,69 @@ async function setCuts(b) {
   const by = CH.prettyName(String(b.by || CH.presence().client || 'your agent'));
   return update(x => { x.cut = { source: rel, summary: CUT.summary(outputOf(x), dur), candidates: list, scoredBy: by, pending: null, at: Date.now() }; C.applyPatch(x, { reply: `${by} picked ${list.length} cut${list.length > 1 ? 's' : ''} on the Cut step.`, from: 'assistant', kind: 'action' }); });
 }
-function cutSteps(s, ids) {
-  const c = s.cut; if (!s.job) throw Object.assign(new Error('name the job first'), { code: 400 });
+// ---------- the Lines view: a long take as lines, keep or retake, grouped into named bites (kit/studio/cut.mjs lines) ----------
+const LINES = new Map(); // source -> { key, lines }, the snapped lines of a transcript
+async function linesOf(rel) {
+  const t = MEDIA.transcript(rel); if (!t) return null;
+  const key = `${t.words.length}:${t.words.length ? t.words[t.words.length - 1][1] : 0}`, hit = LINES.get(rel); if (hit && hit.key === key) return hit.lines;
+  const L = CUT.lines(t.words, await energyOf(rel), durOf(rel)); LINES.set(rel, { key, lines: L }); return L;
+}
+const linesState = (s, rel) => ((s.lines || {})[rel]) || { keep: {}, bites: [], seq: 0, by: null };
+const biteOut = (s, rel, b, L) => { const ranges = CUT.biteRanges(b.lines, L); const by = Object.fromEntries(L.map(l => [l.id, l]));
+  return { ...b, lines: b.lines.filter(id => by[id]), ranges, seconds: +ranges.reduce((a, [x, y]) => a + y - x, 0).toFixed(2), text: b.lines.map(id => by[id] && by[id].text).filter(Boolean).join(' ').slice(0, 220),
+    job: s.job ? subJob(s.job, b.id) : null, outputs: s.job ? C.outputsOf({ job: subJob(s.job, b.id) }) : [], file: s.job && existsSync(join(ROOT, `inbox/studio/${s.job}/cuts/${b.id}.mp4`)) ? `inbox/studio/${s.job}/cuts/${b.id}.mp4` : null }; };
+async function linesView(s, path) {
+  const rel = cutSource(s, path); if (!rel) return { source: null, lines: null, bites: [] };
+  const L = await linesOf(rel), ls = linesState(s, rel), tx = (s.tx || {})[rel] || (L ? { status: 'ready' } : null);
+  if (!L) return { source: rel, seconds: durOf(rel), tx, lines: null, bites: [] };
+  const lines = L.map(l => ({ ...l, keep: CUT.keepOf(l, ls.keep) })), take = CUT.cleanTake(L, ls.keep);
+  return { source: rel, seconds: durOf(rel), tx, lines, bites: ls.bites.map(b => biteOut(s, rel, b, L)), by: ls.by,
+    cleanTake: { lines: take.length, seconds: +CUT.biteRanges(take, L).reduce((a, [x, y]) => a + y - x, 0).toFixed(2) }, kept: lines.filter(l => l.keep).length };
+}
+const bad = m => Object.assign(new Error(m), { code: 400 });
+// keep or retake per line, and the bites: add, update (name, lines in order), remove, move, the clean take, or set them all (the agent)
+async function editLines(b) {
+  const s0 = C.load(), rel = cutSource(s0, b.path || b.source); if (!rel) throw bad('add footage first');
+  const L = await linesOf(rel); if (!L) throw bad('transcribe the footage first (Find cuts or Transcribe on the Cut step)');
+  const ids = new Set(L.map(l => l.id)), idOf = v => (typeof v === 'number' || /^\d+$/.test(String(v)) ? 'l' + (+v) : String(v));
+  const lineList = v => { if (!Array.isArray(v) || !v.length) throw bad('lines: [line ids or numbers], in the order you want them'); const out = v.map(idOf); const miss = out.filter(x => !ids.has(x)); if (miss.length) throw bad(`no line ${miss.join(', ')}`); return [...new Set(out)]; };
+  const by = b.by ? CH.prettyName(String(b.by)) : null;
+  let note = null;
+  const s = update(x => {
+    x.lines = x.lines || {}; const ls = x.lines[rel] = linesState(x, rel);
+    if (b.keep && typeof b.keep === 'object') for (const [k, v] of Object.entries(b.keep)) { const id = idOf(k); if (!ids.has(id)) throw bad(`no line ${k}`); ls.keep[id] = !!v; }
+    const name = (v, d) => String(v || d).replace(/\u2014/g, ', ').slice(0, 60);
+    if (b.action === 'add') { ls.seq++; ls.bites.push({ id: 'b' + ls.seq, name: name(b.name, `Bite ${ls.seq}`), lines: lineList(b.lines), by: by || 'you', kind: 'clip' }); }
+    else if (b.action === 'clean') { const take = CUT.cleanTake(L, ls.keep); if (!take.length) throw bad('keep at least one line');
+      const it = { id: 'take', name: 'Clean take', lines: take, by: by || 'you', kind: 'full' }, k = ls.bites.findIndex(y => y.id === 'take'); if (k >= 0) ls.bites[k] = it; else ls.bites.unshift(it); }
+    else if (b.action === 'set') { if (!Array.isArray(b.bites)) throw bad('bites: [{ name, lines: [line numbers in order] }]');
+      const keepTake = ls.bites.filter(y => y.id === 'take' && b.replace === false);
+      const fresh = b.bites.slice(0, 30).map(y => { ls.seq++; return { id: 'b' + ls.seq, name: name(y.name, `Bite ${ls.seq}`), lines: lineList(y.lines), by: by || 'your agent', kind: 'clip', reason: y.reason ? String(y.reason).replace(/\u2014/g, ', ').slice(0, 160) : null }; });
+      ls.bites = b.replace === false ? ls.bites.concat(fresh) : keepTake.concat(fresh); ls.by = by;
+      if (b.clean) { const take = CUT.cleanTake(L, ls.keep); if (take.length) { ls.bites = ls.bites.filter(y => y.id !== 'take'); ls.bites.unshift({ id: 'take', name: 'Clean take', lines: take, by: by || 'your agent', kind: 'full' }); } }
+      note = `${by || 'Your agent'} picked ${fresh.length} bite${fresh.length === 1 ? '' : 's'} on the Cut step${b.clean ? ', plus the clean take' : ''}.`; }
+    else if (b.action) {
+      const k = ls.bites.findIndex(y => y.id === b.id); if (k < 0) throw Object.assign(new Error(`no bite ${b.id}`), { code: 404 }); const it = ls.bites[k];
+      if (b.action === 'update') { if (b.name != null) it.name = name(b.name, it.name); if (b.lines) it.lines = lineList(b.lines); }
+      else if (b.action === 'remove') ls.bites.splice(k, 1);
+      else if (b.action === 'move') { const j = Math.max(0, Math.min(ls.bites.length - 1, k + (b.by > 0 || b.dir > 0 ? 1 : -1))); ls.bites.splice(k, 1); ls.bites.splice(j, 0, it); }
+      else throw bad('action: add, update, remove, move, clean or set');
+    }
+    if (note) C.applyPatch(x, { reply: note, from: 'assistant', kind: 'action' });
+  });
+  return { s, view: await linesView(s, rel) };
+}
+// bites as Cut candidates for the batch render: a bite is a clip, the clean take follows the Output choice
+async function biteSteps(s, ids, path) {
+  const rel = cutSource(s, path); const L = rel && await linesOf(rel); if (!L) throw bad('transcribe the footage first');
+  const ls = linesState(s, rel), pick = ls.bites.filter(b => (ids && ids.length ? ids.includes(b.id) : true));
+  if (!pick.length) throw bad('make a bite first');
+  const list = pick.map((b, k) => ({ id: b.id, kind: b.kind === 'full' ? 'full' : 'clip', ranges: CUT.biteRanges(b.lines, L), keep: true, order: k })).filter(x => x.ranges.length);
+  return cutSteps(s, null, { source: rel, candidates: list });
+}
+
+function cutSteps(s, ids, over) {
+  const c = over || s.cut; if (!s.job) throw Object.assign(new Error('name the job first'), { code: 400 });
   if (!c || !c.candidates.length) throw Object.assign(new Error('find cuts first'), { code: 400 });
   const o = outputOf(s), src = c.source;
   const keep = c.candidates.filter(x => (ids ? ids.includes(x.id) : x.keep)).sort((a, b) => a.order - b.order);
@@ -606,6 +667,24 @@ async function api(req, res, u) {
     const b = await readBody(req), miss = needFor('render'); const s = C.load(); const r = cutSteps(s, Array.isArray(b.ids) ? b.ids : null); if (miss) return json(res, 400, { error: miss, setup: true });
     runTask('cuts', () => r.steps, () => ({ cuts: r.plan.map(x => ({ ...x, outputs: C.outputsOf({ job: x.job }) })), copiedTo: copyRenders(r.plan.flatMap(x => C.outputsOf({ job: x.job }).slice(0, 1))) }));
     return json(res, 202, { plan: r.plan, ...view(C.load()) });
+  }
+  if (p === '/api/lines' && M === 'GET') return json(res, 200, await linesView(C.load(), u.searchParams.get('path')));
+  if (p === '/api/lines' && M === 'POST') { const b = await readBody(req); const r = await editLines(b); return json(res, 200, { lines: r.view, ...view(r.s) }); }
+  if (p === '/api/lines/render' && M === 'POST') {
+    const b = await readBody(req), miss = needFor('render'), s = C.load(); const r = await biteSteps(s, Array.isArray(b.ids) ? b.ids : null, b.path); if (miss) return json(res, 400, { error: miss, setup: true });
+    // only: 'file' joins the lines into one file (no edit), for the clean take as a plain video
+    const steps = b.only === 'file' ? r.steps.filter(x => x[1][0] === 'extract') : r.steps;
+    runTask('bites', () => steps, () => ({ bites: r.plan.map(x => ({ ...x, outputs: C.outputsOf({ job: x.job }) })), copiedTo: b.only === 'file' ? [] : copyRenders(r.plan.flatMap(x => C.outputsOf({ job: x.job }).slice(0, 1))) }));
+    return json(res, 202, { plan: r.plan, ...view(C.load()) });
+  }
+  if (p === '/api/footage/move' && M === 'POST') {
+    const b = await readBody(req);
+    const s = update(st => {
+      if (Array.isArray(b.order)) { const same = b.order.length === st.footage.length && b.order.every(f => st.footage.includes(f)); if (!same) throw bad('order: every footage path once'); st.footage = b.order.slice(); return; }
+      const k = st.footage.indexOf(b.path); if (k < 0) throw Object.assign(new Error('not in the footage'), { code: 404 });
+      const j = Math.max(0, Math.min(st.footage.length - 1, b.to != null ? +b.to : k + (b.dir > 0 ? 1 : -1))); const [f] = st.footage.splice(k, 1); st.footage.splice(j, 0, f);
+    });
+    return json(res, 200, view(s));
   }
   if (p === '/api/reference/script' && M === 'POST') {
     const s = C.load(); if (!s.job) return json(res, 400, { error: 'name the job first' });
