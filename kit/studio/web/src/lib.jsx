@@ -14,7 +14,7 @@ export async function api(path, body, method) {
   return j;
 }
 
-export const STEPS = ['footage', 'reference', 'style', 'render'];
+export const STEPS = ['footage', 'cut', 'reference', 'style', 'render'];
 export const SITE = { youtube: 'YouTube', 'youtube-shorts': 'Shorts', tiktok: 'TikTok', x: 'X', vimeo: 'Vimeo', instagram: 'Instagram', file: 'File', other: 'Link' };
 export const STATUS = { queued: 'Waiting', downloading: 'Downloading', tearing: 'Breaking down', ready: 'Ready', failed: 'Failed', cancelled: 'Cancelled' };
 export const KIND_NAME = { transition: 'transition', entrance: 'title entrance', captionEntrance: 'caption entrance', captionStyle: 'caption style', graphic: 'graphic', effect: 'effect', finish: 'finish', font: 'font pairing', look: 'look', theme: 'theme', titleLayer: 'title layer', bed: 'music bed', sfx: 'sound', beatSync: 'beat sync', editing: 'editing' };
@@ -58,6 +58,9 @@ const P = {
   dup: <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M4 16V5a1 1 0 0 1 1-1h11" /></>,
   plug: <path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4" />,
   minus: <path d="M5 12h14" />,
+  up: <path d="M5 15l7-7 7 7" />,
+  down: <path d="M5 9l7 7 7-7" />,
+  grip: <path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" strokeWidth="3" strokeLinecap="round" />,
   popout: <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />,
   spark: <path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" />,
 };

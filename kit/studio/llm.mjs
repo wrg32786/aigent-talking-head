@@ -83,3 +83,27 @@ export async function chat(text, state, cat, env = process.env, chatSettings = n
     return { ...parseReply(out), provider: p.name, model: p.model };
   } finally { clearTimeout(timer); }
 }
+
+// one plain request to the picked backend (system + user text in, text out), for jobs like scoring cuts and
+// adapting a script; the same keys and servers as the chat
+export async function complete(system, user, env = process.env, chatSettings = null, { maxTokens = 2000, json = true } = {}) {
+  const p = provider(env, chatSettings);
+  if (!p) throw new Error('no model backend: set ANTHROPIC_API_KEY or OPENAI_API_KEY, or pick a local model in Studio settings');
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), p.name === 'local' ? 300e3 : 90e3);
+  try {
+    if (p.name === 'anthropic') {
+      const r = await fetch(p.base + '/v1/messages', { method: 'POST', signal: ctl.signal, headers: { 'content-type': 'application/json', 'x-api-key': p.key, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: p.model, max_tokens: maxTokens, system, messages: [{ role: 'user', content: user }] }) });
+      const j = await r.json(); if (!r.ok) throw new Error(`anthropic ${r.status}: ${(j.error && j.error.message) || 'request failed'}`);
+      return { text: (j.content || []).map(c => c.text || '').join(''), provider: p.name, model: p.model };
+    }
+    let model = p.model;
+    if (!model && p.name === 'local') { const ms = await models(p.base, p.key).catch(() => []); model = ms[0]; if (!model) throw new Error(`no model found at ${p.base}`); }
+    const send = fmt => fetch(p.base + '/chat/completions', { method: 'POST', signal: ctl.signal, headers: { 'content-type': 'application/json', ...(p.key ? { authorization: 'Bearer ' + p.key } : {}) },
+      body: JSON.stringify({ model, ...(fmt ? { response_format: { type: 'json_object' } } : {}), messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }) });
+    let r = await send(json);
+    if (!r.ok && json && p.name === 'local' && r.status >= 400 && r.status < 500) r = await send(false);
+    const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(`${p.name} ${r.status}: ${(j.error && (j.error.message || j.error)) || 'request failed'}`);
+    return { text: (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '', provider: p.name, model };
+  } finally { clearTimeout(timer); }
+}

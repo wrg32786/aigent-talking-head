@@ -100,6 +100,13 @@ try {
     run(py, [join(KIT, 'tx.py'), 'seg1.mp4'], work, { TX_MODEL: 'tiny.en' });
     if (!existsSync(join(work, 'words.json'))) fail('tx.py wrote no words.json');
   });
+  if (whisper) step('studio/tx_chunks.py (chunked, resumable, tiny.en)', () => {
+    const py = process.env.PYTHON || (process.platform === 'win32' ? 'py' : 'python3');
+    run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=330:duration=7:sample_rate=48000', '-f', 'lavfi', '-i', 'color=c=gray:s=320x240:d=7', '-shortest', '-c:a', 'aac', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', 'long.mp4'], work);
+    const out = execFileSync(py, [join(KIT, 'studio', 'tx_chunks.py'), 'long.mp4', 'long.tx.json', '--chunk', '3'], { cwd: work, encoding: 'utf8', env: { ...process.env, TX_MODEL: 'tiny.en' } });
+    const tx = JSON.parse(readFileSync(join(work, 'long.tx.json'), 'utf8'));
+    if (tx.total !== 3 || tx.done.length !== 3 || !/progress 3 3/.test(out) || !Array.isArray(tx.words)) fail('tx_chunks.py: ' + out.slice(-300) + JSON.stringify(tx).slice(0, 300));
+  });
   // A tone has no speech, so word timings are faked in tx.py's format either way.
   writeFileSync(join(build, 'words.json'), JSON.stringify({ 'seg1.mp4': [[0.2, 0.5, 'This'], [0.5, 0.7, 'is'], [0.7, 0.9, 'a'], [0.9, 1.3, 'smoke'], [1.3, 1.7, 'test.'], [1.9, 2.2, 'Every'], [2.2, 2.6, 'seam'], [2.6, 2.9, 'glitches.']] }));
   writeFileSync(join(build, 'cut.json'), JSON.stringify({
@@ -920,7 +927,7 @@ try {
     await cl.connect(new StdioClientTransport({ command: node, args: [join(KIT, 'mcp.mjs')], cwd: dirname(KIT), stderr: 'ignore', env: { ...process.env, STUDIO_DIR: studioDir } }));
     try {
       const names = (await cl.listTools()).tools.map(t => t.name).join(',');
-      if (names !== 'menu,list_effects,list_packs,get_pack,draft,explain,set_locks,plan,validate,render,verify,studio_get_state,studio_set_selections,studio_run,studio_start,studio_wait_for_message,studio_get_pending,studio_reply,studio_add_reference_url,studio_get_reference_teardown,studio_settings,studio_takes,list_scripts,get_script,write_script,setup_status') fail('MCP tools: ' + names);
+      if (names !== 'menu,list_effects,list_packs,get_pack,draft,explain,set_locks,plan,validate,render,verify,studio_get_state,studio_set_selections,studio_run,studio_start,studio_wait_for_message,studio_get_pending,studio_reply,studio_add_reference_url,studio_get_reference_teardown,studio_settings,studio_takes,list_scripts,get_script,write_script,set_output,get_cuts,set_cuts,render_cuts,get_lines,set_bites,render_bites,setup_status') fail('MCP tools: ' + names);
       const lp = await cl.callTool({ name: 'list_packs', arguments: {} });
       if (lp.isError || !lp.structuredContent || !lp.structuredContent.packs.some(p => p.name === 'magazine')) fail('MCP list_packs: ' + JSON.stringify(lp).slice(0, 300));
       const gp = await cl.callTool({ name: 'get_pack', arguments: { pack: 'cinematic' } });
@@ -989,6 +996,7 @@ try {
   }
   step('Studio Record now in Chrome with a fake camera and mic (tests/studio-record.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-record.e2e.mjs')], dirname(KIT)); });
   step('Studio Connect agent, teleprompter speed and pop-out, footage from a link, in Chrome (tests/studio-connect.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-connect.e2e.mjs')], dirname(KIT)); });
+  step('Studio Cut step in Chrome: footage player, output picker, cut timeline, batch render, pull script (tests/studio-cut.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-cut.e2e.mjs')], dirname(KIT)); });
   step('Studio review tools in Chrome: what to swap, show original, comments, clean-up pass, edit receipt (tests/studio-review.e2e.mjs)', () => { run(node, [join(dirname(KIT), 'tests', 'studio-review.e2e.mjs')], dirname(KIT)); });
   step('check.mjs flags em dashes and banned phrases in captions', () => {
     const b = join(work, 'jobs', 'muse', 'build');
