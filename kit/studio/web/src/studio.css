@@ -817,3 +817,9 @@ ol.conn-steps > li::before { content: counter(cs); position: absolute; left: 0; 
 .bite-h .bite-n { padding: 6px 8px; }
 .bite-h .bite-n { flex: 1 1 0; width: 100%; min-width: 80px; }
 .bite-m { display: flex; align-items: center; gap: 8px; margin-top: 6px; } .bite-m .fine, .bite > .fine { margin: 0; } .bite > p.fine { margin-top: 4px; }
+/* Words and brands */
+#glossary { width: 100%; font: inherit; resize: vertical; }
+.brand-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.brand-list li { display: flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px; border: 1px solid var(--border); border-radius: 999px; }
+.brand-list img { background: #fff; border-radius: 4px; padding: 2px; max-width: 90px; object-fit: contain; }
+.tick.as-is { margin-top: 10px; } .tick.as-is .fine { margin: 0; }

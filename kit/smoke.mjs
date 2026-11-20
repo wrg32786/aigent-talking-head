@@ -598,6 +598,10 @@ try {
     const hk = JSON.parse(readFileSync(join(mt, 'clips-hook', 'clips.json'), 'utf8')).clips.filter(c => c.status.startsWith('keep'))[0];
     if (hk.take !== 'take2.mp4') fail('--hook did not pick the hook take: ' + hk.take);
   });
+  step('clip.py cut rules (tests/test_clip.py): first word kept, no mid-word end, short pieces joined, file order, already-cut files, retakes, fragments, list first, paged sheet', () => {
+    const py = process.env.PYTHON || (process.platform === 'win32' ? 'py' : 'python3');
+    run(py, [join(dirname(KIT), 'tests', 'test_clip.py')], work);
+  });
   step('reel.cjs --look muse: punch, big punches, titles (7 entrances, no repeats), pills, few sounds, mask, render', () => {
     const clips = join(work, 'clips-muse'); mkdirSync(clips);
     const lines = ['Stop editing reels by hand.', 'Record one take on your phone.', 'Drop the file in the inbox.', 'Ask your agent for the reel.'];

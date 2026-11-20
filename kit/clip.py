@@ -3,14 +3,21 @@
 #   python3 kit/clip.py raw.mp4 [--out clips] [--model small.en] [--vertical] [--cropx 0.5] [--min 3.0]
 #   (default small.en: fast on a CPU, ~460 MB once. --model large-v3 is the most accurate and slow, a ~3 GB download once)
 #   python3 kit/clip.py take1.mov take2.mov take3.mov --out clips --vertical [--hook take3.mov]   (several takes)
+#   python3 kit/clip.py a.mp4 b.mp4 --whole      (clips that are already cut: one clip per file, in the order given)
+#   --order auto|files|script (several files: "script" = takes of one script, best take per sentence; "files" = different
+#   clips, kept in the order given; auto picks from how many sentences the files share)
+#   --encoder auto|x264|nvenc|qsv|amf|videotoolbox  --jobs N (clips encoded at once; 0 = about half the CPU cores)
 #
 # What it does
 #   1. Transcribes each file with word timestamps (faster-whisper). --words words.json reuses word times you already
 #      have (kit/tx.py format, keyed by file name) and skips Whisper.
 #   2. Splits it into sentences, then merges short sentences with a neighbour until every clip is at least --min s
 #      (Will 10-12: no clips of about 3 s or less; they read as jumpy).
-#   3. Marks retakes inside a file: when a later sentence repeats a 4-word phrase, the earlier one is the flubbed take.
-#      Its status is "retake" and the later one is "keep". Nothing is deleted; you choose.
+#   3. Marks retakes inside a file: when a later sentence (within 150 s) says most of the same thing, the earlier one is
+#      the flubbed take. "Most" means at least half of the earlier sentence's 4-word phrases come back (phrases made
+#      of common words such as "we know how to" do not count), or 60% the same words in order; a long line is never a
+#      retake of a much shorter one. Its status is "retake" and the later one is "keep". Nothing is deleted; you choose.
+#      A line under 1 s on its own, or one that ends on a cut-off word ("thi-"), is marked "fragment".
 #   3b. Several takes: the same sentence said in more than one file (a shared 4-word phrase, or 60% the same words in
 #      order) is one "slot". Every candidate is scored
 #      (Whisper word confidence, complete wording, no repeated words or fillers like "um"), the best is "keep" and the
@@ -19,14 +26,23 @@
 #      --hook <file> picks the first sentence from that take when it has one (film the hook on your most extreme
 #      angle and name that file). Each clip records its "take" (source file).
 #   4. Sets each clip's ends from the AUDIO, not the word stamps. The head starts in the silence just before the
-#      first word (a few frames of lead, never dead air, never mid-sentence). The tail ends when the voice stops
-#      plus a short hold, never running into the next line.
-#   5. Exports clips/clip-NNN.mp4 (H.264 CRF 16, voice normalised to -16 LUFS; with --vertical, center-cropped to
-#      1080x1920 at --cropx), plus clips.json and clips.md (id, take, source in/out, duration, text, status), plus
-#      clips-sheet.png (first and last frame of every clip) for the eye check.
+#      first word (a few frames of lead, never dead air, never mid-sentence, never after the first word starts). The
+#      tail ends when the voice stops (level AND the band above 4 kHz, so a soft "s" or a trailing vowel is not read as
+#      silence) plus --hold (0.35 s), never running into the next line's first word. A piece under 0.5 s (often the
+#      end of a word Whisper wrote twice, "more.") is joined to the line before it.
+#      Several files that are already cut (each starts and ends on speech and runs under a minute) are used whole.
+#   5. Writes clips.json and clips.md (id, take, source in/out, duration, text, status) as soon as the lines are known,
+#      with "pending": true until the clips exist, so picking can start while they encode. Then exports
+#      clips/clip-NNN.mp4 (H.264 CRF 16, voice normalised to -16 LUFS; with --vertical, center-cropped to 1080x1920 at
+#      --cropx), several at once and on a hardware encoder when one works, printing "progress clips N/M" lines. Last,
+#      clips-sheet.png (first and last frame of every clip, 20 clips a page: clips-sheet-2.png and on for more).
 #
 # Then pick clips into cut.json: {"file":"../clips/clip-004.mp4","in":0,"out":<duration>} and assemble.
 import sys, os, json, re, subprocess, argparse
+try:
+    sys.stdout.reconfigure(line_buffering=True)   # progress lines reach Studio as they happen
+except Exception:
+    pass
 
 ap = argparse.ArgumentParser()
 ap.add_argument("src", nargs="+")
@@ -38,13 +54,23 @@ ap.add_argument("--vertical", action="store_true")
 ap.add_argument("--cropx", type=float, default=0.5)
 ap.add_argument("--min", type=float, default=3.0)
 ap.add_argument("--lead", type=float, default=0.12)
-ap.add_argument("--hold", type=float, default=0.15)
+ap.add_argument("--hold", type=float, default=0.35)
+ap.add_argument("--whole", action="store_true", help="each file is already one clip: no splitting, no retakes, order kept")
+ap.add_argument("--order", choices=["auto", "files", "script"], default="auto")
+ap.add_argument("--encoder", default=os.environ.get("CLIP_ENCODER", "auto"))
+ap.add_argument("--jobs", type=int, default=0)
 a = ap.parse_args()
 os.makedirs(a.out, exist_ok=True)
 MULTI = len(a.src) > 1
 
 def run(cmd):
     return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+
+def silences(src, dur, af):
+    r = run(["ffmpeg", "-v", "info", "-i", src, "-vn", "-af", af, "-f", "null", "-"])
+    starts = [float(x) for x in re.findall(r"silence_start: (-?[0-9.]+)", r.stderr)]
+    ends = [float(x) for x in re.findall(r"silence_end: ([0-9.]+)", r.stderr)]
+    return list(zip(starts, ends + [dur] * (len(starts) - len(ends))))
 
 # 1. words, per take
 model = None
@@ -80,6 +106,33 @@ def words_of(src):
 norm = lambda s: [re.sub(r"[^a-z0-9']", "", x["w"].lower()) for x in s]
 grams = lambda ws: {" ".join(ws[k:k + 4]) for k in range(max(0, len(ws) - 3))}
 FILLERS = {"um", "uh", "erm", "er", "uhm", "hmm", "like"}
+# common words: a 4-word phrase with three or more of these ("we know how to", "and then you can") says nothing about
+# whether two lines are the same line, so it never makes a retake
+COMMON = set("""a an the and or but so if then than that this these those it its it's is are was were be been am do does did
+done have has had i i'm i've we we're you you're your they he she my our me us to of in on at for with from by as
+just know how what when where who why can could will would should not don't no yes all get got go going like um uh
+yeah okay ok right well really very there here about out up one thing things way""".split())
+def strong(ws):
+    return {g for g in grams(ws) if sum(1 for x in g.split() if x in COMMON) < 3}
+from difflib import SequenceMatcher
+def same_line(x, y):
+    # does line y say most of line x? Half of x's 4-word phrases (not the common-word ones) come back in y, or 60% the
+    # same words in order with most of x's own words ("execute", "systems") in y too
+    gx = strong(x)
+    if gx and len(gx & strong(y)) / len(gx) >= 0.5:
+        return True
+    own = [w for w in x if w and w not in COMMON]
+    return (min(len(x), len(y)) >= 4 and bool(own) and sum(1 for w in own if w in y) / len(own) >= 0.6
+            and SequenceMatcher(None, x, y).ratio() >= 0.6)
+def retake_pair(x, y):
+    # is earlier line x a flubbed try of later line y? Most of x has to come back in y, and x is not much longer than y.
+    if len(x) < 4 or len(x) > 1.5 * len(y) + 3:
+        return False
+    return same_line(x, y)
+def precut(words, dur):
+    # looks already cut: starts and ends on speech and runs under a minute (used whole when several different clips
+    # are loaded, see MODE below)
+    return dur <= 60 and words[0]["s"] <= 0.6 and dur - words[-1]["e"] <= 1.0
 
 takes = []
 for ti, src in enumerate(a.src):
@@ -88,15 +141,16 @@ for ti, src in enumerate(a.src):
     if not words:
         print(f"{src}: no speech found, skipped"); continue
     # silence map of the whole file (the audio decides clip ends)
-    r = run(["ffmpeg", "-v", "info", "-i", src, "-vn", "-af", "silencedetect=n=-35dB:d=0.15", "-f", "null", "-"])
-    starts = [float(x) for x in re.findall(r"silence_start: ([0-9.]+)", r.stderr)]
-    ends = [float(x) for x in re.findall(r"silence_end: ([0-9.]+)", r.stderr)]
-    sil = list(zip(starts, ends + [dur] * (len(starts) - len(ends))))
+    sil = silences(src, dur, "silencedetect=n=-35dB:d=0.15")
+    # the band above 4 kHz: an "s", "f" or "th" at the end of a word sits under the level threshold but not here
+    hf = silences(src, dur, "highpass=f=4000,highpass=f=4000,silencedetect=n=-50dB:d=0.12")
     # 2. sentences
     sents, cur = [], []
-    for w in words:
+    for wi, w in enumerate(words):
         cur.append(w)
-        if re.search(r"[.?!]$", w["w"]):
+        # a sentence ends on . ? ! or on a cut-off word ("thi-", "so...") with a pause after it
+        nxt = words[wi + 1]["s"] if wi + 1 < len(words) else dur
+        if re.search(r"[.?!]$", w["w"]) or (re.search(r"(-|\u2014|\u2013|\u2026)$", w["w"]) and nxt - w["e"] > 0.5):
             sents.append(cur); cur = []
     if cur: sents.append(cur)
     # 3. retakes inside this file: a later sentence (within 150 s) that repeats any 4-word phrase means the earlier
@@ -110,13 +164,14 @@ for ti, src in enumerate(a.src):
         for j in range(i + 1, len(sents)):
             if sents[j][0]["s"] - sents[i][0]["s"] > 150:
                 break
-            if G[i] & G[j]:
+            if retake_pair(norm(sents[i]), norm(sents[j])):
                 status[i], retake_of[i] = "retake", (ti, j); break
     # a short lead-in ("All right, welcome back.") that runs straight into a flubbed sentence is part of that take
     for i in range(len(sents) - 2, -1, -1):
         if status[i] == "keep" and len(sents[i]) <= 5 and status[i + 1] == "retake" and sents[i + 1][0]["s"] - sents[i][-1]["e"] < 1.0:
             status[i], retake_of[i] = "retake", retake_of[i + 1]
-    takes.append({"src": src, "dur": dur, "sil": sil, "sents": sents, "status": status, "retake_of": retake_of, "G": G})
+    takes.append({"src": src, "dur": dur, "sil": sil, "hf": hf, "sents": sents, "status": status, "retake_of": retake_of, "G": G,
+                  "precut": precut(words, dur), "whole": a.whole})
 if not takes:
     sys.exit("no speech found")
 
@@ -127,20 +182,42 @@ def score(sent):
     rep = sum(1 for i in range(1, len(ws)) if ws[i] and ws[i] == ws[i - 1])
     fill = sum(1 for x in ws if x in FILLERS)
     return conf - 0.15 * rep - 0.1 * fill + 0.02 * min(len(ws), 30)
-from difflib import SequenceMatcher
 def similar(x, y):
     # same sentence, reworded or stumbled: 4-gram overlap catches most, word-sequence similarity the rest
     return x == y or (min(len(x), len(y)) >= 3 and SequenceMatcher(None, x, y).ratio() >= 0.6)
 order = []  # (take, sent) in output order
+def shared_rate():
+    # how many sentences of the later files are also said in an earlier file: takes of one script share most
+    hits = tot = 0
+    for ti in range(1, len(takes)):
+        for sent in takes[ti]["sents"]:
+            if len(sent) < 3:
+                continue
+            tot += 1
+            x = norm(sent)
+            if any(same_line(x, norm(o)) for tj in range(ti) for o in takes[tj]["sents"]):
+                hits += 1
+    return hits / tot if tot else 0.0
+MODE = "script" if MULTI and a.order == "script" else "files" if (not MULTI or a.order == "files" or a.whole) else ("script" if shared_rate() >= 0.5 else "files")
+if MULTI and MODE == "files":
+    for T in takes:
+        T["whole"] = T["whole"] or T["precut"]
 if MULTI:
+    print(f"{len(takes)} files: " + ("takes of one script, best take per sentence" if MODE == "script" else "different clips, kept in the order given"), flush=True)
+if MODE == "files":
+    # different clips (or one file): every file in the order given, its lines in spoken order; flubs inside a file stay
+    # right before the line that replaced them
+    order = [(ti, si) for ti, T in enumerate(takes) for si in range(len(T["sents"]))]
+    rest = []
+elif MULTI:
     slots, ptr = [], {}
     for ti, T in enumerate(takes):
         p = -1
         for si, sent in enumerate(T["sents"]):
             if T["status"][si] != "keep":
                 continue
-            g = T["G"][si]
-            same = lambda c: (len(sent) >= 4 and g & takes[c[0]]["G"][c[1]]) or similar(norm(sent), norm(takes[c[0]]["sents"][c[1]]))
+            g = strong(norm(sent))
+            same = lambda c: (len(sent) >= 4 and g and len(g & strong(norm(takes[c[0]]["sents"][c[1]]))) / len(g) >= 0.5) or similar(norm(sent), norm(takes[c[0]]["sents"][c[1]]))
             hit = next((k for k, sl in enumerate(slots) if any(same(c) and c[0] != ti for c in sl)), None)
             if hit is None:
                 slots.insert(p + 1, [(ti, si)]); p += 1
@@ -157,14 +234,11 @@ if MULTI:
         order.append(best)
     # flubs inside a file and losing candidates are listed right before the take that replaced them
     rest = [(ti, si) for ti, T in enumerate(takes) for si in range(len(T["sents"])) if T["status"][si] != "keep"]
-else:
-    order = [(0, si) for si in range(len(takes[0]["sents"]))]
-    rest = []
 
 # merge short kept sentences forward (same take, back to back, gap < 1.2 s) until >= --min
 groups, i = [], 0
 seq = order
-if MULTI:
+if MULTI and MODE == "script":
     def target(c):
         seen = set()
         while c is not None and takes[c[0]]["status"][c[1]] != "keep" and c not in seen:
@@ -177,6 +251,14 @@ if MULTI:
     seq += [r for r in rest if target(r) not in pos]
 while i < len(seq):
     ti, si = seq[i]; T = takes[ti]; st = T["status"][si]
+    if T["whole"]:
+        # a clip that is already cut: all of it, as it is
+        n = len(T["sents"])
+        groups.append({"take": ti, "sents": list(range(n)), "status": "keep", "sent": (ti, n - 1), "whole": True})
+        i += 1
+        while i < len(seq) and seq[i][0] == ti:
+            i += 1
+        continue
     group = [si]
     while st == "keep" and i + 1 < len(seq):
         nt, ns = seq[i + 1]
@@ -187,6 +269,18 @@ while i < len(seq):
         i += 1; group.append(ns)
     groups.append({"take": ti, "sents": group, "status": st, "sent": (ti, group[-1])})
     i += 1
+# a piece under 0.5 s of speech is never a clip of its own: it joins the line just before it in the same file (a soft
+# word end read as silence, or Whisper writing the end of a word twice, "anymore." then "more.")
+speech = lambda g: takes[g["take"]]["sents"][g["sents"][-1]][-1]["e"] - takes[g["take"]]["sents"][g["sents"][0]][0]["s"]
+k = 1
+while k < len(groups):
+    g, p = groups[k], groups[k - 1]
+    T = takes[g["take"]]
+    if (not g.get("whole") and not p.get("whole") and speech(g) < 0.5 and g["take"] == p["take"] and g["sents"][0] == p["sents"][-1] + 1
+            and T["sents"][g["sents"][0]][0]["s"] - T["sents"][p["sents"][-1]][-1]["e"] < 1.2):
+        p["sents"] += g["sents"]; p["sent"] = g["sent"]; groups.pop(k)
+    else:
+        k += 1
 sent2clip = {}
 for k, g in enumerate(groups):
     for si in g["sents"]:
@@ -199,57 +293,112 @@ def clip_of(c):
     return sent2clip.get((ti, si))
 
 def head(T, t, prev_end):
-    # start inside the silence that ends nearest before t, a few frames before speech resumes
+    # start inside the silence that ends nearest before t, a few frames before speech resumes; never after the first
+    # word starts (a clip that starts at 0.05 when the word starts at 0.00 shaves it)
     cands = [e for s, e in T["sil"] if e <= t + 0.25 and e >= prev_end]
     speech = max(cands) if cands else t
-    return max(prev_end + 0.05, min(t, speech) - a.lead, 0)
+    return max(0, min(max(prev_end + 0.05, min(t, speech) - a.lead), t - 0.02))
 
-def tail(T, t, next_start):
-    # end when the voice stops after the last word, plus a short hold, never into the next line
+def voice_stop(T, t):
+    # the voice stops where the level drops AND the band above 4 kHz goes quiet: a soft "s" or a trailing vowel sits
+    # under the level threshold. The high band only moves the stop later, by up to 0.5 s (room hiss never ends).
     cands = [s for s, e in T["sil"] if s >= t - 0.3]
     stop = min(cands) if cands else t
-    return min(max(t, stop) + a.hold, next_start - 0.05, T["dur"])
+    hf = [s for s, e in T.get("hf", []) if s >= stop - 0.05]
+    if hf and min(hf) - stop <= 0.5:
+        stop = max(stop, min(hf))
+    return max(t, stop)
 
-# 4 + 5. ends from audio, export
-out, md = [], ["| id | take | src in-out | dur | status | text |", "|---|---|---|---|---|---|"]
+def tail(T, t, next_start):
+    # end when the voice stops after the last word, plus the hold, never into the next line's first word
+    return min(voice_stop(T, t) + a.hold, next_start - 0.05, T["dur"])
+
+# 4 + 5. ends from audio, then clips.json and clips.md right away (picking can start while the clips encode), then export
+CUTOFF = re.compile(r"(-|\u2014|\u2013|\.\.\.|\u2026)$")
+out, md, jobs = [], ["| id | take | src in-out | dur | status | text |", "|---|---|---|---|---|---|"], []
 for k, g in enumerate(groups):
     T = takes[g["take"]]; S = T["sents"]; first, last = g["sents"][0], g["sents"][-1]
     ws = [w for si in g["sents"] for w in S[si]]
-    prev_end = S[first - 1][-1]["e"] if first else 0
+    prev_end = S[first - 1][-1]["e"] if first else -1.0
     next_start = S[last + 1][0]["s"] if last + 1 < len(S) else T["dur"]
-    s = head(T, ws[0]["s"], prev_end)
-    e = tail(T, ws[-1]["e"], next_start)
+    s, e = (0.0, T["dur"]) if g.get("whole") else (head(T, ws[0]["s"], prev_end), tail(T, ws[-1]["e"], next_start))
     d = round(e - s, 3)
     text = " ".join(w["w"] for w in ws)
-    flag = g["status"] if d >= a.min else (g["status"] + ",short")
-    if g["status"] == "retake":
+    st = g["status"]
+    # a fragment: under 1 s of speech on its own, or a line that ends on a cut-off word ("thi-", "so...")
+    if st == "keep" and not g.get("whole") and (ws[-1]["e"] - ws[0]["s"] < 1.0 or CUTOFF.search(ws[-1]["w"])):
+        st = "fragment"
+    flag = st if d >= a.min else (st + ",short")
+    if st == "retake":
         ro = clip_of(T["retake_of"][last])
         if ro is not None:
             flag += f"(see clip-{ro + 1:03d})"
     cid = f"clip-{k + 1:03d}"
-    vf = "fps=24,format=yuv420p"
-    if a.vertical:
-        vf = f"scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(iw-1080)*{a.cropx}:(ih-1920)*0.5,setsar=1," + vf
-    p = run(["ffmpeg", "-v", "error", "-y", "-ss", f"{s:.3f}", "-t", f"{d:.3f}", "-i", T["src"], "-vf", vf,
-             "-af", "loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000", "-c:v", "libx264", "-crf", "16", "-preset", "medium",
-             "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", os.path.join(a.out, cid + ".mp4")])
-    if p.returncode:
-        sys.exit(p.stderr)
     rel = [[round(w["s"] - s, 2), round(w["e"] - s, 2), w["w"]] for w in ws]
     take = os.path.basename(T["src"])
     out.append({"id": cid, "file": f"{a.out}/{cid}.mp4", "take": take, "src_in": round(s, 3), "src_out": round(e, 3), "dur": d,
                 "status": flag, "score": round(sum(score(S[si]) for si in g["sents"]) / len(g["sents"]), 3), "text": text, "words": rel})
     md.append(f"| {cid} | {take} | {s:.2f}-{e:.2f} | {d:.2f} | {flag} | {text} |")
+    jobs.append((cid, T["src"], s, d))
     print(cid, f"{d:5.2f}s", (take[:18] + " ") if MULTI else "", flag.ljust(12), text[:90])
 
-json.dump({"src": a.src[0] if not MULTI else a.src, "takes": [os.path.basename(t["src"]) for t in takes], "clips": out},
-          open(os.path.join(a.out, "clips.json"), "w"), indent=1)
-open(os.path.join(a.out, "clips.md"), "w", encoding="utf-8").write("\n".join(md) + "\n")
+def write_list(pending):
+    meta = {"src": a.src[0] if not MULTI else a.src, "takes": [os.path.basename(t["src"]) for t in takes], "order": MODE}
+    if pending:
+        meta["pending"] = True
+    json.dump({**meta, "clips": out}, open(os.path.join(a.out, "clips.json"), "w", encoding="utf-8"), indent=1)
+    open(os.path.join(a.out, "clips.md"), "w", encoding="utf-8").write("\n".join(md) + "\n")
+write_list(True)
+print(f"clips.json and clips.md written ({len(out)} lines); encoding the clips now", flush=True)
 
-# eye-check sheet: first and last frame of each clip, side by side, one row per clip
-tiles = []
-for c in out:
-    f = c["file"]
+# export: several clips at once, on a hardware encoder when one works here (it falls back to x264 per clip)
+ENC = {"x264": ["-c:v", "libx264", "-crf", "16", "-preset", "medium"],
+       "nvenc": ["-c:v", "h264_nvenc", "-preset", "p5", "-rc", "vbr", "-cq", "19", "-b:v", "0"],
+       "qsv": ["-c:v", "h264_qsv", "-global_quality", "20"],
+       "amf": ["-c:v", "h264_amf", "-rc", "cqp", "-qp_i", "18", "-qp_p", "20"],
+       "videotoolbox": ["-c:v", "h264_videotoolbox", "-q:v", "65"]}
+def pick_encoder(want):
+    if want in ("x264", "libx264", "cpu"):
+        return "x264"
+    tries = [want] if want in ENC else (["videotoolbox"] if sys.platform == "darwin" else ["nvenc", "qsv", "amf"])
+    for name in tries:
+        r = run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=black:s=320x240:d=0.2", "-frames:v", "3", *ENC[name], "-f", "null", "-"])
+        if r.returncode == 0:
+            return name
+    if want in ENC and want != "x264":
+        print(f"note: the {want} encoder does not work here, using x264")
+    return "x264"
+ENCODER = pick_encoder(a.encoder)
+vf = "fps=24,format=yuv420p"
+if a.vertical:
+    vf = f"scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(iw-1080)*{a.cropx}:(ih-1920)*0.5,setsar=1," + vf
+def encode(job):
+    cid, src, s, d = job
+    def go(enc):
+        return run(["ffmpeg", "-v", "error", "-y", "-ss", f"{s:.3f}", "-t", f"{d:.3f}", "-i", src, "-vf", vf,
+                    "-af", "loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000", *ENC[enc],
+                    "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", os.path.join(a.out, cid + ".mp4")])
+    p = go(ENCODER)
+    if p.returncode and ENCODER != "x264":
+        p = go("x264")
+    return cid, p
+from concurrent.futures import ThreadPoolExecutor
+workers = a.jobs if a.jobs > 0 else max(1, min(4, (os.cpu_count() or 2) // 2))
+print(f"encoding {len(jobs)} clips, {workers} at a time ({ENCODER})", flush=True)
+done = 0
+with ThreadPoolExecutor(max_workers=workers) as ex:
+    for cid, p in ex.map(encode, jobs):
+        if p.returncode:
+            sys.exit(f"{cid}: " + (p.stderr or "ffmpeg failed"))
+        done += 1
+        print(f"progress clips {done}/{len(jobs)}", flush=True)
+write_list(False)
+
+# eye-check sheet: first and last frame of each clip, side by side, one row per clip, 20 clips a page (one ffmpeg call
+# with every clip as an input passes the Windows command-line limit on a long recording)
+PAGE = 20
+def frames(c):
+    f = c["file"]; got = []
     # last frame: decode the final quarter second and keep overwriting (-update 1), so the file ends on the true last
     # frame; a seek to dur-0.05 can land past it and write nothing (pheme 11-18)
     for tag, ss, keep in (("a", ["-ss", "0"], ["-frames:v", "1"]), ("b", ["-sseof", "-0.25"], ["-update", "1"])):
@@ -262,16 +411,25 @@ for c in out:
         if not (os.path.exists(t) and os.path.getsize(t)):
             print(f"warning: no {'first' if tag == 'a' else 'last'} frame from {f}; the sheet shows a black tile")
             run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "color=black:s=426x240", "-frames:v", "1", t])
-        tiles.append(t)
-if tiles:
+        got.append(t)
+    return got
+for old in os.listdir(a.out):
+    if re.match(r"clips-sheet(-\d+)?\.png$", old):
+        os.remove(os.path.join(a.out, old))
+sheets = []
+for pg in range(0, len(out), PAGE):
+    page = out[pg:pg + PAGE]
+    tiles = [t for c in page for t in frames(c)]
     ins = sum([["-i", t] for t in tiles], [])
-    n = len(out)
-    lay = "|".join([f"0_{'+'.join(['h0'] * r) if r else '0'}|w0_{'+'.join(['h0'] * r) if r else '0'}" for r in range(n)])
-    sheet = os.path.join(a.out, "clips-sheet.png")
+    lay = "|".join([f"0_{'+'.join(['h0'] * r) if r else '0'}|w0_{'+'.join(['h0'] * r) if r else '0'}" for r in range(len(page))])
+    name = "clips-sheet.png" if pg == 0 else f"clips-sheet-{pg // PAGE + 1}.png"
+    sheet = os.path.join(a.out, name)
     r = run(["ffmpeg", "-v", "error", "-y", *ins, "-filter_complex", f"xstack=inputs={len(tiles)}:layout={lay}:fill=black", sheet])
     if r.returncode or not os.path.exists(sheet):
-        print("warning: clips-sheet.png was not written: " + (r.stderr or "").strip()[-300:])
+        print(f"warning: {name} was not written: " + (r.stderr or "").strip()[-300:])
+    else:
+        sheets.append(name)
     for t in tiles:
         os.remove(t)
-print(f"\n{len(out)} clips -> {a.out}/  (clips.json, clips.md, clips-sheet.png). Retakes are marked, not removed."
-      + (f" {len(takes)} takes; best take kept per sentence." if MULTI else ""))
+print(f"\n{len(out)} clips -> {a.out}/  (clips.json, clips.md, {', '.join(sheets) or 'no sheet'}). Retakes and fragments are marked, not removed."
+      + (f" {len(takes)} takes; best take kept per sentence." if MULTI and MODE == "script" else f" {len(takes)} files in the order given." if MULTI else ""))

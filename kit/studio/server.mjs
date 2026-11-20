@@ -108,7 +108,7 @@ function view(s) {
   let comp; try { comp = C.compose(s, { refPack: refPackName(s) }); } catch (e) { comp = { args: [], errs: [e.message], notes: [] }; }
   let scripts = []; try { scripts = SC.list(s.job); } catch {}
   let cut = null; try { cut = cutView(s); } catch (e) { cut = { error: e.message, candidates: [] }; }
-  return { state: s, compose: comp, outputs: C.outputsOf(s), scripts, cut, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
+  return { state: s, compose: comp, outputs: C.outputsOf(s), scripts, cut, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
 }
 
 // ---------- tasks (one at a time) ----------
@@ -122,7 +122,9 @@ function runTask(kind, steps, done, hooks = {}) {
   (async () => {
     let out = '';
     let si = 0;
-    for (const [script, args, stepEnv] of steps()) {
+    const list = [...steps()];
+    for (const [script, args, stepEnv] of list) {
+      if (me.cancel) { me.status = 'cancelled'; return; }
       if (hooks.step) try { hooks.step(si); } catch {}
       si++;
       log(`$ node ${script} ${args.map(a => /\s/.test(a) ? JSON.stringify(a) : a).join(' ')}`);
@@ -132,7 +134,14 @@ function runTask(kind, steps, done, hooks = {}) {
         p.stdout.on('data', d => { out += d; log(d); }); p.stderr.on('data', d => log(d));
         p.on('close', c => res(c)); p.on('error', e => { log(e.message); res(1); });
       });
-      if (me.status === 'cancelled') return;
+      if (me.cancel) {
+        // a cancel that lands after the last step finished, or after it wrote its video (assemble prints "wrote <file>
+        // len <s>"), does not throw the finished result away: the task ends done, not cancelled. Until the step exits
+        // the task still reads running (cancelling: true), so the page never flashes "cancelled" for a kept result.
+        const wrote = me.lines.map(l => /^wrote (.+\.(?:mp4|mov)) len /.exec(l)).filter(Boolean).pop();
+        if (si === list.length && (code === 0 || (wrote && existsSync(resolve(ROOT, wrote[1]))))) { log('finished before the cancel landed; kept the result'); break; }
+        else { me.status = 'cancelled'; return; }
+      }
       if (code !== 0) { me.status = 'failed'; me.result = { code }; break; }
     }
     if (me.status === 'running') { me.status = 'done'; try { me.result = (await done(out)) || {}; } catch (e) { me.status = 'failed'; log('error: ' + e.message); } }
@@ -565,7 +574,17 @@ async function api(req, res, u) {
   }
   if (p === '/api/upload' && M === 'POST') {
     const kind = u.searchParams.get('kind'), name = safeName(u.searchParams.get('name')), ext = extname(name).toLowerCase();
-    if (!['footage', 'reference', 'music'].includes(kind)) return json(res, 400, { error: 'kind: footage, reference or music' });
+    if (kind === 'brand') {
+      // a brand mark for keyword logos (kit/brands.cjs): kept with the Studio state, for every job; word=<the word>
+      const word = String(u.searchParams.get('word') || '').trim().slice(0, 40);
+      if (!word) return json(res, 400, { error: 'brand: say which word shows it (word=Skool)' });
+      if (!['.svg', '.png', '.webp', '.jpg', '.jpeg'].includes(ext)) return json(res, 400, { error: 'brand: .svg, .png, .webp or .jpg files' });
+      mkdirSync(C.brandsDir(), { recursive: true });
+      await new Promise((ok, bad) => { const w = createWriteStream(join(C.brandsDir(), name)); req.pipe(w); w.on('finish', ok); w.on('error', bad); req.on('error', bad); });
+      const s = update(st => { st.brands = (st.brands || []).filter(x => x.word.toLowerCase() !== word.toLowerCase()).concat({ word, logo: name }); });
+      return json(res, 200, { ok: true, path: name, ...view(s) });
+    }
+    if (!['footage', 'reference', 'music'].includes(kind)) return json(res, 400, { error: 'kind: footage, reference, music or brand' });
     if (!(kind === 'music' ? AUDIO : VIDEO).includes(ext)) return json(res, 400, { error: `${kind}: ${(kind === 'music' ? AUDIO : VIDEO).join(', ')} files` });
     const s0 = C.load(); if (!s0.job) return json(res, 400, { error: 'name the job first' });
     const dir = kind === 'footage' ? join('inbox', 'studio', s0.job) : kind === 'reference' ? join('teardown-in', 'studio', s0.job) : join('inbox', 'studio', s0.job, 'music');
@@ -698,6 +717,14 @@ async function api(req, res, u) {
     if (!s.job) return json(res, 400, { error: 'name the job first' }); if (!topic) return json(res, 400, { error: 'say your topic' });
     const r = await adaptScript(s, String(b.id || ''), topic); return json(res, 200, { ...r, ...view(C.load()) });
   }
+  // Install next to a "not installed" pill: the same pip line as setup (kit/setup.mjs --only), in the kit's Python, then
+  // a fresh look at the tools, so the page updates without a restart
+  if (p === '/api/tools/install' && M === 'POST') {
+    const b = await readBody(req), step = { ytdlp: 'ytdlp', instaloader: 'ytdlp', model: 'model', effects: 'effects' }[b.tool];
+    if (!step) return json(res, 400, { error: 'tool: ytdlp, instaloader, model or effects' });
+    runTask('install', () => [[process.env.STUDIO_SETUP || 'kit/setup.mjs', ['--only', step]]], () => { const t = F.tools({ fresh: true }); setupStatus(true); return { tool: b.tool, ytdlp: t.ytdlp ? t.ytdlp.version : null, instaloader: t.instaloader }; });
+    return json(res, 202, view(C.load()));
+  }
   if (p === '/api/footage/remove' && M === 'POST') { const b = await readBody(req); const s = update(st => { st.footage = st.footage.filter(f => f !== b.path); }); return json(res, 200, view(s)); }
   if (p === '/api/reference' && M === 'POST') {
     const b = await readBody(req), s = C.load();
@@ -725,7 +752,7 @@ async function api(req, res, u) {
     if (b.action === 'use') { if (it.status !== 'ready') return json(res, 400, { error: 'that reference is not broken down yet' }); update(st => useItem(st, st.reference.queue.find(x => x.id === id))); }
     else if (b.action === 'retry') { if (['downloading', 'tearing'].includes(it.status)) return json(res, 409, { error: 'it is running' }); setItem(id, x => { x.status = 'queued'; x.error = null; x.progress = 0; const c = F.classify(x.url); const miss = c.ok ? F.missingFor(c, F.tools({ fresh: true })) : c.error; if (miss) { x.status = 'failed'; x.error = miss; } }); setImmediate(pump); }
     else if (b.action === 'remove') {
-      if (['downloading', 'tearing'].includes(it.status) && task && task.status === 'running') { task.status = 'cancelled'; task.proc && task.proc.kill('SIGTERM'); }
+      if (['downloading', 'tearing'].includes(it.status) && task && task.status === 'running' && task.kind === 'reference') { task.cancel = true; task.proc && task.proc.kill('SIGTERM'); }
       if (it.file && b.deleteFile !== false) rmSync(it.file, { force: true });
       update(st => { st.reference.queue = st.reference.queue.filter(x => x.id !== id); if (st.reference.active === id) st.reference = { ...st.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null }; });
     } else return json(res, 400, { error: 'action: use, retry or remove' });
@@ -753,7 +780,7 @@ async function api(req, res, u) {
     runTask('render', () => r.steps, () => { const st = C.load(), outputs = C.outputsOf(st); return { outputs, copiedTo: copyRenders(outputs), fx: r.fx, effects: r.effects }; });
     return json(res, 202, { ...view(C.load()), fx: r.fx, effectsSkipped: r.effects.length && !r.fx ? 'effects need npm run effects:setup' : null });
   }
-  if (p === '/api/task/cancel' && M === 'POST') { if (task && task.status === 'running') { task.status = 'cancelled'; task.proc && task.proc.kill('SIGTERM'); } return json(res, 200, view(C.load())); }
+  if (p === '/api/task/cancel' && M === 'POST') { if (task && task.status === 'running') { task.cancel = true; task.proc && task.proc.kill('SIGTERM'); } return json(res, 200, view(C.load())); }
   if (p === '/api/choices' && M === 'GET') { const s = C.load(), ch = readChoices(s); return json(res, 200, { choices: ch, receipt: receiptOf(s, ch) }); }
   if (p === '/api/choices' && M === 'POST') {
     const b = await readBody(req), s = C.load(), cur = readChoices(s);
@@ -765,6 +792,12 @@ async function api(req, res, u) {
     update(st => { st.lockedAtDraft = C.compose(st, { refPack: refPackName(st) }).lockString || ''; });
     const ch2 = readChoices(s);
     return json(res, 200, { ok: true, choices: ch2, receipt: receiptOf(s, ch2), log: r.o.trim().split('\n').filter(l => !l.startsWith('{')).slice(-20) });
+  }
+  // a brand mark for the Words and brands list (kit/brands.cjs): one you added, or the kit's own
+  if (p === '/api/brand' && M === 'GET') {
+    const n = String(u.searchParams.get('name') || ''), abs = C.KIT_BRANDS.includes(n) ? join(ROOT, n) : join(C.brandsDir(), basename(n));
+    if (!/\.(svg|png|webp|jpe?g)$/i.test(abs) || !existsSync(abs)) return json(res, 404, { error: 'no such brand mark' });
+    return serveFile(req, res, abs);
   }
   // show original: the session's reference video, wherever the downloads setting put it
   if (p === '/api/reference/video' && M === 'GET') {

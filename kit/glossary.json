@@ -1,0 +1,9 @@
+{
+  "note": "Brand and product names Whisper often mishears, fixed in every draft's clips.json, captions and titles (kit/glossary.cjs). Add your own in Studio (Words and brands), a pack's \"glossary\", or npm run reel -- --glossary words.json.",
+  "glossary": [
+    { "say": "ChatGPT", "heard": ["chat GBT", "chat GPT", "chat gbt", "chatgbt", "chat G.P.T."] },
+    { "say": "claude.ai", "heard": ["cloud.ai", "cloud .ai", "clawed.ai", "clod.ai"] },
+    { "say": "Claude Code", "heard": ["cloud code", "clawed code", "clod code"] },
+    { "say": "Claude", "heard": ["Clawed"] }
+  ]
+}

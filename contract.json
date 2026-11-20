@@ -107,6 +107,12 @@
         { "name": "cleanup", "type": "path", "default": null, "description": "a clean-up file from Studio: spans to cut out of clips, retakes to keep, clips to leave out (kit/studio/review.mjs)" },
         { "name": "cards", "type": "enum", "values": ["auto", "off"], "default": "off (auto in the magazine preset)", "description": "colour cards on short lines to land, numbered chapter cards and a number-pop intro on a counted list" },
         { "name": "aliases", "type": "string", "default": null, "description": "names Whisper mishears, written your way in captions and titles: \"Gwyn: Guinn, Gwin; aigent: agent\" (adds to a recipe's Aliases)" },
+        { "name": "glossary", "type": "string", "default": null, "description": "your words, fixed in captions, titles and clips.json: \"Agent Academy = AIgent Academy; school = Skool after on, in\" (adds to the pack glossary and kit/glossary.json)" },
+        { "name": "brands", "type": "string", "default": null, "description": "keyword logos: a JSON list or file of {\"word\": \"Skool\", \"logo\": \"path/to/mark.svg\"}; the logo shows on a white plate when the word is said (logos you supply only)" },
+        { "name": "as-is", "type": "boolean", "default": false, "description": "the clips are already cut: use each file whole, in the order given (also automatic when a clips.json beside them lists them)" },
+        { "name": "order", "type": "enum", "values": ["auto", "files", "script"], "default": "auto", "description": "clip order for several files: files keeps the order given, script orders takes by the shared script, auto picks script only when the files repeat the same lines" },
+        { "name": "keep-pauses", "type": "string", "default": null, "description": "comma list of pause ids (from the Choices table) to keep when tightening" },
+        { "name": "no-bed", "type": "boolean", "default": false, "description": "no music bed at all, even when a preset or energy would pick one" },
         { "name": "no-boost", "type": "boolean", "default": false, "description": "skip the legibility pass that gives a low-contrast caption moment a denser halo" },
         { "name": "music-energy", "type": "enum", "values": ["low", "mid", "high", "auto"], "default": null, "description": "pick a library bed by energy; auto reads your pace; --bed still wins" },
         { "name": "cropx", "type": "number", "default": "0.5", "description": "horizontal crop centre, 0 to 1 (0.4 puts the face left of centre)" },
@@ -421,6 +427,7 @@
       "flags": [
         { "name": "check", "type": "boolean", "default": false, "description": "only report each dependency as ready or missing with its fix; exit 1 when a core one is missing" },
         { "name": "yes", "type": "boolean", "default": false, "description": "also install ffmpeg and Chrome with Homebrew, winget or the system package manager (never asks for a password)" },
+        { "name": "only", "type": "string", "description": "comma list of the only steps to run (same names as --skip); Studio's Install buttons use it" },
         { "name": "skip", "type": "string", "description": "comma list of steps to skip: npm, python, ytdlp, ffmpeg, chrome, model, effects, humanizer, studio" },
         { "name": "json", "type": "boolean", "default": false, "description": "print the result as JSON" }
       ],

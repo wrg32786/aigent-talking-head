@@ -5,12 +5,14 @@ import { Kbd } from '@astryxdesign/core/Kbd';
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
 import { api, file, toast, pickState, isPaused, Icon, IconBtn, KIND_NAME } from './lib.jsx';
 import { upload } from './upload.js';
+import { WordsBrands } from './Brands.jsx';
 
 export function Style({ CAT, s, apply, patch, reloadCat, hidden, tab, setTab }) {
   return <>
     <Packs CAT={CAT} s={s} apply={apply} patch={patch} reloadCat={reloadCat} hidden={hidden} />
     <Effects CAT={CAT} s={s} patch={patch} hidden={hidden} tab={tab} setTab={setTab} />
     <Sound CAT={CAT} s={s} apply={apply} patch={patch} hidden={hidden} />
+    {!hidden && <WordsBrands s={s} patch={patch} apply={apply} />}
   </>;
 }
 

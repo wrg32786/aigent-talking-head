@@ -16,7 +16,7 @@
 | `render` | `npm run reel -- ... --json` | render the reel (and an `export`) |
 | `verify` | `npm run verify -- <job> --json` | check the finished reel: size, loudness, overlap, safe area, copy |
 | `studio_get_state` | reads the Studio session (`jobs/.studio/state.json`) | what the user picked in Studio (`npm run studio`), their reference, music, pace, the chat and the running task, and the reel arguments it adds up to; with `catalog: true`, every menu item as a `kind:id` ref by category |
-| `studio_set_selections` | writes the Studio session | change picks (`{"transition:whip": "allow"}`, `deny` or `clear`), pack, music, sound, pace, export or reference mode, and answer the user in the Studio chat with `reply`; the page updates live, and unknown names are refused |
+| `studio_set_selections` | writes the Studio session | change picks (`{"transition:whip": "allow"}`, `deny` or `clear`), pack, music, sound, pace (with `keepPauses`), export or reference mode, footage order (`footage`), `asIs`, `clips`, `glossary` and `brands`, and answer the user in the Studio chat with `reply`; the page updates live, and unknown names are refused; a change that does nothing returns `noChange` |
 | `studio_run` | POSTs to the running Studio | start a draft or render the user watches in the page, then poll `studio_get_state` |
 | `studio_start` | starts Studio in the background (as `npm run studio:agent`) | returns the URL and opens the page |
 | `studio_wait_for_message` | long-polls the Studio chat (default 45 s) | the lines the user typed in the Studio page since you last read, marked seen, plus the session context; the page shows you as listening while it waits |

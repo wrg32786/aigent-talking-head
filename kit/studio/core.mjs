@@ -89,8 +89,15 @@ export function defaultState() {
     export: 'reels', chat: [], task: null, outputs: [], takes: [], output: null, cut: null, tx: {}, lines: {} };
 }
 export function load() {
-  try { const s = JSON.parse(readFileSync(statePath(), 'utf8')); return { ...defaultState(), ...s, reference: { ...defaultState().reference, ...(s.reference || {}) } }; }
+  try { const s = JSON.parse(readFileSync(statePath(), 'utf8')); return oneBed({ ...defaultState(), ...s, reference: { ...defaultState().reference, ...(s.reference || {}) } }); }
   catch { return defaultState(); }
+}
+// one place decides the music bed: music.bed. An older session kept a bed pick in picks.bed as well (a reference's bed),
+// which the draft used while the music panel showed music.bed; the pick (what the draft used) moves into music.bed.
+function oneBed(s) {
+  const pb = s.picks && s.picks.bed;
+  if (pb) { if (pb.allow && pb.allow[0]) s.music = { ...s.music, bed: pb.allow[0] }; delete s.picks.bed; }
+  return s;
 }
 export function save(s) {
   mkdirSync(stateDir(), { recursive: true });
@@ -105,11 +112,20 @@ const ENERGY = ['auto', 'low', 'mid', 'high'];
 // a change from the page, the chat or an assistant. Refuses names the engine does not have.
 //   { job, pack, picks: { "transition:whip": "allow" | "deny" | "clear" }, clearPicks: true, music: { bed, energy },
 //     sound: { sfx: on|off, cap: on|off }, pace: { tighten: null|number, punch: on|off }, export, reference: { mode },
-//     say: "user chat line", reply: "assistant chat line", from: "ui" | "assistant" | "chat" }
+//     say: "user chat line", reply: "assistant chat line", from: "ui" | "assistant" | "chat",
+//     footage: [paths from state.footage, in the order to use; leave one out to drop it], clips: "<clip.py folder>" | null,
+//     asIs: true | false (the footage is already cut: one clip per file), glossary: [{ say, heard, after? }] | "heard = say; ...",
+//     brands: [{ word, logo }] (logo: a file added in Studio or the kit's kit/example/skool-logo.svg) }
+// Returns { errs, log, noop }: noop is true when the patch asked for a change and nothing changed, so a caller can say so
+// instead of reporting success.
+const CHAT_KEYS = ['say', 'reply', 'from', 'toAgent', 'replyTo', 'kind', 'attach'];
+const slash = x => String(x).replace(/\\/g, '/').replace(/^\.\//, '');
+export const brandsDir = () => join(stateDir(), 'brands');
+export const KIT_BRANDS = ['kit/example/skool-logo.svg'];
 export function applyPatch(s, p, cat = catalog()) {
   const errs = [], log = [];
-  if (!p || typeof p !== 'object') return { errs: ['patch must be an object'], log };
-  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach'];
+  if (!p || typeof p !== 'object') return { errs: ['patch must be an object'], log, noop: false };
+  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands'];
   for (const k of Object.keys(p)) if (!known.includes(k)) errs.push(`unknown field "${k}" (${known.join(', ')})`);
   if (p.job !== undefined) { if (p.job && !JOB_RE.test(p.job)) errs.push('job: lowercase letters, numbers and dashes'); else { s.job = p.job || null; log.push(`job ${s.job}`); } }
   if (p.pack !== undefined) {
@@ -120,6 +136,15 @@ export function applyPatch(s, p, cat = catalog()) {
   for (const [ref, how] of Object.entries(p.picks || {})) {
     const it = cat.items[ref];
     if (!it) { errs.push(`no such effect "${ref}" (use kind:id from the catalog, e.g. transition:whip)`); continue; }
+    // a bed pick is the music panel's bed (one source of truth: music.bed)
+    if (it.kind === 'bed') {
+      if (!['allow', 'deny', 'clear'].includes(how)) { errs.push(`${ref}: use allow, deny or clear`); continue; }
+      const was = s.music.bed;
+      if (how === 'allow') s.music.bed = it.id; else if (s.music.bed === it.id) s.music.bed = 'auto';
+      if (s.picks.bed) delete s.picks.bed;
+      if (s.music.bed !== was) log.push(`bed ${s.music.bed}`);
+      continue;
+    }
     if (it.mode === 'info') { errs.push(`${ref} is shown for reference; set it ${it.kind === 'sfx' ? 'with the sound settings' : 'in the Music and pace panel or the choices table'}`); continue; }
     if (!['allow', 'deny', 'clear'].includes(how)) { errs.push(`${ref}: use allow, deny or clear`); continue; }
     const key = it.kind === 'editing' ? 'editing' : it.kind;
@@ -131,23 +156,57 @@ export function applyPatch(s, p, cat = catalog()) {
   }
   if (p.music) {
     const m = p.music;
-    if (m.bed !== undefined) { if (m.bed && m.bed !== 'auto' && m.bed !== 'none' && !cat.beds.some(b => b.id === m.bed) && m.bed !== 'upload') errs.push(`music.bed: no bed "${m.bed}"`); else { s.music.bed = m.bed || 'auto'; log.push(`bed ${s.music.bed}`); } }
+    if (m.bed !== undefined) { if (m.bed && m.bed !== 'auto' && m.bed !== 'none' && !cat.beds.some(b => b.id === m.bed) && m.bed !== 'upload') errs.push(`music.bed: no bed "${m.bed}"`); else { const was = s.music.bed; s.music.bed = m.bed || 'auto'; if (s.picks.bed) delete s.picks.bed; if (s.music.bed !== was) log.push(`bed ${s.music.bed}`); } }
     if (m.energy !== undefined) { if (!ENERGY.includes(m.energy)) errs.push('music.energy: auto, low, mid or high'); else { s.music.energy = m.energy; log.push(`music energy ${m.energy}`); } }
   }
   if (p.sound) for (const k of ['sfx', 'cap']) if (p.sound[k] !== undefined) { if (!['on', 'off'].includes(p.sound[k])) errs.push(`sound.${k}: on or off`); else { s.sound[k] = p.sound[k]; log.push(`sound ${k} ${p.sound[k]}`); } }
   if (p.pace) {
     if (p.pace.tighten !== undefined) { const t = p.pace.tighten; if (t !== null && t !== 'off' && !(+t >= 0.1 && +t <= 2)) errs.push('pace.tighten: null (preset decides), off, or 0.1 to 2 seconds'); else { s.pace.tighten = t === null ? null : t === 'off' ? 'off' : +t; log.push(`tighten ${s.pace.tighten ?? 'preset'}`); } }
     if (p.pace.punch !== undefined) { if (!['on', 'off'].includes(p.pace.punch)) errs.push('pace.punch: on or off'); else { s.pace.punch = p.pace.punch; log.push(`punch ${p.pace.punch}`); } }
+    if (p.pace.keepPauses !== undefined) { const k = [].concat(p.pace.keepPauses || []).map(String); if (k.some(x => !/^[\w-]+@\d+(\.\d+)?$/.test(x))) errs.push('pace.keepPauses: clip-id@seconds, from choices.json "pauses"'); else { s.pace.keepPauses = k; log.push(k.length ? `keep pauses ${k.join(', ')}` : 'cut every long pause'); } }
   }
   if (p.export !== undefined) { if (p.export && !cat.exports.includes(p.export)) errs.push(`export: ${cat.exports.join(', ')}`); else { s.export = p.export || null; log.push(`export ${s.export}`); } }
   if (p.reference && p.reference.mode !== undefined) { if (!['influence', 'recreate', 'off'].includes(p.reference.mode)) errs.push('reference.mode: influence, recreate or off'); else { s.reference.mode = p.reference.mode; log.push(`reference mode ${p.reference.mode}`); } }
-  if (p.clips !== undefined) s.clips = p.clips || null;
+  if (p.clips !== undefined) { const c = p.clips ? slash(p.clips) : null; if (c && (c.includes('..') || !existsSync(join(resolve(ROOT, c), 'clips.json')))) errs.push(`clips: no clips.json in ${c}`); else if (c !== s.clips) { s.clips = c; log.push(c ? `clips folder ${c}` : 'clips folder cleared'); } }
+  // footage: reorder or drop files the job already has (state.footage), or add a file already in the job's inbox
+  if (p.footage !== undefined) {
+    if (!Array.isArray(p.footage) || p.footage.some(x => typeof x !== 'string' || !x.trim())) errs.push('footage: a list of file paths from state.footage, in the order to use');
+    else {
+      const want = p.footage.map(slash), inbox = s.job ? `inbox/studio/${s.job}/` : null;
+      const bad = want.filter(f => !s.footage.includes(f) && !(inbox && f.startsWith(inbox) && !f.includes('..') && existsSync(join(ROOT, f))));
+      if (bad.length) errs.push(`footage: not in this job: ${bad.join(', ')} (use the paths in state.footage, or upload the file first)`);
+      else if (new Set(want).size !== want.length) errs.push('footage: a file is listed twice');
+      else if (JSON.stringify(want) !== JSON.stringify(s.footage)) { s.footage = want; s.clips = null; log.push(`footage ${want.length ? want.map(f => basename(f)).join(', ') : 'none'}`); }
+    }
+  }
+  if (p.asIs !== undefined) { const v = !!p.asIs; if (v !== !!s.asIs) { s.asIs = v; log.push(v ? 'footage used as it is (already cut)' : 'footage cut into lines'); } }
+  if (p.glossary !== undefined) {
+    const G = require('../glossary.cjs'), e = typeof p.glossary === 'string' ? [] : G.validate(p.glossary);
+    if (e.length) errs.push(...e);
+    else { const g = G.parse(p.glossary); if (JSON.stringify(g) !== JSON.stringify(s.glossary || [])) { s.glossary = g; log.push(`glossary ${g.length} word${g.length === 1 ? '' : 's'}`); } }
+  }
+  if (p.brands !== undefined) {
+    const list = Array.isArray(p.brands) ? p.brands : null;
+    if (!list) errs.push('brands: a list of { word, logo }');
+    else {
+      const out = [];
+      for (const b of list) {
+        const logo = b && b.logo ? slash(b.logo) : '';
+        const ok = KIT_BRANDS.includes(logo) || (!!logo && !logo.includes('..') && existsSync(join(brandsDir(), basename(logo))));
+        if (!b || !b.word || !String(b.word).trim()) { errs.push('brands: each needs a word'); continue; }
+        if (!ok) { errs.push(`brands: logo "${logo}" is not one you added in Studio (or ${KIT_BRANDS.join(', ')})`); continue; }
+        out.push({ word: String(b.word).trim(), logo: KIT_BRANDS.includes(logo) ? logo : basename(logo) });
+      }
+      if (!errs.some(e => e.startsWith('brands')) && JSON.stringify(out) !== JSON.stringify(s.brands || [])) { s.brands = out; log.push(`brands ${out.map(b => b.word).join(', ') || 'none'}`); }
+    }
+  }
   const at = new Date().toISOString();
   // the Studio chat is its own channel: only lines typed in the page, answers to them, and short action notes
   const line = m => { m.id = s.chatSeq = (s.chatSeq || 0) + 1; m.channel = 'studio'; s.chat.push(m); return m; };
   if (p.say) line({ role: 'user', text: String(p.say).slice(0, 2000), at, from: p.from || 'ui', ...(p.toAgent ? { to: 'agent', status: 'queued' } : {}), ...(p.attach && typeof p.attach === 'object' ? { attach: p.attach } : {}) });
   if (p.reply) line({ role: 'assistant', text: String(p.reply).slice(0, 4000), at, from: p.from || 'assistant', ...(p.replyTo ? { replyTo: p.replyTo } : {}), ...(p.kind ? { kind: p.kind } : {}) });
-  return { errs, log };
+  const asked = Object.keys(p).some(k => !CHAT_KEYS.includes(k));
+  return { errs, log, noop: asked && !errs.length && !log.length };
 }
 
 // ---------- session -> reel arguments ----------
@@ -179,10 +238,17 @@ export function compose(s, { refPack = null } = {}) {
   else if (on('tighten')) args.push('--tighten', '0.3');
   if (s.sound.sfx === 'off') { args.push('--no-sfx'); locks.sfx = false; }
   if (s.sound.cap === 'off' || off('sfx-cap')) args.push('--no-sfx-cap');
-  const bed = (s.picks.bed && s.picks.bed.allow[0]) || (s.music.bed !== 'auto' && s.music.bed !== 'none' && s.music.bed !== 'upload' ? s.music.bed : null);
+  // the bed: music.bed only (the music panel shows the one the draft uses). none = no bed, even when the pack has one.
+  const bed = s.music.bed !== 'auto' && s.music.bed !== 'none' && s.music.bed !== 'upload' ? s.music.bed : null;
   if (s.music.bed === 'upload' && s.music.upload) args.push('--bed', s.music.upload);
   else if (bed) args.push('--bed', bed);
-  else if (s.music.bed !== 'none' && s.music.energy) args.push('--music-energy', s.music.energy);
+  else if (s.music.bed === 'none') args.push('--no-bed');
+  else if (s.music.energy) args.push('--music-energy', s.music.energy);
+  if (Array.isArray(s.pace.keepPauses) && s.pace.keepPauses.length) args.push('--keep-pauses', s.pace.keepPauses.join(','));
+  if (s.asIs) args.push('--as-is');
+  // your words and brand logos (kit/glossary.cjs, kit/brands.cjs), short enough for any command line
+  if (Array.isArray(s.glossary) && s.glossary.length) args.push('--glossary', s.glossary.map(e => `${e.heard.join(' | ')} = ${e.say}${e.after && e.after.length ? ' after ' + e.after.join(', ') : ''}`).join('; '));
+  if (Array.isArray(s.brands) && s.brands.length) args.push('--brands', JSON.stringify(s.brands.map(b => ({ word: b.word, logo: KIT_BRANDS.includes(b.logo) ? join(ROOT, b.logo) : join(brandsDir(), b.logo) }))));
   if (s.export) args.push('--export', s.export);
   const fx = s.picks.effect ? s.picks.effect.allow.filter(x => !s.picks.effect.deny.includes(x)) : [];
   if (fx.length) notes.push(`effects for the effects pass: ${fx.join(', ')} (run after the reel; needs npm run effects:setup)`);
@@ -190,7 +256,7 @@ export function compose(s, { refPack = null } = {}) {
   const errs = L.validate(locks);
   const lockString = lockStringOf(locks);
   if (lockString) args.push('--lock', lockString);
-  return { args, locks, lockString, notes, effects: fx, errs };
+  return { args, locks, lockString, notes, effects: fx, errs, bed: s.music.bed === 'upload' ? (s.music.upload ? basename(s.music.upload) : null) : s.music.bed };
 }
 const KEBAB = { maxTitles: 'max-titles', captionEntrance: 'caption-entrance' };
 export function lockStringOf(l) {
