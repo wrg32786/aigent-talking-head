@@ -143,7 +143,9 @@ try {
   await t('one place renders: the Cut step has no Render, the Render step renders every kept cut as its own video and lists them', async () => {
     assert.strictEqual(await pg.$('#s-cut #cut-render'), null, 'no Render button on the Cut step');
     assert.strictEqual(await pg.$$eval('#s-cut button', x => x.filter(b => /^(Render|Save as)/.test(b.textContent.trim())).length), 0, 'nothing on the Cut step renders or saves a file');
-    assert.ok(/3 kept\. They render at the end, on the Render step\./.test(await pg.textContent('#cut-hint')), 'the Cut step says where they render');
+    // the page catches up with the drop above, then says where the 3 kept ones render
+    await pg.waitForFunction(() => /^3 kept\. They render at the end, on the Render step\.$/.test((document.querySelector('#cut-hint') || {}).textContent || ''), null, { timeout: 10000 })
+      .catch(async () => { throw new Error('the Cut step says where they render: ' + await pg.textContent('#cut-hint')); });
     await pg.goto(url + '/#step=render', { waitUntil: 'networkidle' });
     await pg.waitForSelector('#kept-cuts #render-kept');
     assert.strictEqual(await pg.textContent('#render-kept'), 'Render my 3 cuts');
