@@ -83,7 +83,7 @@ try {
     await listening;
     // Settings has Connect agent and the Setup check
     await pg.click('#open-settings'); await pg.click('#settings-setup'); await pg.waitForSelector('#setup-list li[data-id="ffmpeg"]');
-    assert.strictEqual(await pg.$$eval('#setup-list li[data-id]', l => l.length), 11);
+    assert.strictEqual(await pg.$$eval('#setup-list li[data-id]', l => l.length), 12);
     assert.deepStrictEqual(errs, []);
     await ctx.close();
     // phone: the remembered agent, no sideways scroll

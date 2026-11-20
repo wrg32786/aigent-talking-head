@@ -3,6 +3,7 @@
 # no temporal state, so per-frame flicker has to be taken out here), a light erode + feather,
 # and edge decontamination of the person layer so a background rim does not ride over the type.
 # Guided filter uses a float guide and nan_to_num (a uint8 guide can leak NaNs into the EMA).
+import sys
 import numpy as np, cv2
 
 K3 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
@@ -70,10 +71,30 @@ def temporal_flow(a, rgb, state, cut_luma=18):
     state['prev_g'] = g.astype(np.int16)
     return a, cut
 
-def tighten(a, erode=True, sigma=0.6):
-    """Kill a 1 px light fringe without leaving a dark line. Milder than the RVM-specific ramp squeeze."""
-    x = cv2.erode(a, K3) if erode else a
+def tighten(a, rgb=None, erode=True, sigma=0.6):
+    """Kill a 1 px light fringe without leaving a dark line. Hair-friendly: where the edge band is fine texture (strands,
+    flyaways) the soft alpha is kept instead of eroded, so wisps stay instead of turning into a hard helmet edge."""
+    if not erode:
+        return np.clip(cv2.GaussianBlur(a, (0, 0), sigma), 0, 1)
+    x = cv2.erode(a, K3)
+    if rgb is not None:
+        g = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY).astype(np.float32) / 255
+        tex = cv2.GaussianBlur(np.abs(cv2.Laplacian(g, cv2.CV_32F, ksize=3)), (0, 0), 2.0)
+        soft = ((a > 0.04) & (a < 0.96)).astype(np.float32)
+        hair = np.clip((tex - 0.025) / 0.05, 0, 1) * cv2.GaussianBlur(soft, (0, 0), 2.0)
+        x = hair * a + (1 - hair) * x
     return np.clip(cv2.GaussianBlur(x, (0, 0), sigma), 0, 1)
+
+def ema_interior(a, state, keep=0.35):
+    """Exponential moving average on the solid interior and background only (not the edge band, which the flow pass
+    handles), so a frame-to-frame wobble in BiRefNet's confidence cannot breathe through the type."""
+    prev = state.get('ema')
+    if prev is None or prev.shape != a.shape:
+        state['ema'] = a.copy(); return a
+    solid = ((a < 0.03) | (a > 0.97)) & ((prev < 0.03) | (prev > 0.97))
+    out = np.where(solid, keep * prev + (1 - keep) * a, a).astype(np.float32)
+    state['ema'] = out
+    return out
 
 def refine_frame(a, rgb, state, temporal=True):
     """Full cleanup on one float matte. Reset state['prev_a'] at the start of each title window."""
@@ -82,7 +103,10 @@ def refine_frame(a, rgb, state, temporal=True):
     cut = False
     if temporal:
         a, cut = temporal_flow(a, rgb, state)
-    a = tighten(a)
+        if cut:
+            state['ema'] = None
+        a = ema_interior(a, state)
+    a = tighten(a, rgb)
     return a, cut
 
 def decontaminate(rgb, a):
@@ -105,25 +129,125 @@ def decontaminate(rgb, a):
         img = np.where(sel, img * (1 - wfg) + spread * wfg, img)
     return np.clip(img, 0, 255).astype(np.uint8), aout
 
-# One place that names the matte models and opens them: kit/mask.py (titles behind the head) and
-# effects/fx_runner.py (the effects pass) both use it, so the two masks cannot drift apart.
-# birefnet-portrait gives the best edge on a person; birefnet-general-lite is about twice as fast.
-MATTE_MODELS = {'birefnet': 'birefnet-general-lite', 'birefnet-general-lite': 'birefnet-general-lite', 'birefnet-portrait': 'birefnet-portrait'}
+# One place that names the matte models and opens them: kit/mask.py (titles behind the head), kit/anchors.py and
+# effects/fx_runner.py (the effects pass) all use it, so the masks cannot drift apart.
+#
+# BiRefNet tiers (all MIT, ZhengPeng7/BiRefNet; ONNX exports hosted by rembg, MIT), slowest and best first:
+#   1. BiRefNet_HR / HR-matting: 2048x2048 input, about 4x the compute of tier 2. Not used (too slow on a CPU).
+#   2. birefnet-portrait, birefnet-general (and massive, dis, hrsod): Swin-L backbone at 1024x1024. birefnet-portrait is
+#      the default for anything behind the head: trained on people, best edge on hair in a side-by-side on real footage.
+#   3. birefnet-general-lite: Swin-T backbone at 1024x1024, about 2.5x faster, but it can keep a chair back or a
+#      lamp as part of the person. Kept for the effects pass and as a faster option.
+# "birefnet" means birefnet-general-lite here (the effects pass, which mattes every frame); kit/mask.py maps its own
+# "birefnet" to birefnet-portrait.
+MATTE_MODELS = {'birefnet': 'birefnet-general-lite', 'birefnet-lite': 'birefnet-general-lite', 'birefnet-general-lite': 'birefnet-general-lite',
+                'birefnet-general': 'birefnet-general', 'birefnet-portrait': 'birefnet-portrait'}
+MATTE_URLS = {
+    'birefnet-general-lite': 'https://github.com/danielgatis/rembg/releases/download/v0.0.0/BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx',
+    'birefnet-general': 'https://github.com/danielgatis/rembg/releases/download/v0.0.0/BiRefNet-general-epoch_244.onnx',
+    'birefnet-portrait': 'https://github.com/danielgatis/rembg/releases/download/v0.0.0/BiRefNet-portrait-epoch_150.onnx',
+}
+MATTE_MB = {'birefnet-general-lite': 214, 'birefnet-general': 928, 'birefnet-portrait': 928}
+# Peak memory of one BiRefNet frame at 1024x1024 on ONNX Runtime's CPU provider with the settings in Matter (arena off,
+# prepacking off), measured as peak RSS on Linux: lite 6.6 GB, portrait and general 7.5 GB. Almost all of it is the
+# Swin attention activations, so the lighter model saves little memory; the MediaPipe preview needs about 0.3 GB.
+# With ONNX Runtime's defaults (arena on, what rembg's new_session uses) the same frame grew past 15 GB and was killed on
+# a 16 GB machine, and about 25 GB was seen on Windows. Need = peak + 0.8 GB for the decoder, encoder and cleanup.
+# the whole mask.py run (session + flow + cleanup + ffmpeg pipes) peaked at 8.0 GB with portrait on real footage, about
+# 0.5 GB above the one-frame number, so the table is the full run (lite by the same margin)
+MATTE_PEAK_GB = {'birefnet-general-lite': 7.1, 'birefnet-general': 8.0, 'birefnet-portrait': 8.0}
+def matte_need_gb(model):
+    name = MATTE_MODELS.get(model)
+    return round(MATTE_PEAK_GB[name] + 0.8, 1) if name else 0.5
+
+def avail_gb():
+    """Memory the OS can hand out now, in GB (Linux MemAvailable, Windows ullAvailPhys, macOS free + inactive), or None."""
+    try:
+        if sys.platform.startswith('linux'):
+            for line in open('/proc/meminfo'):
+                if line.startswith('MemAvailable:'):
+                    return int(line.split()[1]) / 1048576
+        elif sys.platform == 'win32':
+            import ctypes
+            class MS(ctypes.Structure):
+                _fields_ = [('dwLength', ctypes.c_ulong), ('dwMemoryLoad', ctypes.c_ulong), ('ullTotalPhys', ctypes.c_ulonglong), ('ullAvailPhys', ctypes.c_ulonglong),
+                            ('ullTotalPageFile', ctypes.c_ulonglong), ('ullAvailPageFile', ctypes.c_ulonglong), ('ullTotalVirtual', ctypes.c_ulonglong),
+                            ('ullAvailVirtual', ctypes.c_ulonglong), ('ullAvailExtendedVirtual', ctypes.c_ulonglong)]
+            m = MS(); m.dwLength = ctypes.sizeof(MS); ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))
+            return m.ullAvailPhys / 1073741824
+        elif sys.platform == 'darwin':
+            import subprocess, re
+            out = subprocess.run(['vm_stat'], capture_output=True, text=True).stdout
+            ps = int(re.search(r'page size of (\d+)', out).group(1))
+            pages = sum(int(re.search(k + r':\s+(\d+)', out).group(1)) for k in ('Pages free', 'Pages inactive', 'Pages speculative'))
+            return pages * ps / 1073741824
+    except Exception:
+        return None
+    return None
+_MEAN = np.array([0.485, 0.456, 0.406], np.float32)
+_STD = np.array([0.229, 0.224, 0.225], np.float32)
+
+def matte_weights(model):
+    """Path of the cached ONNX for a matte model (rembg's cache: $U2NET_HOME, else ~/.u2net), downloading it through
+    rembg on first use. rembg verifies its published checksum."""
+    name = MATTE_MODELS[model]
+    from rembg import new_session  # noqa: F401  (registers the sessions)
+    import importlib
+    mod = importlib.import_module('rembg.sessions.' + name.replace('-', '_'))
+    return str(_session_class(mod, name).download_models())
+
+def _session_class(mod, name):
+    return next(v for k, v in vars(mod).items() if isinstance(v, type) and k.startswith('BiRefNet') and getattr(v, 'name', None) and v.name() == name)
+
+def cached_weights(model):
+    name = MATTE_MODELS.get(model)
+    if not name:
+        return None
+    try:
+        import importlib
+        mod = importlib.import_module('rembg.sessions.' + name.replace('-', '_'))
+        cls = _session_class(mod, name)
+        return cls.resolve_existing(f"{cls.name()}.onnx")
+    except Exception:
+        return None
+
+class Matter:
+    """BiRefNet on ONNX Runtime, on the GPU when ONNX Runtime has a provider for it (DirectML, CUDA, CoreML), else the CPU.
+    Our own pre and post step instead of rembg's predict(): rembg stretches every frame's matte to its own min and max,
+    which makes the matte breathe from frame to frame when the person fills more or less of the shot; here it is the
+    plain sigmoid. Memory settings below keep one frame under 7.5 GB (MATTE_PEAK_GB)."""
+    def __init__(self, model='birefnet-portrait'):
+        import onnxruntime as ort
+        self.model = MATTE_MODELS[model]
+        have = ort.get_available_providers()
+        prov = [p for p in ('CUDAExecutionProvider', 'DmlExecutionProvider', 'CoreMLExecutionProvider', 'CPUExecutionProvider') if p in have]
+        so = ort.SessionOptions()
+        so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        # memory: no arena (it kept every activation size ever seen and grew past 15 GB), no memory pattern, and no
+        # prepacked weight copies (7.5 GB peak instead of 7.9, and about 10% faster on the CPU). Batch size is 1.
+        so.enable_cpu_mem_arena = False
+        so.enable_mem_pattern = False
+        so.add_session_config_entry('session.disable_prepacking', '1')
+        self.inner_session = ort.InferenceSession(matte_weights(model), so, providers=prov)
+        self.input = self.inner_session.get_inputs()[0].name
+    @property
+    def provider(self):
+        return self.inner_session.get_providers()[0]
+    def raw(self, rgb):
+        x = cv2.resize(rgb, (1024, 1024), interpolation=cv2.INTER_AREA).astype(np.float32) / 255
+        x = ((x - _MEAN) / _STD).transpose(2, 0, 1)[None]
+        o = self.inner_session.run(None, {self.input: np.ascontiguousarray(x)})[0][0, 0]
+        a = 1 / (1 + np.exp(-o.astype(np.float32)))
+        if a.shape != rgb.shape[:2]:
+            a = cv2.resize(a, (rgb.shape[1], rgb.shape[0]), interpolation=cv2.INTER_LINEAR)
+        return np.clip(a, 0, 1).astype(np.float32)
 
 def matte_session(model='birefnet'):
-    """rembg session for a matte model, on the GPU when ONNX Runtime has a provider for it, else the CPU.
-    Measured on an Intel Arc B390 through DirectML at 1080x1920: birefnet-general-lite 0.98 s/frame and
-    birefnet-portrait 1.94 s/frame, against 4.2 and 8.8 on the CPU, with the same mask."""
-    import onnxruntime as ort
-    from rembg import new_session
-    have = ort.get_available_providers()
-    prov = [p for p in ('DmlExecutionProvider', 'CUDAExecutionProvider', 'CoreMLExecutionProvider', 'CPUExecutionProvider') if p in have]
-    return new_session(MATTE_MODELS[model], providers=prov)
+    """A Matter for a model name in MATTE_MODELS. Measured on an 8-core CPU (no GPU) at 1080x1920, per frame:
+    birefnet-general-lite 6.6 s, birefnet-portrait 9.0 s, birefnet-general about the same as portrait (same network).
+    On an Intel Arc B390 through DirectML (earlier measurement through rembg): lite 0.98 s, portrait 1.94 s."""
+    return Matter(model)
 
 def matte_raw(session, rgb):
     """Float 0..1 matte for one RGB frame, at the frame's size, before any cleanup."""
-    from PIL import Image
-    raw = np.array(session.predict(Image.fromarray(rgb))[0].convert('L'), dtype=np.float32) / 255
-    if raw.shape != rgb.shape[:2]:
-        raw = cv2.resize(raw, (rgb.shape[1], rgb.shape[0]), interpolation=cv2.INTER_LINEAR)
-    return raw
+    return session.raw(rgb)

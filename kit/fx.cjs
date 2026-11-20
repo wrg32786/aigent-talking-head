@@ -46,7 +46,8 @@ const wp = s => (typeof s === 'string' && /^[A-Za-z]:[\\/]/.test(s) ? '/mnt/' + 
 // raw matte is cached per frame in build/fx/matte-<model>/. birefnet-portrait has the best edge; birefnet is twice as fast.
 const R = require('./rules.cjs');
 let MATTE = opt('mask') || opt('matte') || process.env.FX_MATTE || process.env.MASK_MODEL;
-const matteModel = m => { if (!m) return undefined; const k = R.MASK_MODELS[String(m).toLowerCase()]; if (!k) die('unknown mask model ' + m + ' (use birefnet, birefnet-portrait or mediapipe)'); return k === 'mediapipe' ? undefined : k; };
+// the effects pass mattes every frame, so plain "birefnet" stays birefnet-general-lite here (kit/mask_refine.py MATTE_MODELS)
+const matteModel = m => { if (!m) return undefined; const key = String(m).toLowerCase(); const k = key === 'birefnet' ? 'birefnet' : R.MASK_MODELS[key]; if (!k) die('unknown mask model ' + m + ' (use birefnet, birefnet-portrait, birefnet-general, birefnet-lite or mediapipe)'); return k === 'mediapipe' ? undefined : k; };
 const runFx = args => {
   // PYTHONUTF8: Windows Python reads the plan as cp1252 otherwise, and "·" in a plan comes out as "Â·" on screen
   if (matteModel(MATTE)) return sh(PY, [RUNNER, ...args], undefined, { PYTHONUTF8: '1', FX_MATTE: matteModel(MATTE), FX_MATTE_CACHE: path.dirname(args[2]), FX_TRACK_W: process.env.FX_TRACK_W || '1080' });

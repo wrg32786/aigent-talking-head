@@ -66,6 +66,9 @@ export function checks() {
   add('instaloader', 'instaloader', 'feature', 'Instagram reference links (anonymous)', !!ig, ig ? 'installed' : 'missing', py ? `${py} -m pip install instaloader` : 'npm run setup:all');
   const fx = existsSync(FX_PY) && okRun(FX_PY, ['-c', 'import mediapipe, cv2, PIL, numpy']);
   add('effects', 'Effects pass (MediaPipe, OpenCV, rembg)', 'feature', 'film effects and the person mask', !!fx, fx ? 'effects/.venv' : 'not set up', 'npm run effects:setup');
+  // the default person mask's weights (birefnet-portrait, about 928 MB), so the first render does not stop to download them
+  const maskW = fx && okRun(FX_PY, ['-c', 'import sys; sys.path.insert(0, "kit"); import mask_refine as R; sys.exit(0 if R.cached_weights("birefnet-portrait") else 1)'], { cwd: ROOT, timeout: 60e3 });
+  add('mask', 'Person mask weights (birefnet-portrait)', 'feature', 'titles and captions behind your head', !!maskW, maskW ? 'cached' : 'about 928 MB, not downloaded yet', 'npm run effects:setup -- --birefnet');
   add('humanizer', 'Humanizer skill', 'feature', 'scripts your agent writes', existsSync(join(ROOT, 'skills', 'humanizer', 'SKILL.md')), 'skills/humanizer/SKILL.md', 'git checkout skills/humanizer (it ships with the kit)');
   let built = false, why = 'missing';
   try { const stamp = JSON.parse(readFileSync(join(KIT, 'studio', 'public', 'build.json'), 'utf8')); built = existsSync(join(KIT, 'studio', 'public', 'index.html')); why = built ? 'built ' + (stamp.built || '') : why; } catch {}
@@ -127,6 +130,11 @@ export function install({ yes = false, skip = [], log = console.log } = {}) {
     sh(py, ['-c', `from faster_whisper import WhisperModel; WhisperModel(${JSON.stringify(MODEL)}, device="cpu", compute_type="int8")`], log); return { result: 'installed' };
   }, log)));
   res.push(skipIf('effects', () => step('Effects pass', () => { if (has('effects')) return { result: 'ready' }; sh(process.execPath, [join(ROOT, 'effects', 'setup.mjs')], log); return { result: 'installed' }; }, log)));
+  res.push(skip.includes('effects') ? { name: 'mask', result: 'skipped', detail: 'skipped with the effects pass' } : skipIf('mask', () => step('Person mask weights (birefnet-portrait)', () => {
+    if (has('mask')) return { result: 'ready' };
+    if (!existsSync(FX_PY)) return { result: 'failed', detail: 'needs the effects pass first' };
+    sh(FX_PY, [join(KIT, 'mask.py'), '--download'], log); return { result: 'installed' };
+  }, log)));
   res.push(skipIf('humanizer', () => step('Humanizer skill', () => has('humanizer') ? { result: 'ready' } : { result: 'failed', detail: 'skills/humanizer is missing from this copy: git checkout skills/humanizer' }, log)));
   res.push(skipIf('studio', () => step('Studio page', () => { if (has('studio')) return { result: 'ready' }; sh(process.execPath, [join(KIT, 'studio', 'build.mjs')], log); return { result: 'installed' }; }, log)));
   const summary = { ready: res.filter(r => r.result === 'ready').length, installed: res.filter(r => r.result === 'installed').length, skipped: res.filter(r => r.result === 'skipped').length, failed: res.filter(r => r.result === 'failed').length, needsYou: res.filter(r => r.result === 'needs you').length };

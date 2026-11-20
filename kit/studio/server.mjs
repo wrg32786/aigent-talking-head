@@ -27,6 +27,7 @@ import * as MEDIA from './media.mjs';
 
 const require = createRequire(import.meta.url);
 const K = require('../packs.cjs');
+const MC = require('../memcheck.cjs');
 const { ROOT, KIT, STUDIO } = C;
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
@@ -775,8 +776,14 @@ async function api(req, res, u) {
     return json(res, 202, view(C.load()));
   }
   if (p === '/api/render' && M === 'POST') {
-    const s = C.load(); const r = renderSteps(s);
+    const s = C.load(); const r = renderSteps(s), b = await readBody(req).catch(() => ({}));
+    // memory for the person mask (kit/memcheck.cjs): short, the page says so and offers titles in front or the lighter mask
+    const mem = MC.renderCheck(join(ROOT, 'jobs', s.job, 'build'));
+    if (mem.needed && !mem.ok && !['front', 'light', 'anyway'].includes(b.memory)) return json(res, 409, { error: mem.message, memory: mem });
     const miss = needFor('render'); if (miss) return json(res, 400, { error: miss, setup: true });
+    if (b.memory === 'front') r.steps[0][1].push('--no-mask');
+    if (b.memory === 'light') r.steps[0][1].push('--mask', 'mediapipe');
+    if (b.memory === 'anyway') r.steps[0][2] = { ...(r.steps[0][2] || {}), MASK_FORCE: '1' };
     runTask('render', () => r.steps, () => { const st = C.load(), outputs = C.outputsOf(st); return { outputs, copiedTo: copyRenders(outputs), fx: r.fx, effects: r.effects }; });
     return json(res, 202, { ...view(C.load()), fx: r.fx, effectsSkipped: r.effects.length && !r.fx ? 'effects need npm run effects:setup' : null });
   }

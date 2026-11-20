@@ -51,7 +51,7 @@ After the reel is made, ask your agent to "add effects". It reads the transcript
 
 ```
 npm run effects:setup                                     # once: Python venv with OpenCV + MediaPipe (~150 MB) and rembg + onnxruntime (~390 MB more, for the BiRefNet mask)
-npm run effects:setup -- --birefnet                       # also download birefnet-general-lite (~214 MB) into rembg's cache
+npm run effects:setup -- --birefnet                       # also download birefnet-portrait (~928 MB), the default person mask, into rembg's cache
 npm run fx -- --list                                      # the menu, by moment
 npm run fx -- --name <clip-name> --plan fx.json --still 1.2,6.5   # check frames
 npm run fx -- --name <clip-name> --plan fx.json           # render
@@ -61,7 +61,7 @@ The effects come from [claude-video-effects](https://github.com/Vibha-Ramprakash
 
 ## Looks, caption styles and fonts
 
-`--look` picks the whole edit (`kinetic` default, `oneword`, `muse`, `classic`, `one-word`); `--style`, `--fonts`, `--no-titles`, `--title-layer front|behind|auto`, `--no-punch`, `--no-mask` and `--mask birefnet|birefnet-portrait|mediapipe` override single parts. `oneword` is the full one-word-at-a-time look (type cards, cycling pairings, kit/looks/oneword.md); `--style one-word` is the simple version, one big word at a time. The same `--mask` on `npm run fx` (or `"maskModel"` in `cut.json`) gives the effects that cut-out too.
+`--look` picks the whole edit (`kinetic` default, `oneword`, `muse`, `classic`, `one-word`); `--style`, `--fonts`, `--no-titles`, `--title-layer front|behind|auto`, `--no-punch`, `--no-mask`, `--mask birefnet-portrait|birefnet-general|birefnet-lite|mediapipe`, `--no-face-safe` and `--no-face-zone` override single parts. `oneword` is the full one-word-at-a-time look (type cards, cycling pairings, kit/looks/oneword.md); `--style one-word` is the simple version, one big word at a time. The same `--mask` on `npm run fx` (or `"maskModel"` in `cut.json`) gives the effects that cut-out too.
 
 | Look | Captions | Titles | Notes |
 |---|---|---|---|
@@ -71,13 +71,36 @@ The effects come from [claude-video-effects](https://github.com/Vibha-Ramprakash
 
 Caption styles: `kinetic` (font lockups), `pill`, `hormozi` (bold caps with a cyan active word), `karaoke` (colour wipe as each word is said), `classic`. Set `"captionStyle"` in `captions.js` to change one job.
 
-Titles use 8 entrances (stagger rise, slam, blur rise, slide left, elastic, flip, pop zoom, drop), never the same one twice in a video, with a flicker only on the hook and the payoff. Set them by hand as mode 7 flips in `captions.js` (`"entrance"` to pick one, `"hero"` for the big word, `"layer": "front"|"behind"|"auto"` for whether the hero word sits in front or behind the head), or leave them to `autocaption.mjs --titles`. The job default is in front (`"titleLayer": "front"`). Auto puts only the strongest 1 or 2 punch titles behind, never consecutive ones. Titles rest high so the word stays readable (`"titleY"`, default 345); a behind slam lands lower, then rises to that height (`"titleSlamY"`, default 600; `"titleRise": false` to skip the rise). The smaller partner words of a behind title draw in front of the person. The person mask that puts those titles behind the head is `kit/mask.py`. MediaPipe is the default (fast). For a final reel, `--mask birefnet` (or `"maskModel": "birefnet"` in `cut.json`) uses rembg with birefnet-general-lite: slower on CPU (several seconds per title frame) but much tighter on hair and hands. Optional `"person": "person.mkv"` writes an edge-decontaminated person layer.
+Titles use 8 entrances (stagger rise, slam, blur rise, slide left, elastic, flip, pop zoom, drop), never the same one twice in a video, with a flicker only on the hook and the payoff. Set them by hand as mode 7 flips in `captions.js` (`"entrance"` to pick one, `"hero"` for the big word, `"layer": "front"|"behind"|"auto"` for whether the hero word sits in front or behind the head), or leave them to `autocaption.mjs --titles`. The job default is in front (`"titleLayer": "front"`). Auto puts only the strongest 1 or 2 punch titles behind, never consecutive ones. Titles rest high so the word stays readable (`"titleY"`, default 345); a behind slam lands lower, then rises to that height (`"titleSlamY"`, default 600; `"titleRise": false` to skip the rise). The smaller partner words of a behind title draw in front of the person. The person mask that puts those titles behind the head is `kit/mask.py`; see **Face keep-out and the person mask** below. Optional `"person": "person.mkv"` writes an edge-decontaminated person layer.
 
 **`--look oneword`** is the high bar: one word on screen at a time, each word's size and face picked by its role (small filler, body words, a big italic-serif hero with the rest of the phrase building under it), flat-colour type cards cutting in as text-only b-roll, a key word as a title on the first and last beat (in front by default, or behind the head), and, with `--broll <folder>`, cutaways to your own clips while the voice runs on. Rules and numbers: [kit/looks/oneword.md](../kit/looks/oneword.md).
 
 Font pairings (`--fonts`, or `"fonts"` in `captions.js`): `theme` (default), `modern`, `druk`, `elegant`, `editorial`, plus `literata`, `bricolage`, `pirata`, `michroma`, `redhat`, `jakarta`, `grotesk-times`, `avantgarde`, `recoleta`, `haas`, `wabbit`, `instrument`, `playfair`, `dmserif` (see [kit/fonts/README.md](../kit/fonts/README.md)). List several to cycle them, one pairing per title: `--fonts literata,bricolage,michroma`. A pairing is two faces set together: every title and kinetic line is a lockup with the hero word big in the display face and the rest of the phrase in the partner face (script or sans/serif) beside, under or across it. `"hero"` on a phrase picks the hero word. `playfair` and `dmserif` add a third face: one word of the partner line in the italic serif (`"accent"` on a title picks it). All shipped fonts are SIL OFL Google Fonts; your own licensed fonts go in `kit/fonts/local/` (gitignored). See [kit/fonts/README.md](../kit/fonts/README.md).
 
 Words and titles stay out of the way of effects: where an effect's catalog entry says `captions: off` they hide, and where it says `check` the caption track moves to the top of the frame.
+
+## Face keep-out and the person mask
+
+**No text on the face.** Before the overlay is drawn, `kit/facezone.py` finds the face 8 times a second in the cut picture (`base.mp4`) with YuNet (MIT, already in the repo, needs only OpenCV) and builds a keep-out zone from the eyebrows to below the chin, plus 18% of the face height on every side, smoothed over time with no lag and restarted at cuts. The layout pass in `kit/overlay.html` checks every caption, title and kinetic word against the zone at every moment it is on screen, entrance and exit included, and moves it above the face (onto the hair or cap, which text may cover, in front or behind) or below it, or beside it when it is narrow, shrinking to no less than 60%. Only if nothing fits does it hide the word for the moments the face is under it. Graphics keep their place: a card may cover the chin, and a split-screen panel goes behind the top of the head only (`kit/headmask.py`). `render.mjs` then counts every letter pixel still inside the zone into `facecheck.json` and prints `face check: N of M moments with text on the face zone`; `npm run verify` fails on any. `--no-face-safe` keeps the count but moves nothing (for a before and after); `--no-face-zone` skips it all.
+
+**The person mask** (`kit/mask.py`) is what puts titles, captions and panels behind the head. BiRefNet comes in three tiers (all MIT, ZhengPeng7/BiRefNet; the ONNX files are hosted by rembg):
+
+| Tier | Model | Input | CPU time per frame (8 cores, no GPU) | Peak memory | Used |
+|---|---|---|---|---|---|
+| 1, best and slowest | BiRefNet_HR / HR-matting | 2048x2048 | about 4x tier 2 | more than tier 2 | no |
+| 2 | **birefnet-portrait** (default), birefnet-general | 1024x1024, Swin-L | 9.0 s | 7.5 GB a frame, 8.0 GB a whole run | yes |
+| 3 | birefnet-lite (birefnet-general-lite) | 1024x1024, Swin-T | 6.6 s | 6.6 GB a frame | `--mask birefnet-lite` |
+| preview | MediaPipe Selfie Segmenter | 360x640 | 0.01 s | about 0.3 GB | `--mask mediapipe` |
+
+birefnet-portrait is trained on people and gave the cleanest hair edge on real footage; birefnet-lite kept a chair back as part of the person. On a GPU (CUDA, DirectML or CoreML through ONNX Runtime) tier 2 is about 2 s per frame. The memory numbers are with the kit's ONNX Runtime settings (no memory arena, no prepacked weight copies, batch size 1); with ONNX Runtime's defaults, which rembg uses, one frame grew past 15 GB and was killed on a 16 GB machine.
+
+To keep a render quick:
+- only frames inside a behind-the-head window are masked;
+- BiRefNet runs on every third frame of the picture and on the first and last frame of each window; the frames between are the two nearest mattes moved onto them with optical flow (a frame that moved too much gets its own BiRefNet pass). On a clip where the speaker leans in and out, this matched BiRefNet on every frame to an IoU of 0.989 at a third of the time;
+- every matte is cached in `build/maskcache/<model>/` by a hash of the frame, so a rebuild with new captions, titles or windows reuses it (a 2 s title window: 284 s the first time, 19 s after);
+- `base.mp4` is made once per picture and reused by the face zone and the mask.
+
+The cleanup (`kit/mask_refine.py`) fills holes, removes specks, refines the edge against the picture, smooths over time with optical flow plus an average on the solid inside (no flicker), and keeps hair strands soft instead of eroding them. Before it loads BiRefNet, `kit/mask.py` checks free memory (it needs about 8.8 GB): with less, the default falls back to the MediaPipe preview with a warning, and an explicit `--mask birefnet-portrait` stops with the two ways out. Studio's Render asks first: **Titles in front**, **Lighter mask** or **Try anyway**.
 
 ## Edit rules
 
@@ -140,7 +163,9 @@ Agents: start at [AGENTS.md](../AGENTS.md).
 | `kit/check.mjs` | `npm run check [job]`: copy lint, titles, transitions, sounds, punches and script shape. |
 | `kit/verify.mjs` | `npm run verify -- <job>`: ffprobe, loudness, title and punch stills, contact sheet, mask alpha, copy lint. Run it before every delivery. |
 | `kit/rules.cjs` | The shared edit rules: sounds, entrances, punch amounts, transitions, copy lint, script shape. |
-| `kit/mask.py` | Person mask for titles-behind-the-head. `--model birefnet` (rembg birefnet-general-lite, quality, weights downloaded on first use) or `--model mediapipe` (fast fallback). `kit/mask_refine.py` is the shared cleanup. |
+| `kit/mask.py` | Person mask for anything behind the head. Default birefnet-portrait (BiRefNet second tier), keyframed with optical flow between, cached per frame in `build/maskcache/`, with a free-memory check; `--model birefnet-general`, `birefnet-lite` or `mediapipe` (fast preview). `kit/mask_refine.py` is the shared cleanup and model loader. |
+| `kit/facezone.py` | The face keep-out zone per moment (YuNet landmarks, eyebrows to chin plus a margin, smoothed), into `captions.js` `faceTrack` for the layout pass; `facecheck.json` is what render.mjs measured against it. |
+| `kit/memcheck.cjs` | Free memory against the mask model's measured need, for reel.cjs and Studio's Render. |
 | `kit/fonts/`, `kit/fonts.mjs` | Font pairings, their licence files and example stills (`npm run fonts:examples`). |
 | `kit/transitions.json` | Transition names mapped to ffmpeg xfade modes. |
 | `kit/themes/` | Theme presets: `aigent.js` (default) and `neutral.js`. |

@@ -160,6 +160,13 @@ if (stills.length) {
   }
 }
 
+// 3c. face keep-out (render.mjs -> facecheck.json, from kit/facezone.py): no caption, title or kinetic word on the face
+{ let fc = null; try { fc = JSON.parse(readFileSync(join(build, 'facecheck.json'), 'utf8')); } catch {}
+  if (!fc) notes.push('no facecheck.json: the face check did not run (no face zone; rebuild with the current kit)');
+  else {
+    ok(!fc.overlapMoments, `no text on the face zone at ${fc.withFace} moments with a face${fc.overlapMoments ? `: ${fc.overlapMoments} moments` : ''}${fc.moved && fc.moved.length ? ` (layout moved ${fc.moved.length} off the face)` : ''}`);
+    for (const e of fc.elements || []) lines.push(`      ${e.kind} "${e.text}" at ${e.start}s: ${e.moments} moment${e.moments === 1 ? '' : 's'}, up to ${e.maxPx} px on the face`);
+  } }
 // 4. mask, measured
 const mask = R.maskSpec(C);
 if (C.titles && mask.file) {

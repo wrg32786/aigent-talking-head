@@ -151,15 +151,17 @@ const panelsBehind = caps => ((caps && caps.flips) || []).filter(f => PANEL_MODE
 
 // Person-mask path and backend. cut.json may use "mask": "mask.mkv" or
 // "mask": {"file":"mask.mkv","model":"birefnet","person":"person.mkv"}, plus optional top-level "maskModel" / "person".
-const MASK_MODELS = { birefnet: 'birefnet', 'birefnet-general-lite': 'birefnet', 'birefnet-portrait': 'birefnet-portrait', mediapipe: 'mediapipe' };
+// birefnet = birefnet-portrait, the default (kit/mask.py: BiRefNet's second tier, Swin-L at 1024); birefnet-lite is the faster
+// third tier; mediapipe is the fast preview.
+const MASK_MODELS = { birefnet: 'birefnet-portrait', 'birefnet-portrait': 'birefnet-portrait', 'birefnet-general': 'birefnet-general', 'birefnet-lite': 'birefnet-lite', 'birefnet-general-lite': 'birefnet-lite', mediapipe: 'mediapipe' };
 function maskSpec(cut, opts = {}) {
   const m = cut && cut.mask;
   if (!m && !opts.model && !cut?.maskModel) return { file: null, model: null, person: null };
   const file = !m ? null : (typeof m === 'string' ? m : (m.file || m.path || 'mask.mkv'));
   const raw = opts.model || cut.maskModel || (m && typeof m === 'object' && m.model) || process.env.MASK_MODEL || '';
   const key = String(raw || '').toLowerCase();
-  const model = key ? (MASK_MODELS[key] || null) : null; // null = let mask.py pick (birefnet if cached, else mediapipe)
-  if (key && !MASK_MODELS[key]) throw new Error('unknown mask model ' + raw + ' (use birefnet, birefnet-portrait or mediapipe)');
+  const model = key ? (MASK_MODELS[key] || null) : null; // null = let mask.py pick (birefnet-portrait, else the mediapipe preview with a warning)
+  if (key && !MASK_MODELS[key]) throw new Error('unknown mask model ' + raw + ' (use birefnet-portrait, birefnet-general, birefnet-lite or mediapipe)');
   const person = opts.person || cut.person || (m && typeof m === 'object' && m.person) || null;
   return { file, model, person };
 }

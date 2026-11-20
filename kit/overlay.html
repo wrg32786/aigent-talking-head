@@ -1122,6 +1122,19 @@ const EXPF=CAP.exportFrame&&typeof CAP.exportFrame==='object'?CAP.exportFrame:nu
 // 9:16 talking head (reel.cjs measures yours into faceTop and faceBottom when the person mask is set up)
 const FACEZ={x0:200,x1:880,y0:CAP.faceTop||400,y1:CAP.faceBottom||1180};
 const kindOf=c=>c[3]===0?'caption':c[3]===7?'title':'graphic';
+// Face keep-out (Will, 2026-11-19: captions covered his face; a stacked title sat over his forehead and eyes). captions.js
+// "faceTrack" ({fps, zones: [[x0,y0,x1,y1,crownY]|null,...]}, kit/facezone.py, from YuNet landmarks, smoothed) is the zone
+// from the eyebrows to below the chin, per moment. No caption, title or kinetic word may cover it: the layout pass moves
+// it above (onto the hair or cap, which text may cover, in front or behind) or below the face, shrinking to no less than
+// 60%, and hides it only for the moments nothing fits. Graphics and cards keep their place (a card may cover the chin;
+// a panel behind the head only ever goes behind the crown, kit/headmask.py). "faceSafe": false turns the move off;
+// the check below (window.__faceInk, facecheck.json, npm run verify) still counts every overlap.
+const FTRK=CAP.faceTrack&&Array.isArray(CAP.faceTrack.zones)?CAP.faceTrack:null;
+const TEXTM=new Set([0,1,2,3,6,7,9]);const isText=c=>TEXTM.has(c[3]);
+function faceAt(t){if(!FTRK)return null;const i=Math.round(t*FTRK.fps),z=FTRK.zones[Math.max(0,Math.min(FTRK.zones.length-1,i))];return z?{x0:z[0],y0:z[1],x1:z[2],y1:z[3],crown:z[4]}:null}
+function faceSpan(s,e){if(!FTRK)return null;let b=null;const f=FTRK.fps,i0=Math.max(0,Math.floor(s*f)),i1=Math.min(FTRK.zones.length-1,Math.ceil(Math.min(e,s+30)*f));
+ for(let i=i0;i<=i1;i++){const z=FTRK.zones[i];if(z)b=uni(b,{x0:z[0],y0:z[1],x1:z[2],y1:z[3]})}return b}
+const FACESAFE=CAP.faceSafe!==false&&!!FTRK;
 function boxNow(cs,t,raw){const keep=ctx,L=LAYER,R0=RAW;MSX.setTransform(1,0,0,1,0,0);MSX.globalAlpha=1;MSX.clearRect(0,0,270,480);MSX.setTransform(.25,0,0,.25,0,0);ctx=MSX;LAYER='all';RAW=!!raw;
  try{flip(t,cs)}catch(e){}finally{ctx=keep;LAYER=L;RAW=R0}
  const d=MSX.getImageData(0,0,270,480).data;let x0=1e9,y0=1e9,x1=-1,y1=-1;
@@ -1173,9 +1186,45 @@ function layoutPass(){LAYOUT.clear();REPORT.length=0;const R=safeRect(),M=18;
   x.hide=hit.map(o=>[Math.max(o.s,x.s),Math.min(o.e,x.e)]);x.action='hide'};
  const T=els.filter(x=>x.kind==='title');for(const x of T)place(x,G);
  const C=els.filter(x=>x.kind==='caption');for(const x of C)place(x,G.concat(T.filter(t=>t.action!=='hide')));
+ // 3. face keep-out: every caption, title and kinetic word clear of the face zone at every moment it is on screen,
+ // entrance and exit included (a slam title starts big): measured 8 times a second against the zone at that moment
+ if(FACESAFE){const placed=[],f=FTRK.fps,tol=b=>Math.max(300,area(b)*.01);
+  const order=els.filter(x=>isText(x.c)&&!x.takeover).sort((a,b)=>(a.kind==='title'?0:1)-(b.kind==='title'?0:1)||a.s-b.s);
+  for(const x of order){const e=Math.min(x.e,x.s+30),Zu=faceSpan(x.s,e);
+   if(!Zu){placed.push(x);continue}
+   const S=[];for(let t=x.s+.02;t<e-.01;t+=1/f){const z=faceAt(t);if(!z)continue;const b=boxNow([x.c],t,true);if(b)S.push({t,b,z})}
+   const bad=k=>S.filter(q=>interA(xfBox(q.b,k),q.z)>tol(q.b));
+   const k0=x.xf||{cx:(x.raw.x0+x.raw.x1)/2,cy:(x.raw.y0+x.raw.y1)/2,dx:0,dy:0,s:1};
+   if(!bad(k0).length){placed.push(x);continue}
+   const obs=G.concat(placed).filter(o=>o!==x&&live(o,x)&&o.action!=='hide');
+   const H=x.raw.y1-x.raw.y0,Wd=x.raw.x1-x.raw.x0,cand=[];
+   // every moment's zone, as one box for placing (the union over the element's time on screen)
+   for(let sc=1;sc>=.6-1e-6;sc-=.05){const h=H*sc*(k0.s||1),w=Wd*sc*(k0.s||1);
+    cand.push({cx:k0.cx+(k0.dx||0),cy:Zu.y1+M+h/2,s:sc},{cx:k0.cx+(k0.dx||0),cy:Zu.y0-M-h/2,s:sc});
+    if(w<Zu.x0-R.x0-M)cand.push({cx:R.x0+(Zu.x0-R.x0)/2,cy:k0.cy+(k0.dy||0),s:sc});
+    if(w<R.x1-Zu.x1-M)cand.push({cx:Zu.x1+(R.x1-Zu.x1)/2,cy:k0.cy+(k0.dy||0),s:sc})}
+   let best=null;
+   for(const c of cand){const s2=+((k0.s||1)*c.s).toFixed(3),w=Wd*s2,cx=Math.min(R.x1-w/2,Math.max(R.x0+w/2,c.cx));
+    const k={cx:k0.cx,cy:k0.cy,s:s2,dx:Math.round(cx-k0.cx),dy:Math.round(c.cy-k0.cy)},B=xfBox(x.raw,k);
+    if(B.y0<R.y0-1||B.y1>R.y1+1||B.x0<R.x0-1||B.x1>R.x1+1)continue;if(obs.some(o=>inter(o.box,B,M-2)))continue;
+    const nb=bad(k).length;const cost=nb*1e5+Math.abs(k.dy-(k0.dy||0))+Math.abs(k.dx-(k0.dx||0))*1.2+(1-c.s)*600;if(!best||cost<best.cost)best={k,B,nb,cost}}
+   if(best&&best.nb===0){x.xf=best.k;x.box=best.B;x.action=x.action==='none'?'face':x.action+'+face';placed.push(x);continue}
+   // nothing clears every moment: take the best place, and hide the element only for the moments still on the face
+   const k=best?best.k:k0;if(best){x.xf=k;x.box=best.B}
+   const hs=[];for(const q of bad(k)){const a=q.t-.5/f,b=q.t+.5/f,l=hs[hs.length-1];if(l&&a<=l[1]+.01)l[1]=b;else hs.push([a,b])}
+   x.hide=x.hide.concat(hs);x.action=(x.action==='none'?'':x.action+'+')+(best?'face+face-hide':'face-hide');placed.push(x)}}
  for(const x of els){if(x.xf||x.hide.length)LAYOUT.set(x.c,{xf:x.xf,hide:x.hide});
   REPORT.push({kind:x.kind,mode:x.c[3],start:x.s,end:x.c[1],text:String(x.c[2]||'').slice(0,40),action:x.action,takeover:x.takeover,box:x.raw,final:x.box,hide:x.hide,...(x.xf?{move:{dx:x.xf.dx,dy:x.xf.dy,s:x.xf.s}}:{})})}}
-window.__layout=()=>({export:EXPF?EXPF.name||'custom':null,safe:safeRect(),face:FACEZ,elements:REPORT});
+window.__layout=()=>({export:EXPF?EXPF.name||'custom':null,safe:safeRect(),face:FACEZ,faceTrack:!!FTRK,faceSafe:FACESAFE,elements:REPORT});
+// the face check: every caption, title and kinetic word on screen at t, drawn alone with its layout, and how many of its
+// letter pixels land inside the face zone at t (full-frame pixels; 0 is clean). render.mjs samples it into facecheck.json.
+window.__faceInk=t=>{const z=faceAt(t);if(!z)return null;const q={x0:Math.floor(z.x0/4),y0:Math.floor(z.y0/4),x1:Math.ceil(z.x1/4),y1:Math.ceil(z.y1/4)},out=[];
+ for(const c of flips){if(!isText(c)||t<c[0]||t>=c[1])continue;const keep=ctx,L=LAYER;MSX.setTransform(1,0,0,1,0,0);MSX.globalAlpha=1;MSX.clearRect(0,0,270,480);MSX.setTransform(.25,0,0,.25,0,0);ctx=MSX;LAYER='all';
+  try{flip(t,[c])}catch(e){}finally{ctx=keep;LAYER=L}
+  if(cardAt(t))continue; // on a full colour card there is no face to cover
+  const d=MSX.getImageData(q.x0,q.y0,Math.max(1,q.x1-q.x0),Math.max(1,q.y1-q.y0)).data;let n=0;for(let i=3;i<d.length;i+=4)if(d[i]>96)n++;
+  if(n)out.push({kind:kindOf(c),mode:c[3],start:c[0],text:String(c[2]||'').slice(0,40),px:n*16})}
+ return{zone:z,hits:out}};
 // every element on screen at t, each measured alone with its layout applied (hidden ones report no box)
 window.__boxesAt=t=>flips.filter(c=>t>=c[0]&&t<c[1]).map(c=>({kind:kindOf(c),mode:c[3],start:c[0],end:c[1],text:String(c[2]||'').slice(0,40),box:boxNow([c],t,false),takeover:(REPORT.find(r=>r.start===c[0]&&r.mode===c[3])||{}).takeover||false})).filter(x=>x.box);
 function flip(t,only){for(const c of (only||flips)){if(t<c[0]||t>=c[1])continue;if(LAYER==='panels'&&!(PANM(c[3])&&PANB(c)))continue;use(c.ps);const dt=t-c[0],m=c[3],out=c[1]>90?1:cl((c[1]-t)/.05);ctx.save();ctx.globalAlpha=out;{const k=LXF(c,t);if(k===0){ctx.restore();continue}if(k)xfApply(k)}
