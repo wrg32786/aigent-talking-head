@@ -4,15 +4,16 @@
 # What it does: checks Git, Node.js 18+, ffmpeg, Python 3.10+ and Chrome (offers to install missing ones with Homebrew,
 # apt, dnf or pacman), clones or updates the repo, runs npm install, makes the Python venv, and puts a
 # "Talking Head Studio" launcher on your desktop that starts Studio and opens your browser.
-# The Whisper speech model downloads on the first transcription (about 470 MB for small.en), or now with --prefetch-model.
+# Then it installs every extra up front with kit/setup.mjs (npm run setup:all): yt-dlp, instaloader, the Whisper model
+# (small.en, about 470 MB), the effects pass and the humanizer skill, and prints what only you can do.
 # Options: --dir <path> (default ~/aigent-talking-head), --repo <git url>, --branch <name>, --yes (install missing tools
-#   without asking), --no-shortcut, --prefetch-model, --no-open. In CI (CI set) it never asks and never opens a browser.
+#   without asking), --no-shortcut, --minimal (skip the Whisper model and the effects pass), --no-open. In CI (CI set) it never asks and never opens a browser.
 set -euo pipefail
 
 DIR="${AIGENT_DIR:-$HOME/aigent-talking-head}"
 REPO="${AIGENT_REPO:-https://github.com/wrg32786/aigent-talking-head}"
 BRANCH="${AIGENT_BRANCH:-}"
-YES=0; SHORTCUT=1; PREFETCH=0; OPEN=1
+YES=0; SHORTCUT=1; PREFETCH=0; OPEN=1; MINIMAL=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --dir) DIR="$2"; shift 2 ;;
@@ -21,6 +22,7 @@ while [ $# -gt 0 ]; do
     --yes|-y) YES=1; shift ;;
     --no-shortcut) SHORTCUT=0; shift ;;
     --prefetch-model) PREFETCH=1; shift ;;
+    --minimal) MINIMAL=1; shift ;;
     --no-open) OPEN=0; shift ;;
     -h|--help) sed -n '2,10p' "$0" 2>/dev/null || true; exit 0 ;;
     *) echo "Unknown option: $1"; exit 2 ;;
@@ -110,13 +112,13 @@ say "Setting up Python (venv in $DIR/.venv)"
 [ -x .venv/bin/python ] || "$PY" -m venv .venv
 .venv/bin/python -m pip install --quiet --upgrade pip
 .venv/bin/python -m pip install --quiet -r requirements.txt; ok "Python packages"
-# optional reference-link helpers for Studio: yt-dlp (YouTube, TikTok, X, Vimeo; Unlicense) and instaloader (one public
-# Instagram post, anonymous; MIT). Separate programs the kit runs; a failure here does not stop the install.
-if .venv/bin/python -m pip install --quiet --upgrade yt-dlp instaloader; then ok "yt-dlp and instaloader (Studio reference links)"; else warn "yt-dlp did not install; Studio still takes direct video links. Later: .venv/bin/python -m pip install yt-dlp"; fi
-if [ "$PREFETCH" = 1 ]; then
-  say "Downloading the Whisper model (small.en, about 470 MB)"
-  .venv/bin/python -c "from faster_whisper import WhisperModel; WhisperModel('small.en')" && ok "model ready"
-fi
+
+# everything else, up front (kit/setup.mjs, the same as npm run setup:all): yt-dlp and instaloader for reference links,
+# the Whisper model, the effects pass (MediaPipe, OpenCV, rembg), the humanizer skill and the Studio page check.
+# Safe to stop and run again; it only does what is missing. --minimal skips the model and the effects pass.
+say "Installing the extras (reference links, Whisper model, effects)"
+SETUP_ARGS=""; [ "$YES" = 1 ] && SETUP_ARGS="--yes"; [ "$MINIMAL" = 1 ] && SETUP_ARGS="$SETUP_ARGS --skip model,effects"
+PYTHON="$DIR/.venv/bin/python" node kit/setup.mjs $SETUP_ARGS || warn "some extras did not install; the summary above says which and how to fix them"
 
 say "Making the Studio launcher"
 cat > studio.sh <<LAUNCH

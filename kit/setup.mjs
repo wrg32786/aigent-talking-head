@@ -1,0 +1,158 @@
+// Setup: install everything the kit can use, up front, and say what is left for the user.
+//   npm run setup:all [-- --yes] [--skip effects,model] [--json]   install what is missing, then print a summary
+//   npm run setup:all -- --check [--json]                         only report (Studio's Setup check and the MCP
+//                                                                  setup_status tool use the same list)
+// Safe to run again and to stop halfway: every step first checks whether its thing is already there, so a second run
+// only does what is still missing. The last run is kept in jobs/.studio/setup.json (or STUDIO_DIR).
+// Steps: Node packages, the Python venv (.venv) and requirements.txt, yt-dlp and instaloader (reference links),
+// ffmpeg and ffprobe, Chrome, the Whisper model (small.en, about 470 MB), the effects venv (npm run effects:setup:
+// MediaPipe, OpenCV, rembg), the humanizer skill, and the Studio page build.
+// ffmpeg and Chrome are system programs: with --yes it uses Homebrew, winget, or apt/dnf/pacman when sudo works
+// without a password; otherwise it prints the one command for the user to run (it needs their password).
+import { spawnSync } from 'child_process';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { delimiter, dirname, join, resolve } from 'path';
+import { homedir } from 'os';
+import { fileURLToPath } from 'url';
+
+const KIT = dirname(fileURLToPath(import.meta.url)), ROOT = dirname(KIT);
+const WIN = process.platform === 'win32', MAC = process.platform === 'darwin';
+const VENV_PY = join(ROOT, '.venv', WIN ? 'Scripts/python.exe' : 'bin/python');
+const FX_PY = join(ROOT, 'effects', '.venv', WIN ? 'Scripts/python.exe' : 'bin/python');
+export const MODEL = process.env.TX_MODEL || 'small.en';
+const stateDir = () => resolve(process.env.STUDIO_DIR || join(ROOT, 'jobs', '.studio'));
+export const lastRunPath = () => join(stateDir(), 'setup.json');
+
+const onPath = b => (process.env.PATH || '').split(delimiter).filter(Boolean).map(d => [join(d, b), join(d, b + '.exe'), join(d, b + '.cmd')].find(existsSync)).find(Boolean) || null;
+const run = (cmd, args, o = {}) => spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8', timeout: o.timeout || 60e3, stdio: o.inherit ? 'inherit' : 'pipe', shell: WIN && !/\.exe$/i.test(cmd), env: process.env });
+const okRun = (cmd, args, o) => { try { return run(cmd, args, o).status === 0; } catch { return false; } };
+// the Python the kit runs: PYTHON (a path or a name on PATH), else the kit's .venv, else python3 on PATH
+export const python = () => { const e = process.env.PYTHON; if (e && (existsSync(e) || onPath(e))) return e; if (existsSync(VENV_PY)) return VENV_PY; return onPath(WIN ? 'python' : 'python3') ? (WIN ? 'python' : 'python3') : null; };
+const sysPython = () => ['python3.12', 'python3.11', 'python3.13', 'python3.10', 'python3', WIN ? 'py' : null].filter(Boolean)
+  .find(c => onPath(c) && okRun(c, ['-c', 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)']));
+const hfHome = () => process.env.HF_HOME ? join(process.env.HF_HOME, 'hub') : process.env.HUGGINGFACE_HUB_CACHE || join(homedir(), '.cache', 'huggingface', 'hub');
+const modelCached = () => existsSync(join(hfHome(), `models--Systran--faster-whisper-${MODEL}`, 'snapshots'));
+function pm() {
+  if (MAC) return onPath('brew') ? 'brew' : null;
+  if (WIN) return onPath('winget') ? 'winget' : onPath('choco') ? 'choco' : null;
+  return onPath('apt-get') ? 'apt' : onPath('dnf') ? 'dnf' : onPath('pacman') ? 'pacman' : null;
+}
+const SYS = {
+  ffmpeg: { brew: 'brew install ffmpeg', winget: 'winget install --id Gyan.FFmpeg -e', choco: 'choco install ffmpeg -y', apt: 'sudo apt-get install -y ffmpeg', dnf: 'sudo dnf install -y ffmpeg', pacman: 'sudo pacman -S --noconfirm ffmpeg',
+    none: 'Install ffmpeg from https://ffmpeg.org/download.html (a static build is fine; put ffmpeg and ffprobe on PATH)' },
+  chrome: { brew: 'brew install --cask google-chrome', winget: 'winget install --id Google.Chrome -e', choco: 'choco install googlechrome -y', apt: 'sudo apt-get install -y chromium || sudo apt-get install -y chromium-browser', dnf: 'sudo dnf install -y chromium', pacman: 'sudo pacman -S --noconfirm chromium',
+    none: 'Install Chrome from https://www.google.com/chrome/ (or set CHROME_PATH)' },
+};
+const sysFix = what => SYS[what][pm() || 'none'];
+const needsPassword = fix => /^sudo /.test(fix);
+
+// each check: { id, label, need: 'core' | 'feature', feature, ready, detail, fix, user (only the user can do the fix) }
+export function checks() {
+  const py = python(), out = [];
+  const add = (id, label, need, feature, ready, detail, fix, user = false) => out.push({ id, label, need, feature, status: ready ? 'ready' : 'missing', detail, fix: ready ? null : fix, user: ready ? false : user });
+  const nodeMajor = +process.versions.node.split('.')[0];
+  add('node', 'Node.js 18+', 'core', 'everything', nodeMajor >= 18, `Node ${process.versions.node}`, 'Install Node.js 18 or newer from https://nodejs.org', true);
+  add('npm', 'Node packages', 'core', 'MCP tools, rendering, Studio', existsSync(join(ROOT, 'node_modules', '@modelcontextprotocol', 'sdk')) && existsSync(join(ROOT, 'node_modules', 'playwright-core')), 'node_modules', 'npm install');
+  const reqs = py && okRun(py, ['-c', 'import faster_whisper, librosa, PIL, cv2'], { timeout: 60e3 });
+  add('python', 'Python venv and requirements', 'core', 'transcribing, beats, teardown', !!reqs, py ? py : 'no .venv yet', 'npm run setup:all (makes .venv and installs requirements.txt)');
+  add('ffmpeg', 'ffmpeg and ffprobe', 'core', 'drafts, renders, Record now takes, trimming', !!(onPath('ffmpeg') && onPath('ffprobe')), onPath('ffmpeg') || 'not on PATH', sysFix('ffmpeg'), true);
+  let chrome = null; try { chrome = spawnSync(process.execPath, ['-e', 'import("./kit/chrome.mjs").then(m=>console.log(m.findChrome()))'], { cwd: ROOT, encoding: 'utf8', timeout: 10e3 }).stdout.trim() || null; } catch {}
+  add('chrome', 'Chrome or Chromium', 'core', 'rendering titles and graphics', !!chrome, chrome || 'not found', sysFix('chrome'), true);
+  add('model', `Whisper model (${MODEL})`, 'feature', 'the first transcription (else it downloads then)', modelCached(), modelCached() ? 'cached' : 'about 470 MB, not downloaded yet', 'npm run setup:all');
+  const yt = py && okRun(py, ['-m', 'yt_dlp', '--version']) || !!onPath('yt-dlp');
+  add('ytdlp', 'yt-dlp', 'feature', 'YouTube, TikTok, X and Vimeo reference links', !!yt, yt ? 'installed' : 'missing', py ? `${py} -m pip install yt-dlp` : 'npm run setup:all');
+  const ig = py && okRun(py, ['-c', 'import instaloader']);
+  add('instaloader', 'instaloader', 'feature', 'Instagram reference links (anonymous)', !!ig, ig ? 'installed' : 'missing', py ? `${py} -m pip install instaloader` : 'npm run setup:all');
+  const fx = existsSync(FX_PY) && okRun(FX_PY, ['-c', 'import mediapipe, cv2, PIL, numpy']);
+  add('effects', 'Effects pass (MediaPipe, OpenCV, rembg)', 'feature', 'film effects and the person mask', !!fx, fx ? 'effects/.venv' : 'not set up', 'npm run effects:setup');
+  add('humanizer', 'Humanizer skill', 'feature', 'scripts your agent writes', existsSync(join(ROOT, 'skills', 'humanizer', 'SKILL.md')), 'skills/humanizer/SKILL.md', 'git checkout skills/humanizer (it ships with the kit)');
+  let built = false, why = 'missing';
+  try { const stamp = JSON.parse(readFileSync(join(KIT, 'studio', 'public', 'build.json'), 'utf8')); built = existsSync(join(KIT, 'studio', 'public', 'index.html')); why = built ? 'built ' + (stamp.built || '') : why; } catch {}
+  add('studio', 'Studio page', 'core', 'Studio', built, why.trim(), 'npm run studio:build');
+  return out;
+}
+
+// for Studio and the MCP tool: the list, plus the plain-words list of what only the user can do
+export function status() {
+  const items = checks(), missing = items.filter(x => x.status !== 'ready');
+  let last = null; try { last = JSON.parse(readFileSync(lastRunPath(), 'utf8')); } catch {}
+  return { ready: !missing.some(x => x.need === 'core'), items, missing: missing.length, forUser: missing.filter(x => x.user).map(x => tellUser(x)), lastRun: last && { at: last.at, summary: last.summary } };
+}
+export function tellUser(x) {
+  if (x.id === 'ffmpeg' || x.id === 'chrome') return needsPassword(x.fix) ? `Installing ${x.label} needs your password: run ${x.fix}` : `Install ${x.label}: run ${x.fix}`;
+  if (x.id === 'node') return x.fix;
+  return `${x.label}: run ${x.fix}`;
+}
+
+// ---------- install ----------
+function step(name, fn, log) {
+  log(`\n== ${name}`);
+  try { const r = fn(); return { name, ...r }; } catch (e) { return { name, result: 'failed', detail: e.message }; }
+}
+const sh = (cmd, args, log, timeout = 30 * 60e3) => { log('$ ' + [cmd, ...args].join(' ')); const r = run(cmd, args, { inherit: true, timeout }); if (r.status !== 0) throw new Error(`${cmd} ${args[0] || ''} exited ${r.status ?? r.signal}`); };
+function trySystem(what, yes, log) {
+  const fix = sysFix(what), p = pm();
+  if (!yes) return { result: 'needs you', detail: fix };
+  if (!p) return { result: 'needs you', detail: fix };
+  if (needsPassword(fix) && !(process.getuid && process.getuid() === 0) && !okRun('sudo', ['-n', 'true'])) return { result: 'needs you', detail: `needs your password: run ${fix}` };
+  const line = (process.getuid && process.getuid() === 0) ? fix.replace(/sudo /g, '') : fix;
+  if (p === 'apt') okRun('sh', ['-c', (line.startsWith('sudo') ? 'sudo -n ' : '') + 'apt-get update -qq'], { timeout: 10 * 60e3 });
+  const r = run(WIN ? 'cmd' : 'sh', WIN ? ['/c', line.replace(/^sudo /, 'sudo -n ')] : ['-c', line.replace(/sudo /g, 'sudo -n ')], { inherit: true, timeout: 30 * 60e3 });
+  return r.status === 0 ? { result: 'installed' } : { result: 'failed', detail: `run ${fix}` };
+}
+
+export function install({ yes = false, skip = [], log = console.log } = {}) {
+  const res = [], has = id => checks().find(x => x.id === id).status === 'ready';
+  const skipIf = (id, fn) => skip.includes(id) ? { name: id, result: 'skipped', detail: 'skipped with --skip' } : fn();
+  res.push(skipIf('npm', () => step('Node packages', () => { if (has('npm')) return { result: 'ready' }; sh(WIN ? 'npm.cmd' : 'npm', ['install', '--no-audit', '--no-fund', '--loglevel=error'], log); return { result: 'installed' }; }, log)));
+  res.push(skipIf('python', () => step('Python venv and requirements', () => {
+    if (has('python')) return { result: 'ready' };
+    const own = process.env.PYTHON && (existsSync(process.env.PYTHON) || onPath(process.env.PYTHON)) ? process.env.PYTHON : null, target = own || VENV_PY;
+    if (!own && !existsSync(VENV_PY)) { const sp = sysPython(); if (!sp) return { result: 'needs you', detail: 'Install Python 3.10 or newer from https://www.python.org/downloads/' }; sh(sp, ['-m', 'venv', join(ROOT, '.venv')], log); }
+    sh(target, ['-m', 'pip', 'install', '--quiet', '--upgrade', 'pip'], log); sh(target, ['-m', 'pip', 'install', '--quiet', '-r', join(ROOT, 'requirements.txt')], log);
+    return { result: 'installed' };
+  }, log)));
+  const py = python();
+  res.push(skipIf('ytdlp', () => step('yt-dlp and instaloader', () => {
+    if (has('ytdlp') && has('instaloader')) return { result: 'ready' };
+    if (!py) return { result: 'failed', detail: 'needs the Python venv first' };
+    sh(py, ['-m', 'pip', 'install', '--quiet', '--upgrade', 'yt-dlp', 'instaloader'], log); return { result: 'installed' };
+  }, log)));
+  res.push(skipIf('ffmpeg', () => step('ffmpeg and ffprobe', () => has('ffmpeg') ? { result: 'ready' } : trySystem('ffmpeg', yes, log), log)));
+  res.push(skipIf('chrome', () => step('Chrome', () => has('chrome') ? { result: 'ready' } : trySystem('chrome', yes, log), log)));
+  res.push(skipIf('model', () => step(`Whisper model (${MODEL})`, () => {
+    if (modelCached()) return { result: 'ready' };
+    if (!py) return { result: 'failed', detail: 'needs the Python venv first' };
+    sh(py, ['-c', `from faster_whisper import WhisperModel; WhisperModel(${JSON.stringify(MODEL)}, device="cpu", compute_type="int8")`], log); return { result: 'installed' };
+  }, log)));
+  res.push(skipIf('effects', () => step('Effects pass', () => { if (has('effects')) return { result: 'ready' }; sh(process.execPath, [join(ROOT, 'effects', 'setup.mjs')], log); return { result: 'installed' }; }, log)));
+  res.push(skipIf('humanizer', () => step('Humanizer skill', () => has('humanizer') ? { result: 'ready' } : { result: 'failed', detail: 'skills/humanizer is missing from this copy: git checkout skills/humanizer' }, log)));
+  res.push(skipIf('studio', () => step('Studio page', () => { if (has('studio')) return { result: 'ready' }; sh(process.execPath, [join(KIT, 'studio', 'build.mjs')], log); return { result: 'installed' }; }, log)));
+  const summary = { ready: res.filter(r => r.result === 'ready').length, installed: res.filter(r => r.result === 'installed').length, skipped: res.filter(r => r.result === 'skipped').length, failed: res.filter(r => r.result === 'failed').length, needsYou: res.filter(r => r.result === 'needs you').length };
+  const rec = { at: new Date().toISOString(), steps: res, summary };
+  try { mkdirSync(stateDir(), { recursive: true }); writeFileSync(lastRunPath(), JSON.stringify(rec, null, 2) + '\n'); } catch {}
+  return rec;
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const argv = process.argv.slice(2), flag = k => argv.includes('--' + k);
+  const opt = k => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : undefined; };
+  const VALUED = new Set(['skip']), json = flag('json'), skipArg = opt('skip') || '';
+  if (flag('check')) {
+    const s = status();
+    if (json) console.log(JSON.stringify(s, null, 2));
+    else { for (const x of s.items) console.log(`${x.status === 'ready' ? 'ready  ' : 'MISSING'}  ${x.label}${x.status === 'ready' ? '' : `  (${x.feature}) fix: ${x.fix}`}`); if (s.forUser.length) console.log('\nFor you:\n- ' + s.forUser.join('\n- ')); }
+    process.exit(s.ready ? 0 : 1);
+  }
+  const rec = install({ yes: flag('yes'), skip: skipArg.split(',').map(x => x.trim()).filter(Boolean), log: json ? (m => process.stderr.write(m + '\n')) : console.log });
+  const s = status();
+  if (json) console.log(JSON.stringify({ ...rec, status: s }, null, 2));
+  else {
+    console.log('\nSetup summary');
+    for (const r of rec.steps) console.log(`  ${r.result.padEnd(10)} ${r.name}${r.detail ? ': ' + r.detail : ''}`);
+    console.log(`  ${rec.summary.installed} installed, ${rec.summary.ready} already there, ${rec.summary.skipped} skipped, ${rec.summary.failed} failed, ${rec.summary.needsYou} need you`);
+    if (s.forUser.length) console.log('\nOnly you can do these:\n- ' + s.forUser.join('\n- '));
+    console.log(s.ready ? '\nSETUP READY' : '\nSETUP INCOMPLETE (see above)');
+  }
+  process.exit(rec.summary.failed ? 1 : 0);
+}

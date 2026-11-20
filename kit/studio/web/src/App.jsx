@@ -11,6 +11,8 @@ import { Render } from './Render.jsx';
 import { Chat } from './Chat.jsx';
 import { Settings } from './Settings.jsx';
 import { PicksTray } from './Picks.jsx';
+import { Connect } from './Connect.jsx';
+import { SetupCheck } from './Setup.jsx';
 
 const hashStep = () => (location.hash.match(/step=([a-z]+)/) || [])[1];
 const hashMenu = () => (location.hash.match(/menu=([a-z-]+)/) || [])[1];
@@ -28,6 +30,8 @@ export function App() {
   const [glass, setGlassState] = useState(document.documentElement.dataset.glass !== 'off');
   const [chatOpen, setChatOpen] = useState(/chat/.test(location.hash));
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [connectOpen, setConnectOpen] = useState(/connect/.test(location.hash));
+  const [setupOpen, setSetupOpen] = useState(/setup/.test(location.hash));
   const [log, setLog] = useState('');
   const [recLive, setRecLive] = useState(null);
   const mainRef = useRef(null);
@@ -72,7 +76,9 @@ export function App() {
   const picksAny = Object.values(s.picks).some(p => p.allow.length || p.deny.length);
   const done = { footage: !!(s.footage.length || s.clips), reference: !!s.reference.extracted, style: !!(s.pack || picksAny), render: !!(V.outputs || []).length };
   const i = STEPS.indexOf(step);
-  const ctx = { CAT, V, s, apply, patch, go, reloadCat, setLog, log };
+  const openConnect = () => { setSettingsOpen(false); setChatOpen(false); setConnectOpen(true); };
+  const openSetup = () => { setSettingsOpen(false); setSetupOpen(true); };
+  const ctx = { CAT, V, s, apply, patch, go, reloadCat, setLog, log, openConnect, openSetup };
   const env = V.env, a = env.agent || {}, agentState = env.backend !== 'agent' ? 'alt' : a.listening ? 'on' : a.connected ? 'busy' : 'off';
   const pill = !t ? 'Ready' : running ? `${cap1(t.kind)} running` : t.status === 'failed' ? `${cap1(t.kind)} failed` : `${cap1(t.kind)} ${t.status}`;
 
@@ -91,6 +97,8 @@ export function App() {
         </ol></nav>
         <div className="topr">
           {recLive && step !== 'footage' && <button type="button" className="rec-pill" id="rec-pill" onClick={() => go('footage', true)} aria-label="Recording, go back to the recorder"><i aria-hidden="true" />{recLive.phase === 'paused' ? 'Paused' : recLive.phase === 'saving' ? 'Saving take' : 'Recording'}</button>}
+          {env.setup && !env.setup.ready && <button type="button" className="setup-pill" id="setup-pill" onClick={openSetup}><Icon n="ban" />{Object.values(env.setup.missing).filter(x => x.need === 'core').length} missing</button>}
+          <button type="button" className={'connect-btn ' + agentState} id="connect-open" aria-haspopup="dialog" onClick={openConnect} title={agentState === 'on' ? `${a.name} connected` : 'Connect your terminal agent'}><Icon n="plug" /><span className="cb-l">{agentState === 'on' || agentState === 'busy' ? (a.name || 'Agent') : 'Connect agent'}</span></button>
           <span id="taskpill" role="status" aria-live="polite"><Badge label={pill} variant={running ? 'cyan' : t && t.status === 'failed' ? 'error' : 'neutral'} /></span>
           <IconBtn id="theme" n={theme === 'dark' ? 'sun' : 'moon'} label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
           <button className="icon-btn fab" id="chat-open" type="button" aria-controls="chat" aria-expanded={String(chatOpen)} aria-label="Open chat" onClick={() => setChatOpen(true)}><Icon n="chat" /><span className={'dot ' + agentState} id="fab-dot" aria-hidden="true" /></button>
@@ -112,6 +120,8 @@ export function App() {
         <Chat {...ctx} open={chatOpen} setOpen={setChatOpen} agentState={agentState} />
       </div>
       <Settings {...ctx} open={settingsOpen} setOpen={setSettingsOpen} theme={theme} setTheme={setTheme} glass={glass} setGlass={setGlass} />
+      <Connect {...ctx} open={connectOpen} setOpen={setConnectOpen} />
+      <SetupCheck open={setupOpen} setOpen={setSetupOpen} />
       <Toast />
     </Theme>
   );

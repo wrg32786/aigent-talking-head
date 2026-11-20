@@ -1,12 +1,14 @@
 // Record now: film takes with this computer's camera and mic, right in the Footage step.
 // The preview is the camera as it is; the recording is cropped to the chosen frame (9:16 by default) on a canvas,
 // recorded with MediaRecorder and sent to the server in numbered one-second chunks while you film.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';
 import { Switch } from '@astryxdesign/core/Switch';
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
 import { api, file, toast, RM, cue, Icon, IconBtn } from './lib.jsx';
+import { SpeedBar, PrompterText, PopoutPanel, useRoll, usePopout, clampWpm, pace, canPip, WPM_STEP } from './Prompter.jsx';
+import { NeedFix } from './Setup.jsx';
 
 const FRAMES = { '9:16': 9 / 16, '16:9': 16 / 9, '1:1': 1 };
 const MIMES = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4;codecs=avc1,mp4a', 'video/mp4'];
@@ -47,7 +49,8 @@ export function Recorder({ V, s, apply, onClose, onLive, visible = true, scriptI
   const [wpm, setWpm] = useState(+(localStorage.getItem('studio.rec.wpm') || 150));
   const [fontPx, setFontPx] = useState(+(localStorage.getItem('studio.rec.font') || 22));
   const [flipText, setFlipText] = useState(localStorage.getItem('studio.rec.flip') === '1');
-  const [nudge, setNudge] = useState(0);
+  const [rehearse, setRehearse] = useState('off'); // off | running | paused: scroll the script with no recording
+  const [rollKey, setRollKey] = useState(0);
   const [count, setCount] = useState(0), [secs, setSecs] = useState(0), [level, setLevel] = useState(0), [lastId, setLastId] = useState(null);
   const remember = (k, v) => localStorage.setItem('studio.rec.' + k, typeof v === 'boolean' ? (v ? '1' : '0') : String(v));
   const busy = ['countdown', 'recording', 'paused', 'saving'].includes(phase);
@@ -140,7 +143,7 @@ export function Recorder({ V, s, apply, onClose, onLive, visible = true, scriptI
   const stop = () => { const m = rec.current && rec.current.mr; if (m && m.state !== 'inactive') m.stop(); };
   const retake = async id => { await api('/api/record/take', { id, action: 'discard' }).then(apply).catch(() => {}); begin(); };
 
-  // teleprompter pacer: timer pacing at the chosen WPM, on the take's own clock (starts after the countdown, stops
+  // teleprompter: smooth scroll at the chosen WPM (Prompter.jsx), started by the take (after the countdown, stops
   // when you pause). [pause] holds a line 1.5 s longer. Voice follow is not used: Chrome's speech recognition sends
   // the audio to a server, and Studio keeps everything on this computer.
   const scripts = (V && V.scripts) || [];
@@ -150,34 +153,37 @@ export function Recorder({ V, s, apply, onClose, onLive, visible = true, scriptI
     api('/api/scripts/get?id=' + encodeURIComponent(src)).then(j => { setPicked(j.script); if (j.script.wpm && !localStorage.getItem('studio.rec.wpm')) setWpm(j.script.wpm); }).catch(() => { setSrc('paste'); });
   }, [src, (scripts.find(x => x.id === src) || {}).updated]);
   const text = picked ? picked.text : script;
-  const lines = cue(text, wpm);
+  const lines = useMemo(() => cue(text, wpm), [text, wpm]);
   const total = lines.reduce((a, x) => a + x.dur, 0);
-  const tNow = phase === 'recording' || phase === 'paused' ? secs : 0;
-  let at = lines.findIndex(x => tNow < x.at + x.dur); if (at < 0) at = lines.length - 1;
-  const line = Math.max(0, Math.min(lines.length - 1, at + nudge));
-  useEffect(() => { if (phase === 'countdown') setNudge(0); }, [phase]);
-  useEffect(() => {
-    const box = prompter.current; if (!box) return;
-    const el = box.querySelector(`[data-line="${line}"]`); if (!el) return;
-    box.querySelector('.rp-roll').style.transform = `translateY(${-el.offsetTop + 6}px)`;
-  }, [line, text, fontPx, prompt, phase]);
+  const setSpeed = v => { const w = clampWpm(typeof v === 'function' ? v(wpm) : v); setWpm(w); remember('wpm', w); };
+  const keyRef = useRef(null);
+  const pop = usePopout(keyRef);
+  const { roll, line, nudge, place } = useRoll({ lines, rolling: phase === 'recording' || rehearse === 'running', reset: rollKey, still: RM, win: pop.win });
+  useEffect(() => { if (phase === 'countdown') { setRehearse('off'); setRollKey(k => k + 1); } }, [phase]);
+  useEffect(() => { requestAnimationFrame(place); }, [pop.el, fontPx, prompt, text]);
+  const startRehearse = () => { setRollKey(k => k + 1); setRehearse('running'); };
+  const stopRehearse = () => { setRehearse('off'); setRollKey(k => k + 1); };
+  const popOut = async () => { if (!(await pop.open())) toast('The browser blocked the pop-out. Allow pop-ups for this page and try again.'); };
   // keys while the recorder is on screen: Space record or stop, P pause, up and down change the WPM, left and right move a line
   useEffect(() => {
     if (!visible) return;
     const onKey = e => {
-      if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === ' ' && !document.activeElement.closest('button, [role="switch"]')) { e.preventDefault(); if (phase === 'ready') begin(); else if (phase === 'recording' || phase === 'paused') stop(); }
+      const el = e.target && e.target.tagName ? e.target : document.activeElement;
+      if ((/INPUT|TEXTAREA|SELECT/.test(el.tagName) && el.type !== 'range') || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === ' ' && !(e.target.closest && e.target.closest('button, [role="switch"]'))) { e.preventDefault(); if (rehearse !== 'off') setRehearse(r => (r === 'running' ? 'paused' : 'running')); else if (phase === 'ready') begin(); else if (phase === 'recording' || phase === 'paused') stop(); }
       else if (e.key === 'p' || e.key === 'P') { if (phase === 'recording' || phase === 'paused') { e.preventDefault(); pause(); } }
-      else if (prompt && e.key === 'ArrowUp') { e.preventDefault(); setWpm(w => { const v = Math.min(260, w + 10); remember('wpm', v); return v; }); }
-      else if (prompt && e.key === 'ArrowDown') { e.preventDefault(); setWpm(w => { const v = Math.max(60, w - 10); remember('wpm', v); return v; }); }
-      else if (prompt && e.key === 'ArrowRight') { e.preventDefault(); setNudge(n => n + 1); }
-      else if (prompt && e.key === 'ArrowLeft') { e.preventDefault(); setNudge(n => n - 1); }
+      else if (prompt && e.key === 'ArrowUp') { e.preventDefault(); setSpeed(w => w + WPM_STEP); }
+      else if (prompt && e.key === 'ArrowDown') { e.preventDefault(); setSpeed(w => w - WPM_STEP); }
+      else if (prompt && e.key === 'ArrowRight') { e.preventDefault(); nudge(1); }
+      else if (prompt && e.key === 'ArrowLeft') { e.preventDefault(); nudge(-1); }
     };
+    keyRef.current = onKey;
     document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey);
   });
 
   const takes = (s.takes || []).slice().reverse();
   const live = phase !== 'off' && phase !== 'asking' && phase !== 'insecure';
+  const showPrompt = prompt && (live || rehearse !== 'off' || !!pop.el);
   return <div className="recorder glass-card" id="recorder" aria-label="Record now">
     <div className="rec-head"><h3><Icon n="camera" />Record now</h3>
       {phase === 'recording' && <span className="rec-live" role="status"><i aria-hidden="true" />Recording {clock(secs)}</span>}
@@ -189,7 +195,7 @@ export function Recorder({ V, s, apply, onClose, onLive, visible = true, scriptI
       <div className="rec-main">
       <div className={'rec-stage f' + frame.replace(':', 'x')} data-frame={frame}>
         <video ref={video} className={mirror ? 'mirror' : ''} muted playsInline aria-label="Camera preview" hidden={!live} />
-        {!live && <div className="rec-off">
+        {!live && rehearse === 'off' && <div className="rec-off">
           {phase === 'insecure' ? <p>The camera needs Studio opened at http://127.0.0.1 or localhost on this computer.</p>
             : <><Icon n="camera" className="big" /><p>{err || 'Studio asks for your camera and mic. Nothing leaves this computer.'}</p>
               <Button id="rec-enable" variant="primary" size="lg" label={err ? 'Try again' : 'Turn on camera'} isLoading={phase === 'asking'} onClick={() => startCamera()} /></>}
@@ -198,10 +204,12 @@ export function Recorder({ V, s, apply, onClose, onLive, visible = true, scriptI
           <i className="v1" /><i className="v2" /><i className="h1" /><i className="h2" />
           <span className="head">Head</span><span className="caps">Captions</span>
         </div>}
-        {live && prompt && <div className={'rec-prompter' + (flipText ? ' flip' : '') + (RM ? ' still' : '')} ref={prompter} aria-label="Teleprompter" style={{ fontSize: fontPx }}>
-          <div className="rp-roll">{lines.length ? lines.map((x, i) => <p key={i} data-line={i} className={(i === line ? 'now' : i < line ? 'past' : '') + (x.pause ? ' hold' : '')}>{x.section && <em>{x.section}</em>}{x.text}{x.pause > 0 && <span className="rp-pause" aria-label="pause">||</span>}</p>)
-            : <p className="fine">Pick a script or paste one on the right.</p>}</div>
-        </div>}
+        {showPrompt && !pop.el && <>
+          <PrompterText lines={lines} line={line} roll={roll} flip={flipText} still={RM} fontPx={fontPx} className={live ? '' : 'solo'} />
+          <div className="rp-dock"><SpeedBar wpm={wpm} setWpm={setSpeed} />
+            <IconBtn id="rp-popout" n="popout" label="Pop out the teleprompter" onClick={popOut} /></div>
+        </>}
+        {showPrompt && pop.el && <div className="rp-away" role="status"><Icon n="popout" />The teleprompter is in its own window.<button type="button" className="rp-chip" id="rp-return" onClick={pop.close}>Bring it back</button></div>}
         {phase === 'countdown' && <div className={'rec-count' + (RM ? ' still' : '')} key={count} aria-live="assertive">{count}</div>}
       </div>
       <div className="rec-bar">
@@ -212,6 +220,11 @@ export function Recorder({ V, s, apply, onClose, onLive, visible = true, scriptI
           <button type="button" className="rec-btn on" id="rec-stop" aria-label="Stop and save the take" disabled={phase === 'countdown'} onClick={stop}><span /></button>
         </>}
         {phase === 'saving' && <span className="fine">Saving</span>}
+        {prompt && !busy && (rehearse === 'off'
+          ? <Button id="rec-rehearse" size="sm" variant="secondary" label="Rehearse" onClick={startRehearse} />
+          : <><IconBtn id="rec-rehearse-pause" n={rehearse === 'paused' ? 'play' : 'pause'} label={rehearse === 'paused' ? 'Resume rehearsal' : 'Pause rehearsal'} onClick={() => setRehearse(r => (r === 'running' ? 'paused' : 'running'))} />
+            <Button id="rec-rehearse-stop" size="sm" variant="secondary" label="Stop rehearsal" onClick={stopRehearse} /></>)}
+        {rehearse !== 'off' && <span className="rec-live reh" role="status">{rehearse === 'paused' ? 'Rehearsal paused' : 'Rehearsing, not recording'}</span>}
         <span className="rec-format fine">{frame}{pickMime() ? ', ' + pickMime().split(';')[0].replace('video/', '') : ''}</span>
       </div>
       </div>
@@ -239,12 +252,13 @@ export function Recorder({ V, s, apply, onClose, onLive, visible = true, scriptI
             {scripts.map(x => <option key={x.id} value={x.id}>{x.title} ({x.words} words)</option>)}
           </select>
           {src === 'paste' && <textarea id="rec-script" rows={4} aria-label="Script to read" placeholder="Paste what you will say" value={script} onChange={e => { setScript(e.target.value); localStorage.setItem('studio.script', e.target.value); }} />}
-          <label className="lbl" htmlFor="rec-wpm">Pace <b>{wpm} WPM</b>{total ? `, about ${Math.round(total)} s` : ''}</label>
-          <input id="rec-wpm" type="range" min={60} max={260} step={5} value={wpm} onChange={e => { setWpm(+e.target.value); remember('wpm', e.target.value); }} />
+          <label className="lbl" htmlFor="rec-wpm">Speed <b>{wpm} WPM, {pace(wpm).toLowerCase()}</b>{total ? `, about ${Math.round(total)} s` : ''}</label>
+          <input id="rec-wpm" type="range" min={60} max={260} step={5} value={wpm} onChange={e => setSpeed(+e.target.value)} />
           <label className="lbl" htmlFor="rec-font">Text size <b>{fontPx}</b></label>
           <input id="rec-font" type="range" min={14} max={44} step={1} value={fontPx} onChange={e => { setFontPx(+e.target.value); remember('font', e.target.value); }} />
           <Switch id="rec-flip" size="sm" label="Mirror text (beam splitter)" value={flipText} onChange={v => { setFlipText(v); remember('flip', v); }} />
-          <p className="fine">Paced by a timer from the start of the take. Space records or stops, P pauses, arrows change the pace or move a line.</p>
+          <Button id="rec-popout" size="sm" variant="secondary" label={pop.el ? 'Bring the teleprompter back' : 'Pop out the teleprompter'} onClick={() => (pop.el ? pop.close() : popOut())} />
+          <p className="fine">Scrolls at your speed from the start of the take. Up and down change the speed while it scrolls, left and right move a line, Space records or stops (or pauses a rehearsal), P pauses. {canPip() ? 'The pop-out stays on top of other windows in this browser.' : 'The pop-out is a normal window here; Chrome and Edge keep it on top.'}</p>
         </>}
       </div>
     </div>
@@ -263,6 +277,11 @@ export function Recorder({ V, s, apply, onClose, onLive, visible = true, scriptI
         </span>
       </li>)}
     </ol>}
+    {prompt && <PopoutPanel pop={pop} wpm={wpm} setWpm={setSpeed} phase={phase} secs={secs} count={count} rehearse={rehearse}
+      text={<PrompterText lines={lines} line={line} roll={roll} flip={flipText} still={RM} fontPx={Math.round(fontPx * 1.4)} className="big" />}
+      onRecord={begin} onStop={stop} onPause={pause} onRehearse={startRehearse} onRehearsePause={() => setRehearse(r => (r === 'running' ? 'paused' : 'running'))} onRehearseStop={stopRehearse}
+      flip={flipText} setFlip={v => { setFlipText(v); remember('flip', v); }} fontPx={fontPx} setFontPx={v => { setFontPx(v); remember('font', v); }} />}
+    <NeedFix V={V} ids={['ffmpeg']} what="Saving takes as mp4" />
     <canvas ref={canvas} hidden />
   </div>;
 }

@@ -62,7 +62,7 @@ Studio is a local page for making a reel without memorising commands. Drop in yo
 Install aigent-talking-head, set up Studio from AGENTS.md and run the Studio chat loop.
 ```
 
-The agent clones and installs the kit, registers the MCP server in its own config (`npm run studio:connect -- claude`, `codex` or `cursor`), starts Studio with `npm run studio:agent`, opens the page and listens. Step by step for each agent: [docs/setup-with-ai.md](docs/setup-with-ai.md) and the Studio section of [AGENTS.md](AGENTS.md).
+The agent clones the kit and installs everything up front with `npm run setup:all` (Python, the downloaders, the Whisper model, the effects, the humanizer skill), then tells you only what it cannot do itself, like a password prompt. It registers the MCP server in its own config, starts Studio with `npm run studio:agent`, opens the page and listens. In Studio, **Connect agent** shows the exact command for Claude Code, Codex, Cursor, Gemini CLI, OpenCode or any MCP client, with your install's paths filled in and a copy button, and turns green when the agent connects. Step by step for each agent: [docs/setup-with-ai.md](docs/setup-with-ai.md) and the Studio section of [AGENTS.md](AGENTS.md).
 
 **No terminal?** One line installs everything and puts a "Talking Head Studio" icon on your desktop:
 
@@ -78,6 +78,16 @@ Then run `npm run studio` (or click the icon). Without an agent the chat works o
 <img src="docs/studio/ref-url-desktop.png" width="720" alt="Studio Reference step: a pasted YouTube link broken down into 90 seconds, 17 shots, 123 BPM and a 5.29 second average shot, a shot timeline with a beat grid, tags for what was found, suggested picks as chips, and a contact sheet">
 
 **Record now.** No clip yet? Film it in the Footage step with your computer's camera and mic. Pick the camera and mic, choose 9:16 (the default), 16:9 or 1:1, and record with a 3, 2, 1 countdown, pause and a timer. Framing guides show where your head goes so titles can sit behind it and captions below, and an optional teleprompter scrolls your script near the lens. Every take is listed with a thumbnail: keep it, drop it from the edit, or retake. A kept take is converted to an mp4 and joins your footage right away, and your agent gets a one-line note ("New take recorded: 42 s"). The recording is sent to Studio in small pieces as you film, so a long take is not lost to one failed upload, and nothing leaves your computer. Browsers only allow the camera on a secure page, which `http://127.0.0.1` is. On a phone, open Studio on the phone itself or over https; Studio never opens itself to your network.
+
+<img src="docs/studio/connect-desktop.png" width="520" alt="Connect agent in Studio: pick your agent from a grid, then numbered steps with the claude mcp add command and the hook command filled in with this install's paths, each with a copy button, and the status waiting for your agent"> <img src="docs/studio/connect-phone.png" width="190" alt="Connect agent on a phone, as a full-screen sheet">
+
+**Footage from a link.** Paste a public Dropbox or Google Drive share link, or a plain video URL, and it downloads into your footage with its size and progress, past Drive's virus-scan page for big files. Private links say they need a login.
+
+<img src="docs/studio/footage-link.png" width="520" alt="The Footage step with a link box: a Google Drive file downloaded into the footage, and a private link with the line This link needs a login">
+
+**Teleprompter you can steer.** It scrolls at your speed, and you change it while it scrolls with plus and minus, a slider or the arrow keys, shown as WPM with slow, normal or fast. Rehearse scrolls with nothing recorded, and **Pop out** puts it in its own small window you can drag next to your camera (on top of other apps in Chrome and Edge), in sync with the page.
+
+<img src="docs/studio/teleprompter-speed.png" width="420" alt="Rehearsing: the teleprompter scrolls over the camera preview with a speed bar showing 150 WPM, Normal"> <img src="docs/studio/teleprompter-popout.png" width="300" alt="The teleprompter pop-out window with large text, the speed bar and Stop">
 
 <p>
 <img src="docs/studio/record-desktop.png" width="520" alt="Studio Record now: a 9:16 camera preview with framing guides for the head and the caption band, the record button and timer, camera and mic pickers with a mic level meter, frame, mirror, guides, countdown and teleprompter switches, the script box, and a saved take marked In footage">

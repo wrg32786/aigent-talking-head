@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { ProgressBar } from '@astryxdesign/core/ProgressBar';
+import { NeedFix } from './Setup.jsx';
 import { api, file, toast, fmtS, cap1, Icon } from './lib.jsx';
 import { Compare, Cleanup, Receipt } from './Review.jsx';
 
@@ -26,6 +27,7 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
 
   return <section className="step" id="s-render" data-step="render" aria-labelledby="h-render" hidden={hidden}>
     <header className="sh"><h2 id="h-render">Render</h2><p className="sub">Draft, check the picks, then render.</p></header>
+    <NeedFix V={V} ids={['ffmpeg', 'python', 'chrome', 'npm']} what="Drafting and rendering" />
     <div className="runbar glass-card">
       <Button id="draft" size="lg" variant={drafted ? 'secondary' : 'primary'} label={drafted ? 'Redraft' : 'Draft'} isDisabled={running || !s.job || (!s.footage.length && !s.clips)}
         onClick={() => { setChoices(null); setReceipt(null); setLog(''); api('/api/draft', {}).then(apply).catch(() => {}); }} />

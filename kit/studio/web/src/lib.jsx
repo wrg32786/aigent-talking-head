@@ -56,6 +56,9 @@ const P = {
   trash: <path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13" />,
   edit: <path d="M4 20h4L19 9l-4-4L4 16zM13 7l4 4" />,
   dup: <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M4 16V5a1 1 0 0 1 1-1h11" /></>,
+  plug: <path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4" />,
+  minus: <path d="M5 12h14" />,
+  popout: <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />,
   spark: <path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" />,
 };
 export const Icon = ({ n, className }) => <svg className={'ic' + (className ? ' ' + className : '')} viewBox="0 0 24 24" aria-hidden="true">{P[n]}</svg>;

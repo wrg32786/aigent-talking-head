@@ -7,14 +7,12 @@
 // Safe to run again: it only adds what is missing. Restart the agent (or reload its MCP servers) once afterwards.
 import { spawnSync } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { dirname, join, resolve, delimiter } from 'path';
+import { dirname, join, delimiter } from 'path';
 import { homedir } from 'os';
-import { fileURLToPath } from 'url';
 
-const ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
-const NAME = 'aigent-talking-head', MCP = join(ROOT, 'kit', 'mcp.mjs'), HOOK = join(ROOT, 'kit', 'studio', 'hooks', 'studio-pending.mjs');
-const PY = process.env.PYTHON || [join(ROOT, '.venv', 'bin', 'python'), join(ROOT, '.venv', 'Scripts', 'python.exe')].find(existsSync) || null;
-const NODE = process.execPath;
+// the paths and names are shared with the Connect agent dialog in Studio (kit/studio/agents.mjs)
+import { ROOT, NAME, MCP, HOOK, NODE, python } from './agents.mjs';
+const PY = python();
 const onPath = b => (process.env.PATH || '').split(delimiter).some(d => existsSync(join(d, b)) || existsSync(join(d, b + '.cmd')) || existsSync(join(d, b + '.exe')));
 const say = m => console.log(m);
 const readJson = f => { try { return JSON.parse(readFileSync(f, 'utf8')); } catch { return {}; } };

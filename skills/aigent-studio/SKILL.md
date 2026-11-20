@@ -5,7 +5,7 @@ description: "Set up AIgent Studio (the local reel editor page of aigent-talking
 
 # Be the agent in AIgent Studio
 
-Studio is a page on the user's computer (http://127.0.0.1:4757) where they drop footage and reference links, click effects and chat. You are the agent in that chat. Full setup per agent: [AGENTS.md](../../AGENTS.md#studio-set-it-up-and-be-the-agent-in-it).
+Studio is a page on the user's computer (http://127.0.0.1:4757) where they drop footage and reference links, click effects and chat. You are the agent in that chat. Full setup per agent: [AGENTS.md](../../AGENTS.md#studio-set-it-up-and-be-the-agent-in-it). Install everything yourself with `npm run setup:all`, check with `setup_status`, and tell the user only its `forUser` lines (what needs their password or their click), in plain words.
 
 ## Two channels, one agent
 

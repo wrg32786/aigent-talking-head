@@ -3,9 +3,10 @@
 # What it does: checks Git, Node.js 18+, ffmpeg, Python 3.10+ and Chrome (offers to install missing ones with winget),
 # clones or updates the repo, runs npm install, makes the Python venv, and puts a "Talking Head Studio" shortcut on
 # your desktop that starts Studio and opens your browser.
-# The Whisper speech model downloads on the first transcription (about 470 MB for small.en), or now with -PrefetchModel.
+# Then it installs every extra up front with kit/setup.mjs (npm run setup:all): yt-dlp, instaloader, the Whisper model
+# (small.en, about 470 MB), the effects pass and the humanizer skill, and prints what only you can do.
 # Options (when saved as a file): -Dir <path> (default $HOME\aigent-talking-head), -Repo <git url>, -Branch <name>,
-#   -Yes (install missing tools without asking), -NoShortcut, -PrefetchModel. In CI (CI set) it never asks.
+#   -Yes (install missing tools without asking), -NoShortcut, -Minimal (skip the Whisper model and the effects pass). In CI (CI set) it never asks.
 # Settings also come from env vars when piped: AIGENT_DIR, AIGENT_REPO, AIGENT_BRANCH, AIGENT_YES=1.
 param(
   [string]$Dir = $(if ($env:AIGENT_DIR) { $env:AIGENT_DIR } else { Join-Path $HOME 'aigent-talking-head' }),
@@ -13,7 +14,8 @@ param(
   [string]$Branch = $env:AIGENT_BRANCH,
   [switch]$Yes,
   [switch]$NoShortcut,
-  [switch]$PrefetchModel
+  [switch]$PrefetchModel,
+  [switch]$Minimal
 )
 $ErrorActionPreference = 'Stop'
 if ($env:AIGENT_YES -eq '1') { $Yes = $true }
@@ -97,14 +99,16 @@ if (-not (Test-Path $vpy)) { $a = @($py | Select-Object -Skip 1) + @('-m', 'venv
 & $vpy -m pip install --quiet -r requirements.txt
 if ($LASTEXITCODE -ne 0) { Stop-Install 'pip install failed' }
 Ok 'Python packages'
-# optional reference-link helpers for Studio: yt-dlp (Unlicense) and instaloader (MIT, anonymous). Not fatal.
-& $vpy -m pip install --quiet --upgrade yt-dlp instaloader
-if ($LASTEXITCODE -eq 0) { Ok 'yt-dlp and instaloader (Studio reference links)' } else { Write-Host "    note: yt-dlp did not install; Studio still takes direct video links. Later: $vpy -m pip install yt-dlp" }
-if ($PrefetchModel) {
-  Say 'Downloading the Whisper model (small.en, about 470 MB)'
-  & $vpy -c "from faster_whisper import WhisperModel; WhisperModel('small.en')"
-  Ok 'model ready'
-}
+# everything else, up front (kit/setup.mjs, the same as npm run setup:all): yt-dlp and instaloader for reference links,
+# the Whisper model, the effects pass (MediaPipe, OpenCV, rembg), the humanizer skill and the Studio page check.
+# Safe to stop and run again; it only does what is missing. -Minimal skips the model and the effects pass.
+Say 'Installing the extras (reference links, Whisper model, effects)'
+$setupArgs = @()
+if ($Yes) { $setupArgs += '--yes' }
+if ($Minimal) { $setupArgs += @('--skip', 'model,effects') }
+$env:PYTHON = $vpy
+& node kit/setup.mjs @setupArgs
+if ($LASTEXITCODE -ne 0) { Note 'some extras did not install; the summary above says which and how to fix them' }
 
 Say 'Making the Studio launcher'
 $bat = Join-Path $Dir 'studio.bat'

@@ -19,6 +19,9 @@ import * as AG from './agui.mjs';
 import * as RV from './review.mjs';
 import * as REC from './record.mjs';
 import * as SC from './scripts.mjs';
+import * as AGT from './agents.mjs';
+import * as CL from './cloud.mjs';
+import * as SETUP from '../setup.mjs';
 
 const require = createRequire(import.meta.url);
 const K = require('../packs.cjs');
@@ -46,13 +49,58 @@ let lastRev = -1;
 const pushState = force => { const s = C.load(); if (s.rev !== lastRev || force === true) { lastRev = s.rev; send('state', view(s)); } };
 const update = fn => { const s = C.load(); const r = fn(s); C.save(s); pushState(); return r === undefined ? s : r; };
 
+// ---------- setup check (kit/setup.mjs): cached, refreshed in the background, so a page load never waits on it ----------
+let setupCache = null, setupAt = 0;
+function setupStatus(fresh) {
+  if (fresh || !setupCache || Date.now() - setupAt > 5 * 60e3) { try { setupCache = SETUP.status(); } catch (e) { setupCache = { ready: false, items: [], missing: 0, forUser: [], error: e.message }; } setupAt = Date.now(); }
+  return setupCache;
+}
+// only what is missing: { id: fix } and whether the core is ready
+function setupBrief() {
+  if (!setupCache) return null;
+  return { ready: setupCache.ready, missing: Object.fromEntries(setupCache.items.filter(x => x.status !== 'ready').map(x => [x.id, { label: x.label, fix: x.fix, feature: x.feature, need: x.need }])) };
+}
+// a draft or render that cannot work: the one-line fix now, instead of a failure later
+function needFor(kind) {
+  const b = setupBrief(), miss = b ? b.missing : {};
+  if (!miss.ffmpeg && !F.tools().ffmpeg) miss.ffmpeg = { label: 'ffmpeg', fix: 'npm run setup:all' };
+  const need = kind === 'render' ? ['ffmpeg', 'python', 'chrome', 'npm'] : ['ffmpeg', 'python', 'npm'];
+  const m = need.map(k => miss[k]).filter(Boolean);
+  return m.length ? `${m.map(x => x.label).join(', ')} missing. Fix: ${m.map(x => x.fix).join('; ')}` : null;
+}
+
+// ---------- footage from links (kit/studio/cloud.mjs): Dropbox, Google Drive, plain video URLs ----------
+if (process.env.STUDIO_CLOUD_DRIVE) CL.BASES.drive = process.env.STUDIO_CLOUD_DRIVE;
+if (process.env.STUDIO_CLOUD_DROPBOX) CL.BASES.dropbox = process.env.STUDIO_CLOUD_DROPBOX;
+const imports = new Map(); // id -> AbortController
+const setImport = (id, fn) => update(st => { const it = (st.imports || []).find(x => x.id === id); if (it) fn(it, st); });
+function addFootageLink(raw) {
+  const s0 = C.load(); if (!s0.job) throw Object.assign(new Error('name the job first'), { code: 400 });
+  const p = CL.parse(raw); if (!p.ok) throw Object.assign(new Error(p.error), { code: 400 });
+  const dir = join('inbox', 'studio', s0.job);
+  const id = update(st => { st.imports = (st.imports || []).slice(-19); const id = (st.importSeq = (st.importSeq || 0) + 1);
+    st.imports.push({ id, url: String(raw).trim(), site: p.site, status: 'downloading', received: 0, size: null, name: p.name, file: null, error: null, at: new Date().toISOString() }); return id; });
+  const ac = new AbortController(); imports.set(id, ac);
+  let lastSave = 0;
+  mkdirSync(join(ROOT, dir), { recursive: true });
+  CL.download(p, join(ROOT, dir), { signal: ac.signal, maxBytes: +(process.env.STUDIO_FOOTAGE_MAX_BYTES || 20e9), onProgress: ({ received, size }) => {
+    const now = Date.now(); if (now - lastSave < 700 && received !== size) return; lastSave = now;
+    setImport(id, x => { x.received = received; x.size = size; });
+  } }).then(r => {
+    const relp = `${dir}/${r.name}`.split(sep).join('/');
+    setImport(id, (x, st) => { Object.assign(x, { status: 'ready', file: relp, name: r.name, received: r.size, size: r.size }); if (!st.footage.includes(relp)) st.footage.push(relp); st.clips = null; });
+  }).catch(e => setImport(id, x => { x.status = e.name === 'AbortError' ? 'cancelled' : 'failed'; x.error = e.name === 'AbortError' ? null : e.message; }))
+    .finally(() => imports.delete(id));
+  return id;
+}
+
 function env() {
   const st = S.load(), backend = st.chat.backend, p = backend === 'agent' || backend === 'keywords' ? null : LLM.provider(process.env, st.chat);
   const t = F.tools();
   return { llm: p ? `${p.name}${p.model ? ' (' + p.model + ')' : ''}` : null, backend, agent: CH.presence(), effectsReady: existsSync(join(ROOT, 'effects', '.venv')), port: PORT,
-    settings: { downloads: st.downloads, renders: st.renders, actionNotes: st.actionNotes, chat: st.chat, from: st.from, defaultDownloads: 'teardown-in/studio/<job>/ (in the kit, not shared)', defaultRenders: 'jobs/<job>/ (in the kit)' },
+    settings: { downloads: st.downloads, renders: st.renders, actionNotes: st.actionNotes, agent: st.agent, chat: st.chat, from: st.from, defaultDownloads: 'teardown-in/studio/<job>/ (in the kit, not shared)', defaultRenders: 'jobs/<job>/ (in the kit)' },
     keys: { anthropic: !!process.env.ANTHROPIC_API_KEY, openai: !!process.env.OPENAI_API_KEY }, localPresets: S.LOCAL_PRESETS,
-    tools: { ytdlp: t.ytdlp ? t.ytdlp.version : null, instaloader: t.instaloader, ffmpeg: t.ffmpeg }, install: F.INSTALL };
+    tools: { ytdlp: t.ytdlp ? t.ytdlp.version : null, instaloader: t.instaloader, ffmpeg: t.ffmpeg }, install: F.INSTALL, setup: setupBrief() };
 }
 function view(s) {
   let comp; try { comp = C.compose(s, { refPack: refPackName(s) }); } catch (e) { comp = { args: [], errs: [e.message], notes: [] }; }
@@ -358,6 +406,19 @@ async function api(req, res, u) {
       }
     } catch (e) { return json(res, e.code || 500, { error: e.message }); }
   }
+  if (p === '/api/footage/url' && M === 'POST') { const b = await readBody(req); const id = addFootageLink(b.url); return json(res, 202, { id, ...view(C.load()) }); }
+  if (p === '/api/footage/import' && M === 'POST') {
+    const b = await readBody(req), id = +b.id;
+    if (b.action === 'cancel') { const ac = imports.get(id); if (ac) ac.abort(); }
+    else if (b.action === 'dismiss') update(st => { st.imports = (st.imports || []).filter(x => x.id !== id || x.status === 'downloading'); });
+    else return json(res, 400, { error: 'action: cancel or dismiss' });
+    return json(res, 200, view(C.load()));
+  }
+  if (p === '/api/connect' && M === 'GET') {
+    const url = `http://${req.headers.host}`;
+    return json(res, 200, { agents: AGT.setups({ url }), prompt: AGT.setupPrompt({ url }), selected: S.load().agent, agent: CH.presence(), name: AGT.NAME, say: AGT.SAY });
+  }
+  if (p === '/api/setup' && M === 'GET') { const st = setupStatus(u.searchParams.has('fresh')); return json(res, 200, st); }
   if (p === '/api/footage/remove' && M === 'POST') { const b = await readBody(req); const s = update(st => { st.footage = st.footage.filter(f => f !== b.path); }); return json(res, 200, view(s)); }
   if (p === '/api/reference' && M === 'POST') {
     const b = await readBody(req), s = C.load();
@@ -401,12 +462,14 @@ async function api(req, res, u) {
     return json(res, 200, { ...view(s), log: r.log, errs: r.errs });
   }
   if (p === '/api/draft' && M === 'POST') {
+    const miss = needFor('draft'); if (miss) return json(res, 400, { error: miss, setup: true });
     const s = C.load(); const d = draftSteps(s);
     update(st => { st.lockedAtDraft = d.lockString || ''; });
     runTask('draft', () => d.steps, () => ({ choices: !!readChoices(C.load()) }));
     return json(res, 202, view(C.load()));
   }
   if (p === '/api/render' && M === 'POST') {
+    const miss = needFor('render'); if (miss) return json(res, 400, { error: miss, setup: true });
     const s = C.load(); const r = renderSteps(s);
     runTask('render', () => r.steps, () => { const st = C.load(), outputs = C.outputsOf(st); return { outputs, copiedTo: copyRenders(outputs), fx: r.fx, effects: r.effects }; });
     return json(res, 202, { ...view(C.load()), fx: r.fx, effectsSkipped: r.effects.length && !r.fx ? 'effects need npm run effects:setup' : null });
@@ -594,5 +657,7 @@ server.listen(PORT, HOST, () => {
   const e = env();
   console.log(`Studio: ${url}\nSession: ${C.statePath()}\nChat: ${e.backend === 'agent' ? 'your terminal agent (tell it: Run the Studio chat loop; setup in AGENTS.md)' : e.llm ? e.llm : e.backend}\nReference links: ${e.tools.ytdlp ? 'yt-dlp ' + e.tools.ytdlp : 'direct video links and Instagram only (pip install yt-dlp for YouTube, TikTok, X, Vimeo)'}\nStop with Ctrl+C.`);
   openBrowser(url);
+  // the setup check runs a few quick commands; do it once after start so the page can show what is missing
+  setTimeout(() => { setupStatus(true); pushState(true); }, 200).unref();
 });
 export { server };

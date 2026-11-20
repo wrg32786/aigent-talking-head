@@ -415,6 +415,20 @@
       "failures": ["unknown agent \"<name>\": claude, codex, cursor or print"]
     },
     {
+      "name": "setup:all",
+      "script": "kit/setup.mjs",
+      "summary": "Install everything the kit can use, up front: Node packages, the Python venv and requirements, yt-dlp and instaloader, ffmpeg and Chrome (with --yes, through the package manager when that needs no password), the Whisper model, the effects pass, the humanizer skill and the Studio page. Safe to run again; it only does what is missing. Prints a summary and what only the user can do. --check only reports (the same list as Studio's Setup check and the MCP setup_status tool).",
+      "flags": [
+        { "name": "check", "type": "boolean", "default": false, "description": "only report each dependency as ready or missing with its fix; exit 1 when a core one is missing" },
+        { "name": "yes", "type": "boolean", "default": false, "description": "also install ffmpeg and Chrome with Homebrew, winget or the system package manager (never asks for a password)" },
+        { "name": "skip", "type": "string", "description": "comma list of steps to skip: npm, python, ytdlp, ffmpeg, chrome, model, effects, humanizer, studio" },
+        { "name": "json", "type": "boolean", "default": false, "description": "print the result as JSON" }
+      ],
+      "outputs": ["a summary: installed, already there, skipped, failed, needs you", "jobs/.studio/setup.json (the last run)"],
+      "success": "prints SETUP READY",
+      "failures": ["a step failed (its line says why and the fix)", "SETUP INCOMPLETE: something only the user can do is listed"]
+    },
+    {
       "name": "studio:build",
       "script": "kit/studio/build.mjs",
       "summary": "Rebuild the Studio page (React + Astryx) from kit/studio/web into kit/studio/public. Only for people editing the page; the built page is committed, so installing and running Studio never builds.",
