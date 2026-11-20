@@ -21,6 +21,7 @@ export const CATS = [
 export const CAT_IDS = CATS.map(c => c.id);
 const ASIDE = /^(sorry|anyway|where was i|hold on|one sec|wait|ok(ay)? so|um+|uh+|let me (start|try) (again|over))\b|\b(my (dog|cat|phone)|excuse me|bear with me|where was i)\b/i;
 const PROOF = /\b\d|\b(doubled|tripled|percent|revenue|clients?|customers?|results?|leads|views|followers|grew|months? later|said|told me|says)\b/i;
+const HARD_PROOF = /\b\d|\b(doubled|tripled|percent|said|told me|says)\b/i;
 const LIST = /\b(first|second|third|fourth|number (one|two|three)|rules?|steps?|ways|things|reasons|tips|mistakes)\b|^(one|two|three|next|finally|last)\b/i;
 const TIP = /\b(how to|you can|you should|try (this|it)|use|open|type|set (it )?up|make sure|don'?t|do this|start with|write|keep|read it|film)\b/i;
 const STORY = /\b(i was|when i|my (first|friend|client)|i remember|years? ago|last (year|month|week)|i (quit|started|tried|lost|made|spent|built|did)|she|he)\b/i;
@@ -35,10 +36,12 @@ export function categoryOf(line, i, n) {
   if (ASIDE.test(t) || (g.filler > 0.3) || (g.short && !g.hook && !g.cta && !PROOF.test(t))) return 'aside';
   if (CTA.test(t)) return 'cta';
   if ((g.hook || g.question) && i < Math.max(3, n * 0.3)) return 'hook';
+  // a number or someone's words is proof; "my first client" is a story about a client, not proof
+  if (HARD_PROOF.test(t)) return 'proof';
+  if (STORY.test(t)) return 'story';
   if (PROOF.test(t)) return 'proof';
   if (LIST.test(t)) return 'list';
   if (TIP.test(t)) return 'tip';
-  if (STORY.test(t)) return 'story';
   return g.hook || g.question ? 'hook' : 'story';
 }
 // topic tags: content words said in at least two lines, the most often first (up to 8)

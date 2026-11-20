@@ -134,7 +134,7 @@ function view(s) {
   let reopenable = []; try { reopenable = s.job ? SNAP.list(join(ROOT, 'jobs', s.job)).filter(x => x.snapshot).map(x => `jobs/${s.job}/${x.reel}`) : []; } catch {}
   let combo = { pieces: [], seconds: 0, key: '' }; try { combo = comboOf(s); } catch {}
   let edit = null; try { edit = editOf(s, { combo, cut, broll }); } catch (e) { edit = { error: e.message }; }
-  return { seq: ++viewSeq, boot: BOOT, state: s, compose: comp, outputs: C.outputsOf(s), reopenable, scripts, cut, broll, combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
+  return { seq: ++viewSeq, boot: BOOT, state: s, compose: comp, outputs: C.outputsOf(s), reopenable, scripts, cut, broll, pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
 }
 
 // what a finished draft says (a draft is a plan: no video until Render)
@@ -559,7 +559,7 @@ function editOf(s, v) {
   const next = !takes && !s.clips ? { step: 'footage', label: 'Add footage' } : !s.job ? { step: 'footage', label: 'Name the reel' } : !drafted && fin.reel ? { step: 'finish', label: 'Draft it' } : { step: 'finish', label: 'Render' };
   return {
     making: { text: making, format: fmt, aspect, goal: o.goal, length: (cut.summary && cut.summary.length) || null },
-    from: { takes, source: src, seconds: from === 'pieces' ? combo.seconds : (cut.seconds || null), mode: from, pieces: combo.pieces.length, text: from === 'pieces' ? `${combo.pieces.length} piece${combo.pieces.length === 1 ? '' : 's'}, ${Math.round(combo.seconds)} s, in your order` : takes ? `the whole take${takes > 1 ? ` (${takes} files)` : ''}` : 'no footage yet' },
+    from: { takes, source: src, seconds: from === 'pieces' ? combo.seconds : (cut.seconds || null), mode: from, pieces: combo.pieces.length, text: from === 'pieces' ? `${combo.pieces.length} piece${combo.pieces.length === 1 ? '' : 's'}, ${Math.round(combo.seconds)} s, in your order${(() => { const by = piecesState(s, src).by; return by && combo.pieces.some(x => x.kind === 'piece') ? (by === 'ai' ? ', picked by AI' : by === 'you' ? ', built by you' : `, ${by === 'ai, changed by you' ? 'picked by AI, changed by you' : 'set by ' + by}`) : ''; })()}` : takes ? `the whole take${takes > 1 ? ` (${takes} files)` : ''}` : 'no footage yet' },
     look: { pack: s.pack || null, reference: ref, picks, text: [s.pack || 'Studio picks', ref ? `reference (${ref})` : null, picks ? `${picks} change${picks === 1 ? '' : 's'} by you` : null].filter(Boolean).join(', ') },
     broll: { spots, ideas: ((v.broll && v.broll.beats) || []).filter(b => b.idea && !b.slot).length, cutins: combo.pieces.filter(x => x.kind === 'testimonial').length, text: [spots ? `${spots} spot${spots === 1 ? '' : 's'}` : 'none yet', combo.pieces.some(x => x.kind === 'testimonial') ? `${combo.pieces.filter(x => x.kind === 'testimonial').length} testimonial` : null].filter(Boolean).join(', ') },
     sound: { bed: s.music.bed, sfx: s.sound.sfx, text: `${s.music.bed === 'auto' ? 'Music picked for you' : s.music.bed === 'none' ? 'No music' : s.music.bed}, sounds ${s.sound.sfx}` },
@@ -585,7 +585,7 @@ function versionsOf(job) {
   return vs.map(v => { let st = null; try { st = JSON.parse(readFileSync(join(dir, `reel-v${v}.settings.json`), 'utf8')); } catch {}
     const fs_ = files.filter(f => new RegExp(`/reel(-fx)?-v${v}(-[a-z0-9]+)?\\.mp4$`).test(f)), main = fs_.find(f => new RegExp(`/reel-v${v}\\.mp4$`).test(f)) || fs_[0];
     let at = null; try { at = statSync(join(ROOT, main)).mtime.toISOString(); } catch {}
-    return { v, reel: main, files: fs_.map(f => ({ path: f, label: /-fx-/.test(f) ? 'With effects' : new RegExp(`-v${v}\\.mp4$`).test(f) ? 'Reel' : 'Export ' + (f.match(/-v\d+-([a-z0-9]+)\.mp4$/) || [0, ''])[1] })), at: (st && st.at) || at, seconds: main ? +(durOf(main) || 0).toFixed(1) || null : null,
+    return { v, reel: main, files: fs_.map(f => ({ path: f, label: /-fx-/.test(f) ? 'With effects' : new RegExp(`-v${v}\\.mp4$`).test(f) ? 'Reel' : 'Export ' + (f.match(/-v\d+-([a-z0-9]+)\.mp4$/) || [0, ''])[1] })).sort((a, b) => (a.label === 'Reel' ? 0 : a.label === 'With effects' ? 1 : 2) - (b.label === 'Reel' ? 0 : b.label === 'With effects' ? 1 : 2) || a.path.localeCompare(b.path)), at: (st && st.at) || at, seconds: main ? +(durOf(main) || 0).toFixed(1) || null : null,
       settings: st, reopen: !!(snaps[v] && snaps[v].snapshot) }; });
 }
 function outputsLib(s, all) {
@@ -1019,7 +1019,7 @@ async function api(req, res, u) {
       if (b.clear) { x.ids = []; x.reasons = {}; x.by = null; }
       if ((b.add != null || b.remove != null || b.move) && x.by === 'ai') x.by = 'ai, changed by you';
     });
-    return json(res, 200, { ...piecesOf(C.load(), rel), note, state: C.load() });
+    const s1 = C.load(); return json(res, 200, { ...view(s1), pieces: piecesOf(s1, rel), note });
   }
   if (p === '/api/outputs' && M === 'GET') return json(res, 200, outputsLib(C.load(), u.searchParams.get('all') === '1'));
   if (p === '/api/edit' && M === 'GET') { const v = view(C.load()); return json(res, 200, { edit: v.edit, combo: v.combo, finish: v.state.finish }); }

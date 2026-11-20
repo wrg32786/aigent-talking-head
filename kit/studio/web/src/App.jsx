@@ -10,6 +10,7 @@ import { Keys } from './Keys.jsx';
 import { Footage } from './Footage.jsx';
 import { Reference } from './Reference.jsx';
 import { Cut } from './Cut.jsx';
+import { Outputs } from './Outputs.jsx';
 import { Style } from './Style.jsx';
 import { Render } from './Render.jsx';
 import { Post } from './Post.jsx';
@@ -49,6 +50,7 @@ export function App() {
   const [connectOpen, setConnectOpen] = useState(/connect/.test(location.hash));
   const [setupOpen, setSetupOpen] = useState(/setup/.test(location.hash));
   const [videoMode, setVideoMode] = useState(/new-video/.test(location.hash) ? 'new' : null);
+  const [outputsOpen, setOutputsOpen] = useState(/outputs/.test(location.hash));
   const [log, setLog] = useState('');
   const [recLive, setRecLive] = useState(null);
   const mainRef = useRef(null);
@@ -129,6 +131,7 @@ export function App() {
         <div className="topr">
           {recLive && step !== 'footage' && <button type="button" className="rec-pill" id="rec-pill" onClick={() => go('footage', true)} aria-label="Recording, go back to the recorder"><i aria-hidden="true" />{recLive.phase === 'paused' ? 'Paused' : recLive.phase === 'saving' ? 'Saving take' : 'Recording'}</button>}
           {env.setup && !env.setup.ready && (() => { const nm = Object.values(env.setup.missing).filter(x => x.need === 'core').length; return <button type="button" className="setup-pill" id="setup-pill" onClick={openSetup} aria-label={`${nm} missing, open Setup check`} title="Setup check"><Icon n="ban" /><span className="sp-n">{nm}</span><span className="sp-l"> missing</span></button>; })()}
+          <button type="button" className="out-btn" id="outputs-open" aria-haspopup="dialog" onClick={() => setOutputsOpen(true)} title="Every render, with its settings"><Icon n="film" /><span className="ob-l">Outputs</span></button>
           <button type="button" className={'connect-btn ' + agentState} id="connect-open" aria-haspopup="dialog" onClick={openConnect} title={agentState === 'on' ? `${a.name} connected` : 'Connect your terminal agent'}><Icon n="plug" /><span className="cb-l">{agentState === 'on' || agentState === 'busy' ? (a.name || 'Agent') : 'Connect agent'}</span></button>
           <span id="taskpill" role="status" aria-live="polite" className={t ? '' : 'idle'}>{t ? <Badge label={pill} variant={running ? 'cyan' : t.status === 'failed' ? 'error' : 'neutral'} /> : <span className="sr">{pill}</span>}</span>
           <button type="button" className="icon-btn theme-btn" id="theme" data-mode={theme} aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} title={theme === 'dark' ? 'Light theme' : 'Dark theme'} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}><Icon n="moon" className="tm-moon" /><Icon n="sun" className="tm-sun" /></button>
@@ -137,6 +140,7 @@ export function App() {
           <MoreMenu id="more-open" label="More" items={[
             { id: 'more-new-video', label: 'New video', icon: 'plus', onClick: () => setVideoMode('new') },
             { id: 'more-open-video', label: 'Open a past video', icon: 'film', onClick: () => setVideoMode('open') },
+            { id: 'more-outputs', label: 'Outputs', icon: 'film', onClick: () => setOutputsOpen(true) },
             { id: 'more-connect', label: 'Connect agent', icon: 'plug', onClick: openConnect },
             { id: 'more-setup', label: 'Setup check', icon: 'check', onClick: openSetup },
             { id: 'more-keys', label: 'API keys and providers', icon: 'link', onClick: openKeys },
@@ -171,6 +175,7 @@ export function App() {
       <SetupCheck {...ctx} open={setupOpen} setOpen={setSetupOpen} />
       <Keys {...ctx} open={keysOpen} setOpen={setKeysOpen} />
       <NewVideo {...ctx} mode={videoMode} setMode={setVideoMode} />
+      <Outputs {...ctx} open={outputsOpen} setOpen={setOutputsOpen} />
       <Toast V={V} />
     </Theme>
   );
