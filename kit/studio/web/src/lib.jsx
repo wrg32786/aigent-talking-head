@@ -14,7 +14,7 @@ export async function api(path, body, method) {
   return j;
 }
 
-export const STEPS = ['footage', 'reference', 'style', 'render'];
+export const STEPS = ['footage', 'cut', 'reference', 'style', 'render'];
 export const SITE = { youtube: 'YouTube', 'youtube-shorts': 'Shorts', tiktok: 'TikTok', x: 'X', vimeo: 'Vimeo', instagram: 'Instagram', file: 'File', other: 'Link' };
 export const STATUS = { queued: 'Waiting', downloading: 'Downloading', tearing: 'Breaking down', ready: 'Ready', failed: 'Failed', cancelled: 'Cancelled' };
 export const KIND_NAME = { transition: 'transition', entrance: 'title entrance', captionEntrance: 'caption entrance', captionStyle: 'caption style', graphic: 'graphic', effect: 'effect', finish: 'finish', font: 'font pairing', look: 'look', theme: 'theme', titleLayer: 'title layer', bed: 'music bed', sfx: 'sound', beatSync: 'beat sync', editing: 'editing' };
