@@ -7,23 +7,25 @@
 // Needs Chrome. Run: node tests/studio-folders.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
 import assert from 'assert';
 import { spawn } from 'child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { chromium } from 'playwright-core';
 import { findChrome } from '../kit/chrome.mjs';
+import { patient } from './fixtures/patient.mjs';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const TMP = mkdtempSync(join(tmpdir(), 'studio-folders-e2e-')), HOME = join(TMP, 'home');
 const shots = process.argv.includes('--shots') ? process.argv[process.argv.indexOf('--shots') + 1] : null;
 for (const d of ['Desktop', 'Downloads', 'Videos/2025', 'Documents', 'Projects/reels', '.ssh', 'AppData/Local']) mkdirSync(join(HOME, d), { recursive: true });
 writeFileSync(join(HOME, 'notes.txt'), 'never listed');
-const PICKED = join(HOME, 'Projects', 'reels'), fake = join(TMP, 'dialog.sh');
-writeFileSync(fake, `#!/bin/sh\nprintf '%s\\n' "${PICKED}"\n`); chmodSync(fake, 0o755);
+// the native dialog stand-in is a small node script, so it runs on Windows too
+const PICKED = join(HOME, 'Projects', 'reels'), fake = join(TMP, 'dialog.mjs');
+writeFileSync(fake, `process.stdout.write(${JSON.stringify(PICKED)} + '\\n');\n`);
 let n = 0; const t = async (name, fn) => { await fn(); n++; console.log('ok ' + name); };
 const wait = ms => new Promise(r => setTimeout(r, ms));
-const until = async (fn, ms = 15000) => { const end = Date.now() + ms; for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) throw new Error('timed out'); await wait(120); } };
+const until = async (fn, ms = 30000) => { const end = Date.now() + ms; for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) throw new Error('timed out'); await wait(120); } };
 const env = { ...process.env, CI: '1', STUDIO_DIR: join(TMP, 'studio'), STUDIO_HOME: HOME, STUDIO_FOLDERS_NO_OPEN: '1', STUDIO_CHAT: '', STUDIO_DOWNLOADS: '', STUDIO_RENDERS: '', DISPLAY: '', WAYLAND_DISPLAY: '' };
 const start = extra => new Promise((ok, bad) => {
   const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), '--port', '0', '--no-open'], { cwd: ROOT, env: { ...env, ...extra } });
@@ -31,7 +33,7 @@ const start = extra => new Promise((ok, bad) => {
   srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out.slice(-400))));
 });
 const servers = [];
-const browser = await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox'] });
+const browser = patient(await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox'] }));
 try {
   const a = await start({}); servers.push(a.srv);
   const settings = async () => (await (await fetch(a.url + '/api/state')).json()).env.settings;

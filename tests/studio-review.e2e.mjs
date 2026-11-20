@@ -15,6 +15,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { chromium } from 'playwright-core';
 import { findChrome } from '../kit/chrome.mjs';
+import { patient } from './fixtures/patient.mjs';
 import { clipsFolder, referenceReel } from './fixtures/studio-media.mjs';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -50,7 +51,7 @@ const shot = async (page, sel, name) => {
 };
 const segLen = c => c.segs.reduce((a, s) => a + s.out - s.in, 0);
 
-const browser = await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required'] });
+const browser = patient(await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required'] }));
 try {
   await api('/api/state', { job: JOB, clips: `jobs/${JOB}/clips`, sound: { sfx: 'off' }, music: { bed: 'none' }, pack: 'cinematic' });
   await api('/api/reference/url', { url: `http://127.0.0.1:${media.address().port}/ref.mp4` });
