@@ -91,6 +91,8 @@ function explain(b) {
     locks, locksText: L.describe(locks),
     captions: { style: caps.captionStyle || 'kinetic', entrance: caps.captionEntrance || null, entranceWhy: caps.captionEntrance ? (locks.captionEntrance === caps.captionEntrance ? 'locked' : 'set') : 'kit default: pop, per word', fonts: caps.fonts || 'theme' },
     beats, titles: titleRows, graphics, cards,
+    // pauses --tighten cut inside a line; keep one with npm run reel -- --keep-pauses <clip>@<at> (Studio: Keep this pause)
+    pauses: (cut.tightened || []).map(x => ({ clip: x.clip, at: x.at, resume: x.resume, gap: x.gap, after: x.after, keep: `${x.clip}@${x.at}` })),
     music: { bed: cut.bed ? (typeof cut.bed === 'string' ? path.basename(cut.bed) : 'custom') : null, beatSync: !!cut.beatSync },
     sound: { sfx: sfx.length ? sfx.join(', ') : 'none', sfxMap: !!cut.sfxMap, cap: cut.sfxCap === false ? 'off' : 'on' },
     punch: cut.punch === false ? 'off' : (cut.punch || 0.1),
@@ -108,6 +110,7 @@ function printTable(x) {
   for (const r of x.beats) L2.push(`  ${pad(r.n, 3)} ${pad(r.start.toFixed(2) + '-' + r.end.toFixed(2) + 's', 14)} ${pad(r.n === 1 ? '' : (r.transition || 'glitch'), 12)} ${pad(r.transitionWhy, 44)} finish ${r.finish || '-'}${r.bigPunch ? '  big punch' : ''}`);
   if (x.titles.length) { L2.push('', 'titles'); for (const r of x.titles) L2.push(`  ${pad(r.n, 3)} ${pad(r.start.toFixed(2) + 's', 8)} ${pad('"' + r.text + '"', 28)} ${pad(r.entrance || '(auto)', 13)} ${pad(r.entranceWhy, 44)} ${r.place}, ${r.layer}`); }
   if (x.graphics.length) { L2.push('', 'graphics'); for (const r of x.graphics) L2.push(`  ${pad(r.n, 3)} ${pad(r.start.toFixed(2) + 's', 8)} ${pad(r.id, 18)} ${pad('"' + r.text + '"', 28)} ${r.why}`); }
+  if (x.pauses && x.pauses.length) { L2.push('', 'pauses cut (keep one: --keep-pauses <clip>@<at>)'); for (const r of x.pauses) L2.push(`  ${pad(r.clip, 10)} ${pad(r.at + '-' + r.resume + ' s', 14)} ${r.gap} s after "${r.after}"`); }
   if (x.cards.length) L2.push('', `cards: ${x.cards.map(c => `${c.start}s ${c.bg}${c.chapter != null ? ' #' + c.chapter : ''}`).join(', ')}`);
   L2.push('', `music: ${x.music.bed || 'none'}${x.music.beatSync ? ', beat-synced' : ''};  sound: ${x.sound.sfx}${x.sound.sfxMap ? ', mapped to moves' : ''};  punch: ${x.punch}`);
   return L2.join('\n');

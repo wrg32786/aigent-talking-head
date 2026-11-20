@@ -9,7 +9,36 @@
   "author": "AIgent",
   "license": "Apache-2.0",
   "extends": "aigent",
-  "style": {},
+  "style": {
+    "glossary": [
+      {
+        "say": "AIgent Academy",
+        "heard": [
+          "Agent Academy",
+          "A gent Academy",
+          "AI gent Academy",
+          "A.I. gent Academy"
+        ]
+      },
+      {
+        "say": "AIgent",
+        "heard": [
+          "AI gent",
+          "A.I. gent"
+        ]
+      },
+      {
+        "say": "Skool",
+        "heard": [
+          "school"
+        ],
+        "after": [
+          "on",
+          "in"
+        ]
+      }
+    ]
+  },
   "locks": {
     "transitions": [
       "glitch",

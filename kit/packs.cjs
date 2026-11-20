@@ -23,7 +23,7 @@ const KIT = __dirname, ROOT = path.dirname(KIT);
 const SHIPPED = path.join(ROOT, 'packs'), LOCAL = path.join(SHIPPED, 'local');
 const FORMAT = 'aigent-style-pack', FORMAT_VERSION = 1;
 const SEMVER = /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/;
-const STYLE_KEYS = ['theme', 'look', 'captionStyle', 'fonts', 'titles', 'finish', 'finishPool', 'transition', 'glitch', 'punch', 'tighten', 'cards', 'cardPalette', 'musicEnergy', 'bed', 'sfxMap', 'sfxCap', 'titlePlaces', 'entranceOrder', 'titleLayer', 'effectsFavourites', 'beatSync'];
+const STYLE_KEYS = ['theme', 'look', 'captionStyle', 'fonts', 'titles', 'finish', 'finishPool', 'transition', 'glitch', 'punch', 'tighten', 'cards', 'cardPalette', 'musicEnergy', 'bed', 'sfxMap', 'sfxCap', 'titlePlaces', 'entranceOrder', 'titleLayer', 'effectsFavourites', 'beatSync', 'glossary', 'brands'];
 const TOP_KEYS = ['$schema', 'format', 'formatVersion', 'name', 'version', 'label', 'description', 'author', 'license', 'extends', 'style', 'locks', 'weights', 'preview', 'assets', 'notes'];
 const LICENSES = ['Apache-2.0', 'MIT', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', 'CC0-1.0', 'OFL-1.1'];
 
@@ -82,6 +82,8 @@ function validate(pack) {
   for (const k of ['label', 'description', 'notes']) if (typeof pack[k] === 'string' && pack[k].includes('\u2014')) errs.push(`${k} has an em dash`);
   if (pack.style != null && (typeof pack.style !== 'object' || Array.isArray(pack.style))) errs.push('style must be an object');
   for (const k of Object.keys(pack.style || {})) if (!STYLE_KEYS.includes(k)) errs.push(`style: unknown key "${k}" (${STYLE_KEYS.join(', ')})`);
+  if (pack.style && pack.style.glossary != null) errs.push(...require('./glossary.cjs').validate(pack.style.glossary).map(e => 'style.' + e));
+  if (pack.style && pack.style.brands != null) errs.push(...require('./brands.cjs').validate(pack.style.brands, pack.dir).map(e => 'style.' + e));
   if (pack.weights != null) {
     for (const k of Object.keys(pack.weights)) if (k !== 'transitions') errs.push(`weights: unknown key "${k}" (transitions)`);
     for (const [t, w] of Object.entries(pack.weights.transitions || {})) {

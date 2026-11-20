@@ -1,6 +1,6 @@
 # aigent-talking-head FAQ
 
-aigent-talking-head is a free, open-source (Apache-2.0) talking-head video editor that turns one phone clip into a captioned vertical reel for TikTok, Instagram Reels and YouTube Shorts. You or your coding agent run it on your own machine with Whisper, FFmpeg and Chrome. Answers below were checked against version 1.4.0 in November 2026.
+aigent-talking-head is a free, open-source (Apache-2.0) talking-head video editor that turns one phone clip into a captioned vertical reel for TikTok, Instagram Reels and YouTube Shorts. You or your coding agent run it on your own machine with Whisper, FFmpeg and Chrome. Answers below were checked against version 1.4.1 in November 2026.
 
 ## Getting started
 
@@ -98,4 +98,4 @@ The code and docs are Apache-2.0, so commercial use is fine. The bundled sounds 
 
 ### How do I cite it?
 
-Use [CITATION.cff](../CITATION.cff), or: Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.4.0) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
+Use [CITATION.cff](../CITATION.cff), or: Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.4.1) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head

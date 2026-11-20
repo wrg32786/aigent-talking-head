@@ -34,7 +34,7 @@ export function Reference({ CAT, V, s, apply, patch }) {
       <input type="file" id="file-ref" ref={fileIn} accept="video/*,.mov,.mp4,.m4v,.webm,.mkv" hidden onChange={e => { upload('reference', [...e.target.files], s, apply); e.target.value = ''; }} />
     </div>
     <p className="fine" id="ref-tools">{t.ytdlp ? 'Works with YouTube, TikTok, X, Vimeo, Instagram and .mp4 links. Use videos you have the rights to.'
-      : <><Badge label="yt-dlp not installed" variant="warning" /> Direct .mp4 and Instagram links work now. For the rest: <code>pip install yt-dlp</code>. Use videos you have the rights to.</>}</p>
+      : <><Badge label="yt-dlp not installed" variant="warning" /> <InstallTool tool="ytdlp" V={V} apply={apply} /> Direct .mp4 links work now{t.instaloader ? ', and Instagram' : ''}. Use videos you have the rights to.</>}</p>
     <ol id="ref-queue" className="queue" aria-label="Reference queue" aria-live="polite">
       {q.slice().reverse().map(it => {
         const busy = it.status === 'downloading' || it.status === 'tearing', isActive = r.active === it.id;
@@ -142,5 +142,12 @@ function Swap({ CAT, sw, s, apply, patch }) {
       </div>
     </div>
   </div>;
+}
+// one click installs a missing tool with the kit's own Python (POST /api/tools/install runs kit/setup.mjs --only ytdlp),
+// then the page re-reads the tools; the log shows pip's output if it fails
+function InstallTool({ tool, V, apply }) {
+  const busy = V.task && V.task.kind === 'install' && V.task.status === 'running', failed = V.task && V.task.kind === 'install' && V.task.status === 'failed';
+  const go = () => api('/api/tools/install', { tool }).then(j => { apply(j); toast('Installing. The pill goes away when it is done.', true); }).catch(() => {});
+  return <><Button id={'install-' + tool} size="sm" variant="secondary" label={failed ? 'Install failed, try again' : 'Install'} isLoading={busy} onClick={go} />{failed && <span className="fine"> {(V.task.lines || []).filter(l => /error|fail/i.test(l)).pop() || 'See the log in Render.'}</span>}</>;
 }
 const Stat = ({ b, l }) => <div className="stat"><b>{b}</b><span>{l}</span></div>;
