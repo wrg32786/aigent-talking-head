@@ -24,10 +24,12 @@ export function AskAgent({ step, apply, openChat }) {
   useEffect(() => { if (!open) return; const off = e => { if (box.current && !box.current.contains(e.target)) setOpen(false); }; const esc = e => e.key === 'Escape' && setOpen(false);
     document.addEventListener('pointerdown', off); document.addEventListener('keydown', esc); setTimeout(() => document.getElementById('ask-text')?.focus(), 0);
     return () => { document.removeEventListener('pointerdown', off); document.removeEventListener('keydown', esc); }; }, [open]);
+  const [narrow, setNarrow] = useState(() => matchMedia('(max-width: 640px)').matches);
+  useEffect(() => { const q = matchMedia('(max-width: 640px)'), f = () => setNarrow(q.matches); q.addEventListener('change', f); return () => q.removeEventListener('change', f); }, []);
   const send = async t => { if (!t.trim()) return; setBusy(true); try { await askAgent(t.trim(), step, apply, openChat); setOpen(false); setText(''); } catch {} finally { setBusy(false); } };
   return <div className="ask" ref={box}>
-    <Button id="ask-agent" variant="ghost" size="sm" label="Ask my agent" icon={<Icon n="spark" />} aria-expanded={open ? 'true' : 'false'} aria-controls="ask-pop" onClick={() => setOpen(!open)} />
-    {open && <div className="ask-pop glass" id="ask-pop" role="dialog" aria-label="Ask my agent">
+    <Button id="ask-agent" variant="ghost" size="sm" label={narrow ? 'Ask' : 'Ask my agent'} aria-label="Ask my agent" icon={<Icon n="spark" />} aria-expanded={open ? 'true' : 'false'} aria-controls="ask-pop" onClick={() => setOpen(!open)} />
+    {open && <div className="ask-pop" id="ask-pop" role="dialog" aria-label="Ask my agent">
       <ul className="ask-chips" id="ask-chips">{(ASKS[step] || []).map(q => <li key={q}><button type="button" className="chip" disabled={busy} onClick={() => send(q)}>{q}</button></li>)}</ul>
       <form onSubmit={e => { e.preventDefault(); send(text); }} className="ask-own">
         <label className="sr" htmlFor="ask-text">Ask about this step</label>

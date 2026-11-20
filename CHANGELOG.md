@@ -2,6 +2,18 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.17.0 (unreleased)
+
+Release notes: [docs/releases/v1.17.0.md](docs/releases/v1.17.0.md). The redesign, part 5: point and note, drag to select, wizards, Ask my agent.
+
+- **Notes on a stretch.** Comment on this frame (Finish) gains **Mark the end here**: the note goes to the chat as "from 0:04 to 0:09" with the start frame and your box (`POST /api/comment { end }`, `commentLine` in `kit/studio/review.mjs`). An end on or before the start is one frame.
+- **Drag to select on the waveform.** In the footage player a drag longer than 0.25 s selects instead of scrubbing, snapped to whole words (`kit/studio/web/src/snap.js`): the start goes to the start of its word or the next word, the end to the end of its word or the word before, so a selection never starts or ends mid-word. **Play it**, **Add as a clip** and **Note for my agent** (`POST /api/comment { t, end, source }` with the take).
+- **Ask my agent.** In the step bar on every step: prompts for that step and your own words, sent with the step (`POST /api/chat { text, step }`), and the chat opens. On a phone the button reads Ask.
+- **Apply.** `studio_reply` takes `suggest: { patch, combo, step, label }`. The answer shows Apply (and Show me); nothing changes until it is clicked, a bad patch is refused before it is shown, and `POST /api/chat/apply { id }` makes it once.
+- **Wizards.** In the top bar and More: Make a reel from a long take (goal, Look, Let AI choose, then Finish), Copy a reference (Use all), Clips and ads from one take (3, 5 or 8, ad cuts). Each step has Let my agent decide. `kit/studio/wizards.mjs`, `GET` and `POST /api/wizard`, MCP `run_wizard`.
+- **Fixes.** Your edit wraps on a phone, so Draft it no longer sits on the Look line.
+- **Tests and docs.** `tests/studio-agent-ux.test.mjs` (in `npm run check`) and `tests/studio-agent-ux.e2e.mjs` (in `npm run smoke`); docs/studio.md (Footage player, Ask my agent and Apply, Review your edit, Wizards), docs/mcp.md, AGENTS.md and the Studio skill.
+
 ## 1.16.0 (unreleased)
 
 Release notes: [docs/releases/v1.16.0.md](docs/releases/v1.16.0.md). The redesign, part 4: one Look in 9 layers.

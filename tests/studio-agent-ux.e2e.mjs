@@ -66,13 +66,14 @@ try {
   await t('waveform: a drag selects on whole words; Note for my agent sends from and to', async () => {
     await pg.goto(url + '/#step=cut', { waitUntil: 'networkidle' }); await pg.waitForSelector('#player-scrub'); await pg.waitForSelector('#player-transcript .w');
     const dur = await until(() => pg.evaluate(() => { const v = document.getElementById('player-video'); return v && v.duration > 0 ? v.duration : 0; }));
+    await pg.locator('#player-scrub').scrollIntoViewIfNeeded(); await pg.evaluate(() => scrollBy(0, 150));
     const b = await pg.locator('#player-scrub').boundingBox(), x = s => b.x + (s / dur) * b.width;
-    // from inside "tells" (0.6 + 0.45 = 1.05 to 1.40) to inside "agents." (3.30 to 3.65)
+    // from inside "tells" (1.05 to 1.40) to the quiet after "agents." (2.85 to 3.20): out to the start of tells, back to the end of agents.
     await pg.mouse.move(x(1.2), b.y + b.height / 2); await pg.mouse.down(); await pg.mouse.move(x(2.4), b.y + b.height / 2, { steps: 5 }); await pg.mouse.move(x(3.45), b.y + b.height / 2, { steps: 5 }); await pg.mouse.up();
     await pg.waitForSelector('#pl-sel');
     const [a, e] = await pg.$eval('#scrub-sel', el => [+el.dataset.a, +el.dataset.b]);
     assert.ok(TW.some(w => Math.abs(w[0] - a) < 0.011) && TW.some(w => Math.abs(w[1] - e) < 0.011), `edges on word edges: ${a} ${e}`);
-    assert.ok(Math.abs(a - 1.05) < 0.08 && Math.abs(e - 3.65) < 0.08, `snapped out to tells and agents.: ${a} ${e}`);
+    assert.ok(Math.abs(a - 1.05) < 0.08 && Math.abs(e - 3.2) < 0.08, `snapped out to tells and agents.: ${a} ${e}`);
     assert.ok(/on whole words/.test(await pg.textContent('#pl-sel-at')));
     await pg.click('#note-selection'); await pg.fill('#sel-note', 'Tighten this part');
     await shot(pg, '#player', 'redesign-wave-select-dark.png');
@@ -96,7 +97,7 @@ try {
     client = new Client({ name: 'agent-ux-e2e', version: '1.0.0' });
     await client.connect(new StdioClientTransport({ command: process.execPath, args: [join(ROOT, 'kit', 'mcp.mjs')], cwd: ROOT, env: { ...process.env, STUDIO_DIR: STATE, STUDIO_PORT: String(port) } }));
     const r = await client.callTool({ name: 'studio_reply', arguments: { text: 'The magazine Look fits this hook. Want it?', suggest: { patch: { pack: 'magazine' }, step: 'look', label: 'Use magazine' } } }); assert.ok(!r.isError, JSON.stringify(r.content));
-    await pg.click('#chat-open'); await pg.waitForSelector('#msgs .sg-apply');
+    if (await pg.isVisible('#chat-open')) await pg.click('#chat-open'); await pg.waitForSelector('#msgs .sg-apply');
     assert.notStrictEqual((await api('/api/state')).state.pack, 'magazine', 'nothing changed yet');
     await shot(pg, '#chat', 'redesign-apply-dark.png');
     await pg.click('#msgs .sg-apply'); await pg.waitForSelector('#msgs .sg-done');
@@ -106,7 +107,7 @@ try {
 
   await t('a note on a stretch of the reel in Finish: Mark the end here', async () => {
     mkdirSync(join(ROOT, 'jobs', JOB), { recursive: true }); copyFileSync(TAKE, join(ROOT, 'jobs', JOB, 'reel-v1.mp4'));
-    await pg.goto(url + '/#step=finish', { waitUntil: 'networkidle' }); await pg.waitForSelector('#comment-start');
+    await pg.goto(url + '/#step=finish', { waitUntil: 'networkidle' }); await pg.reload({ waitUntil: 'networkidle' }); await pg.waitForSelector('#comment-start');
     await pg.click('#comment-start'); await pg.fill('#cmp-seek', '4'); await wait(300); await pg.click('#comment-end');
     assert.ok(/From 0:00\.0 to 0:04\.0/.test(await pg.textContent('#cm-hint')), await pg.textContent('#cm-hint'));
     await pg.fill('#comment-text', 'This stretch drags');
@@ -116,7 +117,7 @@ try {
   });
 
   await t('wizards: Make a reel (goal, Look, Let AI choose, Finish) and Clips and ads', async () => {
-    await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' }); await pg.click('#wizards-open'); await pg.waitForSelector('#wz-list');
+    await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' }); await pg.reload({ waitUntil: 'networkidle' }); await pg.click('#wizards-open'); await pg.waitForSelector('#wz-list');
     assert.deepStrictEqual(await pg.$$eval('#wz-list .wz-pick b', x => x.map(e => e.textContent)), ['Make a reel from a long take', 'Copy a reference', 'Clips and ads from one take']);
     await shot(pg, '#wizards', 'redesign-wizards-dark.png');
     await pg.click('.wz-pick[data-wizard="reel"]'); await pg.waitForSelector('.wz-opt[data-goal="sell"]');
@@ -136,7 +137,7 @@ try {
     await pg.click('#wizards-open'); await pg.click('.wz-pick[data-wizard="reel"]'); await pg.waitForSelector('.wz-opt'); await shot(pg, '#wizards', 'redesign-wizard-goal-light.png');
     await pg.click('#wz-back'); await shot(pg, '#wizards', 'redesign-wizards-light.png'); await pg.keyboard.press('Escape');
     await pg.click('#ask-agent'); await pg.waitForSelector('#ask-pop'); await shot(pg, '#stepnav', 'redesign-ask-agent-light.png'); if (shots) await pg.screenshot({ path: join(shots, 'redesign-ask-agent-page-light.png') }); await pg.keyboard.press('Escape');
-    await pg.click('#chat-open'); await pg.waitForSelector('#msgs .sg-done'); await shot(pg, '#chat', 'redesign-apply-light.png'); await pg.keyboard.press('Escape');
+    if (await pg.isVisible('#chat-open')) await pg.click('#chat-open'); await pg.waitForSelector('#msgs .sg-done'); await shot(pg, '#chat', 'redesign-apply-light.png'); await pg.keyboard.press('Escape');
     await theme(pg, 'dark');
     const ph = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1.5, isMobile: true, hasTouch: true });
     ph.on('pageerror', e => errs.push(e.message));

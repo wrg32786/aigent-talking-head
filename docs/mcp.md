@@ -22,7 +22,8 @@
 | `studio_start` | starts Studio in the background (as `npm run studio:agent`) | returns the URL and opens the page |
 | `studio_wait_for_message` | long-polls the Studio chat (default 45 s) | the lines the user typed in the Studio page since you last read, marked seen, plus the session context; the page shows you as listening while it waits |
 | `studio_get_pending` | checks the Studio chat without waiting | the same, for the start of each turn while you work in the terminal |
-| `studio_reply` | writes to the Studio chat only | your answer to Studio message ids (`replyTo`), with an optional `patch`; those messages show as answered |
+| `studio_reply` | writes to the Studio chat only | your answer to Studio message ids (`replyTo`), with an optional `patch`; those messages show as answered. `suggest: { patch, combo: { ids, reasons }, step, label }` adds an Apply button instead: nothing changes until the user clicks it, and a bad patch is refused first |
+| `run_wizard` | changes the session (output, Look, Combo, reference) | the Wizards dialog: `wizard: reel` with `goal` (grow, sell, teach, clean), `look`, `choose: true`; `wizard: clips` with `clips` (1 to 12) and `ads`; `wizard: reference` with `url`. Returns what it did and the step that comes next |
 | `clear_reference` | changes the look | take the reference off with every pick Use parts added (and the Look or bed it set), as one undo; `undo: true` puts it back |
 | `save_look` | adds a Look | save the current Look (pack, layer picks and the reference's look when one is in use) as `packs/local/<name>`; `fromReference: true` for a reference set to Use all or Off |
 | `studio_add_reference_url` | POSTs to the running Studio | queues reference links to download and tear down |

@@ -1100,3 +1100,6 @@ dialog.wizards .fb-h > div:first-child { flex: 1; } dialog.wizards .fb-h p { mar
 .wz-look img, .wz-look .ph { width: 64px; height: 114px; object-fit: cover; border-radius: 8px; background: var(--card); }
 .wz-url { display: flex; gap: 6px; } .wz-agent { align-self: flex-start; } .wz-back { align-self: flex-start; }
 @media (max-width: 520px) { .wz-opts { grid-template-columns: 1fr; } }
+.ask-pop { background: var(--background); background-image: linear-gradient(var(--muted), var(--muted)); backdrop-filter: blur(22px) saturate(1.2); -webkit-backdrop-filter: blur(22px) saturate(1.2); border: 1px solid var(--glass-edge, var(--border)); }
+[data-theme="light"] .ask-pop { background: #fffdf8; }
+@media (max-width: 640px) { .your-edit { flex-wrap: wrap; } .your-edit .ye-list { flex: 1 1 100%; } .your-edit .ye-next { margin-left: 0; } }
