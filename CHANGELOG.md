@@ -2,7 +2,19 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
-## 1.10.1 (unreleased)
+## 1.10.2 (unreleased)
+
+Release notes: [docs/releases/v1.10.2.md](docs/releases/v1.10.2.md). Studio never shows a terminal command for an install or a fix.
+
+- **Fix buttons.** `kit/studio/fixes.mjs` describes each thing Studio can need (Node packages, Python tools, ffmpeg, Chrome, Node.js, the Whisper model, yt-dlp, instaloader, the effects pass, the person mask, rea-video, the humanizer skill, the Studio page): a plain label, why it matters, whether Studio can install it, a download link for what only you can install, and the instruction for an agent with the command inside it. `web/src/Fix.jsx` shows **Install**, **Send to my agent** (when a terminal agent is connected) and **Copy for my agent**, and the page state carries the fixes as `env.fixes`.
+- **Install runs one setup step.** `POST /api/fix/install {id}` runs only `kit/setup.mjs --only <step>` (the old `/api/tools/install` is the same endpoint), shows progress, and reports whether it worked; when it did not, the row says your agent can take it from there. New `--only mask`; `--only effects` still fetches the mask and `--skip effects` still skips it.
+- **Send to my agent.** `POST /api/fix/send {id}` queues the instruction in the Studio chat for the terminal agent. The chat shows the short ask ("Please install rea-video for Studio."); the agent reads the full instruction (`attach: { kind: 'fix' }`). AGENTS.md says how to answer it.
+- **Errors carry fix ids.** Draft and Render refused for a missing tool (`{ error, fix: [ids] }`), B-roll cards without Chrome, a transcript without Python or faster-whisper, a reference link without yt-dlp or instaloader (the queue item's `fix`), and effects skipped at render now say what is missing in plain words; the toast and the row show the fix buttons. `/api/setup` returns fix ids instead of commands and a plain `forUser`.
+- **No commands on the page.** The Setup check, the Render and Record notes, B-roll Make, the Reference step and the rea-video note use the buttons. The Render step's Command fold is now **For your agent**, which copies the reel as an instruction. The CLI and MCP `setup_status` still print the commands for agents.
+- **Tests.** `tests/studio-fixes.test.mjs` (in `npm run check`): every fix has plain words and an instruction; the page source and the built page have a command only inside an agent instruction; server messages have none; the setup list, a refused draft, Install, Send and a yt-dlp link through the server. `tests/studio-fixes.e2e.mjs` (in `npm run smoke`): the buttons, the clipboard, the toast, Install's result, the chat, and no command on any step, in dark and light. `STUDIO_SETUP_STATUS` lets a test fix the setup status.
+- **B-roll race and steadier tests (#43).** A B-roll reply that landed after a newer live update (an agent idea, a clear from the API) put the older lane back on screen; `BRoll.jsx` now fetches `/api/state` and `apply` drops anything older than what is showing. The e2e tests wait for the page to be ready and for actions to finish (`tests/fixtures/patient.mjs`), the More menu test waits for focus, and the folder tests use small node scripts as the dialog stand-in (`STUDIO_FOLDER_DIALOG` runs a `.mjs` with node), so they run on Windows.
+
+## 1.10.1
 
 Release notes: [docs/releases/v1.10.1.md](docs/releases/v1.10.1.md). Fixes from Will's second real session (kit 1.7.0, a 10 minute take).
 

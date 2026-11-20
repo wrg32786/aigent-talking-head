@@ -63,7 +63,7 @@ try {
     const [a, b, c, d] = r.j.added;
     assert.strictEqual(a.status, 'failed'); assert.ok(/not a link/.test(a.error));
     assert.strictEqual(b.status, 'failed'); assert.ok(/one post/.test(b.error));
-    assert.strictEqual(c.status, 'failed'); assert.ok(/yt-dlp/.test(c.error) && /pip install yt-dlp/.test(c.error));
+    assert.strictEqual(c.status, 'failed'); assert.ok(/yt-dlp/.test(c.error) && !/pip install|npm run/.test(c.error)); assert.strictEqual(c.fix, 'ytdlp');
     assert.strictEqual(d.status, 'queued'); assert.strictEqual(d.site, 'file');
     const done = await until(async () => { const s = (await req('/api/state')).j.state; const it = s.reference.queue.find(x => x.id === d.id); return it.status === 'ready' || it.status === 'failed' ? s : null; }, 120e3); // a download and a teardown: slow on a busy or Windows machine
     const it = done.reference.queue.find(x => x.id === d.id);

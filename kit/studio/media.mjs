@@ -82,14 +82,14 @@ export function transcribe(rel, { onProgress = () => {}, onDone = () => {}, chun
   if (txJobs.has(rel)) return { status: 'running' };
   const out = txFile(rel), stand = process.env.STUDIO_TX;
   const [cmd, args] = stand ? [process.execPath, [resolve(ROOT, stand), resolve(ROOT, rel), out, '--chunk', String(chunk)]] : [python(), [join(STUDIO, 'tx_chunks.py'), resolve(ROOT, rel), out, '--chunk', String(chunk)]];
-  if (!cmd) { onDone(new Error('Python is missing. Fix: npm run setup:all')); return { status: 'failed' }; }
+  if (!cmd) { onDone(Object.assign(new Error('Python is missing, so Studio cannot transcribe yet.'), { fix: 'python' })); return { status: 'failed' }; }
   const p = spawn(cmd, args, { cwd: ROOT, env: process.env });
   txJobs.set(rel, p);
   let err = '';
   const read = d => { for (const l of String(d).split(/\r?\n/)) { const m = l.match(/^progress (\d+) (\d+)/); if (m) onProgress(+m[1], +m[2]); else if (l.trim()) err = l.trim().slice(0, 300); } };
   p.stdout.on('data', read); p.stderr.on('data', read);
   p.on('error', e => { err = e.message; });
-  p.on('close', c => { txJobs.delete(rel); onDone(c === 0 && transcript(rel) ? null : new Error(/faster_whisper/.test(err) ? 'faster-whisper is missing. Fix: npm run setup:all' : err || `transcription stopped (${c})`)); });
+  p.on('close', c => { txJobs.delete(rel); onDone(c === 0 && transcript(rel) ? null : /faster_whisper/.test(err) ? Object.assign(new Error('The Python tools for transcribing (faster-whisper) are missing, so Studio cannot transcribe yet.'), { fix: 'python' }) : new Error(err || `transcription stopped (${c})`)); });
   return { status: 'running' };
 }
 export function stopAll() { for (const p of [...running.values(), ...txJobs.values()]) try { p.kill(); } catch {} }

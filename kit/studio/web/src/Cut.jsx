@@ -6,6 +6,7 @@ import { Badge } from '@astryxdesign/core/Badge';
 import { ProgressBar } from '@astryxdesign/core/ProgressBar';
 import { api, file, toast, cap1, fmtS, Icon, IconBtn } from './lib.jsx';
 import { Lines } from './Lines.jsx';
+import { FixActions } from './Fix.jsx';
 import { Player, useMedia, useTranscript, Wave, clock } from './Player.jsx';
 
 const KIND = { full: 'Full edit', part: 'Parts', clip: 'Clips', ad: 'Ad cuts' };
@@ -172,6 +173,7 @@ export function Cut({ V, s, apply, go }) {
     {tx && tx.status === 'running' && <div className="tx-run" id="cut-tx"><ProgressBar label="Transcribing the take" value={tx.total ? Math.round(100 * tx.done / tx.total) : undefined} isIndeterminate={!tx.total} />
       <span className="fine">Transcribing{tx.total ? ` part ${Math.min(tx.done + 1, tx.total)} of ${tx.total}` : ''}, then finding cuts. Safe to leave this page.</span></div>}
     {tx && tx.status === 'failed' && <p className="err" role="alert">{tx.error}</p>}
+    {tx && tx.status === 'failed' && tx.fix && <FixActions V={V} id={tx.fix} apply={apply} />}
     {cutsRun && <div id="cut-progress"><ProgressBar label="Rendering the cuts" isIndeterminate /></div>}
     <div className="cut-grid">
       <div className="cut-play">{src && <Player path={src} tx={tx} playerRef={player} onAddRange={r => add(r, 'clip')} />}</div>

@@ -1,6 +1,6 @@
 // Setup: install everything the kit can use, up front, and say what is left for the user.
 //   npm run setup:all [-- --yes] [--skip effects,model] [--only ytdlp] [--json]   install what is missing, then print a summary
-//     (--only: just those steps; Studio's Install button runs --only ytdlp for yt-dlp and instaloader)
+//     (--only: just those steps; Studio's Install buttons run --only <step>, see kit/studio/fixes.mjs)
 //   npm run setup:all -- --check [--json]                         only report (Studio's Setup check and the MCP
 //                                                                  setup_status tool use the same list)
 // Safe to run again and to stop halfway: every step first checks whether its thing is already there, so a second run
@@ -44,7 +44,7 @@ const SYS = {
   chrome: { brew: 'brew install --cask google-chrome', winget: 'winget install --id Google.Chrome -e', choco: 'choco install googlechrome -y', apt: 'sudo apt-get install -y chromium || sudo apt-get install -y chromium-browser', dnf: 'sudo dnf install -y chromium', pacman: 'sudo pacman -S --noconfirm chromium',
     none: 'Install Chrome from https://www.google.com/chrome/ (or set CHROME_PATH)' },
 };
-const sysFix = what => SYS[what][pm() || 'none'];
+export const sysFix = what => SYS[what][pm() || 'none'];
 const needsPassword = fix => /^sudo /.test(fix);
 
 // rea-video next to the kit's Python or on PATH (kit/teardown.mjs looks the same way)
@@ -141,7 +141,7 @@ export function install({ yes = false, skip = [], log = console.log } = {}) {
     sh(py, ['-c', `from faster_whisper import WhisperModel; WhisperModel(${JSON.stringify(MODEL)}, device="cpu", compute_type="int8")`], log); return { result: 'installed' };
   }, log)));
   res.push(skipIf('effects', () => step('Effects pass', () => { if (has('effects')) return { result: 'ready' }; sh(process.execPath, [join(ROOT, 'effects', 'setup.mjs')], log); return { result: 'installed' }; }, log)));
-  res.push(skip.includes('effects') ? { name: 'mask', result: 'skipped', detail: 'skipped with the effects pass' } : skipIf('mask', () => step('Person mask weights (birefnet-portrait)', () => {
+  res.push(skip.includes('effects') && skip.includes('mask') ? { name: 'mask', result: 'skipped', detail: 'skipped with the effects pass' } : skipIf('mask', () => step('Person mask weights (birefnet-portrait)', () => {
     if (has('mask')) return { result: 'ready' };
     if (!existsSync(FX_PY)) return { result: 'failed', detail: 'needs the effects pass first' };
     sh(FX_PY, [join(KIT, 'mask.py'), '--download'], log); return { result: 'installed' };
@@ -170,8 +170,9 @@ export function install({ yes = false, skip = [], log = console.log } = {}) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const argv = process.argv.slice(2), flag = k => argv.includes('--' + k);
   const opt = k => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : undefined; };
-  const VALUED = new Set(['skip', 'only']), json = flag('json'), STEP_IDS = ['npm', 'python', 'ytdlp', 'ffmpeg', 'chrome', 'model', 'effects', 'rea', 'humanizer', 'studio'];
-  const only = (opt('only') || '').split(',').map(x => x.trim()).filter(Boolean), skipArg = only.length ? STEP_IDS.filter(x => !only.includes(x)).join(',') : opt('skip') || '';
+  const VALUED = new Set(['skip', 'only']), json = flag('json'), STEP_IDS = ['npm', 'python', 'ytdlp', 'ffmpeg', 'chrome', 'model', 'effects', 'mask', 'rea', 'humanizer', 'studio'];
+  // --only effects also fetches the mask weights (as before); --skip effects also skips them
+  const only = (opt('only') || '').split(',').map(x => x.trim()).filter(Boolean).flatMap(x => x === 'effects' ? [x, 'mask'] : [x]), skipArg = only.length ? STEP_IDS.filter(x => !only.includes(x)).join(',') : (opt('skip') || '').split(',').flatMap(x => x.trim() === 'effects' ? ['effects', 'mask'] : [x]).join(',');
   if (flag('check')) {
     const s = status();
     if (json) console.log(JSON.stringify(s, null, 2));

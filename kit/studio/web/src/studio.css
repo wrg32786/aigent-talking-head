@@ -639,7 +639,20 @@ ol.conn-steps > li::before { content: counter(cs); position: absolute; left: 0; 
 .for-user { margin-top: 12px; padding: 10px 14px; border-radius: var(--radius); background: color-mix(in srgb, var(--warning) 10%, transparent); border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent); }
 .for-user ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
 .needfix { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; padding: 8px 12px; border-radius: var(--radius); font-size: 13px; background: color-mix(in srgb, var(--warning) 10%, transparent); border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent); }
-.needfix .ic { width: 16px; height: 16px; color: var(--warning); } .needfix code { font-size: 12px; }
+.needfix { flex-direction: column; align-items: stretch; gap: 6px; }
+.needfix > p { display: flex; align-items: center; gap: 8px; margin: 0; }
+.needfix .ic { width: 16px; height: 16px; color: var(--warning); flex: none; }
+/* fix buttons (Fix.jsx): Install, a link for what only you can install, Send or Copy for my agent */
+.fix { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; vertical-align: middle; }
+.setup-list .fix, .needfix .fix, .toast .fix { display: flex; margin-top: 6px; }
+.fix-row { display: flex; flex-direction: column; gap: 2px; }
+.fix-link { font-size: 13px; font-weight: 600; color: var(--primary); padding: 4px 6px; border-radius: var(--radius); text-decoration: none; }
+.fix-link::after { content: " \2197"; font-weight: 400; }
+.fix-link:hover { text-decoration: underline; }
+.fix-ok { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--success); }
+.fix-ok .ic { width: 14px; height: 14px; }
+.fix-note { flex-basis: 100%; }
+.toast.has-fix { max-width: 440px; }
 /* ---------- footage from a link ---------- */
 .flink { margin-top: 14px; padding: 12px 14px; }
 .flink form { gap: 8px; align-items: center; } .flink .fl-ic { width: 18px; height: 18px; color: var(--primary); flex: none; }

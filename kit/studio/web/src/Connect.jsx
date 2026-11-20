@@ -6,10 +6,10 @@ import { StatusDot } from '@astryxdesign/core/StatusDot';
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
 import { api, toast, Icon, IconBtn } from './lib.jsx';
 
-export async function copyText(t) {
+export async function copyText(t, said) {
   try { await navigator.clipboard.writeText(t); }
   catch { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); document.execCommand('copy'); a.remove(); }
-  toast('Copied', true);
+  toast(said || 'Copied', true);
 }
 export function CopyBlock({ code, label, id }) {
   return <div className="copyblock" id={id}><pre><code>{code}</code></pre><IconBtn n="copy" label={'Copy ' + (label || '')} onClick={() => copyText(code)} /></div>;

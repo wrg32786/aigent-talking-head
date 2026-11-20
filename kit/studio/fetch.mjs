@@ -21,11 +21,16 @@ export const MAX_BYTES = 1024 ** 3;
 export const DEFAULT_MAX_SECONDS = +(process.env.STUDIO_REF_MAX_SECONDS || 90);
 const IG_POST = /^https?:\/\/(?:www\.|m\.)?instagram\.com\/(?:[A-Za-z0-9._]+\/)?(?:reels?|p|tv)\/([A-Za-z0-9_-]{5,})\/?(?:[?#].*)?$/;
 const DIRECT = ['.mp4', '.mov', '.m4v', '.webm'];
+// plain words for the page and the agent; Studio shows Install, Send to my agent and Copy for my agent next to these
+// (kit/studio/fixes.mjs, the fix ids in FIX_OF), and the CLI adds the command (kit/setup.mjs --only ytdlp)
 export const INSTALL = {
-  ytdlp: 'yt-dlp is not installed. It is optional and free: pip install yt-dlp (or python -m pip install yt-dlp), or get the standalone program from https://github.com/yt-dlp/yt-dlp#installation and put it on your PATH (or set YTDLP to its path). Then add the link again.',
-  instaloader: 'Instagram links need instaloader or yt-dlp, optional extras: pip install instaloader yt-dlp (or the Install button in Studio). Both fetch one public post anonymously; nothing logs in.',
-  ffmpeg: 'ffmpeg is needed to join video and audio and to trim long videos. Install it from https://ffmpeg.org/download.html.',
+  ytdlp: 'yt-dlp is not installed, so Studio cannot download this link yet. It is free and optional. Install it, then add the link again.',
+  instaloader: 'Instagram links need instaloader or yt-dlp, and neither is installed. Both are free and fetch one public post anonymously; nothing logs in. Install them, then add the link again.',
+  ffmpeg: 'ffmpeg is needed to join video and audio and to trim long videos, and it is not installed.',
 };
+const FIX_OF = { ytdlp: 'ytdlp', instaloader: 'instaloader', ffmpeg: 'ffmpeg' };
+// the fix id behind one of the messages above (an error line may carry a prefix such as "download failed: ")
+export const fixOf = msg => { const k = Object.keys(INSTALL).find(k => String(msg || '').includes(INSTALL[k])); return k ? FIX_OF[k] : null; };
 
 // what a link is, before anything is downloaded
 export function classify(raw) {
@@ -179,5 +184,5 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     const r = await download(url, resolve(out), { maxSeconds: +(opt('max-seconds') || DEFAULT_MAX_SECONDS), say: l => console.log(l) });
     console.log(a.includes('--json') ? JSON.stringify(r) : `saved ${r.file}${r.seconds ? ` (${r.seconds} s)` : ''}`);
-  } catch (e) { console.error('download failed: ' + e.message); process.exit(1); }
+  } catch (e) { console.error('download failed: ' + e.message); if (fixOf(e.message) && fixOf(e.message) !== 'ffmpeg') console.error('fix: npm run setup:all -- --only ytdlp'); process.exit(1); }
 }
