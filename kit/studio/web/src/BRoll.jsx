@@ -190,7 +190,7 @@ export function BRoll({ V, apply, go, openKeys }) {
       <span><b>{a.by}</b> asks to generate{a.beat != null ? ` for beat ${a.beat}` : ''} with {a.provider}: "{a.prompt}" <Badge label={money(a.estimate)} variant="warning" /></span>
       <Button size="sm" variant="primary" label={`Approve ${money(a.estimate)}`} onClick={() => ask(a, true)} /><Button size="sm" variant="ghost" label="Decline" onClick={() => ask(a, false)} /></div>)}</div>}
     {B.gens.filter(g => g.status !== 'done').map(g => <p key={g.id} className={'gen-st ' + g.status} data-id={g.id}>{g.status === 'running' ? `Generating with ${g.provider}${g.phase ? ' (' + g.phase.replace('_', ' ') + ')' : ''}: "${g.prompt.slice(0, 60)}"` : `Generate failed: ${g.error}`}</p>)}
-    {!B.draft ? <div className="empty-art" id="broll-empty"><Icon n="film" /><p>The beats come from a draft. Make one on the Render step, then come back.</p><Button id="broll-to-render" variant="secondary" size="sm" label="Go to Render" onClick={() => go('render', true)} /></div>
+    {!B.draft ? <div className="empty-art" id="broll-empty"><Icon n="film" /><p>The beats come from a draft. Make one on the Finish step, then come back.</p><Button id="broll-to-render" variant="secondary" size="sm" label="Go to Finish" onClick={() => go('finish', true)} /></div>
       : <>
         <div className="blane" id="broll-lane" role="list">
           {B.beats.map(b => <button key={b.n} type="button" role="listitem" className={'beat' + (b.n === sel ? ' sel' : '') + (b.slot ? ' filled' : '') + (b.idea ? ' has-idea' : '')} data-beat={b.n} style={{ flexGrow: Math.max(1, b.seconds) }} onClick={() => setSel(b.n)} aria-pressed={String(b.n === sel)}>

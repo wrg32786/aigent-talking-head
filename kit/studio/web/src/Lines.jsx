@@ -1,5 +1,5 @@
 // The Lines view on the Cut step: a long take as its lines (text, length, play, keep or retake), grouped into named
-// bites you can reorder and play, plus one clean take of the whole thing. Bites render on the Render step (Render.jsx),
+// bites you can reorder and play, plus one clean take of the whole thing. Bites render on the Finish step (Render.jsx),
 // the one place that makes videos. Your agent can do the picking (get_lines and set_bites over MCP) and its bites show
 // here as picked by it.
 import { useEffect, useRef, useState } from 'react';
@@ -62,7 +62,7 @@ export function Lines({ s, src, player, apply, t, backend, open: open0 }) {
           <input id="bite-name" placeholder="Name it (optional)" value={name} onChange={e => setName(e.target.value)} maxLength={60} />
           <Button id="bite-add" size="sm" label="Make a bite" isDisabled={!sel.length} onClick={make} />
         </div>
-        {lv.bites.length > 0 && <p className="fine" id="bites-hint">{`Your ${lv.bites.length > 1 ? lv.bites.length + ' bites render' : 'bite renders'} at the end, on the Render step.`}</p>}
+        {lv.bites.length > 0 && <p className="fine" id="bites-hint">{`Your ${lv.bites.length > 1 ? lv.bites.length + ' bites render' : 'bite renders'} at the end, on the Finish step, as one reel.`}</p>}
         <ol className="bite-list" aria-label="Bites">{lv.bites.map((b, i) => <Bite key={b.id} b={b} byId={byId} first={i === 0} last={i === lv.bites.length - 1} playing={playing === b.id}
           onPlay={() => play(b.id, b.ranges)} onPost={x => post({ id: b.id, ...x }).catch(() => {})} />)}</ol>
       </div>

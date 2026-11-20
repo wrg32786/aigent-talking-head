@@ -23,7 +23,7 @@ function Packs({ CAT, s, apply, patch, reloadCat, hidden }) {
   const packs = [{ name: null, label: 'kit defaults, your picks only' }, ...CAT.packs.filter(p => !/^ref-/.test(p.name))];
   const save = e => { e.preventDefault(); api('/api/pack/save', { name: name.trim() }).then(async j => { await reloadCat(); apply(j); setMsg(`Saved ${j.path}`); }).catch(() => {}); };
   return <section className="step" id="s-look" data-step="style" aria-labelledby="h-look" hidden={hidden}>
-    <header className="sh"><h2 id="h-look">Style</h2><p className="sub">Start from a pack, then pick the effects you want.</p></header>
+    <header className="sh"><h2 id="h-look">Look</h2><p className="sub">How it looks and sounds. Start from a pack, then change what you want.</p></header>
     <div className="block glass-card">
       <div className="bh"><h3>Pack</h3>
         <Popover className="pop" id="save-pop"><PopoverButton className="btn ghost sm" id="save-pop-btn">Save as pack</PopoverButton>

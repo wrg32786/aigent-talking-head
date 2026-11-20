@@ -31,7 +31,7 @@ export function Post({ V, s, go }) {
   const reels = st.reels;
   return <section className="step" id="s-post" data-step="post" aria-labelledby="h-post">
     <header className="sh"><h2 id="h-post">Post</h2><p className="sub">Send the reel to Buffer. Drafts by default, so nothing goes out until you say so.</p></header>
-    {!reels.length ? <div className="empty-art glass-card" id="post-empty"><Icon n="film" /><p>{s.job ? 'Render the reel first, then post it here.' : 'Name the reel at the top to start.'}</p>{s.job && <Button id="post-go-render" variant="secondary" label="Go to Render" onClick={() => go('render', true)} />}</div> : <>
+    {!reels.length ? <div className="empty-art glass-card" id="post-empty"><Icon n="film" /><p>{s.job ? 'Render the reel first, then post it here.' : 'Name the reel at the top to start.'}</p>{s.job && <Button id="post-go-render" variant="secondary" label="Go to Finish" onClick={() => go('finish', true)} />}</div> : <>
       <ol className="post-parts" aria-label="Post steps">{PARTS.map(([id, label], k) => <li key={id}>
         <button type="button" id={'post-part-' + id} aria-current={part === id ? 'step' : 'false'} disabled={id !== 'connect' && !connected} onClick={() => setPart(id)}>
           <span className="sn">{id === 'connect' && connected && part !== 'connect' ? <Icon n="check" /> : k + 1}</span>{label}</button></li>)}</ol>

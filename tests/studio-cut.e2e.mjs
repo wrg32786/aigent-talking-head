@@ -3,7 +3,7 @@
 //   tests/fixtures/fake-tx.mjs) highlights along and a word click seeks; an .mkv plays from a 540p preview copy
 // - the Cut step: smart defaults and the summary, the picker cards, Find cuts, candidates on the timeline, trim by
 //   dragging an edge, drop one, add one by dragging on a lane
-// - batch render: kept cuts become their own videos (a stand-in for the engine, tests/fixtures/fake-reel.mjs, with the
+// - batch render on Finish: kept cuts become their own videos (a stand-in for the engine, tests/fixtures/fake-reel.mjs, with the
 //   real extract), a long form one through the real 16:9 pass (1920x1080), an ad one with the CTA end card
 // - Reference: Pull script puts the reference's words in Scripts with [hook], [body] and [cta]
 // - cut points on the audio: a synthetic clip with tone "words" at known times, a breath and room tone, and a transcript
@@ -140,16 +140,21 @@ try {
     await until(async () => !(await api('/api/cut')).candidates.some(x => x.id === 'm1'));
     if (shots) await shot(pg, '#cut-timeline', 'cut-timeline.png');
   });
-  await t('one place renders: the Cut step has no Render, the Render step renders every kept cut as its own video and lists them', async () => {
+  await t('one place renders: the Cut step has no Render; Finish renders every kept cut as its own video in its one Render', async () => {
     assert.strictEqual(await pg.$('#s-cut #cut-render'), null, 'no Render button on the Cut step');
     assert.strictEqual(await pg.$$eval('#s-cut button', x => x.filter(b => /^(Render|Save as)/.test(b.textContent.trim())).length), 0, 'nothing on the Cut step renders or saves a file');
     // the page catches up with the drop above, then says where the 3 kept ones render
-    await pg.waitForFunction(() => /^3 kept\. They render at the end, on the Render step\.$/.test((document.querySelector('#cut-hint') || {}).textContent || ''), null, { timeout: 10000 })
+    await pg.waitForFunction(() => /^3 kept\. They render at the end, on the Finish step, as one reel\.$/.test((document.querySelector('#cut-hint') || {}).textContent || ''), null, { timeout: 10000 })
       .catch(async () => { throw new Error('the Cut step says where they render: ' + await pg.textContent('#cut-hint')); });
-    await pg.goto(url + '/#step=render', { waitUntil: 'networkidle' });
-    await pg.waitForSelector('#kept-cuts #render-kept');
-    assert.strictEqual(await pg.textContent('#render-kept'), 'Render my 3 cuts');
-    await pg.click('#render-kept');
+    await pg.goto(url + '/#step=finish', { waitUntil: 'networkidle' });
+    await pg.waitForSelector('#fin-exports #exp-clips');
+    assert.strictEqual(await pg.$('#kept-cuts'), null, 'one render path: no second render card');
+    assert.strictEqual(await pg.textContent('#exp-clips'), '3 clips from your pieces');
+    // each kept cut as its own reel, and no reel of them all this time
+    await pg.click('#exp-clips'); await pg.waitForSelector('#exp-clips[aria-pressed="true"]');
+    await pg.click('#exp-reel'); await pg.waitForSelector('#exp-reel[aria-pressed="false"]');
+    await pg.waitForFunction(() => document.querySelector('#render').getAttribute('aria-disabled') !== 'true');
+    await pg.click('#render');
     const v = await waitTask(); assert.strictEqual(v.task.status, 'done', JSON.stringify(v.task).slice(0, 800));
     const c = (await api('/api/cut')).candidates, kept = c.filter(x => x.keep);
     assert.strictEqual(kept.length, 3); for (const k of kept) assert.ok(k.outputs.length === 1 && existsSync(join(ROOT, k.outputs[0])), k.id);
@@ -163,15 +168,16 @@ try {
     assert.ok(cj.precut && e1 && Array.isArray(e1.words) && e1.words.length && Math.abs(e1.dur - want) < 0.05, JSON.stringify(e1).slice(0, 300));
     await pg.waitForSelector('#cut-outputs figure');
     assert.strictEqual(await pg.$$eval('#cut-outputs figure', x => x.length), 3);
-    // the plain clips sit in the fold: each kept cut joined as it is, no reel edit
+    // plain clips: each kept cut joined as it is, no reel edit
     const plain = join(ROOT, 'inbox', 'studio', JOB, 'cuts', 'c1.mp4'), reelLog = join(ROOT, 'jobs', `${JOB}-c1`, 'fake-reel.log'), logBefore = readFileSync(reelLog, 'utf8');
     rmSync(plain);
-    await pg.click('#plain-fold .fold2-h'); await pg.click('#cuts-file');
+    await pg.click('#exp-plain'); await pg.waitForSelector('#exp-plain[aria-pressed="true"]'); await pg.click('#exp-clips'); await pg.waitForSelector('#exp-clips[aria-pressed="false"]');
+    await pg.click('#render');
     const pv = await waitTask(); assert.strictEqual(pv.task.status, 'done', JSON.stringify(pv.task).slice(0, 800));
     assert.ok(existsSync(plain) && Math.abs(+probe(plain).format.duration - want) < 0.6, 'the plain clip');
     assert.strictEqual(readFileSync(reelLog, 'utf8'), logBefore, 'a plain clip does not run the reel edit');
-    await pg.waitForSelector('#fc-list li[data-kind="cut"][data-id="c1"] a[href*="c1.mp4"]');
-    if (shots) { await pg.evaluate(() => scrollTo(0, 0)); await pg.waitForTimeout(300); await shot(pg, '#s-render', 'render-from-cut.png'); }
+    if (shots) { await pg.evaluate(() => scrollTo(0, 0)); await pg.waitForTimeout(300); await shot(pg, '#s-render', 'finish-pieces.png'); }
+    await api('/api/state', { finish: { reel: true, clips: false, plain: false } });
   });
   await t('long form: a clip through the real 16:9 pass is 1920x1080; an ad gets the CTA end card and tighter cuts', async () => {
     await api('/api/cut/output', { format: 'long', kind: 'clips', clips: 1, seconds: 20, goal: 'organic' });
@@ -251,17 +257,18 @@ try {
     await pg.click('#bites li.bite .bite-a button:has-text("Stop")');
     // nothing on the Cut step renders: the bite says where it does
     assert.strictEqual(await pg.$$eval('#s-cut button', x => x.filter(b => /^(Render|Save as)/.test(b.textContent.trim())).length), 0, 'no Render or Save as on the Cut step');
-    assert.ok(/renders at the end, on the Render step/.test(await pg.textContent('#bites-hint')));
-    // on the Render step: Render my 1 bite, and in the fold, save it as one file: the two lines joined, nothing else
+    assert.ok(/renders at the end, on the Finish step/.test(await pg.textContent('#bites-hint')));
+    // on Finish the bite is one of your pieces: Plain clips saves it as one file, the two lines joined, nothing else
     const bid = (await api('/api/lines')).bites[0].id;
-    await pg.goto(url + '/#step=render', { waitUntil: 'networkidle' });
-    await pg.waitForSelector('#render-bites'); assert.strictEqual(await pg.textContent('#render-bites'), 'Render my 1 bite');
-    await pg.click('#plain-fold .fold2-h');
-    await pg.click(`#fc-list li[data-kind="bite"][data-id="${bid}"] button:has-text("Plain clip")`);
+    await pg.goto(url + '/#step=finish', { waitUntil: 'networkidle' });
+    await until(async () => (await api('/api/edit')).combo.pieces.some(x => x.kind === 'bite' && x.id === bid));
+    await pg.waitForSelector('#exp-plain:not([disabled])');
+    await pg.click('#exp-plain'); await pg.waitForSelector('#exp-plain[aria-pressed="true"]'); await pg.click('#exp-reel'); await pg.waitForSelector('#exp-reel[aria-pressed="false"]');
+    await pg.click('#render');
     const v = await waitTask(); assert.strictEqual(v.task.status, 'done', JSON.stringify(v.task).slice(0, 600));
     const L = (await api('/api/lines')).bites[0]; assert.ok(L.file, 'the joined file'); assert.ok(Math.abs(+probe(join(ROOT, L.file)).format.duration - L.seconds) < 0.25, `${L.seconds}`);
     assert.ok(!existsSync(join(ROOT, 'jobs', `${JOB}-${L.id}`, 'fake-reel.log')), 'one file is not a reel edit');
-    await pg.waitForSelector(`#fc-list li[data-kind="bite"] a[href*="${L.id}.mp4"]`);
+    await api('/api/state', { finish: { reel: true, clips: false, plain: false } });
     await pg.goto(url + '/#step=cut', { waitUntil: 'networkidle' });
     await pg.click('#lines-toggle'); await pg.waitForSelector('#bites li.bite');
     await pg.waitForSelector(`#bites li.bite a[href*="${L.id}.mp4"]`);

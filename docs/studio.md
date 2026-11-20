@@ -10,7 +10,9 @@ That starts Studio on http://127.0.0.1:4757 and opens your browser. `--port <n>`
 
 ![Studio on a laptop: the AIgent wordmark, the Style step with packs and the effects grid, the picks bar at the bottom, and the chat](studio/desktop.png)
 
-Five steps across the top: Footage, Cut, Reference, Style, Render. Each one is its own screen with Back and Next at the bottom, and a step shows a check when it is done. The chat sits on the right (behind the chat button on a phone). Dark is the default; switch to light with the sun button or in Settings.
+Six steps across the top: Footage, Cut, Look, B-roll, Finish, Post. Each one is its own screen with Back and Next at the bottom, and a step shows a check when it is done. **Look** has two views, **Your look** (packs, effects, sound and pace) and **Reference**. Old links still land: `#step=style` and `#step=reference` open Look, `#step=render` opens Finish.
+
+**Your edit.** One quiet line above every step says what you are making (one reel, clips, plain clips; the aspect), from what (your N pieces in your order, or the whole take), the look, the b-roll spots and the sound, and offers the next action (Draft it, Render). Click a part to open its step. When you change your pieces after a draft it says so. Agents read the same thing with `get_edit` (`GET /api/edit`). The chat sits on the right (behind the chat button on a phone). Dark is the default; switch to light with the sun button or in Settings.
 
 ![Studio in the light theme, the AIgent cream with deep teal: the Style step](studio/light.png)
 
@@ -32,7 +34,7 @@ Five steps across the top: Footage, Cut, Reference, Style, Render. Each one is i
 
 ## Words and brands
 
-In the Style step, **Words and brands** has two lists:
+In Look (Your look), **Words and brands** has two lists:
 
 - **Your words.** One per line, the way Whisper writes it, then `=`, then how you write it: `Agent Academy = AIgent Academy`, `chat GBT | chat GPT = ChatGPT`, `school = Skool after on, in` (only after those words). The draft fixes them in captions, titles and the clip list, and keeps their own capitals even in an all-caps caption style. AIgent Academy, Skool, claude.ai, ChatGPT and Claude Code are built in (`kit/glossary.json`, the aigent pack). The same text works as `npm run reel -- --glossary "..."`, a pack's `style.glossary`, or `glossary` in `studio_set_selections`.
 - **Logos when you say a word.** Type the word, click **Add its logo** and pick an svg, png, webp or jpg. When the word is said, its logo shows on a small white plate for about a second, at most one every 4 s, never over a title or graphic. The marks are kept in `jobs/.studio/brands/`. **Use the kit's Skool mark** adds `kit/example/skool-logo.svg`. Studio never downloads a logo; use only marks you have the right to use. CLI: `--brands '[{"word":"Skool","logo":"path/to/mark.svg"}]'` or a JSON file.
@@ -109,7 +111,7 @@ The Cut step comes right after Footage. It asks what to make from the take, find
 
 Tick **Show cut points** under the timeline to see them: a dashed tick where the transcript put each edge, and for the selected candidate a table with the edge, the word, the transcript time, the audio time, the cut (click to hear it), the shift and why, for example "audio: the word ran past the transcript".
 
-**Nothing renders on the Cut step.** Cut is for choosing: keep, drop, trim and order. Under **Find cuts** it says how many you kept and that they render at the end, on the [Render step](#render). There, **Render my N cuts** renders every kept candidate as its own video, one after another, in `jobs/<job>-<id>/` (the cut itself is in `inbox/studio/<job>/cuts/`). Shorts and square posts go through the full reel edit with the session's style and the platform export; ads also get the end card. They show on the Render step under "From the Cut step".
+**Nothing renders on the Cut step.** Cut is for choosing: keep, drop, trim and order. Under **Find cuts** it says how many you kept and that they render at the end, on the [Finish step](#finish), as one reel. The kept cuts (in your order) and your bites are **your pieces**: Draft on Finish makes the reel from them, already cut. Tick **N clips from your pieces** there to also render every piece as its own video in the same run, in `jobs/<job>-<id>/` (the cut itself is in `inbox/studio/<job>/cuts/`). Shorts and square posts go through the full reel edit with the session's style and the platform export; ads also get the end card. They show on Finish under "Clips from your pieces".
 
 **Long form.** The engine renders 9:16, so a Long form output is a plain edit for now: the cut joined with short fades, centered over a blurred copy of itself at 1920x1080, loudness-normalized to -14 LUFS. No captions or graphics yet.
 
@@ -194,7 +196,7 @@ The Scripts area in the Footage step holds what you will say on camera, per reel
 - **Marks.** A line that is only `[hook]`, `[body]` or `[cta]` starts a section; the stats show when each starts. `[pause]` anywhere is a breath: it adds 1.5 s and the teleprompter holds there.
 - **Ask for one.** Type a request under the editor ("write a 30 s script on cold showers", "rewrite this tighter") and it goes to whoever answers the chat. After a reference breakdown, **Write script from this reference** sends your agent a Studio message with the teardown, so the script follows the reference's hook, pacing and beat times.
 - **Who writes.** Your terminal agent writes with `write_script` and runs a humanizer skill on every draft first: its own if it has one, otherwise the bundled `skills/humanizer` ([blader/humanizer](https://github.com/blader/humanizer), MIT, by Siqi Chen). With an API key or a local model, the Studio chat writes the script itself and follows a short form of the same rules (`HUMANIZER_RULES` in `kit/studio/scripts.mjs`); em dashes are removed either way. In keywords mode the page says in one line that writing scripts needs an agent, an API key or a local model.
-- **From a reference.** **Pull script** on the Reference step puts a reference's own words in Scripts: `[hook]` for its opening seconds, `[body]`, `[cta]` when it ends by asking for something, and `[pause]` at gaps over 1.2 s. The words come from its teardown, or Studio transcribes it. **Adapt to my topic** rewrites it for your topic in the same structure, with about the same lines, pauses and pacing: your agent gets the ask and saves it with `write_script` after the humanizer, or the API or local model writes it with the humanizer rules. The original stays next to it.
+- **From a reference.** **Pull script** in Look, Reference, puts a reference's own words in Scripts: `[hook]` for its opening seconds, `[body]`, `[cta]` when it ends by asking for something, and `[pause]` at gaps over 1.2 s. The words come from its teardown, or Studio transcribes it. **Adapt to my topic** rewrites it for your topic in the same structure, with about the same lines, pauses and pacing: your agent gets the ask and saves it with `write_script` after the humanizer, or the API or local model writes it with the humanizer rules. The original stays next to it.
 - **Read it.** **Read it in Record** opens the recorder with that script in the teleprompter (see [Record now](#record-now)).
 
 API: `GET /api/scripts`, `GET /api/scripts/get?id=`, `POST /api/scripts` (create, or replace with `id`), `POST /api/scripts/action` (`delete`, `duplicate`, `rename`), `POST /api/reference/script` (pull), `POST /api/scripts/adapt` (`{ id, topic }`), `POST /api/scripts/from-reference`. MCP: `list_scripts`, `get_script`, `write_script`.
@@ -388,17 +390,23 @@ Off by default. Turn on **Allow generating** in API keys and providers and add a
 | fal | what the model makes | You name the model. Cost per model. Not verified. |
 | Runway, Veo, Kling, Sora | | Listed, not wired: Runway's API is documented but not in this version; Veo's preview ended 2026-10-22 (use Google); Kling runs through Higgsfield; Sora closed. |
 
-## Render
+## Finish
 
-![The Render step: Redraft and Render buttons, the export size, the finished reel and its export with download links, and the picks folded below](studio/render.png)
+![The Finish step: Draft, Check and Render in order, the Make card with Your 2 pieces or The whole take, the reel, clips and plain clips chips and the export size, then Redraft and Render v4](studio/finish.png)
+
+Finish is the one place that makes videos, in three steps shown across the top: **Draft**, **Check**, **Render**. The **Make** card says what the one Render makes:
+
+- **From.** When you kept pieces on the Cut step: **Your N pieces** (the default) or **The whole take**. Your pieces are cut once, on their audio-checked edges, and handed to the reel as they are (`--as-is`, with a `clips.json` beside them carrying each one's words), so nothing is transcribed or cut a second time.
+- **The reel**, **N clips from your pieces** (each piece as its own reel with the same look) and **Plain clips, no edit** (the words you kept, joined, no look, in seconds). Any mix; Render makes them all in one run. With only clips or plain clips ticked there is nothing to draft.
+- **Export**, the platform size.
+
+Render stays off until the reel is drafted, and when your pieces changed after the draft it says "Your pieces changed since the draft. Draft again first." (Your edit says so too.) Agents start the same runs with `studio_run` (`from: pieces | take` for a draft, `exports: { reel, clips, plain }` for a render) or set them with `finish` in `studio_set_selections`.
 
 Draft first. "Picks and why" opens with each pick per beat and the reason. The log is folded below it, and **For your agent** copies this reel as an instruction for your agent. Render then builds the reel, applies your choices edits, and lists every output (`reel-vN.mp4` and the export) with a player and a download link. The effects pass (camera moves, person-mask effects) runs when the effects venv is set up; without it, Studio says the picked effects need it, with **Install** and the agent buttons, and the reel renders without them. When the draft tightened pauses, **Pauses cut** lists each one with **Keep this pause** (`pace.keepPauses`, `--keep-pauses clip@seconds`). A cancel that lands after the render wrote its video keeps the video; the task ends done.
 
-Draft plans the reel; it makes no video. When it ends the step says "Plan ready, no video yet. Press Render."
+Draft plans the reel; it makes no video. When it ends the step says "Plan ready, no video yet. Check it below, then Render." The Check tools (Show original, the edit receipt, the clean-up pass, Picks and why) show once there is a draft.
 
-![The Render step's From the Cut step card: Render my 3 cuts and Render my 2 bites, and More ways to save opened with plain clip buttons and one row per cut and bite](studio/render-from-cut.png)
-
-**From the Cut step.** The Render step is the one place that makes videos. When you kept cuts or made bites on the Cut step, a card at the top says how many and offers **Render my N cuts** and **Render my N bites**, each one as its own reel with your look. Draft then reads **Draft whole take** so it is clear it plans one reel from the whole take instead. **More ways to save** is folded below the buttons: **Save each cut as a plain clip** and **Save each bite as one file** join the kept words with no look and no captions, and one row per cut and bite lets you **Render** or save a **Plain clip** of just that one, with a download link once the file exists. The rendered ones show under "From the Cut step" below your reels.
+![Finish after a render: the reel and each piece as its own reel under Clips from your pieces](studio/finish-rendered.png)
 
 Every export saves the build behind it beside the video (`reel-vN.build/`). A later Draft replaces `build/`, so a finished reel shows **Edit this reel**: it brings that reel's build back (the draft it replaces is kept as `draft-<time>.build/`), then edit and Render. Agents use `reopen_reel` or `npm run reopen -- <job> v3`.
 
@@ -406,13 +414,13 @@ When the reel puts titles or captions behind you, Render first checks free memor
 
 ## Review your edit
 
-Five tools in the Reference and Render steps help you see what changed and say what to change next. They read files the kit already writes (the teardown's `Reel.md`, the draft's `clips.json` and `choices.json`), so nothing goes online.
+Five tools in Look (the Reference view) and Finish help you see what changed and say what to change next. They read files the kit already writes (the teardown's `Reel.md`, the draft's `clips.json` and `choices.json`), so nothing goes online.
 
-**What to swap** (Reference step, under the breakdown). The reference's parts in order with their times: the hook, every cut and how it moves, title moments, b-roll and cards, graphics and the call to action. Click a time to watch that moment in the reference. Each part lists the Studio picks that match it (transition, title entrance, finish, caption style, punch, graphic); click one chip to pick it, or **Use** to pick them all. Only items the menu has are offered.
+**What to swap** (Look, Reference, under the breakdown). The reference's parts in order with their times: the hook, every cut and how it moves, title moments, b-roll and cards, graphics and the call to action. Click a time to watch that moment in the reference. Each part lists the Studio picks that match it (transition, title entrance, finish, caption style, punch, graphic); click one chip to pick it, or **Use** to pick them all. Only items the menu has are offered.
 
 <img src="studio/swap-desktop.png" width="620" alt="What to swap: the reference video next to a list of its parts, each with a time button, a kind such as Hook, Cut, Title or CTA, what happens there, chips for matching picks and a Use button">
 
-**Show original** (Render step). Your reel and the reference on one clock: side by side, or the reference laid over your reel with an opacity slider. One play button and one scrubber drive both. If the reference starts earlier or later than your reel, set "Original starts at" in seconds. The reference plays muted unless you tick its sound.
+**Show original** (Finish step). Your reel and the reference on one clock: side by side, or the reference laid over your reel with an opacity slider. One play button and one scrubber drive both. If the reference starts earlier or later than your reel, set "Original starts at" in seconds. The reference plays muted unless you tick its sound.
 
 <img src="studio/compare-desktop.png" width="620" alt="Show original: the reference and your reel side by side at the same moment, with one play button, one scrubber, a start offset and a sound checkbox">
 
@@ -456,7 +464,7 @@ Studio never shows you a terminal command to install or fix something. Wherever 
 - **Send to my agent.** Shown when your terminal agent is connected. The steps go to it through the Studio chat, which shows your short ask ("Please install rea-video for Studio.") while the agent gets the full instruction. Its answer shows in the chat.
 - **Copy for my agent.** Copies a plain instruction for any agent, for example: "In my aigent-talking-head folder (…), install rea-video for Studio by running … Then tell me when it is done." The command lives only inside that instruction.
 
-Things only you can install (ffmpeg, Chrome, Node.js) also get a link to the official download page. The same holds for the reel itself: the Render step's **For your agent** fold copies this reel as an instruction instead of showing the command.
+Things only you can install (ffmpeg, Chrome, Node.js) also get a link to the official download page. The same holds for the reel itself: the Finish step's **For your agent** fold copies this reel as an instruction instead of showing the command.
 
 <p>
 <img src="studio/render-needfix.png" width="560" alt="The Render step saying drafting and rendering need ffmpeg and Chrome, with Get ffmpeg, Get Chrome, Send to my agent and Copy for my agent buttons">

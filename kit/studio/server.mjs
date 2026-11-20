@@ -7,6 +7,7 @@
 // studio_set_selections read and write the same file, and the page updates live when they do.
 import http from 'http';
 import { spawn } from 'child_process';
+import { createHash } from 'crypto';
 import { copyFileSync, createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, watchFile, writeFileSync } from 'fs';
 import { join, extname, basename, resolve, sep } from 'path';
 import { createRequire } from 'module';
@@ -130,7 +131,9 @@ function view(s) {
   let cut = null; try { cut = cutView(s); } catch (e) { cut = { error: e.message, candidates: [] }; }
   let broll = null; try { broll = BRL.view(s); } catch (e) { broll = { error: e.message, beats: [] }; }
   let reopenable = []; try { reopenable = s.job ? SNAP.list(join(ROOT, 'jobs', s.job)).filter(x => x.snapshot).map(x => `jobs/${s.job}/${x.reel}`) : []; } catch {}
-  return { seq: ++viewSeq, boot: BOOT, state: s, compose: comp, outputs: C.outputsOf(s), reopenable, scripts, cut, broll, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
+  let combo = { pieces: [], seconds: 0, key: '' }; try { combo = comboOf(s); } catch {}
+  let edit = null; try { edit = editOf(s, { combo, cut, broll }); } catch (e) { edit = { error: e.message }; }
+  return { seq: ++viewSeq, boot: BOOT, state: s, compose: comp, outputs: C.outputsOf(s), reopenable, scripts, cut, broll, combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
 }
 
 // what a finished draft says (a draft is a plan: no video until Render)
@@ -210,6 +213,12 @@ function draftSteps(s) {
   if (comp.errs.length) throw Object.assign(new Error(comp.errs.join('; ')), { code: 400 });
   let args = comp.args.slice();
   if (recreate) { const i = args.indexOf('--pack'); if (i >= 0) args.splice(i, 2); args.push('--recipe', join(s.reference.out, 'Reel.md')); }
+  // your pieces (the Combo) when you kept any: cut once, here, and handed to the reel as they are (--as-is)
+  const combo = comboOf(s), fromPieces = draftFrom(s, combo) === 'pieces' && !recreate;
+  if (fromPieces) {
+    const cf = comboFiles(s, combo);
+    return { steps: [...cf.steps, [process.env.STUDIO_REEL || 'kit/reel.cjs', [...cf.files, '--as-is', '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])]]], lockString: comp.lockString, txPrompt: null, key: draftKey(s, combo), from: 'pieces', pieces: combo.pieces.length };
+  }
   const cl = cleanupFor(s), src = cl ? ['--clips', relOf(clipsDirOf(s)), '--cleanup', cl] : s.clips ? ['--clips', s.clips] : s.footage;
   // takes filmed from a script: hand the script to Whisper as a hint (TX_PROMPT, kit/tx.py and kit/clip.py), so captions spell its words
   const said = (s.takes || []).filter(t => t.script && t.script.text && s.footage.includes(t.file)).map(t => t.script.text.replace(/\[[a-z]+\]/gi, ' ').replace(/\s+/g, ' ').trim());
@@ -225,7 +234,7 @@ function draftSteps(s) {
       wordsArg = ['--words', wf];
     }
   }
-  return { steps: [[process.env.STUDIO_REEL || 'kit/reel.cjs', [...src, ...wordsArg, '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])], stepEnv]], lockString: comp.lockString, txPrompt: stepEnv.TX_PROMPT || null };
+  return { steps: [[process.env.STUDIO_REEL || 'kit/reel.cjs', [...src, ...wordsArg, '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])], stepEnv]], lockString: comp.lockString, txPrompt: stepEnv.TX_PROMPT || null, key: 'take:' + footageKey(s), from: 'take' };
 }
 function renderSteps(s) {
   if (!s.job || !existsSync(join(ROOT, 'jobs', s.job, 'build', 'cut.json'))) throw Object.assign(new Error('make a draft first'), { code: 400 });
@@ -464,6 +473,81 @@ function cutSteps(s, ids, over) {
     plan.push({ id: x.id, job: sub, aspect, export: exp });
   }
   return { steps, plan };
+}
+
+// ---------- the Combo: the pieces you kept on the Cut step, in order (kept cuts, then your bites) ----------
+// Draft builds the one reel from these, already cut, so nothing is cut twice; Render's exports make each piece its own
+// reel or a plain clip in the same run. Bites need the take's lines: a view uses the cached lines and asks for them once.
+const LINES_ASKED = new Set();
+function linesCached(rel) {
+  const t = MEDIA.transcript(rel); if (!t) return null;
+  const key = `${t.words.length}:${t.words.length ? t.words[t.words.length - 1][1] : 0}`, hit = LINES.get(rel);
+  if (hit && hit.key === key) return hit.lines;
+  if (!LINES_ASKED.has(rel + key)) { LINES_ASKED.add(rel + key); linesOf(rel).then(() => pushState(true)).catch(() => {}); }
+  return null;
+}
+function comboOf(s) {
+  const src = cutSource(s); if (!src) return { source: null, pieces: [], seconds: 0, key: '' };
+  const pieces = [], c = s.cut && s.cut.source === src ? s.cut : null;
+  if (c) for (const x of (c.candidates || []).filter(y => y.keep).sort((a, b) => a.order - b.order)) {
+    const ranges = CUT.renderRanges(x); if (ranges.length) pieces.push({ kind: 'cut', id: x.id, label: x.label || x.id, ranges, cutKind: x.kind || 'clip' });
+  }
+  const ls = linesState(s, src), L = ls.bites.length ? linesCached(src) : null;
+  if (L) for (const b of ls.bites) { const ranges = CUT.biteRanges(b.lines, L); if (ranges.length) pieces.push({ kind: 'bite', id: b.id, label: b.name || b.id, ranges, cutKind: b.kind === 'full' ? 'full' : 'clip' }); }
+  for (const x of pieces) x.seconds = +x.ranges.reduce((a, [p, q]) => a + q - p, 0).toFixed(2);
+  const seconds = +pieces.reduce((a, x) => a + x.seconds, 0).toFixed(2);
+  const key = pieces.length ? createHash('sha1').update(JSON.stringify([src, pieces.map(x => [x.kind, x.id, x.ranges])])).digest('hex').slice(0, 12) : '';
+  return { source: src, pieces, seconds, key };
+}
+// what the next Draft is made from: your pieces when you kept any (finish.from auto), or the whole take
+function draftFrom(s, combo = comboOf(s)) {
+  const f = (s.finish && s.finish.from) || 'auto';
+  if (f === 'take') return 'take';
+  if (f === 'pieces') return combo.pieces.length ? 'pieces' : 'take';
+  return combo.pieces.length ? 'pieces' : 'take';
+}
+const draftKey = (s, combo = comboOf(s)) => draftFrom(s, combo) === 'pieces' ? 'pieces:' + combo.key : 'take:' + footageKey(s);
+// the pieces as already cut files, with a clips.json beside them that carries each one's words (one transcript)
+function comboFiles(s, combo) {
+  const words = wordsOf(combo.source) || [], cutsDir = join(ROOT, `inbox/studio/${s.job}/cuts`), cj = join(cutsDir, 'clips.json');
+  let prev = []; try { prev = JSON.parse(readFileSync(cj, 'utf8')).clips || []; } catch {}
+  const entries = combo.pieces.map((x, k) => { const w = CUT.clipWords(words, x.ranges);
+    return { id: `clip-${String(k + 1).padStart(3, '0')}`, file: `cuts/${x.id}.mp4`, take: combo.source.split('/').pop(), ranges: x.ranges, src_in: x.ranges[0][0], src_out: x.ranges[x.ranges.length - 1][1], dur: x.seconds, status: 'keep', text: w.map(y => y[2]).join(' '), words: w }; });
+  mkdirSync(cutsDir, { recursive: true });
+  writeFileSync(cj, JSON.stringify({ src: combo.source, takes: [combo.source.split('/').pop()], order: 'files', precut: true, clips: [...prev.filter(y => !entries.some(e => e.file === y.file)), ...entries] }, null, 1));
+  const steps = combo.pieces.map(x => ['kit/studio/cut-run.mjs', ['extract', '--src', combo.source, '--ranges', x.ranges.map(r => r.join('-')).join(','), '--out', `inbox/studio/${s.job}/cuts/${x.id}.mp4`]]);
+  return { steps, files: combo.pieces.map(x => `inbox/studio/${s.job}/cuts/${x.id}.mp4`) };
+}
+// the exports of the one Render: each piece as its own reel (clips) or as a plain clip (plain), from the Combo
+function exportSteps(s, combo, { clips, plain }) {
+  const steps = [], plan = [];
+  if (!combo.pieces.length || (!clips && !plain)) return { steps, plan };
+  const cand = combo.pieces.map((x, k) => ({ id: x.id, kind: x.cutKind, ranges: x.ranges, keep: true, order: k, label: x.label }));
+  const r = cutSteps(s, null, { source: combo.source, candidates: cand });
+  if (clips) { steps.push(...r.steps); plan.push(...r.plan); }
+  else steps.push(...r.steps.filter(x => x[1][0] === 'extract'));
+  return { steps, plan, plain: plain ? combo.pieces.map(x => `inbox/studio/${s.job}/cuts/${x.id}.mp4`) : [] };
+}
+// Your edit: what you are making, from what, the look, b-roll, sound and what comes next, in plain words (every step
+// shows it; MCP get_edit reads it)
+function editOf(s, v) {
+  const combo = v.combo, o = outputOf(s), cut = v.cut || {}, from = draftFrom(s, combo), fin = { ...C.defaultState().finish, ...(s.finish || {}) };
+  const fmt = (CUT.FORMATS[o.format] || {}).label || o.format, aspect = CUT.aspectOf(o);
+  const takes = s.footage.length, src = combo.source ? basename(combo.source) : null;
+  const making = [fin.reel ? `1 ${o.format === 'long' ? 'long form video' : 'reel'}` : null, fin.clips && combo.pieces.length ? `${combo.pieces.length} clip${combo.pieces.length === 1 ? '' : 's'}` : null, fin.plain && combo.pieces.length ? 'plain clips' : null].filter(Boolean).join(' and ') || 'nothing yet';
+  const picks = Object.values(s.picks || {}).reduce((a, p) => a + (p.allow || []).length + (p.deny || []).length, 0);
+  const ref = s.reference && s.reference.extracted && s.reference.mode !== 'off' ? (s.reference.mode === 'recreate' ? 'recreate' : 'influence') : null;
+  const spots = ((v.broll && v.broll.beats) || []).filter(b => b.slot).length;
+  const drafted = s.drafted && s.drafted.key === draftKey(s, combo);
+  const next = !takes && !s.clips ? { step: 'footage', label: 'Add footage' } : !s.job ? { step: 'footage', label: 'Name the reel' } : !drafted && fin.reel ? { step: 'finish', label: 'Draft it' } : { step: 'finish', label: 'Render' };
+  return {
+    making: { text: making, format: fmt, aspect, goal: o.goal, length: (cut.summary && cut.summary.length) || null },
+    from: { takes, source: src, seconds: from === 'pieces' ? combo.seconds : (cut.seconds || null), mode: from, pieces: combo.pieces.length, text: from === 'pieces' ? `${combo.pieces.length} piece${combo.pieces.length === 1 ? '' : 's'}, ${Math.round(combo.seconds)} s, in your order` : takes ? `the whole take${takes > 1 ? ` (${takes} files)` : ''}` : 'no footage yet' },
+    look: { pack: s.pack || null, reference: ref, picks, text: [s.pack || 'Studio picks', ref ? `reference (${ref})` : null, picks ? `${picks} change${picks === 1 ? '' : 's'} by you` : null].filter(Boolean).join(', ') },
+    broll: { spots, text: spots ? `${spots} spot${spots === 1 ? '' : 's'}` : 'none yet' },
+    sound: { bed: s.music.bed, sfx: s.sound.sfx, text: `${s.music.bed === 'auto' ? 'Music picked for you' : s.music.bed === 'none' ? 'No music' : s.music.bed}, sounds ${s.sound.sfx}` },
+    drafted: !!drafted, stale: !!(s.drafted && !drafted && fin.reel), next,
+  };
 }
 
 // a reference's words: from its teardown when it has speech, otherwise transcribed here
@@ -856,12 +940,26 @@ async function api(req, res, u) {
   if (p === '/api/draft' && M === 'POST') {
     const s = C.load(); const d = draftSteps(s); // checks the footage first, so an empty job says that before a missing tool
     const miss = needFor('draft'); if (miss) return json(res, 400, miss);
-    update(st => { st.lockedAtDraft = d.lockString || ''; });
-    runTask('draft', () => d.steps, () => ({ choices: !!readChoices(C.load()), note: DRAFT_DONE }));
-    return json(res, 202, view(C.load()));
+    update(st => { st.lockedAtDraft = d.lockString || ''; st.drafted = null; });
+    runTask('draft', () => d.steps, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; }); return { choices: !!readChoices(C.load()), note: DRAFT_DONE, from: d.from }; });
+    return json(res, 202, { ...view(C.load()), from: d.from });
   }
+  if (p === '/api/edit' && M === 'GET') { const v = view(C.load()); return json(res, 200, { edit: v.edit, combo: v.combo, finish: v.state.finish }); }
   if (p === '/api/render' && M === 'POST') {
-    const s = C.load(); const r = renderSteps(s), b = await readBody(req).catch(() => ({}));
+    // the one Render: the reel (from the draft), and in the same run the exports you ticked in Finish: each piece as its
+    // own reel (clips) or as a plain clip (plain). Body { exports: { reel, clips, plain } } overrides finish for this run.
+    const s0 = C.load(), b = await readBody(req).catch(() => ({}));
+    const fin = { ...C.defaultState().finish, ...(s0.finish || {}), ...(b.exports && typeof b.exports === 'object' ? Object.fromEntries(['reel', 'clips', 'plain'].filter(k => b.exports[k] !== undefined).map(k => [k, !!b.exports[k]])) : {}) };
+    if (!fin.reel && !fin.clips && !fin.plain) return json(res, 400, { error: 'pick something to make: the reel, clips or plain clips' });
+    const combo = comboOf(s0);
+    if (!fin.reel && !combo.pieces.length) return json(res, 400, { error: 'keep a piece on the Cut step first, or turn the reel back on' });
+    if (!fin.reel) {
+      const miss = needFor('render'); if (miss) return json(res, 400, miss);
+      const x = exportSteps(s0, combo, fin);
+      runTask('render', () => x.steps, () => ({ cuts: x.plan.map(y => ({ ...y, outputs: C.outputsOf({ job: y.job }) })), plain: x.plain || [], copiedTo: copyRenders(x.plan.flatMap(y => C.outputsOf({ job: y.job }).slice(0, 1))) }));
+      return json(res, 202, { ...view(C.load()), exports: fin, plan: x.plan });
+    }
+    const s = s0; const r = renderSteps(s), xs = exportSteps(s, combo, fin);
     // memory for the person mask (kit/memcheck.cjs): short, the page says so and offers titles in front or the lighter mask
     const mem = MC.renderCheck(join(ROOT, 'jobs', s.job, 'build'));
     if (mem.needed && !mem.ok && !['front', 'light', 'anyway'].includes(b.memory)) return json(res, 409, { error: mem.message, memory: mem });
@@ -869,8 +967,8 @@ async function api(req, res, u) {
     if (b.memory === 'front') r.steps[0][1].push('--no-mask');
     if (b.memory === 'light') r.steps[0][1].push('--mask', 'mediapipe');
     if (b.memory === 'anyway') r.steps[0][2] = { ...(r.steps[0][2] || {}), MASK_FORCE: '1' };
-    runTask('render', () => r.steps, () => { const st = C.load(), outputs = C.outputsOf(st); return { outputs, copiedTo: copyRenders(outputs), fx: r.fx, effects: r.effects }; });
-    return json(res, 202, { ...view(C.load()), fx: r.fx, effectsSkipped: r.effects.length && !r.fx ? 'Effects are not set up on this computer, so this reel renders without them.' : null, ...(r.effects.length && !r.fx ? { fix: ['effects'] } : {}) });
+    runTask('render', () => [...r.steps, ...xs.steps], () => { const st = C.load(), outputs = C.outputsOf(st); const cuts = xs.plan.map(y => ({ ...y, outputs: C.outputsOf({ job: y.job }) })); return { outputs, cuts, plain: xs.plain || [], copiedTo: copyRenders([...outputs, ...cuts.flatMap(y => y.outputs.slice(0, 1))]), fx: r.fx, effects: r.effects }; });
+    return json(res, 202, { ...view(C.load()), exports: fin, plan: xs.plan, fx: r.fx, effectsSkipped: r.effects.length && !r.fx ? 'Effects are not set up on this computer, so this reel renders without them.' : null, ...(r.effects.length && !r.fx ? { fix: ['effects'] } : {}) });
   }
   // Edit this reel: the build behind a finished reel back into build/ (kit/snapshots.cjs); the build it replaces is saved
   if (p === '/api/reopen' && M === 'POST') {
@@ -878,7 +976,8 @@ async function api(req, res, u) {
     if (!s.job) return json(res, 400, { error: 'name the job first' });
     if (task && task.status === 'running') return json(res, 409, { error: 'wait for the running task to finish' });
     let r; try { r = SNAP.reopen(join(ROOT, 'jobs', s.job), String(b.reel || '').split('/').pop()); } catch (e) { return json(res, 400, { error: e.message }); }
-    update(st => { if (S.load().actionNotes !== false) C.applyPatch(st, { reply: `${r.reel} is back in the editor. Change the picks, then Render makes the next version.${r.backup ? ' The draft it replaced is saved as ' + r.backup + '.' : ''}`, from: 'Studio', kind: 'action' }); });
+    // the reopened build is what Render uses now, whatever the pieces say: it counts as drafted
+    update(st => { st.drafted = { key: draftKey(st), from: 'reopen', reel: r.reel, at: Date.now() }; if (S.load().actionNotes !== false) C.applyPatch(st, { reply: `${r.reel} is back in the editor. Change the picks, then Render makes the next version.${r.backup ? ' The draft it replaced is saved as ' + r.backup + '.' : ''}`, from: 'Studio', kind: 'action' }); });
     return json(res, 200, { reopened: r, ...view(C.load()) });
   }
   if (p === '/api/task/cancel' && M === 'POST') { if (task && task.status === 'running') { task.cancel = true; task.proc && task.proc.kill('SIGTERM'); } return json(res, 200, view(C.load())); }
@@ -921,7 +1020,7 @@ async function api(req, res, u) {
     const note = `Clean-up: ${removed.filter(x => x.type === 'silence').length} pauses, ${removed.filter(x => x.type === 'filler').length} filler words and ${items.filter(x => x.type === 'take').length - pl.keep.length} retakes left out, ${pl.saved} s shorter. ${b.redraft === false ? 'Used on the next draft.' : 'Redrafting.'}`;
     update(st => { st.cleanup = { on: true, silence: sil || (st.cleanup && st.cleanup.silence) || 0.7, decisions: dec, footage: footageKey(st), at: new Date().toISOString(), saved: pl.saved };
       if (S.load().actionNotes !== false) C.applyPatch(st, { reply: note, from: 'Studio', kind: 'action' }); });
-    if (b.redraft !== false) { const s = C.load(), d = draftSteps(s); update(st => { st.lockedAtDraft = d.lockString || ''; }); runTask('draft', () => d.steps, () => ({ choices: !!readChoices(C.load()), cleanup: pl, note: DRAFT_DONE })); }
+    if (b.redraft !== false) { const s = C.load(), d = draftSteps(s); update(st => { st.lockedAtDraft = d.lockString || ''; st.drafted = null; }); runTask('draft', () => d.steps, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; }); return { choices: !!readChoices(C.load()), cleanup: pl, note: DRAFT_DONE }; }); }
     return json(res, 202, { ...cleanupView(C.load()), plan: pl, ...view(C.load()) });
   }
   // comment on the preview: a click or a box on a frame, sent to whoever answers the chat, with the frame saved in the job

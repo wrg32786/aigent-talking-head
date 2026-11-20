@@ -94,7 +94,7 @@ try {
     assert.strictEqual((await api('/api/state')).state.job, OLD, 'Cancel changes nothing');
   });
   await t('a switch made by your agent (new_video) moves the page to Footage with the new name', async () => {
-    await pg.click('#stepper button[data-step="style"]'); await pg.waitForFunction(() => document.querySelector('main').dataset.step === 'style');
+    await pg.click('#stepper button[data-step="look"]'); await pg.waitForFunction(() => document.querySelector('main').dataset.step === 'look');
     const AG = NEW + '-agent';
     await api('/api/videos/new', { name: AG });
     await pg.waitForFunction(j => document.querySelector('#job').value === j && document.querySelector('main').dataset.step === 'footage', AG, { timeout: 15e3 });

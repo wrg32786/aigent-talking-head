@@ -15,8 +15,13 @@ export async function api(path, body, method) {
   return j;
 }
 
-export const STEPS = ['footage', 'cut', 'reference', 'style', 'broll', 'render', 'post'];
+export const STEPS = ['footage', 'cut', 'look', 'broll', 'finish', 'post'];
 export const STEP_LABEL = { broll: 'B-roll' };
+// the step names before 1.13.0, so old links and saved places still land: Style and Reference are both in Look now,
+// and Render is Finish
+export const STEP_ALIAS = { style: 'look', reference: 'look', render: 'finish' };
+export const stepOf = st => STEP_ALIAS[st] || st;
+export const lookSubOf = st => (st === 'reference' ? 'reference' : st === 'style' ? 'style' : null);
 export const stepName = st => STEP_LABEL[st] || cap1(st);
 export const SITE = { youtube: 'YouTube', 'youtube-shorts': 'Shorts', tiktok: 'TikTok', x: 'X', vimeo: 'Vimeo', instagram: 'Instagram', file: 'File', other: 'Link' };
 export const STATUS = { queued: 'Waiting', downloading: 'Downloading', tearing: 'Breaking down', ready: 'Ready', failed: 'Failed', cancelled: 'Cancelled' };
