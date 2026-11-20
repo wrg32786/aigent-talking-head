@@ -569,7 +569,7 @@ Nothing is deleted from here.
 <img src="studio/more-menu.png" width="520" alt="The top bar with numbered steps, the setup pill, Connect agent, theme, Settings and the More menu open with Connect agent, Setup check, API keys and providers and the theme">
 <img src="studio/top-phone.png" width="260" alt="The top bar on a phone: the reel name and buttons on the first row and the six steps on a second row">
 
-The top bar always fits on one line: on a laptop only the current step shows its name (the others show their number, and hovering a step still names it), the setup pill shows just the count of what is missing, and Connect agent shrinks to its plug. **More** (the three dots) holds New video, Open a past video, Connect agent, Setup check, API keys and providers and the theme, and works with the keyboard: Enter or Space opens it, the arrow keys move, Enter picks, Escape closes. On a phone the steps get their own row under the reel name.
+**Outputs** opens the [Outputs library](#outputs). The top bar always fits on one line: on a laptop only the current step shows its name (the others show their number, and hovering a step still names it), the setup pill shows just the count of what is missing, and Connect agent shrinks to its plug. **More** (the three dots) holds New video, Open a past video, Connect agent, Setup check, API keys and providers and the theme, and works with the keyboard: Enter or Space opens it, the arrow keys move, Enter picks, Escape closes. On a phone the steps get their own row under the reel name.
 
 Longer explanations sit behind a small **i** next to the thing they explain (Footage from a link, Clean-up pass, Record screen in B-roll); click it to read, Escape or a click elsewhere closes it.
 

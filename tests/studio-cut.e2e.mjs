@@ -67,6 +67,7 @@ try {
   assert.ok(take && mkv, 'uploaded');
   const errs = [];
   const pg = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await pg.addInitScript(() => { if (!localStorage.getItem('studio.cutView')) localStorage.setItem('studio.cutView', 'cuts'); }); // this test is about Cuts and lines (tests/studio-pieces.e2e.mjs covers Pieces)
   pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
 
   await t('footage player: click a clip to play; J K L and arrows; the transcript follows and a word click seeks', async () => {
