@@ -185,14 +185,14 @@ export function BRoll({ V, apply, go, openKeys }) {
     {B.gens.filter(g => g.status !== 'done').map(g => <p key={g.id} className={'gen-st ' + g.status} data-id={g.id}>{g.status === 'running' ? `Generating with ${g.provider}${g.phase ? ' (' + g.phase.replace('_', ' ') + ')' : ''}: "${g.prompt.slice(0, 60)}"` : `Generate failed: ${g.error}`}</p>)}
     {!B.draft ? <div className="empty-art" id="broll-empty"><Icon n="film" /><p>The beats come from a draft. Make one on the Render step, then come back.</p><Button id="broll-to-render" variant="secondary" size="sm" label="Go to Render" onClick={() => go('render', true)} /></div>
       : <>
-        <div className="lane" id="broll-lane" role="list">
+        <div className="blane" id="broll-lane" role="list">
           {B.beats.map(b => <button key={b.n} type="button" role="listitem" className={'beat' + (b.n === sel ? ' sel' : '') + (b.slot ? ' filled' : '') + (b.idea ? ' has-idea' : '')} data-beat={b.n} style={{ flexGrow: Math.max(1, b.seconds) }} onClick={() => setSel(b.n)} aria-pressed={String(b.n === sel)}>
             <span className="bn">{b.n}</span><span className="bt">{t1(b.start)} s</span>
             {b.slot ? <span className="bslot"><img src={b.slot.clip.thumb || ''} alt="" /><em>{b.slot.place === 'full' ? 'Full' : b.slot.place === 'top' ? 'Split' : 'PiP'}</em></span> : <span className="bempty"><Icon n="plus" /></span>}
             <span className="btx">{b.text || 'No words'}</span>
           </button>)}
         </div>
-        <div className="lane-scale" aria-hidden="true">{B.beats.map(b => <i key={b.n} style={{ left: (b.start / L * 100) + '%' }} />)}</div>
+        <div className="blane-scale" aria-hidden="true">{B.beats.map(b => <i key={b.n} style={{ left: (b.start / L * 100) + '%' }} />)}</div>
         {beat && <div className="beat-panel glass" id="beat-panel">
           <div className="bp-h"><b>Beat {beat.n}</b><span className="fine">{t1(beat.start)} to {t1(beat.end)} s · "{beat.text}"</span></div>
           {beat.idea && <div className="idea" id="beat-idea"><Icon n="spark" /><span><b>{beat.idea.by}</b> suggests: {beat.idea.idea}{beat.idea.place ? ` (${B.places[beat.idea.place].toLowerCase()})` : ''}</span>

@@ -831,7 +831,7 @@ ol.conn-steps > li::before { content: counter(cs); position: absolute; left: 0; 
 .idea { border-color: color-mix(in srgb, var(--primary) 40%, transparent); background: color-mix(in srgb, var(--primary) 7%, transparent); }
 .idea svg { width: 16px; height: 16px; color: var(--primary); }
 .gen-st { font-size: 13px; margin: 0 0 8px; color: var(--muted-foreground); } .gen-st.failed { color: var(--destructive); }
-.lane { display: flex; gap: 6px; overflow-x: auto; padding: 4px 2px 8px; scrollbar-width: thin; }
+.blane { display: flex; gap: 6px; overflow-x: auto; padding: 4px 2px 8px; scrollbar-width: thin; }
 .beat { flex: 1 1 0; min-width: 120px; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto 72px auto; gap: 4px 8px; text-align: left; padding: 8px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); color: var(--foreground); cursor: pointer; transition: border-color .15s, background .15s; }
 .beat:hover { border-color: var(--input); }
 .beat.sel { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
@@ -842,8 +842,8 @@ ol.conn-steps > li::before { content: counter(cs); position: absolute; left: 0; 
 .beat .bslot img { width: 100%; height: 100%; object-fit: cover; background: var(--muted); }
 .beat .bslot em { position: absolute; left: 6px; bottom: 6px; font-style: normal; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 6px; background: #000a; color: #fff; }
 .beat .btx { grid-column: 1 / -1; font-size: 12px; color: var(--muted-foreground); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.lane-scale { position: relative; height: 4px; margin: 0 2px 12px; border-radius: 2px; background: var(--muted); }
-.lane-scale i { position: absolute; top: -2px; width: 2px; height: 8px; background: var(--muted-foreground); }
+.blane-scale { position: relative; height: 4px; margin: 0 2px 12px; border-radius: 2px; background: var(--muted); }
+.blane-scale i { position: absolute; top: -2px; width: 2px; height: 8px; background: var(--muted-foreground); }
 .beat-panel { border-radius: var(--radius-lg); padding: 14px; display: flex; flex-direction: column; gap: 12px; }
 .bp-h { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; } .bp-h .fine { margin: 0; }
 .slot-set { display: grid; grid-template-columns: 150px 1fr; gap: 14px; align-items: start; }
