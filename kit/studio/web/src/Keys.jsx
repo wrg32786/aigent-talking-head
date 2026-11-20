@@ -9,9 +9,9 @@ import { Switch } from '@astryxdesign/core/Switch';
 import { api, toast, Icon, IconBtn } from './lib.jsx';
 import { FolderField } from './Folders.jsx';
 
-const GROUPS = [['stock', 'Stock footage (free)'], ['generate', 'Generate (paid, your account)'], ['text', 'Text']];
+const GROUPS = [['stock', 'Stock footage (free)'], ['generate', 'Generate (paid, your account)'], ['text', 'Text'], ['post', 'Posting (your Buffer and video host)']];
 
-function KeyRow({ k, setKeys }) {
+export function KeyRow({ k, setKeys }) {
   const [v, setV] = useState(''), [v2, setV2] = useState(''), [busy, setBusy] = useState(''), [res, setRes] = useState(null);
   const env = k.from && k.from.startsWith('env');
   const save = async () => {

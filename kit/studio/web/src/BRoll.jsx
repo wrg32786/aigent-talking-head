@@ -167,7 +167,7 @@ export function BRoll({ V, apply, go, openKeys }) {
   const [sel, setSel] = useState(null), [tab, setTab] = useState('library'), [busy, setBusy] = useState('');
   const beat = B.beats.find(b => b.n === sel) || null;
   useEffect(() => { if (!beat && B.beats.length) setSel((B.beats.find(b => b.idea) || B.beats.find(b => !b.slot && b.n > 1) || B.beats[0]).n); }, [B.beats.length]);
-  const after = j => { if (j && j.state) apply({ ...V, state: j.state, broll: j.broll }); else if (j && j.broll) apply({ ...V, broll: j.broll }); };
+  const after = j => { if (j && j.state) apply({ ...V, seq: 0, state: j.state, broll: j.broll }); else if (j && j.broll) apply({ ...V, seq: 0, broll: j.broll }); };
   const fill = async (o, j) => { if (j) return after(j); try { after(await api('/api/broll/slot', { beat: beat.n, ...o })); } catch {} };
   const idea = async (n, action) => { setBusy('idea' + n); try { after(await api('/api/broll/idea', { beat: n, action })); } catch {} setBusy(''); };
   const suggest = async () => { setBusy('suggest'); try { const j = await api('/api/broll/suggest', {}); after(j); toast(j.count ? `${j.count} ideas to approve` : 'No new ideas. Fill a beat by hand.', !!j.count); } catch {} setBusy(''); };

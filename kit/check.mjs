@@ -228,6 +228,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-broll.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { berrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio b-roll tests (tests/studio-broll.test.mjs: API keys never shown, Pexels, Pixabay and Higgsfield against a mock, library, lane and placements, credits, generate approval, MCP b-roll tools)', errs: berrs, warns: [] });
+    const posterrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-post.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { posterrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio post tests (tests/studio-post.test.mjs: Buffer, R2 and Cloudinary against a mock, links refused, per-channel limits, drafts by default, post now needs a confirm, H.264, MCP Buffer tools)', errs: posterrs, warns: [] });
     const ses = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-session.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { ses.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }

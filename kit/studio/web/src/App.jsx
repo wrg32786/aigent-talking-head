@@ -11,6 +11,7 @@ import { Reference } from './Reference.jsx';
 import { Cut } from './Cut.jsx';
 import { Style } from './Style.jsx';
 import { Render } from './Render.jsx';
+import { Post } from './Post.jsx';
 import { Chat } from './Chat.jsx';
 import { Settings } from './Settings.jsx';
 import { MoreMenu } from './ui.jsx';
@@ -44,7 +45,14 @@ export function App() {
   const [recLive, setRecLive] = useState(null);
   const mainRef = useRef(null);
 
-  const apply = useCallback(v => { if (v && v.state) setV(v); return v; }, []);
+  const seen = useRef({ boot: null, seq: 0 });
+  const apply = useCallback(v => {
+    if (!v || !v.state) return v;
+    const k = seen.current;
+    if (v.seq && v.boot === k.boot && v.seq < k.seq) return v; // an older reply than what is on screen
+    if (v.seq) seen.current = { boot: v.boot, seq: v.seq };
+    setV(v); return v;
+  }, []);
   const patch = useCallback(p => api('/api/state', p).then(apply), [apply]);
   const reloadCat = useCallback(async () => setCat(await api('/api/catalog')), []);
 
@@ -128,6 +136,7 @@ export function App() {
           <Style {...ctx} hidden={step !== 'style'} tab={tab} setTab={pickTab} />
           {step === 'broll' && <BRoll {...ctx} />}
           <Render {...ctx} hidden={step !== 'render'} />
+          {step === 'post' && <Post {...ctx} />}
           <footer className="stepnav glass" id="stepnav">
             <span style={{ visibility: i ? 'visible' : 'hidden' }}><Button id="prev" variant="ghost" label="Back" icon={<Icon n="left" />} onClick={() => go(STEPS[Math.max(0, i - 1)], true)} /></span>
             <PicksTray s={s} patch={patch} />

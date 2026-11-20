@@ -40,6 +40,8 @@
 | `suggest_broll` | proposes | ideas per beat (`clip`, `query` or `card`, and `place`) that wait on the B-roll step for the user to approve or dismiss |
 | `fill_slot` | changes a slot | put a clip on a beat, change its place, offset, length or in point, or clear it. `generate` only asks: the user sees the estimate and approves on the page |
 | `broll_providers` | reads | each provider key as set or not and where from (env or Studio settings), never the key; which sources are on; whether generating is allowed |
+| `buffer_channels` | reads | the user's Buffer channels (id, name, service) with each network's video length and caption limits, and whether a Buffer key and a video host are set up; never a key |
+| `buffer_post_reel` | sends to Buffer | a rendered reel to the picked channels (ids, or a service such as `instagram`), one post each, saved as Buffer drafts unless `mode` is `queue`, `schedule` (with `dueAt`) or `now` (needs `confirmNow: true`, only when the user asked to publish now). Uploads to the user's R2 or Cloudinary, or takes `url`, a public https link; re-encodes to H.264 when needed; skips channels the reel is too long for. See [posting.md](posting.md) |
 | `setup_status` | reads what is installed | each dependency (Node packages, Python and requirements, ffmpeg, Chrome, the Whisper model, yt-dlp, instaloader, the effects pass and the person mask weights, the humanizer skill, the Studio page) as ready or missing with its one fix, plus `forUser`, the plain-words list of what only the user can do. Run `npm run setup:all` for the rest |
 | `studio_takes` | reads or writes the session | takes filmed with Record now (file, thumbnail, seconds, status, kept); keep, unkeep or discard one |
 
