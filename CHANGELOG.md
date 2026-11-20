@@ -25,6 +25,7 @@ Release notes: [docs/releases/v1.16.0.md](docs/releases/v1.16.0.md). The redesig
 - **Music and SFX** is one layer: the bed, energy, sound effects and pace panel sits with the beds and sounds, instead of a second Sound and pace block.
 - **MCP.** New `clear_reference` and `save_look`; `studio_get_state` with `catalog` lists the options by layer.
 - **Tests and docs.** `tests/studio-look.test.mjs` (in `npm run check`): 9 layers with every option once, the plan's homes for the old duplicates, a map that loses an option fails, badges, Clear reference and Undo, Save as a Look, the MCP tools. `tests/studio-look.e2e.mjs` (in `npm run smoke`): the step in Chrome, every option once across the tabs, badges, Clear and Undo, Save as a Look, the phone. `docs/studio.md` (Look and its 9 layers), `docs/mcp.md`, `AGENTS.md`, the Studio skill.
+- **Smoke.** The Studio Chrome tests run two at a time (`SMOKE_E2E_JOBS`), so the CI smoke job stays inside its time limit.
 
 ## 1.15.0 (unreleased)
 
