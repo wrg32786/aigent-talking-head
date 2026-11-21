@@ -181,14 +181,27 @@ function musicLevel(levels) {
 }
 
 // a reference shot that is a cutaway (B-roll, a screen, a graphic): talk_share under 0.35 when the breakdown has it,
-// else no face on screen, else material that is not real camera footage with no face count
-function isCutaway(s) {
+// else no face on screen, else material that is not real camera footage with no face count.
+// speaker ({ faceH, eyeY, cx }, the middle face of the shots where someone talks): a shot whose face is on screen
+// all through it, the same size and in the same place, is the speaker pausing or hidden behind a microphone, never a
+// cutaway. (Live reference, 2026-11-21: three such shots were marked as cutaways and its real B-roll was not.)
+function isCutaway(s, speaker = null) {
   const ts = s.talk_share ?? (s.aspects && s.aspects.talk && s.aspects.talk.share);
-  if (ts != null && Number.isFinite(+ts)) return +ts < 0.35;
   const f = Array.isArray(s.faces) ? s.faces.length : s.faces;
+  if (speaker && f != null && +f >= 0.6) {
+    const m = (s.aspects && s.aspects.framing && s.aspects.framing.measured) || {}, h = +m.face_h, cy = +m.center_y, cx = +m.center_x;
+    if (h > 0 && Math.abs(h - speaker.faceH) <= 0.35 * speaker.faceH && (!Number.isFinite(cy) || speaker.cy == null || Math.abs(cy - speaker.cy) <= 0.12) && (!Number.isFinite(cx) || speaker.cx == null || Math.abs(cx - speaker.cx) <= 0.15)) return false;
+  }
+  if (ts != null && Number.isFinite(+ts)) return +ts < 0.35;
   if (f != null && Number.isFinite(+f)) return +f === 0;
   const o = s.material && s.material.origin;
   return !!o && o !== 'real' && o !== 'unknown' && s.material.has_real_material === false && f == null;
+}
+// the speaker's face over a reference: the middle size and place of the faces in the shots where someone talks
+function speakerOf(shots) {
+  const med = a => { const v = a.filter(Number.isFinite).sort((p, q) => p - q); return v.length ? v[Math.floor(v.length / 2)] : null; };
+  const ms = (shots || []).filter(s => { const ts = s.talk_share ?? (s.aspects && s.aspects.talk && s.aspects.talk.share); return ts != null && +ts >= 0.5; }).map(s => (s.aspects && s.aspects.framing && s.aspects.framing.measured) || {}).filter(m => +m.face_h > 0);
+  return ms.length >= 2 ? { faceH: med(ms.map(m => +m.face_h)), cy: med(ms.map(m => +m.center_y)), cx: med(ms.map(m => +m.center_x)) } : null;
 }
 
 // the reference's transition into a shot (rea-video: cut, jump, flash, fade, dissolve, wipe, slide, whip, zoom, spin, blur,
@@ -243,4 +256,4 @@ function brollOf(s, textOf = v => (typeof v === 'string' ? v : '')) {
   return out ? out.replace(/\|/g, ' ') : null;
 }
 
-module.exports = { brollOf, transitionFor, moveFor, MOVES, recut, zooms, zoomFor, quietFrom, sfxId, SFX, roleOf, matchRoles, slotPhrase, fillSlots, musicLevel, isCutaway, MIN_SHOT, MIN_QUIET };
+module.exports = { brollOf, transitionFor, moveFor, MOVES, recut, zooms, zoomFor, quietFrom, sfxId, SFX, roleOf, matchRoles, slotPhrase, fillSlots, musicLevel, isCutaway, speakerOf, MIN_SHOT, MIN_QUIET };

@@ -307,6 +307,11 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-spots.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { sperrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio b-roll spots tests (tests/studio-spots.test.mjs: spots of 6 to 10 s from the captions, Add a spot, reference spots, counters, quotes and noun searches from the words, the first spot too, upload kinds, Approve with no key, MCP pick_broll, add_spot, add_testimonial)', errs: sperrs, warns: [] });
+    // B-roll slots (1.28.0): detection, the planner keeps slots with no assets, effects into the plan, Studio's needs
+    { const be = [];
+      try { execFileSync(process.execPath, [join(ROOT, 'tests', 'broll-slots.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+      catch (e) { be.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+      results.push({ label: 'B-roll slots tests (tests/broll-slots.test.mjs: a speaker shot is not a cutaway, panels merge and keep their effects, the Reel.md B-roll block, Recreate and Copy the look keep every slot with no assets and land it on your words, effects in plan.json, a panel under the chin, Studio needs, Skip, a clip as a panel, slot states at render)', errs: be, warns: [] }); }
     const rparts = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-recreate-parts.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { rparts.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }

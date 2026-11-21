@@ -71,13 +71,14 @@ function convert(b, extras = {}, opts = {}) {
   const look = cs.style === 'one-word' ? 'one-word' : cs.style === 'pill' ? 'muse' : 'kinetic';
   // the font read from the words on screen (extras.json "font", kit/fontmatch.py): only a pairing we ship is ever named
   const font = fontOf(extras.font);
+  const SPEAKER = SPL.speakerOf(b.shots || []);
   const shots = (b.shots || []).map((s, i) => {
     const m = { ...((s.aspects && s.aspects.grade && s.aspects.grade.measured) || {}), ...(extras.shots && extras.shots[i] ? extras.shots[i] : {}) };
     if (s.x_scan != null && m.scan == null) m.scan = s.x_scan;
     const fin = finishOf(m, (+s.end || 0) - (+s.start || 0));
     const cam = (s.aspects && s.aspects.camera && (s.aspects.camera.result || s.aspects.camera.measured)) || {};
     const move = cam.move || cam.motion;
-    return { n: i + 1, m, start: r2(s.start), end: r2(s.end), finish: fin.finish, finishWhy: fin.why, ...(fin.unread ? { unread: true } : {}), transitionIn: s.transition_in, tx: SPL.transitionFor(s.transition_in, s.transition), moves: SPL.moveFor(cam), vlmText: SC.textOf(s && s.vlm), framing: ((s.aspects && s.aspects.framing && (s.aspects.framing.result || s.aspects.framing.measured)) || {}).shot_size || null, cutaway: SPL.isCutaway(s), broll: SPL.isCutaway(s) ? SPL.brollOf(s, SC.textOf) : null, face: m.face && m.face.h ? { faceH: m.face.h, eyeY: m.face.eye_y, cx: m.face.cx } : null, lab: m.lab && Array.isArray(m.lab.mean) ? m.lab : null, boxes: ((s.overlay && s.overlay.boxes) || []).filter(x => Array.isArray(x.bbox) && x.bbox[2] * x.bbox[3] >= 0.04), move: typeof move === 'string' ? move : null, shake: (s.aspects && s.aspects.camera && s.aspects.camera.measured && s.aspects.camera.measured.shake) };
+    return { n: i + 1, m, start: r2(s.start), end: r2(s.end), finish: fin.finish, finishWhy: fin.why, ...(fin.unread ? { unread: true } : {}), transitionIn: s.transition_in, tx: SPL.transitionFor(s.transition_in, s.transition), moves: SPL.moveFor(cam), vlmText: SC.textOf(s && s.vlm), framing: ((s.aspects && s.aspects.framing && (s.aspects.framing.result || s.aspects.framing.measured)) || {}).shot_size || null, cutaway: SPL.isCutaway(s, SPEAKER), broll: SPL.isCutaway(s, SPEAKER) ? SPL.brollOf(s, SC.textOf) : null, face: m.face && m.face.h ? { faceH: m.face.h, eyeY: m.face.eye_y, cx: m.face.cx } : null, lab: m.lab && Array.isArray(m.lab.mean) ? m.lab : null, boxes: ((s.overlay && s.overlay.boxes) || []).filter(x => Array.isArray(x.bbox) && x.bbox[2] * x.bbox[3] >= 0.04), move: typeof move === 'string' ? move : null, shake: (s.aspects && s.aspects.camera && s.aspects.camera.measured && s.aspects.camera.measured.shake) };
   });
   const read = shots.filter(s => !s.unread);
   const ambient = gradeChoice(read);

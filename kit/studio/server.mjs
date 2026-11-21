@@ -671,7 +671,7 @@ function editOf(s, v) {
     making: { text: making, format: fmt, aspect, goal: o.goal, length: (cut.summary && cut.summary.length) || null },
     from: { takes, source: src, seconds: from === 'pieces' ? combo.seconds : (cut.seconds || null), mode: from, pieces: combo.pieces.length, text: from === 'pieces' ? fromText(s, combo) : takes ? `the whole take${takes > 1 ? ` (${takes} files)` : ''}` : 'no footage yet' },
     look: { pack: s.pack || null, reference: ref, styleLook, picks, text: [styleLook ? `style look ${styleLook}` : s.pack || 'No Look', ref ? `reference (${ref === 'look' ? 'copy the look' : ref})` : null, picks ? `${picks} change${picks === 1 ? '' : 's'} by you` : null].filter(Boolean).join(', ') },
-    broll: { spots, ideas: ((v.broll && v.broll.beats) || []).filter(b => b.idea && !b.slot).length, cutins: combo.pieces.filter(x => x.kind === 'testimonial').length, text: [spots ? `${spots} spot${spots === 1 ? '' : 's'}` : 'none yet', combo.pieces.some(x => x.kind === 'testimonial') ? `${combo.pieces.filter(x => x.kind === 'testimonial').length} testimonial` : null].filter(Boolean).join(', ') },
+    broll: { spots, ideas: ((v.broll && v.broll.beats) || []).filter(b => b.idea && !b.slot).length, cutins: combo.pieces.filter(x => x.kind === 'testimonial').length, needs: brollNeeds(v), text: [spots ? `${spots} spot${spots === 1 ? '' : 's'}` : brollNeeds(v) ? null : 'none yet', brollNeeds(v) ? `${brollNeeds(v)} need${brollNeeds(v) === 1 ? 's' : ''} a clip` : null, combo.pieces.some(x => x.kind === 'testimonial') ? `${combo.pieces.filter(x => x.kind === 'testimonial').length} testimonial` : null].filter(Boolean).join(', ') },
     sound: { bed: s.music.bed, sfx: s.sound.sfx, text: `${s.music.bed === 'auto' ? 'Music picked for you' : s.music.bed === 'none' ? 'No music' : s.music.bed}, sounds ${s.sound.sfx}` },
     drafted: !!drafted, stale: !!(s.drafted && !drafted && fin.reel), next,
   };
@@ -918,12 +918,21 @@ const SIZER = SIZES.mount({ ROOT, C, json, readBody, runTask: (...a) => runTask(
 // A Recreate draft re-cut to the reference's shots gives its cutaways on the draft's own clock: build/plan.json
 // shots first, else cut.json refShots (kit/recreate.cjs shotsOf).
 // Each carries the cutaway's length and what it showed (Reel.md shot broll), so the spot matches it.
-const refBroll = (s, cut, job = s.job) => { if (!s.reference || s.reference.mode === 'off' || noTimeline(s)) return [];
+// the plan's B-roll slots with no clip yet, not skipped (Your edit says how many)
+const brollNeeds = v => ((v.broll && v.broll.beats) || []).filter(b => b.need && !b.need.skipped && !b.slot).length;
+// 1.28.0: a draft from a reference or a look plans its B-roll slots itself (build/plan.json "broll", kit/broll-slots.cjs):
+// each slot is a spot, with what it should show and how it is treated, in Recreate and in Copy the look.
+const planSlots = job => { const p = job ? RC.readPlan(join(ROOT, 'jobs', String(job), 'build')) : null; return p && Array.isArray(p.broll) ? p.broll : []; };
+const refBroll = (s, cut, job = s.job) => {
+  const ps = planSlots(job);
+  if (ps.length) return ps.map(x => ({ at: +x.start + 0.05, seconds: +(+x.end - +x.start).toFixed(2), label: 'B-roll', detail: x.what ? `it shows ${x.what}` : x.ref ? 'the reference shows B-roll here' : 'the look has B-roll here', ...(x.what ? { what: x.what } : {}), slot: x }));
+  if (!s.reference || s.reference.mode === 'off' || noTimeline(s)) return [];
   const rs = RC.shotsOf(job ? join(ROOT, 'jobs', String(job), 'build') : null, cut).filter(x => x.cutaway);
   if (rs.length) return rs.map(x => ({ at: +x.start + 0.05, seconds: +(+x.end - +x.start).toFixed(2), label: 'B-roll', detail: x.broll ? `it shows ${x.broll}` : 'the reference cuts away here', ...(x.broll ? { what: x.broll } : {}) }));
   const sw = swapOf(s); if (!sw || !sw.seconds) return [];
   return (sw.parts || []).filter(p => p.kind === 'broll').map(p => ({ frac: p.at / sw.seconds, ...(p.end != null && p.end > p.at ? { fracLen: (p.end - p.at) / sw.seconds } : {}), label: p.label, detail: p.detail, ...(p.what ? { what: p.what } : {}) })); };
 const BRL = mountBroll({ ROOT, C, update, json, readBody, serveFile: (...a) => serveFile(...a), CH, capturePage, chromeOk, refParts: refBroll,
+  askAgent: (text, attach) => (S.load().chat.backend === 'agent' ? chatTurn(text, false, attach) : null),
   transcribe: (rel, done) => { startTranscribe(rel, () => done(null)); if (MEDIA.transcribing(rel)) watchTx(rel, done); }, wordsOf, energyOf });
 // startTranscribe calls back only on success; a raw upload also wants to hear a failure
 function watchTx(rel, done) { const t = setInterval(() => { const x = (C.load().tx || {})[rel]; if (x && x.status === 'failed') { clearInterval(t); done(Object.assign(new Error(x.error || 'transcription failed'), { fix: x.fix })); } else if (!MEDIA.transcribing(rel)) clearInterval(t); }, 500); }
