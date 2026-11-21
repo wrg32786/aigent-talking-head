@@ -40,6 +40,7 @@ const require = createRequire(import.meta.url);
 const SNAP = require('../snapshots.cjs');
 const K = require('../packs.cjs');
 const MC = require('../memcheck.cjs');
+const RC = require('../recreate.cjs');
 const { ROOT, KIT, STUDIO } = C;
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
@@ -820,10 +821,11 @@ const FOLDERS = mountFolders({ ROOT, json, readBody, extraFolders: () => { const
   ensure: [join(ROOT, 'teardown-in', 'studio'), join(ROOT, 'jobs')] });
 const POSTR = mountPost({ ROOT, C, json, readBody });
 // the reference's b-roll parts, on its own clock as a fraction of its length, become spots (kit/studio/lane.mjs spots)
-// A Recreate draft re-cut to the reference's shots (cut.json refShots) gives its cutaways on the draft's own clock.
+// A Recreate draft re-cut to the reference's shots gives its cutaways on the draft's own clock: build/plan.json
+// shots first, else cut.json refShots (kit/recreate.cjs shotsOf).
 // Each carries the cutaway's length and what it showed (Reel.md shot broll), so the spot matches it.
-const refBroll = (s, cut) => { if (!s.reference || s.reference.mode === 'off') return [];
-  const rs = cut && Array.isArray(cut.refShots) ? cut.refShots.filter(x => x.cutaway) : [];
+const refBroll = (s, cut, job = s.job) => { if (!s.reference || s.reference.mode === 'off') return [];
+  const rs = RC.shotsOf(job ? join(ROOT, 'jobs', String(job), 'build') : null, cut).filter(x => x.cutaway);
   if (rs.length) return rs.map(x => ({ at: +x.start + 0.05, seconds: +(+x.end - +x.start).toFixed(2), label: 'B-roll', detail: x.broll ? `it shows ${x.broll}` : 'the reference cuts away here', ...(x.broll ? { what: x.broll } : {}) }));
   const sw = swapOf(s); if (!sw || !sw.seconds) return [];
   return (sw.parts || []).filter(p => p.kind === 'broll').map(p => ({ frac: p.at / sw.seconds, ...(p.end != null && p.end > p.at ? { fracLen: (p.end - p.at) / sw.seconds } : {}), label: p.label, detail: p.detail, ...(p.what ? { what: p.what } : {}) })); };

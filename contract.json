@@ -145,6 +145,7 @@
       "outputs": [
         "jobs/<name>/clips/clips.json and clips.md (best take per sentence, retakes flagged)",
         "jobs/<name>/build/cut.json, captions.js, theme.js and overlay frames",
+        "jobs/<name>/build/plan.json with --recipe: what the draft took from the recipe (shots, transitions, moves, shakes, sounds, scenes, theme, accent; docs/reel-md.md)",
         "jobs/<name>/reel-vN.mp4 (a new number each run; earlier versions are kept)",
         "jobs/<name>/reel-vN-<export>.mp4 with --export",
         "jobs/<name>/build/layout.json: what the layout pass moved clear of a graphic, hid while one was up, or placed inside the export's safe area",
