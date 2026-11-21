@@ -2,7 +2,7 @@
 
 > aigent-talking-head is a free, open-source (Apache-2.0) talking-head video editor that turns one phone clip into a captioned vertical reel for TikTok, Instagram Reels and YouTube Shorts, run by you or your coding agent (Claude Code, Codex, Cursor or any MCP client) on your own machine with Whisper, FFmpeg and Chrome. Made by Will Gwyn at The AIgent.
 
-Key facts (version 1.25.0, November 2026):
+Key facts (version 1.26.0, November 2026):
 
 - Flow: draft (local Whisper transcription and cut), plan (graphics proposed from the transcript), review the Reel.md, render, verify.
 - 30 overlay graphics, 56 transitions, 51 effects, 7 caption styles, 9 title entrances, 10 film finishes, 19 font pairings, 11 brand presets, 37 sound effects, 11 CC0 music beds (each tagged low, mid or high energy).
