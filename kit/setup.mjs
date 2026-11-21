@@ -50,10 +50,12 @@ export const sysFix = what => SYS[what][pm() || 'none'];
 // Homebrew ffmpeg can also stop starting after ffmpeg-full upgrades x265; brew upgrade ffmpeg fixes that.
 // ffmpegState: 'ready' | 'missing' (not on PATH) | 'broken' (on PATH, does not start) | 'nodrawtext'
 const BREW_PATH = 'put "$(brew --prefix ffmpeg-full)/bin" first on PATH (ffmpeg-full is keg-only)';
+// fresh: probe again. The same path can change state (brew upgrade ffmpeg repairs it in place), and Studio and the MCP
+// server are long-lived, so every setup check probes; only the fix text between checks reads the cache.
 let ffCache = null;
-export function ffmpegState() {
+export function ffmpegState(fresh = false) {
   const at = onPath('ffmpeg'), probe = onPath('ffprobe');
-  if (ffCache && ffCache.at === at && ffCache.probe === probe) return ffCache.state;
+  if (!fresh && ffCache && ffCache.at === at && ffCache.probe === probe) return ffCache.state;
   let state = 'missing';
   if (at && probe) { let r = null; try { r = run('ffmpeg', ['-hide_banner', '-filters'], { timeout: 20e3 }); } catch {}
     state = !r || r.status !== 0 ? 'broken' : /\bdrawtext\b/.test(r.stdout || '') ? 'ready' : 'nodrawtext'; }
@@ -68,7 +70,7 @@ export function ffmpegFixFor(state, p = pm()) {
 }
 export const ffmpegFix = () => ffmpegFixFor(ffmpegState());
 const FF_DETAIL = { missing: 'not on PATH', broken: 'on PATH but it does not start', nodrawtext: 'no drawtext filter (built without libfreetype), so titles cannot render' };
-const needsPassword = fix => /^sudo /.test(fix);
+const needsPassword = fix => /(^|: )sudo /.test(fix);
 
 // rea-video next to the kit's Python or on PATH (kit/teardown.mjs looks the same way)
 export const REA_PKG = 'rea-video[ocr] @ git+https://github.com/JuneYaooo/rea-video';
@@ -86,7 +88,7 @@ export function checks() {
   add('npm', 'Node packages', 'core', 'MCP tools, rendering, Studio', existsSync(join(ROOT, 'node_modules', '@modelcontextprotocol', 'sdk')) && existsSync(join(ROOT, 'node_modules', 'playwright-core')), 'node_modules', 'npm install');
   const reqs = py && okRun(py, ['-c', 'import faster_whisper, librosa, PIL, cv2'], { timeout: 60e3 });
   add('python', 'Python venv and requirements', 'core', 'transcribing, beats, teardown', !!reqs, py ? py : 'no .venv yet', 'npm run setup:all (makes .venv and installs requirements.txt)');
-  const ff = ffmpegState();
+  const ff = ffmpegState(true);
   add('ffmpeg', 'ffmpeg and ffprobe', 'core', 'drafts, renders, Record now takes, trimming', ff === 'ready', ff === 'ready' ? onPath('ffmpeg') : FF_DETAIL[ff], ffmpegFixFor(ff), true);
   let chrome = null; try { chrome = spawnSync(process.execPath, ['-e', 'import("./kit/chrome.mjs").then(m=>console.log(m.findChrome()))'], { cwd: ROOT, encoding: 'utf8', timeout: 10e3 }).stdout.trim() || null; } catch {}
   add('chrome', 'Chrome or Chromium', 'core', 'rendering titles and graphics', !!chrome, chrome || 'not found', sysFix('chrome'), true);
@@ -118,6 +120,8 @@ export function status() {
   return { ready: !missing.some(x => x.need === 'core'), items, missing: missing.length, forUser: missing.filter(x => x.user).map(x => tellUser(x)), lastRun: last && { at: last.at, summary: last.summary } };
 }
 export function tellUser(x) {
+  // a fix that is a sentence, not a command (ffmpegFixFor: "reinstall ffmpeg so it starts: ...", "install an ffmpeg build ..."), reads as is
+  if (x.id === 'ffmpeg' && /^(re)?install /.test(x.fix)) return `${x.label}: ${x.fix}${needsPassword(x.fix) ? ' (it needs your password)' : ''}`;
   if (x.id === 'ffmpeg' || x.id === 'chrome') return needsPassword(x.fix) ? `Installing ${x.label} needs your password: run ${x.fix}` : `Install ${x.label}: run ${x.fix}`;
   if (x.id === 'node') return x.fix;
   return `${x.label}: run ${x.fix}`;
@@ -163,7 +167,7 @@ export function install({ yes = false, skip = [], log = console.log } = {}) {
     // on PATH but broken or without drawtext: only a Mac with Homebrew has a safe one-line fix; ffmpeg-full still needs PATH after
     if (ff === 'broken' || (ff !== 'missing' && pm() !== 'brew')) return { result: 'needs you', detail: ffmpegFixFor(ff) };
     const r = trySystem('ffmpeg', yes, log);
-    return pm() === 'brew' && r.result === 'installed' ? { result: 'needs you', detail: `ffmpeg-full is installed: ${BREW_PATH}, then run this again` } : r.result === 'needs you' ? { ...r, detail: ffmpegFixFor(ff) } : r;
+    return pm() === 'brew' && r.result === 'installed' ? { result: 'needs you', detail: `ffmpeg-full is installed: ${BREW_PATH}, then run this again` } : pm() === 'brew' && r.result === 'needs you' ? { ...r, detail: ffmpegFixFor(ff) } : r;
   }, log)));
   res.push(skipIf('chrome', () => step('Chrome', () => has('chrome') ? { result: 'ready' } : trySystem('chrome', yes, log), log)));
   res.push(skipIf('model', () => step(`Whisper model (${MODEL})`, () => {
