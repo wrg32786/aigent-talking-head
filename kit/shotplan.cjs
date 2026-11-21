@@ -133,6 +133,43 @@ function matchRoles(mine, ref) {
   return out;
 }
 
+// Recreate: a reference title slot that holds a timer or a number (a "5:00" clock, a "3 tips" count) and none of your
+// titles took gets a title from your own words: the nearest phrase you say that does the same job, near the slot's
+// scaled time, whole words only. words are { start, end, word } on the reel's clock; taken are your titles' times.
+const NUMW = 'one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|sixty|ninety|hundred|thousand|million|half|a';
+const UNIT = /^(s|sec|secs|seconds?|minutes?|mins?|hours?|hrs?|days?|weeks?|months?|years?)$/i;
+const clean = w => String(w || '').replace(/^[^\w$%]+|[^\w$%]+$/g, '');
+function slotPhrase(words, role, at, { taken = [], span = 4, len = Infinity } = {}) {
+  const isNum = w => /^\$?\d[\d,.]*%?$/.test(w) || new RegExp('^(' + NUMW + ')$', 'i').test(w);
+  const cands = [];
+  for (let i = 0; i < words.length; i++) {
+    const a = clean(words[i].word); if (!isNum(a) || /^(a|half)$/i.test(a) && role !== 'timer') continue;
+    let j = i; while (j + 1 < words.length && isNum(clean(words[j + 1].word)) && j - i < 2) j++;
+    const nx = words[j + 1] && clean(words[j + 1].word);
+    if (role === 'timer') { if (!nx || !UNIT.test(nx)) continue; j++; }
+    else if (nx && /^(easy|simple|quick|big|best|top|little|new|key|main|great|small|free|hidden|secret|common|biggest|best|simple|cheap|fast|real|huge|daily|weekly)$/i.test(nx) && words[j + 2] && /^[a-z]{3,}$/i.test(clean(words[j + 2].word))) j += 2;
+    else if (nx && /^[a-z]{3,}$/i.test(nx) && !UNIT.test(nx) && !/^(and|the|of|or|to|in|on|at|is|was|for|with|that|this|more|less|times?)$/i.test(nx)) j++;
+    else if (/^(one|a|half)$/i.test(a)) continue; // a bare "one" is not a number title
+    const st = words[i].start, en = words[j].end;
+    if (Math.abs(st - at) > span || st >= len - 0.5) continue;
+    if (taken.some(t => st < t.end + 0.3 && en > t.start - 0.3)) continue;
+    cands.push({ start: st, end: en, text: words.slice(i, j + 1).map(w => clean(w.word)).join(' '), d: Math.abs(st - at) });
+  }
+  cands.sort((x, y) => x.d - y.d);
+  return cands[0] || null;
+}
+function fillSlots(ref, matched, words, { k = 1, len = Infinity, taken = [] } = {}) {
+  const used = new Set(matched), out = [];
+  ref.forEach((r, j) => {
+    if (used.has(r)) return; const role = r.role || roleOf(r.text, r.start, j);
+    if (role !== 'timer' && role !== 'number') return;
+    const p = slotPhrase(words, role, r.start * k, { taken: taken.concat(out), len }); if (!p) return;
+    const dur = Math.max(1.2, Math.min(3, (r.end - r.start) * k || 1.8));
+    out.push({ ...r, text: p.text, start: +p.start.toFixed(2), end: +Math.min(len, p.start + dur).toFixed(2), role, slot: true });
+  });
+  return out;
+}
+
 // the reference's music level: under -37 dB (or under the voice by 25 dB) is no music bed; else a bed volume for the
 // kit's beds (0.16 is the kit's usual level, for music about 8 dB under the voice)
 function musicLevel(levels) {
@@ -154,4 +191,4 @@ function isCutaway(s) {
   return !!o && o !== 'real' && o !== 'unknown' && s.material.has_real_material === false && f == null;
 }
 
-module.exports = { recut, zooms, zoomFor, quietFrom, sfxId, SFX, roleOf, matchRoles, musicLevel, isCutaway, MIN_SHOT, MIN_QUIET };
+module.exports = { recut, zooms, zoomFor, quietFrom, sfxId, SFX, roleOf, matchRoles, slotPhrase, fillSlots, musicLevel, isCutaway, MIN_SHOT, MIN_QUIET };

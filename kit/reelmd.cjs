@@ -22,6 +22,8 @@ const CARDS = require('./cards.cjs');
 const PLACES = ['left', 'right', 'above', 'chest', 'face', 'center'];
 // graphic overlays (kit/graphics.json): type -> captions.js mode
 const GRAPHICS = Object.fromEntries(JSON.parse(fs.readFileSync(path.join(__dirname, 'graphics.json'), 'utf8')).graphics.map(g => [g.id, g.mode]));
+// a scene (kit/scenes.cjs): something the menu had no item for, made from a reference or by your agent, drawn as overlay mode 39
+GRAPHICS.scene = 39;
 const CAPTION_POSITIONS = ['top', 'middle', 'bottom'];
 const SRC = require('./sources.cjs');
 // the one-word caption's look: Reel.md key -> captions.js key and its values
@@ -168,6 +170,7 @@ function validate(r) {
     const type = g.type || g['type~'];
     if (!GRAPHICS[type]) errs.push(`graphics #${pad2(g.n)}: type must be ${Object.keys(GRAPHICS).join(', ')}`);
     for (const k of ['color', 'border', 'tile', 'ink']) if (g[k] && !/^#[0-9a-f]{6}$/i.test(g[k])) errs.push(`graphics #${pad2(g.n)}: ${k} must be a #rrggbb colour`);
+    if (type === 'scene' && !/^ref-[a-z0-9-]+$/.test(String(g.scene || ''))) errs.push(`graphics #${pad2(g.n)}: a scene needs scene <id> (ref-..., kit/scenes.cjs)`);
     const auto = GRAPHICS[type] >= 11;
     if (g.layer && !(auto ? ['front', 'behind', 'auto'] : ['front', 'behind']).includes(g.layer)) errs.push(`graphics #${pad2(g.n)}: layer must be front or behind${auto ? ' or auto' : ''}`);
     if (g.shape && !['circle', 'arrow', 'underline', 'box'].includes(g.shape)) errs.push(`graphics #${pad2(g.n)}: shape must be circle, arrow, underline or box`);
@@ -286,7 +289,7 @@ function graphicFlips(r) {
     const f = { start: +g.start, end: +g.end, mode: GRAPHICS[v(g, 'type')] };
     // a code card and a terminal session keep their text as written (\n for a new line); elsewhere " / " is a line break, shown as a space
     const text = v(g, 'text'); if (text != null && !none(text)) f.text = f.mode === 23 || f.mode === 28 ? String(text) : String(text).replace(/\s*\/\s*/g, ' ');
-    for (const k of ['layer', 'color', 'ink', 'border', 'tile', 'sub', 'left', 'right', 'shape', 'glyph', 'title', 'values', 'labels', 'kind', 'tag', 'keyword', 'corner', 'live', 'clock', 'cues', 'cam', 'cursor', 'style', 'case', 'bg']) { const x = v(g, k); if (x != null && !none(x)) f[k] = String(x); }
+    for (const k of ['layer', 'color', 'ink', 'border', 'tile', 'sub', 'left', 'right', 'shape', 'glyph', 'title', 'values', 'labels', 'kind', 'tag', 'keyword', 'corner', 'live', 'clock', 'cues', 'cam', 'cursor', 'style', 'case', 'bg', 'scene']) { const x = v(g, k); if (x != null && !none(x)) f[k] = String(x); }
     for (const k of ['x', 'y', 'w', 'h', 'in', 'size', 'step', 'of', 'count', 'speed', 'opacity']) { const x = v(g, k); if (x != null && x !== '' && !isNaN(+x)) f[k] = +x; }
     { const x = v(g, 'items'); if (x != null && !none(x)) f.items = String(x).split(';').map(s => s.trim()).filter(Boolean); }
     { const x = v(g, 'details'); if (x != null && !none(x)) f.details = String(x).split(';').map(s => s.trim()); }

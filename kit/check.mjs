@@ -197,6 +197,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'recreate-shotplan.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
     catch (e) { shperrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Recreate shot plan tests (tests/recreate-shotplan.test.cjs: a multi-shot reference to a recipe, one take re-cut on word boundaries with framing per shot, sounds, boxes, titles by role, transcript offset, an end in a pause)', errs: shperrs, warns: [] });
+    const scerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'ref-scenes.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { scerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'scenes made from a reference (tests/ref-scenes.test.mjs: safe scenes kept once, a teardown makes its sticker, labels and effects as REF menu items, --scenes, no bed, timer and number title slots)', errs: scerrs, warns: [] });
     const snerrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'snapshots.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
     catch (e) { snerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 6).join(' | ')); }

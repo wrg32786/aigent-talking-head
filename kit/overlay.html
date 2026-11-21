@@ -1118,6 +1118,10 @@ function numberPop(c,t){const o=c[4],dt=t-c[0],n=Math.max(2,Math.min(10,Math.rou
   const x=Math.min(1080-SAFE-S0/2,Math.max(SAFE+S0/2,cx+side*rw*Math.cos(a))),y=Math.max(SAFE+S0/2,cy+rh*Math.sin(a))+Math.sin(tt*2.2+i)*4;
   ctx.save();ctx.translate(x,y);ctx.rotate((side*.06+(1-Math.min(1,s))*side*.4));ctx.scale(s,s);ctx.shadowColor='rgba(0,0,0,.35)';ctx.shadowBlur=22;ctx.shadowOffsetY=8;ctx.fillStyle=col;rrect(ctx,-S0/2,-S0/2,S0,S0,R);ctx.fill();ctx.shadowColor='transparent';
   const fs=Math.round(S0*.78);ctx.font=fnt(G,fs);ctx.letterSpacing='0px';ctx.textAlign='center';ctx.textBaseline='alphabetic';ctx.fillStyle=ink;const m=ctx.measureText(String(i+1)),hh=m.actualBoundingBoxAscent-m.actualBoundingBoxDescent;ctx.fillText(String(i+1),0,hh/2);ctx.restore()}}
+// mode 39, a scene (kit/scenes.cjs): something the menu had no item for, made from a reference or by your agent as HTML and
+// CSS. render.mjs draws it to clear PNG frames with the Make card renderer; here each frame is placed in its box.
+function sceneG(c,t){const a=gxa(c),fr=a.frames||[];if(!fr.length)return;const o=c[4],dt=t-c[0];let i=Math.floor(dt*(a.fps||24)+1e-6);i=o.loop?((i%fr.length)+fr.length)%fr.length:Math.min(fr.length-1,Math.max(0,i));
+ const im=gimg(fr[i]);if(!im||!im.naturalWidth)return;ctx.save();ctx.globalAlpha*=1-gOut(c,t,.2);ctx.drawImage(im,gd(c,'x',0)*1080,gd(c,'y',0)*1920,gd(c,'w',1)*1080,gd(c,'h',1)*1920);ctx.restore()}
 const GDRAW={11:screenCard,12:lowerThird,13:statCallout,14:checklist,15:quoteCard,16:highlight,17:stepCounter,18:versus,19:iconBadge,20:stickerPop,21:priceTag,22:ctaCard,23:codeCard,
  24:dataChart,25:chapterCard,26:logoBug,27:channelBug,28:terminalSession,29:newsStrap,30:ticker,31:splitFlap,32:featureCards,33:releasePill,34:ctaButton,35:hudCallout,36:flashCard,37:keywordCaption,38:numberPop};
 // fast moves (the first 0.42 s and the exit) are drawn with motion blur
@@ -1133,7 +1137,7 @@ const PANM=m=>PANMODES.has(m);
 const PANB=c=>{const l=['front','behind','auto'].includes(c[4].layer)?c[4].layer:['front','behind','auto'].includes(CAP.panelLayer)?CAP.panelLayer:'auto';if(l!=='auto')return l==='behind';if(c[3]===11)return true;return gd(c,'y',1)<ABY};
 window.__panels=()=>flips.some(c=>PANM(c[3])&&PANB(c));
 window.__layered=()=>TITLES.length>0||flips.some(c=>c[3]===9&&c[4].layer==='behind')||(CAPBEH&&flips.some(c=>c[3]===0))||flips.some(c=>c[3]===0&&placeOf(c[4])==='face')||window.__panels();
-window.__graphics=()=>flips.filter(c=>c[3]===9||c[3]===10||PANM(c[3])).map(c=>{const a=gxa(c);return{start:c[0],end:c[1],mode:c[3],text:c[2]||'',layer:PANM(c[3])?(PANB(c)?'behind':'front'):(c[4].layer||'front'),asset:a.frames?'video':(a.src||a.icon)?'image':c[3]>=12?'drawn':'placeholder',loaded:[a.icon,a.src,...(a.frames||[]).slice(0,1)].filter(Boolean).every(u=>GIMG[u]&&GIMG[u].naturalWidth>0)}});
+window.__graphics=()=>flips.filter(c=>c[3]===9||c[3]===10||c[3]===39||PANM(c[3])).map(c=>{const a=gxa(c);return{start:c[0],end:c[1],mode:c[3],text:c[2]||'',layer:PANM(c[3])?(PANB(c)?'behind':'front'):(c[4].layer||'front'),asset:a.scene?'html':a.frames?'video':(a.src||a.icon)?'image':c[3]>=12?'drawn':'placeholder',loaded:[a.icon,a.src,...(a.frames||[]).slice(0,1)].filter(Boolean).every(u=>GIMG[u]&&GIMG[u].naturalWidth>0)}});
 let LAYER='all';
 // Layout pass (runs once, after the fonts load). Every element's box is measured from its own pixels (drawn alone on a
 // quarter-size scratch canvas at a few settled moments), then:
@@ -1263,6 +1267,7 @@ if(LAYER==='titles'){if(lay==='behind')title(c,t,'hero')}else if(LAYER==='front'
 else if(PANM(m)&&PANB(c)){if(LAYER==='panels'||LAYER==='all')drawG(c,t)}
 else if(m===0&&(CAPBEH||(placeOf(c[4])==='face'&&!cardAt(t)))){if(LAYER!=='front')caption(c,t)}
 else if(LAYER==='titles'){}
+else if(m===39)sceneG(c,t);
 else if(m===8)typeCard(c,t);
 else if(m===10)appLabel(c,t);
 else if(PANM(m))drawG(c,t);

@@ -389,6 +389,18 @@ try {
     if (sig(RM.graphicFlips(rr)) !== sig(caps.flips)) fail('graphics round trip:\n' + sig(RM.graphicFlips(rr)) + '\n' + sig(caps.flips));
     if (!RM.validate(RM.parse(md.replace('shape arrow', 'shape blob'), 'bad.md')).errs.length || !RM.validate(RM.parse(md.replace('glyph bolt', 'glyph logo'), 'bad.md')).errs.length) fail('a bad shape or glyph should fail the check');
   });
+  step('scenes (mode 39): a label made from a reference draws your word in its box, in front, only while it is up; a full-frame effect draws too', () => {
+    const SCN = createRequire(import.meta.url)('./scenes.cjs');
+    const lab = SCN.labelScene({ text: 'WOW', t0: 1, bbox: [0.2, 0.3, 0.6, 0.05], style: { fill: '#ffee00', stroke: '#000000', stroke_ratio: 0.08 } }), fx = SCN.effectScene('light-leak');
+    const sc = (x, a, b, text) => ({ start: a, end: b, mode: 39, text, html: x.html, css: x.css, seconds: x.seconds, x: x.box.x, y: x.box.y, w: x.box.w, h: x.box.h, layer: 'front' });
+    const d = join(work, 'scenes');
+    layered(d, { captionStyle: 'one-word', flips: [sc(lab, 1, 2.5, 'STUDIO'), sc(fx, 3, 4.2, '')] }, [0.5, 1.8, 3.6]);
+    const at = x => ({ front: ink(join(d, 'stills-front', `t${x.toFixed(2)}.png`)) }), pre = at(0.5), on = at(1.8), leak = at(3.6);
+    if (pre.front.n) fail('nothing before the scene starts');
+    if (!on.front.n || on.front.mid < 1920 * lab.box.y - 40 || on.front.mid > 1920 * (lab.box.y + lab.box.h) + 40) fail('the label should draw in its box: ' + JSON.stringify(on.front) + ' box ' + JSON.stringify(lab.box));
+    if (!leak.front.n) fail('the light leak should draw');
+    if (!readdirSync(join(d, 'gfx')).some(f => f.startsWith('scene-'))) fail('scene frames not cached in build/gfx');
+  });
   step('layout pass: captions and titles move clear of a graphic or hide; export safe area; boxes measured from pixels', () => {
     const d = join(work, 'layout'); mkdirSync(d, { recursive: true });
     const wd = (t, t0) => t.split(' ').map((w, i) => [+(t0 + i * 0.3).toFixed(2), +(t0 + i * 0.3 + 0.28).toFixed(2), w]);
@@ -959,7 +971,7 @@ try {
     await cl.connect(new StdioClientTransport({ command: node, args: [join(KIT, 'mcp.mjs')], cwd: dirname(KIT), stderr: 'ignore', env: { ...process.env, STUDIO_DIR: studioDir } }));
     try {
       const names = (await cl.listTools()).tools.map(t => t.name).join(',');
-      if (names !== 'menu,list_effects,list_packs,get_pack,draft,explain,set_locks,plan,validate,render,verify,studio_get_state,studio_set_selections,studio_run,get_edit,studio_start,studio_wait_for_message,studio_get_pending,studio_reply,clear_reference,save_look,run_wizard,studio_add_reference_url,studio_get_reference_teardown,studio_settings,studio_takes,list_scripts,get_script,write_script,set_output,get_cuts,set_cuts,render_cuts,get_lines,set_bites,render_bites,list_broll,add_broll,suggest_broll,fill_slot,clear_broll,pick_broll,add_spot,add_testimonial,get_pieces,set_combo,choose_combo,list_outputs,broll_providers,buffer_channels,buffer_post_reel,reopen_reel,list_videos,new_video,open_video,cut_range,find_noises,setup_status') fail('MCP tools: ' + names);
+      if (names !== 'menu,list_effects,list_packs,get_pack,draft,explain,set_locks,plan,validate,render,verify,studio_get_state,studio_set_selections,studio_run,get_edit,studio_start,studio_wait_for_message,studio_get_pending,studio_reply,studio_make_scene,clear_reference,save_look,run_wizard,studio_add_reference_url,studio_get_reference_teardown,studio_settings,studio_takes,list_scripts,get_script,write_script,set_output,get_cuts,set_cuts,render_cuts,get_lines,set_bites,render_bites,list_broll,add_broll,suggest_broll,fill_slot,clear_broll,pick_broll,add_spot,add_testimonial,get_pieces,set_combo,choose_combo,list_outputs,broll_providers,buffer_channels,buffer_post_reel,reopen_reel,list_videos,new_video,open_video,cut_range,find_noises,setup_status') fail('MCP tools: ' + names);
       const lp = await cl.callTool({ name: 'list_packs', arguments: {} });
       if (lp.isError || !lp.structuredContent || !lp.structuredContent.packs.some(p => p.name === 'magazine')) fail('MCP list_packs: ' + JSON.stringify(lp).slice(0, 300));
       const gp = await cl.callTool({ name: 'get_pack', arguments: { pack: 'cinematic' } });
@@ -1031,6 +1043,7 @@ try {
   {
     const E2E = [
       ['Studio Record now in Chrome with a fake camera and mic (tests/studio-record.e2e.mjs)', 'studio-record.e2e.mjs'],
+      ['Studio scenes made from a reference in Chrome: what Recreate brings on the reference card, the REF tile with its own still, an agent scene without a reload, taking one out (tests/studio-scenes.e2e.mjs)', 'studio-scenes.e2e.mjs'],
       ['Studio Connect agent, teleprompter speed and pop-out, footage from a link, in Chrome (tests/studio-connect.e2e.mjs)', 'studio-connect.e2e.mjs'],
       ['Studio Cut step in Chrome: footage player, output picker, cut timeline, batch render, pull script (tests/studio-cut.e2e.mjs)', 'studio-cut.e2e.mjs'],
       ['Studio B-roll step in Chrome: lane, placements, API keys, stock, cards, ideas, generate and screen recording against mocks, assemble placements (tests/studio-broll.e2e.mjs)', 'studio-broll.e2e.mjs'],

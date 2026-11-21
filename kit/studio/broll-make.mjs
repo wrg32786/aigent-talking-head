@@ -99,3 +99,47 @@ export async function make(spec, { out } = {}) {
   rmSync(dir, { recursive: true, force: true });
   return { file, seconds: secs };
 }
+// A scene over your video (kit/scenes.cjs, overlay.html mode 39): the same renderer as a card, on a clear background,
+// to transparent PNG frames. jobs: [{ page, w, h, seconds, dir }] (page: a whole HTML document); one Chrome for all.
+// Each frame sets every CSS animation to its time, so motion is exact at fps. Resolves the frame files per job.
+export async function sceneFrames(jobs, { fps = 24 } = {}) {
+  if (!jobs.length) return [];
+  const { chromium } = require('playwright-core');
+  const browser = await chromium.launch({ executablePath: findChrome(), headless: true, args: ['--no-first-run', '--disable-extensions'] });
+  const out = [];
+  try {
+    for (const j of jobs) {
+      const w = Math.max(16, Math.round(j.w)), h = Math.max(16, Math.round(j.h));
+      const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, javaScriptEnabled: false, serviceWorkers: 'block', acceptDownloads: false, offline: true });
+      try {
+        await ctx.route('**/*', r => (/^(data|about):/.test(r.request().url()) ? r.continue() : r.abort()));
+        const page = await ctx.newPage();
+        await page.setContent(j.page, { waitUntil: 'load' });
+        mkdirSync(j.dir, { recursive: true });
+        const n = Math.max(1, Math.round(Math.max(0.4, Math.min(8, +j.seconds || 2)) * fps)), files = [];
+        for (let i = 0; i < n; i++) {
+          await page.evaluate(ms => { for (const a of document.getAnimations()) { a.pause(); a.currentTime = ms; } }, (i * 1000) / fps);
+          const f = join(j.dir, `${String(i).padStart(4, '0')}.png`);
+          await page.screenshot({ path: f, type: 'png', omitBackground: true });
+          files.push(f);
+        }
+        out.push(files);
+      } finally { await ctx.close(); }
+    }
+  } finally { await browser.close(); }
+  return out;
+}
+// one still of a scene (the menu tile): the frame at 60% of it, on a dark ground
+export async function sceneStill(pageHtml, { w, h, seconds, file }) {
+  const { chromium } = require('playwright-core');
+  const browser = await chromium.launch({ executablePath: findChrome(), headless: true, args: ['--no-first-run', '--disable-extensions'] });
+  try {
+    const sc = Math.min(1, 480 / Math.max(w, h)), ctx = await browser.newContext({ viewport: { width: Math.max(16, Math.round(w)), height: Math.max(16, Math.round(h)) }, deviceScaleFactor: sc, javaScriptEnabled: false, offline: true });
+    await ctx.route('**/*', r => (/^(data|about):/.test(r.request().url()) ? r.continue() : r.abort()));
+    const page = await ctx.newPage();
+    await page.setContent(pageHtml.replace('<style>', '<style>html,body{background:#1a1d24!important}'), { waitUntil: 'load' });
+    await page.evaluate(ms => { for (const a of document.getAnimations()) { a.pause(); a.currentTime = ms; } }, Math.round((+seconds || 2) * 600));
+    await page.screenshot({ path: file, type: 'png' });
+  } finally { await browser.close(); }
+  return file;
+}

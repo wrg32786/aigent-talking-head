@@ -12,6 +12,7 @@
 // Reads breakdown.json (rea-video's full data, or kit/teardown.py's fallback with the same field names). Everything
 // it writes is a guess you should check: see "How sure is this" in docs/teardown.md.
 'use strict';
+const SC = require('./scenes.cjs');
 const SPL = require('./shotplan.cjs');
 // brand names the breakdown read (rea-video packaging.brands or video_context.brands), for a title's role
 const colourless = b => [].concat((b.packaging && b.packaging.brands) || [], (b.video_context && b.video_context.brands) || []).map(x => typeof x === 'string' ? x : x && (x.name || x.text)).filter(Boolean);
@@ -314,6 +315,28 @@ function mapGraphics(b, extras) {
   return out;
 }
 
+// a sticker's own image (rea-video packaging/sticker_NN.jpg, or the file it names), as a data: URL for a scene
+function stickerImage(st, i, dir) {
+  if (!dir) return null;
+  const MIME = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
+  for (const f of [st.file, st.image, st.path, st.src, `packaging/sticker_${String(i + 1).padStart(2, '0')}.png`, `packaging/sticker_${String(i + 1).padStart(2, '0')}.jpg`].filter(Boolean)) {
+    const abs = path.isAbsolute(String(f)) ? String(f) : path.join(dir, String(f)), m = MIME[(abs.split('.').pop() || '').toLowerCase()];
+    try { if (m && fs.statSync(abs).size < 1.5 * 2 ** 20) return `data:${m};base64,${fs.readFileSync(abs).toString('base64')}`; } catch {}
+  }
+  return null;
+}
+// the scenes a teardown made: beside its Reel.md (scenes.json, so the recipe carries them) and in the scene library
+// (scenes/local, the menu's REF items for every job). Returns the ids added to the library.
+function saveScenes(res, outDir, { library = true } = {}) {
+  const sc = (res && res.scenes) || [];
+  const f = path.join(outDir, 'scenes.json');
+  if (!sc.length) { fs.rmSync(f, { force: true }); return []; }
+  fs.writeFileSync(f, JSON.stringify({ scenes: sc }, null, 1) + '\n');
+  if (!library) return [];
+  const added = []; for (const s of sc) { try { const r = SC.save(s); if (r.added) added.push(r.scene.id); } catch (e) { console.warn('note: scene ' + s.id + ': ' + e.message); } }
+  return added;
+}
+
 function convert(b, extras = {}, opts = {}) {
   const src0 = b.source || {};
   const src = { ...src0, file: src0.file || src0.filename || (src0.path ? path.basename(src0.path) : undefined) };
@@ -373,10 +396,29 @@ function convert(b, extras = {}, opts = {}) {
   const busy = (a, z) => graphics.some(g => g.start < z && a < g.end);
   const extraG = [];
   shots.forEach(s => s.boxes.slice(0, 1).forEach(x => { if (busy(s.start, s.end)) return; const [bx, by, bw] = x.bbox; extraG.push({ start: s.start, end: r2(Math.min(s.end, s.start + 4)), type: 'screen-card', keys: { y: r2(Math.min(0.8, Math.max(0.3, by + x.bbox[3] / 2))), w: r2(Math.min(0.92, Math.max(0.4, bw + 0.04))), 'subject~': `a box the reference drew (${x.band || 'frame'})` } }); }));
-  for (const st of ((b.packaging || {}).stickers || []).slice(0, 4)) {
-    const t0 = +(st.t ?? st.start ?? (st.span && st.span[0])); if (!Number.isFinite(t0) || busy(t0, t0 + 1)) continue;
-    extraG.push({ start: r2(t0), end: r2(+(st.end ?? (st.span && st.span[1])) || t0 + 1.5), type: 'sticker-pop', keys: { ...(st.glyph ? { glyph: st.glyph } : {}), 'subject~': clean(String(st.what || st.text || st.kind || 'a sticker')).slice(0, 40) || 'a sticker' } });
+  // what the menu has no item for becomes a scene (kit/scenes.cjs): the sticker's own image, a styled text label, an
+  // effect the reference's description names. Each goes in the menu with a REF badge and is kept for later jobs.
+  const scenes = [], busy2 = (a, z) => busy(a, z) || extraG.some(g => g.start < z && a < g.end);
+  const addScene = (sc, start, end, keys = {}) => { const n = SC.normal({ ...sc, from: { ...(sc.from || {}), reference: src.file || null } }); if (SC.check(n).length) return null;
+    if (!scenes.some(x => x.id === n.id)) scenes.push(n); extraG.push({ start: r2(start), end: r2(end), type: 'scene', keys: { scene: n.id, ...keys } }); return n; };
+  const pkgDir = b._dir || opts.dir || null;
+  ((b.packaging || {}).stickers || []).slice(0, 4).forEach((st, i) => {
+    const t0 = +(st.t ?? st.start ?? (st.span && st.span[0])); if (!Number.isFinite(t0) || busy2(t0, t0 + 1)) return;
+    const t1 = +(st.end ?? (st.span && st.span[1])) || t0 + 1.5, what = clean(String(st.what || st.text || st.kind || 'a sticker')).slice(0, 40) || 'a sticker';
+    const img = stickerImage(st, i, pkgDir);
+    if (img && addScene(SC.stickerScene(img, { t: t0, what, bbox: st.bbox }), t0, Math.max(t1, t0 + 1.2))) return;
+    extraG.push({ start: r2(t0), end: r2(t1), type: 'sticker-pop', keys: { ...(st.glyph ? { glyph: st.glyph } : {}), 'subject~': what } });
+  });
+  { // styled labels: decorative text (huazi) and boxed labels that are not your captions or a title, by look, the two most used
+    const said = new Set(titles.map(t => String(t.text || '').toLowerCase()));
+    const cues = (((b.packaging || {}).text_cues) || []).filter(c => c && c.style && !c.part_of_picture && (c.kind === 'huazi' || (c.kind === 'label' && (c.style.box || c.style.stroke_ratio > 0.04))) && !said.has(String(c.text || '').toLowerCase()) && Number.isFinite(+c.t0));
+    const bySig = new Map(); for (const c of cues) { const sc = SC.labelScene(c), k = sc.sig; if (!bySig.has(k)) bySig.set(k, { sc, cues: [] }); bySig.get(k).cues.push(c); }
+    [...bySig.values()].sort((a, z) => z.cues.length - a.cues.length).slice(0, 2).forEach(({ sc, cues: cs }) => {
+      const { sig, ...scene } = sc; let n = 0;
+      for (const c of cs) { if (n >= 3) break; const a = +c.t0, z = Math.max(+c.t1 || a + 1, a + 0.9); if (busy2(a, z)) continue; if (addScene({ ...scene, from: { ...scene.from, t: r2(a) } }, a, Math.min(z, a + 2.5))) n++; }
+    });
   }
+  for (const k of SC.effectsNamed(b).slice(0, 3)) { const sh = shots[1 + scenes.filter(x => x.kind === 'effect').length * 2] || shots[0]; const a = Math.max(0, (sh ? sh.start : 0) - 0.1), e = SC.effectScene(k, { t: a }); if (e) addScene(e, a, a + e.seconds); }
   const card = {
     videomd: 1, name,
     description: `Recipe torn down from ${src.file || 'a reference reel'}: ${shots.length} shots in ${dur}s, ${titles.length} big titles, ${cs.style} captions${bpm ? `, music near ${Math.round(bpm)} BPM` : ''}. Measured by ${engine}; finishes, entrances and layers are best guesses.`,
@@ -495,10 +537,14 @@ function convert(b, extras = {}, opts = {}) {
     '- A finish is only kept when the grade changes across shots or is strong. An even warm or cool cast on every shot is read as the room light.',
     '- Front or behind is a colour test against a person mask. It misses when the text colour matches the clothes or hair.',
     '- OCR misreads stylised or moving type. Check the title text before you remake; your remake should use your own words anyway.', '');
-  return { md, report: R.join('\n'), titles, shots, captionStyle: cs.style, captionPosition: cs.position, captionColor: cs.color, graphics, dropped, jobFinish, bpm, bed };
+  if (scenes.length) {
+    R.push('', '## Made for the menu', '', 'The menu had nothing for these, so they were made as scenes (HTML and CSS, kit/scenes.cjs), added to the Look menu with a REF badge and kept for later jobs.', '', '| Scene | Kind | First seen | Length |', '|---|---|---|---|');
+    for (const x of scenes) R.push(`| ${x.name} (${x.id}) | ${x.kind} | ${x.from && x.from.t != null ? x.from.t + ' s' : ''} | ${x.seconds} s |`);
+  }
+  return { md, report: R.join('\n'), scenes, titles, shots, captionStyle: cs.style, captionPosition: cs.position, captionColor: cs.color, graphics, dropped, jobFinish, bpm, bed };
 }
 
-module.exports = { convert, pickTitles, mapGraphics, captionLook, gradeChoice, placeOf, captionStyle, oneWordStream, finishOf, suggestBed, loadBreakdown, ENTRANCE_MAP };
+module.exports = { convert, saveScenes, stickerImage, pickTitles, mapGraphics, captionLook, gradeChoice, placeOf, captionStyle, oneWordStream, finishOf, suggestBed, loadBreakdown, ENTRANCE_MAP };
 
 if (require.main === module) {
   const argv = process.argv.slice(2);
@@ -511,5 +557,6 @@ if (require.main === module) {
   const res = convert(b, ex, { name: opt('name'), recipePath: path.relative(ROOT, out) });
   fs.writeFileSync(out, res.md);
   fs.writeFileSync(opt('report', path.join(path.dirname(out), 'teardown.md')), res.report);
-  console.log('wrote ' + out);
+  const added = saveScenes(res, path.dirname(out), { library: !argv.includes('--no-scenes') });
+  console.log('wrote ' + out + (res.scenes.length ? `; ${res.scenes.length} scene${res.scenes.length === 1 ? '' : 's'} made from it (${res.scenes.map(x => x.name).join(', ')})${added.length ? ', ' + added.length + ' new in the menu' : ''}` : ''));
 }

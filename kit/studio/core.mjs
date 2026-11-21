@@ -15,6 +15,7 @@ export const KIT = dirname(STUDIO), ROOT = dirname(KIT);
 const L = require('../locks.cjs');
 const K = require('../packs.cjs');
 const R = require('../rules.cjs');
+const SCN = require('../scenes.cjs');
 
 // ---------- catalog ----------
 // how a click on a tile of each engine kind is used. multi: allow or forbid many. one: pick one. toggle: on or off.
@@ -57,9 +58,25 @@ export function layersOf(map, categories, items, errs = []) {
   if (L.length) for (const c of categories) for (const r of c.items) if (!at[r] && !hidden.has(r)) errs.push(`${r} (tab ${c.id}) is in no layer`);
   return L.map(l => { const x = out[l.id]; x.groups = x.groups.filter(g => g.items.length); x.items = x.groups.flatMap(g => g.items); x.count = x.items.length; return x; });
 }
-let cached = null;
+let cached = null, cachedScenes = null;
+// the scenes made from references or by your agent (kit/scenes.cjs): REF items in the Graphics and Colour layers
+const sceneSig = () => { try { return readdirSync(SCN.dir()).filter(f => f.endsWith('.json')).sort().join(',') + '|' + statSync(SCN.dir()).mtimeMs; } catch { return ''; } };
+export const sceneStillUrl = id => `/api/scenes/${encodeURIComponent(id)}/still.png`;
+function addScenes(c) {
+  const sc = SCN.list(); if (!sc.length) return { ...c, scenesSig: '' };
+  const items = { ...c.items }, refs = { graphic: [], effect: [] };
+  for (const x of sc) { const ref = `graphic:${x.id}`;
+    items[ref] = { ref, kind: 'graphic', id: x.id, section: 'scenes', label: `${x.name}. Made ${x.by === 'agent' ? 'by your agent' : 'from ' + (x.from && x.from.reference ? x.from.reference : 'a reference')} as HTML and CSS, kept for every job.`, flag: null, mode: 'multi',
+      preview: { url: sceneStillUrl(x.id), src: null, animated: false }, made: { by: x.by || 'reference', from: (x.from && x.from.reference) || null, kind: x.kind, name: x.name } };
+    refs[x.kind === 'effect' ? 'effect' : 'graphic'].push(ref); }
+  const group = (lid, list) => ({ id: 'ref-made', label: 'Made from your references', items: list });
+  const layers = c.layers.map(l => { const add = l.id === 'graphics' ? refs.graphic : l.id === 'color' ? refs.effect : []; if (!add.length) return l; const groups = [group(l.id, add), ...l.groups]; return { ...l, groups, items: groups.flatMap(g => g.items), count: groups.reduce((a, g) => a + g.items.length, 0) }; });
+  const categories = [...c.categories, { id: 'ref-made', label: 'Made from your references', hint: 'Effects and graphics a reference had that the menu did not, made as scenes', items: [...refs.graphic, ...refs.effect], count: sc.length }];
+  return { ...c, items, layers, categories, scenesSig: sc.map(x => x.id).join(',') };
+}
 export function catalog({ fresh = false } = {}) {
-  if (cached && !fresh) return cached;
+  const sig = sceneSig();
+  if (cached && !fresh) { if (cachedScenes && cachedScenes.sig === sig) return cachedScenes.c; cachedScenes = { sig, c: addScenes(cached) }; return cachedScenes.c; }
   const menu = loadMenu(), fxcat = JSON.parse(readFileSync(join(ROOT, 'effects', 'catalog.json'), 'utf8'));
   const fxBy = Object.fromEntries(fxcat.effects.map(e => [e.name, e]));
   const map = JSON.parse(readFileSync(join(STUDIO, 'categories.json'), 'utf8'));
@@ -96,7 +113,8 @@ export function catalog({ fresh = false } = {}) {
   const beds = JSON.parse(readFileSync(join(KIT, 'music', 'beds.json'), 'utf8'));
   cached = { categories, layers, items, packs, candidates: map.candidates || [], beds: Object.entries(beds).map(([id, b]) => ({ id, title: b.title, seconds: b.seconds, energy: b.energy, file: rel(join(KIT, 'music', b.file)) })),
     exports: menu.items.filter(i => i.section === 'exports').map(i => i.id), errs };
-  return cached;
+  cachedScenes = { sig, c: addScenes(cached) };
+  return cachedScenes.c;
 }
 
 // ---------- state ----------
@@ -306,7 +324,11 @@ export function compose(s, { refPack = null } = {}) {
   if (pack) args.push('--pack', pack);
   const tr = allowed(s, 'transition'); if (tr && tr.length) locks.transitions = tr;
   const ti = allowed(s, 'entrance'); if (ti && ti.length) locks.titles = ti;
-  const g = s.picks.graphic; if (g && (g.allow.length || g.deny.length)) locks.graphics = { ...(g.allow.length ? { allow: g.allow.slice() } : {}), ...(g.deny.length ? { deny: g.deny.slice() } : {}) };
+  // graphics: the kit's in the lock; scenes (ref-..., made from a reference or by your agent) placed by --scenes
+  const g0 = s.picks.graphic, isScene = id => /^ref-/.test(id), g = g0 && { allow: g0.allow.filter(id => !isScene(id)), deny: g0.deny.filter(id => !isScene(id)) };
+  if (g && (g.allow.length || g.deny.length)) locks.graphics = { ...(g.allow.length ? { allow: g.allow.slice() } : {}), ...(g.deny.length ? { deny: g.deny.slice() } : {}) };
+  const scn = g0 ? g0.allow.filter(id => isScene(id) && !g0.deny.includes(id) && SCN.get(id)) : [];
+  if (scn.length) args.push('--scenes', scn.join(','));
   const fi = allowed(s, 'finish'); if (fi) locks.finishes = fi.length ? fi : ['none'];
   const one = k => s.picks[k] && s.picks[k].allow[0];
   if (one('captionEntrance')) { locks.captionEntrance = one('captionEntrance'); args.push('--caption-entrance', one('captionEntrance')); }
@@ -359,6 +381,17 @@ export function lockStringOf(l) {
 // ---------- reference: influence ----------
 // What a teardown Reel.md says about the reference, as Studio suggestions. Influence mode turns them into a local
 // pack (packs/local/ref-<job>/) with soft transition weights and no locks; the user's own picks become locks on top.
+// the scenes a reference's teardown made (its scenes.json), each with whether it is in the menu now
+function scenesOf(r, dir) {
+  let sc = []; try { sc = JSON.parse(readFileSync(join(dir, 'scenes.json'), 'utf8')).scenes || []; } catch {}
+  const used = new Set((r.graphics || []).filter(g => g.type === 'scene').map(g => g.scene));
+  return sc.filter(x => x && x.id).map(x => ({ id: x.id, name: x.name, kind: x.kind, inMenu: !!SCN.get(x.id), used: used.has(x.id) }));
+}
+// what a Recreate draft takes from the recipe besides the Look: the shot plan, framing per shot, cutaways and sounds
+function planOf(r) {
+  const sh = r.shots || [], fr = [...new Set(sh.map(s => s.framing).filter(Boolean))];
+  return { shots: sh.length, framing: fr, cutaways: sh.filter(s => s.cutaway === true || s.cutaway === 'on').length, sounds: (r.sfx || []).length, graphics: (r.graphics || []).length, noBed: !!(r.music && /^none$/i.test(String(r.music.bed || ''))) };
+}
 export function extract(recipePath) {
   const RM = require('../reelmd.cjs');
   const r = RM.parse(readFileSync(recipePath, 'utf8'));
@@ -369,7 +402,7 @@ export function extract(recipePath) {
   bump(st.transition); for (const sh of r.shots || []) bump(sh.transition);
   const entrances = [...new Set((r.titles || []).map(t => t.entrance).filter(e => R.ENTRANCES.includes(e)))];
   const finishes = [...new Set([st.finish, ...(r.shots || []).map(s => s.finish)].filter(Boolean).flatMap(f => String(f).split(',')).map(x => x.trim()).filter(x => x && x !== 'none'))];
-  const graphics = [...new Set((r.graphics || []).map(g => g.type || g.graphic || g.id).filter(Boolean))];
+  const graphics = [...new Set((r.graphics || []).map(g => (g.type === 'scene' && g.scene) || g.type || g.graphic || g.id).filter(x => x && x !== 'scene'))];
   const effects = st.effects ? String(st.effects).split(',').map(x => x.trim()).filter(Boolean) : [];
   const cat = catalog();
   const real = (kind, ids) => ids.filter(id => cat.items[`${kind}:${id}`]);
@@ -378,8 +411,11 @@ export function extract(recipePath) {
     name: (r.card && r.card.name) || basename(dirname(recipePath)), shots: (r.shots || []).length, titles: (r.titles || []).length,
     preset: br.preset && br.preset !== 'none' ? br.preset : null, look: st.look || null, captionStyle: st.captions || null,
     transitions: tcount, entrances: real('entrance', entrances), finishes: real('finish', finishes), graphics: real('graphic', graphics), effects: real('effect', effects),
-    music: { bed: mu.bed && mu.bed !== 'none' ? mu.bed : null, energy: mu.energy || null, beatSync: mu['beat-sync'] || null }, punch: st.punch || null,
+    music: { bed: mu.bed && mu.bed !== 'none' ? mu.bed : null, ...(mu.bed === 'none' ? { noBed: true } : {}), energy: mu.energy || null, beatSync: mu['beat-sync'] || null }, punch: st.punch || null,
     ran: ranOf(dirname(recipePath), r),
+    // what was made for the menu from it (kit/scenes.cjs), and what Recreate re-cuts and brings: its shot plan, framing, cutaways and sounds
+    scenes: scenesOf(r, dirname(recipePath)),
+    plan: planOf(r),
   };
 }
 // which parts of the breakdown ran, from what the teardown left beside its Reel.md, each with the fix when one did not:
@@ -482,6 +518,8 @@ export function referenceLook(ex, mode, cat = catalog(), parts = null) {
   for (const r of Object.keys(picks)) if (!cat.items[r] || cat.items[r].mode === 'info') delete picks[r];
   const out = { picks };
   if (mode === 'recreate' && ex.preset && cat.packs.some(x => x.name === ex.preset)) out.pack = ex.preset;
+  // a reference with no music bed (its music stem -37 dB or quieter): Recreate, or Influence with sound on, plays none
+  if (ex.music && ex.music.noBed && (mode === 'recreate' || { ...INFLUENCE_PARTS, ...(parts || {}) }.sound)) out.music = { bed: 'none' };
   return out;
 }
 const allowedRefs = s => new Set([...Object.entries(s.picks || {}).flatMap(([k, v]) => ((v && v.allow) || []).map(id => `${k}:${id}`)), ...(s.music && s.music.bed ? [`bed:${s.music.bed}`] : [])]);
@@ -505,7 +543,7 @@ export function setReferenceLook(s, cat = catalog()) {
   const had = allowedRefs(s), prev = { one: {} };
   for (const ref of Object.keys(p.picks)) { const it = cat.items[ref]; if (it.kind !== 'bed' && it.mode === 'one') { const k = it.kind === 'editing' ? 'editing' : it.kind; prev.one[k] = ((s.picks[k] && s.picks[k].allow) || []).slice(); } }
   if (p.pack !== undefined) prev.pack = s.pack || null;
-  if (Object.keys(p.picks).some(x => x.startsWith('bed:'))) prev.bed = s.music.bed;
+  if (Object.keys(p.picks).some(x => x.startsWith('bed:')) || p.music) prev.bed = s.music.bed;
   applyPatch(s, p, cat, { nested: true });
   const now = allowedRefs(s);
   r.added = Object.keys(p.picks).filter(x => !had.has(x) && now.has(x));

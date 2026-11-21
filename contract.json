@@ -1,7 +1,7 @@
 {
   "contract": 1,
   "name": "aigent-talking-head",
-  "version": "1.21.0",
+  "version": "1.22.0",
   "summary": "Turn a phone clip into a captioned, styled 9:16 talking-head reel, locally.",
   "skill": "skills/aigent-talking-head/SKILL.md",
   "invoke": "npm run <command> -- <args>  (from the repo root; or node <script> <args>)",
@@ -83,6 +83,7 @@
         { "name": "lock", "type": "string", "default": null, "description": "pin choices so the auto-picker stays inside them, e.g. \"transitions=whip,zoom; titles=typewriter; no-graphics=checklist\" (keys in kit/locks.cjs); adds to a pack's locks; works on rebuild too" },
         { "name": "recipe", "type": "path", "default": null, "description": "a Reel.md recipe (docs/reel-md.md)" },
         { "name": "recipe-titles", "type": "boolean", "default": false, "description": "use the recipe's title text and times, only where you say that text" },
+        { "name": "scenes", "type": "string", "default": null, "description": "comma list of scene ids (ref-...) from the scene library (scenes/local/, kit/scenes.cjs): each placed once, spread over the reel, an effect on a cut, a graphic on a word" },
         { "name": "recut", "type": "boolean", "default": false, "description": "re-cut your edit to the recipe's shot plan: lengths scaled, cuts on word boundaries, the reference framing per shot, its sound effects at scaled times, titles matched by role (Studio Recreate)" },
         { "name": "capture-sources", "type": "boolean", "default": false, "description": "capture the recipe's confirmed screen-card sources first (public pages)" },
         { "name": "theme", "type": "string", "default": "aigent", "description": "a theme in kit/themes/ (aigent, neutral, or your own)" },
@@ -498,6 +499,7 @@
         { "name": "no-ocr", "type": "boolean", "default": false, "description": "skip on-screen text recognition" },
         { "name": "vlm", "type": "boolean", "default": false, "description": "rea-video: use its vision model pass" },
         { "name": "reuse", "type": "boolean", "default": false, "description": "keep an earlier breakdown in the out folder and only redo the mapping" },
+        { "name": "no-scenes", "type": "boolean", "default": false, "description": "do not add the effects and graphics made from the reference (scenes.json next to Reel.md) to the Studio menu library (scenes/local/)" },
         { "name": "url", "type": "string", "default": null, "description": "optional: one Instagram post or reel link instead of a file (needs instaloader; anonymous, no login, no bulk; you must have the rights)" }
       ],
       "outputs": ["teardown/<name>/Reel.md, teardown.md, contact.jpg, and videomd/ (rea-video) or fallback.json"],
