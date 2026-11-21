@@ -67,6 +67,7 @@ function checkJob(captionsFile, cutFile, label) {
     const file = f.mode === 10 || f.mode === 19 ? f.icon : f.mode === 11 ? f.src : null;
     if (file && !existsSync(resolve(dirname(captionsFile), file))) errs.push(`graphic ${f.start}s: no file at ${file}`);
     if (f.mode === 9 && f.layer && !['front', 'behind'].includes(f.layer)) errs.push(`graphic ${f.start}s: layer "${f.layer}" (front, behind)`);
+    if (f.mode === 9 && f.shape && !['seal', 'starburst'].includes(f.shape)) errs.push(`graphic ${f.start}s: shape "${f.shape}" (seal, starburst)`);
     if (f.mode === 11 && f.layer && !R.PANEL_LAYERS.includes(f.layer)) errs.push(`screen card ${f.start}s: layer "${f.layer}" (front, behind, auto)`);
     if (f.mode >= 12 && f.layer && !R.PANEL_LAYERS.includes(f.layer)) errs.push(`graphic ${f.start}s: layer "${f.layer}" (front, behind, auto)`);
     for (const [m, nm] of [[14, 'checklist'], [30, 'ticker'], [32, 'feature cards']]) if (f.mode === m && !(Array.isArray(f.items) ? f.items.length : String(f.items || '').trim())) errs.push(`${nm} ${f.start}s: no items`);
@@ -201,6 +202,14 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'recreate-plan.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
     catch (e) { rperrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Recreate module and plan.json tests (tests/recreate-plan.test.cjs: one scale, per-shot settings, sounds, shakes, graphics, accent, a recipe draft writes build/plan.json, read first with cut.json refShots as the fallback)', errs: rperrs, warns: [] });
+    const rgerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'reframe-grade.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
+    catch (e) { rgerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'reframe and grade match tests (tests/reframe-grade.test.cjs: the crop that puts your face on the reference face, the zoom limit of the source, the face box kept inside, the Reel.md face and lab keys, YuNet end to end, the skin-protected LUT, one LUT when the shots agree, the assembler applying both)', errs: rgerrs, warns: [] });
+    const slerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'stylelook.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
+    catch (e) { slerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Copy the look tests (tests/stylelook.test.cjs: a style look from a teardown with none of its words or times, save, load and list, cuts only in your own pauses, stickers on your own words, the look\'s titles and sounds, build/match.json, --style-look refused with --recipe)', errs: slerrs, warns: [] });
     const scerrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'ref-scenes.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { scerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
@@ -293,6 +302,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-refstyle.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { rserrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio reference sets the Look (tests/studio-refstyle.test.mjs: Recreate sets every layer, Influence keeps your Look and sound, your changes stay, Back to my look gives your own picks back, a reference still being read sets it when ready, MCP studio_set_selections)', errs: rserrs, warns: [] });
+    const slkerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-stylelook.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { slkerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio Copy the look (tests/studio-stylelook.test.mjs: reference mode look, a draft with --style-look and no recipe or re-cut, the look saved as look-<job>, a saved style look with no reference, Recreate wins, the list and save API, match passed through, MCP get_edit, studio_set_selections and save_look)', errs: slkerrs, warns: [] });
     const auerrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-agent-ux.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { auerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
@@ -305,6 +318,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'face-matte.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { ferrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'face and mask tests (tests/face-matte.test.mjs: BiRefNet tiers, memory check, Studio 409 when memory is short)', errs: ferrs, warns: [] });
+    const sberrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'starburst.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { sberrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'starburst sticker tests (tests/starburst.test.mjs: a spiky star read as a starburst with its point count, a disc as a seal, shape and spikes through the teardown mapping, Reel.md and the flips, the overlay drawing path)', errs: sberrs, warns: [] });
   }
   {
     const star = createRequire(import.meta.url)('./star.cjs');

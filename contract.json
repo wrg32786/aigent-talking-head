@@ -1,7 +1,7 @@
 {
   "contract": 1,
   "name": "aigent-talking-head",
-  "version": "1.27.1",
+  "version": "1.28.0",
   "summary": "Turn a phone clip into a captioned, styled 9:16 talking-head reel, locally.",
   "skill": "skills/aigent-talking-head/SKILL.md",
   "invoke": "npm run <command> -- <args>  (from the repo root; or node <script> <args>)",
@@ -32,7 +32,7 @@
     "glyphs": ["check", "star", "bolt", "heart", "fire", "play", "bell", "spark", "plus", "lock", "arrow", "rocket", "terminal", "chart", "world", "cpu"],
     "rules": ["fields under spoken must be words you say in the graphic's window (near-homophones and the recipe's Aliases count); a recipe job drops a graphic only when a field under required is not said, and otherwise leaves off just the unsaid field (kit/spoken.cjs)", "while a graphic is up, captions and titles that would sit on it move clear or hide (the layout pass in kit/overlay.html); npm run verify fails on any overlap", "layer behind puts the graphic under the crown mask: only the top of your head goes over it, never your face or chin"],
     "types": [
-      {"id": "ordinal-sticker", "mode": 9, "entrance": "burst-pop", "exit": "fade", "spoken": ["text"], "fields": ["text", "color", "ink", "layer", "x", "y", "size", "head", "head-y"], "summary": "list number sticker: an italic serif word (FIRST, SECOND, NEXT) set on a flat seal in the theme accent; the seal can sit behind your head"},
+      {"id": "ordinal-sticker", "mode": 9, "entrance": "burst-pop", "exit": "fade", "spoken": ["text"], "fields": ["text", "color", "ink", "layer", "x", "y", "size", "shape", "spikes", "head", "head-y"], "summary": "list number sticker: an italic serif word (FIRST, SECOND, NEXT) set on a flat seal in the theme accent; the seal can sit behind your head"},
       {"id": "app-label", "mode": 10, "entrance": "tile-pop", "exit": "fade", "spoken": ["text"], "fields": ["text", "icon", "tile", "x", "y", "size"], "summary": "app or logo label: a top-lit icon tile springs in and a name plate wipes out under it; your icon image, or a monogram of the name"},
       {"id": "screen-card", "mode": 11, "entrance": "card-rise", "exit": "fade", "spoken": [], "fields": ["src", "source", "subject", "border", "in", "w", "y", "cursor", "cam", "cues", "at", "layer"], "summary": "screen card: a dark window card (title bar, address pill, accent rim with a glow), inset in the lower middle, showing your screenshot or screen recording; optional pointer clicks and pan and zoom keyframes on beats you say"},
       {"id": "lower-third", "mode": 12, "entrance": "bar-wipe", "exit": "wipe-back", "spoken": ["text", "sub"], "required": ["text"], "fields": ["text", "sub", "color", "x", "y", "layer"], "summary": "lower third name tag: an accent rule springs up, a name plate wipes out from it and a small line follows on an accent tab"},
@@ -86,6 +86,9 @@
         { "name": "scenes", "type": "string", "default": null, "description": "comma list of scene ids (ref-...) from the scene library (scenes/local/, kit/scenes.cjs): each placed once, spread over the reel, an effect on a cut, a graphic on a word" },
         { "name": "scenes-off", "type": "string", "default": null, "description": "comma list of scene ids (ref-...) to leave out, the recipe's own scenes too (forbidden on the Studio Look step)" },
         { "name": "recut", "type": "boolean", "default": false, "description": "re-cut your edit to the recipe's shot plan: lengths scaled, cuts on word boundaries, the reference framing per shot, its sound effects at scaled times, titles matched by role (Studio Recreate)" },
+        { "name": "no-reframe", "type": "boolean", "default": false, "description": "with recut or style-look: do not crop each shot to the reference's face size and eye line (kit/reframe.cjs); the punch by shot size is used" },
+        { "name": "no-grade-match", "type": "boolean", "default": false, "description": "with recut or style-look: do not match your take's colour to the reference with a skin-protected 3D LUT (kit/grade-match.cjs); the finish still applies" },
+        { "name": "style-look", "type": "string", "default": null, "description": "Copy the look: a saved style look name (npm run look -- list) or a look.json path. Your own words and timing with the look's framing, grade, captions, titles, stickers, sounds, transitions and music (docs/reel-md.md, Copy the look). Not with recipe. Writes build/plan.json (mode look) and build/match.json" },
         { "name": "capture-sources", "type": "boolean", "default": false, "description": "capture the recipe's confirmed screen-card sources first (public pages)" },
         { "name": "theme", "type": "string", "default": "aigent", "description": "a theme in kit/themes/ (aigent, neutral, or your own)" },
         { "name": "look", "type": "enum", "values": ["kinetic", "oneword", "muse", "classic", "one-word"], "values_from": "kit/preset.cjs LOOKS", "default": "kinetic" },
@@ -357,6 +360,22 @@
       "failures": ["No pack <name>", "ffmpeg or Chrome errors"]
     },
     {
+      "name": "look",
+      "script": "kit/stylelook.cjs",
+      "summary": "Style looks (Copy the look): save a reference teardown's style as a named, reusable look (looks/local/<name>/look.json), list, show or remove them. Use one with npm run reel -- --style-look <name>.",
+      "subcommands": [
+        { "name": "save", "positional": [{"name": "teardown", "type": "path", "required": true, "description": "a teardown folder (npm run teardown) or its Reel.md"}], "outputs": ["looks/local/<name>/look.json and a summary of each part"] },
+        { "name": "list", "positional": [], "outputs": ["the saved looks with a line per part (default when no subcommand)"] },
+        { "name": "show", "positional": [{"name": "look", "type": "string", "required": true, "description": "a saved look name or a look.json path"}], "outputs": ["the look, summarised (or the file with --json)"] },
+        { "name": "remove", "positional": [{"name": "look", "type": "string", "required": true}], "outputs": ["removes looks/local/<name>/"] }
+      ],
+      "flags": [
+        { "name": "name", "type": "string", "default": null, "description": "save: the look's name (lowercase letters, digits, hyphens); default is the teardown's name" },
+        { "name": "json", "type": "boolean", "default": false, "description": "list and show: print JSON" }
+      ],
+      "env": ["LOOKS_DIR"]
+    },
+    {
       "name": "choices",
       "script": "kit/choices.cjs",
       "summary": "See every pick in a drafted job per beat with its reason (locked, pack, recipe, you, kit default), edit jobs/<job>/choices.json and apply it, or pin locks on the job; then npm run reel -- --rebuild.",
@@ -376,7 +395,7 @@
     {
       "name": "studio",
       "script": "kit/studio/server.mjs",
-      "summary": "Studio: a local web page over the kit (footage, a reference to influence or recreate, the effects menu by category, packs, music and pace, chat, the choices table, draft, render and download). Binds to 127.0.0.1 only. docs/studio.md.",
+      "summary": "Studio: a local web page over the kit (footage, a reference to influence, recreate or copy the look of, the effects menu by category, packs, music and pace, chat, the choices table, draft, render and download). Binds to 127.0.0.1 only. docs/studio.md.",
       "positional": [],
       "flags": [
         {
