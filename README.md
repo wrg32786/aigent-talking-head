@@ -181,7 +181,7 @@ The easy way is to tell your agent: paste the line in [Quick start](#quick-start
 | Need | Mac | Linux | Windows |
 |---|---|---|---|
 | Node 18+ | `brew install node` | your package manager or nodejs.org | nodejs.org installer |
-| ffmpeg + ffprobe | `brew install ffmpeg` | `sudo apt install ffmpeg` | `winget install ffmpeg` |
+| ffmpeg + ffprobe, with the `drawtext` filter | `brew install ffmpeg-full`, then put `$(brew --prefix ffmpeg-full)/bin` first on `PATH` (the plain `ffmpeg` formula has no `drawtext`) | `sudo apt install ffmpeg` | `winget install ffmpeg` |
 | Python 3.9+ (3.11+ for the BiRefNet mask) | `brew install python` | usually installed | python.org installer (gives `py`) |
 | Chrome or Chromium | google.com/chrome | `google-chrome` or `chromium` package | google.com/chrome |
 
