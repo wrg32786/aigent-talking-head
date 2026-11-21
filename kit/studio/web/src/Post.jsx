@@ -106,6 +106,8 @@ function Compose({ hidden, part, setPart, st, s, reload, V }) {
   const toFeed = picked.filter(c => c.service === 'instagram' && place[c.id] === 'feed'), feedMissing = toFeed.length > 0 && (!feedFile || feedFile.missing);
   const task = V && V.task, taskRunning = !!(task && task.status === 'running');
   useEffect(() => { if (making && !taskRunning) { setMaking(false); reload().catch(() => {}); } }, [taskRunning]);
+  // an export that ended before the page ever saw it running: Make it stops spinning and the file is looked for again
+  useEffect(() => { if (!making || taskRunning) return; const id = setTimeout(() => { setMaking(false); reload().catch(() => {}); }, 4000); return () => clearTimeout(id); }, [making, taskRunning]);
   const makeFeed = () => api('/api/sizes/make', { size: 'feed45', file: reel }).then(() => setMaking(true)).catch(() => {});
   const name = f => String(f || '').split('/').pop();
   // a reel by its version, not its file name (the file name stays in the tooltip and on Download)
