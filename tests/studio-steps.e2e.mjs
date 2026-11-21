@@ -143,6 +143,14 @@ try {
     await pg.waitForSelector('#recreate-ready');
     await open(pg, '#step=music');
     assert.match(await pg.$eval('#music-ref', e => e.textContent), /From your reference: .*1 sound.*fast tempo/);
+    // the Fonts layer says whose font the next draft uses, and a font picked here is yours from then on
+    await open(pg, '#step=text&menu=fonts');
+    await pg.waitForSelector('#tab-fonts[aria-selected="true"]');
+    assert.match(await pg.$eval('#font-ref', e => e.textContent), /^From your reference: .*Pick one here to use yours instead\.$/);
+    assert.strictEqual(await pg.$eval('#font-ref', e => e.dataset.locked), 'false');
+    const st = await (await fetch(url + '/api/state', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ picks: { 'font:literata': 'allow' } }) })).json();
+    assert.strictEqual(st.state.fontLock, true); assert.deepStrictEqual(st.refFont.locked, true);
+    await pg.waitForFunction(() => /^Your font is used/.test((document.querySelector('#font-ref') || {}).textContent || ''), null, { timeout: 8000 });
   });
 
   assert.deepStrictEqual(errs, [], 'no page errors');
