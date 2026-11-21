@@ -113,7 +113,7 @@ def run(src, out, fps=8.0, margin=0.18):
     sig = json.dumps([os.path.abspath(src), st.st_size, int(st.st_mtime), fps, margin, 2])
     if os.path.exists(out):
         try:
-            old = json.load(open(out))
+            old = json.load(open(out, encoding="utf-8"))
             if old.get('sig') == sig:
                 print(f"face zone: cached ({old.get('faces')} of {old.get('samples')} samples with a face) -> {out}")
                 return old
@@ -137,7 +137,7 @@ def run(src, out, fps=8.0, margin=0.18):
     dec.wait()
     zones = smooth(raw, fps)
     res = {'fps': fps, 'size': [OW, OH], 'zones': zones, 'faces': found, 'samples': len(raw), 'margin': margin, 'sig': sig}
-    with open(out, 'w') as fh:
+    with open(out, 'w', encoding="utf-8") as fh:
         json.dump(res, fh)
     print(f"face zone: a face in {found} of {len(raw)} samples ({fps:g} a second) -> {out}")
     return res

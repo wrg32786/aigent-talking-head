@@ -106,5 +106,5 @@ if __name__ == '__main__':
     a = ap.parse_args()
     res = {'video': os.path.abspath(a.video), 'spans': measure_spans(a.video, parse_spans(a.spans), a.samples, a.cropx)}
     if a.json:
-        json.dump(res, open(a.json, 'w'))
+        json.dump(res, open(a.json, 'w', encoding="utf-8"))
     print(json.dumps(res))

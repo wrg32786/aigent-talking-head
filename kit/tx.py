@@ -14,4 +14,4 @@ for f in files:
     words = [w[2] for w in out[os.path.basename(f)]]
     rep = [words[i] for i in range(1, len(words)) if words[i].lower().strip(",.?!") == words[i-1].lower().strip(",.?!")]
     print(os.path.basename(f), " ".join(words), ("  <<REPEATED: " + ", ".join(rep) + ">>") if rep else "")
-json.dump(out, open("words.json", "w"), indent=0)
+json.dump(out, open("words.json", "w", encoding="utf-8"), indent=0)

@@ -74,7 +74,7 @@ a = ap.parse_args()
 def cut_json():
     if not os.path.exists("cut.json"):
         return {}
-    return json.load(open("cut.json"))
+    return json.load(open("cut.json", encoding="utf-8"))
 
 def cut_mask(cut):
     m = cut.get("mask")
@@ -334,7 +334,7 @@ meta = {"src": a.src, "frames": written, "size": [OW, OH], "model": model,
         "s_per_frame": spf, "masked_frames": masked, "birefnet_frames": perf["infer"], "cached_frames": perf["cache"],
         "flow_frames": perf["flow"], "flow_fallback": perf["flow_fallback"], "wall_s": wall,
         "windows": stats, "clear": clear, "person": person_path, "note": note}
-json.dump(meta, open(os.path.splitext(a.out)[0] + ".json", "w"), indent=1)
+json.dump(meta, open(os.path.splitext(a.out)[0] + ".json", "w", encoding="utf-8"), indent=1)
 for s in stats:
     print(f"mask {s['window'][0]:.2f}-{s['window'][1]:.2f}s: person in {s['person'] * 100:.0f}% of frames, coverage {s['coverage'] * 100:.1f}%, title band alpha {s['band']:.2f}")
 print(f"wrote {a.out} [{model}: {masked} frames masked, {perf['infer']} {'MediaPipe' if model == 'mediapipe' else 'BiRefNet'} at {spf if spf is not None else 'n/a'} s/frame, {perf['cache']} from the cache, {perf['flow']} by flow; {wall}s]")

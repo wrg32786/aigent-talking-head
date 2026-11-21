@@ -2063,7 +2063,7 @@ def fx_place_in_grid(c, e):
 
 # Optional private effects (not part of the public pack). If fx_private.py sits next to this file, its effects load too.
 _PRIV = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fx_private.py')
-if os.path.exists(_PRIV): exec(open(_PRIV).read(), globals())
+if os.path.exists(_PRIV): exec(open(_PRIV, encoding="utf-8").read(), globals())
 
 
 # ---------- pack 5: phrase pops starters (added 2 Nov 2026) ----------
@@ -2277,7 +2277,7 @@ def main():
         for i, (k, (_, d)) in enumerate(EFFECTS.items()): print(f'{i + 1:2d}. {k:15s} {d}')
         return
     if a.plan:
-        src, dst = a.args[0], a.args[1]; plan = json.load(open(a.plan))
+        src, dst = a.args[0], a.args[1]; plan = json.load(open(a.plan, encoding="utf-8"))
         plan = plan.get('effects', plan) if isinstance(plan, dict) else plan
     else:
         name, src, dst = a.args[0], a.args[1], a.args[2]

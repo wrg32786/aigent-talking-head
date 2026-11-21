@@ -29,7 +29,7 @@ def main():
     st = {"file": src, "duration": round(dur, 2), "chunk": chunk, "total": n, "done": [], "words": [], "model": model_name, "vad": VAD_VERSION}
     if os.path.exists(out):
         try:
-            old = json.load(open(out))
+            old = json.load(open(out, encoding="utf-8"))
             if old.get("chunk") == chunk and old.get("total") == n and old.get("model") == model_name and old.get("vad") == VAD_VERSION: st = old
         except Exception:
             pass
@@ -49,7 +49,7 @@ def main():
         st["words"] = sorted(st["words"] + ws, key=lambda w: w[0])
         st["done"].append(k)
         os.remove(wav)
-        json.dump(st, open(out + ".tmp", "w"))
+        json.dump(st, open(out + ".tmp", "w", encoding="utf-8"))
         os.replace(out + ".tmp", out)
         print(f"progress {len(st['done'])} {n}", flush=True)
 

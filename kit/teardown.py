@@ -199,7 +199,7 @@ def beat_grid(path, dur):
         r = subprocess.run([sys.executable, os.path.join(HERE, "beats.py"), wav, "--duration", str(dur), "--out", out], capture_output=True, text=True)
         if r.returncode or not os.path.exists(out):
             return None
-        return json.load(open(out))
+        return json.load(open(out, encoding="utf-8"))
 
 
 def stage(name, words):
@@ -244,7 +244,7 @@ def cmd_analyze(a):
     imgs = [x for x in (frame_at(a.video, (s["start"] + s["end"]) / 2, 160) for s in shots[:12]) if x is not None]
     if imgs:
         out["x_palette"] = dominant_colours(imgs)
-    json.dump(out, open(a.out, "w"), indent=1)
+    json.dump(out, open(a.out, "w", encoding="utf-8"), indent=1)
     print(f"fallback teardown: {len(shots)} shots, {len(out['packaging']['text_cues'])} text cues, speech {'yes' if out['speech'].get('ok') else 'no'}, "
           f"bpm {out['audio'].get('tempo_bpm')}")
 
@@ -793,7 +793,7 @@ def shot_looks(video, shots, rows, graphics):
 
 def cmd_extras(a):
     import cv2, numpy as np
-    b = json.load(open(a.breakdown))
+    b = json.load(open(a.breakdown, encoding="utf-8"))
     shots = b.get("shots", [])
     seg = person_mask_fn()
     out = {"shots": [], "titles": [], "mask": bool(seg)}
@@ -803,7 +803,7 @@ def cmd_extras(a):
             out["shots"].append({}); continue
         st = grade_stats(img)
         out["shots"].append({"index": s.get("index"), **st, "scan": scanline_score(img)})
-    titles = json.load(open(a.titles)) if a.titles and os.path.exists(a.titles) else []
+    titles = json.load(open(a.titles, encoding="utf-8")) if a.titles and os.path.exists(a.titles) else []
     sheet = []
     for t in titles:
         tm = (t["start"] + min(t["end"], t["start"] + 1.2)) / 2 + 0.25
@@ -836,7 +836,7 @@ def cmd_extras(a):
         out["caption_look"]["layer_samples"] = caption_layer(a.video, cues, seg)
     except Exception as e:
         print(f"note: caption outline check failed: {e}")
-    json.dump(out, open(a.out, "w"), indent=1)
+    json.dump(out, open(a.out, "w", encoding="utf-8"), indent=1)
     sys.stdout.flush()
     print(f"graphics: {sum(g['type'] == 'ordinal-sticker' for g in gx)} ordinal stickers, {sum(g['type'] == 'app-label' for g in gx)} app labels, {sum(g['type'] == 'screen-card' for g in gx)} screen cards")
     print(f"extras: {len(out['shots'])} shots measured, {len(out['titles'])} title layers ({'MediaPipe mask' if seg else 'no person mask; layers not estimated'})")

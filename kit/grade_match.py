@@ -132,7 +132,7 @@ def write_cube(path, p, strength, skin, size=33):
     b, g, r = np.meshgrid(ax, ax, ax, indexing='ij')
     rgb = np.stack([r.ravel(), g.ravel(), b.ravel()], axis=1)
     out = np.clip(transfer(rgb, p, strength, skin), 0, 1)
-    with open(path, 'w') as fh:
+    with open(path, 'w', encoding="utf-8") as fh:
         fh.write(f'TITLE "grade match"\nLUT_3D_SIZE {size}\nDOMAIN_MIN 0.0 0.0 0.0\nDOMAIN_MAX 1.0 1.0 1.0\n')
         for row in out:
             fh.write(f'{row[0]:.6f} {row[1]:.6f} {row[2]:.6f}\n')
@@ -210,7 +210,7 @@ if __name__ == '__main__':
     p.add_argument('--size', type=int, default=33); p.add_argument('--samples', type=int, default=3); p.add_argument('--per-shot', action='store_true')
     a = ap.parse_args()
     if a.cmd == 'stats':
-        boxes = json.load(open(a.boxes)) if a.boxes else None
+        boxes = json.load(open(a.boxes, encoding="utf-8")) if a.boxes else None
         print(json.dumps({'spans': span_stats(a.video, parse_spans(a.spans), a.samples, boxes, a.min)}))
     else:
-        print(json.dumps(fit(a.video, parse_spans(a.spans), json.load(open(a.targets)), a.out_dir, a.strength, a.skin, a.size, a.samples, a.per_shot)))
+        print(json.dumps(fit(a.video, parse_spans(a.spans), json.load(open(a.targets, encoding="utf-8")), a.out_dir, a.strength, a.skin, a.size, a.samples, a.per_shot)))
