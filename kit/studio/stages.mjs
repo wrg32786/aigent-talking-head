@@ -13,8 +13,8 @@ export const STAGES = [
   { id: 'sound', label: 'Reading music and sounds', w: 6 },
   { id: 'graphics', label: 'Reading graphics', w: 12 },
   { id: 'framing', label: 'Reading framing', w: 8 },
-  { id: 'colours', label: 'Reading colours', w: 6 },
-  { id: 'recipe', label: 'Building the recipe', w: 4 },
+  { id: 'colours', label: 'Reading colors', w: 6 },
+  { id: 'recipe', label: 'Putting it together', w: 4 },
 ];
 const IDS = STAGES.map(x => x.id), AT = Object.fromEntries(IDS.map((id, i) => [id, i]));
 export const stageLabel = id => (STAGES[AT[id]] || {}).label || null;

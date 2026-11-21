@@ -36,7 +36,7 @@ export function FootageLink({ s, apply }) {
     <form className="row" onSubmit={add}>
       <Icon n="link" className="fl-ic" />
       <label className="sr" htmlFor="footage-link">Footage link</label>
-      <input id="footage-link" className="grow" type="url" inputMode="url" placeholder="Paste a Dropbox or Google Drive link, or a video URL" spellCheck="false" autoComplete="off" value={url} onChange={e => setUrl(e.target.value)} />
+      <input id="footage-link" className="grow" type="url" inputMode="url" placeholder="Paste a link to your own footage (Dropbox, Google Drive or a video URL)" spellCheck="false" autoComplete="off" value={url} onChange={e => setUrl(e.target.value)} />
       <Button id="footage-link-add" type="submit" variant="secondary" label="Add" isLoading={busy} />
       <Hint id="footage-link-hint" label="Which links work" align="end">Public share links only. Private links need a login, so download those and drop the file in.</Hint>
     </form>
@@ -99,7 +99,7 @@ export function Footage({ V, s, apply, patch, go, hidden, onLive, looks }) {
         <IconBtn n="x" label={'Remove ' + f.split('/').pop()} onClick={() => api('/api/footage/remove', { path: f }).then(apply)} />
       </li>)}
     </ul>
-    {s.footage.length > 0 && !s.clips && <div className="as-is"><Toggle id="as-is" label="Already cut: use each file as it is" description="One clip per file, in this order, no second cut." checked={!!s.asIs} onChange={v => api('/api/state', { asIs: v }).then(apply).catch(() => {})} /></div>}
+    {s.footage.length > 0 && !s.clips && <div className="as-is"><Toggle id="as-is" label="My clips are already trimmed" description="Use each file as it is, in this order." checked={!!s.asIs} onChange={v => api('/api/state', { asIs: v }).then(apply).catch(() => {})} /></div>}
     {!rec && <StartMode s={s} apply={apply} patch={patch} go={go} looks={looks} />}
     {!showScripts ? <button type="button" className="rs-open glass-card" id="scripts-open" onClick={() => { localStorage.setItem('studio.scripts.show', '1'); setScriptsOn(true); }}>
       <Icon n="script" /><span className="rs-t"><b>Scripts</b><span className="fine">Write what you will say, or ask your agent to</span></span><Icon n="right" className="rs-go" /></button>

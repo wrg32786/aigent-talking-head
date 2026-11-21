@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { StatusDot } from '@astryxdesign/core/StatusDot';
 import { Button } from '@astryxdesign/core/Button';
-import { api, file, toast, grow, Icon, IconBtn, MSG_STATUS, SETUP_LINE } from './lib.jsx';
+import { api, file, toast, grow, Icon, IconBtn, MSG_STATUS } from './lib.jsx';
 import { clock } from './Review.jsx';
 
 const DOT = { on: 'success', busy: 'warning', off: 'error', alt: 'neutral' };
@@ -19,7 +19,7 @@ export function Chat({ V, s, apply, go, open, setOpen, agentState, openConnect }
   const e = V.env, a = e.agent || {}, backend = e.backend, name = a.name || 'Your agent';
   const ol = useRef(null), input = useRef(null), fab = useRef(null), atBottom = useRef(true);
   const [text, setText] = useState(''), [busy, setBusy] = useState(false);
-  const label = backend === 'agent' ? (a.listening ? `${name}, listening` : a.connected ? `${name}, busy` : 'No agent') : e.llm ? e.llm : backend === 'keywords' ? 'Keywords' : 'Keywords (no model ready)';
+  const label = backend === 'agent' ? (a.listening ? `${name}, listening` : a.connected ? `${name}, busy` : 'No agent') : e.llm ? e.llm : backend === 'keywords' ? 'Built-in helper' : 'Built-in helper (no model ready)';
   useLayoutEffect(() => { const o = ol.current; if (o && atBottom.current) o.scrollTop = o.scrollHeight; }, [s.chat]);
   useEffect(() => {
     if (open) { const o = ol.current; if (o) o.scrollTop = o.scrollHeight; input.current?.focus({ preventScroll: true }); }
@@ -33,7 +33,7 @@ export function Chat({ V, s, apply, go, open, setOpen, agentState, openConnect }
   };
   const waiting = s.chat.filter(m => m.role === 'user' && m.to === 'agent' && m.status !== 'answered');
   const empty = backend === 'agent' && !a.connected
-    ? <li className="empty"><Icon n="plug" /><p>Connect your terminal agent to chat with it here.</p><Button id="chat-connect" variant="primary" size="sm" label="Connect agent" onClick={openConnect} /><p className="fine">Already set up? Tell it:</p><div className="copyline"><code>{SETUP_LINE}</code><IconBtn n="copy" label="Copy" onClick={() => navigator.clipboard && navigator.clipboard.writeText(SETUP_LINE).then(() => toast('Copied', true))} /></div></li>
+    ? <li className="empty"><Icon n="plug" /><p>Connect your terminal agent to chat with it here.</p><Button id="chat-connect" variant="primary" size="sm" label="Connect agent" onClick={openConnect} /></li>
     : <li className="empty"><Icon n="chat" /><p>{backend === 'agent' ? `${name} is here. Say what you want.` : 'Describe the vibe.'}</p><p className="fine">"Calm and cinematic, no glitch"</p></li>;
   return <aside className={'chat glass' + (open ? ' open' : '')} id="chat" aria-labelledby="h-chat">
     <header className="ch"><h2 id="h-chat">Chat</h2>

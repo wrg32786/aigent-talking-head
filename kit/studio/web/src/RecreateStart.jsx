@@ -61,7 +61,7 @@ export function StartMode({ s, apply, patch, go, looks }) {
     </div>
     {has && !choice && <p className="fine" id="start-mode-note">Your reference is on Influence: we take only the parts you switched on. <button type="button" className="linkish" onClick={() => go('picture', true)}>Change it on Picture</button></p>}
     {open && <div className="rs glass-card" id="recreate-card" ref={box} data-state={ex ? 'ready' : has ? 'reading' : 'empty'} data-mode={choice}>
-      <b className="rs-h" id="recreate-h">{has ? 'Your reference' : using ? 'Your look' : isLook ? 'The video whose look you want' : 'The video to recreate'}</b>
+      <b className="rs-h" id="recreate-h">{has ? 'Your reference' : using ? 'Your look' : isLook ? 'The video you like' : 'The video to recreate'}</b>
       {ex ? <p className="rs-line" id="recreate-ready"><Icon n="check" /><span><b>{refName(s)}</b>{meta ? `, ${meta}` : ''}. {isLook ? 'We copy its style. Your own words set the timing.' : 'We follow its cuts and timing on your take.'}</span>
           <button type="button" className="linkish" id="recreate-details" onClick={() => go('reference', true)}>See how it was made</button></p>
         : r.status === 'uploaded' ? <p className="rs-line" id="recreate-uploaded"><span>Your file is here.</span><Button id="recreate-go" size="sm" variant="secondary" label="Break down the file" onClick={breakDown} /></p>
@@ -70,8 +70,8 @@ export function StartMode({ s, apply, patch, go, looks }) {
         : using ? <p className="rs-line" id="recreate-using"><Icon n="check" /><span>Using your saved look <b>{using}</b>. No reference needed.</span></p>
         : <form className="row rs-form" onSubmit={addLink}>
           <label className="sr" htmlFor="recreate-link">{isLook ? 'Link to the video whose look you want' : 'Link to the video to recreate'}</label>
-          <input id="recreate-link" className="grow" type="url" inputMode="url" placeholder="Paste a video link" spellCheck="false" autoComplete="off" value={url} onChange={e => setUrl(e.target.value)} />
-          <Button id="recreate-add" type="submit" variant="primary" label="Add" isLoading={busy} />
+          <input id="recreate-link" className="grow" type="url" inputMode="url" placeholder="Paste the link of the video you like" spellCheck="false" autoComplete="off" value={url} onChange={e => setUrl(e.target.value)} />
+          <Button id="recreate-add" type="submit" variant="primary" label="Use this video" isLoading={busy} />
           <Button id="recreate-upload" type="button" variant="secondary" label="Upload" icon={<Icon n="upload" />} onClick={() => fileIn.current.click()} />
           <input type="file" id="recreate-file" ref={fileIn} accept="video/*,.mov,.mp4,.m4v,.webm,.mkv" hidden onChange={e => { addFile([...e.target.files]); e.target.value = ''; }} />
         </form>}
