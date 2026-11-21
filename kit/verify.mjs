@@ -183,7 +183,7 @@ if (stills.length) {
   } }
 // 3e. round every title, on the drawn frames (kit/titlecheck.mjs): from two frames before a title's start to five after,
 // and the same at its end, no caption word in the bar while the title is up and none of its own words in the bar outside it
-if (!EXN || XBUILD) { const tc = titleCheck(build, { dur: TL.total, fps: FPS });
+if (!EXN || XBUILD || !X.isReframed(EXN)) { const tc = titleCheck(build, { dur: TL.total, fps: FPS });
   tc.notes.forEach(n => notes.push(n));
   if (tc.ran) { ok(!tc.fails.length, `no caption word under or beside a title on ${tc.frames} frames round ${tc.titles} title${tc.titles === 1 ? '' : 's'} (${tc.pixelFrames} read from the drawn text layer)${tc.fails.length ? ':' : ''}`); tc.fails.forEach(c => lines.push('      ' + c)); } }
 // 4. mask, measured
