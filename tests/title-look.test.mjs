@@ -16,6 +16,7 @@ const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..'), TL = join(ROOT, 'kit', 'titlelook.py');
 const V = require('../kit/videomd2reel.cjs'), RM = require('../kit/reelmd.cjs'), R = require('../kit/rules.cjs'), { textDoubt } = require('../kit/teardown/titles.cjs');
 const PY = process.env.PYTHON || [join(ROOT, '.venv', 'Scripts', 'python.exe'), join(ROOT, '.venv', 'bin', 'python')].find(f => existsSync(f)) || (process.platform === 'win32' ? 'py' : 'python3');
+try { execFileSync(PY, ['-c', 'import cv2, PIL'], { stdio: 'ignore' }); } catch { console.log('skip the title look tests (needs Python with OpenCV and Pillow, from requirements.txt)'); process.exit(0); }
 let pass = 0, failed = 0;
 const ok = (c, m) => { if (c) pass++; else { failed++; console.error('FAIL ' + m); } };
 const dir = mkdtempSync(join(tmpdir(), 'titlelook-'));
