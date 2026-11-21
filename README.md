@@ -79,7 +79,7 @@ Your agent installs everything up front (Python, the downloaders, the Whisper mo
 
 <img src="docs/studio/light.png" width="720" alt="The same Cut step in the light theme">
 
-**Your edit.** A strip at the top of every step says what you are making in plain words: the format, where it comes from ("7 lines, 25 s, in your order, our pick"), the Look, the b-roll and the sound, with one button to the next thing to do (Add footage, Draft it). Click any part to jump to the step that sets it.
+**Your edit.** One slim line at the top of every step after Start says what you are making in plain words: the format, where it comes from ("our 7 best lines, 25 s" or "your 7 lines, 25 s"), the Look and the b-roll, and the sound once you change it. Click any part to jump to the step that sets it.
 
 **Reference links.** Paste one or more links (YouTube and Shorts, TikTok, X, Vimeo, a direct .mp4, or one public Instagram post) and Studio downloads each to a folder on your computer, shows the progress, and breaks it down: length, shots and cut times, pace, music BPM and energy, caption style, transitions, finishes and graphics. It then suggests matching items from the effects menu. The breakdown goes into the chat, so "use the transitions from the reference but calmer" works. Use it as an influence (soft defaults) or recreate its structure with your clip. Link downloads need [yt-dlp](https://github.com/yt-dlp/yt-dlp), which the installer adds; Instagram uses [instaloader](https://github.com/instaloader/instaloader) anonymously, with no login. Only use videos you have the rights to use as a reference.
 
@@ -143,7 +143,7 @@ Your agent installs everything up front (Python, the downloaders, the Whisper mo
 
 <img src="docs/studio/ask-agent.png" width="440" alt="Ask my agent open on the Cut step: three suggested asks, a box for your own words and Send"> <img src="docs/studio/apply.png" width="210" alt="The chat: the ask marked Answered and Claude Code's reply with Use cinematic and Show me"> <img src="docs/studio/apply-light.png" width="210" alt="The same reply in the light theme">
 
-**Wizards.** **Wizards** in the top bar walks you through a whole job in two or three questions: make a reel from a long take, copy a reference, or clips and ads from one take. Each answer sets the steps for you, and **Let my agent decide** hands the choice to your agent.
+**Wizards.** **Wizards** in the More menu walks you through a whole job in two or three questions: make a reel from a long take, copy a reference, or clips and ads from one take. Each answer sets the steps for you, and **Let my agent decide** hands the choice to your agent.
 
 <img src="docs/studio/wizards.png" width="400" alt="The Make a reel from a long take wizard in dark: What is this reel for, with Grow followers, Sell or sign up, Teach one thing and Full clean take"> <img src="docs/studio/wizards-light.png" width="400" alt="The same wizard in the light theme">
 **Settings.** Dark by default, with a light theme. The chat, step bar and settings are frosted glass panels; a switch turns them solid on older computers. Choose who answers the chat (your terminal agent by default, or a local model through Ollama, LM Studio or llama.cpp, the Claude or OpenAI API, or keywords only), where reference downloads go, and where finished reels are copied.

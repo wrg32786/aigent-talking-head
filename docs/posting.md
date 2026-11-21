@@ -30,7 +30,7 @@ Instagram only takes a 9:16 video as a Reel or a Story. A Feed post has to be be
 
 - A channel set to **Reels** gets the reel you picked (`reel-v1.mp4`).
 - A channel set to **Feed** gets the 4:5 file of the same version (`reel-v1-feed-4x5.mp4`) on its own link, as an Instagram post. You do not pick it; Studio finds it.
-- When that version has no 4:5 file yet, the Feed channel is marked **Will be skipped** and the note shows one button, **Make the 4:5 version for the Feed**. It makes the file from the same edit (the frame follows your face and the captions are laid out again), with progress in the page, and the channel is ready when it is done. Ticking **Instagram Feed 4:5** on Render makes it with the reel in the first place.
+- When that version has no 4:5 file yet, the Feed channel's row says **Can't post yet. Needs the 4:5 version.** with one button, **Make it**. It makes the file from the same edit (the frame follows your face and the captions are laid out again), with progress in the page, and the channel is ready when it is done. Ticking **Instagram Feed 4:5** on Render makes it with the reel in the first place.
 - A 9:16 file is never sent to the Feed in its place.
 - With **My own link** as the host, paste a second link for the 4:5 file.
 
