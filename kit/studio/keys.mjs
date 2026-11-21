@@ -102,4 +102,14 @@ export function envWithKeys(env = process.env) {
   for (const [id, name] of [['openai', 'OPENAI_API_KEY'], ['anthropic', 'ANTHROPIC_API_KEY']]) if (!out[name]) { const v = readFile()[id]; if (v) out[name] = v; }
   return out;
 }
+// the reference's descriptions (rea-video --vlm, a vision model reading each shot): the keys for it, from the
+// environment or Studio's saved keys, as the env rea-video reads. null when there is no vision key. A Gemini key goes
+// in as is; an OpenAI key as an OpenAI-compatible server (gpt-4o-mini, STUDIO_VLM_MODEL to change it). Keys stay on
+// this computer: they only go to the teardown process.
+export function vlmEnv(env = process.env) {
+  if (env.REA_VLM_API_KEY && env.REA_VLM_BASE_URL) return {};
+  const g = get('google', env); if (g) return { GEMINI_API_KEY: g };
+  const o = get('openai', env); if (o) return { REA_VLM_BASE_URL: (env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, ''), REA_VLM_API_KEY: o, REA_VLM_MODEL: env.STUDIO_VLM_MODEL || 'gpt-4o-mini' };
+  return null;
+}
 export const fileExists = () => existsSync(keysPath());

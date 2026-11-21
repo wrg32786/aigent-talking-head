@@ -249,7 +249,7 @@ function toPreset(r) {
   return out;
 }
 
-// Per-shot settings for drafted segments, in order: finish, big punch, transition.
+// Per-shot settings for drafted segments, in order: finish, big punch, transition, the camera move and a shake.
 function shotSettings(r) {
   return r.shots.map(s => {
     const o = {};
@@ -257,6 +257,8 @@ function shotSettings(r) {
     if (s.punch === 'big') o.bigPunch = true;
     if (s.framing && !none(s.framing)) o.framing = String(s.framing).replace(/-/g, ' ');
     if (onOff(s.cutaway)) o.cutaway = true;
+    if (s.move && /^(push|pull|drift)$/.test(String(s.move).toLowerCase())) o.move = String(s.move).toLowerCase();
+    if (onOff(s.shake)) o.shake = true;
     o.dur = +(s.end - s.start).toFixed(3);
     if (s.transition && !none(s.transition)) o.transition = s.transition;
     if (s.src) { o.file = s.src; o.in = +(s.in ?? 0); o.out = s.out != null ? +s.out : +(s.in ?? 0) + (s.end - s.start); }

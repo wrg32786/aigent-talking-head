@@ -1,6 +1,6 @@
 // Tear down a reference reel into a Reel.md you can remake with your own clip and brand.
 //
-//   npm run teardown -- <reel.mp4> [--out teardown/<name>] [--engine rea|lite] [--install] [--no-asr] [--no-ocr] [--vlm] [--reuse]
+//   npm run teardown -- <reel.mp4> [--out teardown/<name>] [--engine rea|lite] [--install] [--no-asr] [--no-ocr] [--vlm [--max-vlm-shots n]] [--reuse]
 //   npm run teardown -- --url https://www.instagram.com/reel/<code>/   (optional, needs: pip install instaloader)
 //   --reuse keeps an earlier rea-video breakdown and transcript in the out folder and only redoes the mapping
 //   then: npm run reel -- --recipe teardown/<name>/Reel.md --clip inbox/my-clip.mp4
@@ -32,7 +32,7 @@ const KIT = dirname(fileURLToPath(import.meta.url)), ROOT = dirname(KIT);
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['out', 'engine', 'name', 'model', 'url']);
+const VALUED = new Set(['out', 'engine', 'name', 'model', 'url', 'max-vlm-shots']);
 const pos = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const die = m => { console.error(m); process.exit(1); };
 // the kit's Python: PYTHON, else the kit's .venv, else the system one
@@ -96,7 +96,13 @@ let b;
 if (engine === 'rea') {
   const pkg = join(out, 'videomd');
   if (flag('reuse') && existsSync(join(pkg, 'breakdown.json'))) console.log('reusing ' + join(pkg, 'breakdown.json') + ' (--reuse)');
-  else run(rea, ['decompose', video, '-o', pkg, '--lang', 'en', ...(flag('vlm') ? ['--vlm'] : []), ...(flag('no-ocr') ? ['--no-ocr'] : []), ...(flag('no-asr') ? ['--no-asr'] : [])]);
+  else {
+    const base = ['decompose', video, '-o', pkg, '--lang', 'en', ...(flag('no-ocr') ? ['--no-ocr'] : []), ...(flag('no-asr') ? ['--no-asr'] : [])];
+    // --vlm: a vision model describes each shot (the effects and transitions measurements miss). When that call fails
+    // (no key, a bad key, the service is down) the breakdown runs again without it, so a teardown never fails for it
+    if (flag('vlm')) { try { run(rea, [...base, '--vlm', ...(opt('max-vlm-shots') ? ['--max-vlm-shots', String(opt('max-vlm-shots'))] : [])]); } catch (e) { console.warn('note: the descriptions (--vlm) failed; reading the reference without them'); run(rea, [...base, '--no-vlm']); } }
+    else run(rea, base);
+  }
   b = V.loadBreakdown(pkg);
 } else {
   const f = join(out, 'fallback.json');

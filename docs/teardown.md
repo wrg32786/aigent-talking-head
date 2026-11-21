@@ -33,8 +33,11 @@ It fetches only the post you name, anonymously. It never logs in, and it does no
 | Big text that is not a caption | up to 7 titles with text, times, the nearest entrance (cut to slam, pop to pop-zoom, type-on to stagger-rise, fade to blur-rise, slide to slide-left), and front or behind |
 | Grade per shot | the nearest finish (`mono`, `teal`, `bleach`, `crushed`, `cool`, `warm`, `scan-lines`, `grain`, `vignette`), only when it is strong or differs across shots; otherwise none (see below) |
 | Cuts, jump cuts, zoom moves | the shot list, big punches, punch on or off |
+| Transitions between shots (1.24.0) | each shot's `transition` on the kit's names: flash, a fade through black or white, crossfade, whip and push with their direction, swipe up or down, wipe, zoom, blur, glitch, warp for a morph, slice for a layout change. The job transition is the one used on a third or more of the cuts, else `none`. A spin, which the kit has no transition for, is made as a REF scene on that cut |
+| Camera inside a shot (1.24.0) | `move push` (push-in), `move pull` (pull-out), `move drift` (pan or track): a slow zoom over the segment. Handheld or a shake transition: `shake on`, a shake just after the cut in |
+| Effects its descriptions name (1.24.0) | with `--vlm`: light leaks, flashes, confetti, speed lines and the rest of `kit/scenes.cjs` EFFECTS, made as REF scenes on the shot the description names. Studio passes `--vlm` itself when a Gemini or OpenAI key is set (`STUDIO_VLM=off` turns it off); a failed model call falls back to the measured read |
 | Music and BPM | beat sync on, and the library bed with the closest tempo |
-| Text and frame colours | brand kit colours |
+| Text and frame colours | brand kit colours and the closest theme (`neutral`, `magazine` or `aigent`, by accent and darkest colour). A remake puts the reference's accent on hero words, stickers, number tiles and cards unless you pass `--theme` |
 | Speech | a `reel-script` block with the reference's lines and times |
 
 ### Titles: what is left out

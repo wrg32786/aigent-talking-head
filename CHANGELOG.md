@@ -2,6 +2,18 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.24.0 (unreleased)
+
+Release notes: [docs/releases/v1.24.0.md](docs/releases/v1.24.0.md). Effects and colours from the reference.
+
+- **Transitions.** A teardown maps each cut's transition to the kit's names (`kit/shotplan.cjs` `transitionFor`): flash, a fade through black or white, crossfade, whip and push with their direction, swipe, wipe, zoom, blur, glitch, warp for a morph, slice for a layout change. The job transition is the one on a third or more of the cuts.
+- **Camera moves.** New shot keys `move push|pull|drift` (a slow zoom over the segment, `cut.json` seg `push`, drawn by `kit/assemble.cjs`) and `shake on` (a shake hit just after the cut in), from rea-video's camera read (`moveFor`).
+- **Missing effects become REF scenes.** A spin, which has no kit transition, is made as a scene on that cut. Effects a shot's description names are made on that shot, not spread across the reel.
+- **Studio asks for the descriptions itself.** With a Gemini or OpenAI key set, Studio runs the teardown with `--vlm --max-vlm-shots 24` (`kit/studio/keys.mjs` `vlmEnv`; `STUDIO_VLM=off` turns it off). A failed model call falls back to the measured read. New teardown flag `--max-vlm-shots`.
+- **Colours and theme.** The recipe names the closest theme (`neutral`, `magazine` or `aigent`) and a remake puts the reference's accent on hero words, stickers, number tiles and cards (unless `--theme` is passed).
+- **Influence Effects switch works.** Effect scenes made from a reference count as Effects, not Graphics (`reference.mjs` `partOf`), so the switch now drops or keeps them. Reasons on scene picks say "made as a scene".
+- **Tests.** `tests/recreate-shotplan.test.cjs` and `tests/ref-scenes.test.mjs` cover the maps, the scenes, the theme, the switch and the vision keys.
+
 ## 1.23.1 (unreleased)
 
 Release notes: [docs/releases/v1.23.1.md](docs/releases/v1.23.1.md). Recreate tells the truth about the reference (from Fable's end to end review).

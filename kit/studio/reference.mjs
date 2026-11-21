@@ -87,7 +87,7 @@ export function summarize(r, recipePath, found, cat = catalog()) {
   if (st.captions) add(`captionStyle:${st.captions}`, 'caption style of the reference');
   if (st.look) add(`look:${st.look}`, 'caption look of the reference');
   for (const f of found.finishes) add(`finish:${f}`, 'grade on some shots');
-  for (const g of found.graphics) add(`graphic:${g}`, 'graphic seen on screen');
+  for (const g of found.graphics) { const m = cat.items[`graphic:${g}`] && cat.items[`graphic:${g}`].made; add(`graphic:${g}`, m && m.kind === 'effect' ? 'effect in the reference, made as a scene' : m ? 'seen on screen, made as a scene' : 'graphic seen on screen'); }
   for (const e of found.effects) add(`effect:${e}`, 'effect in the reference');
   if (mu['beat-sync'] === 'on') add('beatSync:beat-sync', `cuts land on the beat${bpm ? ` (${bpm} BPM)` : ''}`);
   if (mu.bed && mu.bed !== 'none') add(`bed:${mu.bed}`, `closest library bed${bpm ? ' by tempo' : ''}`);
@@ -145,12 +145,14 @@ export const REF_PARTS = [
 ];
 export const INFLUENCE_PARTS = { captions: true, titles: true, transitions: true, grade: true, effects: true, graphics: true, pace: false, sound: false, fonts: true };
 const partOfKind = k => (REF_PARTS.find(p => p.kinds.includes(k)) || {}).id || null;
+// the part a catalog item belongs to: a scene made from a reference counts as an effect or a graphic by what it is
+export const partOf = it => (it && it.made && it.made.kind === 'effect' ? 'effects' : it ? partOfKind(it.kind) : null);
 export const refParts = r => ({ ...INFLUENCE_PARTS, ...((r && r.parts) || {}) });
 export function referenceLook(ex, mode, cat = catalog(), parts = null) {
   if (!ex || !['recreate', 'influence'].includes(mode)) return null;
   const picks = referencePicks(ex, null, cat);
   for (const x of (ex.summary && ex.summary.suggestions) || []) { const it = cat.items[x.ref]; if (it && it.mode !== 'info') picks[x.ref] = 'allow'; }
-  if (mode === 'influence') { const on = { ...INFLUENCE_PARTS, ...(parts || {}) }; for (const r of Object.keys(picks)) { const it = cat.items[r], part = it && partOfKind(it.kind); if (part && on[part] === false) delete picks[r]; } }
+  if (mode === 'influence') { const on = { ...INFLUENCE_PARTS, ...(parts || {}) }; for (const r of Object.keys(picks)) { const part = partOf(cat.items[r]); if (part && on[part] === false) delete picks[r]; } }
   for (const r of Object.keys(picks)) if (!cat.items[r] || cat.items[r].mode === 'info') delete picks[r];
   const out = { picks };
   if (mode === 'recreate' && ex.preset && cat.packs.some(x => x.name === ex.preset)) out.pack = ex.preset;

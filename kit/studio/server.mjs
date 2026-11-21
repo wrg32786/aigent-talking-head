@@ -705,9 +705,14 @@ function teardownSteps(s, url) {
   if (!url && !s.reference.file) throw Object.assign(new Error('add a reference video or a link first'), { code: 400 });
   args.push('--out', out, '--name', `studio-${s.job}`);
   if (process.env.STUDIO_TEARDOWN_ARGS) args.push(...process.env.STUDIO_TEARDOWN_ARGS.split(' '));
-  return { steps: [['kit/teardown.mjs', args]], out };
+  const v = vlmOf(); if (v) args.push(...v.args);
+  return { steps: [['kit/teardown.mjs', args, v && v.env]], out };
 }
 
+// Studio asks for the reference's descriptions itself when a vision key is set (Gemini or OpenAI, kit/studio/keys.mjs):
+// they name the effects and transitions the measurements cannot (a spin, a light leak), made as REF scenes.
+// STUDIO_VLM=off turns it off. The teardown falls back to the measured read when the model call fails.
+function vlmOf() { if (/^(0|off|no)$/i.test(process.env.STUDIO_VLM || '')) return null; const env = KEYS.vlmEnv(); return env ? { args: ['--vlm', '--max-vlm-shots', '24'], env } : null; }
 // ---------- reference links: a queue, one download and teardown at a time ----------
 const TEARDOWN = process.env.STUDIO_TEARDOWN || 'kit/teardown.mjs';
 const relOf = p => (p.startsWith(ROOT + sep) ? p.slice(ROOT.length + 1) : p).split(sep).join('/');
@@ -745,7 +750,7 @@ function pump() {
   setItem(it.id, x => { x.status = 'downloading'; x.progress = 0; x.error = null; x.file = file; x.out = out.split(sep).join('/'); });
   try {
     runTask('reference', () => [['kit/studio/fetch.mjs', [it.url, '--out', file, '--max-seconds', max, '--json']],
-      [TEARDOWN, [file, '--out', out, '--name', `studio-${s.job}-r${it.id}`, ...(process.env.STUDIO_TEARDOWN_ARGS ? process.env.STUDIO_TEARDOWN_ARGS.split(' ') : [])]]], () => {
+      (v => [TEARDOWN, [file, '--out', out, '--name', `studio-${s.job}-r${it.id}`, ...(process.env.STUDIO_TEARDOWN_ARGS ? process.env.STUDIO_TEARDOWN_ARGS.split(' ') : []), ...(v ? v.args : [])], v && v.env])(vlmOf())], () => {
       const recipe = join(ROOT, out, 'Reel.md');
       if (!existsSync(recipe)) throw new Error('teardown wrote no Reel.md');
       const ex = C.extract(recipe);
