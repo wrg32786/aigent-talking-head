@@ -8,8 +8,19 @@ export const onToast = fn => { toastSubs.add(fn); return () => toastSubs.delete(
 // fix: fix ids (kit/studio/fixes.mjs) from an error; the toast then shows the fix buttons instead of a command
 export const toast = (msg, ok, fix) => toastSubs.forEach(fn => fn({ msg, ok, fix: fix ? [].concat(fix) : null, at: Date.now() }));
 
+// Studio stopped (closed, crashed or restarting): fetch gives the browser's bare "Failed to fetch". We say what happened
+// instead, and the page shows the Studio stopped bar until the server answers again (StudioOffline in App.jsx).
+export const OFFLINE_MSG = 'Studio is not running, so this could not load. Ask your agent to start Studio again.';
+const offSubs = new Set(); let offline = false;
+export const isOffline = () => offline;
+export const onOffline = fn => { offSubs.add(fn); return () => offSubs.delete(fn); };
+export const setOffline = v => { v = !!v; if (v === offline) return; offline = v; offSubs.forEach(fn => fn(v)); };
+
 export async function api(path, body, method) {
-  const r = await fetch(path, { method: method || (body === undefined ? 'GET' : 'POST'), headers: body !== undefined ? { 'content-type': 'application/json' } : {}, body: body !== undefined ? JSON.stringify(body) : undefined });
+  let r;
+  try { r = await fetch(path, { method: method || (body === undefined ? 'GET' : 'POST'), headers: body !== undefined ? { 'content-type': 'application/json' } : {}, body: body !== undefined ? JSON.stringify(body) : undefined }); }
+  catch { setOffline(true); throw new Error(OFFLINE_MSG); }
+  setOffline(false);
   const j = await r.json().catch(() => ({}));
   if (!r.ok) { toast(j.error || `request failed (${r.status})`, false, j.fix); throw new Error(j.error || r.status); }
   return j;

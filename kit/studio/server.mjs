@@ -124,7 +124,7 @@ function env() {
   return { llm: p ? `${p.name}${p.model ? ' (' + p.model + ')' : ''}` : null, backend, agent: CH.presence(), effectsReady: existsSync(join(ROOT, 'effects', '.venv')), port: PORT,
     settings: { downloads: st.downloads, renders: st.renders, actionNotes: st.actionNotes, agent: st.agent, chat: st.chat, from: st.from, defaultDownloads: 'teardown-in/studio/<job>/ (in the kit, not shared)', defaultRenders: 'jobs/<job>/ (in the kit)', defaultDownloadsPath: join(ROOT, 'teardown-in', 'studio'), defaultRendersPath: join(ROOT, 'jobs') },
     keys: { anthropic: KEYS.isSet('anthropic'), openai: KEYS.isSet('openai') }, broll: st.broll, localPresets: S.LOCAL_PRESETS,
-    tools: { ytdlp: t.ytdlp ? t.ytdlp.version : null, instaloader: t.instaloader, ffmpeg: t.ffmpeg }, install: F.INSTALL, setup: setupBrief(), fixes: FX.all(), refParts: C.REF_PARTS.map(({ id, label }) => ({ id, label })), influenceParts: C.INFLUENCE_PARTS };
+    tools: { ytdlp: t.ytdlp ? t.ytdlp.version : null, instaloader: t.instaloader, ffmpeg: t.ffmpeg }, install: F.INSTALL, setup: setupBrief(), fixes: FX.all(), restart: FX.restartPrompt(), refParts: C.REF_PARTS.map(({ id, label }) => ({ id, label })), influenceParts: C.INFLUENCE_PARTS };
 }
 // every view carries a rising seq (and this run's boot id) so the page can drop a reply that is older than an event it
 // already applied, e.g. a POST answer that lands after the SSE state for a download that failed right away
@@ -1418,6 +1418,11 @@ server.on('error', async e => {
   console.error(`Port ${PORT} is in use by another program. Start Studio on another port: npm run studio -- --port 4758`);
   process.exit(1);
 });
+// an error in a background job (a download, transcript, teardown or a callback after one) is logged and Studio keeps
+// running. Before 1.27.2 it stopped the whole server, and the open page only said "Failed to fetch" on every click.
+const keepRunning = (kind, e) => { console.error(`Studio kept running after ${kind}: ${(e && e.stack) || e}`); if (!server.listening) process.exit(1); };
+process.on('uncaughtException', e => keepRunning('an error', e));
+process.on('unhandledRejection', e => keepRunning('a failed promise', e));
 // a task, download, transcript or generate still marked running was cut off when Studio last stopped
 if (C.settleStale(C.load())) update(st => { C.settleStale(st); });
 // a take still marked recording or converting was cut off when Studio last stopped

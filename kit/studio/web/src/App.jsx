@@ -3,7 +3,7 @@ import { Theme } from '@astryxdesign/core/theme';
 import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';
 import { aigentTheme } from './theme.js';
-import { api, toast, onToast, STEPS, stepName, stepOf, lookSubOf, Icon, IconBtn, cap1 } from './lib.jsx';
+import { api, toast, onToast, onOffline, setOffline, isOffline, STEPS, stepName, stepOf, lookSubOf, Icon, IconBtn, cap1 } from './lib.jsx';
 import { YourEdit } from './Edit.jsx';
 import { BRoll } from './BRoll.jsx';
 import { Keys } from './Keys.jsx';
@@ -19,7 +19,7 @@ import { Chat } from './Chat.jsx';
 import { Settings } from './Settings.jsx';
 import { MoreMenu } from './ui.jsx';
 import { PicksTray } from './Picks.jsx';
-import { Connect } from './Connect.jsx';
+import { Connect, copyText } from './Connect.jsx';
 // the AIgent wordmark (from the AIgent brand's assets/Marks): one file per ground, never one colour
 import wordmarkDark from './brand/aigent-wordmark-for-dark.svg';
 import wordmarkLight from './brand/aigent-wordmark-for-white.svg';
@@ -100,6 +100,9 @@ export function App() {
       es.addEventListener('state', e => apply(JSON.parse(e.data)));
       es.addEventListener('log', e => { const d = JSON.parse(e.data); setLog(l => (l ? l + '\n' : '') + d.line); });
       es.addEventListener('task', () => api('/api/state').then(apply).catch(() => {}));
+      // the live line drops when Studio stops: check once, so the Studio stopped bar shows before anyone clicks
+      es.addEventListener('error', () => { fetch('/api/state', { cache: 'no-store' }).then(r => { if (r.ok) setOffline(false); }).catch(() => setOffline(true)); });
+      es.addEventListener('open', () => { if (isOffline()) { setOffline(false); api('/api/state').then(apply).catch(() => {}); } });
     })();
     const onHash = () => { const m = hashMenu(), st = hashStep(); if (m) { setStep('look'); setLookSub('style'); setTab(m); } else if (st && STEPS.includes(stepOf(st))) go(st, true); };
     const onKey = e => {
@@ -109,7 +112,7 @@ export function App() {
     return () => { es && es.close(); removeEventListener('hashchange', onHash); document.removeEventListener('keydown', onKey); };
   }, [apply, go, setLookSub]);
 
-  if (!CAT || !V) return <Theme theme={aigentTheme} mode={theme}><div className="boot" role="status"><span className="spin" aria-hidden="true" />Loading Studio</div><Toast /></Theme>;
+  if (!CAT || !V) return <Theme theme={aigentTheme} mode={theme}><div className="boot" role="status"><span className="spin" aria-hidden="true" />Loading Studio</div><StudioOffline onBack={() => location.reload()} /><Toast /></Theme>;
 
   const s = V.state, t = V.task, running = t && t.status === 'running';
   const picksAny = Object.values(s.picks).some(p => p.allow.length || p.deny.length);
@@ -185,6 +188,7 @@ export function App() {
       <NewVideo {...ctx} mode={videoMode} setMode={setVideoMode} />
       <Outputs {...ctx} open={outputsOpen} setOpen={setOutputsOpen} />
       <Wizards {...ctx} open={wizOpen} setOpen={setWizOpen} />
+      <StudioOffline onBack={apply} prompt={V.env.restart} />
       <Toast V={V} />
     </Theme>
   );
@@ -213,6 +217,28 @@ function JobName({ s, patch }) {
 }
 
 // a toast with fix ids stays longer and shows the fix buttons (web/src/Fix.jsx) under the message
+// Studio stopped while the page was open (the window that ran it closed, the PC slept, or it crashed). Every click would
+// say "Failed to fetch", so we say it once, plainly, with a prompt for the agent, and reconnect by ourselves when it is back.
+// the instruction comes from the server (kit/studio/fixes.mjs restartPrompt) and is kept from the last state; before
+// Studio ever loaded we only have plain words
+const RESTART_PLAIN = 'AIgent Studio stopped. Start it again from my aigent-talking-head folder, then tell me when the page is back.';
+function StudioOffline({ onBack, prompt }) {
+  const [off, setOff] = useState(isOffline()), back = useRef(onBack); back.current = onBack;
+  useEffect(() => onOffline(setOff), []);
+  useEffect(() => {
+    if (!off) return;
+    const t = setInterval(async () => {
+      try { const r = await fetch('/api/state', { cache: 'no-store' }); if (!r.ok) return; const j = await r.json(); setOffline(false); back.current && back.current(j); toast('Studio is back.', true); } catch {}
+    }, 2000);
+    return () => clearInterval(t);
+  }, [off]);
+  if (!off) return null;
+  return <div className="offline glass" id="studio-offline" role="alert">
+    <p><b>Studio stopped.</b> Nothing can load or save until it runs again. Ask your agent to start it; this page reconnects by itself.</p>
+    <Button size="sm" variant="primary" label="Copy for my agent" icon={<Icon n="copy" />} onClick={() => copyText(prompt || RESTART_PLAIN, 'Copied. Paste it into your agent.')} />
+  </div>;
+}
+
 function Toast({ V }) {
   const [t, setT] = useState(null);
   useEffect(() => { let timer; const off = onToast(x => { setT(x); clearTimeout(timer); timer = setTimeout(() => setT(null), x.fix ? 15000 : 4200); }); return () => { off(); clearTimeout(timer); }; }, []);

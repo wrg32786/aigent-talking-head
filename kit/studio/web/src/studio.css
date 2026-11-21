@@ -1257,3 +1257,7 @@ button.rp-made { cursor: pointer; } button.rp-made:hover { background: color-mix
 .pk-more:hover { color: var(--foreground); border-color: var(--primary); }
 .pk-f { display: flex; justify-content: flex-end; gap: 6px; padding-top: 8px; border-top: 1px solid var(--border); }
 .pk-f .btn { font: inherit; font-size: 13px; cursor: pointer; border: 0; border-radius: 999px; }
+/* ---------- Studio stopped (the server went away while the page was open) ---------- */
+.offline { position: fixed; left: 50%; top: calc(var(--top, 64px) + 12px); transform: translateX(-50%); z-index: 60; width: min(560px, calc(100vw - 24px)); display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--border); border-left: 3px solid var(--destructive); background: var(--popover); color: var(--foreground); box-shadow: var(--shadow); font-size: 14px; animation: rise .2s ease-out; }
+.offline p { margin: 0; flex: 1; }
+@media (max-width: 560px) { .offline { flex-direction: column; align-items: stretch; } }
