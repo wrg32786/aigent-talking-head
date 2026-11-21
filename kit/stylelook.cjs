@@ -120,15 +120,17 @@ function fromTeardown(dir, opts = {}) {
   const cut = shots.filter(s => s.cutaway), cards = (recipe.graphics || []).filter(g => (g.type || g['type~']) === 'screen-card');
   const name = slug(opts.name || recipe.card.name || path.basename(td)) || 'look';
   const tl = (recipe.titles || []);
+  // the font the teardown matched (Reel.md Style font, font-face, font-match; Brand kit fonts): captions and titles share it
+  const font = st['font-match'] && !none(br.fonts) && br.fonts !== 'theme' ? { pairing: br.fonts, kind: st.font || null, face: st['font-face'] || null, match: st['font-match'] } : null;
   return {
     version: VERSION, kind: KIND, name,
     from: { reference: (recipe.card.source && recipe.card.source.file) || null, teardown: recipe.card.name || path.basename(td), duration: dur },
     created: opts.created || new Date().toISOString(),
     framing: framingOf(shots),
     grade: { target: GM.pool(labs, shots.map(s => s.dur)), shots: labs.filter(Boolean), finish: none(st.finish) ? null : st.finish, skin: GM.SKIN },
-    captions: { style: captionStyle, look: none(st.look) ? null : st.look, font: null, size: subs.length ? r3(median(subs.map(c => c.line_h))) : null, position: st['caption-position'] || null, color: st['caption-color'] || null,
+    captions: { style: captionStyle, look: none(st.look) ? null : st.look, font, size: subs.length ? r3(median(subs.map(c => c.line_h))) : null, position: st['caption-position'] || null, color: st['caption-color'] || null,
       outline: st['caption-outline'] || null, shadow: st['caption-shadow'] || null, case: st['caption-case'] || null, layer: st['caption-layer'] || null, entrance: st['caption-entrance'] || null, wordsPerCue, accent: require('./recreate.cjs').accentFor({ colors }) },
-    titles: { on: !/^(off|no|false)$/i.test(String(st.titles || 'on')), font: null, size: null, entrances: [...new Set(tl.map(t => t.entrance).filter(Boolean))], layer: st['title-layer'] || 'front', colors, count: tl.length, perMin: dur ? r2(tl.length / dur * 60) : 0, seconds: tl.length ? r2(median(tl.map(t => t.end - t.start))) : null },
+    titles: { on: !/^(off|no|false)$/i.test(String(st.titles || 'on')), font, size: null, entrances: [...new Set(tl.map(t => t.entrance).filter(Boolean))], layer: st['title-layer'] || 'front', colors, count: tl.length, perMin: dur ? r2(tl.length / dur * 60) : 0, seconds: tl.length ? r2(median(tl.map(t => t.end - t.start))) : null },
     stickers: stickersOf(recipe.graphics || [], dur),
     transitions: { default: none(st.transition) ? 'cut' : st.transition, glitch: /^(on|yes|true)$/i.test(String(st.glitch || '')), mix: shares(shots.slice(1).map(s => (s.transition && !none(s.transition) ? s.transition : 'cut'))) },
     moves: { push: r2(shots.filter(s => s.move === 'push').length / (shots.length || 1)), pull: r2(shots.filter(s => s.move === 'pull').length / (shots.length || 1)), drift: r2(shots.filter(s => s.move === 'drift').length / (shots.length || 1)),

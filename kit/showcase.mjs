@@ -572,6 +572,20 @@ function loadExistingStills() {
 }
 
 
+// a font pairing added since the last full run: just its still, drawn the same way as in refreshTypeStills
+function missingFontStills(py, work, put, menu) {
+  const todo = menu.sections.find(s => s.id === 'fonts').items.filter(fo => !existsSync(join(OUT, 'media', 'font', fo.id + '.jpg')));
+  if (!todo.length) return;
+  PERSON = presenterPath(); MASK = existsSync(PRESENTER_MASK) ? PRESENTER_MASK : null;
+  const build = join(work, 'type-fonts'); mkdirSync(build, { recursive: true });
+  for (const fo of todo) {
+    const out = join(OUT, 'media', 'font', fo.id + '.jpg');
+    try { writeFileSync(join(build, 'captions.js'), 'window.CAPTIONS=' + JSON.stringify(captionsDoc('kinetic', fo.id)) + ';\n'); typeStill(build, 1.0, { THEME: 'aigent', FONTS: fo.id }, out); }
+    catch (e) { console.warn('font ' + fo.id + ' failed, using card: ' + e.message.split('\n')[0]); cardStill(py, work, 'font', fo.id, fo.label, out); }
+    put(fo.kind, fo.id, out); console.log('font still ' + fo.id);
+  }
+}
+
 function refreshTypeStills(py, work, stills, put, menu) {
   PERSON = presenterPath();
   MASK = existsSync(PRESENTER_MASK) ? PRESENTER_MASK : null;
@@ -776,6 +790,7 @@ async function rebuildFromStills() {
     renderTransitionStills(work, PERSON, put, menu, missing('transition'));
     try { refreshEntranceStills(work, stills, put, menu, missing('entrance')); }
     catch (e) { console.warn('entrances refresh failed: ' + (e.message || e).toString().split('\n')[0]); }
+    missingFontStills(py, work, put, menu);
   }
   console.log('graphics');
   renderGraphicStills(work, put, menu);

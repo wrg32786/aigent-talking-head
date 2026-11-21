@@ -11,7 +11,7 @@ const { themeFor, jobTransition } = require('./palette.cjs');
 const colourless = b => [].concat((b.packaging && b.packaging.brands) || [], (b.video_context && b.video_context.brands) || []).map(x => typeof x === 'string' ? x : x && (x.name || x.text)).filter(Boolean);
 
 function recipeMd(c) {
-  const { b, opts, src, name, dur, engine, shots, titles, graphics, extraG, sfx, lines, cs, look, colours, bpm, level, hasMusic, bed, jobFinish, layerDefault, zoomShots, jumpCuts, avgShot, big } = c;
+  const { b, opts, src, name, dur, engine, shots, titles, graphics, extraG, sfx, lines, cs, look, font, colours, bpm, level, hasMusic, bed, jobFinish, layerDefault, zoomShots, jumpCuts, avgShot, big } = c;
   const card = {
     videomd: 1, name,
     description: `Recipe torn down from ${src.file || 'a reference reel'}: ${shots.length} shots in ${dur}s, ${titles.length} big titles, ${cs.style} captions${bpm ? `, music near ${Math.round(bpm)} BPM` : ''}. Measured by ${engine}; finishes, entrances and layers are best guesses.`,
@@ -21,9 +21,11 @@ function recipeMd(c) {
   const L = ['---', RM.dumpYaml(card).trimEnd(), '---', '', `# Teardown: ${src.file || name}`, '',
     'Detected from the reference. Read the teardown report next to this file, change anything that looks wrong, then remake:',
     `\`npm run reel -- --recipe ${opts.recipePath || 'teardown/' + name + '/Reel.md'} --clip inbox/your-clip.mp4\``, '',
-    '## Brand kit', '- preset: auto', `- theme: ${themeFor(colours)}`, `- colors: ${colours.join(', ') || 'none'}`, '- fonts: theme', '- logo: none', '',
+    '## Brand kit', '- preset: auto', `- theme: ${themeFor(colours)}`, `- colors: ${colours.join(', ') || 'none'}`, `- fonts: ${font ? font.pairing : 'theme'}`, '- logo: none', '',
     '## Music', `- bed: ${!hasMusic ? 'none' : bed ? bed.name : 'auto'}`, ...(hasMusic && bed && level && level.vol ? [`- bed-volume: ${level.vol}`] : []), `- bpm: ${bpm ? Math.round(bpm) : ''}`, `- beat-sync: ${hasMusic ? 'on' : 'off'}`, '',
-    '## Style', `- look: ${look}`, `- captions: ${cs.style}`, ...(cs.position ? [`- caption-position: ${cs.position}`] : []), ...(cs.color ? [`- caption-color: ${cs.color}`] : []), ...(cs.outline ? [`- caption-outline: ${cs.outline}`] : []), ...(cs.shadow ? [`- caption-shadow: ${cs.shadow}`] : []), ...(cs.textCase && cs.style === 'one-word' ? [`- caption-case: ${cs.textCase}`] : []), ...(cs.layer ? [`- caption-layer: ${cs.layer}`] : []), `- titles: ${titles.length ? 'on' : 'off'}`, `- title-layer: ${layerDefault}`,
+    '## Style', `- look: ${look}`, `- captions: ${cs.style}`, ...(cs.position ? [`- caption-position: ${cs.position}`] : []), ...(cs.color ? [`- caption-color: ${cs.color}`] : []), ...(cs.outline ? [`- caption-outline: ${cs.outline}`] : []), ...(cs.shadow ? [`- caption-shadow: ${cs.shadow}`] : []), ...(cs.textCase && cs.style === 'one-word' ? [`- caption-case: ${cs.textCase}`] : []), ...(cs.layer ? [`- caption-layer: ${cs.layer}`] : []),
+    // the font read from the words on screen, matched to a pairing we ship (kit/fontmatch.py); the pairing itself is Brand kit fonts
+    ...(font ? [`- font: ${[font.category, font.weight].filter(Boolean).join(' ')}`, `- font-face: ${font.face}`, `- font-match: ${font.match}`] : []), `- titles: ${titles.length ? 'on' : 'off'}`, `- title-layer: ${layerDefault}`,
     `- finish: ${jobFinish ? jobFinish.split(',').join(', ') : 'none'}`, `- transition: ${jobTransition(shots)}`, `- glitch: ${shots.some(s => s.tx && s.tx.name === 'glitch') ? 'on' : 'off'}`,
     `- punch: ${zoomShots || jumpCuts || avgShot < 3 ? 'on' : 'off'}`, '- effects: none', '',
     '## Shots', '', '```videomd-timeline'];

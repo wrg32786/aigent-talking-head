@@ -129,7 +129,7 @@ export function defaultState() {
     reference: { file: null, url: null, mode: 'influence', status: 'none', out: null, extracted: null, applied: false, queue: [], active: null },
     pack: null, picks: {}, music: { bed: 'auto', energy: 'auto', upload: null }, sound: { sfx: 'on', cap: 'on' }, pace: { tighten: null, punch: 'on' },
     export: 'reels', sizes: [], chat: [], task: null, outputs: [], takes: [], output: null, cut: null, tx: {}, lines: {}, broll: {},
-    finish: { from: 'auto', reel: true, clips: false, plain: false }, drafted: null, styleLook: null, point: '' };
+    finish: { from: 'auto', reel: true, clips: false, plain: false }, drafted: null, styleLook: null, point: '', fontLock: false };
 }
 export function load() {
   try { const s = JSON.parse(readFileSync(statePath(), 'utf8')); return oneBed({ ...defaultState(), ...s, reference: { ...defaultState().reference, ...(s.reference || {}) } }); }
@@ -199,7 +199,7 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
     if (p.pack && !cat.packs.some(x => x.name === p.pack)) errs.push(`pack: no pack named "${p.pack}" (${cat.packs.map(x => x.name).join(', ')})`);
     else { s.pack = p.pack || null; log.push(s.pack ? `pack ${s.pack}` : 'no pack'); }
   }
-  if (p.clearPicks) { s.picks = {}; log.push('cleared every pick'); }
+  if (p.clearPicks) { s.picks = {}; s.fontLock = false; log.push('cleared every pick'); }
   for (const [ref, how] of Object.entries(p.picks || {})) {
     const it = cat.items[ref];
     if (!it) { errs.push(`no such effect "${ref}" (use kind:id from the catalog, e.g. transition:whip)`); continue; }
@@ -220,6 +220,8 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
     if (how === 'allow') { if (it.mode === 'one') slot.allow = []; slot.allow.push(it.id); }
     if (how === 'deny') { if (it.mode === 'one') { errs.push(`${ref}: pick another one instead of forbidding this`); continue; } slot.deny.push(it.id); }
     log.push(`${how === 'clear' ? 'cleared' : how === 'allow' ? 'picked' : 'forbade'} ${it.kind} ${it.id}`);
+    // a font you pick yourself holds over a reference's font from here on (the lock); taking your last one back hands it back
+    if (it.kind === 'font' && !nested) s.fontLock = slot.allow.length > 0;
     // you took back or forbade a pick the reference set: it is yours now, and Back to my look leaves it alone
     if (how !== 'allow' && s.reference && s.reference.added) s.reference.added = s.reference.added.filter(x => x !== ref);
   }
@@ -252,7 +254,7 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
   if (p.styleLook !== undefined) {
     const n = p.styleLook === null || p.styleLook === '' ? null : p.styleLook;
     if (n !== null && !SLK.exists(n)) errs.push(`styleLook: no saved look named "${n}"${SLK.list().length ? ` (${SLK.list().map(x => x.name).join(', ')})` : ''}`);
-    else if (n !== (s.styleLook || null)) { s.styleLook = n; log.push(n ? `style look ${n}` : 'no style look'); }
+    else if (n !== (s.styleLook || null)) { s.styleLook = n; if (n) clearFontPick(s); /* a saved look brings its own font */ log.push(n ? `style look ${n}` : 'no style look'); }
   }
   if (p.clips !== undefined) { const c = p.clips ? slash(p.clips) : null; if (c && (c.includes('..') || !existsSync(join(resolve(ROOT, c), 'clips.json')))) errs.push(`clips: no clips.json in ${c}`); else if (c !== s.clips) { s.clips = c; log.push(c ? `clips folder ${c}` : 'clips folder cleared'); } }
   // footage: reorder or drop files the job already has (state.footage), or add a file already in the job's inbox
@@ -354,7 +356,12 @@ export function compose(s, { refPack = null } = {}) {
   if (one('look')) args.push('--look', one('look'));
   if (one('theme')) args.push('--theme', one('theme'));
   if (one('titleLayer')) args.push('--title-layer', one('titleLayer'));
-  const fonts = s.picks.font && s.picks.font.allow.filter(f => f !== 'theme'); if (fonts && fonts.length) args.push('--fonts', fonts.join(','));
+  // fonts: yours, unless a reference's style is being copied (Recreate, Copy the look, a saved look) and you have not
+  // picked a font since. Then the font the teardown matched is used and an older pick is never sent.
+  { const mine = (s.picks.font && s.picks.font.allow) || [], fonts = mine.filter(f => f !== 'theme'), copied = copiesStyle(s.reference) || (!!s.styleLook && !(s.reference && s.reference.mode !== 'off' && s.reference.extracted));
+    if (copied && !s.fontLock) { if (mine.length) notes.push('fonts: the reference sets them; pick a font on Text and graphics to use yours instead'); }
+    else if (fonts.length) args.push('--fonts', fonts.join(','));
+    else if (copied && mine.includes('theme')) args.push('--fonts', 'theme'); }
   if (one('beatSync') === 'no-beat-sync') args.push('--no-beat-sync');
   const ed = s.picks.editing || { allow: [], deny: [] }, on = id => ed.allow.includes(id), off = id => ed.deny.includes(id);
   if (on('cards-auto') || on('colour-card') || on('chapter-card')) args.push('--cards', 'auto');
@@ -401,7 +408,7 @@ export function lockStringOf(l) {
 // ---------- reference ----------
 // kit/studio/reference.mjs: extract, referenceLook, influencePack and the rest of what a reference gives Studio
 export * from './reference.mjs';
-import { REF_PARTS, refParts, referencePicks, setReferenceLook } from './reference.mjs';
+import { REF_PARTS, refParts, referencePicks, setReferenceLook, copiesStyle, clearFontPick, syncRefFont } from './reference.mjs';
 
 // a pack whose style must sit inside its locks (pack validate refuses a style transition outside them)
 export function fitStyle(pack) {
@@ -526,6 +533,7 @@ export function freshSession(s, { job = null, keepLook = true } = {}) {
   const look = {}; if (keepLook) for (const k of LOOK_KEYS) if (s[k] !== undefined) look[k] = clone(s[k]);
   for (const k of Object.keys(s)) delete s[k];
   Object.assign(s, d, keep, look, { job: job || null, keepLook: !!keepLook });
+  clearFontPick(s); // a font pick belongs to the video it was made for: it never rides into the next one
   // Clip-specific pause exceptions are edit decisions, not a reusable pace setting.
   if (s.pace.keepPauses) delete s.pace.keepPauses;
   return s;
@@ -625,6 +633,7 @@ export function resetEdit(s, { keepLook = s.keepLook === true } = {}) {
   delete s.cleanup;
   s.output = null;
   s.reference = clone(d.reference);
+  clearFontPick(s); // and so does the font picked for it
   delete s.undoRef;
   delete s.lastChange; // its Undo belongs to the old video
   s.finish = clone(d.finish);

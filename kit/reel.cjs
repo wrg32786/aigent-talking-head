@@ -237,7 +237,11 @@ const LOOK_STYLE = { kinetic: 'kinetic', oneword: 'oneword', muse: 'pill', class
 const STYLE = opt('style', (!lookFlag && preset && preset.captionStyle) || LOOK_STYLE[look]);
 if (STYLE && !P.STYLES.includes(STYLE)) die('--style must be ' + P.STYLES.join(', '));
 const TITLES = flag('no-titles') ? false : (flag('titles') ? true : (!lookFlag && preset && preset.titles !== undefined ? !!preset.titles : look !== 'classic'));
-const FONTS = opt('fonts') || (!lookFlag && preset && preset.fonts) || (look === 'oneword' ? 'instrument,literata,bricolage' : undefined);
+// The font a teardown read from the reference (Reel.md Style font-match, Brand kit fonts; kit/fontmatch.py) is part of what
+// Recreate and Copy the look copy, so it holds under an explicit --look too. Only --fonts, your own pick, goes over it.
+const REFFONT = recipe && recipe.style && recipe.style['font-match'] && preset && preset.fonts && preset.fonts !== 'theme' ? preset.fonts : null;
+const FONTS = opt('fonts') || REFFONT || (!lookFlag && preset && preset.fonts) || (look === 'oneword' ? 'instrument,literata,bricolage' : undefined);
+if (REFFONT) console.log(opt('fonts') ? `fonts: ${opt('fonts')} (your pick; the reference reads as ${recipe.style.font || 'unknown'}, our ${REFFONT})` : `fonts: ${REFFONT} from the reference (${recipe.style.font || 'kind not read'}, ${recipe.style['font-match']})`);
 const name = opt('name') || (src ? path.basename(src).replace(/\.[^.]+$/, '') : path.basename(path.resolve(clipsArg || '.')))
   .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'reel';
 const job = path.resolve(opt('jobs', path.join(ROOT, 'jobs')), name), build = path.join(job, 'build');
@@ -742,7 +746,7 @@ if (!flag('rebuild')) {
     // build/match.json: how close this draft is to what it copies, per part (kit/fidelity.cjs; an estimate from the plan)
     if (RECUT) {
       const len = RC.lengthOf(cutNow.segs), target = LOOK ? FID.targetOfLook(LOOK, { len, skipped: RECUT.skipped.length, planned: LOOKPLAN.plan.length }) : FID.targetOfRecipe(recipe, { k: SCALE.k, len, skipped: RECUT.skipped.length });
-      const m = FID.write(build, FID.measure({ mode: plan.mode, plan, cut: cutNow, caps: capsNow, grade: MATCH && MATCH.grade, target }));
+      const m = FID.write(build, FID.measure({ mode: plan.mode, plan, cut: cutNow, caps: { ...capsNow, fonts: capsNow.fonts || FONTS || 'theme' }, grade: MATCH && MATCH.grade, target }));
       console.log(FID.line(m));
     } else FID.drop(build);
   } else { RC.dropPlan(build); FID.drop(build); }

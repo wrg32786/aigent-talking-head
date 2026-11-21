@@ -1,8 +1,9 @@
 {
- "note": "Font pairings: pick one with --fonts <name> (reel.cjs), FONTS=<name> (render.mjs) or \"fonts\": \"<name>\" in captions.js. Roles: display = hero words and titles, secondary = body words and pills, script = the one accent word per phrase (optional). Every file here is SIL OFL 1.1 from Google Fonts, committed unmodified with its OFL text. Your own licensed fonts (Druk, Helvetica...) go in kit/fonts/local/ with a kit/fonts/local/pairings.json in this same shape; that folder is gitignored and never committed. 'theme' keeps the theme's own fonts. lockup = how the two faces sit together in one title or caption: arrange stack|overlap|inline, partner script|secondary, scale = partner size / hero size (scriptBoost multiplies it for a script partner, whose small x-height reads smaller), partnerUpper/partnerTracking (em)/justify for tracked caps, anchor right|center and rotate (deg) and drop (partner baseline below the hero, in partner sizes) for overlap, heroColor/partnerColor accent|text|#hex.",
+ "note": "Font pairings: pick one with --fonts <name> (reel.cjs), FONTS=<name> (render.mjs) or \"fonts\": \"<name>\" in captions.js. Roles: display = hero words and titles, secondary = body words and pills, script = the one accent word per phrase (optional). Every file here is SIL OFL 1.1 from Google Fonts, committed unmodified with its OFL text. Your own licensed fonts (Druk, Helvetica...) go in kit/fonts/local/ with a kit/fonts/local/pairings.json in this same shape; that folder is gitignored and never committed. 'theme' keeps the theme's own fonts. lockup = how the two faces sit together in one title or caption: arrange stack|overlap|inline, partner script|secondary, scale = partner size / hero size (scriptBoost multiplies it for a script partner, whose small x-height reads smaller), partnerUpper/partnerTracking (em)/justify for tracked caps, anchor right|center and rotate (deg) and drop (partner baseline below the hero, in partner sizes) for overlap, heroColor/partnerColor accent|text|#hex. category = what the hero face is (sans, serif, condensed, blackletter): kit/fontmatch.py matches the type in a reference video to the nearest pairing by it.",
  "pairings": {
   "theme": null,
   "modern": {
+   "category": "sans",
    "about": "heavy caps grotesk + script tail overlapping its baseline (stand-in for a modern bold sans + Constane)",
    "display": {
     "family": "Archivo Black",
@@ -38,6 +39,7 @@
    }
   },
   "druk": {
+   "category": "sans",
    "about": "WIDE heavy caps + a small tracked clean-sans caps line justified to it (free stand-in for Druk Wide + Helvetica)",
    "display": {
     "family": "Unbounded",
@@ -63,7 +65,9 @@
     "partnerColor": "text"
    }
   },
-  "elegant": { "contrast": "low",
+  "elegant": {
+   "category": "serif",
+   "contrast": "low",
    "about": "classical serif caps + formal script crossing it (free stand-in for Optitimes + Sloop)",
    "display": {
     "family": "Marcellus",
@@ -98,7 +102,9 @@
     "scriptBoost": 1.35
    }
   },
-  "editorial": { "contrast": "low",
+  "editorial": {
+   "category": "serif",
+   "contrast": "low",
    "about": "condensed serif italic hero + roman text serif support (free stand-in for Vanguard + Athelas)",
    "display": {
     "family": "Instrument Serif",
@@ -126,6 +132,7 @@
    }
   },
   "literata": {
+   "category": "sans",
    "about": "Archivo Black + Literata: heavy caps grotesk over a quiet serif line. Clean; good for hooks and titles",
    "display": {
     "family": "Archivo Black",
@@ -152,6 +159,7 @@
    }
   },
   "bricolage": {
+   "category": "sans",
    "about": "Bricolage Grotesque + Gloock: a characterful bold grotesk with a high-contrast display serif. Clean; good for hooks and titles",
    "display": {
     "family": "Bricolage Grotesque",
@@ -179,6 +187,7 @@
    }
   },
   "pirata": {
+   "category": "blackletter",
    "about": "Pirata One + Nunito Sans: blackletter hero over a quiet bold sans line",
    "display": {
     "family": "Pirata One",
@@ -206,6 +215,7 @@
    }
   },
   "michroma": {
+   "category": "sans",
    "about": "Michroma + Cardo: wide techno caps with a classical italic underneath",
    "display": {
     "family": "Michroma",
@@ -233,6 +243,7 @@
    }
   },
   "redhat": {
+   "category": "sans",
    "about": "Red Hat Display + Red Hat Mono: heavy display sans over tracked mono caps",
    "display": {
     "family": "Red Hat Display",
@@ -259,6 +270,7 @@
    }
   },
   "jakarta": {
+   "category": "sans",
    "about": "Plus Jakarta Sans + Ribeye: clean bold sans with a playful display script on top. For Instagram Edits style reels",
    "display": {
     "family": "Plus Jakarta Sans",
@@ -294,6 +306,7 @@
    }
   },
   "grotesk-times": {
+   "category": "sans",
    "about": "tight bold grotesk + a book serif (free stand-in for ID Grotesk + Times)",
    "display": {
     "family": "Hanken Grotesk",
@@ -321,6 +334,7 @@
    }
   },
   "avantgarde": {
+   "category": "sans",
    "about": "geometric caps + a soft fat serif (free stand-in for Avant Garde + Cooper)",
    "display": {
     "family": "League Spartan",
@@ -347,6 +361,7 @@
    }
   },
   "recoleta": {
+   "category": "serif",
    "about": "soft old-style serif + small tracked grotesk caps (free stand-in for Recoleta + Berthold)",
    "display": {
     "family": "Fraunces",
@@ -374,6 +389,7 @@
    }
   },
   "haas": {
+   "category": "sans",
    "about": "one neo-grotesk, heavy over regular (free stand-in for Neue Haas Grotesk Display + Helvetica Neue)",
    "display": {
     "family": "Inter Tight",
@@ -401,6 +417,7 @@
    }
   },
   "wabbit": {
+   "category": "sans",
    "about": "heavy caps grotesk + a cartoon brush (free stand-in for Archivo Black + Wascally Wabbit). For Instagram Edits style reels",
    "display": {
     "family": "Archivo Black",
@@ -436,6 +453,7 @@
    }
   },
   "instrument": {
+   "category": "serif",
    "about": "Instrument Serif Italic + Inter Tight: a condensed italic serif for the key word over a clean grotesk for the rest. The oneword look's pairing",
    "display": {
     "family": "Instrument Serif",
@@ -463,6 +481,7 @@
    }
   },
   "playfair": {
+   "category": "serif",
    "about": "Playfair Display + Inter Tight, with Playfair Display Italic as the accent: three faces in one phrase (a serif hero or numeral, one italic serif word, sans for the rest). The magazine preset's first pairing",
    "display": {
     "family": "Playfair Display",
@@ -497,6 +516,7 @@
    }
   },
   "dmserif": {
+   "category": "serif",
    "about": "DM Serif Display + Manrope, with DM Serif Display Italic as the accent: a high-contrast serif hero or numeral, one italic serif word, a rounded sans for the rest",
    "display": {
     "family": "DM Serif Display",
@@ -528,6 +548,33 @@
     "partnerColor": "text",
     "accent": "script",
     "accentScale": 1.3
+   }
+  },
+  "anton": {
+   "category": "condensed",
+   "about": "Anton + Inter Tight: tall condensed caps over a clean grotesk line. The condensed pairing a reference with narrow heavy type is matched to",
+   "display": {
+    "family": "Anton",
+    "file": "Anton-Regular.ttf",
+    "weight": 400,
+    "tracking": 0,
+    "upper": true
+   },
+   "secondary": {
+    "family": "Inter Tight",
+    "file": "InterTight-VF.ttf",
+    "weight": 600
+   },
+   "script": null,
+   "lockup": {
+    "arrange": "stack",
+    "partner": "secondary",
+    "scale": 0.4,
+    "partnerUpper": false,
+    "partnerTracking": 0,
+    "justify": false,
+    "heroColor": "text",
+    "partnerColor": "text"
    }
   }
  }

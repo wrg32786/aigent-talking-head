@@ -47,6 +47,8 @@ export function extract(recipePath) {
     name: (r.card && r.card.name) || basename(dirname(recipePath)), shots: (r.shots || []).length, titles: (r.titles || []).length,
     preset: br.preset && br.preset !== 'none' ? br.preset : null, look: st.look || null, captionStyle: st.captions || null,
     transitions: tcount, entrances: real('entrance', entrances), finishes: real('finish', finishes), graphics: real('graphic', graphics), effects: real('effect', effects),
+    // the font read from the words on screen and matched to a pairing we ship (kit/fontmatch.py), or null
+    font: st['font-match'] && br.fonts && !/^(none|theme)$/i.test(String(br.fonts)) ? { pairing: String(br.fonts).split(',')[0].trim(), kind: st.font || null, face: st['font-face'] || null, match: String(st['font-match']).toLowerCase() } : null,
     music: { bed: mu.bed && !/^(none|auto)$/i.test(mu.bed) ? mu.bed : null, ...(mu.bed === 'none' ? { noBed: true } : {}), energy: mu.energy || null, beatSync: mu['beat-sync'] || null }, punch: st.punch || null,
     ran: ranOf(dirname(recipePath), r),
     // what was made for the menu from it (kit/scenes.cjs), and what Recreate re-cuts and brings: its shot plan, framing, cutaways and sounds
@@ -172,11 +174,36 @@ export function undoReferenceLook(s) {
   r.added = []; r.prev = null; r.auto = null;
   return n;
 }
+// ---------- the font and a reference ----------
+// Recreate and Copy the look copy the reference's style, and its font is part of that. A font you picked before the
+// reference (in the video before this one, or earlier in this one) never goes over it: when a reference whose style we
+// copy comes into use, the old font pick is cleared (kept aside for Back to my look) and nothing is locked. A font you
+// pick after that is yours and holds (state.fontLock), until the next reference or the next video.
+export const copiesStyle = r => !!r && ['recreate', 'look'].includes(r.mode) && !!(r.extracted || r.out);
+const refKey = r => (r && (r.out || r.active || r.url || r.file)) || null;
+export function clearFontPick(s) { const had = ((s.picks && s.picks.font && s.picks.font.allow) || []).slice(); if (s.picks && s.picks.font) delete s.picks.font; s.fontLock = false; return had; }
+export function syncRefFont(s) {
+  const r = s.reference; if (!r) return;
+  const key = copiesStyle(r) ? refKey(r) : null;
+  if (key && r.fontFor !== key) { const had = clearFontPick(s); if (had.length && !r.prevFont) r.prevFont = had; r.fontFor = key; }
+  else if (!key && r.fontFor) { // back to your own look (Off, Influence, or the reference is gone): your earlier font comes back
+    if (r.prevFont && !((s.picks.font && s.picks.font.allow) || []).length) s.picks.font = { allow: r.prevFont.slice(), deny: [] };
+    r.prevFont = null; r.fontFor = null; s.fontLock = false;
+  }
+}
+// what the page says on the Fonts layer: whose font the next draft uses when a reference's style is being copied
+export function refFontOf(s, lookFont = null) {
+  const r = s.reference, ref = copiesStyle(r), look = !ref && !!s.styleLook; if (!ref && !look) return null;
+  const f = ref ? (r.extracted && r.extracted.font) || null : lookFont;
+  return { from: ref ? 'reference' : 'look', locked: !!s.fontLock, font: f };
+}
+
 // sets the Look from the reference for its mode, after taking out what an earlier mode or reference set.
 // Returns { mode, n, pack, bed, at } (reference.auto, what the page's notice reads) or null when nothing was set.
 export function setReferenceLook(s, cat = catalog()) {
   const r = s.reference; if (!r) return null;
   if ((r.added && r.added.length) || r.prev || r.auto) undoReferenceLook(s);
+  syncRefFont(s);
   const p = referenceLook(r.extracted, r.mode, cat, r.parts); if (!p) return null;
   const had = allowedRefs(s), prev = { one: {} };
   for (const ref of Object.keys(p.picks)) { const it = cat.items[ref]; if (it.kind !== 'bed' && it.mode === 'one') { const k = it.kind === 'editing' ? 'editing' : it.kind; prev.one[k] = ((s.picks[k] && s.picks[k].allow) || []).slice(); } }
