@@ -2,6 +2,15 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.27.1 (unreleased)
+
+Release notes: [docs/releases/v1.27.1.md](docs/releases/v1.27.1.md). Fixes from Fable's final review of Recreate, and a live test.
+
+- **A failed file teardown no longer blocks Recreate.** A reference file whose teardown failed, was cancelled or was cut off by a restart stayed "running", and Draft refused every Recreate draft while it waited. It now goes back to ready, uploaded or none (`settleReference` in `kit/studio/core.mjs`, on the task's end and at startup).
+- **A queued link starts after a restart.** Studio starts the reference queue when it starts listening, so a link left queued does not hold up a Recreate draft.
+- **Honest labels with the glitch off.** When the recipe turns the glitch off, the choices list says "hard cut (glitch off: the reference does not glitch)" and the recipe summary says "transition cut (glitch off)", not the glitch default (`kit/choices.cjs`, `kit/reelmd.cjs`). The render was already right.
+- **Tests.** `tests/studio-videos.test.mjs`: a cut off or failed file teardown is not left running.
+
 ## 1.27.0 (unreleased)
 
 Release notes: [docs/releases/v1.27.0.md](docs/releases/v1.27.0.md). Recreate code split into small modules, and one plan file per draft (built with Fable).

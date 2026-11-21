@@ -708,8 +708,15 @@ export function videoBusy(s) {
   return null;
 }
 // work Studio was doing when it last stopped can never finish: mark it, so it does not block switching videos forever
+// a file teardown that failed, was cancelled or was cut off: the file is still here to break down again. Left as
+// "running" it would refuse every Recreate draft (kit/studio/server.mjs refWait). True when it changed something.
+export function settleReference(s) {
+  const r = s.reference; if (!r || r.status !== 'running') return false;
+  r.status = r.extracted ? 'ready' : r.file ? 'uploaded' : 'none'; return true;
+}
 export function settleStale(s) {
   let n = 0; const stop = (x, status, error) => { Object.assign(x, { status, ...(error ? { error } : {}) }); n++; };
+  if (settleReference(s)) n++;
   if (s.task && s.task.status === 'running') stop(s.task, 'cancelled');
   for (const x of s.imports || []) if (x.status === 'downloading') stop(x, 'failed', 'Studio stopped during this download');
   for (const x of refRunning(s)) stop(x, 'failed', 'Studio stopped while reading this reference');

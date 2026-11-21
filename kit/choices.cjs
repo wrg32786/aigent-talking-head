@@ -48,14 +48,15 @@ function explain(b) {
     if (i === 0) { row.transition = null; row.transitionWhy = 'first shot'; }
     else if (s.jump) { row.transition = 'cut'; row.transitionWhy = 'jump inside a line (a tightened pause stays a hard cut)'; }
     else {
-      row.transition = s.transition || null;
-      const v = s.transition || 'glitch';
+      const off = cut.glitch === false; // glitch off (a recipe whose reference does not glitch): a plain hard cut
+      row.transition = s.transition || (off ? 'cut' : null);
+      const v = s.transition || (off ? 'cut' : 'glitch');
       row.transitionWhy = (you.transitions || []).includes(i) ? 'you'
         : cut.weights && cut.weights.transitions && locks.transitions && locks.transitions.includes(v) ? (sn || 'style') + ' weighted pick (' + locks.transitions.join(', ') + ')'
         : locks.transitions && locks.transitions.includes(v) && v !== ps.transition ? 'locked (' + locks.transitions.join(', ') + ')'
           : s.transition && ps.transition === s.transition ? sn || 'style'
             : s.transition && cut.recipe ? 'recipe'
-              : s.transition ? 'set in cut.json' : 'kit default: hard cut with the glitch seam';
+              : s.transition ? 'set in cut.json' : off ? 'hard cut (glitch off' + (cut.recipe ? ': the reference does not glitch)' : ')') : 'kit default: hard cut with the glitch seam';
     }
     const fin = s.finish != null ? s.finish : cut.finish != null ? cut.finish : null;
     row.finish = s.finish != null ? s.finish : null;

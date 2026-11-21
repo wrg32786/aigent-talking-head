@@ -459,7 +459,7 @@ function summary(r) {
   return [`recipe: ${r.card.name} (${r.shots.length} shots, ${r.titles.length} titles, ${r.card.source && r.card.source.duration}s)`,
     `brand: preset ${r.brand.preset || 'none'}, theme ${p.theme || 'aigent'}, fonts ${p.fonts || 'theme'}${p.colors ? ', colors ' + p.colors.join(' ') : ''}`,
     `music: bed ${p.bed || 'none'}, beat-sync ${p.beatSync === false ? 'off' : p.beatSync || p.bed ? 'on (when a bed is set)' : 'off'}${p.bpm ? ', ~' + p.bpm + ' BPM in the reference' : ''}`,
-    `style: look ${p.look || 'kinetic'}, captions ${p.captionStyle || 'kinetic'}, title layer ${p.titleLayer || 'front'}, finish ${p.finishPool ? 'vary across shots: ' + p.finishPool.join('/') : p.finish || 'none'}, transition ${p.transition || 'glitch'}`,
+    `style: look ${p.look || 'kinetic'}, captions ${p.captionStyle || 'kinetic'}, title layer ${p.titleLayer || 'front'}, finish ${p.finishPool ? 'vary across shots: ' + p.finishPool.join('/') : p.finish || 'none'}, transition ${p.transition || (p.glitch === false ? 'cut (glitch off)' : 'glitch')}`,
     ...(p.captionPosition || p.captionColor || p.captionOutline ? [`captions at ${p.captionPosition || 'the default band'}${p.captionColor ? ', colour ' + p.captionColor : ''}${p.captionOutline ? ', outline ' + p.captionOutline : ''}${p.captionShadow ? ', shadow ' + p.captionShadow : ''}${p.captionCase ? ', case ' + p.captionCase : ''}`] : []),
     ...r.titles.map(t => `  title #${pad2(t.n)} ${t.start}-${t.end}s ${t.entrance || 'any entrance'}, ${t.layer || 'job layer'}: ${t.text || ''}`),
     ...(r.cards || []).map(c => `  card #${pad2(c.n)} ${c.start}-${c.end}s ${c.bg || 'olive'}${c.chapter != null ? ', chapter ' + c.chapter : ''}`),
