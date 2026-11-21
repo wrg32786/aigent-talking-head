@@ -41,6 +41,12 @@ try {
   ok(one.lines === 1 && !one.partner, `one big word alone is one line (${one.lines})`);
   const other = frame([], ['--key', '347 Days', '--partner', "THAT'D KEEP ME GOING FOR"]);
   ok(other.lines === 2 && other.key.italic && other.partner.case === 'upper', `another title of the same look reads the same ("347 Days": ${other.lines} lines, italic ${other.key.italic})`);
+  // the OCR often reads only the big word: the small line just above it is still found, and its capitals read from the letters' shapes
+  const keyOnly = frame(['--key-box']);
+  ok(keyOnly.lines === 2 && keyOnly.partner && keyOnly.partner.place === 'above' && keyOnly.partner.color === '#ffffff' && keyOnly.partner.case === 'upper', `with only the key word's box and text, the partner line is still read (${JSON.stringify(keyOnly.partner)})`);
+  ok(keyOnly.key.category === 'serif' && keyOnly.key.italic && keyOnly.glow >= 0.12, 'and the key word reads the same');
+  const keyAlone = frame(['--key-box', '--one']);
+  ok(keyAlone.lines === 1, 'one word alone with room round it is still one line');
   // ---- every title folded into one look
   const sf = join(dir, 'rows.json'); writeFileSync(sf, JSON.stringify([ref, other, one, null]));
   const sum = py(['summary', '--json', sf]);

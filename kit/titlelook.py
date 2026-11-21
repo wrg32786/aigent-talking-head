@@ -9,7 +9,8 @@ A teardown already finds each title (kit/teardown/titles.cjs: its text, box and 
 summary() folds every title into one look for the recipe (Reel.md Style title-lockup, title-key, title-partner,
 title-glow, title-dim). Nothing leaves the machine: OpenCV reads, Pillow draws the test frames.
   python kit/titlelook.py read --image frame.png --bbox x,y,w,h --text "IF WE MADE/$30K" [--before before.png]
-  python kit/titlelook.py frame --out frame.png [--plain] [--no-glow] [--no-dim] [--one]     a test frame and its bbox
+  python kit/titlelook.py frame --out frame.png [--plain] [--no-glow] [--no-dim] [--one] [--key-box]   a test frame and its bbox
+      (--key-box: only the big word's box and text, as the OCR often reads a title)
 teardown.py calls read_video(video, titles, shots, frame_at) and writes the result to extras.json as "title_look".
 """
 import argparse, json, math, os, sys
@@ -181,59 +182,90 @@ def glow_of(crop, mask, color_bgr):
     return round(max(0.0, min(1.0, (la - lb) / (lc - lb))), 3)
 
 
+def _case_shape(m):
+    """upper or lower from the letters' shapes when the words were not read: in capitals every letter is as tall as the
+    line; in lower case most are the x-height. None when there are too few letters to say."""
+    import cv2, numpy as np
+    n, lab, st, _ = cv2.connectedComponentsWithStats(m.astype(np.uint8), 8)
+    hs = [st[i, cv2.CC_STAT_HEIGHT] for i in range(1, n) if st[i, cv2.CC_STAT_AREA] >= 8 and st[i, cv2.CC_STAT_WIDTH] >= 2]
+    if len(hs) < 4:
+        return None
+    full = sum(h >= 0.82 * m.shape[0] for h in hs) / len(hs)
+    return "upper" if full >= 0.8 else "lower" if full <= 0.55 else None
+
+
 def read(img, bbox, text, before=None):
-    """One title. img: the frame with the title up (BGR). bbox: [x, y, w, h] in fractions of the frame. text: the OCR
-    text, lines joined with "/". before: a frame of the same shot with no title, for the dim. Returns a dict or None."""
+    """One title. img: the frame with the title up (BGR). bbox: [x, y, w, h] in fractions of the frame: the key word's
+    box, or the whole title's. text: the OCR text, lines joined with "/". before: a frame of the same shot with no
+    title, for the dim. Returns a dict, or None when no letters are found there.
+    The OCR often reads only the big word, so we also look just above and just below its box for a small line of one
+    colour, centred on it: the partner line."""
     import cv2, numpy as np
     if img is None or not bbox:
         return None
     H, W = img.shape[:2]
     x, y, w, h = bbox
     px, py = 0.03, 0.02
-    x0, y0, x1, y1 = int(max(0, (x - px) * W)), int(max(0, (y - py) * H)), int(min(W, (x + w + px) * W)), int(min(H, (y + h + py) * H))
+    said = [s.strip() for s in str(text or "").split("/") if s.strip()]
+    grow = 0.0 if len(said) >= 2 else min(0.09, max(0.045, 0.6 * h))  # room for a partner line the OCR did not join to the key word
+    x0, x1 = int(max(0, (x - px) * W)), int(min(W, (x + w + px) * W))
+    y0, y1 = int(max(0, (y - py - grow) * H)), int(min(H, (y + h + py + grow) * H))
+    by0, by1 = int(max(0, (y - py) * H)) - y0, int(min(H, (y + h + py) * H)) - y0  # the given box, in crop rows
     crop = img[y0:y1, x0:x1]
     if crop.size == 0 or crop.shape[0] < 16 or crop.shape[1] < 16:
         return None
     m = letter_mask(crop)
-    bands = row_bands(m)
-    if not bands:
-        return None
-    said = [s.strip() for s in str(text or "").split("/") if s.strip()]
     lines = []
-    for a, z in bands:
+    for a, z in row_bands(m):
         mm = m[a:z]
         xs = np.where(mm.sum(axis=0) > 0)[0]
         if not len(xs):
             continue
-        cx0, cx1 = max(0, xs.min() - 2), min(mm.shape[1], xs.max() + 3)
         core, col = core_mask(crop[a:z], mm)
         ys2 = np.where(core.sum(axis=1) > 0)[0]
-        ca, cz = (a + int(ys2.min()), a + int(ys2.max()) + 1) if len(ys2) else (a, z)
-        lines.append({"y0": ca, "y1": cz, "h": cz - ca, "mask": core[ca - a:cz - a, cx0:cx1], "full": core, "row": a, "bgr": col, "color": _snap(col)})
-    if not lines:
+        xs2 = np.where(core.sum(axis=0) > 0)[0]
+        if not len(ys2) or not len(xs2):
+            continue
+        ca, cz = a + int(ys2.min()), a + int(ys2.max()) + 1
+        cx0, cx1 = int(xs2.min()), int(xs2.max()) + 1
+        lines.append({"y0": ca, "y1": cz, "h": cz - ca, "x0": cx0, "x1": cx1, "mask": core[ca - a:cz - a, cx0:cx1], "full": core, "row": a, "bgr": col, "color": _snap(col),
+                      "share": float(core.sum()) / max(1, int(mm.sum()))})
+    inbox = [l for l in lines if l["y1"] > by0 and l["y0"] < by1 and min(l["y1"], by1) - max(l["y0"], by0) >= 0.5 * l["h"]]
+    if not inbox:
         return None
-    # two lines when the letters sit on two rows of clearly different height (a caption-size line and a big word), or
-    # when the OCR read two lines; more rows than that is a block of text, kept as its two tallest
-    if len(lines) > 2:
-        lines = sorted(sorted(lines, key=lambda l: -l["h"])[:2], key=lambda l: l["y0"])
-    two = len(lines) == 2
-    key = max(lines, key=lambda l: l["h"])
+    if len(said) >= 2:
+        # the OCR read the lines together: the two tallest rows in the box
+        pick = sorted(sorted(inbox, key=lambda l: -l["h"])[:2], key=lambda l: l["y0"])
+        key = max(pick, key=lambda l: l["h"])
+        partner = next((l for l in pick if l is not key), None)
+    else:
+        key = max(inbox, key=lambda l: l["h"])
+        kcx, kw = (key["x0"] + key["x1"]) / 2.0, key["x1"] - key["x0"]
+        # a partner line: small against the key word, close to it, centred on it, letters of one colour (a busy
+        # picture behind gives rows of many colours, which core_mask thins out)
+        cand = [l for l in lines if l is not key and 0.1 * key["h"] <= l["h"] <= 0.62 * key["h"] and l["h"] >= 0.012 * H
+                and min(abs(l["y1"] - key["y0"]), abs(l["y0"] - key["y1"])) <= 0.6 * key["h"] and (l["y1"] <= key["y0"] + 0.15 * key["h"] or l["y0"] >= key["y1"] - 0.15 * key["h"])
+                and abs((l["x0"] + l["x1"]) / 2.0 - kcx) <= 0.2 * kw and 0.12 * kw <= l["x1"] - l["x0"] <= 1.15 * kw and l["share"] >= 0.6]
+        partner = min(cand, key=lambda l: min(abs(l["y1"] - key["y0"]), abs(l["y0"] - key["y1"]))) if cand else None
+    two = partner is not None
     out = {"lines": 2 if two else 1, "said_lines": len(said) or 1}
-    ki = lines.index(key)
-    ktext = said[ki] if len(said) == len(lines) else (max(said, key=len) if said and not two else (said[-1] if said else ""))
+    if len(said) >= 2 and two:
+        ktext, ptext = (said[1], said[0]) if partner["y0"] < key["y0"] else (said[0], said[1])
+    else:
+        ktext, ptext = (said[0] if said else ""), ""
     kc, kface, ksc = _kind(key["mask"], ktext)
     sl = slant(key["mask"])
     out["key"] = {"category": kc, "face": kface, "score": ksc, "italic": sl >= 0.11, "slant": sl, "case": _case(ktext), "color": key["color"], "h": round(key["h"] / H, 4)}
     if two:
-        p = lines[1 - ki]
-        ptext = said[1 - ki] if len(said) == 2 else ""
-        pc, pface, psc = _kind(p["mask"], ptext)
-        out["partner"] = {"category": pc, "face": pface, "score": psc, "italic": slant(p["mask"]) >= 0.11, "case": _case(ptext) if ptext else None, "color": p["color"],
-                          "place": "above" if p["y0"] < key["y0"] else "below", "scale": round(p["h"] / max(1, key["h"]), 3)}
+        pc, pface, psc = _kind(partner["mask"], ptext)
+        out["partner"] = {"category": pc, "face": pface, "score": psc, "italic": slant(partner["mask"]) >= 0.11, "case": _case(ptext) if ptext else _case_shape(partner["mask"]), "color": partner["color"],
+                          "place": "above" if partner["y0"] < key["y0"] else "below", "scale": round(partner["h"] / max(1, key["h"]), 3)}
     # the glow, read on the key line with room round it
     gy0, gy1 = max(0, key["y0"] - key["h"]), min(crop.shape[0], key["y1"] + key["h"])
     gm = np.zeros((gy1 - gy0, crop.shape[1]), np.uint8)
-    gm[key["row"] - gy0:key["row"] - gy0 + key["full"].shape[0]] = key["full"]
+    r0 = key["row"] - gy0
+    seg = key["full"][max(0, -r0):max(0, -r0) + (gm.shape[0] - max(0, r0))]
+    gm[max(0, r0):max(0, r0) + seg.shape[0]] = seg
     out["glow"] = glow_of(crop[gy0:gy1], gm, key["bgr"])
     if before is not None and before.shape == img.shape:
         g1, g0 = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).astype(np.float32), cv2.cvtColor(before, cv2.COLOR_BGR2GRAY).astype(np.float32)
@@ -268,6 +300,9 @@ def summary(rows):
     if is_two:
         out["partner"] = {"category": _most([r["partner"]["category"] for r in two]), "case": _most([r["partner"]["case"] for r in two]), "color": _most([r["partner"]["color"] for r in two]),
                           "place": _most([r["partner"]["place"] for r in two]), "scale": round(float(np.median([r["partner"]["scale"] for r in two])), 3)}
+    # glow and dim are read on the titles that make the look (the two-line ones when that is the lockup): a caption word
+    # picked up as a title has neither and must not vote them away
+    rows = src
     gl = [r["glow"] for r in rows if r.get("glow") is not None]
     g = float(np.median(gl)) if gl else 0.0
     out["glow"] = round(g, 3) if g >= GLOW_MIN else 0
@@ -278,32 +313,76 @@ def summary(rows):
     return out
 
 
-def read_video(video, titles, shots, frame_at):
+def partner_cue(t, cues):
+    """The OCR's own cue for a title's small line, when it read one: on screen with the title, just above or below its
+    box, across the same part of the frame, a good deal smaller."""
+    if not t.get("bbox"):
+        return None
+    x, y, w, h = t["bbox"]
+    best = None
+    for c in cues or []:
+        bb = c.get("bbox")
+        if not bb or not c.get("text") or abs(bb[1] - y) < 1e-4 and abs(bb[3] - h) < 1e-4:
+            continue
+        c0, c1 = c.get("t0", 0), c.get("t1") or c.get("t0", 0)
+        ov = min(c1, t["end"]) - max(c0, t["start"])
+        if ov < 0.5 * min(c1 - c0, t["end"] - t["start"]) or ov <= 0:
+            continue
+        lh = c.get("line_h") or bb[3]
+        if not (0.1 * h <= lh <= 0.62 * h):
+            continue
+        gap = min(abs(bb[1] + bb[3] - y), abs(bb[1] - (y + h)))
+        if gap > 0.6 * h or not (bb[1] + bb[3] <= y + 0.2 * h or bb[1] >= y + h - 0.2 * h):
+            continue
+        if abs((bb[0] + bb[2] / 2) - (x + w / 2)) > 0.2 * w:
+            continue
+        if best is None or gap < best[0]:
+            best = (gap, c)
+    return best[1] if best else None
+
+
+def read_video(video, titles, shots, frame_at, cues=None):
     """titles: the teardown's titles.json rows ({start, end, bbox, text}). shots: the breakdown's shots ({start, end}).
-    frame_at(video, t, width) -> BGR. Returns {"rows": [per title or None], "look": summary or None}."""
+    cues: the breakdown's text cues, to find a partner line the OCR read on its own. frame_at(video, t, width) -> BGR.
+    A cue's times are coarse (the OCR looks twice a second), so the title is read in the middle of its time and, when
+    its letters are not there, a little earlier and later. Returns {"rows": [per title or None], "look": summary or None}."""
     rows = []
     for t in titles or []:
         try:
             if not t.get("bbox"):
                 rows.append(None); continue
             t0, t1 = float(t["start"]), float(t["end"])
-            img = frame_at(video, min(t1 - 0.08, t0 + max(0.45, min(0.9, (t1 - t0) * 0.6))), 720)
+            bbox, text = list(t["bbox"]), str(t.get("text", ""))
+            pc = partner_cue(t, cues) if "/" not in text else None
+            if pc:
+                pb = pc["bbox"]
+                x0, y0 = min(bbox[0], pb[0]), min(bbox[1], pb[1])
+                x1, y1 = max(bbox[0] + bbox[2], pb[0] + pb[2]), max(bbox[1] + bbox[3], pb[1] + pb[3])
+                text = (str(pc["text"]) + "/" + text) if pb[1] < bbox[1] else (text + "/" + str(pc["text"]))
+                bbox = [x0, y0, x1 - x0, y1 - y0]
             # a frame of the same shot with no title up: just before it, else just after
             sh = next((s for s in shots or [] if s["start"] <= t0 < s["end"]), None)
             before = None
-            for tb in (t0 - 0.3, t1 + 0.3):
-                if sh and sh["start"] + 0.05 <= tb <= sh["end"] - 0.05 and not any(o is not t and o["start"] - 0.1 <= tb <= o["end"] + 0.1 for o in titles):
+            for tb in (t0 - 0.35, t1 + 0.35):
+                if sh and sh["start"] + 0.05 <= tb <= sh["end"] - 0.05 and not any(o is not t and o.get("bbox") and o["start"] - 0.1 <= tb <= o["end"] + 0.1 and o["bbox"][1] < bbox[1] + bbox[3] and bbox[1] < o["bbox"][1] + o["bbox"][3] for o in titles):
                     before = frame_at(video, tb, 720); break
-            rows.append(read(img, t["bbox"], t.get("text", ""), before))
+            got = None
+            for f in (0.5, 0.38, 0.62, 0.75, 0.25):
+                r = read(frame_at(video, t0 + (t1 - t0) * f, 720), bbox, text, before)
+                if r and (got is None or (r["key"]["score"] or 0) > (got["key"]["score"] or 0)):
+                    got = r
+                if r and r["key"]["category"]:
+                    break
+            # letters that are not the words the OCR read there: the title was not up on any frame we looked at
+            rows.append(got if got and got["key"]["category"] else None)
         except Exception as e:  # one unreadable title never stops the teardown
             print(f"note: title look not read at {t.get('start')}s: {e}")
             rows.append(None)
-    slim = [None if r is None else {k: v for k, v in r.items()} for r in rows]
-    return {"rows": slim, "look": summary(rows)}
+    return {"rows": rows, "look": summary(rows)}
 
 
 # ---- test frames ----
-def test_frame(plain=False, glow=True, dim=True, one=False, w=720, h=1280, key_text="$30K", partner_text="IF WE MADE", seed=3):
+def test_frame(plain=False, glow=True, dim=True, one=False, key_box=False, w=720, h=1280, key_text="$30K", partner_text="IF WE MADE", seed=3):
     """A frame like the reference in the report: a small white sans line in caps over one big yellow word in an italic
     serif, glowing, on a darkened picture. plain: both lines in one upright sans, white. Returns (frame, before, bbox)."""
     import cv2, numpy as np
@@ -342,7 +421,8 @@ def test_frame(plain=False, glow=True, dim=True, one=False, w=720, h=1280, key_t
     bx0, by0, bx1, by1 = (kb if one else (min(kb[0], pb[0]), min(kb[1], pb[1]), max(kb[2], pb[2]), max(kb[3], pb[3])))
     out = cv2.GaussianBlur(np.asarray(im.convert("RGB"))[:, :, ::-1].copy(), (0, 0), 0.7)
     ok, buf = cv2.imencode(".jpg", out, [cv2.IMWRITE_JPEG_QUALITY, 70])
-    return cv2.imdecode(buf, cv2.IMREAD_COLOR), before, [round(bx0 / w, 4), round(by0 / h, 4), round((bx1 - bx0) / w, 4), round((by1 - by0) / h, 4)]
+    box = lambda q: [round(q[0] / w, 4), round(q[1] / h, 4), round((q[2] - q[0]) / w, 4), round((q[3] - q[1]) / h, 4)]
+    return cv2.imdecode(buf, cv2.IMREAD_COLOR), before, (box(kb) if key_box else box((bx0, by0, bx1, by1)))
 
 
 def main():
@@ -350,14 +430,14 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("read"); r.add_argument("--image", required=True); r.add_argument("--bbox", required=True); r.add_argument("--text", default=""); r.add_argument("--before")
     f = sub.add_parser("frame"); f.add_argument("--out", required=True); f.add_argument("--plain", action="store_true"); f.add_argument("--no-glow", action="store_true")
-    f.add_argument("--no-dim", action="store_true"); f.add_argument("--one", action="store_true"); f.add_argument("--key", default="$30K"); f.add_argument("--partner", default="IF WE MADE")
+    f.add_argument("--no-dim", action="store_true"); f.add_argument("--one", action="store_true"); f.add_argument("--key-box", action="store_true"); f.add_argument("--key", default="$30K"); f.add_argument("--partner", default="IF WE MADE")
     s = sub.add_parser("summary"); s.add_argument("--json", required=True)
     a = ap.parse_args()
     import cv2
     if a.cmd == "frame":
-        img, before, bb = test_frame(plain=a.plain, glow=not a.no_glow, dim=not a.no_dim, one=a.one, key_text=a.key, partner_text=a.partner)
+        img, before, bb = test_frame(plain=a.plain, glow=not a.no_glow, dim=not a.no_dim, one=a.one, key_box=a.key_box, key_text=a.key, partner_text=a.partner)
         cv2.imwrite(a.out, img); cv2.imwrite(a.out.replace(".png", "-before.png"), before)
-        print(json.dumps({"bbox": bb, "text": a.key if a.one else a.partner + "/" + a.key})); return
+        print(json.dumps({"bbox": bb, "text": a.key if a.one or a.key_box else a.partner + "/" + a.key})); return
     if a.cmd == "summary":
         print(json.dumps(summary(json.load(open(a.json, encoding="utf-8"))))); return
     res = read(cv2.imread(a.image), [float(x) for x in a.bbox.split(",")], a.text, cv2.imread(a.before) if a.before else None)
