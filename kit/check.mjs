@@ -358,6 +358,15 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'starburst.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { sberrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'starburst sticker tests (tests/starburst.test.mjs: a spiky star read as a starburst with its point count, a disc as a seal, shape and spikes through the teardown mapping, Reel.md and the flips, the overlay drawing path)', errs: sberrs, warns: [] });
+    // Studio report 4 (camera moves, B-roll runs, the last piece, the breakdown's progress)
+    for (const [f, what] of [
+      ['motion.test.mjs', 'camera moves you can see (tests/motion.test.mjs: the move size measured per shot, carried in the recipe as move-size, sized by Subtle, Medium or Strong with Medium the default, sized again on a rebuild, the Studio control)'],
+    ]) {
+      const e2 = [];
+      try { execFileSync(process.execPath, [join(ROOT, 'tests', f)], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+      catch (e) { e2.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+      results.push({ label: what, errs: e2, warns: [] });
+    }
   }
   {
     const star = createRequire(import.meta.url)('./star.cjs');

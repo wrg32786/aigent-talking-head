@@ -115,6 +115,7 @@ Every section is optional except the card. Anything left out falls back to the p
 | transition | a name from `kit/transitions.json` | segment `transition` |
 | reframe | `on` (default) or `off` | with `--recut`: each shot is cropped to the reference's face size and eye line. `off` (or `--no-reframe`) keeps the punch by shot size |
 | grade-match | `on` (default) or `off` | with `--recut`: your take's colour is matched to the reference per shot with a 3D LUT, skin kept. `off` (or `--no-grade-match`) leaves your colour as it is. The finish is separate and still applies |
+| motion | `subtle`, `medium` (default) or `strong` | `--motion`: how big the camera moves in the shot list are drawn. Works on `--rebuild` too |
 | punch | `on`, `off`, or a zoom such as `0.12` (12%) | `--no-punch`; a number sets `cut.json` `punch` (every other cut punches in by that much) |
 | tighten | `off`, `on` (0.3) or the longest pause to keep in seconds | `--tighten` / `--no-tighten`: no dead air, a pause inside a line longer than this cuts to a jump (0.12 s of breath stays) |
 | cards | `auto` or `off` | `--cards`: colour cards on short lines to land, chapter cards and the number-pop intro on a counted list |
@@ -139,7 +140,8 @@ Every section is optional except the card. Anything left out falls back to the p
 | broll | with `cutaway on`: what the reference shows there, in a few words (`a screen recording of OmniRoute`) | the B-roll spot's idea and search, and its length is the shot's (`refShots` `broll`) |
 | face | where the speaker's face sits in the reference shot, written by a teardown when the speaker is on screen: `height@eye line` as shares of the frame, with an optional `@centre x` when the face is off centre (`0.16@0.32`, `0.16@0.32@0.46`). Measured with YuNet (`kit/framing.py`) | with `--recut`, that shot's crop: your take is measured the same way and each segment gets `zoom`, `punchX` and `punchY` so your face height and eye line match (see Reframe below). It replaces the `framing` punch for that shot |
 | lab | the shot's colour in Lab, written by a teardown: `L,a,b~L,a,b` (mean, then spread; `42.4,1.9,9.9~22.1,4.9,6.7`). Black shots, shots under 2 s and the reference's own graphics are left out | with `--recut`, the colour your take is matched to in that shot (see Grade match below) |
-| move | the camera inside the shot: `push` (a slow push-in), `pull` (a slow pull-out), `drift` (a gentle push, for a pan or a track) | that segment's `push` (zoom gained over the segment: 0.07, -0.07, 0.035) |
+| move | the camera inside the shot: `push` (a slow push-in), `pull` (a slow pull-out), `drift` (a gentle push, for a pan or a track) | that segment's `move` and `push` (the zoom gained over the segment), sized by the motion strength: Subtle 0.07, -0.07, 0.035; Medium (default) 0.12, -0.11, 0.08; Strong 0.18, -0.16, 0.12 |
+| move-size | the zoom the reference's own move gained, as a share (`0.035`); a teardown measures it (`kit/camera_move.py`) | the push is this size times 1, 1.6 or 2.2 (Subtle, Medium, Strong), held between 4 and 10, 8 and 16, or 12 and 24 percent so it shows on a talking head; kept on the segment as `moveRef` |
 | shake | `on`: a handheld or shaking camera, or a shake cut | a shake hit on the cut into that segment (`cut.json` `hits`) |
 | any `key~` | a guess, written by a teardown (VIDEO.md marks inferred keys with `~`) | not used by the render |
 

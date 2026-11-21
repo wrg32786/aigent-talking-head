@@ -321,6 +321,7 @@ The page changed its words; the tools, the API and the saved state kept their na
 | A clip your agent stitched from lines | a bite | `set_bites`, `render_bites` |
 | The point | `point` | read in `get_edit`, `get_cuts`, `get_pieces` and `studio_get_state`; set with `studio_set_selections` |
 | Pacing | `pace.tighten` (`off`, 0.45, 0.25) | `get_cuts` returns `pacing`; set with `studio_set_selections` |
+| Camera moves (Picture, Motion) | `pace.motion` (`subtle`, `medium`, `strong`; `null` is Medium) | set with `studio_set_selections`; shown when a reference or a saved look is in use |
 
 `set_output` sets What to make. `get_cuts` reads the take, the point, the pacing, the transcript as numbered sentences and the candidates (`find: true` runs our rules first), and `set_cuts` sends your picks (time ranges, a score and a reason each). `get_pieces` returns every line with its group, score and topics, `fits: true` on lines that serve the point, `best` (the lines we would pick) and the Combo. `get_lines` lists every line with keep and a retake hint, and `set_bites` sends named clips as line numbers in play order (`clean: true` adds one clean take of every kept line); they show on Clips with **By** and your agent's name.
 

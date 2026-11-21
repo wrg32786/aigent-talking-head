@@ -1342,6 +1342,7 @@ button.rp-made { cursor: pointer; } button.rp-made:hover { background: color-mix
 /* layers: this step's tabs on the left, search on the right */
 .bh .tabs { margin: 0; padding-bottom: 3px; }
 .layer-extra { margin: 4px 0 14px; }
+.layer-extra .motion-size { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; } .motion-size .lbl { margin: 0; }
 .lg-jump { margin-left: 10px; font-weight: 500; }
 .layer-bare > #tabhint { margin: 0 0 12px; }
 .fold2.step { margin-top: 0; }

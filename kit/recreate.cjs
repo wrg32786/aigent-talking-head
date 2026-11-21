@@ -44,17 +44,40 @@ function recut({ recipe, segs, segClip, clipsDir, manyClips = false, log = conso
   return rc;
 }
 
+// A camera move on a segment: "move" (push, pull, drift), "moveRef" (the reference's measured size, when it was
+// read) and "push" (what kit/assemble.cjs draws: the zoom gained, sized by the motion strength, kit/shotplan.cjs)
+function setMove(sg, move, motion, measured) {
+  const v = SPL.moveSize(move, motion, measured);
+  if (v == null) return;
+  Object.assign(sg, { move, push: v }); if (measured > 0) sg.moveRef = measured; else delete sg.moveRef;
+}
+// a new motion strength on segments already drafted (a rebuild): every move is sized again. Returns how many.
+function resizeMoves(segs, motion) {
+  let n = 0;
+  for (const sg of segs || []) if (sg.push != null && !sg.bigPunch) { const move = sg.move || (sg.push < 0 ? 'pull' : 'push'); setMove(sg, move, motion, sg.moveRef); n++; }
+  return n;
+}
+// one line for the build log
+function motionLine(segs, motion) {
+  const mv = (segs || []).filter(s => s.push != null && !s.bigPunch);
+  if (!mv.length) return `motion: ${motion}; the reference has no camera move to carry`;
+  const pc = v => Math.round(Math.abs(v) * 100) + '%', by = k => mv.filter(s => (s.move || (s.push < 0 ? 'pull' : 'push')) === k);
+  const part = k => { const a = by(k); if (!a.length) return null; const lo = Math.min(...a.map(s => Math.abs(s.push))), hi = Math.max(...a.map(s => Math.abs(s.push))); return `${a.length} ${k}${a.length === 1 ? '' : k === 'push' ? 'es' : 's'} of ${lo === hi ? pc(lo) : pc(lo) + ' to ' + pc(hi)}`; };
+  const read = mv.filter(s => s.moveRef > 0).length;
+  return `motion: ${motion}; ${['push', 'pull', 'drift'].map(part).filter(Boolean).join(', ')} on ${mv.length} of ${segs.length} pieces${read ? ` (${read} sized from the reference's own move)` : ''}`;
+}
+
 // The recipe's per-shot settings (finish, big punch, transition, move, shake) on the segments: on the re-cut shots
 // when rc is given, else on your clips in order (clipStart: the first segment of each clip). A finish goes on every
 // segment of the shot, the rest on its first. Returns the plan and the segments that start with a shake.
-function applyShotPlan({ recipe, segs, rc = null, clipStart = [], wantPunch = true }) {
+function applyShotPlan({ recipe, segs, rc = null, clipStart = [], wantPunch = true, motion = SPL.MOTION_DEFAULT }) {
   const plan = RM.shotSettings(recipe), shakeAt = [];
   const put = (p, k, next, notFirst) => {
     const sg = segs[k], subs = segs.slice(k, next ?? segs.length);
     if (p.finish) subs.forEach(x => { x.finish = p.finish; });
     if (p.bigPunch && wantPunch) sg.bigPunch = true;
     if (p.transition && notFirst) sg.transition = p.transition;
-    if (p.move && !sg.bigPunch) sg.push = SPL.MOVES[p.move];
+    if (p.move && !sg.bigPunch) setMove(sg, p.move, motion, p.moveSize);
     if (p.shake && notFirst) shakeAt.push(k);
   };
   if (rc) rc.shotStart.forEach((k, j) => put(plan[rc.shotOf[j]] || {}, k, rc.shotStart[j + 1], j));
@@ -162,7 +185,7 @@ function writeAccent(build, accent) {
 // build/plan.json: what a recipe draft took from the recipe, on your edit's clock. shots is the re-cut plan (the same
 // list as cut.json refShots; empty without --recut), scale is 1 when nothing was scaled.
 function planOf({ recipe, scale = null, rc = null, cut, shakes = [], sounds = [], flips = [], theme = null, accent = null, mode = null, look = null, broll = [] }) {
-  const segs = (cut && cut.segs) || [], moveName = v => Object.keys(SPL.MOVES).find(m => SPL.MOVES[m] === v) || null;
+  const segs = (cut && cut.segs) || [];
   const at = segs.map((s, i) => r3(startOf(segs, i)));
   return {
     version: PLAN_VERSION,
@@ -171,12 +194,13 @@ function planOf({ recipe, scale = null, rc = null, cut, shakes = [], sounds = []
     scale: rc && scale ? scale.k : 1,
     shots: rc ? rc.plan : [],
     transitions: segs.map((s, i) => (s.transition ? { t: at[i], name: s.transition } : null)).filter(Boolean),
-    moves: segs.map((s, i) => (s.push != null ? { t: at[i], move: moveName(s.push), push: s.push } : null)).filter(Boolean),
+    moves: segs.map((s, i) => (s.push != null ? { t: at[i], move: s.move || (s.push < 0 ? 'pull' : 'push'), push: s.push, ...(s.moveRef ? { measured: s.moveRef } : {}) } : null)).filter(Boolean),
     shakes: shakes.map(h => ({ t: h[0], strength: h[1] })),
     sounds: sounds.map(h => ({ id: h.id, t: h.t })),
     scenes: flips.filter(f => f.mode === 39).map(f => ({ start: f.start, end: f.end, scene: f.scene, ...(f.sceneName ? { name: f.sceneName } : {}) })),
     // where B-roll goes, what each slot should show and how it is treated; a slot with no clip is "needs" (kit/broll-slots.cjs)
     broll,
+    ...(cut && cut.motion ? { motion: cut.motion } : {}),
     theme, accent,
   };
 }
@@ -193,4 +217,4 @@ function shotsOf(build, cut) {
   return cut && Array.isArray(cut.refShots) ? cut.refShots : [];
 }
 
-module.exports = { quietFn, reframeShots, matchShots, sourceSize, scaleOf, lengthOf, recut, applyShotPlan, refSounds, refShakes, addShakes, scaleGraphics, titleSlots, accentFor, writeAccent, planOf, writePlan, dropPlan, readPlan, shotsOf, PLAN_FILE, PLAN_VERSION };
+module.exports = { setMove, resizeMoves, motionLine, quietFn, reframeShots, matchShots, sourceSize, scaleOf, lengthOf, recut, applyShotPlan, refSounds, refShakes, addShakes, scaleGraphics, titleSlots, accentFor, writeAccent, planOf, writePlan, dropPlan, readPlan, shotsOf, PLAN_FILE, PLAN_VERSION };
