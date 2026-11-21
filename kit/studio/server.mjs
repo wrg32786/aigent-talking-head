@@ -144,13 +144,18 @@ function view(s) {
 // what a finished draft says (a draft is a plan: no video until Render)
 const DRAFT_DONE = 'Plan ready, no video yet. Press Render.';
 // ---------- tasks (one at a time) ----------
-let task = null, seq = 0, activeRequests = 0;
+// Two lanes, one process each: `task` is the work you asked for (draft, render, cuts, install, a file teardown) and
+// `refTask` is the reference queue (one download and teardown at a time, hooks.lane 'reference'). A link that is still
+// downloading never refuses a Draft or a Render. The reference lane stays off the task pill and the task log: its
+// progress lives on the queue items.
+let task = null, refTask = null, seq = 0, activeRequests = 0;
 function runTask(kind, steps, done, hooks = {}) {
-  if (task && task.status === 'running') throw Object.assign(new Error(`busy: ${task.kind} is running`), { code: 409 });
-  task = { id: ++seq, kind, status: 'running', startedAt: Date.now(), lines: [], proc: null };
-  const me = task;
-  const log = l => { for (const x of String(l).split(/\r?\n/)) if (x.trim()) { me.lines.push(x.slice(0, 400)); if (me.lines.length > 400) me.lines.shift(); send('log', { id: me.id, line: x.slice(0, 400) }); if (hooks.line) try { hooks.line(x); } catch {} } };
-  update(s => { s.task = { id: me.id, kind, status: 'running' }; });
+  const lane = hooks.lane === 'reference', cur = lane ? refTask : task;
+  if (cur && cur.status === 'running') throw Object.assign(new Error(`busy: ${cur.kind} is running`), { code: 409 });
+  const me = { id: ++seq, kind, status: 'running', startedAt: Date.now(), lines: [], proc: null };
+  if (lane) refTask = me; else task = me;
+  const log = l => { for (const x of String(l).split(/\r?\n/)) if (x.trim()) { me.lines.push(x.slice(0, 400)); if (me.lines.length > 400) me.lines.shift(); if (!lane) send('log', { id: me.id, line: x.slice(0, 400) }); if (hooks.line) try { hooks.line(x); } catch {} } };
+  if (!lane) update(s => { s.task = { id: me.id, kind, status: 'running' }; });
   (async () => {
     let out = '';
     let si = 0;
@@ -177,7 +182,7 @@ function runTask(kind, steps, done, hooks = {}) {
       if (code !== 0) { me.status = 'failed'; me.result = { code }; break; }
     }
     if (me.status === 'running') { me.status = 'done'; try { me.result = (await done(out)) || {}; } catch (e) { me.status = 'failed'; log('error: ' + e.message); }  if (me.status === 'done' && kind === 'draft') log(DRAFT_DONE); }
-  })().finally(() => { me.endedAt = Date.now(); if (hooks.end) try { hooks.end(me.status, me.lines); } catch (e) { log('error: ' + e.message); } update(s => { s.task = { id: me.id, kind, status: me.status }; s.outputs = C.outputsOf(s); }); send('task', { id: me.id, status: me.status }); setImmediate(pump); });
+  })().finally(() => { me.endedAt = Date.now(); if (hooks.end) try { hooks.end(me.status, me.lines); } catch (e) { log('error: ' + e.message); } if (!lane) { update(s => { s.task = { id: me.id, kind, status: me.status }; s.outputs = C.outputsOf(s); }); send('task', { id: me.id, status: me.status }); } setImmediate(pump); });
   return me;
 }
 
@@ -186,6 +191,7 @@ function runTask(kind, steps, done, hooks = {}) {
 function busyWith(s) {
   if (activeRequests) return 'Studio is still saving a change';
   if (task && task.status === 'running') return `${task.kind === 'draft' ? 'A draft' : task.kind === 'render' ? 'A render' : 'A ' + task.kind} is running`;
+  if (refTask && refTask.status === 'running') return C.REF_BUSY;
   return C.videoBusy(s);
 }
 // { name, keepLook } starts a new video; { open: job } opens a past one (kit/studio/core.mjs switchVideo). The current
@@ -222,11 +228,21 @@ function lookSources(s, cat = C.catalog()) {
   if (ex) { for (const r of Object.keys(C.referencePicks(ex, null, cat))) ref.add(r); add(ref, 'look', ex.look); }
   const added = new Set((s.reference && s.reference.added) || []);
   for (const r of added) ref.add(r);
-  return { pack: [...pack], ref: [...ref], added: [...added], packName: s.pack || null, refName: ex ? (ex.name || null) : null };
+  // why the reference picked each one (its teardown's reasons, kit/studio/reference.mjs summarize), for the Look step
+  const why = Object.fromEntries(((ex && ex.summary && ex.summary.suggestions) || []).filter(x => ref.has(x.ref) && x.why).map(x => [x.ref, x.why]));
+  return { pack: [...pack], ref: [...ref], added: [...added], why, packName: s.pack || null, refName: ex ? (ex.name || null) : null };
+}
+// Recreate needs the reference's recipe: while it is still being read, Draft says so plainly (never a generic busy)
+function refWait(s) {
+  const r = s.reference || {}; if (r.mode !== 'recreate' || C.recreateRecipe(s, ROOT)) return null;
+  const it = (r.queue || []).find(x => C.REF_READING.includes(x.status));
+  const what = it ? (it.status === 'tearing' ? 'being broken down' : 'downloading') : r.status === 'running' ? 'being broken down' : null;
+  return what ? `The reference is still ${what}. Recreate needs it: draft again when it is ready, or set the reference to Off to draft without it.` : null;
 }
 function draftSteps(s) {
   if (!s.job) throw Object.assign(new Error('name the job first'), { code: 400 });
   if (!s.footage.length && !s.clips) throw Object.assign(new Error('add footage first'), { code: 400 });
+  const wait = refWait(s); if (wait) throw Object.assign(new Error(wait), { code: 409 });
   const recreate = C.recreateRecipe(s, ROOT); // Recreate: the reference's Reel.md, your take re-cut to it (kit/studio/reference.mjs)
   const ref = recreate ? null : writeRefPack(s);
   const comp = C.compose(s, { refPack: ref });
@@ -741,7 +757,7 @@ function addLinks(urls) {
   return added;
 }
 function pump() {
-  if (task && task.status === 'running') return;
+  if (refTask && refTask.status === 'running') return;
   const s = C.load(), it = (s.reference.queue || []).find(x => x.status === 'queued');
   if (!it || !s.job) return;
   const dir = refDir(s), file = join(dir, `ref-${it.id}.mp4`), out = join('teardown', `studio-${s.job}-r${it.id}`);
@@ -763,6 +779,7 @@ function pump() {
         const m = /^progress (\d+)%/.exec(l); if (m && +m[1] !== lastP && (+m[1] - lastP >= 5 || +m[1] === 100)) { lastP = +m[1]; setItem(it.id, x => { if (x.status === 'downloading') x.progress = lastP; }); }
         if (l.startsWith('{"file"')) { try { const j = JSON.parse(l); title = j.title; setItem(it.id, x => { x.title = j.title; x.seconds = j.seconds; x.trimmed = j.trimmed; }); } catch {} }
       },
+      lane: 'reference',
       end: (status, lines) => { if (status !== 'done') setItem(it.id, x => { if (x.status !== 'ready') { x.status = status === 'cancelled' ? 'cancelled' : 'failed'; const e = lines.filter(l => /download failed|error|Error|failed|not found/i.test(l) && !l.startsWith('$')).pop(); x.fix = F.fixOf(e); x.error = (e || lines[lines.length - 1] || 'failed').replace(/^download failed: /, '').slice(0, 300); } }); },
     });
   } catch (e) { setItem(it.id, x => { x.status = 'failed'; x.error = e.message; }); }
@@ -1057,7 +1074,7 @@ async function api(req, res, u) {
     if (b.action === 'use') { if (it.status !== 'ready') return json(res, 400, { error: 'that reference is not broken down yet' }); update(st => useItem(st, st.reference.queue.find(x => x.id === id))); }
     else if (b.action === 'retry') { if (['downloading', 'tearing'].includes(it.status)) return json(res, 409, { error: 'it is running' }); setItem(id, x => { x.status = 'queued'; x.error = null; x.progress = 0; const c = F.classify(x.url); const miss = c.ok ? F.missingFor(c, F.tools({ fresh: true })) : c.error; if (miss) { x.status = 'failed'; x.error = miss; } }); setImmediate(pump); }
     else if (b.action === 'remove') {
-      if (['downloading', 'tearing'].includes(it.status) && task && task.status === 'running' && task.kind === 'reference') { task.cancel = true; task.proc && task.proc.kill('SIGTERM'); }
+      if (['downloading', 'tearing'].includes(it.status) && refTask && refTask.status === 'running') { refTask.cancel = true; refTask.proc && refTask.proc.kill('SIGTERM'); }
       if (it.file && b.deleteFile !== false) rmSync(it.file, { force: true });
       update(st => { st.reference.queue = st.reference.queue.filter(x => x.id !== id); if (st.reference.active === id) { C.undoReferenceLook(st); } if (st.reference.active === id) st.reference = { ...st.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null }; });
     } else return json(res, 400, { error: 'action: use, retry or remove' });

@@ -3,11 +3,13 @@
 //   Look, turning it back on puts them back; Recreate and Off hide the switches
 // - the Breakdown shows which parts of the reference were read, and a fix button (no command) for each that was not;
 //   the same Recreate, Influence, Off control as the card; stats, timeline and contact sheet behind Details
+// - Recreate from the first screen: "Recreate a video" on Footage takes a link, sets Recreate and stays on Footage
 // - screenshots, dark and light
 // Needs Chrome. Run: node tests/studio-recreate.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
 import assert from 'assert';
 import { spawn, execFileSync } from 'child_process';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
+import http from 'http';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -34,7 +36,13 @@ execFileSync(process.execPath, [join(ROOT, 'kit', 'videomd2reel.cjs'), join(TD, 
 const EX = C.extract(join(TD, 'Reel.md'));
 mkdirSync(SDIR, { recursive: true });
 writeFileSync(join(SDIR, 'state.json'), JSON.stringify({ ...C.defaultState(), job: JOB, reference: { ...C.defaultState().reference, status: 'ready', mode: 'off', extracted: EX } }));
-const env = { ...process.env, CI: '1', STUDIO_DIR: SDIR, STUDIO_CHAT: '', STUDIO_BROLL_AUTO: '' };
+// a reference link served here and held back until the test lets it go; the stand-in teardown reads it
+const CLIP = join(STATE, 'ref.mp4'); try { execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=320x568:rate=24:duration=2', '-pix_fmt', 'yuv420p', CLIP]); } catch {}
+if (!existsSync(CLIP)) { const b = Buffer.alloc(4096); b.writeUInt32BE(32, 0); b.write('ftypisom', 4); writeFileSync(CLIP, b); }
+let release; const gate = new Promise(r => { release = r; });
+const media = http.createServer(async (q, res) => { if (q.url !== '/ref.mp4') { res.writeHead(404); return res.end(); } await gate; const b = readFileSync(CLIP); res.writeHead(200, { 'content-type': 'video/mp4', 'content-length': b.length }); res.end(b); });
+await new Promise(r => media.listen(0, '127.0.0.1', r));
+const env = { ...process.env, CI: '1', STUDIO_DIR: SDIR, STUDIO_CHAT: '', STUDIO_BROLL_AUTO: '', STUDIO_TEARDOWN: 'tests/fixtures/fake-teardown.mjs' };
 const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), '--port', '0', '--no-open'], { cwd: ROOT, env });
 const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out))); });
 const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json();
@@ -101,8 +109,37 @@ try {
     for (const th of ['dark', 'light']) { await theme(pg, th); await pg.waitForSelector('#ref-card'); await shot(pg, `recreate-useall-${th}.png`); }
     assert.deepStrictEqual(errs, []);
   });
+  await t('Recreate from the first screen: one quiet entry on Footage takes a link, sets Recreate, and you stay on Footage', async () => {
+    await api('/api/settings', { downloads: join(STATE, 'dl') });
+    await api('/api/reference/clear', {}); await api('/api/state', { reference: { mode: 'influence' } }); await theme(pg, 'dark');
+    await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' }); await pg.waitForSelector('#recreate-open');
+    assert.match(await pg.textContent('#recreate-open'), /Recreate a video/); assert.strictEqual(await pg.$('#recreate-card'), null, 'one row until you ask');
+    assert.ok(await pg.$eval('#recreate-open', e => e.getBoundingClientRect().height < 80), 'a quiet row, not a third big tile');
+    await shot(pg, 'recreate-first-dark.png');
+    await pg.click('#recreate-open'); await pg.waitForSelector('#recreate-card[data-state="empty"] #recreate-link');
+    await pg.waitForSelector('#recreate-mode [data-mode="recreate"][aria-checked="true"]');
+    assert.deepStrictEqual(await pg.$$eval('#recreate-mode [role="radio"]', x => x.map(e => e.textContent.trim())), ['Recreate', 'Influence', 'Off'], 'the same control as the Look step');
+    assert.strictEqual((await api('/api/state')).state.reference.mode, 'recreate');
+    assert.ok(await pg.isVisible('#recreate-upload'), 'a file works too');
+    await pg.fill('#recreate-link', `http://127.0.0.1:${media.address().port}/ref.mp4`); await pg.click('#recreate-add');
+    await pg.waitForSelector('#recreate-card[data-state="reading"] #recreate-reading'); assert.match(await pg.textContent('#recreate-reading'), /Record or add your footage while it reads\./);
+    assert.ok(await pg.isVisible('#drop-footage') && await pg.isVisible('#record-now'), 'footage and the recorder are right there');
+    for (const th of ['dark', 'light']) { await theme(pg, th); await pg.waitForSelector('#recreate-reading'); await shot(pg, `recreate-first-reading-${th}.png`); }
+    await theme(pg, 'dark'); release();
+    await pg.waitForSelector('#recreate-card[data-state="ready"] #recreate-ready', { timeout: 30000 });
+    assert.strictEqual(await pg.evaluate(() => document.querySelector('main').dataset.step), 'footage', 'still on the first screen');
+    const st = (await api('/api/state')).state; assert.strictEqual(st.reference.mode, 'recreate'); assert.strictEqual(st.reference.status, 'ready'); assert.ok(st.reference.extracted);
+    await shot(pg, 'recreate-first-ready-dark.png');
+    assert.ok(!/\u2014/.test(await pg.textContent('#recreate-card')), 'no em dashes');
+    await pg.click('#next'); await pg.click('#next'); await pg.waitForSelector('#ref-card[data-mode="recreate"]'); // Cut, then Look: the reference is already set
+    await pg.setViewportSize({ width: 390, height: 844 }); await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' }); await pg.waitForSelector('#recreate-card');
+    const over = await pg.evaluate(() => Math.max(...[...document.querySelectorAll('#s-footage *')].filter(e => e.offsetParent).map(e => e.getBoundingClientRect().right)) - innerWidth); assert.ok(over <= 1, 'fits a phone: ' + over);
+    assert.deepStrictEqual(errs, []);
+  });
 } finally {
+  release(); media.closeAllConnections(); media.close();
   await browser.close(); srv.kill();
+  rmSync(join(ROOT, 'teardown', `studio-${JOB}-r1`), { recursive: true, force: true }); rmSync(join(ROOT, 'teardown-in', 'studio', JOB), { recursive: true, force: true });
   rmSync(STATE, { recursive: true, force: true }); rmSync(join(ROOT, 'jobs', JOB), { recursive: true, force: true });
 }
 console.log(`\n${n} studio recreate e2e tests passed`);

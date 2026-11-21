@@ -165,10 +165,10 @@ try {
     await ph.goto(url + '/#step=cut', { waitUntil: 'networkidle' }); await ph.waitForSelector('#ask-agent'); await ph.click('#ask-agent'); await ph.waitForSelector('#ask-pop');
     const over = await ph.evaluate(() => Math.max(...[...document.querySelectorAll('body *')].filter(e => e.offsetParent).map(e => e.getBoundingClientRect().right)) - innerWidth); assert.ok(over <= 1, 'no sideways scroll: ' + over);
     if (shots) await ph.screenshot({ path: join(shots, 'redesign-ask-agent-phone-dark.png') });
-    await ph.keyboard.press('Escape'); await ph.goto(url + '/#step=footage', { waitUntil: 'networkidle' }); await ph.click('#more-open'); await ph.click('#more-wizards'); await ph.waitForSelector('#wz-list');
+    await ph.keyboard.press('Escape'); await ph.goto(url + '/#step=footage', { waitUntil: 'networkidle' }); await ph.click('#wizards-open'); await ph.waitForSelector('#wz-list');
     const ow = await ph.evaluate(() => document.getElementById('wizards').getBoundingClientRect().right - innerWidth); assert.ok(ow <= 1, 'the wizard fits: ' + ow);
     if (shots) await ph.screenshot({ path: join(shots, 'redesign-wizards-phone-dark.png') });
-    await ph.evaluate(() => localStorage.setItem('studio.theme', 'light')); await ph.reload({ waitUntil: 'networkidle' }); await ph.click('#more-open'); await ph.click('#more-wizards'); await ph.waitForSelector('#wz-list');
+    await ph.evaluate(() => localStorage.setItem('studio.theme', 'light')); await ph.reload({ waitUntil: 'networkidle' }); await ph.click('#wizards-open'); await ph.waitForSelector('#wz-list');
     if (shots) await ph.screenshot({ path: join(shots, 'redesign-wizards-phone-light.png') });
     await ph.close();
     assert.deepStrictEqual(errs, []);

@@ -5,6 +5,9 @@ import { useEffect, useRef } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { toast, Icon } from './lib.jsx';
 
+// the two labels for what a reference gives you: a built-in option it picked, and a scene made from it for the menu
+export const REF_LABEL = 'From reference', MADE_LABEL = 'Made for you';
+export const READING = ['queued', 'downloading', 'tearing'];
 export const REF_MODES = [['recreate', 'Recreate'], ['influence', 'Influence'], ['off', 'Off']];
 export const REF_HINT = {
   recreate: 'Your take re-cut to its shots, with its look, titles, sounds and music.',
@@ -40,11 +43,11 @@ export function RefPlan({ ex, mode, onMade, id = 'ref-plan' }) {
     pl.cutaways > 0 && ['cutaways', count(pl.cutaways, 'cutaway')], pl.sounds > 0 && ['sounds', count(pl.sounds, 'sound')], pl.noBed && ['music', 'No music']].filter(Boolean) : [];
   if (!bits.length && !made.length) return null;
   const names = made.map(x => x.name).join(', '), madeId = id === 'ref-plan' ? 'ref-made' : id.replace('ref-plan', 'ref-made');
-  return <ul className="ref-plan" id={id} aria-label="From the reference">
+  return <ul className="ref-plan" id={id} aria-label={REF_LABEL}>
     {bits.map(([k, v]) => <li key={k} className="rp-chip" data-plan={k}>{v}</li>)}
     {made.length > 0 && <li className="rp-li">{onMade
-      ? <button type="button" className="rp-chip rp-made" id={madeId} title={names} onClick={() => onMade(made)}><Icon n="spark" />{made.length} made for you</button>
-      : <span className="rp-chip rp-made" id={madeId} title={names}><Icon n="spark" />{made.length} made for you</span>}</li>}
+      ? <button type="button" className="rp-chip rp-made" id={madeId} title={names} onClick={() => onMade(made)}><Icon n="spark" />{made.length} {MADE_LABEL.toLowerCase()}</button>
+      : <span className="rp-chip rp-made" id={madeId} title={names}><Icon n="spark" />{made.length} {MADE_LABEL.toLowerCase()}</span>}</li>}
   </ul>;
 }
 
@@ -60,7 +63,6 @@ export function RefParts({ V, s, patch }) {
 }
 
 // One short line when the reference set the Look (or is about to), with the way back to your own picks
-const READING = ['queued', 'downloading', 'tearing'];
 export function RefNotice({ s, patch, id = 'ref-notice' }) {
   const r = s.reference, a = r.auto, reading = !r.extracted && r.mode !== 'off' && (r.status === 'running' || (r.queue || []).some(x => READING.includes(x.status)));
   if (reading) return <div className="ref-notice glass-card" id={id} role="status"><span className="rn-spin" aria-hidden="true" /><p><b>Reading the reference.</b> We will set your look from it when it is ready.</p></div>;

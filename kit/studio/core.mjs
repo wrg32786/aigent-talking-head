@@ -695,8 +695,12 @@ export function listVideos(current = null, { limit = Infinity } = {}) {
   return out.slice(0, limit);
 }
 // Persisted work which still owns this board. Used by the server and by MCP when Studio is closed.
+// a reference link in the queue that is being read (kit/studio/server.mjs runs these in their own lane)
+export const REF_READING = ['queued', 'downloading', 'tearing'], REF_BUSY = 'A reference link is still downloading';
+const refRunning = s => ((s.reference && s.reference.queue) || []).filter(x => x.status === 'downloading' || x.status === 'tearing');
 export function videoBusy(s) {
   if (s.task && s.task.status === 'running') return `A ${s.task.kind || 'task'} is running`;
+  if (refRunning(s).length) return REF_BUSY;
   if ((s.imports || []).some(x => x.status === 'downloading')) return 'A footage link is still downloading';
   if ((s.takes || []).some(t => t.status === 'recording' || t.status === 'converting')) return 'A take is still being saved';
   if (Object.values(s.tx || {}).some(x => x && x.status === 'running')) return 'A transcript is still running';
@@ -708,6 +712,7 @@ export function settleStale(s) {
   let n = 0; const stop = (x, status, error) => { Object.assign(x, { status, ...(error ? { error } : {}) }); n++; };
   if (s.task && s.task.status === 'running') stop(s.task, 'cancelled');
   for (const x of s.imports || []) if (x.status === 'downloading') stop(x, 'failed', 'Studio stopped during this download');
+  for (const x of refRunning(s)) stop(x, 'failed', 'Studio stopped while reading this reference');
   for (const x of Object.values(s.tx || {})) if (x && x.status === 'running') stop(x, 'failed', 'Studio stopped during this transcript');
   for (const b of Object.values(s.broll || {})) for (const g of (b && b.gens) || []) if (g.status === 'running') stop(g, 'failed', 'Studio stopped while this was generating');
   return n;

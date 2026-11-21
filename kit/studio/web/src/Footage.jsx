@@ -7,6 +7,7 @@ import { Recorder } from './Recorder.jsx';
 import { Scripts } from './Scripts.jsx';
 import { Player, clock } from './Player.jsx';
 import { Toggle, Hint } from './ui.jsx';
+import { RecreateStart } from './RecreateStart.jsx';
 
 export function Dropzone({ id, inputId, kind, s, apply, accept, multiple, big, children, label }) {
   const input = useRef(null); const [over, setOver] = useState(false);
@@ -52,7 +53,7 @@ export function FootageLink({ s, apply }) {
   </div>;
 }
 
-export function Footage({ V, s, apply, hidden, onLive }) {
+export function Footage({ V, s, apply, patch, go, hidden, onLive }) {
   const [readId, setReadId] = useState(null);
   const [playing, setPlaying] = useState(null), drag = useRef(null), [over, setOver] = useState(null);
   // reorder in place: drag a clip onto another, or the arrow buttons; the draft uses this order
@@ -74,6 +75,7 @@ export function Footage({ V, s, apply, hidden, onLive }) {
         </button>
       </div>}
     {!rec && <FootageLink s={s} apply={apply} />}
+    {!rec && <RecreateStart s={s} apply={apply} patch={patch} go={go} />}
     <Scripts V={V} s={s} apply={apply} onRead={id => { if (needJob()) return; setReadId(id); open(true); requestAnimationFrame(() => document.getElementById('recorder')?.scrollIntoView({ block: 'start', behavior: 'smooth' })); }} />
     {showing && <Player apply={apply} path={showing} tx={(s.tx || {})[showing]} onClose={() => setPlaying(null)} />}
     <ul id="footage" className="clips">

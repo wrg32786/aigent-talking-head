@@ -345,7 +345,7 @@ main[data-step="look"][data-look="style"] .picks { display: flex; }
   .fab .dot { position: absolute; top: 8px; right: 7px; width: 7px; height: 7px; box-shadow: 0 0 0 2px var(--background); } .fab .dot.on { background: var(--success); } .fab .dot.busy { background: var(--warning); } .fab .dot.off { background: var(--destructive); }
   .controls { grid-template-columns: 1fr; }
   .tabs { display: none; } .tabselect { display: block; margin-bottom: 8px; } .tabselect select { width: 100%; }
-  .picks .lbl, #clear-picks { display: none; }
+  .picks .lbl { display: none; }
 }
 @media (max-width: 640px) {
   .top { gap: 8px; padding: 0 10px; }
@@ -1218,3 +1218,42 @@ button.rp-made { cursor: pointer; } button.rp-made:hover { background: color-mix
 .td-fold > .td-body { padding-top: 4px; }
 .td-fold > .swap { border-top: 0; padding-top: 4px; }
 @media (max-width: 640px) { .td-head .ref-mode { align-items: flex-start; } .td-head .ref-mode-hint { text-align: left; } }
+
+/* ---------- Recreate from the first screen (RecreateStart.jsx): one quiet row that opens a small card ---------- */
+.rs-open, .rs { margin-top: 14px; padding: 12px 14px; border-radius: 14px; }
+.rs-open { display: flex; align-items: center; gap: 12px; width: 100%; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.rs-open > .ic { width: 18px; height: 18px; color: var(--primary); flex: none; } .rs-open .rs-go { margin-left: auto; color: var(--muted-foreground); }
+.rs-open .rs-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; } .rs-open .fine { margin: 0; }
+.rs-open:hover { border-color: var(--primary); }
+.rs { display: flex; flex-direction: column; gap: 10px; }
+.rs-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 32px; }
+.rs-form { gap: 8px; align-items: center; flex-wrap: nowrap; } .rs-form input { min-width: 0; } .rs-form > .astryx-button { flex: none; }
+.rs-line { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; margin: 0; font-size: 13px; line-height: 1.4; }
+.rs-line > .ic { width: 16px; height: 16px; color: var(--success); flex: none; } .rs-line b { font-weight: 650; }
+.rs .err { margin: 0; }
+@media (max-width: 640px) { .rs-form { flex-wrap: wrap; } .rs-form input { flex: 1 1 100%; } }
+
+/* ---------- the two reference labels on a tile: "Made for you" and "From reference", sentence case, top left ---------- */
+.tile .made, .tile .src-ref { text-transform: none; letter-spacing: .01em; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+.tile .src-ref { left: 8px; right: auto; }
+.tile:has(.src-ref) .flag, .tile:has(.made) .flag { top: 30px; }
+.tile:hover .src-ref, .tile:focus-within .src-ref, .tile:hover .made, .tile:focus-within .made { opacity: 0; }
+.hovercard .why.ref { background: color-mix(in srgb, #e0a33a 12%, transparent); }
+#tabhint .layer-ref { display: block; margin-top: 2px; color: #e0a33a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+[data-theme="light"] #tabhint .layer-ref { color: #9a6408; }
+
+/* ---------- the Picks tray (Picks.jsx): a count that opens your picks, one line per layer ---------- */
+.picks-btn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; cursor: pointer; border: 0; border-radius: 999px; }
+.picks-btn b { color: var(--foreground); } .picks-btn .ic { width: 14px; height: 14px; opacity: .7; }
+.picks-panel { width: min(420px, calc(100vw - 16px)); padding: 12px; gap: 10px; }
+.pk-groups { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.pk-g { display: grid; grid-template-columns: 88px minmax(0, 1fr); align-items: center; gap: 10px; }
+.pk-l { font-size: 12px; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pk-c { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+.pk-c .chip { flex: 0 1 auto; min-width: 0; cursor: pointer; font: inherit; font-size: 12px; } .pk-c .chip .ic { flex: none; width: 12px; height: 12px; }
+.pk-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-dot { width: 6px; height: 6px; border-radius: 50%; background: #e0a33a; flex: none; }
+.pk-more { flex: none; font: inherit; font-size: 12px; font-weight: 600; min-height: 26px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--muted-foreground); cursor: pointer; }
+.pk-more:hover { color: var(--foreground); border-color: var(--primary); }
+.pk-f { display: flex; justify-content: flex-end; gap: 6px; padding-top: 8px; border-top: 1px solid var(--border); }
+.pk-f .btn { font: inherit; font-size: 13px; cursor: pointer; border: 0; border-radius: 999px; }
