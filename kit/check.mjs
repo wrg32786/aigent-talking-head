@@ -347,7 +347,8 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'text-overlap.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { toerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'words never overlap (tests/text-overlap.test.mjs: every text box on every frame for 9:16, 4:5 and 1:1; a said word leaves when a title enters, a title over a word, two titles, caption lines, an ordinal word)', errs: toerrs, warns: [] });
-    for (const [f, what] of [['fontmatch.test.mjs', 'font match tests (tests/fontmatch.test.mjs: words drawn in blackletter, sans, serif and condensed faces come back as their own kind and pairing; weight, case, colour; faces we do not ship land in the right kind)'],
+    for (const [f, what] of [['title-rules.test.mjs', 'titles and the caption bar (tests/title-rules.test.mjs: nothing in the bar while a title is up, the minimum never carries a word past a title, the title check fails on a word drawn under a title and passes with the rule on, beat snap lines and a title\'s own caption word, the partner line, glow and dim, a label that repeats the caption, the shadow on a low-contrast word)'],
+      ['fontmatch.test.mjs', 'font match tests (tests/fontmatch.test.mjs: words drawn in blackletter, sans, serif and condensed faces come back as their own kind and pairing; weight, case, colour; faces we do not ship land in the right kind)'],
       ['studio-fonts.test.mjs', 'Studio font tests (tests/studio-fonts.test.mjs: a reference clears an older font pick and its own font is used, a font picked after it holds, a new reference, a new video and new footage clear it, Font: Matched, Close or Guess)']]) {
       const e = [];
       try { execFileSync(process.execPath, [join(ROOT, 'tests', f)], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }

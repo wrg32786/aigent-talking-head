@@ -85,7 +85,7 @@
 //            (the order given); auto decides from how many sentences the files share
 //          --keep-pauses "clip-003@2.72,clip-005@1.1"  with --tighten, leave these pauses (clip id @ clip seconds, as
 //            listed in choices.json "pauses") uncut
-//          --no-boost  skip the legibility pass (on by default: a caption moment under 3:1 gets a denser halo and is drawn again)
+//          --no-boost  skip the legibility pass (on by default: a caption moment under 3:1 gets a soft shadow behind that word, also when the style has none, and is drawn again)
 // A title behind the head moves in front when the person mask covers more than 22% of its letters (cut.json "behindMax";
 // kit/cover.py); a face title moves to the slot above the head. Left and right titles keep a 6.5% side margin and shrink to fit.
 // Writes jobs/<name>/: clips/ (clip.py output), build/ (cut.json, captions.js, theme.js, overlay frames), reel-vN.mp4.
@@ -777,6 +777,8 @@ if (B.wantBeatSync(cut) && cut.bed) {
     if (cut.glitch === false && cut.dropHits) { delete cut.dropHits; fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); }
     const nDrop = (cut.dropHits || []).length;
     console.log(`beat-sync: ${grid.tempo_bpm} BPM, ${(grid.beats || []).length} beats, ${nDrop} drop shakes (window ${B.windowOf(cut)}s); speech cuts unchanged`);
+    // every title the beat moved, one line each; "snap": false on a title in captions.js keeps it where you put it
+    B.snapLines(synced.moved).forEach(l => console.log(l));
   }
 } else if (cut.dropHits) {
   delete cut.dropHits;
@@ -943,7 +945,9 @@ sh(process.execPath, [path.join(KIT, 'assemble.cjs'), out], build, (flag('no-sfx
       if (add.length) {
         caps.boost = have.concat(add).sort((x, y) => x[0] - y[0]);
         fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
-        console.log(`legibility: denser halo on ${add.length} low-contrast moment${add.length > 1 ? 's' : ''} (${add.map(x => x.join('-')).join(', ')} s), drawing again`);
+        // say which words (Studio report 4, item 14: it was reported on every build and never acted on when the style had no shadow)
+        const lowWords = add.map(([x, y]) => { const ws = (caps.flips || []).filter(f => f.mode === 0).flatMap(f => (f.words || []).filter(w => +w[0] < y - 0.25 && +w[1] > x + 0.25).map(w => String(w[2]).replace(/[^\p{L}\p{N}'$%]/gu, ''))).filter(Boolean); return `${x}-${y} s${ws.length ? ' "' + ws.slice(0, 4).join(' ') + '"' : ''}`; });
+        console.log(`legibility: soft shadow added behind ${add.length} low-contrast caption moment${add.length > 1 ? 's' : ''} (${lowWords.join(', ')})${caps.captionShadow === 'none' ? ', though the style has no shadow' : ''}; drawing again`);
         sh(process.execPath, [path.join(KIT, 'render.mjs'), LEN.toFixed(2)], build);
         sh(process.execPath, [path.join(KIT, 'assemble.cjs'), out], build, (flag('no-sfx') || opt('sfx') === 'off') ? { NOSFX: '1' } : {});
         spans = legib();

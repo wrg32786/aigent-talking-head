@@ -183,25 +183,50 @@ function applySync(cut, captions, grid, opts = {}) {
   const shakes = planDropShakes(next, grid, opts);
   next.dropHits = shakes.map(s => [s.t, s.strength]);
 
-  let caps = captions;
+  // Titles land on the beat (Studio report 4, item 4). A title with "snap": false stays where it is. A title's own
+  // caption words (a caption word that is one of the title's words and sits inside the title's time) move with it, so
+  // the word never shows in the caption bar after its title has left. moved: one entry per title that moved, for the
+  // build log (snapLines).
+  let caps = captions; const moved = [];
   if (captions && Array.isArray(captions.flips)) {
-    const flips = captions.flips.map(f => ({ ...f }));
+    const flips = captions.flips.map(f => ({ ...f, ...(Array.isArray(f.words) ? { words: f.words.map(w => (Array.isArray(w) ? w.slice() : w)) } : {}) }));
     const titles = flips.filter(f => f.mode === R.TITLE_MODE).sort((a, b) => a.start - b.start);
+    const nw = w => String(w).toLowerCase().replace(/[^a-z0-9]/g, '');
     let last = -Infinity;
     for (const t of titles) {
-      const dur = (t.end === 99 ? 99 : t.end) - t.start;
+      if (t.snap === false) { last = t.start; continue; }
       const s = snap(t.start, times, win);
       let start = s.t;
       if (start <= last + 0.05) start = t.start; // keep order if a snap would collide
-      const delta = start - t.start;
+      const from = [t.start, t.end], delta = start - t.start;
       t.start = +start.toFixed(2);
       if (t.end !== 99) t.end = +Math.max(t.start + 0.2, t.end + delta).toFixed(2);
       last = t.start;
+      const d0 = +(t.start - from[0]).toFixed(3), d1 = t.end === 99 ? d0 : +(t.end - from[1]).toFixed(3);
+      if (Math.abs(d0) < 0.005 && Math.abs(d1) < 0.005) continue;
+      const own = String(t.text || '').split(/[\s|]+/).map(nw).filter(Boolean), z0 = from[1] === 99 ? Infinity : from[1];
+      let words = 0;
+      for (const f of flips) {
+        if (f.mode !== 0 || !Array.isArray(f.words)) continue;
+        let all = f.words.length > 0;
+        for (const w of f.words) {
+          if (!Array.isArray(w) || !own.includes(nw(w[2])) || !(+w[0] >= from[0] - 0.06 && +w[1] <= z0 + 0.06)) { all = false; continue; }
+          w[0] = +Math.max(0, +w[0] + d0).toFixed(3); w[1] = +Math.max(w[0] + 0.02, +w[1] + d1).toFixed(3); words++;
+        }
+        // a caption that is only the title's words moves as a whole
+        if (all) { f.start = +Math.max(0, f.start + d0).toFixed(2); if (f.end !== 99) f.end = +Math.max(f.start + 0.05, f.end + d1).toFixed(2); }
+      }
+      moved.push({ text: String(t.text || '').replace(/\|/g, ' '), from: from[0], to: t.start, end: [from[1], t.end], words });
     }
     caps = { ...captions, flips };
   }
   next.beatSync = true;
-  return { cut: next, captions: caps, snaps: times.length };
+  return { cut: next, captions: caps, snaps: times.length, moved };
+}
+
+// one line per title the beat moved: title 'for it' 12.84 to 12.77, on the beat
+function snapLines(moved) {
+  return (moved || []).map(m => `title '${m.text}' ${m.from.toFixed(2)} to ${m.to.toFixed(2)}, on the beat${m.words ? ` (its caption word${m.words > 1 ? 's' : ''} moved with it)` : ''}`);
 }
 
 function analyseBed(cut, buildDir, opts = {}) {
@@ -240,5 +265,5 @@ module.exports = {
   WINDOW, DROP_INTENSITY_MIN, MAX_SHAKES_PER_SEG, FINISH, CANON,
   finishName, parseFinish, finishChain,
   wantBeatSync, windowOf, anchors, snap, strongDrops, planDropShakes,
-  snapSfxList, applySync, analyseBed, loadGrid, writeCaptions,
+  snapSfxList, applySync, snapLines, analyseBed, loadGrid, writeCaptions,
 };
