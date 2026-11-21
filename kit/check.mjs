@@ -318,6 +318,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-pieces.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { pcerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio pieces and outputs tests (tests/studio-pieces.test.mjs: a category for every line, your category wins, topics, Let AI choose hook first and CTA last with reasons, neighbours join into one range, the Outputs library with each version\'s settings, MCP get_pieces, set_combo, choose_combo, list_outputs)', errs: pcerrs, warns: [] });
+    const pterrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-point.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { pterrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio Cut step tests (tests/studio-point.test.mjs: the point of the video steers lines, Let AI choose, clips and the model prompt; topics are 3 to 5 themes of two or more words, never the old single words; pacing only removes quiet, never part of a word; the stitched previews; your own clip; MCP fields)', errs: pterrs, warns: [] });
     const ferrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'face-matte.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { ferrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
