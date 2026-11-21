@@ -173,7 +173,9 @@ function validate(r) {
     if (type === 'scene' && !/^ref-[a-z0-9-]+$/.test(String(g.scene || ''))) errs.push(`graphics #${pad2(g.n)}: a scene needs scene <id> (ref-..., kit/scenes.cjs)`);
     const auto = GRAPHICS[type] >= 11;
     if (g.layer && !(auto ? ['front', 'behind', 'auto'] : ['front', 'behind']).includes(g.layer)) errs.push(`graphics #${pad2(g.n)}: layer must be front or behind${auto ? ' or auto' : ''}`);
-    if (g.shape && !['circle', 'arrow', 'underline', 'box'].includes(g.shape)) errs.push(`graphics #${pad2(g.n)}: shape must be circle, arrow, underline or box`);
+    if (type === 'ordinal-sticker') { if (g.shape && !['seal', 'starburst'].includes(g.shape)) errs.push(`graphics #${pad2(g.n)}: shape must be seal or starburst`); }
+    else if (g.shape && !['circle', 'arrow', 'underline', 'box'].includes(g.shape)) errs.push(`graphics #${pad2(g.n)}: shape must be circle, arrow, underline or box`);
+    if (g.spikes != null && g.spikes !== '' && !(+g.spikes >= 6 && +g.spikes <= 24)) errs.push(`graphics #${pad2(g.n)}: spikes must be a number from 6 to 24`);
     if (g.glyph) for (const x of String(g.glyph).split(';').map(s => s.trim()).filter(Boolean)) if (!GLYPHS.includes(x)) errs.push(`graphics #${pad2(g.n)}: glyph "${x}" must be one of ${GLYPHS.join(', ')}`);
     for (const k of ['step', 'of', 'count', 'h']) if (g[k] != null && g[k] !== '' && isNaN(+g[k])) errs.push(`graphics #${pad2(g.n)}: ${k} must be a number`);
     if (type === 'checklist' && !String(g.items || g['items~'] || '').trim()) errs.push(`graphics #${pad2(g.n)}: a checklist needs items (rows separated by ;)`);
@@ -259,6 +261,8 @@ function shotSettings(r) {
     if (onOff(s.cutaway)) { o.cutaway = true; if (s.broll && onOff(s.broll) === undefined) o.broll = String(s.broll).slice(0, 80); }
     if (s.move && /^(push|pull|drift)$/.test(String(s.move).toLowerCase())) o.move = String(s.move).toLowerCase();
     if (onOff(s.shake)) o.shake = true;
+    { const f = require('./reframe.cjs').parseFace(s.face); if (f) o.face = f; }
+    { const g = require('./grade-match.cjs').parseLab(s.lab); if (g) o.lab = g; }
     o.dur = +(s.end - s.start).toFixed(3);
     if (s.transition && !none(s.transition)) o.transition = s.transition;
     if (s.src) { o.file = s.src; o.in = +(s.in ?? 0); o.out = s.out != null ? +s.out : +(s.in ?? 0) + (s.end - s.start); }
@@ -292,7 +296,7 @@ function graphicFlips(r) {
     // a code card and a terminal session keep their text as written (\n for a new line); elsewhere " / " is a line break, shown as a space
     const text = v(g, 'text'); if (text != null && !none(text)) f.text = f.mode === 23 || f.mode === 28 ? String(text) : String(text).replace(/\s*\/\s*/g, ' ');
     for (const k of ['layer', 'color', 'ink', 'border', 'tile', 'sub', 'left', 'right', 'shape', 'glyph', 'title', 'values', 'labels', 'kind', 'tag', 'keyword', 'corner', 'live', 'clock', 'cues', 'cam', 'cursor', 'style', 'case', 'bg', 'scene']) { const x = v(g, k); if (x != null && !none(x)) f[k] = String(x); }
-    for (const k of ['x', 'y', 'w', 'h', 'in', 'size', 'step', 'of', 'count', 'speed', 'opacity']) { const x = v(g, k); if (x != null && x !== '' && !isNaN(+x)) f[k] = +x; }
+    for (const k of ['x', 'y', 'w', 'h', 'in', 'size', 'step', 'of', 'count', 'speed', 'opacity', 'spikes']) { const x = v(g, k); if (x != null && x !== '' && !isNaN(+x)) f[k] = +x; }
     { const x = v(g, 'items'); if (x != null && !none(x)) f.items = String(x).split(';').map(s => s.trim()).filter(Boolean); }
     { const x = v(g, 'details'); if (x != null && !none(x)) f.details = String(x).split(';').map(s => s.trim()); }
     { const x = v(g, 'at'); if (x != null && !none(x)) f.at = String(x).split(/[;,]/).map(s => +s.trim()).filter(n => !isNaN(n)); }
@@ -423,7 +427,7 @@ function exportJob(cut, caps, opts = {}) {
     gfx.forEach((g, i) => {
       const f = [`#${pad2(i + 1)} ${fmtT(g.start)}-${fmtT(g.end >= 99 ? dur : g.end)}`, `type ${TYPE[g.mode]}`];
       if (g.text) f.push(`text ${String(g.text).replace(/\n/g, ' ')}`);
-      for (const k of ['sub', 'left', 'right', 'shape', 'glyph', 'title', 'step', 'of', 'count', 'values', 'labels', 'kind', 'tag', 'keyword', 'corner', 'live', 'clock', 'cues', 'cam', 'cursor', 'style', 'case', 'bg', 'speed', 'opacity', 'layer', 'color', 'ink', 'border', 'tile', 'x', 'y', 'w', 'h', 'in', 'size']) if (g[k] != null) f.push(`${k} ${g[k]}`);
+      for (const k of ['sub', 'left', 'right', 'shape', 'spikes', 'glyph', 'title', 'step', 'of', 'count', 'values', 'labels', 'kind', 'tag', 'keyword', 'corner', 'live', 'clock', 'cues', 'cam', 'cursor', 'style', 'case', 'bg', 'speed', 'opacity', 'layer', 'color', 'ink', 'border', 'tile', 'x', 'y', 'w', 'h', 'in', 'size']) if (g[k] != null) f.push(`${k} ${g[k]}`);
       if (Array.isArray(g.details) && g.details.length) f.push(`details ${g.details.join('; ')}`);
       if (Array.isArray(g.items) && g.items.length) f.push(`items ${g.items.join('; ')}`);
       if (Array.isArray(g.at) && g.at.length) f.push(`at ${g.at.join('; ')}`);

@@ -30,7 +30,9 @@
 // and the cut into the payoff), "punchDelay": 0.08 (start the punch this many seconds into the segment, set by beat-sync),
 // "zoom": 1.15 (fixed zoom for this segment, overrides the toggle), "push": 0.07 (a slow push-in over the segment, minus
 // for a pull-out; the reference's camera move), "punchY": 0.4
-// (zoom centre, 0 top .. 1 bottom), "transition": "crossfade" (named transition INTO this segment, see
+// (zoom centre, 0 top .. 1 bottom), "punchX": 0.5 (zoom centre, 0 left .. 1 right; kit/reframe.cjs sets zoom, punchX and
+// punchY to match a reference's face size and eye line), "lut": "grade-shot-01.cube" (a 3D LUT on this segment, the
+// base grade matched to a reference by kit/grade-match.cjs; finishes still go on top), "transition": "crossfade" (named transition INTO this segment, see
 // kit/transitions.json; default is the hard cut with the glitch seam) and "transitionDur": 0.3.
 // sfx keys: whoosh, swipe, boom, click, typing (the locked set in kit/rules.cjs), plus the legacy F and D. Each entry is a
 // time or [time, gain]. "sfxHits": [{ "id": "01-cinematic-hit-a", "t": 4.2 }] places a pack sound (kit/sfx/sfx.json) so
@@ -86,29 +88,34 @@ segs.forEach((s, i) => {
   const fadeIn = i === 0 ? (s.fadeIn ?? 0.25) : 0;
   // zoom punch: a fixed punch-in is a plain scale + crop; a big punch eases in 12% more over 0.3 s with zoompan.
   // punchDelay (from beat-sync) starts that move on a nearby beat, never before this segment (speech cuts stay put).
-  const z = zoomOf(s, i), py = s.punchY ?? R.PUNCH.y;
+  const z = zoomOf(s, i), py = s.punchY ?? R.PUNCH.y, px = s.punchX ?? 0.5;
   const delayN = Math.max(0, Math.round((+s.punchDelay || 0) * 24));
   let zf = '';
   if (s.push && !s.bigPunch) {
     // a camera move from the reference (Reel.md shot "move"): the zoom eases from z to z*(1+push) over the segment
     // (a minus push starts closer and pulls out)
     const p = +s.push, N = Math.max(1, Math.round((s.out - s.in) * 24)), za = p > 0 ? z : z * (1 - p), zb = p > 0 ? z * (1 + p) : z;
-    zf = `,scale=2160:3840,zoompan=z='${za.toFixed(4)}+${(zb - za).toFixed(4)}*min(on/${N},1)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*${py}':d=1:s=1080x1920:fps=24,setsar=1`;
+    zf = `,scale=2160:3840,zoompan=z='${za.toFixed(4)}+${(zb - za).toFixed(4)}*min(on/${N},1)':x='(iw-iw/zoom)*${px}':y='(ih-ih/zoom)*${py}':d=1:s=1080x1920:fps=24,setsar=1`;
   } else if (s.bigPunch) {
     const z1 = z * (1 + R.PUNCH.big), n = Math.round(R.PUNCH.bigDur * 24);
-    zf = `,scale=2160:3840,zoompan=z='${z}+${(z1 - z).toFixed(4)}*(1-pow(1-min(max(on-${delayN},0)/${n},1),3))':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*${py}':d=1:s=1080x1920:fps=24,setsar=1`;
+    zf = `,scale=2160:3840,zoompan=z='${z}+${(z1 - z).toFixed(4)}*(1-pow(1-min(max(on-${delayN},0)/${n},1),3))':x='(iw-iw/zoom)*${px}':y='(ih-ih/zoom)*${py}':d=1:s=1080x1920:fps=24,setsar=1`;
   } else if (z > 1.0001 && delayN > 0) {
     const nEase = 3;
-    zf = `,scale=2160:3840,zoompan=z='1+${(z - 1).toFixed(4)}*(1-pow(1-min(max(on-${delayN},0)/${nEase},1),3))':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*${py}':d=1:s=1080x1920:fps=24,setsar=1`;
+    zf = `,scale=2160:3840,zoompan=z='1+${(z - 1).toFixed(4)}*(1-pow(1-min(max(on-${delayN},0)/${nEase},1),3))':x='(iw-iw/zoom)*${px}':y='(ih-ih/zoom)*${py}':d=1:s=1080x1920:fps=24,setsar=1`;
   } else if (z > 1.0001) {
     const w = Math.round(1080 * z / 2) * 2, h = Math.round(1920 * z / 2) * 2;
-    zf = `,scale=${w}:${h},crop=1080:1920:(iw-ow)/2:(ih-oh)*${py},setsar=1`;
+    // a reframed shot (kit/reframe.cjs) zooms far closer than a punch: crop first, then scale, so the frame is never
+    // blown up to several times 1080x1920 in memory. The same picture as scale then crop.
+    const cw = Math.round(1080 / z / 2) * 2, ch = Math.round(1920 / z / 2) * 2;
+    zf = s.reframed || z > 1.4 ? `,crop=${cw}:${ch}:(iw-ow)*${px}:(ih-oh)*${py},scale=1080:1920:flags=lanczos,setsar=1` : `,scale=${w}:${h},crop=1080:1920:(iw-ow)*${px}:(ih-oh)*${py},setsar=1`;
   }
   // hold the last frame so every segment's picture is exactly out-in long (phone clips often end a frame short of
   // their audio, which left gaps and a variable frame rate after concat)
   const exact = `,tpad=stop_mode=clone:stop_duration=0.25,trim=duration=${(s.out - s.in).toFixed(4)}`;
   const segFinish = s.finish ? `,${B.finishChain(s.finish)}` : '';
-  if (!BASE) f.push(`[${n}:v]trim=${s.in}:${s.out},${V}${exact},${fit}${zf}${segFinish}${fadeIn ? `,fade=t=in:st=0:d=${fadeIn}` : ''}${tp.length ? `,tpad=${tp.join(':')}` : ''}[v${i}]`);
+  // the matched base grade (kit/grade-match.cjs): a 3D LUT on this segment, under any finish
+  const lut = s.lut && fs.existsSync(s.lut) ? `,lut3d=file='${String(s.lut).replace(/\\/g, '/').replace(/'/g, '')}':interp=tetrahedral` : '';
+  if (!BASE) f.push(`[${n}:v]trim=${s.in}:${s.out},${V}${exact},${fit}${lut}${zf}${segFinish}${fadeIn ? `,fade=t=in:st=0:d=${fadeIn}` : ''}${tp.length ? `,tpad=${tp.join(':')}` : ''}[v${i}]`);
   const d = s.out - s.in;
   const delay = s.pad ? `,adelay=${Math.round(s.pad * 1000)}|${Math.round(s.pad * 1000)}` : '';
   const apad = last && tail ? `,apad=pad_dur=${tail}` : '';

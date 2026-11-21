@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { loadMenu } from '../menu.mjs';
 import * as CF from './conflicts.mjs';
+import * as SLK from './stylelooks.mjs';
 
 const require = createRequire(import.meta.url);
 export const STUDIO = dirname(fileURLToPath(import.meta.url));
@@ -125,7 +126,7 @@ export function defaultState() {
     reference: { file: null, url: null, mode: 'influence', status: 'none', out: null, extracted: null, applied: false, queue: [], active: null },
     pack: null, picks: {}, music: { bed: 'auto', energy: 'auto', upload: null }, sound: { sfx: 'on', cap: 'on' }, pace: { tighten: null, punch: 'on' },
     export: 'reels', chat: [], task: null, outputs: [], takes: [], output: null, cut: null, tx: {}, lines: {}, broll: {},
-    finish: { from: 'auto', reel: true, clips: false, plain: false }, drafted: null };
+    finish: { from: 'auto', reel: true, clips: false, plain: false }, drafted: null, styleLook: null };
 }
 export function load() {
   try { const s = JSON.parse(readFileSync(statePath(), 'utf8')); return oneBed({ ...defaultState(), ...s, reference: { ...defaultState().reference, ...(s.reference || {}) } }); }
@@ -150,6 +151,7 @@ const JOB_RE = /^[a-z0-9][a-z0-9-]{0,48}$/;
 const ENERGY = ['auto', 'low', 'mid', 'high'];
 // a change from the page, the chat or an assistant. Refuses names the engine does not have.
 //   { job, pack, picks: { "transition:whip": "allow" | "deny" | "clear" }, clearPicks: true, music: { bed, energy },
+//     styleLook: "<a saved style look>" | null (Copy the look, kit/studio/stylelooks.mjs),
 //     sound: { sfx: on|off, cap: on|off }, pace: { tighten: null|number, punch: on|off }, export, reference: { mode },
 //     say: "user chat line", reply: "assistant chat line", from: "ui" | "assistant" | "chat",
 //     footage: [paths from state.footage, in the order to use; leave one out to drop it], clips: "<clip.py folder>" | null,
@@ -172,7 +174,7 @@ export const effectsReady = () => existsSync(join(ROOT, 'effects', '.venv'));
 export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
   const errs = [], log = [];
   if (!p || typeof p !== 'object') return { errs: ['patch must be an object'], log, noop: false };
-  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands', 'finish', 'switchFor', 'undoChange'];
+  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands', 'finish', 'switchFor', 'undoChange', 'styleLook'];
   for (const k of Object.keys(p)) if (!known.includes(k)) errs.push(`unknown field "${k}" (${known.join(', ')})`);
   if (p.undoChange) {
     const u = s.lastChange && s.lastChange.undo; if (!u) { errs.push('undoChange: nothing to undo'); return { errs, log, noop: false }; }
@@ -229,7 +231,7 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
     if (p.pace.keepPauses !== undefined) { const k = [].concat(p.pace.keepPauses || []).map(String); if (k.some(x => !/^[\w-]+@\d+(\.\d+)?$/.test(x))) errs.push('pace.keepPauses: clip-id@seconds, from choices.json "pauses"'); else { s.pace.keepPauses = k; log.push(k.length ? `keep pauses ${k.join(', ')}` : 'cut every long pause'); } }
   }
   if (p.export !== undefined) { if (p.export && !cat.exports.includes(p.export)) errs.push(`export: ${cat.exports.join(', ')}`); else { s.export = p.export || null; log.push(`export ${s.export}`); } }
-  if (p.reference && p.reference.mode !== undefined) { if (!['influence', 'recreate', 'off'].includes(p.reference.mode)) errs.push('reference.mode: influence, recreate or off'); else { const was = s.reference.mode; s.reference.mode = p.reference.mode; log.push(`reference mode ${p.reference.mode}`);
+  if (p.reference && p.reference.mode !== undefined) { if (!SLK.MODES.includes(p.reference.mode)) errs.push('reference.mode: influence, recreate, look or off'); else { const was = s.reference.mode; s.reference.mode = p.reference.mode; log.push(`reference mode ${p.reference.mode}`);
     // Recreate or Influence sets the Look from the reference; Off takes it back out (your own picks stay)
     if (was !== s.reference.mode || (s.reference.mode !== 'off' && s.reference.extracted && !s.reference.auto)) { const a = setReferenceLook(s, cat); if (a) log.push(`set the look from the reference (${a.n} change${a.n === 1 ? '' : 's'})`); else if (was !== 'off' && s.reference.mode === 'off') log.push('back to your own look'); } } }
   if (p.reference && p.reference.parts !== undefined) {
@@ -237,6 +239,12 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
     if (bad.length) errs.push(`reference.parts: { ${REF_PARTS.map(x => x.id).join(', ')} } each true or false`);
     else { s.reference.parts = { ...refParts(s.reference), ...q }; log.push('reference parts: ' + Object.entries(q).map(([k, v]) => `${k} ${v ? 'on' : 'off'}`).join(', '));
       if (s.reference.mode === 'influence' && s.reference.extracted) { const a = setReferenceLook(s, cat); if (a) log.push(`set the look from the reference (${a.n} change${a.n === 1 ? '' : 's'})`); } }
+  }
+  // a saved style look for drafts with no reference in use; null clears it
+  if (p.styleLook !== undefined) {
+    const n = p.styleLook === null || p.styleLook === '' ? null : p.styleLook;
+    if (n !== null && !SLK.exists(n)) errs.push(`styleLook: no saved look named "${n}"${SLK.list().length ? ` (${SLK.list().map(x => x.name).join(', ')})` : ''}`);
+    else if (n !== (s.styleLook || null)) { s.styleLook = n; log.push(n ? `style look ${n}` : 'no style look'); }
   }
   if (p.clips !== undefined) { const c = p.clips ? slash(p.clips) : null; if (c && (c.includes('..') || !existsSync(join(resolve(ROOT, c), 'clips.json')))) errs.push(`clips: no clips.json in ${c}`); else if (c !== s.clips) { s.clips = c; log.push(c ? `clips folder ${c}` : 'clips folder cleared'); } }
   // footage: reorder or drop files the job already has (state.footage), or add a file already in the job's inbox
@@ -483,9 +491,9 @@ export function outputsOf(s) {
 // A "video" is a job. Starting fresh never deletes a file: the old job's footage (inbox/studio/<job>), renders and
 // reel-vN.build snapshots stay where they are, and its session is saved to jobs/.studio/videos/<job>.json so opening
 // it again puts you back where you were. What carries over: your words (glossary) and the counters; with
-// keepLook, the look too (pack, picks, music, sound, pace, export, brand logos). Keys, settings and the agent
+// keepLook, the look too (pack, picks, music, sound, pace, export, brand logos, the saved style look). Keys, settings and the agent
 // connection live in other files and are never touched here.
-export const LOOK_KEYS = ['pack', 'picks', 'music', 'sound', 'pace', 'export', 'brands'];
+export const LOOK_KEYS = ['pack', 'picks', 'music', 'sound', 'pace', 'export', 'brands', 'styleLook'];
 const KEEP_KEYS = ['format', 'version', 'rev', 'updated', 'chatSeq', 'refSeq', 'importSeq', 'commentSeq', 'videoSeq', 'glossary'];
 const VIDEO_EXT = /\.(mp4|mov|m4v|webm|mkv)$/i;
 export const videosDir = () => join(stateDir(), 'videos');
@@ -618,6 +626,7 @@ export function resetEdit(s, { keepLook = s.keepLook === true } = {}) {
     s.pace = clone(d.pace);
     s.export = d.export;
     delete s.brands;
+    s.styleLook = null;
   }
   return s;
 }

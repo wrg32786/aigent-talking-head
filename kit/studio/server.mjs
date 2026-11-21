@@ -32,6 +32,7 @@ import { findChrome } from '../chrome.mjs';
 import { mount as mountBroll } from './broll-api.mjs';
 import * as PIECES from './pieces.mjs';
 import * as WIZ from './wizards.mjs';
+import * as SLK from './stylelooks.mjs';
 import { mount as mountFolders } from './folders.mjs';
 import { mountScenes } from './scene-routes.mjs';
 import { mount as mountPost } from './post-api.mjs';
@@ -139,9 +140,13 @@ function view(s) {
   let edit = null; try { edit = editOf(s, { combo, cut, broll }); } catch (e) { edit = { error: e.message }; }
   let look = null; try { look = lookSources(s); } catch {}
   const outputs = C.outputsOf(s), currentOutputs = currentOutputsOf(s);
-  return { seq: ++viewSeq, boot: BOOT, scenes: C.catalog().scenesSig || '', state: s, look, compose: comp, outputs, currentOutputs, draftPreview: draftPreviewOf(s), reopenable, scripts, cut, broll, pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
+  return { seq: ++viewSeq, boot: BOOT, scenes: C.catalog().scenesSig || '', state: s, look, compose: comp, outputs, currentOutputs, draftPreview: draftPreviewOf(s), match: matchOf(s), styleLooks: SLK.list(), reopenable, scripts, cut, broll, pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: noTimeline(s) ? null : swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
 }
 
+// Copy the look (kit/studio/stylelooks.mjs): the reference's timeline is not used, so no "what to swap" and no spots from it
+const noTimeline = s => !!(s.reference && s.reference.mode === 'look');
+// how close the current draft is to what it copies (build/match.json), or null
+const matchOf = s => (s && s.job && C.draftIsCurrent(s) ? SLK.matchOf(join(ROOT, 'jobs', s.job, 'build')) : null);
 // what a finished draft says (a draft is a plan: no video until Render)
 const DRAFT_DONE = 'Plan ready, no video yet. Press Render.';
 // ---------- tasks (one at a time) ----------
@@ -233,12 +238,12 @@ function lookSources(s, cat = C.catalog()) {
   const why = Object.fromEntries(((ex && ex.summary && ex.summary.suggestions) || []).filter(x => ref.has(x.ref) && x.why).map(x => [x.ref, x.why]));
   return { pack: [...pack], ref: [...ref], added: [...added], why, packName: s.pack || null, refName: ex ? (ex.name || null) : null };
 }
-// Recreate needs the reference's recipe: while it is still being read, Draft says so plainly (never a generic busy)
+// Recreate and Copy the look need the reference's recipe: while it is still being read, Draft says so plainly (never a generic busy)
 function refWait(s) {
-  const r = s.reference || {}; if (r.mode !== 'recreate' || C.recreateRecipe(s, ROOT)) return null;
+  const r = s.reference || {}; if (!['recreate', 'look'].includes(r.mode) || (r.mode === 'look' ? SLK.refDir(s, ROOT) : C.recreateRecipe(s, ROOT))) return null;
   const it = (r.queue || []).find(x => C.REF_READING.includes(x.status));
   const what = it ? (it.status === 'tearing' ? 'being broken down' : 'downloading') : r.status === 'running' ? 'being broken down' : null;
-  return what ? `The reference is still ${what}. Recreate needs it: draft again when it is ready, or set the reference to Off to draft without it.` : null;
+  return what ? `The reference is still ${what}. ${r.mode === 'look' ? 'Copy the look' : 'Recreate'} needs it: draft again when it is ready, or set the reference to Off to draft without it.` : null;
 }
 function draftSteps(s) {
   if (!s.job) throw Object.assign(new Error('name the job first'), { code: 400 });
@@ -250,13 +255,15 @@ function draftSteps(s) {
   if (comp.errs.length) throw Object.assign(new Error(comp.errs.join('; ')), { code: 400 });
   let args = comp.args.slice();
   if (recreate) C.recreateArgs(args, recreate);
+  // Copy the look, or a saved style look with no reference in use: --style-look, never --recipe or --recut
+  const styleLook = recreate ? null : SLK.forDraft(s, ROOT, args);
   // your pieces (the Combo) when you kept any: cut once, here, and handed to the reel as they are (--as-is). Recreate
   // runs on them too, with the reference's Reel.md as the recipe, so the draft is what Your edit says it is (it used
   // to switch to the whole take, so the draft's key never matched and Render could not come on)
   const combo = comboOf(s), fromPieces = draftFrom(s, combo) === 'pieces';
   if (fromPieces) {
     const cf = comboFiles(s, combo);
-    return { steps: [...cf.steps, [process.env.STUDIO_REEL || 'kit/reel.cjs', [...cf.files, '--as-is', '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])]]], lockString: comp.lockString, txPrompt: null, key: draftKey(s, combo), from: 'pieces', pieces: combo.pieces.length };
+    return { steps: [...cf.steps, [process.env.STUDIO_REEL || 'kit/reel.cjs', [...cf.files, '--as-is', '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])]]], lockString: comp.lockString, txPrompt: null, key: draftKey(s, combo), from: 'pieces', pieces: combo.pieces.length, styleLook };
   }
   const cl = cleanupFor(s), src = cl ? ['--clips', relOf(clipsDirOf(s)), '--cleanup', cl] : s.clips ? ['--clips', s.clips] : s.footage;
   // takes filmed from a script: hand the script to Whisper as a hint (TX_PROMPT, kit/tx.py and kit/clip.py), so captions spell its words
@@ -273,7 +280,15 @@ function draftSteps(s) {
       wordsArg = ['--words', wf];
     }
   }
-  return { steps: [[process.env.STUDIO_REEL || 'kit/reel.cjs', [...src, ...wordsArg, '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])], stepEnv]], lockString: comp.lockString, txPrompt: stepEnv.TX_PROMPT || null, key: 'take:' + C.footageKey(s), from: 'take' };
+  return { steps: [[process.env.STUDIO_REEL || 'kit/reel.cjs', [...src, ...wordsArg, '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])], stepEnv]], lockString: comp.lockString, txPrompt: stepEnv.TX_PROMPT || null, key: 'take:' + C.footageKey(s), from: 'take', styleLook };
+}
+// a draft starts: remember its locks, drop a saved look that is gone, and say in the task log which look it uses
+function startDraft(d, done) {
+  const sl = d.styleLook;
+  update(st => { st.lockedAtDraft = d.lockString || ''; st.drafted = null; if (sl && sl.clear) st.styleLook = null; });
+  const tk = runTask('draft', () => d.steps, done);
+  if (sl && sl.note) { tk.lines.push(sl.note); send('log', { id: tk.id, line: sl.note }); }
+  return tk;
 }
 function renderSteps(s) {
   if (!s.job || !existsSync(join(ROOT, 'jobs', s.job, 'build', 'cut.json'))) throw Object.assign(new Error('make a draft first'), { code: 400 });
@@ -592,14 +607,15 @@ function editOf(s, v) {
   const takes = s.footage.length, src = combo.source ? basename(combo.source) : null;
   const making = [fin.reel ? `1 ${o.format === 'long' ? 'long form video' : 'reel'}` : null, fin.clips && combo.pieces.length ? `${combo.pieces.length} clip${combo.pieces.length === 1 ? '' : 's'}` : null, fin.plain && combo.pieces.length ? 'plain clips' : null].filter(Boolean).join(' and ') || 'nothing yet';
   const picks = Object.values(s.picks || {}).reduce((a, p) => a + (p.allow || []).length + (p.deny || []).length, 0);
-  const ref = s.reference && s.reference.extracted && s.reference.mode !== 'off' ? (s.reference.mode === 'recreate' ? 'recreate' : 'influence') : null;
+  const ref = s.reference && s.reference.extracted && s.reference.mode !== 'off' ? (['recreate', 'look'].includes(s.reference.mode) ? s.reference.mode : 'influence') : null;
+  const styleLook = SLK.inUse(s, ROOT); // the style look the next draft uses (kit/studio/stylelooks.mjs)
   const spots = ((v.broll && v.broll.beats) || []).filter(b => b.slot).length;
   const drafted = s.drafted && s.drafted.key === draftKey(s, combo);
   const next = !takes && !s.clips ? { step: 'footage', label: 'Add footage' } : !s.job ? { step: 'footage', label: 'Name the reel' } : !drafted && fin.reel ? { step: 'finish', label: 'Draft it' } : { step: 'finish', label: 'Render' };
   return {
     making: { text: making, format: fmt, aspect, goal: o.goal, length: (cut.summary && cut.summary.length) || null },
     from: { takes, source: src, seconds: from === 'pieces' ? combo.seconds : (cut.seconds || null), mode: from, pieces: combo.pieces.length, text: from === 'pieces' ? `${pieceN(combo)} piece${pieceN(combo) === 1 ? '' : 's'}, ${Math.round(combo.seconds)} s, in your order${(() => { const by = piecesState(s, combo.source).by; return by && combo.pieces.some(x => x.kind === 'piece') ? (by === 'ai' ? ', picked by AI' : by === 'you' ? ', built by you' : `, ${by === 'ai, changed by you' ? 'picked by AI, changed by you' : 'set by ' + by}`) : ''; })()}` : takes ? `the whole take${takes > 1 ? ` (${takes} files)` : ''}` : 'no footage yet' },
-    look: { pack: s.pack || null, reference: ref, picks, text: [s.pack || 'Studio picks', ref ? `reference (${ref})` : null, picks ? `${picks} change${picks === 1 ? '' : 's'} by you` : null].filter(Boolean).join(', ') },
+    look: { pack: s.pack || null, reference: ref, styleLook, picks, text: [styleLook ? `style look ${styleLook}` : s.pack || 'Studio picks', ref ? `reference (${ref === 'look' ? 'copy the look' : ref})` : null, picks ? `${picks} change${picks === 1 ? '' : 's'} by you` : null].filter(Boolean).join(', ') },
     broll: { spots, ideas: ((v.broll && v.broll.beats) || []).filter(b => b.idea && !b.slot).length, cutins: combo.pieces.filter(x => x.kind === 'testimonial').length, text: [spots ? `${spots} spot${spots === 1 ? '' : 's'}` : 'none yet', combo.pieces.some(x => x.kind === 'testimonial') ? `${combo.pieces.filter(x => x.kind === 'testimonial').length} testimonial` : null].filter(Boolean).join(', ') },
     sound: { bed: s.music.bed, sfx: s.sound.sfx, text: `${s.music.bed === 'auto' ? 'Music picked for you' : s.music.bed === 'none' ? 'No music' : s.music.bed}, sounds ${s.sound.sfx}` },
     drafted: !!drafted, stale: !!(s.drafted && !drafted && fin.reel), next,
@@ -841,7 +857,7 @@ const POSTR = mountPost({ ROOT, C, json, readBody });
 // A Recreate draft re-cut to the reference's shots gives its cutaways on the draft's own clock: build/plan.json
 // shots first, else cut.json refShots (kit/recreate.cjs shotsOf).
 // Each carries the cutaway's length and what it showed (Reel.md shot broll), so the spot matches it.
-const refBroll = (s, cut, job = s.job) => { if (!s.reference || s.reference.mode === 'off') return [];
+const refBroll = (s, cut, job = s.job) => { if (!s.reference || s.reference.mode === 'off' || noTimeline(s)) return [];
   const rs = RC.shotsOf(job ? join(ROOT, 'jobs', String(job), 'build') : null, cut).filter(x => x.cutaway);
   if (rs.length) return rs.map(x => ({ at: +x.start + 0.05, seconds: +(+x.end - +x.start).toFixed(2), label: 'B-roll', detail: x.broll ? `it shows ${x.broll}` : 'the reference cuts away here', ...(x.broll ? { what: x.broll } : {}) }));
   const sw = swapOf(s); if (!sw || !sw.seconds) return [];
@@ -1113,8 +1129,7 @@ async function api(req, res, u) {
   if (p === '/api/draft' && M === 'POST') {
     const s = C.load(); const d = draftSteps(s); // checks the footage first, so an empty job says that before a missing tool
     const miss = needFor('draft'); if (miss) return json(res, 400, miss);
-    update(st => { st.lockedAtDraft = d.lockString || ''; st.drafted = null; });
-    runTask('draft', () => d.steps, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; delete st.draftStale; }); BRL.autoPick(s.job); return { choices: !!readChoices(C.load()), note: DRAFT_DONE, from: d.from }; });
+    startDraft(d, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; delete st.draftStale; }); BRL.autoPick(s.job); return { choices: !!readChoices(C.load()), note: DRAFT_DONE, from: d.from }; });
     return json(res, 202, { ...view(C.load()), from: d.from });
   }
   // ---------- pieces and the Combo (kit/studio/pieces.mjs) ----------
@@ -1145,7 +1160,7 @@ async function api(req, res, u) {
     const s1 = C.load(); return json(res, 200, { ...view(s1), pieces: piecesOf(s1, rel), note });
   }
   if (p === '/api/outputs' && M === 'GET') return json(res, 200, outputsLib(C.load(), u.searchParams.get('all') === '1'));
-  if (p === '/api/edit' && M === 'GET') { const v = view(C.load()); return json(res, 200, { edit: v.edit, combo: v.combo, finish: v.state.finish }); }
+  if (p === '/api/edit' && M === 'GET') { const v = view(C.load()); return json(res, 200, { edit: v.edit, combo: v.combo, finish: v.state.finish, referenceMode: v.state.reference.mode, styleLook: v.state.styleLook || null, styleLooks: v.styleLooks, match: v.match }); }
   if (p === '/api/render' && M === 'POST') {
     // the one Render: the reel (from the draft), and in the same run the exports you ticked in Finish: each piece as its
     // own reel (clips) or as a plain clip (plain). Body { exports: { reel, clips, plain } } overrides finish for this run.
@@ -1222,7 +1237,7 @@ async function api(req, res, u) {
     const note = `Clean-up: ${removed.filter(x => x.type === 'silence').length} pauses, ${removed.filter(x => x.type === 'filler').length} filler words and ${items.filter(x => x.type === 'take').length - pl.keep.length} retakes left out, ${pl.saved} s shorter. ${b.redraft === false ? 'Used on the next draft.' : 'Redrafting.'}`;
     update(st => { st.cleanup = { on: true, silence: sil || (st.cleanup && st.cleanup.silence) || 0.7, decisions: dec, footage: C.footageKey(st), at: new Date().toISOString(), saved: pl.saved };
       if (S.load().actionNotes !== false) C.applyPatch(st, { reply: note, from: 'Studio', kind: 'action' }); });
-    if (b.redraft !== false) { const s = C.load(), d = draftSteps(s); update(st => { st.lockedAtDraft = d.lockString || ''; st.drafted = null; }); runTask('draft', () => d.steps, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; delete st.draftStale; }); return { choices: !!readChoices(C.load()), cleanup: pl, note: DRAFT_DONE }; }); }
+    if (b.redraft !== false) { const s = C.load(), d = draftSteps(s); startDraft(d, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; delete st.draftStale; }); return { choices: !!readChoices(C.load()), cleanup: pl, note: DRAFT_DONE }; }); }
     return json(res, 202, { ...cleanupView(C.load()), plan: pl, ...view(C.load()) });
   }
   // comment on the preview: a click or a box on a frame, sent to whoever answers the chat, with the frame saved in the job
@@ -1244,6 +1259,13 @@ async function api(req, res, u) {
     const end = b.end != null && +b.end > t + 0.05 ? +(+b.end).toFixed(2) : null, source = typeof b.source === 'string' && okFootage(s, b.source) ? b.source : null;
     const line = RV.commentLine({ text, t, end, region: rg, video: video || source, frame });
     return json(res, 200, await chatTurn(line, false, { kind: 'comment', t: +t.toFixed(2), ...(end != null ? { end } : {}), region: rg, video: video || source, frame, note: text }));
+  }
+  // saved style looks (kit/studio/stylelooks.mjs): the list, and Save this look from the current reference
+  if (p === '/api/style-looks' && M === 'GET') return json(res, 200, { looks: SLK.list() });
+  if (p === '/api/style-looks/save' && M === 'POST') {
+    const b = await readBody(req).catch(() => ({})); let r;
+    try { r = SLK.saveCurrent(C.load(), ROOT, b.name); } catch (e) { return json(res, e.code || 500, { error: e.message }); }
+    pushState(true); return json(res, 200, { ok: true, name: r.name, looks: SLK.list() });
   }
   if (p === '/api/pack/save' && M === 'POST') {
     const b = await readBody(req), s = C.load(), name = String(b.name || '').toLowerCase();

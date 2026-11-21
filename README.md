@@ -297,7 +297,12 @@ Top captions tuck behind your hair where they meet it (`--caption-layer front|be
 ```
 npm run teardown -- reference.mp4                                       # what it is made of, as a Reel.md
 npm run reel -- --recipe teardown/reference/Reel.md --clip inbox/me.mp4  # the same style, your clip and brand
+npm run reel -- --recipe teardown/reference/Reel.md --recut --clip inbox/me.mp4   # Recreate: the same edit, shot by shot
+npm run look -- save teardown/reference --name warm-list                # Copy the look: save its style under a name
+npm run reel -- --style-look warm-list --clip inbox/another-take.mp4    # ...and put it on any take, your script and timing
 ```
+
+Recreate re-cuts your take to the reference's shots and matches each shot's face size, eye line and colour (skin kept natural). Copy the look keeps only the style (framing, colour, captions, titles, stickers, sounds, pace) and takes every cut from your own pauses, so it works with your own script and subject. Both leave a short read-out of how close the draft is (`build/match.json`). See [Copy the look](docs/reel-md.md#copy-the-look).
 
 [rea-video](https://github.com/JuneYaooo/rea-video) breaks the reference down shot by shot; the kit maps it onto the menu above and shows you what it found before anything renders. Local files, or one Instagram post with `--url` if you install the optional instaloader (you need the rights to it). See [how accurate teardowns are](docs/teardown.md).
 
@@ -415,7 +420,7 @@ The CLI may print a one-line star reminder after your first successful render, a
 
 ## Cite this
 
-> Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.27.2) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
+> Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.28.0) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
 
 Machine-readable metadata is in [CITATION.cff](CITATION.cff), and GitHub shows it under "Cite this repository".
 

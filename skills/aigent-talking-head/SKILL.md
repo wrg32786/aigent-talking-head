@@ -73,6 +73,7 @@ Run each as `npm run <command> -- <args>` from the repo root. Full flag list wit
 | `preset` | list, show or save presets | `--show <name>`, `--save <name> --from <job>` |
 | `reelmd` | Reel.md recipes | `check <Reel.md>`, `compile <Reel.md> [--out dir]`, `export <job> [--out Reel.md] [--name n]`, `package <Reel.md> <dir>` |
 | `teardown` | reference reel to a Reel.md | `<video>`, `--out`, `--name`, `--engine rea\|lite`, `--install`, `--model`, `--no-asr`, `--no-ocr`, `--vlm`, `--reuse` |
+| `look` | Copy the look: save a teardown's style as a reusable style look, list them | `save <teardown dir>`, `list`, `show <look>`, `remove <look>`, `--name`, `--json`; use one with `npm run reel -- --style-look <name>` |
 | `capture` | public page to a screen card | `<urls...>` or `--recipe <Reel.md> [--list]`, `--scroll 8`, `--width 780`, `--force`, `--image-only` |
 | `menu` | every option | `--json` |
 | `list` | one part of the effects menu by kind (transitions, titles, captions, graphics, effects, editing); animated previews in `docs/effects.md` | `-- <kind>`, `--json` |

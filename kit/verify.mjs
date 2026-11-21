@@ -185,7 +185,10 @@ if (C.titles && mask.file) {
     lines.push(`${good ? 'ok    ' : 'note  '}mask at title ${tm.toFixed(2)}s: alpha coverage ${(cov * 100).toFixed(1)}%, mean ${(sum / buf.length / 255).toFixed(3)}, title band ${bandA.toFixed(3)}`);
   }
   if (existsSync(mf)) {
-    const off = TL.total > 0.5 ? [0.05].filter(x => !titles.some(t => x >= t.start - 0.1 && x <= t.end + 0.1)) : [];
+    // the mask is also made for captions behind the person, stickers behind the head and screen cards behind its top
+    // (kit/reel.cjs), so a moment inside one of those is not "outside"
+    const alsoMasked = [...(R.captionLayer(CAP) === 'behind' ? (CAP.flips || []).filter(f => f.mode === 0).map(f => ({ start: f.start, end: f.end + 1.5 })) : []), ...(CAP.flips || []).filter(f => f.mode === 9 && f.layer === 'behind'), ...R.panelsBehind(CAP)];
+    const off = TL.total > 0.5 ? [0.05].filter(x => !titles.some(t => x >= t.start - 0.1 && x <= t.end + 0.1) && !alsoMasked.some(t => x >= t.start - 0.15 && x <= t.end + 0.15)) : []; // a window opens 0.1 s early, and the probe lands on the next frame
     for (const tm of off) { const b = execFileSync('ffmpeg', ['-v', 'error', '-ss', String(tm), '-i', mf, '-frames:v', '1', '-vf', 'scale=90:160', '-f', 'rawvideo', '-pix_fmt', 'gray', '-']); ok(b.every(x => x <= 8), `mask is empty outside the title windows (t=${tm}s, max alpha ${Math.max(...b)})`); }
     }
   }

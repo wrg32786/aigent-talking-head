@@ -567,12 +567,27 @@ const SAFE=54; // 5% title-safe margin
 // rises and its spacing settles
 const ordGeo=c=>{const o=c[4],R=o.size||400;return{x:(o.x??.5)*1080,y:(o.y??.27)*1920,R}};
 function sealPath(R,n,d){ctx.beginPath();for(let i=0;i<=n;i++){const a=i/n*Math.PI*2-Math.PI/2,am=a-Math.PI/n,ri=R*(1-d);if(!i)ctx.moveTo(Math.cos(a)*ri,Math.sin(a)*ri);else ctx.quadraticCurveTo(Math.cos(am)*R*(1+d*.9),Math.sin(am)*R*(1+d*.9),Math.cos(a)*ri,Math.sin(a)*ri)}ctx.closePath()}
-function ordBurst(c,t){const o=c[4],dt=t-c[0],{x,y,R}=ordGeo(c),col=o.color||CY,s=spring(dt,1.9,.55),rot=(1-Math.min(1,s))*-.45+dt*.04;if(s<=.002)return;
+// starburst shape (shape starburst): a flat spiky star with N points behind the head, the inner radius about 0.62 of the
+// outer, each point a little off in length and angle (fixed per point, so every frame draws the same star); the word is
+// white italic serif above the burst, over the crown, with a soft shadow
+// a starburst behind the head is under the person (the mask), so it cannot cover the face: the face check counts only
+// its word. captions.js "personMask": false (a job with no mask) counts the burst too, like a burst in front.
+let WORDONLY=false;const STARBEH=c=>c[3]===9&&isStar(c[4])&&c[4].layer==='behind'&&CAP.personMask!==false;
+const STARCOL='#f5e04a',isStar=o=>o.shape==='starburst',starN=o=>Math.max(6,Math.min(24,Math.round(+o.spikes||12)));
+const starJ=(i,k)=>{const v=Math.sin(i*127.1+k*311.7)*43758.5453;return v-Math.floor(v)};
+function starPath(R,n){ctx.beginPath();for(let i=0;i<n;i++){const st=Math.PI*2/n,a=i*st-Math.PI/2+(starJ(i,1)-.5)*st*.22,ro=R*(.9+.1*starJ(i,2)),ri=R*(.59+.06*starJ(i,3)),am=(i+.5)*st-Math.PI/2;
+ ctx[i?'lineTo':'moveTo'](Math.cos(a)*ro,Math.sin(a)*ro);ctx.lineTo(Math.cos(am)*ri,Math.sin(am)*ri)}ctx.closePath()}
+function starBurst(c,t){const o=c[4],dt=t-c[0],{x,y,R}=ordGeo(c),s=spring(dt,1.9,.55);if(s<=.002)return;
+ ctx.save();ctx.translate(x,y);ctx.rotate((1-Math.min(1,s))*-.35);ctx.scale(s,s);starPath(R,starN(o));ctx.fillStyle=o.color||STARCOL;ctx.fill();ctx.restore()}
+function starWord(c,t){const o=c[4],dt=t-c[0]-.1,txt=String(c[2]||'').toUpperCase();if(dt<0||!txt)return;const {x,y,R}=ordGeo(c);let fs=o.wordSize||Math.round(Math.min(170,R*.36));ctx.font=SERIF(fs);while(ctx.measureText(txt).width>Math.min(940,R*1.5)&&fs>48){fs-=4;ctx.font=SERIF(fs)}
+ const e=EMPH(cl(dt/.45)),wy=Math.max(SAFE+fs*.6,y-R*.93-fs*.15);ctx.save();ctx.font=SERIF(fs);ctx.textAlign='center';ctx.textBaseline='middle';ctx.letterSpacing=((-.01+.12*(1-e))*fs)+'px';ctx.globalAlpha*=cl(dt/.12);ctx.translate(x,wy+(1-e)*30);
+ ctx.shadowColor='rgba(0,0,0,.45)';ctx.shadowBlur=fs*.16;ctx.shadowOffsetY=fs*.03;ctx.fillStyle=o.ink||'#ffffff';ctx.fillText(txt,0,0);ctx.restore()}
+function ordBurst(c,t){if(isStar(c[4]))return starBurst(c,t);const o=c[4],dt=t-c[0],{x,y,R}=ordGeo(c),col=o.color||CY,s=spring(dt,1.9,.55),rot=(1-Math.min(1,s))*-.45+dt*.04;if(s<=.002)return;
  ctx.save();ctx.translate(x,y);ctx.rotate(rot);ctx.scale(s,s);const P=()=>sealPath(R,36,.028);elev(P,.9);
  P();const g=ctx.createLinearGradient(0,-R,0,R);g.addColorStop(0,mix(col,'#ffffff',.08));g.addColorStop(1,mix(col,'#000000',.08));ctx.fillStyle=g;ctx.fill();
  ctx.beginPath();ctx.arc(0,0,R*.86,0,7);ctx.lineWidth=Math.max(2,R*.008);ctx.strokeStyle=rgba(onCol(col),.22);ctx.stroke();
  ctx.restore()}
-function ordWord(c,t){const o=c[4],dt=t-c[0]-.1,txt=String(c[2]||'').toUpperCase();if(dt<0||!txt)return;const {x,y,R}=ordGeo(c),col=o.color||CY,wy=Math.max(120,y-R*.6);let fs=o.wordSize||Math.round(Math.min(150,R*.32));ctx.font=SERIF(fs);while(ctx.measureText(txt).width>Math.min(940,R*1.3)&&fs>48){fs-=4;ctx.font=SERIF(fs)}
+function ordWord(c,t){if(isStar(c[4]))return starWord(c,t);const o=c[4],dt=t-c[0]-.1,txt=String(c[2]||'').toUpperCase();if(dt<0||!txt)return;const {x,y,R}=ordGeo(c),col=o.color||CY,wy=Math.max(120,y-R*.6);let fs=o.wordSize||Math.round(Math.min(150,R*.32));ctx.font=SERIF(fs);while(ctx.measureText(txt).width>Math.min(940,R*1.3)&&fs>48){fs-=4;ctx.font=SERIF(fs)}
  const e=EMPH(cl(dt/.45)),ink=o.ink||onCol(col);ctx.save();ctx.font=SERIF(fs);ctx.textAlign='center';ctx.textBaseline='middle';ctx.letterSpacing=((.03+.2*(1-e))*fs)+'px';ctx.globalAlpha*=cl(dt/.12);ctx.translate(x,wy+(1-e)*30);
  ctx.fillStyle=ink;ctx.fillText(txt,0,0);ctx.restore()}
 // app label, entrance tile-pop: the app tile springs in from a tilt (top-lit, specular, hairline rim), then the name plate
@@ -1169,8 +1184,8 @@ function faceAt(t){if(!FTRK)return null;const i=Math.round(t*FTRK.fps),z=FTRK.zo
 function faceSpan(s,e){if(!FTRK)return null;let b=null;const f=FTRK.fps,i0=Math.max(0,Math.floor(s*f)),i1=Math.min(FTRK.zones.length-1,Math.ceil(Math.min(e,s+30)*f));
  for(let i=i0;i<=i1;i++){const z=FTRK.zones[i];if(z)b=uni(b,{x0:z[0],y0:z[1],x1:z[2],y1:z[3]})}return b}
 const FACESAFE=CAP.faceSafe!==false&&!!FTRK;
-function boxNow(cs,t,raw){const keep=ctx,L=LAYER,R0=RAW;MSX.setTransform(1,0,0,1,0,0);MSX.globalAlpha=1;MSX.clearRect(0,0,270,480);MSX.setTransform(.25,0,0,.25,0,0);ctx=MSX;LAYER='all';RAW=!!raw;
- try{flip(t,cs)}catch(e){}finally{ctx=keep;LAYER=L;RAW=R0}
+function boxNow(cs,t,raw,word){const keep=ctx,L=LAYER,R0=RAW,W0=WORDONLY;WORDONLY=!!word;MSX.setTransform(1,0,0,1,0,0);MSX.globalAlpha=1;MSX.clearRect(0,0,270,480);MSX.setTransform(.25,0,0,.25,0,0);ctx=MSX;LAYER='all';RAW=!!raw;
+ try{flip(t,cs)}catch(e){}finally{ctx=keep;LAYER=L;RAW=R0;WORDONLY=W0}
  const d=MSX.getImageData(0,0,270,480).data;let x0=1e9,y0=1e9,x1=-1,y1=-1;
  for(let y=0;y<480;y++){const r=y*1080;for(let x=0;x<270;x++)if(d[r+x*4+3]>56){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}}
  return x1<0?null:{x0:x0*4,y0:y0*4,x1:x1*4+4,y1:y1*4+4}}
@@ -1207,7 +1222,7 @@ function layoutPass(){LAYOUT.clear();REPORT.length=0;const R=safeRect(),M=18;
  // 1b. a card or graphic never covers the eyes: one that meets the face above its lower 30% (the chin, which a card may
  // cover) moves down so it starts there, shrinking to fit the frame (no less than 60%). A reference's card placed for
  // its speaker lands on yours this way when you sit lower or wider in the frame.
- if(FACESAFE)for(const x of els){if(x.kind!=='graphic'||x.takeover||x.c[3]===8)continue;const Z=faceSpan(x.s,Math.min(x.e,x.s+30));if(!Z)continue;
+ if(FACESAFE)for(const x of els){if(x.kind!=='graphic'||x.takeover||x.c[3]===8||STARBEH(x.c))continue;const Z=faceSpan(x.s,Math.min(x.e,x.s+30));if(!Z)continue;
   const eyes={x0:Z.x0,x1:Z.x1,y0:Z.y0,y1:Z.y0+(Z.y1-Z.y0)*.7},B0=x.box;if(interA(B0,eyes)<area(B0)*.02)continue;
   const top=eyes.y1+M,H=B0.y1-B0.y0,s=Math.max(.6,Math.min(1,(R.y1-top)/H)),k0=x.xf||{cx:(x.raw.x0+x.raw.x1)/2,cy:(x.raw.y0+x.raw.y1)/2,dx:0,dy:0,s:1};
   const s2=+((k0.s||1)*s).toFixed(3),rh=x.raw.y1-x.raw.y0,k={cx:k0.cx,cy:k0.cy,dx:k0.dx||0,s:s2,dy:Math.round(top+rh*s2/2-k0.cy)},B=xfBox(x.raw,k);
@@ -1234,7 +1249,7 @@ function layoutPass(){LAYOUT.clear();REPORT.length=0;const R=safeRect(),M=18;
   const order=els.filter(x=>isText(x.c)&&!x.takeover).sort((a,b)=>(a.kind==='title'?0:1)-(b.kind==='title'?0:1)||a.s-b.s);
   for(const x of order){const e=Math.min(x.e,x.s+30),Zu=faceSpan(x.s,e);
    if(!Zu){placed.push(x);continue}
-   const S=[];for(let t=x.s+.02;t<e-.01;t+=1/f){const z=faceAt(t);if(!z)continue;const b=boxNow([x.c],t,true);if(b)S.push({t,b,z})}
+   const S=[];for(let t=x.s+.02;t<e-.01;t+=1/f){const z=faceAt(t);if(!z)continue;const b=boxNow([x.c],t,true,true);if(b)S.push({t,b,z})}
    const bad=k=>S.filter(q=>interA(xfBox(q.b,k),q.z)>tol(q.b));
    const k0=x.xf||{cx:(x.raw.x0+x.raw.x1)/2,cy:(x.raw.y0+x.raw.y1)/2,dx:0,dy:0,s:1};
    if(!bad(k0).length){placed.push(x);continue}
@@ -1261,16 +1276,16 @@ window.__layout=()=>({export:EXPF?EXPF.name||'custom':null,safe:safeRect(),face:
 // the face check: every caption, title and kinetic word on screen at t, drawn alone with its layout, and how many of its
 // letter pixels land inside the face zone at t (full-frame pixels; 0 is clean). render.mjs samples it into facecheck.json.
 window.__faceInk=t=>{const z=faceAt(t);if(!z)return null;const q={x0:Math.floor(z.x0/4),y0:Math.floor(z.y0/4),x1:Math.ceil(z.x1/4),y1:Math.ceil(z.y1/4)},out=[];
- for(const c of flips){if(!isText(c)||t<c[0]||t>=c[1])continue;const keep=ctx,L=LAYER;MSX.setTransform(1,0,0,1,0,0);MSX.globalAlpha=1;MSX.clearRect(0,0,270,480);MSX.setTransform(.25,0,0,.25,0,0);ctx=MSX;LAYER='all';
-  try{flip(t,[c])}catch(e){}finally{ctx=keep;LAYER=L}
+ for(const c of flips){if(!isText(c)||t<c[0]||t>=c[1])continue;const keep=ctx,L=LAYER;MSX.setTransform(1,0,0,1,0,0);MSX.globalAlpha=1;MSX.clearRect(0,0,270,480);MSX.setTransform(.25,0,0,.25,0,0);ctx=MSX;LAYER='all';WORDONLY=true;
+  try{flip(t,[c])}catch(e){}finally{ctx=keep;LAYER=L;WORDONLY=false}
   if(cardAt(t))continue; // on a full colour card there is no face to cover
   let d;try{d=MSX.getImageData(q.x0,q.y0,Math.max(1,q.x1-q.x0),Math.max(1,q.y1-q.y0)).data}catch(e){window.__faceTainted=true;continue}/* a file image tainted it: report, never stop the render */let n=0;for(let i=3;i<d.length;i+=4)if(d[i]>96)n++;
   if(n)out.push({kind:kindOf(c),mode:c[3],start:c[0],text:String(c[2]||'').slice(0,40),px:n*16})}
  return{zone:z,hits:out}};
 // every element on screen at t, each measured alone with its layout applied (hidden ones report no box)
-window.__boxesAt=t=>flips.filter(c=>t>=c[0]&&t<c[1]).map(c=>({kind:kindOf(c),mode:c[3],start:c[0],end:c[1],text:String(c[2]||'').slice(0,40),box:boxNow([c],t,false),takeover:(REPORT.find(r=>r.start===c[0]&&r.mode===c[3])||{}).takeover||false})).filter(x=>x.box);
+window.__boxesAt=t=>flips.filter(c=>t>=c[0]&&t<c[1]).map(c=>({kind:kindOf(c),mode:c[3],start:c[0],end:c[1],text:String(c[2]||'').slice(0,40),box:boxNow([c],t,false,STARBEH(c)),takeover:(REPORT.find(r=>r.start===c[0]&&r.mode===c[3])||{}).takeover||false})).filter(x=>x.box);
 function flip(t,only){for(const c of (only||flips)){if(t<c[0]||t>=c[1])continue;if(LAYER==='panels'&&!(PANM(c[3])&&PANB(c)))continue;use(c.ps);const dt=t-c[0],m=c[3],out=c[1]>90?1:cl((c[1]-t)/.05);ctx.save();ctx.globalAlpha=out;{const k=LXF(c,t);if(k===0){ctx.restore();continue}if(k)xfApply(k)}
-if(m===9){const beh=c[4].layer==='behind';if(LAYER==='titles'){if(beh)ordBurst(c,t)}else{if(!(beh&&LAYER==='front'))ordBurst(c,t);ordWord(c,t)}}
+if(m===9){const beh=c[4].layer==='behind';if(LAYER==='titles'){if(beh)ordBurst(c,t)}else{if(!(beh&&LAYER==='front')&&!(WORDONLY&&STARBEH(c)))ordBurst(c,t);ordWord(c,t)}}
 else if(m===7){if(zoneAt(t)!=='hide'){const lay=cardAt(t)?'front':(c.layer||'front'); // on a colour card there is no head to sit behind
 if(LAYER==='titles'){if(lay==='behind')title(c,t,'hero')}else if(LAYER==='front'){title(c,t,lay==='behind'?'partner':'all')}else title(c,t,'all')}}
 else if(PANM(m)&&PANB(c)){if(LAYER==='panels'||LAYER==='all')drawG(c,t)}

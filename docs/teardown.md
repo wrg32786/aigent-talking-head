@@ -16,11 +16,18 @@ npm run teardown -- --url https://www.instagram.com/reel/<code>/  # fetches that
 
 It fetches only the post you name, anonymously. It never logs in, and it does not fetch profiles, hashtags, stories or anything in bulk. If Instagram asks for a login or rate-limits the request, it stops and says so; download the video yourself instead. You must have the rights to the content, and you must follow Instagram's terms. Other sites (TikTok, YouTube and so on) are not supported: save the video yourself where the platform and the creator allow it, then pass the file.
 
+## Two ways to use a teardown
+
+- **Recreate** (the same edit): `npm run reel -- --recipe teardown/<name>/Reel.md --recut --clip <your take>` re-cuts the reference's timeline onto your take: its shot rhythm, each shot's face size, eye line and colour, its graphics and sounds at its times.
+- **Copy the look** (the same style, your content): `npm run look -- save teardown/<name> --name <name>` saves the style as a reusable style look, and `npm run reel -- --style-look <name> --clip <any take>` puts it on a take with its own script and timing. Nothing from the reference's script, text or times is used. See [Copy the look](reel-md.md#copy-the-look).
+
+Both write `build/match.json`, an estimate of how close the draft is, part by part.
+
 ## What runs
 
 1. **rea-video** ([JuneYaooo/rea-video](https://github.com/JuneYaooo/rea-video), Apache-2.0) breaks the video down shot by shot and writes a [VIDEO.md](https://videomd.github.io/videomd/) package: cuts, captions and styled text with timing, colour, outline and entrance, stickers, music BPM and beats, sound effects, grade, framing and camera moves, plus its own `report.html`. It runs offline. A vision model is optional (`--vlm`, see rea-video's docs).
 2. **Speech**: if rea-video's optional speech step is off, faster-whisper (already a kit dependency) transcribes the reference so you can see its timing.
-3. **Extras** (`kit/teardown.py extras`): things a talking-head remake needs that rea-video does not measure. Front or behind for each big title (a MediaPipe person mask from the effects venv, when it is set up), corner darkening and noise per shot, and a labelled contact sheet.
+3. **Extras** (`kit/teardown.py extras`): things a talking-head remake needs that rea-video does not measure. Front or behind for each big title (a MediaPipe person mask from the effects venv, when it is set up), corner darkening and noise per shot, and a labelled contact sheet. Since 1.28.0 also, per shot, where the speaker's face sits (height, eye line and centre, `kit/framing.py`) and the shot's colour in Lab (`kit/grade_match.py`); both need only opencv.
 4. **Mapping** (`kit/videomd2reel.cjs`): the breakdown becomes a Reel.md on the talking-head menu.
 
 | Detected | Becomes |
@@ -33,6 +40,8 @@ It fetches only the post you name, anonymously. It never logs in, and it does no
 | Big text that is not a caption | up to 7 titles with text, times, the nearest entrance (cut to slam, pop to pop-zoom, type-on to stagger-rise, fade to blur-rise, slide to slide-left), and front or behind |
 | Grade per shot | the nearest finish (`mono`, `teal`, `bleach`, `crushed`, `cool`, `warm`, `scan-lines`, `grain`, `vignette`), only when it is strong or differs across shots; otherwise none (see below) |
 | Cuts, jump cuts, zoom moves | the shot list, big punches, punch on or off |
+| The speaker's face per shot (1.28.0) | each shot's `face` (`height@eye line`, shares of the frame, YuNet): a Recreate crops every shot of your take to the same face size and eye line (`kit/reframe.cjs`), where the framing word alone gave one of four punches |
+| Colour per shot (1.28.0) | each shot's `lab` (mean and spread in Lab, from a few frames, the reference's own graphics left out; black shots and shots under 2 s are skipped): a Recreate matches your take's colour to it with a 3D LUT and keeps skin natural (`kit/grade-match.cjs`). This is separate from the finish below |
 | Transitions between shots (1.24.0) | each shot's `transition` on the kit's names: flash, a fade through black or white, crossfade, whip and push with their direction, swipe up or down, wipe, zoom, blur, glitch, warp for a morph, slice for a layout change. The job transition is the one used on a third or more of the cuts, else `none`. A spin, which the kit has no transition for, is made as a REF scene on that cut |
 | Camera inside a shot (1.24.0) | `move push` (push-in), `move pull` (pull-out), `move drift` (pan or track): a slow zoom over the segment. Handheld or a shake transition: `shake on`, a shake just after the cut in |
 | Effects its descriptions name (1.24.0) | with `--vlm`: light leaks, flashes, confetti, speed lines and the rest of `kit/scenes.cjs` EFFECTS, made as scenes (Made for you) on the shot the description names. Studio passes `--vlm` itself when a Gemini or OpenAI key is set (`STUDIO_VLM=off` turns it off); a failed model call falls back to the measured read |
@@ -64,7 +73,7 @@ Frames are sampled every 0.25 s at 540x960 and looked at for three kinds of grap
 
 | Graphic | Detected as | Becomes |
 |---|---|---|
-| Ordinal sticker | a large warm-yellow region with a spiky outline (low solidity), plus a short ordinal word (FIRST, 2nd, #3) read at the same time; front or behind from the person mask | `ordinal-sticker`, with the word (guessed from its place in the list when OCR could not read it, marked `text~`) |
+| Ordinal sticker | a large warm-yellow region with a spiky outline (low solidity), plus a short ordinal word (FIRST, 2nd, #3) read at the same time; front or behind from the person mask, or with no mask behind when a face is found inside the burst's outline and is not yellow. The outline is read around its centre: clear points make it a `starburst` and are counted (the usual gap between the points we can see gives the count, so the part behind the person does not lower it; 6 to 24), a round one is a `seal` | `ordinal-sticker`, with the word (guessed from its place in the list when OCR could not read it, marked `text~`), its colour and layer, and for a starburst `shape starburst` and `spikes <count>` (a round seal is the default and writes neither) |
 | App label | a small square tile of high-contrast colour, with a label read below or beside it | `app-label`, the label text and tile colour, a generic glyph until you add `icon` |
 | Screen card | a large dark rounded rectangle with a coloured border and at least two small UI text lines inside | `screen-card`, its border colour and place, a placeholder window until you add `src` (an image or a screen recording) |
 
@@ -117,4 +126,4 @@ Always show the user the teardown report and contact sheet, and let them change 
 - `teardown.md`: what was detected, per title and per shot, and why.
 - `contact.jpg`: sampled frames with the detected titles boxed and labelled.
 - `videomd/`: rea-video's VIDEO.md package, `breakdown.json` and `report.html` (or `fallback.json` from the built-in analyzer).
-- `titles.json`, `extras.json`, `speech.json`: intermediate data.
+- `titles.json`, `extras.json`, `speech.json`: intermediate data. `extras.json` `shots[]` holds each shot's grade stats, and since 1.28.0 `face` (`h`, `eye_y`, `cx`, the box `x0 y0 x1 y1`, and `n` of `of` samples with a face) and `lab` (`mean`, `std`); `graphics[]` holds each ordinal sticker's `shape`, `spikes`, `color` and `layer`.

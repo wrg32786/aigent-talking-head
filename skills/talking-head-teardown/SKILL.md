@@ -41,6 +41,13 @@ Ask what to change, and edit `teardown/<name>/Reel.md`: their preset and colours
 npm run reel -- --recipe teardown/<name>/Reel.md --clip inbox/<their-clip>.mp4 --draft
 ```
 
+Ask which of the two they want:
+
+- **Recreate** (the same edit): add `--recut`. Their take is re-cut to the reference's shots on word boundaries, each shot cropped to the reference's face size and eye line and graded to its colour (skin kept), with its stickers and sounds at its times.
+- **Copy the look** (the same style, their own script and subject): `npm run look -- save teardown/<name> --name <look>`, then `npm run reel -- --style-look <look> --clip inbox/<their-clip>.mp4 --draft`. The cuts land in their own pauses at the look's pace; nothing from the reference's script, text or times is used. The saved look works on any later take (`npm run look -- list`).
+
+Both write `jobs/<job>/build/match.json`: tell the user, in plain words, how close each part is and why a part is low (for example a take that was too wide to zoom all the way).
+
 Their own words stay; the recipe's title entrances and layers apply in order (`--recipe-titles` uses the reference's title text instead, only if the user wants that and the text is theirs to use; a title they do not say is dropped). Review, offer the menu again, `npm run reel -- --rebuild --name <job>`, then `npm run verify -- <job>` must print `VERIFY PASS`.
 
 ## Rules
