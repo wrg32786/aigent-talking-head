@@ -134,7 +134,8 @@ function fromTeardown(dir, opts = {}) {
     moves: { push: r2(shots.filter(s => s.move === 'push').length / (shots.length || 1)), pull: r2(shots.filter(s => s.move === 'pull').length / (shots.length || 1)), drift: r2(shots.filter(s => s.move === 'drift').length / (shots.length || 1)),
       shake: r2(shots.filter(s => s.shake).length / (shots.length || 1)), bigPunch: r2(shots.filter(s => s.bigPunch).length / (shots.length || 1)), punch: !/^(off|no|false)$/i.test(String(st.punch || 'on')) },
     pace: paceOf(shots, dur, words),
-    broll: { cutawayShare: dur ? r2(cut.reduce((a, s) => a + s.dur, 0) / dur) : 0, cutaways: cut.length, layout: cards.length ? 'card' : 'full' },
+    // slots: how often the reference shows B-roll, the kinds and how each is treated (kit/broll-slots.cjs lookSummary)
+    broll: { cutawayShare: dur ? r2(cut.reduce((a, s) => a + s.dur, 0) / dur) : 0, cutaways: cut.length, layout: cards.length ? 'card' : 'full', ...require('./broll-slots.cjs').lookSummary(require('./broll-slots.cjs').fromRecipe(recipe), dur) },
     music: { present: hasMusic, bed: hasMusic && mu.bed !== 'auto' ? mu.bed : null, bpm, energy: !none(mu.energy) ? mu.energy : bpm ? (bpm < 95 ? 'low' : bpm < 125 ? 'mid' : 'high') : null, level: mu['bed-volume'] != null && mu['bed-volume'] !== '' ? +mu['bed-volume'] : null,
       mood: [].concat((b.audio && b.audio.music && (b.audio.music.mood || b.audio.music.genre)) || []).map(String).slice(0, 4), beatSync: /^(on|yes|true)$/i.test(String(mu['beat-sync'] || '')) },
     sfx: sfxOf(recipe, dur),
