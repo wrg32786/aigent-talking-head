@@ -50,6 +50,25 @@ const shot = async (pg, sel, name) => {
 };
 const lastUser = async () => (await api('/api/state')).state.chat.filter(x => x.role === 'user').pop();
 
+const asCurrentDraft = async (job, version = 1) => {
+  const cur = await api('/api/state');
+  const key = (cur.combo && cur.combo.from === 'pieces' && cur.combo.key)
+    ? 'pieces:' + cur.combo.key
+    : 'take:' + JSON.stringify([cur.state.footage || [], cur.state.clips || null]);
+  writeFileSync(join(ROOT, 'jobs', job, `reel-v${version}.settings.json`), JSON.stringify({
+    version, at: new Date().toISOString(), job, key,
+    footage: JSON.stringify([cur.state.footage || [], cur.state.clips || null]),
+    takes: (cur.state.footage || []).map(f => String(f).split('/').pop()),
+    from: (cur.edit && cur.edit.from && cur.edit.from.text) || (cur.combo && cur.combo.from === 'pieces' ? 'your pieces' : 'the whole take'),
+  }));
+  if (!cur.edit || !cur.edit.drafted) {
+    const st = JSON.parse(readFileSync(join(STATE, 'state.json'), 'utf8'));
+    st.drafted = { key, from: (cur.combo && cur.combo.from) || 'take', at: Date.now() };
+    delete st.draftStale;
+    writeFileSync(join(STATE, 'state.json'), JSON.stringify(st, null, 2));
+  }
+};
+
 const browser = patient(await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox'] }));
 let client;
 try {
@@ -107,6 +126,7 @@ try {
 
   await t('a note on a stretch of the reel in Finish: Mark the end here', async () => {
     mkdirSync(join(ROOT, 'jobs', JOB), { recursive: true }); copyFileSync(TAKE, join(ROOT, 'jobs', JOB, 'reel-v1.mp4'));
+    await asCurrentDraft(JOB);
     await pg.goto(url + '/#step=finish', { waitUntil: 'networkidle' }); await pg.reload({ waitUntil: 'networkidle' }); await pg.waitForSelector('#comment-start');
     await pg.click('#comment-start'); await pg.fill('#cmp-seek', '4'); await wait(300); await pg.click('#comment-end');
     assert.ok(/From 0:00\.0 to 0:04\.0/.test(await pg.textContent('#cm-hint')), await pg.textContent('#cm-hint'));
