@@ -41,7 +41,7 @@ The user picks what to make from a take on the Cut step: format, length, full ed
 
 ## The Look step
 
-A Look is a pack; the user changes it layer by layer in 9 layers (Text, Fonts, Graphics, Transitions, Color and finish, Motion, Music and SFX, B-roll, Layout), each option in exactly one. `studio_get_state` with `catalog: true` lists them by layer. A reference is used whole (recreate), in parts (influence) or off. `clear_reference` takes it and the picks it added off as one undo (`undo: true` puts them back); `save_look` saves the current Look, with the reference's look when one is in use.
+A Look is a pack; the user changes it layer by layer in 9 layers (Text, Fonts, Graphics, Transitions, Color and finish, Motion, Music and SFX, B-roll, Layout), each option in exactly one. `studio_get_state` with `catalog: true` lists them by layer. A reference is used whole (recreate), in parts (influence) or off. Choosing recreate or influence sets the Look from it for the user (recreate: every layer it read, its Look, music and pace too; influence: its picks, with the user's Look and sound kept), each badged From reference; off takes out only what it set. Tell the user in one line, for example "I set your look from the reference. Change anything you like." `clear_reference` takes it and the picks it added off as one undo (`undo: true` puts them back); `save_look` saves the current Look, with the reference's look when one is in use.
 
 ## Pieces and the Combo
 
