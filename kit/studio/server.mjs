@@ -672,7 +672,7 @@ function editOf(s, v) {
     making: { text: making, format: fmt, aspect, goal: o.goal, length: (cut.summary && cut.summary.length) || null },
     from: { takes, source: src, seconds: from === 'pieces' ? combo.seconds : (cut.seconds || null), mode: from, pieces: combo.pieces.length, text: from === 'pieces' ? fromText(s, combo) : takes ? `the whole take${takes > 1 ? ` (${takes} files)` : ''}` : 'no footage yet' },
     look: { pack: s.pack || null, reference: ref, styleLook, picks, text: [styleLook ? `style look ${styleLook}` : s.pack || 'No Look', ref ? `reference (${ref === 'look' ? 'copy the look' : ref})` : null, picks ? `${picks} change${picks === 1 ? '' : 's'} by you` : null].filter(Boolean).join(', ') },
-    broll: { spots, ideas: ((v.broll && v.broll.beats) || []).filter(b => b.idea && !b.slot).length, cutins: combo.pieces.filter(x => x.kind === 'testimonial').length, text: [spots ? `${spots} spot${spots === 1 ? '' : 's'}` : 'none yet', combo.pieces.some(x => x.kind === 'testimonial') ? `${combo.pieces.filter(x => x.kind === 'testimonial').length} testimonial` : null].filter(Boolean).join(', ') },
+    broll: { spots, ideas: ((v.broll && v.broll.beats) || []).filter(b => b.idea && !b.slot).length, cutins: combo.pieces.filter(x => x.kind === 'testimonial').length, needs: brollNeeds(v), text: [spots ? `${spots} spot${spots === 1 ? '' : 's'}` : brollNeeds(v) ? null : 'none yet', brollNeeds(v) ? `${brollNeeds(v)} need${brollNeeds(v) === 1 ? 's' : ''} a clip` : null, combo.pieces.some(x => x.kind === 'testimonial') ? `${combo.pieces.filter(x => x.kind === 'testimonial').length} testimonial` : null].filter(Boolean).join(', ') },
     sound: { bed: s.music.bed, sfx: s.sound.sfx, text: `${s.music.bed === 'auto' ? 'Music picked for you' : s.music.bed === 'none' ? 'No music' : s.music.bed}, sounds ${s.sound.sfx}` },
     drafted: !!drafted, stale: !!(s.drafted && !drafted && fin.reel), next,
   };
@@ -919,6 +919,8 @@ const SIZER = SIZES.mount({ ROOT, C, json, readBody, runTask: (...a) => runTask(
 // A Recreate draft re-cut to the reference's shots gives its cutaways on the draft's own clock: build/plan.json
 // shots first, else cut.json refShots (kit/recreate.cjs shotsOf).
 // Each carries the cutaway's length and what it showed (Reel.md shot broll), so the spot matches it.
+// the plan's B-roll slots with no clip yet, not skipped (Your edit says how many)
+const brollNeeds = v => ((v.broll && v.broll.beats) || []).filter(b => b.need && !b.need.skipped && !b.slot).length;
 // 1.28.0: a draft from a reference or a look plans its B-roll slots itself (build/plan.json "broll", kit/broll-slots.cjs):
 // each slot is a spot, with what it should show and how it is treated, in Recreate and in Copy the look.
 const planSlots = job => { const p = job ? RC.readPlan(join(ROOT, 'jobs', String(job), 'build')) : null; return p && Array.isArray(p.broll) ? p.broll : []; };

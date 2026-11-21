@@ -91,6 +91,20 @@ npm run capture -- https://github.com/owner/repo --scroll 8  # or one page
 
 Each page becomes `assets/web/<page>/shot.png` (the top of the page, or of the README on a repo) and `scroll.mp4` (a short smooth scroll), in dark mode, cached per URL (`--force` to redo). Only public pages: http and https only, no localhost or private network addresses (checked before loading, and for every request the page makes), a fresh browser profile with no cookies and no login.
 
+### B-roll
+
+Since 1.28.0 a teardown also says where the reference shows B-roll, in a `## B-roll` block (`reel-broll`, see [reel-md.md](reel-md.md)). Three things count:
+
+| What | How it is found | In the block |
+| --- | --- | --- |
+| A framed panel over the speaker | the screen cards above; one that touches the next in the same place is one slot, and a panel the detector loses for a moment is followed by its border | `kind panel`, its place, size and border |
+| A full cutaway | a shot with no face, or a face that is not the speaker's. A shot with the speaker on screen is never a cutaway, even when they are quiet or behind a microphone | `kind full` |
+| A split screen | a hard edge from side to side near the middle that is there for only part of the reel | `kind split` |
+
+For each one `kit/broll_fx.py` reads the picture (OpenCV, on your computer): whether it pushes in, pulls out or drifts and by how much, whether it shakes, whether single frames flash or tear (a glitch), black and white or a colour shift on a full cutaway, and how it arrives and leaves (a cut, a fade, a pop, a slide, a flash). `shows~` is the name read in it or the tool named just before it, and `says~` is what the reference said then. These are guesses: read them with the user and fix what is wrong.
+
+What it does not find yet: a light panel with no dark window, a small picture in a corner, and B-roll that sits behind the whole speaker.
+
 ## Install rea-video
 
 ```
