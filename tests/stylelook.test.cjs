@@ -6,7 +6,8 @@
 // - the look as a recipe has no shots, titles, graphics, sounds or script
 // - the plan: shot lengths from the look's pace that add up to your edit, the same every run; every cut in the quiet
 //   between two of your words, none inside a word; framing from the look's mix, close and wide taking turns
-// - stickers on your own words: ordinals first, then numbers, then strong keywords, in the look's style, clear of titles
+// - stickers on your own words: ordinals first, then numbers, then the words of your goal (kit/goalwords.cjs), then
+//   names and repeated words, in the look's style, clear of titles; generic words never, fewer stickers instead
 // - titles keep the look's count, entrances and layer; sounds follow its density and what it put them on
 // - match.json: each part scored against the look or the recipe, null where nothing could be measured
 // - reel.cjs: --style-look with --recipe is refused, an unknown look is refused
@@ -154,6 +155,46 @@ t('stickers: on your own words, ordinals first, then numbers, then keywords; the
   const fl = [{ mode: 9, start: 5, end: 6, x: 0.49, y: 0.42, size: 386 }], moved = LK.placeOnFace(fl, [{ start: 0, end: 10, face: { faceH: 0.24, eyeY: 0.4, cx: 0.55 }, faceTarget: { faceH: 0.16, eyeY: 0.32, cx: 0.5 } }]);
   assert.strictEqual(moved, 1); assert.deepStrictEqual(fl[0], { mode: 9, start: 5, end: 6, x: 0.535, y: 0.55, size: 579 });
   assert.strictEqual(LK.placeOnFace([{ mode: 9, start: 5, end: 6, x: 0.49, y: 0.42, size: 386 }], [{ start: 0, end: 10, face: { faceH: 0.16, eyeY: 0.32, cx: 0.5 }, faceTarget: { faceH: 0.16, eyeY: 0.32, cx: 0.5 } }]), 0);
+});
+
+t('sticker words: ordinals, then numbers, then the goal\'s words, then names; generic words never; the look\'s density is the most', () => {
+  const GW = require('../kit/goalwords.cjs');
+  // the shared helper: stemmed content words, stopwords out, and a 0..1 overlap
+  assert.deepStrictEqual(GW.contentWords('Show beginners they can build an app with AI in a weekend'), ['beginner', 'build', 'app', 'ai', 'weekend']);
+  assert.strictEqual(GW.stem('building'), GW.stem('builds')); assert.strictEqual(GW.stem('posts'), 'post'); assert.strictEqual(GW.stem('Editing,'), GW.stem('edits'));
+  assert.strictEqual(GW.overlap('Show beginners they can build an app with AI in a weekend', 'building apps'), 1);
+  assert.strictEqual(GW.overlap('Show beginners they can build an app with AI in a weekend', 'the weather is nice'), 0);
+  assert.strictEqual(GW.overlap('Show beginners they can build an app with AI in a weekend', 'a weekend of football'), 0.5);
+  assert.strictEqual(GW.overlap('', 'anything'), 0); assert.ok(GW.STOPWORDS.has('the') && GW.isGeneric('Headlines,') && GW.isGeneric('carousel') && !GW.isGeneric('Kubernetes'));
+  let t0 = 1; const said = 'so the first carousel gets 50% more headlines when beginners build an app over one weekend with Supabase and the important dashboard gets amazing results honestly'.split(' ');
+  const w = said.map(x => { const o = { start: t0, end: t0 + 0.3, word: x }; t0 += 3; return o; }), len = t0 + 2;
+  const goal = 'Show beginners they can build an app with AI in a weekend';
+  const keys = LK.keyWords(w, { goal });
+  assert.deepStrictEqual(keys.map(k => [k.text, k.kind]), [['FIRST', 'ordinal'], ['50%', 'number'], ['BEGINNERS', 'goal'], ['BUILD', 'goal'], ['APP', 'goal'], ['WEEKEND', 'goal'], ['SUPABASE', 'keyword']]);
+  assert.ok(keys.every((k, i) => !i || keys[i - 1].rank >= k.rank), 'best first');
+  for (const g of ['CAROUSEL', 'HEADLINES', 'IMPORTANT', 'DASHBOARD', 'AMAZING', 'RESULTS', 'HONESTLY']) assert.ok(!keys.some(k => k.text === g), g + ' is generic, or a plain word said once: no sticker');
+  // with no goal the goal's words are plain words again: only the ordinal, the number and the name are left
+  assert.deepStrictEqual(LK.keyWords(w).map(k => k.text), ['FIRST', '50%', 'SUPABASE']);
+  // a name from the glossary counts at the start of a sentence too; a word you say twice is a keyword
+  assert.deepStrictEqual(LK.keyWords([{ start: 1, end: 1.3, word: 'done.' }, { start: 2, end: 2.3, word: 'Claude' }, { start: 3, end: 3.3, word: 'edits' }], { names: ['claude'] }).map(k => k.text), ['CLAUDE']);
+  assert.deepStrictEqual(LK.keyWords([{ start: 1, end: 1.3, word: 'done.' }, { start: 2, end: 2.3, word: 'Claude' }]).map(k => k.text), []);
+  assert.deepStrictEqual(LK.keyWords('our pipeline is slow and the pipeline breaks'.split(' ').map((x, i) => ({ start: i, end: i + 0.3, word: x }))).map(k => k.text), ['PIPELINE']);
+  // "the second I say it" is a length of time, not the second point
+  assert.deepStrictEqual(LK.keyWords('it lands the second, I say its name'.split(' ').map((x, i) => ({ start: i, end: i + 0.3, word: x }))).map(k => k.text), []);
+  assert.deepStrictEqual(LK.keyWords('and second, you paste it'.split(' ').map((x, i) => ({ start: i, end: i + 0.3, word: x }))).map(k => k.text), ['SECOND']);
+  // the density is an upper bound: 0.75 per 10 s on this take is 6, and the best 6 are placed in rank order
+  const st = LK.stickers(look, w, len, { goal });
+  assert.strictEqual(st.want, Math.round(0.75 * len / 10)); assert.ok(st.want >= 6);
+  assert.deepStrictEqual(st.flips.map(f => f.text), ['FIRST', '50%', 'BEGINNERS', 'BUILD', 'APP', 'WEEKEND', 'SUPABASE'].slice(0, st.want).sort((a, b) => said.findIndex(x => x.toUpperCase() === a) - said.findIndex(x => x.toUpperCase() === b)));
+  // room for only two: the ordinal and the number win over the goal words
+  const two = LK.stickers({ ...look, stickers: { ordinal: { ...look.stickers.ordinal, per10: 2 * 10 / len } } }, w, len, { goal });
+  assert.deepStrictEqual(two.flips.map(f => f.text), ['FIRST', '50%']); assert.deepStrictEqual(two.kinds, ['ordinal', 'number']);
+  // not enough good words: fewer stickers than the look has, never a generic one, and the log says so
+  const few = LK.stickers(look, w, len);
+  assert.deepStrictEqual(few.flips.map(f => f.text), ['FIRST', '50%', 'SUPABASE']); assert.ok(few.flips.length < few.want);
+  assert.ok(few.lines.some(l => /only 3 of your words are strong enough/.test(l) && /--goal/.test(l)), few.lines.join('|'));
+  const none = LK.stickers(look, 'this carousel gets more headlines and important results'.split(' ').map((x, i) => ({ start: 2 + i * 3, end: 2.3 + i * 3, word: x })), 30);
+  assert.deepStrictEqual(none.flips, []); assert.ok(/none of your words made a sticker/.test(none.lines[0]));
 });
 
 t('titles and sounds: the look\'s count, entrances and layer; sounds at its density on your stickers, titles and cuts', () => {

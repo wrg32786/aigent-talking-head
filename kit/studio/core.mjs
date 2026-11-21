@@ -357,6 +357,8 @@ export function compose(s, { refPack = null } = {}) {
   if (on('cards-auto') || on('colour-card') || on('chapter-card')) args.push('--cards', 'auto');
   if (off('cards-auto') || (off('colour-card') && off('chapter-card'))) { args.push('--cards', 'off'); locks.cards = false; }
   if (s.pace.punch === 'off' || off('punch')) { args.push('--no-punch'); locks.punch = false; }
+  // the point of the video (kit/studio/point.mjs): the engine leans its big caption word and a look's stickers on it
+  if (s.point) args.push('--goal', s.point);
   if (s.pace.tighten === 'off' || off('tighten')) args.push('--no-tighten');
   else if (typeof s.pace.tighten === 'number') args.push('--tighten', String(s.pace.tighten));
   else if (on('tighten')) args.push('--tighten', '0.3');

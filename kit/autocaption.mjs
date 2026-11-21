@@ -3,6 +3,7 @@
 //   words.json from kit/tx.py (keyed by file name), and/or clips.json from kit/clip.py next to the clip files.
 //   node <kit>/autocaption.mjs                 -> writes captions.draft.js (never overwrites captions.js)
 //   node <kit>/autocaption.mjs --out captions.js [--force] [--words 4] [--chars 22] [--shift 0.3] [--hero] [--logo logo.svg]
+//                              [--goal "the point of this video"]
 // Every phrase is a plain caption (mode 0). --hero makes the last phrase before each seam a spray hero word (mode 1).
 // --cards adds type cards (mode 8, flat-colour cutaways; the oneword look). --titles makes it a kinetic title instead (mode 7, one per beat, up to 7, each with its own entrance; in front by default, or behind the person when layer is behind and a mask is made). --style kinetic (default: every word animates in, one emphasis word per phrase)|oneword (one word at a time, the full look)|classic|pill|hormozi|karaoke|one-word (one big word, simple) sets
 // captionStyle; pill groups 3 to 5 words. --fonts <pairing>[,<pairing>...] writes "fonts" (kit/fonts/pairings.json; several cycle).
@@ -12,6 +13,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { execFileSync } from 'child_process';
 import { basename, dirname, join } from 'path';
+import GW from './goalwords.cjs';
 
 const argv = process.argv.slice(2);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i < 0 ? d : (argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : true); };
@@ -89,7 +91,10 @@ if (MINW > 1) for (let i = 0; i < phrases.length; i++) {
   else if (next && next[0].seg === p[0].seg && next.length + p.length <= MAXW) { next.unshift(...p); phrases.splice(i--, 1); }
 }
 const STOP = new Set('a an the and or but of to in on at for with is are was it this that you your i we my our be as by so if do just'.split(' '));
-const heroIdx = ws => { const lv = ws.map(w => { const x = String(w).toLowerCase().replace(/[^a-z0-9']/g, ''); return /\d/.test(x) ? 99 : STOP.has(x) ? x.length / 10 : x.length; }); return lv.indexOf(Math.max(...lv)); };
+// --goal "<one line>": the point of the video. A word of the goal (kit/goalwords.cjs, by its stem) is the big word of
+// its phrase, ahead of a longer word; a number still wins.
+const GOAL = typeof opt('goal', null) === 'string' ? GW.contentWords(opt('goal', '')) : [];
+const heroIdx = ws => { const lv = ws.map(w => { const x = String(w).toLowerCase().replace(/[^a-z0-9']/g, ''); return /\d/.test(x) ? 99 : STOP.has(x) ? x.length / 10 : (GOAL.length && GW.isGoalWord(GOAL, x) ? 50 : 0) + x.length; }); return lv.indexOf(Math.max(...lv)); };
 const clean = s => s.replace(/\s+/g, ' ').replace(/^[,;:\s]+|[,;:]+$/g, '').trim();
 const flips = phrases.map((p, i) => {
   const next = phrases[i + 1];

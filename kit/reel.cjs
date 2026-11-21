@@ -46,6 +46,9 @@
 //          --style-look <name|path>  Copy the look: a saved style look (npm run look, kit/stylelook.cjs) on your take.
 //            Your words and timing, the look's framing, grade, captions, titles, stickers, sounds, transitions and
 //            music (kit/lookplan.cjs). Not with --recipe. Writes build/plan.json and build/match.json.
+//          --goal "<one line>"  the point of this video ("Show beginners they can build an app with AI in a weekend").
+//            Its words (kit/goalwords.cjs) are the big word of a caption or title when you say one, and with
+//            --style-look they get a sticker after your ordinals and numbers. Kept in plan.json and cut.json as goal.
 //          --clip <file>  the video to use (same as passing the path; reads well with --recipe)
 //            A recipe's graphics (ordinal stickers, app labels, screen cards) land at the recipe's times; icon and src
 //            paths are relative to the recipe, and anything left out is drawn as a neutral placeholder.
@@ -103,13 +106,14 @@ const SFXMAP = require('./sfx-map.cjs');
 const RC = require('./recreate.cjs');
 const SL = require('./stylelook.cjs');
 const LK = require('./lookplan.cjs');
+const RF = require('./reframe.cjs');
 const FID = require('./fidelity.cjs');
 
 const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['style-look', 'words', 'scenes', 'scenes-off', 'pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
+const VALUED = new Set(['style-look', 'goal', 'words', 'scenes', 'scenes-off', 'pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const JSON_OUT = flag('json');
@@ -215,6 +219,8 @@ if (opt('style-look')) {
 setJobAliases(recipe);
 // the glossary and brand logos: the kit's list, the pack's or preset's, then --glossary / --brands (later ones win)
 let GLOSS = [], BRANDS = [];
+// --goal: the point of this video, one line. Its words lead the caption and title emphasis and the look's stickers.
+const GOAL = String(opt('goal') || '').replace(/\s+/g, ' ').trim().slice(0, 300);
 try { GLOSS = GL.merge(GL.shipped(), GL.parse(preset && preset.glossary), ...many('glossary').map(v => GL.read(v))); } catch (e) { die('--glossary: ' + e.message); }
 try { BRANDS = [...BR.parse(preset && preset.brands, (pack && pack.dir) || ROOT), ...many('brands').flatMap(v => /^\s*\[/.test(v) ? BR.parse(JSON.parse(v)) : BR.read(v))]; } catch (e) { die('--brands: ' + e.message); }
 { const bad = BRANDS.filter(b => !fs.existsSync(b.logo) || !BR.IMG.test(b.logo)); if (bad.length) die('brands: logo file missing or not an image: ' + bad.map(b => b.logo).join(', ')); }
@@ -432,13 +438,17 @@ if (!flag('rebuild')) {
   if (pack) { cut.pack = pack.name; if (pack.weights) cut.weights = pack.weights; }
   if (preset) cut.packStyle = { transition: preset.transition, entranceOrder: preset.entranceOrder, finishPool: preset.finishPool };
   if (!L.isEmpty(LOCKS)) for (const l of L.applyCut(LOCKS, cut, { weights: pack && pack.weights, repick: !!(pack && pack.weights && pack.weights.transitions), defaultTransition: preset && preset.transition })) console.log(l);
+  // a reframed shot keeps its headroom under every move, and a take already as close as its target is not pushed in
+  // (kit/reframe.cjs): the last word on zoom, after the recipe's or the look's moves and big punches are set
+  if (RF.capMoves) for (const l of RF.capMoves(segs, { big: R.PUNCH.big })) console.log(l);
+  if (GOAL) cut.goal = GOAL;
   if (fs.existsSync(path.join(build, 'cut.json')) && !flag('force')) die('build/cut.json exists. Use --rebuild to render your edits, or --force to redraft.');
   fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
   console.log(`cut.json: ${segs.length} segments, seams ${JSON.stringify(seams)}`);
   // 3. captions from the clips' word times
   const logo = opt('logo');
   if (logo) fs.copyFileSync(path.resolve(logo), path.join(build, path.basename(logo)));
-  sh(process.execPath, [path.join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--force', ...(cut.hits && cut.hits.length === 0 ? ['--no-glitch'] : []), ...(TITLES ? ['--titles'] : look === 'oneword' ? [] : ['--hero']), ...(look === 'oneword' ? ['--cards'] : []), '--style', STYLE, ...(FONTS ? ['--fonts', FONTS] : []), ...(logo ? ['--logo', path.basename(logo)] : []), ...(LOCKS.titleWords ? ['--title-words', LOCKS.titleWords] : [])], build);
+  sh(process.execPath, [path.join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--force', ...(cut.hits && cut.hits.length === 0 ? ['--no-glitch'] : []), ...(TITLES ? ['--titles'] : look === 'oneword' ? [] : ['--hero']), ...(look === 'oneword' ? ['--cards'] : []), '--style', STYLE, ...(FONTS ? ['--fonts', FONTS] : []), ...(logo ? ['--logo', path.basename(logo)] : []), ...(LOCKS.titleWords ? ['--title-words', LOCKS.titleWords] : []), ...(GOAL ? ['--goal', GOAL] : [])], build);
   // captions and titles in the words you mean: the recipe's Aliases, and numbers Whisper split at the comma ("10 ,000")
   // and the glossary (kit/glossary.cjs): brand words, with their own casing kept under a caps display face
   { const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), n = S.meantFlips(caps.flips) + GL.applyFlips(caps.flips, GLOSS);
@@ -503,8 +513,9 @@ if (!flag('rebuild')) {
     // --capture-sources: capture the recipe's confirmed screen-card sources (public pages) first (kit/capture.mjs)
     if (recipe && flag('capture-sources')) { try { sh(process.execPath, [path.join(KIT, 'capture.mjs'), '--recipe', recipe.file], ROOT); } catch { console.warn('note: some sources were not captured (listed above); their cards use the placeholder'); } }
     const gfx = recipe && !LOOK ? RM.graphicFlips(recipe) : [];
-    // Copy the look: the look's sticker on your own key words (ordinals, numbers, strong keywords), clear of your titles
-    if (LOOK) { const st = LK.stickers(LOOK, S.timeline(segs, build), RC.lengthOf(segs), { busy: (R.readCaptions(path.join(build, 'captions.js')).flips || []).filter(f => f.mode === 7) }); gfx.push(...st.flips); st.lines.forEach(l => console.log(l)); }
+    // Copy the look: the look's sticker on your own key words (ordinals, numbers, the words of your --goal, then names
+    // and words you repeat), clear of your titles. Never a generic word: fewer stickers instead.
+    if (LOOK) { const st = LK.stickers(LOOK, S.timeline(segs, build), RC.lengthOf(segs), { busy: (R.readCaptions(path.join(build, 'captions.js')).flips || []).filter(f => f.mode === 7), goal: GOAL, names: GLOSS.flatMap(e => GL.tok(e.say)) }); gfx.push(...st.flips); st.lines.forEach(l => console.log(l)); }
     // Recreate: the reference's graphics at its times scaled to your edit, like its shots and sounds
     if (RECUT && gfx.length && RC.scaleGraphics(gfx, SCALE)) console.log(`recut: ${gfx.length} graphics from the reference at its times, scaled by ${SCALE.k.toFixed(2)}`);
     // scenes (kit/scenes.cjs): what the menu had no item for, made from the reference (its scenes.json, else the
@@ -722,7 +733,7 @@ if (!flag('rebuild')) {
   // build/plan.json: what this draft took from the recipe, for other tools (kit/recreate.cjs; docs/reel-md.md)
   if (recipe) {
     const cutNow = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8')), capsNow = R.readCaptions(path.join(build, 'captions.js'));
-    const plan = RC.writePlan(build, RC.planOf({ recipe, scale: SCALE, rc: RECUT, cut: cutNow, shakes: REFSHAKES, sounds: REFSOUNDS, flips: capsNow.flips || [], theme: path.basename(th, '.js'), accent, mode: LOOK ? 'look' : null, look: LOOK ? LOOK.name : null }));
+    const plan0 = RC.planOf({ recipe, scale: SCALE, rc: RECUT, cut: cutNow, shakes: REFSHAKES, sounds: REFSOUNDS, flips: capsNow.flips || [], theme: path.basename(th, '.js'), accent, mode: LOOK ? 'look' : null, look: LOOK ? LOOK.name : null, goal: GOAL }); if (GOAL && !plan0.goal) plan0.goal = GOAL; const plan = RC.writePlan(build, plan0);
     // build/match.json: how close this draft is to what it copies, per part (kit/fidelity.cjs; an estimate from the plan)
     if (RECUT) {
       const len = RC.lengthOf(cutNow.segs), target = LOOK ? FID.targetOfLook(LOOK, { len, skipped: RECUT.skipped.length, planned: LOOKPLAN.plan.length }) : FID.targetOfRecipe(recipe, { k: SCALE.k, len, skipped: RECUT.skipped.length });

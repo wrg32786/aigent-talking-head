@@ -5,7 +5,9 @@
 //               moves, shakes and cutaways
 //   cut()       your edit re-cut to that list by kit/shotplan.cjs recut(): every cut in the quiet between two of your
 //               words (never inside a word, never starting mid-word); no quiet near a wanted cut, no cut
-//   stickers()  the look's sticker on your key words: ordinals first, then numbers, then strong keywords
+//   stickers()  the look's sticker on your key words: ordinals first, then numbers and stats, then the words of your
+//               goal (--goal, "what is the point of this video"), then other strong keywords. Generic words never
+//               get one: with too few good words we place fewer stickers than the look has.
 //   titles()    the look's title style on the titles drafted from your words
 //   sounds()    the look's sounds at its density, on your stickers, titles and cuts
 // kit/reel.cjs --style-look runs these; kit/reframe.cjs and kit/grade-match.cjs then set the framing and the grade.
@@ -14,6 +16,7 @@ const SPL = require('./shotplan.cjs');
 const RF = require('./reframe.cjs');
 const S = require('./spoken.cjs');
 const SFXPLAN = require('./sfx-plan.cjs');
+const GW = require('./goalwords.cjs');
 
 const MIN_LEN = 1.2;       // no planned shot under this
 const STICKER_GAP = 2.5;   // seconds between two stickers
@@ -83,30 +86,57 @@ function cut({ look, segs, words, quiet, seed = '', wantPunch = true }) {
   return { rc, plan, shakeAt, lines };
 }
 
-const STOP = new Set('about above after again against because before being below between both could does doing down during each from further have having here itself just more most myself once only other ourselves over same should some such than that their theirs them themselves then there these they this those through under until very were what when where which while will with would your yours yourself really actually going gonna thing things something anything everything every people pretty right yeah okay well also into like know want need make made take took get got much many even still back look think'.split(' '));
 const bare = w => String(w || '').replace(/^[^\p{L}\p{N}$%]+|[^\p{L}\p{N}$%]+$/gu, '');
-const isNumber = w => /^\$?\d[\d,.]*[%xk]?$/i.test(w) || /^(two|three|four|five|six|seven|eight|nine|ten|twenty|thirty|fifty|hundred|thousand|million|billion)$/i.test(w);
+const isNumber = w => /^\$?\d[\d,.]*(%|x|k|m|bn?)?$/i.test(w) || /^(two|three|four|five|six|seven|eight|nine|ten|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion)$/i.test(w);
+// "second" as a length of time is not an ordinal: "the second I say it", "ten seconds", "a split second"
+const SUBJECT = new Set(['i', 'you', 'we', 'they', 'he', 'she', 'it']);
+const timeUnit = (words, i) => {
+  const prev = bare((words[i - 1] || {}).word).toLowerCase(), next = bare((words[i + 1] || {}).word).toLowerCase();
+  if (!/^seconds?$/i.test(bare(words[i].word))) return false;
+  if (/^(\d+|one|two|three|four|five|six|seven|eight|nine|ten|few|split|per)$/.test(prev)) return true;
+  // "the second I say it": "the" before it and a subject right behind. "Second, you paste" stays an ordinal.
+  return /^(the|that|this)$/.test(prev) && SUBJECT.has(next);
+};
 
-// Your key words for a sticker, best first: ordinals you say, numbers, then strong keywords (long, said once).
-function keyWords(words) {
-  const out = [], ords = S.ordinalsSaid(words);
-  for (const w of ords) out.push({ start: w.start, end: w.end, text: String(Object.keys(S.ORD).find(k => S.ORD[k] === w.n && /^[a-z]+$/.test(k)) || bare(w.word)).toUpperCase(), spoken: bare(w.word), kind: 'ordinal', rank: 3 });
-  const counts = {}; for (const w of words) { const b = bare(w.word).toLowerCase(); counts[b] = (counts[b] || 0) + 1; }
-  for (const w of words) {
-    const b = bare(w.word); if (!b || ords.some(o => o.start === w.start)) continue;
-    if (isNumber(b)) out.push({ start: w.start, end: w.end, text: b.toUpperCase(), spoken: b, kind: 'number', rank: 2 });
-    else if (b.length >= 6 && /^[\p{L}'-]+$/u.test(b) && !STOP.has(b.toLowerCase()) && counts[b.toLowerCase()] === 1) out.push({ start: w.start, end: w.end, text: b.toUpperCase(), spoken: b, kind: 'keyword', rank: 1 + Math.min(0.9, (b.length - 6) * 0.1 + (/^[A-Z]/.test(b) ? 0.2 : 0)) });
-  }
+// Your key words for a sticker, best first:
+//   4 ordinals you say (first, second, third)       always qualify
+//   3 numbers and stats (3, 10x, 50%, $100)         always qualify
+//   2 the words of your goal (opts.goal, one line)  each once, by its stem
+//   1 other strong keywords                         a name (a brand from opts.names, or a word written with a capital
+//                                                   inside a sentence) or a word you say more than once; six letters
+//                                                   or more, not a stopword, not a generic word
+// A stopword or a generic word (kit/goalwords.cjs) is never a keyword, however long it is, and a long word said once
+// is not one either: nothing says it matters.
+function keyWords(words, { goal = '', names = [] } = {}) {
+  const out = [], goalStems = GW.contentWords(goal), seen = new Set(), brand = new Set(names.map(x => String(x).toLowerCase()));
+  const count = {}; for (const w of words) { const st = GW.stem(bare(w.word)); count[st] = (count[st] || 0) + 1; }
+  const midSentence = i => i > 0 && !/[.?!]["')\]]?$/.test(String(words[i - 1].word).trim());
+  const ords = S.ordinalsSaid(words).filter(w => !timeUnit(words, words.findIndex(x => x.start === w.start)));
+  for (const w of ords) out.push({ start: w.start, end: w.end, text: String(Object.keys(S.ORD).find(k => S.ORD[k] === w.n && /^[a-z]+$/.test(k)) || bare(w.word)).toUpperCase(), spoken: bare(w.word), kind: 'ordinal', rank: 4 });
+  words.forEach((w, i) => {
+    const b = bare(w.word); if (!b || ords.some(o => o.start === w.start)) return;
+    if (isNumber(b)) { out.push({ start: w.start, end: w.end, text: b.toUpperCase(), spoken: b, kind: 'number', rank: 3 }); return; }
+    if (!/^[\p{L}\p{N}'-]+$/u.test(b) || GW.isStop(b) || S.ORD[b.toLowerCase()]) return;
+    const st = GW.stem(b); if (seen.has(st)) return;
+    if (goalStems.includes(st)) { seen.add(st); out.push({ start: w.start, end: w.end, text: b.toUpperCase(), spoken: b, kind: 'goal', rank: 2 }); }
+    else if (b.length >= 6 && /^[\p{L}'-]+$/u.test(b) && !GW.isGeneric(b)) {
+      const name = brand.has(b.toLowerCase()) || (/^\p{Lu}/u.test(b) && midSentence(i)), often = count[st] >= 2;
+      if (!name && !often) return;
+      seen.add(st); out.push({ start: w.start, end: w.end, text: b.toUpperCase(), spoken: b, kind: 'keyword', rank: 1 + (name ? 0.5 : 0) + (often ? 0.3 : 0) + Math.min(0.15, (b.length - 6) * 0.03) });
+    }
+  });
   return out.sort((a, b) => b.rank - a.rank || a.start - b.start);
 }
 
 // The look's sticker on your key words, as captions.js flips (mode 9). len: the edit's length; busy: spans to keep
-// clear of ([{ start, end }], your titles). As many as the look's density asks for, never two within STICKER_GAP.
-function stickers(look, words, len, { busy = [] } = {}) {
+// clear of ([{ start, end }], your titles); goal: the point of the video, one line; names: brand words (the
+// glossary). The look's density is the most
+// we place (never two within STICKER_GAP); with fewer good words we place fewer.
+function stickers(look, words, len, { busy = [], goal = '', names = [] } = {}) {
   const st = (look.stickers || {}).ordinal;
-  if (!st) return { flips: [], lines: ['stickers: the look has none'] };
+  if (!st) return { flips: [], lines: ['stickers: the look has none'], want: 0 };
   const want = Math.max(1, Math.round((+st.per10 || 0.5) * len / 10)), secs = clamp(+st.seconds || 1, 0.8, 1.6), picked = [];
-  for (const k of keyWords(words)) {
+  for (const k of keyWords(words, { goal, names })) {
     if (picked.length >= want) break;
     const a = Math.max(0, k.start - 0.15), b = Math.min(len, a + secs);
     if (a < 0.8 || b > len - 0.3) continue;
@@ -115,9 +145,11 @@ function stickers(look, words, len, { busy = [] } = {}) {
       ...(st.x != null ? { x: st.x } : {}), ...(st.y != null ? { y: st.y } : {}), ...(st.size != null ? { size: st.size } : {}) });
   }
   picked.sort((a, b) => a.start - b.start);
-  const lines = [picked.length ? `stickers: ${picked.length} in the look's style (${st.shape === 'starburst' ? `a ${st.spikes}-point starburst` : 'a round seal'}${st.color ? ', ' + st.color : ''}) on your words: ${picked.map(p => `"${p.spoken}" (${p.kind}) at ${p.start}s`).join(', ')}` : 'stickers: none of your words made a sticker (no ordinal, number or strong keyword clear of a title)'];
+  const KIND = { ordinal: 'ordinal', number: 'number', goal: 'your goal', keyword: 'keyword' };
+  const lines = [picked.length ? `stickers: ${picked.length} in the look's style (${st.shape === 'starburst' ? `a ${st.spikes}-point starburst` : 'a round seal'}${st.color ? ', ' + st.color : ''}) on your words: ${picked.map(p => `"${p.spoken}" (${KIND[p.kind]}) at ${p.start}s`).join(', ')}` : `stickers: none of your words made a sticker (no ordinal, number${goal ? ', goal word' : ''} or strong keyword clear of a title)`];
+  if (picked.length && picked.length < want) lines.push(`stickers: the look has room for ${want} on your ${len.toFixed(1)} s; only ${picked.length} of your words ${picked.length === 1 ? 'is' : 'are'} strong enough (an ordinal, a number${goal ? ', a word of your goal' : ''} or a strong keyword), so we place ${picked.length} and no generic ones${goal ? '' : '. A goal line (--goal) gives us more words to pick from'}`);
   for (const k of ['appLabel', 'screenCard']) if ((look.stickers || {})[k]) lines.push(`${k === 'appLabel' ? 'app labels' : 'screen cards'}: the look keeps their style; they need your own ${k === 'appLabel' ? 'icons' : 'screens'}, so none are placed on a draft`);
-  return { flips: picked.map(({ kind, ...f }) => f), lines };
+  return { flips: picked.map(({ kind, ...f }) => f), lines, want, kinds: picked.map(p => p.kind) };
 }
 
 // A sticker placed for the reference's face, moved and sized for yours: shotsPlan entries carry face (what you got) and
