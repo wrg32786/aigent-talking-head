@@ -35,6 +35,9 @@ Release notes: [docs/releases/v1.28.0.md](docs/releases/v1.28.0.md). Recreate no
 
 - **Windows: UTF-8 everywhere in our Python** (Studio report 4 item 1). Every text `open()` in `kit/` and the effects scripts names `encoding="utf-8"`, so a breakdown with a non-ASCII character no longer stalls on Windows. `tests/py-utf8.test.mjs` (in `npm run check`) fails on any that does not.
 
+- **The split panel's shadow no longer crosses your head (Studio report 4 item 18).** The soft shadow under the split panel was drawn over the speaker's picture, and the head cut-out stopped at the seam, so a dark line ran across the forehead. The cut-out now runs 40 px past the seam (`kit/split.cjs` `layout`, `SHADOW_H`), in the 9:16 reel and in the 4:5 and 1:1 frames: the shadow falls on the room behind you and your head stays clean.
+- **A wide clip is shown whole in the split panel (item 21).** A split insert takes `"fit": "cover"` (the clip fills the panel, its sides cropped, as before) or `"fit": "whole"` (the whole clip sharp, flush on the seam, over a blurred copy of itself, so your head rises in front of it). A clip 16:10 or wider, such as a website, is shown whole by default; anything squarer covers (`kit/split.cjs` `fitOf`, `wholeBox`; `kit/assemble.cjs`). A still keeps its slow push in, anchored on the seam. Tests: `tests/split-panel.test.mjs`, in `npm run check`.
+
 ## 1.27.3 (unreleased)
 
 Release notes: [docs/releases/v1.27.3.md](docs/releases/v1.27.3.md). macOS fixes from @mmjohnson84BMP (#70), and the follow-ups it left.

@@ -73,6 +73,7 @@ const TL = R.timeline(C);
 const trans = segs.map((s, i) => { if (!i || !s.transition) return null; const m = R.xfadeMode(s.transition); if (m === undefined) { console.error(`unknown transition "${s.transition}" on seg ${i} (see kit/transitions.json)`); process.exit(1); } return m ? { m, d: +(s.transitionDur || 0.3) } : null; });
 const segLen = s => (s.out - s.in) + (s.pad || 0);
 const LEN = +(segs.reduce((a, s) => a + segLen(s), 0) + tail).toFixed(3);
+const clipDims = f => { try { const [w, h] = execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=p=0:s=x', f]).toString().trim().split('\n')[0].split('x').map(Number); return w > 0 && h > 0 ? { w, h } : null; } catch { return null; } };
 const hasAudio = f => { try { return execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'a', '-show_entries', 'stream=index', '-of', 'csv=p=0', f]).toString().trim() !== ''; } catch { return false; } };
 
 const BASE = process.env.BASE, BASEONLY = !!process.env.BASEONLY;
@@ -221,7 +222,7 @@ if (panelsOn) {
 // and white. Captions in the oneword look move up into the insert's open space ("y", default 640) and can take a
 // "tint" to match its light.
 // "place" (Studio's b-roll lane, kit/studio/broll-run.mjs): "full" (the default, as above), "top" (split: the insert fills the top half and you
-// fill the bottom half, your head over the panel's lower edge, see below), "frame" (framed cards, below) or "pip" (a 16:9 box "pipW" wide,
+// fill the bottom half, your head over the panel's lower edge, see below; "fit": "cover" or "whole", a wide clip is shown whole over its own blur), "frame" (framed cards, below) or "pip" (a 16:9 box "pipW" wide,
 // default 460, with a thin white edge, top right; "pipX" and "pipY" move it). A still picture ("image": true, or a
 // .jpg, .png or .webp file) holds for the span with a slow push in.
 // "place": "frame" (Framed, kit/split.cjs): the b-roll in a rounded card up top and you smaller in a card below, your head
@@ -250,7 +251,17 @@ const chromeFile = g => {
   const n = still ? inp('-loop', '1', '-framerate', '24', '-t', (d + 0.5).toFixed(3), '-i', s.file) : inp('-i', s.file);
   const fit = still ? `scale=${Math.round(W * 1.1 / 2) * 2}:${Math.round(H * 1.1 / 2) * 2}:force_original_aspect_ratio=increase,crop=${Math.round(W * 1.1 / 2) * 2}:${Math.round(H * 1.1 / 2) * 2},zoompan=z='1+0.08*on/${Math.max(1, Math.round(d * 24))}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=24`
     : `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`;
-  const src = still ? `[${n}:v]${V},${fit}` : `[${n}:v]trim=${i0}:${(i0 + d).toFixed(3)},${V},${fit}`;
+  const head = still ? `[${n}:v]${V}` : `[${n}:v]trim=${i0}:${(i0 + d).toFixed(3)},${V}`;
+  let src = `${head},${fit}`;
+  // a wide clip in the split panel is shown whole (kit/split.cjs fitOf): sharp and flush on the seam, over a blurred,
+  // slightly darker copy of itself that fills the rest of the panel. A still gets its slow push in from the seam.
+  const dims = place === 'top' && g ? clipDims(s.file) : null;
+  if (place === 'top' && g && SPL.fitOf(s, dims) === 'whole') {
+    const b = SPL.wholeBox(W, H, dims), e2 = v => Math.round(v / 2) * 2;
+    const fg = still ? `scale=${e2(b.w * 1.1)}:${e2(b.h * 1.1)},zoompan=z='1+0.08*on/${Math.max(1, Math.round(d * 24))}':x='iw/2-(iw/zoom/2)':y='ih-ih/zoom':d=1:s=${b.w}x${b.h}:fps=24` : `scale=${b.w}:${b.h}`;
+    f.push(`${head},split[wa${k}][wb${k}]`, `[wa${k}]scale=${e2(W / 4)}:${e2(H / 4)}:force_original_aspect_ratio=increase,crop=${e2(W / 4)}:${e2(H / 4)},boxblur=8:2,scale=${W}:${H},eq=brightness=-0.08:saturation=0.9[wg${k}]`, `[wb${k}]${fg}[wf${k}]`);
+    src = `[wg${k}][wf${k}]overlay=${b.x}:${b.y}:shortest=1`;
+  }
   const on = `enable='between(t,${a0},${(a0 + d).toFixed(3)})'`, win = `trim=start=${a0}:end=${(a0 + d + 0.05).toFixed(3)}`;
   // "fx" (a reference B-roll slot's treatment, kit/broll-slots.cjs): motion push | pull | drift with zoom, shake, a
   // glitch on the way in, colour bw | muted | vivid | warm | cool, and in / out: fade, flash, zoom, glitch, slide-*
@@ -287,7 +298,7 @@ const chromeFile = g => {
     return `hv${k}`;
   };
   if (g && place === 'top') {
-    const seam = g.seam, y = seam - g.dy, sh = `color=c=black:s=1080x36:r=24:d=${(d + 0.1).toFixed(3)},format=rgba,${SPL.shadowGeq()},setpts=PTS+${a0}/TB[shd${k}]`;
+    const seam = g.seam, y = seam - g.dy, sh = `color=c=black:s=1080x${SPL.SHADOW_H}:r=24:d=${(d + 0.1).toFixed(3)},format=rgba,${SPL.shadowGeq()},setpts=PTS+${a0}/TB[shd${k}]`;
     f.push(`[${vcur}]split[vs${k}a][vs${k}b]`, `[vs${k}b]crop=1080:${g.panel.h}:0:${y}[spk${k}]`, `[vs${k}a][spk${k}]overlay=0:${seam}:${on}[vt${k}]`, `[vt${k}][ins${k}]overlay=0:${g.panel.y}:eof_action=pass:${on}[vp${k}]`, sh, `[vp${k}][shd${k}]overlay=0:${seam}:format=auto:eof_action=pass:${on}[vq${k}]`);
     vcur = band(`vq${k}`, false);
   } else if (g && place === 'frame') {
