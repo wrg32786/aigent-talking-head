@@ -33,6 +33,7 @@ import { mount as mountBroll } from './broll-api.mjs';
 import * as PIECES from './pieces.mjs';
 import * as WIZ from './wizards.mjs';
 import { mount as mountFolders } from './folders.mjs';
+import { mountScenes } from './scene-routes.mjs';
 import { mount as mountPost } from './post-api.mjs';
 
 const require = createRequire(import.meta.url);
@@ -210,7 +211,7 @@ function writeRefPack(s, { force = false } = {}) {
   return name;
 }
 // where each option on the Look step came from, for the badges: the Look (the pack's locks and style), the reference
-// (what its teardown suggests, and the picks Use parts added) and you (your own picks)
+// (what its teardown suggests, and the picks Influence added) and you (your own picks)
 function lookSources(s, cat = C.catalog()) {
   const pack = new Set(), ref = new Set(), add = (set, kind, ids) => { for (const id of [].concat(ids || [])) if (id && cat.items[`${kind}:${id}`]) set.add(`${kind}:${id}`); };
   let P = null; try { P = s.pack ? K.load(s.pack) : null; } catch {}
@@ -226,12 +227,12 @@ function lookSources(s, cat = C.catalog()) {
 function draftSteps(s) {
   if (!s.job) throw Object.assign(new Error('name the job first'), { code: 400 });
   if (!s.footage.length && !s.clips) throw Object.assign(new Error('add footage first'), { code: 400 });
-  const recreate = s.reference.mode === 'recreate' && s.reference.out && existsSync(join(ROOT, s.reference.out, 'Reel.md'));
+  const recreate = C.recreateRecipe(s, ROOT); // Recreate: the reference's Reel.md, your take re-cut to it (kit/studio/reference.mjs)
   const ref = recreate ? null : writeRefPack(s);
   const comp = C.compose(s, { refPack: ref });
   if (comp.errs.length) throw Object.assign(new Error(comp.errs.join('; ')), { code: 400 });
   let args = comp.args.slice();
-  if (recreate) { const i = args.indexOf('--pack'); if (i >= 0) args.splice(i, 2); args.push('--recipe', join(s.reference.out, 'Reel.md'), '--recut'); }
+  if (recreate) C.recreateArgs(args, recreate);
   // your pieces (the Combo) when you kept any: cut once, here, and handed to the reel as they are (--as-is). Recreate
   // runs on them too, with the reference's Reel.md as the recipe, so the draft is what Your edit says it is (it used
   // to switch to the whole take, so the draft's key never matched and Render could not come on)
@@ -809,6 +810,7 @@ const safeName = n => basename(String(n || 'file')).replace(/[^A-Za-z0-9._-]+/g,
 
 let chromeSeen = null; const chromeOk = () => { if (chromeSeen == null) { try { chromeSeen = !!findChrome(); } catch { chromeSeen = false; } } return chromeSeen; };
 // Settings folder fields: the native folder dialog, the in-page folder list, New folder and Open folder (kit/studio/folders.mjs)
+const sceneApi = mountScenes({ json, readBody, update, chromeOk });
 const FOLDERS = mountFolders({ ROOT, json, readBody, extraFolders: () => { const st = S.load(); return [st.downloads, st.renders, st.broll && st.broll.library, join(ROOT, 'teardown-in', 'studio'), join(ROOT, 'jobs')]; },
   ensure: [join(ROOT, 'teardown-in', 'studio'), join(ROOT, 'jobs')] });
 const POSTR = mountPost({ ROOT, C, json, readBody });
@@ -838,30 +840,6 @@ function serveFile(req, res, file) {
   }
   res.writeHead(200, { ...headers, 'content-length': st.size });
   createReadStream(file).pipe(res);
-}
-
-// scenes (kit/scenes.cjs): effects and graphics made from a reference or by your agent, in the menu with a REF badge
-const SCN = createRequire(import.meta.url)('../scenes.cjs');
-const stillBusy = new Map();
-async function sceneStill(id) {
-  const sc = SCN.get(id); if (!sc) return null;
-  const f = SCN.stillPath(id); if (existsSync(f)) return f;
-  if (!chromeOk()) return null;
-  if (!stillBusy.has(id)) stillBusy.set(id, (await import('./broll-make.mjs')).sceneStill(SCN.page(sc), { w: sc.box.w * 1080, h: sc.box.h * 1920, seconds: sc.seconds, file: f }).catch(() => null).finally(() => stillBusy.delete(id)));
-  await stillBusy.get(id); return existsSync(f) ? f : null;
-}
-async function sceneApi(req, res, p, M) {
-  if (p === '/api/scenes' && M === 'GET') return json(res, 200, { scenes: SCN.list().map(({ html, css, ...x }) => ({ ...x, still: C.sceneStillUrl(x.id) })) });
-  if (p === '/api/scenes' && M === 'POST') {
-    const b = await readBody(req, 6e6), r = SCN.save({ ...(b.scene || b), by: (b.scene || b).by === 'reference' ? 'reference' : 'agent' });
-    update(st => C.applyPatch(st, { reply: `${r.added ? 'Added' : 'Already in the menu'}: ${r.scene.name} (${r.scene.kind}), on the Look step with a REF badge.`, from: 'assistant', kind: 'action' }));
-    return json(res, 200, { scene: { ...r.scene, still: C.sceneStillUrl(r.scene.id) }, added: r.added });
-  }
-  const m = p.match(/^\/api\/scenes\/(ref-[a-z0-9-]+)(\/still\.png)?$/); if (!m) return false;
-  if (m[2] && M === 'GET') { const f = await sceneStill(m[1]); if (!f) return json(res, 404, { error: 'no still for that scene (it needs Chrome)' }); res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'max-age=60' }); return createReadStream(f).pipe(res); }
-  if (!m[2] && M === 'GET') { const sc = SCN.get(m[1]); return sc ? json(res, 200, { scene: sc, page: SCN.page(sc) }) : json(res, 404, { error: 'no scene ' + m[1] }); }
-  if (!m[2] && M === 'DELETE') { const ok = SCN.remove(m[1]); if (ok) update(st => { const g = st.picks.graphic; if (g) { g.allow = g.allow.filter(x => x !== m[1]); g.deny = g.deny.filter(x => x !== m[1]); } }); return json(res, ok ? 200 : 404, { removed: ok }); }
-  return false;
 }
 
 async function api(req, res, u) {
@@ -1098,7 +1076,7 @@ async function api(req, res, u) {
     const picks = Array.isArray(b.refs) ? Object.fromEntries(b.refs.filter(r => cat.items[r]).map(r => [r, 'allow'])) : C.referencePicks(ex, b.kinds || null, cat);
     const patch = { picks, ...(ex.music.bed && cat.beds.some(b => b.id === ex.music.bed) ? { music: { bed: ex.music.bed } } : {}), ...(ex.preset && cat.packs.some(x => x.name === ex.preset) ? { pack: ex.preset } : {}) };
     if (Array.isArray(b.refs) || b.kinds) { delete patch.music; delete patch.pack; }
-    // what Use parts adds, so Clear reference can take exactly that back out
+    // what Influence adds, so Clear reference can take exactly that back out
     const had = new Set(Object.entries(s.picks).flatMap(([k, v]) => (v.allow || []).map(id => `${k}:${id}`)));
     const prev = { pack: s.pack || null, bed: s.music && s.music.bed };
     const r = C.applyPatch(s, patch); s.reference.applied = true;
@@ -1278,7 +1256,7 @@ async function api(req, res, u) {
     if (w.wizard === 'clips') { setOut(WIZ.clipsOutput(w.clips, w.ads)); done.push(`clips: ${w.clips}${w.ads ? ' with ad cuts' : ''}`); next = 'cut';
       if (!MEDIA.transcript(rel)) { update(x => { x.cut = { source: rel, candidates: [], scoredBy: null, pending: 'transcript' }; }); startTranscribe(rel, () => findCuts(rel, 'auto').catch(e => console.error(e.message))); pending = 'transcript'; note = `Transcribing, then finding ${w.clips} clips on whole words.`; }
       else { await findCuts(rel, 'auto'); note = `Found the clips on whole words. Check them on Cut.`; } }
-    if (w.wizard === 'reference') { update(st => { C.applyPatch(st, { reference: { mode: 'recreate' } }); }); const added = addLinks([w.url]); done.push('reference: reading it, Use all'); next = 'reference'; note = 'Reading the reference. We will set your look from it when it is ready.'; if (!added.length) note = 'That link is already in.'; }
+    if (w.wizard === 'reference') { update(st => { C.applyPatch(st, { reference: { mode: 'recreate' } }); }); const added = addLinks([w.url]); done.push('reference: reading it, Recreate'); next = 'reference'; note = 'Reading the reference. We will set your look from it when it is ready.'; if (!added.length) note = 'That link is already in.'; }
     return json(res, 200, { ...view(C.load()), wizard: { done, next, pending, note } });
   }
   if (p === '/api/chat/apply' && M === 'POST') {

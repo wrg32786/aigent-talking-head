@@ -64,7 +64,7 @@ The user can film takes in the Footage step (Record now). A saved take is alread
 
 ## Wizards
 
-`run_wizard` does what the Wizards dialog does: `{ wizard: reel, goal: grow | sell | teach | clean, look, choose: true }` (any of them, in one call or one at a time), `{ wizard: clips, clips, ads }` (finds them on whole words), `{ wizard: reference, url }` (Use all). When the user presses **Let my agent decide** in a wizard, you get a message asking you to make that choice: make it with `run_wizard` or suggest it with `studio_reply suggest`.
+`run_wizard` does what the Wizards dialog does: `{ wizard: reel, goal: grow | sell | teach | clean, look, choose: true }` (any of them, in one call or one at a time), `{ wizard: clips, clips, ads }` (finds them on whole words), `{ wizard: reference, url }` (Recreate). When the user presses **Let my agent decide** in a wizard, you get a message asking you to make that choice: make it with `run_wizard` or suggest it with `studio_reply suggest`.
 
 ## Rules
 

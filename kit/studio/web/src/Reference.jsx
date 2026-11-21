@@ -2,12 +2,11 @@ import { useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';
 import { ProgressBar } from '@astryxdesign/core/ProgressBar';
-import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
-import { api, file, toast, grow, pickState, Icon, IconBtn, SITE, STATUS, KIND_NAME, MODE_TIP } from './lib.jsx';
+import { api, file, toast, grow, pickState, Icon, IconBtn, SITE, STATUS, KIND_NAME } from './lib.jsx';
 import { upload } from './upload.js';
 import { canWrite, NO_WRITER } from './Scripts.jsx';
 import { FixActions } from './Fix.jsx';
-import { RefNotice, RefParts, RefPlan } from './Style.jsx';
+import { RefMode, RefNotice, RefParts, RefPlan } from './RefCard.jsx';
 
 export function Reference({ CAT, V, s, apply, patch }) {
   const r = s.reference, env = V.env, q = r.queue || [], t = env.tools || {};
@@ -77,63 +76,54 @@ function Breakdown({ CAT, V, s, apply, patch }) {
   for (const x of ex.graphics || []) found.push(['graphic', x]);
   for (const x of ex.effects || []) found.push(['effect', x]);
   if (ex.titles) found.push(['titles', String(ex.titles)]);
-  const sugg = (sm.suggestions || []).filter(x => CAT.items[x.ref]);
   const engine = sm.engine;
   return <div id="ref-out" className="teardown glass-card">
     <div className="td-head">
-      <h3 title={item ? item.url : ''}>Breakdown<span className="fine"> {item ? SITE[item.site] || 'Link' : 'File'}{engine ? ', ' + engine : ''}</span></h3>
-      <div id="ref-mode" title={MODE_TIP[r.mode]}>
-        <SegmentedControl label="Reference mode" value={r.mode} onChange={m => patch({ reference: { mode: m } })} size="sm">
-          {['influence', 'recreate', 'off'].map(m => <SegmentedControlItem key={m} value={m} label={m[0].toUpperCase() + m.slice(1)} />)}
-        </SegmentedControl>
-      </div>
+      <h3 title={item ? item.url : ''}>Breakdown<span className="fine"> {item ? SITE[item.site] || 'Link' : 'File'}</span></h3>
+      <RefMode id="ref-mode" mode={r.mode} patch={patch} />
     </div>
-    {/fallback/.test(engine || '') && <p className="fine ref-engine" id="ref-engine" role="note"><Badge label="Read by the built-in analyzer" variant="warning" /> It is rougher and can miss shots, titles and the grade. Get rea-video for the full read, then add this reference again. <FixActions V={V} id="rea" apply={apply} /></p>}
+    <RefRan V={V} s={s} apply={apply} ran={Array.isArray(ex.ran) ? ex.ran : []} fallback={/fallback/.test(engine || '')} />
     <RefNotice s={s} patch={patch} id="ref-notice-td" />
-    {r.mode === 'influence' && !r.auto && <p className="fine" id="ref-mode-note">Influence takes the parts you switch on. Recreate uses all of it.</p>}
     {r.mode === 'influence' && <RefParts V={V} s={s} patch={patch} />}
-    <RefPlan ex={r.extracted} mode={r.mode} />
-    {Array.isArray(ex.ran) && <RefRan V={V} s={s} apply={apply} ran={ex.ran} />}
-    <div className="td-body">
-      {r.contact ? <img src={file(r.contact)} alt="Contact sheet of the reference, one frame per shot" /> : <div className="empty-art"><Icon n="film" /></div>}
-      <div>
-        <div className="stats">
-          <Stat b={len ? `${Math.round(len)} s` : '?'} l="length" /><Stat b={String(ex.shots)} l="shots" />
-          <Stat b={mu.bpm ? String(mu.bpm) : '?'} l={'BPM' + (mu.energy ? `, ${mu.energy} energy` : '')} /><Stat b={sm.averageShot ? `${sm.averageShot} s` : '?'} l={(sm.pacing || 'pace') + ' cut'} />
+    <RefPlan ex={ex} mode={r.mode} id="ref-plan-td" />
+    <div className="row ref-script"><Button id="ref-script" variant="secondary" size="sm" label="Write script from this reference" icon={<Icon n="script" />} isDisabled={!canWrite(V.env)}
+      onClick={() => api('/api/scripts/from-reference', {}).then(j => { apply(j); toast(V.env.backend === 'agent' ? 'Sent to your agent with the breakdown' : 'Writing the script', true); }).catch(() => {})} />
+      {!canWrite(V.env) && <span className="fine">{NO_WRITER}</span>}</div>
+    <details className="td-fold" id="ref-details"><summary>Details</summary>
+      <div className="td-body">
+        {r.contact ? <img src={file(r.contact)} alt="Contact sheet of the reference, one frame per shot" loading="lazy" /> : <div className="empty-art"><Icon n="film" /></div>}
+        <div>
+          <div className="stats">
+            <Stat b={len ? `${Math.round(len)} s` : '?'} l="length" /><Stat b={String(ex.shots)} l="shots" />
+            <Stat b={mu.bpm ? String(mu.bpm) : '?'} l={'BPM' + (mu.energy ? `, ${mu.energy} energy` : '')} /><Stat b={sm.averageShot ? `${sm.averageShot} s` : '?'} l={(sm.pacing || 'pace') + ' cut'} />
+          </div>
+          {len > 0 && <div className="timeline" role="img" aria-label={`Timeline: ${shots.length} shots over ${Math.round(len)} seconds${mu.bpm ? `, beats at ${mu.bpm} BPM` : ''}`}>
+            <div className="tl">{shots.map(([a, b], i) => <div key={i} className="shot" style={{ width: `${((b - a) / len) * 100}%` }} title={`Shot ${i + 1}: ${a.toFixed(1)} to ${b.toFixed(1)} s`}>{(b - a) / len > 0.06 ? i + 1 : ''}</div>)}</div>
+            {beats.length > 0 && <div className="beats" aria-hidden="true">{beats.map((x, i) => <i key={i} style={{ left: `${(x / len) * 100}%` }} />)}</div>}
+            <div className="tl-legend"><span>0 s</span><span>{Math.round(len)} s</span></div>
+          </div>}
+          {found.length > 0 && <div className="found" aria-label="Found in the reference">{found.map(([k, v], i) => <span key={i} className="tag"><em>{k}</em>{v}</span>)}</div>}
         </div>
-        {len > 0 && <div className="timeline" role="img" aria-label={`Timeline: ${shots.length} shots over ${Math.round(len)} seconds${mu.bpm ? `, beat grid at ${mu.bpm} BPM` : ''}`}>
-          <div className="tl">{shots.map(([a, b], i) => <div key={i} className="shot" style={{ width: `${((b - a) / len) * 100}%` }} title={`Shot ${i + 1}: ${a.toFixed(1)} to ${b.toFixed(1)} s`}>{(b - a) / len > 0.06 ? i + 1 : ''}</div>)}</div>
-          {beats.length > 0 && <div className="beats" aria-hidden="true">{beats.map((x, i) => <i key={i} style={{ left: `${(x / len) * 100}%` }} />)}</div>}
-          <div className="tl-legend"><span>0 s</span><span>{mu.bpm ? `beat grid, ${mu.bpm} BPM` : ''}</span><span>{Math.round(len)} s</span></div>
-        </div>}
-        {found.length > 0 && <div className="found" aria-label="Found in the reference">{found.map(([k, v], i) => <span key={i} className="tag"><em>{k}</em>{v}</span>)}</div>}
-        {sugg.length > 0 && <div>
-          <div className="sugg-h"><span className="lbl">Its picks</span><span className="fine">{r.mode === 'off' ? 'Click one to use it.' : 'Set on your Look. Click one to take it out.'}</span></div>
-          <div className="chips">{sugg.map(x => {
-            const it = CAT.items[x.ref], st = pickState(s, it);
-            return <button key={x.ref} className={'chip' + (st === 'allow' ? ' on' : '')} type="button" title={x.why} aria-pressed={String(st === 'allow')} onClick={() => patch({ picks: { [x.ref]: st === 'allow' ? 'clear' : 'allow' } })}>
-              <Icon n={st === 'allow' ? 'check' : 'plus'} /><span className="k">{KIND_NAME[it.kind] || it.kind}</span>{it.id}</button>;
-          })}</div>
-        </div>}
-        <div className="row ref-script"><Button id="ref-script" variant="secondary" size="sm" label="Write script from this reference" icon={<Icon n="script" />} isDisabled={!canWrite(V.env)}
-          onClick={() => api('/api/scripts/from-reference', {}).then(j => { apply(j); toast(V.env.backend === 'agent' ? 'Sent to your agent with the breakdown' : 'Writing the script', true); }).catch(() => {})} />
-          {!canWrite(V.env) && <span className="fine">{NO_WRITER}</span>}</div>
-        <p className="fine">Your agent sees this breakdown. Try: "use the transitions from the reference but calmer".</p>
       </div>
-    </div>
-    {V.swap && V.swap.parts && V.swap.parts.length > 0 && <Swap CAT={CAT} sw={V.swap} s={s} apply={apply} patch={patch} />}
+    </details>
+    {V.swap && V.swap.parts && V.swap.parts.length > 0 && <details className="td-fold" id="ref-byhand"><summary>Pick parts by hand</summary><Swap CAT={CAT} sw={V.swap} s={s} apply={apply} patch={patch} /></details>}
   </div>;
 }
 
-// which parts of the breakdown ran, and a fix for each that did not
-function RefRan({ V, s, apply, ran }) {
+// One row, only when something was not read: which parts ran, a fix for each that did not (never a command), and the
+// built-in analyzer's warning when it did the reading
+function RefRan({ V, s, apply, ran, fallback }) {
   const miss = ran.filter(x => !x.ok), fixes = [...new Set(miss.map(x => x.fix).filter(Boolean))], r = s.reference;
+  if (!miss.length && !fallback) return null;
   const again = () => api('/api/reference/item', { id: r.active, action: 'retry' }).then(v => { apply(v); toast('Reading the reference again', true); }).catch(() => {});
-  return <div className="ref-ran" id="ref-ran">
-    <ul className="ran" aria-label="What we read from the reference">{ran.map(x => <li key={x.id} className={x.ok ? 'ok' : 'miss'} title={x.why} data-part={x.id}><i aria-hidden="true" />{x.label}<span className="sr">{x.ok ? ', read' : ', not read: ' + x.why}</span></li>)}</ul>
-    {miss.length > 0 && <div className="ran-fix fine">{fixes.map(id => { const ls = miss.filter(x => x.fix === id).map(x => x.label), parts = ls.length > 1 ? ls.slice(0, -1).join(', ') + ' and ' + ls[ls.length - 1].toLowerCase() : ls[0], f = V.env && V.env.fixes && V.env.fixes[id];
+  return <div className="ref-ran" id="ref-ran" role="note">
+    <div className="ran-top">{fallback && <span id="ref-engine" title="It is rougher and can miss shots, titles and the grade."><Badge label="Read by the built-in analyzer" variant="warning" /></span>}
+      {ran.length > 0 && <ul className="ran" aria-label="What we read from the reference">{ran.map(x => <li key={x.id} className={x.ok ? 'ok' : 'miss'} title={x.why} data-part={x.id}><i aria-hidden="true" />{x.label}<span className="sr">{x.ok ? ', read' : ', not read: ' + x.why}</span></li>)}</ul>}</div>
+    <div className="ran-fix fine">
+      {fallback && !fixes.includes('rea') && <div className="ran-row" data-fix="rea"><span>It can miss shots, titles and the grade. <b>{(V.env && V.env.fixes && V.env.fixes.rea && V.env.fixes.rea.label) || 'rea-video'}</b> reads it in full.</span><FixActions V={V} id="rea" apply={apply} /></div>}
+      {fixes.map(id => { const ls = miss.filter(x => x.fix === id).map(x => x.label), parts = ls.length > 1 ? ls.slice(0, -1).join(', ') + ' and ' + ls[ls.length - 1].toLowerCase() : ls[0], f = V.env && V.env.fixes && V.env.fixes[id];
         return <div className="ran-row" key={id} data-fix={id}><span>{parts} did not run. <b>{f ? f.label : id}</b> reads {ls.length > 1 ? 'them' : 'it'}.</span><FixActions V={V} id={id} apply={apply} /></div>; })}
-      {r.active != null && <span><Button id="ref-again" variant="secondary" size="sm" label="Read it again" onClick={again} /> after a fix.</span>}</div>}
+      {r.active != null && <span><Button id="ref-again" variant="secondary" size="sm" label="Read it again" onClick={again} /> after a fix.</span>}</div>
   </div>;
 }
 
