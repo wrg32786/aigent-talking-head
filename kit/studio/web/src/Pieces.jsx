@@ -1,7 +1,7 @@
 // The Cut step's Pieces view: the take's lines sorted into what they do (hook, story, tip, proof, list, CTA, with
 // asides and retakes hidden until you ask), and Your combo, the pieces in the order the reel plays them. Let AI choose
 // fills the combo with one reason a piece; Build my own starts it empty. Pieces are whole transcript lines, so every
-// edge sits on a word boundary and no word is ever cut. Nothing renders here: Finish renders the combo.
+// edge sits on a word boundary and no word is ever cut. Nothing renders here: Render renders the combo.
 import { useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';

@@ -1305,7 +1305,7 @@ async function api(req, res, u) {
     const b = await readBody(req), text = String(b.text || '').trim();
     if (!text) return json(res, 400, { error: 'say something' });
     // Ask my agent: the step it was asked from rides along, so the agent knows what "this" is
-    const STEP = { footage: 'Footage', cut: 'Cut', look: 'Look', broll: 'B-roll', finish: 'Finish', post: 'Post' };
+    const STEP = { start: 'Start', footage: 'Start', cut: 'Cut', picture: 'Picture', look: 'Picture', text: 'Text and graphics', broll: 'B-roll', music: 'Music and sounds', review: 'Review', finish: 'Review', render: 'Render', post: 'Post' };
     const said = b.step && STEP[b.step] ? `(On the ${STEP[b.step]} step) ${text}` : text;
     return json(res, 200, await chatTurn(said, b.offline));
   }

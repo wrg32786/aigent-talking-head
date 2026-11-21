@@ -15,14 +15,12 @@ export async function api(path, body, method) {
   return j;
 }
 
-export const STEPS = ['footage', 'cut', 'look', 'broll', 'finish', 'post'];
-export const STEP_LABEL = { broll: 'B-roll' };
-// the step names before 1.13.0, so old links and saved places still land: Style and Reference are both in Look now,
-// and Render is Finish
-export const STEP_ALIAS = { style: 'look', reference: 'look', render: 'finish' };
-export const stepOf = st => STEP_ALIAS[st] || st;
-export const lookSubOf = st => (st === 'reference' ? 'reference' : st === 'style' ? 'style' : null);
-export const stepName = st => STEP_LABEL[st] || cap1(st);
+// the 8 steps, their old names and which step owns each layer live in steps.js (plain JS, the tests read it too)
+export { STEPS, STEP_LABEL, STEP_ALIAS, stepOf, stepName, viewOf, STEP_LAYERS, LAYER_STEP, LAYER_LABEL, layerOf, menuStep, nextStep, matchChips } from './steps.js';
+// a request that may not exist on an older server (the saved looks): null instead of a toast when it fails
+export async function quiet(path, body) {
+  try { const r = await fetch(path, { method: body === undefined ? 'GET' : 'POST', headers: body !== undefined ? { 'content-type': 'application/json' } : {}, body: body !== undefined ? JSON.stringify(body) : undefined }); if (!r.ok) return null; return await r.json(); } catch { return null; }
+}
 export const SITE = { youtube: 'YouTube', 'youtube-shorts': 'Shorts', tiktok: 'TikTok', x: 'X', vimeo: 'Vimeo', instagram: 'Instagram', file: 'File', other: 'Link' };
 export const STATUS = { queued: 'Waiting', downloading: 'Downloading', tearing: 'Breaking down', ready: 'Ready', failed: 'Failed', cancelled: 'Cancelled' };
 export const KIND_NAME = { transition: 'transition', entrance: 'title entrance', captionEntrance: 'caption entrance', captionStyle: 'caption style', graphic: 'graphic', effect: 'effect', finish: 'finish', font: 'font pairing', look: 'look', theme: 'theme', titleLayer: 'title layer', bed: 'music bed', sfx: 'sound', beatSync: 'beat sync', editing: 'editing' };

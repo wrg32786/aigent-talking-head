@@ -1,4 +1,4 @@
-// The reference's shared pieces, used by the Look step card (Style.jsx) and the Breakdown (Reference.jsx):
+// The reference's shared pieces, used by Start (RecreateStart.jsx), the Picture step card (Style.jsx) and the Breakdown (Reference.jsx):
 // RefMode (one control, one vocabulary), RefPlan (what Recreate brings, as chips), RefParts (Influence switches)
 // and RefNotice (one line while a reference is read, or when it set your Look).
 import { useEffect, useRef } from 'react';
@@ -8,14 +8,45 @@ import { toast, Icon } from './lib.jsx';
 // the two labels for what a reference gives you: a built-in option it picked, and a scene made from it for the menu
 export const REF_LABEL = 'From reference', MADE_LABEL = 'Made for you';
 export const READING = ['queued', 'downloading', 'tearing'];
-export const REF_MODES = [['recreate', 'Recreate'], ['influence', 'Influence'], ['off', 'Off']];
+// one vocabulary everywhere a reference is used: Recreate, Copy the look, Influence, Off (reference.mode)
+export const REF_MODES = [['recreate', 'Recreate'], ['look', 'Copy the look'], ['influence', 'Influence'], ['off', 'Off']];
 export const REF_HINT = {
-  recreate: 'Your take re-cut to its shots, with its look, titles, sounds and music.',
-  influence: 'Only the parts you switch on, as soft defaults.',
+  recreate: 'Same edit, your take: its cuts and timing, with its look, titles, sounds and music.',
+  look: 'Same style, your script: its look and sound, with the timing from your own words.',
+  influence: 'Only the parts you switch on. Everything else stays yours.',
   off: 'Kept here, not used.',
 };
+// the name we show for the reference in use
+export function refName(s) {
+  const r = s.reference || {}, ex = r.extracted, item = (r.queue || []).find(x => x.id === r.active);
+  return (ex && ex.name) || (item && (item.title || item.url)) || 'your reference';
+}
+// the mode in plain words for the Your edit line: null when no reference and no saved look is in use
+export function refSays(s) {
+  const r = s.reference || {}, on = !!r.extracted && r.mode !== 'off';
+  if (on && r.mode === 'recreate') return `Recreating ${refName(s)}`;
+  if (on && r.mode === 'look') return `The look of ${refName(s)}, your words`;
+  if (!on && s.styleLook) return `The look of ${s.styleLook}, your words`;
+  return null;
+}
+// what the reference brought to the sound, in plain words (no tempo numbers): "no music, 4 sounds, fast tempo"
+export function refBrought(s) {
+  const r = s.reference || {}, ex = r.extracted; if (!ex || r.mode === 'off') return null;
+  const mu = { ...((ex.summary && ex.summary.music) || {}), ...(ex.music || {}) }, pl = ex.plan || {}, bpm = +((ex.summary && ex.summary.music) || {}).bpm || 0;
+  const music = mu.noBed || pl.noBed ? 'no music' : mu.energy ? `${mu.energy} energy music` : mu.bed ? 'music' : null;
+  const bits = [music, pl.sounds > 0 ? `${pl.sounds} sound${pl.sounds === 1 ? '' : 's'}` : null, bpm ? `${bpm < 90 ? 'slow' : bpm < 118 ? 'medium' : 'fast'} tempo` : null].filter(Boolean);
+  return bits.length ? bits.join(', ') : null;
+}
+// a saved look in a few words (GET /api/style-looks summary): only the parts it has, never an empty row
+const LOOK_PARTS = [['framing', 'Framing'], ['grade', 'Color'], ['captions', 'Captions'], ['pace', 'Pace'], ['music', 'Music'], ['sfx', 'Sounds']];
+const say = v => (v == null || v === '' ? null : v === true ? 'yes' : v === false ? 'none' : Array.isArray(v) ? v.slice(0, 3).join(', ') : typeof v === 'object' ? (v.label || v.name || v.style || null) : String(v));
+export function LookChips({ summary, id }) {
+  const bits = summary ? LOOK_PARTS.map(([k, l]) => [k, l, say(summary[k])]).filter(x => x[2]) : [];
+  if (!bits.length) return null;
+  return <ul className="ref-plan look-chips" id={id} aria-label="What this look sets">{bits.map(([k, l, v]) => <li key={k} className="rp-chip" data-part={k}><span className="rp-k">{l}</span>{v}</li>)}</ul>;
+}
 
-// How the reference is used: Recreate, Influence or Off, with one line for the mode you are in
+// How the reference is used: Recreate, Copy the look, Influence or Off, with one line for the mode you are in
 export function RefMode({ id, mode, patch }) {
   const box = useRef(null), refocus = useRef(false);
   // the card moves when the mode changes (above the Looks in Recreate), so put the focus back on the mode you chose
@@ -38,7 +69,7 @@ export function RefMode({ id, mode, patch }) {
 const count = (n, one) => `${n} ${one}${n === 1 ? '' : 's'}`;
 export function RefPlan({ ex, mode, onMade, id = 'ref-plan' }) {
   if (!ex || mode === 'off') return null;
-  const pl = mode === 'recreate' ? ex.plan : null, made = ex.scenes || [];
+  const pl = mode === 'recreate' ? ex.plan : mode === 'look' && ex.plan ? { framing: ex.plan.framing, sounds: ex.plan.sounds, noBed: ex.plan.noBed } : null, made = ex.scenes || [];
   const bits = pl ? [pl.shots > 1 && ['shots', count(pl.shots, 'shot')], pl.framing && pl.framing.length > 0 && ['framing', pl.framing.slice(0, 3).join(', ')],
     pl.cutaways > 0 && ['cutaways', count(pl.cutaways, 'cutaway')], pl.sounds > 0 && ['sounds', count(pl.sounds, 'sound')], pl.noBed && ['music', 'No music']].filter(Boolean) : [];
   if (!bits.length && !made.length) return null;
@@ -69,6 +100,6 @@ export function RefNotice({ s, patch, id = 'ref-notice' }) {
   if (!r.extracted || !a || r.mode === 'off') return null;
   const back = () => patch({ reference: { mode: 'off' } }).then(() => toast('Back to your own look. The reference is off.', true)).catch(() => {});
   return <div className="ref-notice glass-card" id={id} role="status" data-mode={a.mode}><Icon n="spark" />
-    <p><b>{a.mode === 'recreate' ? 'We set your look from the reference.' : 'We set your picks from the reference.'}</b> {a.mode === 'recreate' ? 'Change anything you like.' : (a.sound ? 'Your Look stays yours. Change anything you like.' : 'Your Look and sound stay yours. Change anything you like.')}</p>
+    <p><b>{a.mode === 'recreate' || a.mode === 'look' ? 'We set your look from the reference.' : 'We set your picks from the reference.'}</b> {a.mode === 'recreate' || a.mode === 'look' ? 'Change anything you like.' : (a.sound ? 'Your Look stays yours. Change anything you like.' : 'Your Look and sound stay yours. Change anything you like.')}</p>
     <Button id={id + '-back'} size="sm" variant="secondary" label="Back to my look" onClick={back} /></div>;
 }

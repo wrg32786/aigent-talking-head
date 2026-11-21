@@ -1,4 +1,4 @@
-// The Picks tray on the Look step: one quiet count that opens your picks grouped by layer. A group is one line: up to
+// The Picks tray on the steps with layers (Picture, Text and graphics, B-roll, Music and sounds): one quiet count that opens your picks grouped by layer. A group is one line: up to
 // three short names (a made scene shows its name, never its id) and "+N" for the rest, which opens that layer.
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react';
 import { toast, Icon } from './lib.jsx';

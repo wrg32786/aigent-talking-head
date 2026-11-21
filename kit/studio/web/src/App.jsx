@@ -3,7 +3,7 @@ import { Theme } from '@astryxdesign/core/theme';
 import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';
 import { aigentTheme } from './theme.js';
-import { api, toast, onToast, STEPS, stepName, stepOf, lookSubOf, Icon, IconBtn, cap1 } from './lib.jsx';
+import { api, quiet, toast, onToast, STEPS, stepName, stepOf, viewOf, menuStep, layerOf, STEP_LAYERS, LAYER_STEP, pickState, Icon, IconBtn, cap1 } from './lib.jsx';
 import { YourEdit } from './Edit.jsx';
 import { BRoll } from './BRoll.jsx';
 import { Keys } from './Keys.jsx';
@@ -12,8 +12,8 @@ import { Reference } from './Reference.jsx';
 import { Cut } from './Cut.jsx';
 import { Outputs } from './Outputs.jsx';
 import { AskAgent, Wizards } from './Agent.jsx';
-import { Style } from './Style.jsx';
-import { Render } from './Render.jsx';
+import { Picture, TextStep, Music, BrollLayer } from './Style.jsx';
+import { Render, ReviewStep, RunFoot, useRun } from './Render.jsx';
 import { Post } from './Post.jsx';
 import { Chat } from './Chat.jsx';
 import { Settings } from './Settings.jsx';
@@ -29,20 +29,27 @@ import { FixActions } from './Fix.jsx';
 
 const hashStep = () => (location.hash.match(/step=([a-z]+)/) || [])[1];
 const hashMenu = () => (location.hash.match(/menu=([a-z-]+)/) || [])[1];
+// where the page opens: a #step= link (old names land on the step that holds them now), a #menu= link (the step
+// that owns that layer), or the place you left
 function firstStep() {
-  const s = stepOf(hashStep() || (hashMenu() ? 'look' : localStorage.getItem('studio.step')) || 'footage');
-  return STEPS.includes(s) ? s : 'footage';
+  const m = hashMenu(), s = m ? menuStep(m) : stepOf(hashStep() || localStorage.getItem('studio.step') || 'start');
+  return STEPS.includes(s) ? s : 'start';
 }
-// Look holds two views: your look (packs, effects, sound) and the reference
-function firstLookSub() { return lookSubOf(hashStep()) || (hashMenu() ? 'style' : localStorage.getItem('studio.look')) || 'style'; }
+// Picture and Render each hold a second view: how the reference was made, and Post. A link names it (#step=reference,
+// #step=post); otherwise the view you left
+const firstPicView = () => { const h = hashStep(); return hashMenu() ? 'main' : h ? (h === 'reference' ? 'reference' : 'main') : localStorage.getItem('studio.picture') === 'reference' ? 'reference' : 'main'; };
+const firstOutView = () => { const h = hashStep(); return h ? (h === 'post' ? 'post' : 'main') : localStorage.getItem('studio.render') === 'post' ? 'post' : 'main'; };
 
 export function App() {
   const [CAT, setCat] = useState(null);
   const [V, setV] = useState(null);
   const [step, setStep] = useState(firstStep);
   const [tab, setTab] = useState(hashMenu() || null);
-  const [lookSub, setLookSubState] = useState(firstLookSub);
-  const setLookSub = useCallback(v => { setLookSubState(v); localStorage.setItem('studio.look', v); }, []);
+  const [picView, setPicViewState] = useState(firstPicView);
+  const [outView, setOutViewState] = useState(firstOutView);
+  const setPicView = useCallback(v => { setPicViewState(v); localStorage.setItem('studio.picture', v); }, []);
+  const setOutView = useCallback(v => { setOutViewState(v); localStorage.setItem('studio.render', v); }, []);
+  const [looksList, setLooksList] = useState(null);
   const [theme, setThemeState] = useState(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
   const [glass, setGlassState] = useState(document.documentElement.dataset.glass !== 'off');
   const [chatOpen, setChatOpen] = useState(/chat/.test(location.hash));
@@ -67,7 +74,7 @@ export function App() {
     if (v.seq && v.boot === k.boot && v.seq < k.seq) return v; // an older reply than what is on screen
     const video = v.state.videoSeq || 0;
     if (k.video !== null && video !== k.video) {
-      setStep('footage'); localStorage.setItem('studio.step', 'footage'); history.replaceState(null, '', '#step=footage');
+      setStep('start'); localStorage.setItem('studio.step', 'start'); history.replaceState(null, '', '#step=start');
       setLog(''); setRecLive(null); // a task log and a recorder status belong to the previous board
     }
     if (v.seq) seen.current = { boot: v.boot, seq: v.seq, video };
@@ -81,13 +88,20 @@ export function App() {
   const setTheme = t => { document.documentElement.dataset.theme = t; localStorage.setItem('studio.theme', t); setThemeState(t); };
   const setGlass = on => { if (on) delete document.documentElement.dataset.glass; else document.documentElement.dataset.glass = 'off'; localStorage.setItem('studio.glass', on ? '1' : '0'); setGlassState(on); };
 
+  const catRef = useRef(null); catRef.current = CAT;
   const go = useCallback((s0, focus) => {
-    const s = stepOf(s0), sub = lookSubOf(s0); if (sub) setLookSub(sub);
+    const s = stepOf(s0), v = viewOf(s0);
+    if (s === 'picture' && v) setPicView(v); if (s === 'render' && v) setOutView(v);
     setStep(s); localStorage.setItem('studio.step', s);
-    if (!/menu=/.test(location.hash) || s !== 'look') history.replaceState(null, '', '#step=' + s);
-    if (focus) requestAnimationFrame(() => { window.scrollTo({ top: 0 }); const h = document.querySelector(`main .step[data-step="${s === 'look' ? (sub || localStorage.getItem('studio.look') || 'style') : s}"]:not([hidden]) h2`); if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); } });
-  }, [setLookSub]);
-  const pickTab = useCallback(id => { setTab(id); history.replaceState(null, '', '#menu=' + id); }, []);
+    // a #menu= link stays while you are on the step that owns its layer
+    const m = hashMenu(); if (!m || menuStep(m, catRef.current && catRef.current.layers) !== s) history.replaceState(null, '', '#step=' + s);
+    if (focus) requestAnimationFrame(() => { window.scrollTo({ top: 0 }); const h = document.querySelector('main .step:not([hidden]) h2'); if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); } });
+  }, [setPicView, setOutView]);
+  // open a layer: the step that owns it comes up with that layer showing
+  const pickTab = useCallback(id => { const layers = catRef.current && catRef.current.layers, l = layerOf(id, layers) || id, st = menuStep(l, layers);
+    setTab(l); if (st === 'picture') setPicView('main'); setStep(st); localStorage.setItem('studio.step', st); history.replaceState(null, '', '#menu=' + l); }, [setPicView]);
+  // the looks saved from earlier references (GET /api/style-looks); null when this server does not have them
+  const reloadLooks = useCallback(() => quiet('/api/style-looks').then(j => { setLooksList(j && Array.isArray(j.looks) ? j.looks : null); }), []);
 
   useEffect(() => {
     let es;
@@ -96,31 +110,42 @@ export function App() {
         setCat(await api('/api/catalog'));
         apply(await api('/api/state'));
       } catch (e) { toast('Studio could not load: ' + e.message); return; }
+      reloadLooks();
       es = new EventSource('/api/events');
       es.addEventListener('state', e => apply(JSON.parse(e.data)));
       es.addEventListener('log', e => { const d = JSON.parse(e.data); setLog(l => (l ? l + '\n' : '') + d.line); });
       es.addEventListener('task', () => api('/api/state').then(apply).catch(() => {}));
     })();
-    const onHash = () => { const m = hashMenu(), st = hashStep(); if (m) { setStep('look'); setLookSub('style'); setTab(m); } else if (st && STEPS.includes(stepOf(st))) go(st, true); };
+    const onHash = () => { const m = hashMenu(), st = hashStep(); if (m) pickTab(m); else if (st && STEPS.includes(stepOf(st))) go(st, true); };
+    // "/" searches every option: from Picture or Text and graphics it stays there, from anywhere else it opens Picture
     const onKey = e => {
-      if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); go('style'); setTimeout(() => document.getElementById('filter')?.focus(), 30); }
+      if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); if (!document.getElementById('filter')) go('picture'); setTimeout(() => document.getElementById('filter')?.focus(), 30); }
     };
     addEventListener('hashchange', onHash); document.addEventListener('keydown', onKey);
     return () => { es && es.close(); removeEventListener('hashchange', onHash); document.removeEventListener('keydown', onKey); };
-  }, [apply, go, setLookSub]);
+  }, [apply, go, pickTab, reloadLooks]);
+  // an old tab name in a link (#menu=captions) is a group inside a layer: once the catalog is in, open the step that holds it
+  useEffect(() => { const m = hashMenu(); if (CAT && m) { const st = menuStep(m, CAT.layers); if (st !== step) pickTab(m); } }, [!!CAT]);
+  const run = useRun(V || { compose: {} }, V ? V.state : { footage: [] }, log, setLog);
 
   if (!CAT || !V) return <Theme theme={aigentTheme} mode={theme}><div className="boot" role="status"><span className="spin" aria-hidden="true" />Loading Studio</div><Toast /></Theme>;
 
   const s = V.state, t = V.task, running = t && t.status === 'running';
-  const picksAny = Object.values(s.picks).some(p => p.allow.length || p.deny.length);
-  const done = { footage: !!(s.footage.length || s.clips), cut: !!(V.cut && V.cut.candidates && V.cut.candidates.length), look: !!(s.pack || picksAny || s.reference.extracted), broll: !!(V.broll && V.broll.beats && V.broll.beats.some(b => b.slot)), finish: !!(V.currentOutputs || []).length };
+  const pickedIn = st => (STEP_LAYERS[st] || []).some(id => { const l = (CAT.layers || []).find(x => x.id === id); return !!l && l.items.some(r => CAT.items[r] && pickState(s, CAT.items[r])); });
+  const refOn = !!(s.reference.extracted && s.reference.mode !== 'off'), drafted = !!(V.edit && V.edit.drafted);
+  const done = { start: !!(s.footage.length || s.clips), cut: !!(V.cut && V.cut.candidates && V.cut.candidates.length), picture: !!(s.pack || refOn || s.styleLook || pickedIn('picture')), text: pickedIn('text'),
+    broll: !!(V.broll && V.broll.beats && V.broll.beats.some(b => b.slot)), music: s.music.bed !== 'auto' || s.sound.sfx === 'off' || s.pace.tighten != null || pickedIn('music'), review: drafted, render: !!(V.currentOutputs || []).length };
+  const looks = { on: looksList !== null, list: looksList || [], reload: reloadLooks,
+    save: name => quiet('/api/style-looks/save', { name }).then(j => { if (!j) return false; if (Array.isArray(j.looks)) setLooksList(j.looks); else reloadLooks(); return true; }),
+    pick: name => quiet('/api/state', { styleLook: name }).then(j => { if (j) apply(j); else toast('We could not switch the saved look.'); }) };
   const i = STEPS.indexOf(step);
   const openConnect = () => { setSettingsOpen(false); setChatOpen(false); setConnectOpen(true); };
   const openSetup = () => { setSettingsOpen(false); setSetupOpen(true); };
   const openKeys = () => { setSettingsOpen(false); setKeysOpen(true); };
   const openChat = () => setChatOpen(true);
   const openOutputs = () => setOutputsOpen(true), openNewVideo = () => setVideoMode('new');
-  const ctx = { CAT, V, s, apply, patch, go, reloadCat, setLog, log, openConnect, openSetup, openKeys, openChat, openOutputs, openNewVideo };
+  const ctx = { CAT, V, s, apply, patch, go, reloadCat, setLog, log, openConnect, openSetup, openKeys, openChat, openOutputs, openNewVideo, looks };
+  const refAny = !!(s.reference.extracted || s.reference.file || (s.reference.status && s.reference.status !== 'none') || (s.reference.queue || []).length), post = step === 'render' && outView === 'post', breakdown = step === 'picture' && picView === 'reference';
   const env = V.env, a = env.agent || {}, agentState = env.backend !== 'agent' ? 'alt' : a.listening ? 'on' : a.connected ? 'busy' : 'off';
   const pill = !t ? 'Ready' : running ? `${cap1(t.kind)} running` : t.status === 'failed' ? `${cap1(t.kind)} failed` : `${cap1(t.kind)} ${t.status}`;
 
@@ -138,7 +163,7 @@ export function App() {
             </button></li>)}
         </ol></nav>
         <div className="topr">
-          {recLive && step !== 'footage' && <button type="button" className="rec-pill" id="rec-pill" onClick={() => go('footage', true)} aria-label="Recording, go back to the recorder"><i aria-hidden="true" />{recLive.phase === 'paused' ? 'Paused' : recLive.phase === 'saving' ? 'Saving take' : 'Recording'}</button>}
+          {recLive && step !== 'start' && <button type="button" className="rec-pill" id="rec-pill" onClick={() => go('start', true)} aria-label="Recording, go back to the recorder"><i aria-hidden="true" />{recLive.phase === 'paused' ? 'Paused' : recLive.phase === 'saving' ? 'Saving take' : 'Recording'}</button>}
           {env.setup && !env.setup.ready && (() => { const nm = Object.values(env.setup.missing).filter(x => x.need === 'core').length; return <button type="button" className="setup-pill" id="setup-pill" onClick={openSetup} aria-label={`${nm} missing, open Setup check`} title="Setup check"><Icon n="ban" /><span className="sp-n">{nm}</span><span className="sp-l"> missing</span></button>; })()}
           <button type="button" className="out-btn" id="wizards-open" aria-haspopup="dialog" onClick={() => setWizOpen(true)} title="A guided start"><Icon n="spark" /><span className="ob-l">Wizards</span></button>
           <button type="button" className="out-btn" id="outputs-open" aria-haspopup="dialog" onClick={() => setOutputsOpen(true)} title="Every render, with its settings"><Icon n="film" /><span className="ob-l">Outputs</span></button>
@@ -156,23 +181,29 @@ export function App() {
         </div>
       </header>
       <div className="layout">
-        <main id="main" data-step={step} data-look={lookSub} ref={mainRef}>
-          {step !== 'post' && <YourEdit V={V} s={s} go={go} step={step} />}
-          {step === 'look' && <LookSwitch sub={lookSub} setSub={v => { setLookSub(v); }} s={s} />}
+        <main id="main" data-step={step} data-view={step === 'picture' ? picView : step === 'render' ? outView : 'main'} ref={mainRef}>
+          {!post && <YourEdit V={V} s={s} go={go} step={step} />}
+          {step === 'picture' && (refAny || breakdown) && <ViewSwitch id="look-switch" label="Picture" value={picView} set={setPicView} views={[['main', 'Your picture', 'look-sub-style'], ['reference', 'How the reference was made', 'look-sub-reference', refOn]]} />}
+          {step === 'render' && <ViewSwitch id="render-switch" label="Render" value={outView} set={setOutView} views={[['main', 'Render', 'render-sub-main'], ['post', 'Post', 'render-sub-post']]} />}
           {/* a new or opened video remounts the steps, so no step keeps the last board's local picks */}
           <Fragment key={'v' + (s.videoSeq || 0)}>
-          <Footage {...ctx} hidden={step !== 'footage'} onLive={setRecLive} />
+          <Footage {...ctx} hidden={step !== 'start'} onLive={setRecLive} />
           {step === 'cut' && <Cut {...ctx} />}
-          {step === 'look' && lookSub === 'reference' && <Reference {...ctx} />}
-          <Style {...ctx} hidden={step !== 'look' || lookSub !== 'style'} tab={tab} setTab={pickTab} />
+          {breakdown && <Reference {...ctx} />}
+          {step === 'picture' && !breakdown && <Picture {...ctx} tab={tab} setTab={pickTab} />}
+          {step === 'text' && <TextStep {...ctx} tab={tab} setTab={pickTab} />}
           {step === 'broll' && <BRoll {...ctx} />}
-          <Render {...ctx} hidden={step !== 'finish'} />
-          {step === 'post' && <Post {...ctx} />}
+          {step === 'broll' && <BrollLayer {...ctx} tab={tab} setTab={pickTab} />}
+          {step === 'music' && <Music {...ctx} tab={tab} setTab={pickTab} />}
+          <ReviewStep {...ctx} run={run} hidden={step !== 'review'} />
+          <Render {...ctx} run={run} hidden={step !== 'render' || post} toPost={() => { setOutView('post'); window.scrollTo({ top: 0 }); }} />
+          {post && <Post {...ctx} />}
+          {(step === 'review' || (step === 'render' && !post)) && <RunFoot V={V} s={s} log={log} />}
           </Fragment>
           <footer className="stepnav glass" id="stepnav">
             <span style={{ visibility: i ? 'visible' : 'hidden' }}><Button id="prev" variant="ghost" label="Back" icon={<Icon n="left" />} onClick={() => go(STEPS[Math.max(0, i - 1)], true)} /></span>
             <PicksTray s={s} patch={patch} cat={CAT} added={(V.look && V.look.added) || []} openLayer={pickTab} />
-            <AskAgent step={step} apply={apply} openChat={openChat} />
+            <AskAgent step={post ? 'post' : step} apply={apply} openChat={openChat} />
             {i < STEPS.length - 1 ? <Button id="next" variant="primary" label={stepName(STEPS[i + 1])} endContent={<Icon n="right" />} onClick={() => go(STEPS[i + 1], true)} /> : <span className="nextpad" />}
           </footer>
         </main>
@@ -190,12 +221,10 @@ export function App() {
   );
 }
 
-// Look is one step with two views: your look (packs, effects, sound and pace) and a reference to borrow from
-function LookSwitch({ sub, setSub, s }) {
-  const r = s.reference, refOn = !!(r && r.extracted && r.mode !== 'off');
-  return <div className="look-switch" id="look-switch"><div className="seg" role="radiogroup" aria-label="Look">
-    <button type="button" role="radio" id="look-sub-style" aria-checked={sub === 'style'} onClick={() => setSub('style')}>Your look</button>
-    <button type="button" role="radio" id="look-sub-reference" aria-checked={sub === 'reference'} onClick={() => setSub('reference')}>Reference{refOn ? <span className="dotmark" aria-label=", in use" /> : null}</button>
+// A step with two views (Picture and how the reference was made; Render and Post): one small switch above the step
+function ViewSwitch({ id, label, value, set, views }) {
+  return <div className="look-switch" id={id}><div className="seg" role="radiogroup" aria-label={label}>
+    {views.map(([v, l, bid, mark]) => <button key={v} type="button" role="radio" id={bid} aria-checked={value === v} onClick={() => set(v)}>{l}{mark ? <span className="dotmark" aria-label=", in use" /> : null}</button>)}
   </div></div>;
 }
 

@@ -7,7 +7,7 @@ import { Recorder } from './Recorder.jsx';
 import { Scripts } from './Scripts.jsx';
 import { Player, clock } from './Player.jsx';
 import { Toggle, Hint } from './ui.jsx';
-import { RecreateStart } from './RecreateStart.jsx';
+import { StartMode } from './RecreateStart.jsx';
 
 export function Dropzone({ id, inputId, kind, s, apply, accept, multiple, big, children, label }) {
   const input = useRef(null); const [over, setOver] = useState(false);
@@ -53,7 +53,7 @@ export function FootageLink({ s, apply }) {
   </div>;
 }
 
-export function Footage({ V, s, apply, patch, go, hidden, onLive }) {
+export function Footage({ V, s, apply, patch, go, hidden, onLive, looks }) {
   const [readId, setReadId] = useState(null);
   const [playing, setPlaying] = useState(null), drag = useRef(null), [over, setOver] = useState(null);
   // reorder in place: drag a clip onto another, or the arrow buttons; the draft uses this order
@@ -63,8 +63,8 @@ export function Footage({ V, s, apply, patch, go, hidden, onLive }) {
   const [rec, setRec] = useState(() => localStorage.getItem('studio.rec.open') === '1' || /record/.test(location.hash));
   const open = v => { localStorage.setItem('studio.rec.open', v ? '1' : '0'); setRec(v); };
   const needJob = () => { if (s.job) return false; toast('Name the reel first (top left)'); document.getElementById('job')?.focus(); return true; };
-  return <section className="step" id="s-footage" data-step="footage" aria-labelledby="h-footage" hidden={hidden}>
-    <header className="sh"><h2 id="h-footage">Footage</h2><p className="sub">Your raw clip, a few takes, or film one now from a script.</p></header>
+  return <section className="step" id="s-footage" data-step="start" aria-labelledby="h-footage" hidden={hidden}>
+    <header className="sh"><h2 id="h-footage">Start</h2><p className="sub">Add your footage or film it now. Then say if a video you like should guide the edit.</p></header>
     {rec ? <Recorder V={V} s={s} apply={apply} onClose={() => open(false)} onLive={onLive} visible={!hidden} scriptId={readId} />
       : <div className="sources">
         <Dropzone id="drop-footage" inputId="file-footage" kind="footage" s={s} apply={apply} big multiple accept="video/*,.mov,.mp4,.m4v,.webm,.mkv" label="Add footage: drop video files or press Enter to choose">
@@ -75,8 +75,6 @@ export function Footage({ V, s, apply, patch, go, hidden, onLive }) {
         </button>
       </div>}
     {!rec && <FootageLink s={s} apply={apply} />}
-    {!rec && <RecreateStart s={s} apply={apply} patch={patch} go={go} />}
-    <Scripts V={V} s={s} apply={apply} onRead={id => { if (needJob()) return; setReadId(id); open(true); requestAnimationFrame(() => document.getElementById('recorder')?.scrollIntoView({ block: 'start', behavior: 'smooth' })); }} />
     {showing && <Player apply={apply} path={showing} tx={(s.tx || {})[showing]} onClose={() => setPlaying(null)} />}
     <ul id="footage" className="clips">
       {s.clips && <li className="note">Using the clips folder {s.clips}</li>}
@@ -99,5 +97,7 @@ export function Footage({ V, s, apply, patch, go, hidden, onLive }) {
       </li>)}
     </ul>
     {s.footage.length > 0 && !s.clips && <div className="as-is"><Toggle id="as-is" label="Already cut: use each file as it is" description="One clip per file, in this order, no second cut." checked={!!s.asIs} onChange={v => api('/api/state', { asIs: v }).then(apply).catch(() => {})} /></div>}
+    {!rec && <StartMode s={s} apply={apply} patch={patch} go={go} looks={looks} />}
+    <Scripts V={V} s={s} apply={apply} onRead={id => { if (needJob()) return; setReadId(id); open(true); requestAnimationFrame(() => document.getElementById('recorder')?.scrollIntoView({ block: 'start', behavior: 'smooth' })); }} />
   </section>;
 }

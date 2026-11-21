@@ -1,4 +1,4 @@
-// Words and brands: the glossary (words Whisper mishears, written your way in every draft's captions and titles,
+// Words and brands: the glossary (words we mishear, written your way in every draft's captions and titles,
 // kit/glossary.cjs) and keyword logos (a plate with a brand's mark when its word is said, kit/brands.cjs). Logos are
 // files you add here, or the kit's own Skool mark; nothing is downloaded.
 import { useRef, useState } from 'react';
@@ -21,14 +21,12 @@ export function WordsBrands({ s, patch, apply }) {
   };
   const remove = w => patch({ brands: brands.filter(b => b.word !== w) });
   const kitSkool = () => patch({ brands: brands.filter(b => b.word.toLowerCase() !== 'skool').concat({ word: 'Skool', logo: KIT_MARK }) });
-  return <section className="step" id="s-words" data-step="style" aria-labelledby="h-words">
-    <div className="block glass-card">
-      <div className="bh"><h3 id="h-words">Words and brands</h3></div>
+  return <div id="s-words" className="words-brands">
       <div className="controls">
         <div className="ctl wide"><label className="lbl" htmlFor="glossary">Your words</label>
           <textarea id="glossary" rows={3} spellCheck="false" placeholder={'Agent Academy = AIgent Academy\nschool = Skool after on, in\nchat GBT | chat GPT = ChatGPT'} value={text} onChange={e => setText(e.target.value)} />
           <div className="row"><Button id="glossary-save" size="sm" variant="secondary" label="Save words" isDisabled={!dirty} onClick={saveWords} />
-            <span className="fine">What Whisper writes = how you write it. Fixed in every draft; a word like AIgent keeps its own capitals.</span></div></div>
+            <span className="fine">What we hear = how you write it. Fixed in every draft; a word like AIgent keeps its own capitals.</span></div></div>
         <div className="ctl wide"><span className="lbl">Logos when you say a word</span>
           <ul className="brand-list" id="brand-list">
             {brands.map(b => <li key={b.word} data-word={b.word}><img src={'/api/brand?name=' + encodeURIComponent(b.logo)} alt="" height={28} /><b>{b.word}</b>
@@ -42,6 +40,5 @@ export function WordsBrands({ s, patch, apply }) {
             {!brands.some(b => b.logo === KIT_MARK) && <Button id="brand-skool" size="sm" variant="ghost" label="Use the kit's Skool mark" onClick={kitSkool} />}</div>
           <p className="fine">Use only logos you have the right to use.</p></div>
       </div>
-    </div>
-  </section>;
+  </div>;
 }

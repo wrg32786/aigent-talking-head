@@ -31,7 +31,7 @@ export function NewVideo({ s, V, apply, go, mode, setMode }) {
     return () => { live = false; };
   }, [open, mode, running, s.rev]);
   const close = () => setMode(null);
-  const done = (v, msg) => { apply(v); close(); go('footage', true); toast(msg, true); };
+  const done = (v, msg) => { apply(v); close(); go('start', true); toast(msg, true); };
   const start = async e => {
     if (e) e.preventDefault(); setWorking(true); setErr('');
     try { const v = await api('/api/videos/new', { name: cleanJob(name), keepLook: keep }); done(v, `New video: ${v.state.job}`); }
