@@ -297,6 +297,7 @@ if (target) {
     for (const [f, what] of [['studio-point.test.mjs', 'Studio Cut step tests (tests/studio-point.test.mjs: the point of the video steers lines and clips, topics are real themes, Pacing never cuts a word)'],
       ['studio-cut-server.test.mjs', 'Studio Cut server tests (tests/studio-cut-server.test.mjs: the Cut routes, the point, topics, Pacing and the stitched previews over HTTP)'],
       ['studio-stages.test.mjs', 'Studio stage status tests (tests/studio-stages.test.mjs: teardown log lines to the stage line, the list and the bar)'],
+      ['studio-ref-clear.test.mjs', 'Studio reference clear tests (tests/studio-ref-clear.test.mjs: a stopped breakdown\'s line goes when the reference is cleared or replaced)'],
       ['py-utf8.test.mjs', 'Python reads and writes utf-8 (tests/py-utf8.test.mjs: every text open() names the encoding, so a breakdown works on Windows)']]) {
       const e2 = [];
       try { execFileSync(process.execPath, [join(ROOT, 'tests', f)], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
