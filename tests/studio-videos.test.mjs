@@ -98,6 +98,13 @@ try {
       assert.throws(() => C.switchVideo(s, { name: 'nv-y-' + P }), e => e.code === 409 && /reference link is still downloading/.test(e.message)); }
     assert.strictEqual(C.settleStale(s), 1); assert.strictEqual(s.reference.queue[1].status, 'failed'); assert.match(s.reference.queue[1].error, /Studio stopped/); assert.strictEqual(C.videoBusy(s), null);
   });
+  await t('a file teardown that was cut off or failed is not left "running" (it would refuse every Recreate draft): the file can be broken down again', () => {
+    const s = busyBoard(B); s.task = null; s.reference = { ...s.reference, mode: 'recreate', status: 'running', file: 'teardown-in/studio/x.mp4', extracted: null, queue: [] };
+    assert.strictEqual(C.settleStale(s), 1); assert.strictEqual(s.reference.status, 'uploaded');
+    s.reference.status = 'running'; s.reference.file = null; assert.strictEqual(C.settleReference(s), true); assert.strictEqual(s.reference.status, 'none');
+    s.reference.status = 'running'; s.reference.extracted = { name: 'x' }; C.settleReference(s); assert.strictEqual(s.reference.status, 'ready');
+    assert.strictEqual(C.settleReference(s), false);
+  });
   // over HTTP, with the real server
   const env = { ...process.env, CI: '1', STUDIO_DIR: STATE, STUDIO_CHAT: '', ANTHROPIC_API_KEY: '', OPENAI_API_KEY: '' };
   const base = busyBoard(A); base.imports = [{ id: 9, status: 'downloading' }]; base.chat = []; C.save(base);

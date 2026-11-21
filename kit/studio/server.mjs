@@ -1062,7 +1062,7 @@ async function api(req, res, u) {
       const ex = C.extract(recipe);
       update(st => { st.reference.status = 'ready'; st.reference.extracted = ex; st.reference.out = t.out; st.reference.contact = existsSync(join(ROOT, t.out, 'contact.jpg')) ? `${t.out}/contact.jpg`.split(sep).join('/') : null; st.reference.auto = null; C.setReferenceLook(st); });
       return { extracted: ex };
-    });
+    }, { end: status => { if (status !== 'done') update(st => { C.settleReference(st); }); } }); // failed or cancelled: not "running" forever
     return json(res, 202, view(C.load()));
   }
   if (p === '/api/reference/url' && M === 'POST') {
@@ -1423,6 +1423,7 @@ if (C.settleStale(C.load())) update(st => { C.settleStale(st); });
 // a take still marked recording or converting was cut off when Studio last stopped
 { const s0 = C.load(); if ((s0.takes || []).some(t => t.status === 'recording' || t.status === 'converting')) update(st => { for (const t of st.takes) if (t.status === 'recording' || t.status === 'converting') Object.assign(t, { status: 'failed', error: 'Studio stopped while this take was being saved' }); }); }
 server.listen(PORT, HOST, () => {
+  setImmediate(pump); // a reference link still queued from the last run
   const url = `http://${HOST}:${server.address().port}`;
   const e = env();
   console.log(`Studio: ${url}\nSession: ${C.statePath()}\nChat: ${e.backend === 'agent' ? 'your terminal agent (tell it: Run the Studio chat loop; setup in AGENTS.md)' : e.llm ? e.llm : e.backend}\nReference links: ${e.tools.ytdlp ? 'yt-dlp ' + e.tools.ytdlp : 'direct video links and Instagram only (pip install yt-dlp for YouTube, TikTok, X, Vimeo)'}\nStop with Ctrl+C.`);
