@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { Switch } from '@astryxdesign/core/Switch';
-import { Kbd } from '@astryxdesign/core/Kbd';
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
-import { api, quiet, file, toast, pickState, isPaused, Icon, IconBtn, KIND_NAME, RM, STEP_LAYERS, LAYER_STEP, LAYER_LABEL, layerOf, stepName } from './lib.jsx';
+import { api, quiet, file, toast, pickState, isPaused, Icon, IconBtn, KIND_NAME, RM, showName, STEP_LAYERS, LAYER_STEP, LAYER_LABEL, layerOf, stepName } from './lib.jsx';
 import { RefMode, RefNotice, RefParts, RefPlan, REF_LABEL, MADE_LABEL, refName, refBrought, LookChips } from './RefCard.jsx';
 import { Fold } from './ui.jsx';
 import { upload } from './upload.js';
@@ -41,7 +40,7 @@ export function Music({ CAT, V, s, apply, patch, tab, setTab }) {
       <ChangeNote s={s} patch={patch} />
       <Sound CAT={CAT} s={s} apply={apply} patch={patch} ctx={ctx} />
     </section>
-    <Fold id="sounds-fold" title="Every music bed and sound" className="step" defaultOpen={!!tab && layerOf(tab, CAT.layers) === 'audio'}><Layers step="music" bare CAT={CAT} V={V} s={s} apply={apply} patch={patch} tab={tab} setTab={setTab} /></Fold>
+    <Fold id="sounds-fold" title="All music and sounds" className="step" defaultOpen={!!tab && layerOf(tab, CAT.layers) === 'audio'}><Layers step="music" bare CAT={CAT} V={V} s={s} apply={apply} patch={patch} tab={tab} setTab={setTab} /></Fold>
   </>;
 }
 
@@ -95,7 +94,7 @@ function RefMore(props) {
 // the reference sets the Look, so its card comes first and the Looks row steps back
 function Looks({ CAT, V, s, apply, patch, reloadCat, go, setTab, looks: saved }) {
   const r = s.reference, ex = r.extracted, item = (r.queue || []).find(x => x.id === r.active);
-  const looks = [{ name: null, label: 'Your picks only' }, ...CAT.packs.filter(p => !/^ref-/.test(p.name))];
+  const looks = [{ name: null, label: 'No Look' }, ...CAT.packs.filter(p => !/^ref-/.test(p.name))];
   const clear = () => api('/api/reference/clear', {}).then(j => { apply(j); toast(j.note, true); }).catch(() => {});
   const undo = () => api('/api/reference/clear', { undo: true }).then(j => { apply(j); toast(j.note, true); }).catch(() => {});
   const sm = (ex && ex.summary) || {}, byRef = !!ex && (r.mode === 'recreate' || r.mode === 'look'), isLook = !!ex && r.mode === 'look';
@@ -103,14 +102,17 @@ function Looks({ CAT, V, s, apply, patch, reloadCat, go, setTab, looks: saved })
   // the made chip: open the layer that holds the scenes made from the reference and bring that group into view
   const showMade = made => { const layer = made[0] && made[0].kind === 'effect' ? 'color' : 'graphics'; setTab(layer);
     let n = 0; const find = () => { const g = document.querySelector(`#grid[aria-labelledby="tab-${layer}"] [data-group="ref-made"]`); if (g) g.scrollIntoView({ block: 'center', behavior: RM ? 'auto' : 'smooth' }); else if (n++ < 30) requestAnimationFrame(find); }; requestAnimationFrame(find); };
+  // your own picks on top of the Look: the moment Save as a new Look means something
+  const changed = Object.values(s.picks || {}).some(p => (p.allow || []).length || (p.deny || []).length);
   const row = <div className="looks-wrap" key="looks">
     {byRef && <p className="fine looks-by-ref" id="looks-by-ref">Set by your reference</p>}
     <div id="looks" className={'packs looks' + (byRef ? ' by-ref' : '')} role="radiogroup" aria-label="Look" aria-describedby={byRef ? 'looks-by-ref' : undefined}>
       {looks.map(p => <button key={p.name || 'none'} className="pack" type="button" role="radio" data-look={p.name || ''} aria-checked={String((s.pack || null) === p.name)} title={p.description || (p.label || '').split(':')[0]} onClick={() => patch({ pack: p.name })}>
-        <span className="pv">{p.preview ? <img src={file(p.preview)} alt="" loading="lazy" width={112} height={199} /> : <span className="ph">{p.name ? 'No preview' : 'Your picks only'}</span>}</span>
-        <b>{p.name || 'None'}</b><small className="fine">{!p.name ? 'our defaults' : p.shipped ? 'built in' : /reference/i.test(p.label || '') ? 'saved from a reference' : 'your saved Look'}</small>
+        <span className="pv">{p.preview ? <img src={file(p.preview)} alt="" loading="lazy" width={112} height={199} /> : <span className="ph">{p.name ? 'No preview' : 'No Look'}</span>}</span>
+        <b>{p.name ? (p.shipped ? showName(p.name) : p.name) : 'No Look'}</b>{(!p.name || !p.shipped) && <small className="fine">{!p.name ? 'Studio picks the basics' : /reference/i.test(p.label || '') ? 'saved from a reference' : 'yours'}</small>}
       </button>)}
     </div>
+    {changed && <SaveLook id="save-look" label="Save as a new Look" reloadCat={reloadCat} apply={apply} variant="outline" />}
   </div>;
   const card = ex ? <div className={'ref-card glass-card' + (byRef ? ' first' : '')} id="ref-card" key="card" data-mode={r.mode}>
     <div className="rc-h">
@@ -130,8 +132,7 @@ function Looks({ CAT, V, s, apply, patch, reloadCat, go, setTab, looks: saved })
     <LookChips summary={picked.summary} id="look-card-chips" />
   </div> : s.undoRef ? <p className="fine ref-undo" id="ref-undo" key="undo">Reference cleared. <button type="button" className="linkish" id="ref-undo-btn" onClick={undo}>Undo</button></p> : null;
   return <section className="step" id="s-look" data-step="picture" aria-labelledby="h-look">
-    <header className="sh look-h"><div><h2 id="h-look">Picture</h2><p className="sub">Pick one Look, then change the color, motion, transitions or layout below if you want to.</p></div>
-      <SaveLook id="save-look" label="Save as a new Look" reloadCat={reloadCat} apply={apply} variant="outline" /></header>
+    <header className="sh look-h"><div><h2 id="h-look">Picture</h2><p className="sub">Pick one Look, then change the color, motion, transitions or layout below if you want to.</p></div></header>
     {!ex && <RefNotice s={s} patch={patch} />}
     {byRef || picked ? [card, row] : [row, card]}
   </section>;
@@ -148,7 +149,7 @@ function Layers({ step, bare, CAT, V, s, apply, patch, tab, setTab }) {
   const want = layerOf(tab, every), cur = layers.some(c => c.id === want) ? want : (layers[0] || {}).id;
   const L = layers.find(x => x.id === cur), ql = q.trim().toLowerCase();
   useEffect(() => { if (focusKey.current) { const b = [...gridRef.current.querySelectorAll('[data-focus]')].find(x => x.dataset.focus === focusKey.current); if (b) b.focus({ preventScroll: true }); focusKey.current = null; } });
-  const match = it => !ql || it.id.includes(ql) || (it.made && it.made.name.toLowerCase().includes(ql)) || (it.label || '').toLowerCase().includes(ql);
+  const match = it => !ql || it.id.includes(ql) || showName(it.id).toLowerCase().includes(ql) || (it.made && it.made.name.toLowerCase().includes(ql)) || (it.label || '').toLowerCase().includes(ql);
   // search looks across every layer, so you never need to know which one holds it
   // (and the step that holds it is one click away)
   const groups = ql ? every.flatMap(l => l.groups.map(g => ({ ...g, key: l.id + ':' + g.id, layer: l.id, label: l.label === g.label ? l.label : `${l.label}: ${g.label}`, items: g.items.filter(r => match(CAT.items[r])) }))).filter(g => g.items.length) : L ? L.groups : [];
@@ -188,8 +189,8 @@ function Layers({ step, bare, CAT, V, s, apply, patch, tab, setTab }) {
               {x.label}{refIn(x) > 0 ? <span className="pd pd-ref" title={REF_LABEL} aria-label="has picks from the reference" /> : any && <span className="pd" title="has your picks" aria-label="has your picks" />}</button>; })}
         </div>
         <div className="tools">
-          <label className="search"><Icon n="search" /><span className="sr">Filter effects</span><input id="filter" type="search" placeholder="Search all" aria-label="Filter effects" value={q} onChange={e => setQ(e.target.value)} /><span className="kbdwrap"><Kbd keys="/" /></span></label>
-          <IconBtn id="pause" n={paused ? 'play' : 'pause'} label={paused ? 'Play previews' : 'Pause previews'} aria-pressed={String(paused)} onClick={togglePause} />
+          <label className="search"><Icon n="search" /><span className="sr">Filter effects</span><input id="filter" type="search" placeholder="Search all" aria-label="Filter effects" value={q} onChange={e => setQ(e.target.value)} /></label>
+          <button type="button" className="btn sm ghost pause-btn" id="pause" aria-pressed={String(paused)} onClick={togglePause}><Icon n={paused ? 'play' : 'pause'} />{paused ? 'Play previews' : 'Pause previews'}</button>
         </div>
       </div>
       <label className="tabselect"><span className="sr">Layer</span><select id="tabselect" value={cur} onChange={e => setTab(e.target.value)}>{layers.map(x => <option key={x.id} value={x.id}>{x.label} ({x.count})</option>)}</select></label>
@@ -208,7 +209,7 @@ const SRC = { you: 'YOU', ref: REF_LABEL, look: 'LOOK' }, SRC_TIP = { you: 'Your
 function Tile({ it, st, src, why, paused, setPick, setTip, block, need, sw }) {
   const info = it.mode === 'info', kind = KIND_NAME[it.kind] || it.kind, canDeny = !info && it.mode !== 'one' && !block, did = 'd-' + it.ref.replace(/[^a-z0-9]/gi, '-');
   const still = paused && it.preview && it.preview.animated ? it.preview.still : null, showAnim = it.preview && (!paused || !it.preview.animated);
-  const flag = info ? 'info' : it.needsCopy ? 'your words' : it.made ? null : it.preview && (!it.preview.animated || still) ? 'still' : null;
+  const flag = info ? 'info' : it.needsCopy ? 'your words' : null;
   const pv = p => (p && p.url) || (p && p.src ? file(p.src) : null);
   const deny = () => setPick(it, st === 'deny' ? 'clear' : 'deny', 'p:' + it.ref);
   return <div className={`tile ${st || ''} ${info ? 'info' : ''} ${block ? 'blocked' : ''} ${it.made ? 'scene' : ''}`} data-blocked={block ? block.id : undefined} onMouseEnter={e => setTip({ el: e.currentTarget, it, block, need, why })} onMouseLeave={() => setTip(null)} onFocus={e => setTip({ el: e.currentTarget, it, block, need, why })} onBlur={() => setTip(null)}>
@@ -218,9 +219,9 @@ function Tile({ it, st, src, why, paused, setPick, setTip, block, need, sw }) {
       onContextMenu={e => { if (!canDeny) return; e.preventDefault(); deny(); }}
       onKeyDown={e => { if ((e.key === 'f' || e.key === 'F') && canDeny) { e.preventDefault(); deny(); } }}>
       <span className="media">{showAnim ? <img src={pv(it.preview)} alt="" loading="lazy" decoding="async" width={120} height={160} /> : still ? <img src={file(still)} alt="" loading="lazy" width={120} height={160} /> : <span className="np">{it.preview ? 'Paused' : it.id}</span>}</span>
-      <span className="nm">{it.made ? it.made.name : it.id}</span>{block ? <span className="ds why" id={did}>{block.reason}</span> : <span className="ds" id={did}>{why ? `From the reference: ${why}. ` : ''}{it.label || ''}</span>}
+      <span className="nm">{it.made ? it.made.name : showName(it.id)}</span>{block ? <span className="ds why" id={did}>{block.reason}</span> : <span className="ds" id={did}>{why ? `From the reference: ${why}. ` : ''}{it.label || ''}</span>}
     </button>
-    {!block && (need || flag) && <span className={'flag' + (need ? ' need' : '')} aria-hidden="true">{need ? 'needs setup' : flag}</span>}
+    {!block && (need || flag) && <span className={'flag' + (need ? ' need' : '')} aria-hidden="true">{need ? 'Needs setup' : flag}</span>}
     {it.made && <span className="made" title={it.made.by === 'agent' ? 'Made by your agent' : 'Made from a reference'} data-made={it.made.by}>{MADE_LABEL}<span className="sr">, {it.made.by === 'agent' ? 'by your agent' : 'from a reference'}</span></span>}
     {src && !it.made && <span className={'src src-' + src} title={SRC_TIP[src]} data-src={src}>{SRC[src]}{src !== 'ref' && <span className="sr">, {SRC_TIP[src]}</span>}</span>}
     <span className="state" aria-hidden="true">{st === 'allow' ? <Icon n="check" /> : st === 'deny' ? <Icon n="x" /> : null}</span>
@@ -242,7 +243,7 @@ function HoverCard({ tip }) {
   }, [tip]);
   const it = tip && tip.it;
   return <div id="tip" ref={ref} className="hovercard glass" role="tooltip" hidden={!tip} style={{ left: pos.left, top: pos.top }}>
-    {it && <><span className="k">{it.made ? (it.made.kind === 'effect' ? 'Effect, made for you' : 'Graphic, made for you') : KIND_NAME[it.kind] || it.kind}</span><b>{it.made ? it.made.name : it.id}</b>{it.label && <p>{it.label}</p>}
+    {it && <><span className="k">{it.made ? (it.made.kind === 'effect' ? 'Effect, made for you' : 'Graphic, made for you') : KIND_NAME[it.kind] || it.kind}</span><b>{it.made ? it.made.name : showName(it.id)}</b>{it.label && <p>{it.label}</p>}
       {tip.why && <p className="why ref" id="tip-ref">From the reference: {tip.why}.</p>}
       {tip.block ? <p className="why" id="tip-why"><b>{tip.block.reason}.</b> {tip.block.why} Click to {tip.block.act[0].toLowerCase() + tip.block.act.slice(1)}.</p> : tip.need ? <p className="why need" id="tip-why">{tip.need}</p> : null}
       {tip.block ? null : it.mode === 'info' ? <p className="k">Shown so you know it exists. Your agent can set it.</p> : <p className="k">{it.mode === 'one' ? 'Click to pick. One per reel.' : 'Click to pick. Right-click or F to forbid.'}</p>}</>}
@@ -284,10 +285,10 @@ function Sound({ CAT, s, apply, patch, ctx }) {
     </div>
     <div className="block glass-card sound-card" role="group" aria-labelledby="h-sfx">
       <h3 className="lbl" id="h-sfx">Sounds</h3>
-      <Seg id="sfx" label="Sound effects" value={s.sound.sfx} onChange={v => patch({ sound: { sfx: v } })} options={[['on', 'On'], ['off', 'Off']]} />
+      <Switch id="sfx" size="sm" label="Sounds on the cuts" value={s.sound.sfx !== 'off'} onChange={on => patch({ sound: { sfx: on ? 'on' : 'off' } })} />
       <Switch id="cap" size="sm" label="Fewer sounds, only the strong moments" value={s.sound.cap !== 'off'} onChange={on => patch({ sound: { cap: on ? 'on' : 'off' } })} isDisabled={!!cp} disabledMessage={cp ? cp.reason : undefined} />
     </div>
-    <p className="fine sound-pace" id="pacing-line">Pacing: <b>{paceName}</b>. How much quiet comes out between your words is one choice, on the Cut step. <a className="linkish" href="#step=cut" onClick={() => localStorage.setItem('studio.cutLayer', 'clips')}>Change it on Cut</a></p>
+    <p className="fine sound-pace" id="pacing-line">Pacing: <b>{paceName}</b>. <a className="linkish" href="#step=cut" onClick={() => localStorage.setItem('studio.cutLayer', 'clips')}>Change it on Cut</a></p>
   </div>;
 }
 
