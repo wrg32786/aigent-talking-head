@@ -613,7 +613,7 @@ function placeholderUI(X,Y,w,h,dt,seed){const q=rng(seed+11),k=(d,l=.35)=>EMPH(c
  const cx=X+sb+M,cw=w-sb-M*2,hh=Math.min(h*.36,170),hk=k(.15,.45);ctx.save();ctx.globalAlpha*=hk;const hero=ctx.createLinearGradient(cx,Y+M,cx+cw,Y+M+hh);hero.addColorStop(0,rgba(CY,.38));hero.addColorStop(1,rgba(CY,.06));rr(ctx,cx,Y+M,cw,hh,RAD(14));ctx.fillStyle=hero;ctx.fill();
  ctx.fillStyle='rgba(255,255,255,.92)';rr(ctx,cx+24,Y+M+hh-66,cw*.46,18,RAD(9));ctx.fill();ctx.fillStyle='rgba(255,255,255,.5)';rr(ctx,cx+24,Y+M+hh-38,cw*.3,12,RAD(6));ctx.fill();rr(ctx,cx+cw-24-104,Y+M+hh-60,104,36,RAD(18));ctx.fillStyle=CY;ctx.fill();ctx.restore();
  const ty=Y+M*2+hh,th=h-hh-M*3;if(th>40){const n=3,gw=(cw-M*(n-1))/n;for(let i=0;i<n;i++){const a=k(.35+i*.07);if(a<=0)continue;ctx.save();ctx.globalAlpha*=a;const gx=cx+i*(gw+M),gy=ty+(1-a)*16;rr(ctx,gx,gy,gw,th,RAD(12));ctx.fillStyle='rgba(255,255,255,.045)';ctx.fill();ctx.lineWidth=1;ctx.strokeStyle='rgba(255,255,255,.07)';ctx.stroke();
-  rr(ctx,gx+16,gy+16,gw*.4,10,RAD(5));ctx.fillStyle='rgba(255,255,255,.3)';ctx.fill();if(th>80){ctx.font=FG(Math.min(46,th*.32));ctx.textAlign='left';ctx.textBaseline='alphabetic';ctx.fillStyle=i===0?CY:'rgba(255,255,255,.85)';ctx.fillText(['84%','2.4k','12'][i],gx+16,gy+16+18+Math.min(46,th*.32))}
+  rr(ctx,gx+16,gy+16,gw*.4,10,RAD(5));ctx.fillStyle='rgba(255,255,255,.3)';ctx.fill();if(th>80){ctx.font=FG(Math.min(46,th*.32));ctx.letterSpacing='0px';ctx.textAlign='left';ctx.textBaseline='alphabetic';ctx.fillStyle=i===0?CY:'rgba(255,255,255,.85)';ctx.fillText(['84%','2.4k','12'][i],gx+16,gy+16+18+Math.min(46,th*.32))}
   const bh=Math.min(36,th*.25),bars=7;for(let b=0;b<bars;b++){const v=.25+q()*.75;ctx.fillStyle=i===0?rgba(CY,.55):'rgba(255,255,255,.14)';ctx.fillRect(gx+16+b*((gw-32)/bars),gy+th-14-bh*v*a,(gw-32)/bars-5,bh*v*a)}ctx.restore()}}}
 // screen card camera and pointer (clean-room versions of the Stage camera and Cursor techniques in the MIT Digital Samba
 // toolkit, THIRD_PARTY.md). "cam": zoom keyframes "z x y; z x y" (zoom, then the point to centre, 0..1 of the screen), one
@@ -1104,7 +1104,7 @@ function flashCard(c,t){const o=c[4],dt=t-c[0],ws=gs(c[2]).split(/\s*\|\s*|\s+/)
  const inK=cl(dt/.12),outK=end<Infinity?cl((end-t)/.12):1,n=8;ctx.save();ctx.beginPath();for(let i=0;i<n;i++){const ki=cl(Math.min(inK*1.6-i*.08,outK*1.6-(n-1-i)*.08));if(ki>0)ctx.rect(0,i*1920/n,1080*ki+(ki>=1?1:0),1920/n+1)}ctx.clip();
  ctx.fillStyle=bg;ctx.fillRect(0,0,1080,1920);ctx.save();ctx.globalAlpha=.06;ctx.globalCompositeOperation='overlay';ctx.fillStyle=grain();ctx.fillRect(0,0,1080,1920);ctx.restore();
  const w=ws[k].toUpperCase();let fs=o.size||520;ctx.font=SLAM(fs);while(ctx.measureText(w).width>1080-SAFE*2&&fs>90){fs-=6;ctx.font=SLAM(fs)}const p=1+.07*Math.exp(-tk*14);ctx.save();ctx.translate(540,gd(c,'y',.5)*1920);ctx.scale(p,p);ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=ink;ctx.fillText(w,0,fs*.04);ctx.restore();
- if(ws.length>1){ctx.font=FW(700,28);ctx.fillStyle=rgba(ink,.6);ctx.textBaseline='middle';tabText(`${String(k+1).padStart(2,'0')} / ${String(ws.length).padStart(2,'0')}`,1080-SAFE,SAFE+30,'right')}
+ if(ws.length>1){ctx.font=FW(700,28);ctx.fillStyle=rgba(ink,.6);ctx.textBaseline='middle';tabText(`${String(k+1).padStart(2,'0')} / ${String(ws.length).padStart(2,'0')}`,1080-SAFE,(EXPF?(+EXPF.y0||0)+((EXPF.safe||{}).top||0):0)+SAFE+30,'right')}
  ctx.restore()}
 
 // keyword caption, entrance block-in: a caption line rises word by word; on its beat a solid accent block wipes in behind
@@ -1136,7 +1136,9 @@ function numberPop(c,t){const o=c[4],dt=t-c[0],n=Math.max(2,Math.min(10,Math.rou
 // mode 39, a scene (kit/scenes.cjs): something the menu had no item for, made from a reference or by your agent as HTML and
 // CSS. render.mjs draws it to clear PNG frames with the Make card renderer; here each frame is placed in its box.
 function sceneG(c,t){const a=gxa(c),fr=a.frames||[];if(!fr.length)return;const o=c[4],dt=t-c[0];let i=Math.floor(dt*(a.fps||24)+1e-6);i=o.loop?((i%fr.length)+fr.length)%fr.length:Math.min(fr.length-1,Math.max(0,i));
- const im=gimg(fr[i]);if(!im||!im.naturalWidth)return;ctx.save();ctx.globalAlpha*=1-gOut(c,t,.2);ctx.drawImage(im,gd(c,'x',0)*1080,gd(c,'y',0)*1920,gd(c,'w',1)*1080,gd(c,'h',1)*1920);ctx.restore()}
+ const im=gimg(fr[i]);if(!im||!im.naturalWidth)return;ctx.save();ctx.globalAlpha*=1-gOut(c,t,.2);if(XFULL(c))ctx.drawImage(im,0,+EXPF.y0||0,1080,+EXPF.h);else ctx.drawImage(im,gd(c,'x',0)*1080,gd(c,'y',0)*1920,gd(c,'w',1)*1080,gd(c,'h',1)*1920);ctx.restore()}
+// a full-frame scene on a 4:5 or 1:1 version of the reel (exportFrame.reframed): render.mjs drew it at that frame's size
+const XFULL=c=>!!(EXPF&&EXPF.reframed&&gd(c,'w',1)>=.98&&gd(c,'h',1)>=.98);
 const GDRAW={11:screenCard,12:lowerThird,13:statCallout,14:checklist,15:quoteCard,16:highlight,17:stepCounter,18:versus,19:iconBadge,20:stickerPop,21:priceTag,22:ctaCard,23:codeCard,
  24:dataChart,25:chapterCard,26:logoBug,27:channelBug,28:terminalSession,29:newsStrap,30:ticker,31:splitFlap,32:featureCards,33:releasePill,34:ctaButton,35:hudCallout,36:flashCard,37:keywordCaption,38:numberPop};
 // fast moves (the first 0.42 s and the exit) are drawn with motion blur
@@ -1159,6 +1161,8 @@ let LAYER='all';
 // 1. export frame (captions.js "exportFrame", from kit/exports.json via reel --export): every element moves (and, if it
 //    is too big, shrinks to no less than 60%) the least it must to sit inside the platform's safe area: inside the 4:5
 //    or 1:1 crop window and clear of the platform's UI;
+//    On a 4:5 or 1:1 version (exportFrame.reframed, kit/export-frame.cjs) the frame sits in the middle of this canvas and
+//    the picture is moved under it, so the face track here is already where the face is inside that frame;
 // 2. overlap avoidance: a title or caption that would sit on a graphic while it is up (or a caption on a title) moves
 //    the shortest way clear of it, never further into the face zone than it already was; if nothing fits it hides,
 //    with a short fade, only while that graphic is up. Graphics keep their place (they are the point of the moment).

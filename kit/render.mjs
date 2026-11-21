@@ -46,7 +46,7 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
   { let C = {}; try { C = JSON.parse(readFileSync(join(ROOT, 'cut.json'), 'utf8')); } catch {}
     writeFileSync(join(ROOT, 'lockover.js'), 'window.LOCKOVER=' + JSON.stringify({ lockup: C.lockup || null, hero: C.hero || null, titleLayer: C.titleLayer || null, inserts: [...(C.inserts || []).filter(s => !s.place || s.place === 'full').map(s => ({ at: +s.at, dur: +s.dur, y: s.y, tint: s.tint, line: s.line, arc: s.arc })),
       // split and framed b-roll (kit/split.cjs): the captions sit on the line the layout leaves for them, off your face
-      ...(C.inserts || []).filter(s => SPL.SPLIT.includes(s.place)).map(s => ({ at: +s.at, dur: +s.dur, y: s.y || SPL.layout(s, null, { mask: !!C.mask }).capY, tint: s.tint, split: s.place, light: SPL.lightBg(s) }))] }) + ';\n'); }
+      ...(C.inserts || []).filter(s => SPL.SPLIT.includes(s.place)).map(s => ({ at: +s.at, dur: +s.dur, y: s.y || SPL.layout(s, null, { mask: !!C.mask, frame: C.frame || null }).capY, tint: s.tint, split: s.place, light: SPL.lightBg(s) }))] }) + ';\n'); }
   if (!existsSync(join(ROOT, 'fxzones.js'))) writeFileSync(join(ROOT, 'fxzones.js'), 'window.FXZONES=[];\n');
   // graphics (modes 10, 11, 19 and 26): icon and screen images as file URLs; a screen recording becomes a short frame list
   // (build/gfx/, 12 fps) so the card can play it frame-accurately. Fonts for the ordinal word, the label, the code
@@ -57,7 +57,10 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
     { const SC = createRequire(import.meta.url)('./scenes.cjs'), jobs = [], keys = [];
       for (const f of CAP.flips || []) {
         if (f.mode !== 39 || !f.html) continue;
-        const page = SC.page(f, f.text), w = Math.round((+f.w || 1) * 1080), h = Math.round((+f.h || 1) * 1920), secs = +f.seconds || 2;
+        // a full-frame scene on a 4:5 or 1:1 version (captions.js exportFrame, reframed) is drawn at that frame's size, so
+        // its HTML lays itself out again instead of being cropped (kit/overlay.html places it on the frame)
+        const XF = CAP.exportFrame && CAP.exportFrame.reframed ? CAP.exportFrame : null, fullScene = (+f.w || 1) >= 0.98 && (+f.h || 1) >= 0.98;
+        const page = SC.page(f, f.text), w = Math.round((+f.w || 1) * 1080), h = XF && fullScene ? Math.round(+XF.h) : Math.round((+f.h || 1) * 1920), secs = +f.seconds || 2;
         const dir = join(ROOT, 'gfx', 'scene-' + createHash('sha1').update(JSON.stringify([page, w, h, secs])).digest('hex').slice(0, 16));
         const done = existsSync(join(dir, 'done')) ? readdirSync(dir).filter(x => x.endsWith('.png')).sort().map(x => join(dir, x)) : null;
         keys.push([f.mode + '@' + f.start, dir, done]); if (!done) jobs.push({ page, w, h, seconds: secs, dir });

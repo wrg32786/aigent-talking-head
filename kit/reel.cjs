@@ -5,7 +5,11 @@
 //          --model small.en (Whisper model for transcription; default small.en, fast on a CPU; large-v3 is the slow, most
 //            accurate opt-in, a ~3 GB download the first time)
 //          --export tiktok|reels|shorts|feed45|square  lay the reel out for that platform's safe area and write
-//            reel-vN-<name>.mp4 too (crop, length and bitrate caps: kit/exports.json)
+//            reel-vN-<name>.mp4 too (length and bitrate caps: kit/exports.json). Several at once with commas:
+//            --export reels,feed45,square makes the 9:16 reel and, in the same run, reel-vN-feed-4x5.mp4 (1080x1350,
+//            for the Instagram Feed) and reel-vN-square-1x1.mp4. The 4:5 and 1:1 versions are not crops: the frame
+//            follows your face (kit/facewindow.cjs) and the captions, titles, graphics and b-roll are laid out again
+//            inside it, off your face (kit/export-frame.cjs, jobs/<job>/build-<name>/). The timing is the same.
 //          --json  print one JSON result line at the end ({ ok, job, reel, export, layout, verify }), for agents and the MCP server
 //          After a successful render (not --draft), a one-line star reminder may print on the first
 //            render and once more after 5 renders. Skipped with --json, a non-TTY stdout, CI, or AIGENT_NO_STAR=1.
@@ -115,8 +119,9 @@ const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.
 const JSON_OUT = flag('json');
 const die = m => { if (JSON_OUT) console.log(JSON.stringify({ ok: false, error: m })); console.error(m); process.exit(1); };
 const X = require('./exports.cjs');
-const EXPORT = opt('export') ? String(opt('export')).toLowerCase() : null;
-if (EXPORT && !X.get(EXPORT)) die('--export must be ' + X.NAMES.join(', '));
+const EXL = opt('export') ? X.parseList(opt('export')) : null;
+if (EXL && (EXL.bad.length || !EXL.names.length)) die('--export must be ' + X.NAMES.join(', ') + ' (several with commas: reels,feed45)');
+const EXPORT = EXL ? EXL.names.join(',') : null;
 const VIDEO = /\.(mov|mp4|m4v|mkv|webm|avi)$/i;
 // the kit's Python: PYTHON, else the kit's .venv (where the installer put Whisper, yt-dlp and the rest), else the system one
 const PY = process.env.PYTHON || [path.join(ROOT, '.venv', 'Scripts', 'python.exe'), path.join(ROOT, '.venv', 'bin', 'python')].find(f => fs.existsSync(f)) || (process.platform === 'win32' ? 'py' : 'python3');
@@ -776,9 +781,15 @@ if (cut.sfxMap) {
 // name stays in cut.json so a later --rebuild exports again
 { const capF = path.join(build, 'captions.js');
   if (EXPORT && fs.existsSync(capF)) {
-    const caps = R.readCaptions(capF); caps.exportFrame = X.frameOf(EXPORT); fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
+    // the reel itself is laid out for the 9:16 preset named (if any); a 4:5 or 1:1 size gets its own layout later
+    const caps = R.readCaptions(capF); if (EXL.main) caps.exportFrame = X.frameOf(EXL.main); else delete caps.exportFrame; fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
     if (cut.export !== EXPORT) { cut.export = EXPORT; fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); }
-    console.log(`export ${EXPORT}: ${X.get(EXPORT).label}, everything kept inside its safe area`);
+    if (EXL.main) console.log(`export ${EXL.main}: ${X.get(EXL.main).label}, everything kept inside its safe area`);
+    if (EXL.reframed.length) console.log(`also making ${EXL.reframed.map(n => X.get(n).label).join(' and ')}: its own framing and layout, after the reel`);
+  } else if (fs.existsSync(capF)) {
+    // a job from before 1.28.0 that was laid out inside the fixed 4:5 or 1:1 crop: the reel goes back to its own layout
+    const caps = R.readCaptions(capF);
+    if (caps.exportFrame && X.isReframed(caps.exportFrame.name)) { delete caps.exportFrame; fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); }
   } }
 // copy lint and title/sound rules: printed, not blocking (npm run check -- <name> and npm run verify fail on errors)
 try { sh(process.execPath, [path.join(KIT, 'check.mjs'), build, '--warn-only'], build); } catch {}
@@ -925,18 +936,35 @@ sh(process.execPath, [path.join(KIT, 'assemble.cjs'), out], build, (flag('no-sfx
     }
     if (spans.length) console.warn('note: some caption moments read under 3:1 against the picture (listed above). Move the word, change its colour or pick another shot.');
   } }
-let exported = null;
-if (cut.export && X.get(cut.export)) {
-  exported = X.outName(out, cut.export);
-  if (LEN > X.get(cut.export).maxSec) console.warn(`note: the reel is ${LEN.toFixed(1)} s, longer than ${X.get(cut.export).label} allows (${X.get(cut.export).maxSec} s); the export is trimmed`);
-  execFileSync('ffmpeg', X.ffmpegArgs(cut.export, out, exported, LEN), { stdio: 'inherit' });
-  console.log(`export ${cut.export}: ${exported}`);
-}
 // everything this reel was made from, kept beside it (jobs/<job>/reel-vN.build/), so a later Draft cannot erase it
 // and the reel can be reopened (kit/snapshots.cjs, Studio "Edit this reel", the reopen_reel tool)
 let snapshot = null; try { snapshot = require('./snapshots.cjs').save(job, out); if (snapshot) console.log(`saved the build behind this reel: ${path.relative(job, snapshot)} (reopen: npm run reopen -- ${name} v${v})`); } catch (e) { console.warn('note: could not save the build behind this reel: ' + e.message); }
+// the sizes of this run (cut.json "export", a list): a capped copy for each 9:16 preset, and for 4:5 and 1:1 a version of
+// its own, the frame following your face and everything laid out again inside it (kit/export-frame.cjs)
+let exported = null; const exportsMade = [];
+const EXN = cut.export ? X.parseList(cut.export) : null;
+if (EXN && EXN.names.length) {
+  for (const n of [EXN.main, ...EXN.extra].filter(Boolean)) {
+    const f = X.outName(out, n);
+    if (LEN > X.get(n).maxSec) console.warn(`note: the reel is ${LEN.toFixed(1)} s, longer than ${X.get(n).label} allows (${X.get(n).maxSec} s); the export is trimmed`);
+    execFileSync('ffmpeg', X.ffmpegArgs(n, out, f, LEN), { stdio: 'inherit' });
+    console.log(`export ${n}: ${f}`);
+    exportsMade.push({ name: n, file: f, size: `${X.get(n).w}x${X.get(n).h}`, label: X.fileInfo(f).use });
+  }
+  if (EXN.reframed.length) {
+    ensureBase();
+    for (const n of EXN.reframed) {
+      try {
+        const r = require('./export-frame.cjs').make({ jobDir: job, src: build, name: n, reel: out, base: path.join(build, 'base.mp4'), masks: build, python: PY, env: (flag('no-sfx') || opt('sfx') === 'off') ? { NOSFX: '1' } : {} });
+        exportsMade.push({ name: n, file: r.file, size: r.size, label: r.label, window: r.window, layout: r.layout, faceHits: r.faceHits });
+      } catch (e) { die(`The reel is done (${out}), but the ${X.get(n).label} version failed: ${String(e.message || e).split('\n')[0]}`); }
+    }
+  }
+  exported = exportsMade.length ? exportsMade[0].file : null;
+}
 let LAY = null; try { LAY = JSON.parse(fs.readFileSync(path.join(build, 'layout.json'), 'utf8')); } catch {}
 const lay = LAY ? { moved: LAY.elements.filter(e => e.action === 'shift').length, hidden: LAY.elements.filter(e => e.action === 'hide').length, safeArea: LAY.elements.filter(e => e.action === 'safe-area').length } : null;
-console.log(`\nReel: ${out}${exported ? '\nExport: ' + exported : ''}\nCheck it: npm run verify -- ${name}${cut.export ? ' --export ' + cut.export : ''} (contact sheet, ffprobe, loudness, mask, overlap${cut.export ? ', safe area' : ''}), watch it, read clips/clips.md for skipped retakes, then edit build/captions.js or build/cut.json and run: npm run reel -- --rebuild --name ${name}`);
+const VEX = EXN && EXN.names.length ? (EXN.main || EXN.names[0]) : null;
+console.log(`\nReel: ${out}${exportsMade.map(x => `\n${x.label}: ${x.file}`).join('')}\nCheck it: npm run verify -- ${name}${VEX ? ' --export ' + VEX : ''} (contact sheet, ffprobe, loudness, mask, overlap${VEX ? ', safe area' : ''}), watch it, read clips/clips.md for skipped retakes, then edit build/captions.js or build/cut.json and run: npm run reel -- --rebuild --name ${name}`);
 try { require('./star.cjs').maybePrompt({ json: JSON_OUT }); } catch {}
-if (JSON_OUT) console.log(JSON.stringify({ ok: true, job: name, dir: job, reel: out, export: exported, exportPreset: cut.export || null, seconds: +LEN.toFixed(2), layout: lay, verify: `npm run verify -- ${name}${cut.export ? ' --export ' + cut.export : ''} --json`, snapshot: snapshot ? path.relative(job, snapshot) : null }));
+if (JSON_OUT) console.log(JSON.stringify({ ok: true, job: name, dir: job, reel: out, export: exported, exportPreset: cut.export || null, exports: exportsMade, seconds: +LEN.toFixed(2), layout: lay, verify: `npm run verify -- ${name}${VEX ? ' --export ' + VEX : ''} --json`, snapshot: snapshot ? path.relative(job, snapshot) : null }));
