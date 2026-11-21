@@ -28,7 +28,8 @@
 // }
 // Per segment, also: "bigPunch": true (an extra 12% push over 0.3 s from this cut; use it on the cut after the hook
 // and the cut into the payoff), "punchDelay": 0.08 (start the punch this many seconds into the segment, set by beat-sync),
-// "zoom": 1.15 (fixed zoom for this segment, overrides the toggle), "punchY": 0.4
+// "zoom": 1.15 (fixed zoom for this segment, overrides the toggle), "push": 0.07 (a slow push-in over the segment, minus
+// for a pull-out; the reference's camera move), "punchY": 0.4
 // (zoom centre, 0 top .. 1 bottom), "transition": "crossfade" (named transition INTO this segment, see
 // kit/transitions.json; default is the hard cut with the glitch seam) and "transitionDur": 0.3.
 // sfx keys: whoosh, swipe, boom, click, typing (the locked set in kit/rules.cjs), plus the legacy F and D. Each entry is a
@@ -88,7 +89,12 @@ segs.forEach((s, i) => {
   const z = zoomOf(s, i), py = s.punchY ?? R.PUNCH.y;
   const delayN = Math.max(0, Math.round((+s.punchDelay || 0) * 24));
   let zf = '';
-  if (s.bigPunch) {
+  if (s.push && !s.bigPunch) {
+    // a camera move from the reference (Reel.md shot "move"): the zoom eases from z to z*(1+push) over the segment
+    // (a minus push starts closer and pulls out)
+    const p = +s.push, N = Math.max(1, Math.round((s.out - s.in) * 24)), za = p > 0 ? z : z * (1 - p), zb = p > 0 ? z * (1 + p) : z;
+    zf = `,scale=2160:3840,zoompan=z='${za.toFixed(4)}+${(zb - za).toFixed(4)}*min(on/${N},1)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*${py}':d=1:s=1080x1920:fps=24,setsar=1`;
+  } else if (s.bigPunch) {
     const z1 = z * (1 + R.PUNCH.big), n = Math.round(R.PUNCH.bigDur * 24);
     zf = `,scale=2160:3840,zoompan=z='${z}+${(z1 - z).toFixed(4)}*(1-pow(1-min(max(on-${delayN},0)/${n},1),3))':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*${py}':d=1:s=1080x1920:fps=24,setsar=1`;
   } else if (z > 1.0001 && delayN > 0) {

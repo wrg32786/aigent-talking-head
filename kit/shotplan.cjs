@@ -191,4 +191,43 @@ function isCutaway(s) {
   return !!o && o !== 'real' && o !== 'unknown' && s.material.has_real_material === false && f == null;
 }
 
-module.exports = { recut, zooms, zoomFor, quietFrom, sfxId, SFX, roleOf, matchRoles, slotPhrase, fillSlots, musicLevel, isCutaway, MIN_SHOT, MIN_QUIET };
+// the reference's transition into a shot (rea-video: cut, jump, flash, fade, dissolve, wipe, slide, whip, zoom, spin, blur,
+// glitch, shake, effect, mg_transition, morph, match) as one of the kit's named transitions (kit/transitions.json).
+// null: a plain cut. shake: a cut with a shake hit. A kind the kit has no transition for (spin) comes back as
+// { scene: key }, a REF effect scene (kit/scenes.cjs EFFECTS) laid over the cut.
+const SIDE = d => (/right/.test(d) ? 'right' : /up/.test(d) ? 'up' : /down/.test(d) ? 'down' : 'left');
+function transitionFor(type, tr = {}) {
+  const t = String(type || '').toLowerCase().replace(/[\s_]+/g, '-'), d = String((tr && tr.direction) || '').toLowerCase(), via = String((tr && tr.via) || '').toLowerCase();
+  if (!t || /^(start|cut|jump|match|hard)/.test(t)) return null;
+  if (/flash|white/.test(t)) return { name: 'flash' };
+  if (t === 'fade') return { name: /white/.test(via) ? 'dip-white' : /black|dark/.test(via) || !via ? 'dip-black' : 'fade-fast' };
+  if (/dissolve|cross/.test(t)) return { name: 'crossfade' };
+  if (/whip/.test(t)) return { name: SIDE(d) === 'right' ? 'whip-right' : 'whip-left' };
+  if (/slide|push/.test(t)) { const sd = SIDE(d); return { name: sd === 'up' ? 'swipe-up' : sd === 'down' ? 'swipe-down' : 'push-' + sd }; }
+  if (/wipe/.test(t)) return { name: 'wipe' };
+  if (/zoom/.test(t)) return { name: 'zoom' };
+  if (/blur/.test(t)) return { name: 'blur' };
+  if (/glitch/.test(t)) return { name: 'glitch' };
+  if (/shake/.test(t)) return { name: null, shake: true };
+  if (/morph/.test(t)) return { name: 'warp' };
+  if (/mg-transition|layout/.test(t)) return { name: 'slice' };
+  if (/spin|rotat/.test(t)) return { name: null, scene: 'spin' };
+  if (/leak|flare/.test(t)) return { name: 'light-leak' };
+  if (/effect/.test(t)) return { name: 'zoom-blur' };
+  return null;
+}
+// the reference's camera inside a shot (rea-video aspects.camera) as a move the kit makes: push (a slow push-in over the
+// shot), pull (a slow pull-out), drift (a gentle push for a pan or a track) and shake (handheld: a shake on the cut in)
+function moveFor(cam = {}) {
+  const mv = String(cam.move || '').toLowerCase(), sup = String(cam.support || '').toLowerCase(), mo = String(cam.motion || '').toLowerCase();
+  const out = [];
+  if (/push|dolly in|zoom in|推/.test(mv)) out.push('push');
+  else if (/pull|dolly out|zoom out|拉/.test(mv)) out.push('pull');
+  else if (/pan|track|follow|orbit|摇|移|跟|环绕/.test(mv)) out.push('drift');
+  if (/handheld/.test(sup) || /handheld/.test(mo) || /handheld|shake|手持/.test(mv)) out.push('shake');
+  return out;
+}
+// a move as the cut.json keys: push is the zoom gained over the segment (minus: a pull-out)
+const MOVES = { push: 0.07, pull: -0.07, drift: 0.035 };
+
+module.exports = { transitionFor, moveFor, MOVES, recut, zooms, zoomFor, quietFrom, sfxId, SFX, roleOf, matchRoles, slotPhrase, fillSlots, musicLevel, isCutaway, MIN_SHOT, MIN_QUIET };

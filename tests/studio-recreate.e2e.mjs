@@ -27,7 +27,7 @@ const C = await import('../kit/studio/core.mjs');
 mkdirSync(join(TD, 'videomd'), { recursive: true });
 const SH = [[0, 2, 'close-up'], [2, 3.5, 'close-up'], [3.5, 6, 'medium close-up'], [6, 8, 'medium shot'], [8, 10, 'extreme close-up'], [10, 12, 'close-up']];
 const B = { source: { file: 'ref.mp4', duration: 12 }, summary: { duration: 12 }, audio: { music: { present: true, tempo_bpm: 120 } }, stems: { level_db: { music: -20, vocals: -18 } },
-  shots: SH.map(([a, b, size], i) => ({ start: a, end: b, transition_in: i ? (i % 2 ? 'fade' : 'cut') : 'start', faces: i === 3 ? 0 : 1, aspects: { framing: { result: { shot_size: size } } } })),
+  shots: SH.map(([a, b, size], i) => ({ start: a, end: b, transition_in: i ? (i % 2 ? 'dissolve' : 'cut') : 'start', faces: i === 3 ? 0 : 1, aspects: { framing: { result: { shot_size: size } } } })),
   audio_plan: { sfx_merged: [{ t: 2, dur: 0.2, level_db: -20, type: 'pop' }] }, speech: { words: [], lines: [] } };
 writeFileSync(join(TD, 'videomd', 'breakdown.json'), JSON.stringify(B));
 execFileSync(process.execPath, [join(ROOT, 'kit', 'videomd2reel.cjs'), join(TD, 'videomd', 'breakdown.json'), '--out', join(TD, 'Reel.md'), '--report', join(TD, 'teardown.md')], { stdio: 'pipe' });

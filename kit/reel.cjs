@@ -357,16 +357,20 @@ if (!flag('rebuild')) {
   if (flag('no-beat-sync')) cut.beatSync = false;
   else if (flag('beat-sync') || bed) cut.beatSync = true;
   if (recipe) {
-    const plan = RM.shotSettings(recipe);
+    const plan = RM.shotSettings(recipe), SPLM = require('./shotplan.cjs'), shakeAt = [];
     // per-shot settings go to each clip (its first segment, or every segment for a finish, when pauses were tightened)
     if (RECUT) {
-      RECUT.shotStart.forEach((k, j) => { const p = plan[RECUT.shotOf[j]] || {}, sg = segs[k], subs = segs.slice(k, RECUT.shotStart[j + 1] ?? segs.length); if (p.finish) subs.forEach(x => { x.finish = p.finish; }); if (p.bigPunch && wantPunch) sg.bigPunch = true; if (p.transition && j) sg.transition = p.transition; });
+      RECUT.shotStart.forEach((k, j) => { const p = plan[RECUT.shotOf[j]] || {}, sg = segs[k], subs = segs.slice(k, RECUT.shotStart[j + 1] ?? segs.length); if (p.finish) subs.forEach(x => { x.finish = p.finish; }); if (p.bigPunch && wantPunch) sg.bigPunch = true; if (p.transition && j) sg.transition = p.transition; if (p.move && !sg.bigPunch) sg.push = SPLM.MOVES[p.move]; if (p.shake && j) shakeAt.push(k); });
       cut.refShots = RECUT.plan;
       // the reference's sound effects, scaled to your edit, as the kit's sounds (the cap still thins them)
       const len = segs.reduce((a, x) => a + x.out - x.in, 0), R0 = +(recipe.card.source && recipe.card.source.duration) || recipe.shots[recipe.shots.length - 1].end || len, k = len / R0;
       const hits = (recipe.sfx || []).map(x => ({ id: x.sound || require('./shotplan.cjs').sfxId(x.type), t: +(x.start * k).toFixed(3), ref: true })).filter(h => h.t < len - 0.1 && SFXPLAN.lookup(h.id));
       if (hits.length) { cut.sfx = {}; cut.sfxHits = (cut.sfxHits || []).concat(hits); console.log(`recut: ${hits.length} sound effects from the reference at its times, scaled (${hits.map(h => h.id + '@' + h.t).join(', ')})`); }
-    } else plan.forEach((p, i) => { const k = clipStart[i]; if (k == null) return; const sg = segs[k], subs = segs.slice(k, clipStart[i + 1] ?? segs.length); if (p.finish) subs.forEach(x => { x.finish = p.finish; }); if (p.bigPunch && wantPunch) sg.bigPunch = true; if (p.transition && i) sg.transition = p.transition; });
+    } else plan.forEach((p, i) => { const k = clipStart[i]; if (k == null) return; const sg = segs[k], subs = segs.slice(k, clipStart[i + 1] ?? segs.length); if (p.finish) subs.forEach(x => { x.finish = p.finish; }); if (p.bigPunch && wantPunch) sg.bigPunch = true; if (p.transition && i) sg.transition = p.transition; if (p.move && !sg.bigPunch) sg.push = SPLM.MOVES[p.move]; if (p.shake && i) shakeAt.push(k); });
+    // the reference's handheld or shaking shots: a shake on the cut in, just after the seam (the voice runs on across it)
+    if (shakeAt.length && cut.hits) { const at = k => segs.slice(0, k).reduce((a, x) => a + x.out - x.in, 0), added = [];
+      for (const k of shakeAt) { const t = +(at(k) + 0.08).toFixed(3); if (!cut.hits.some(([h]) => Math.abs(h - t) < 0.2)) { cut.hits.push([t, 18]); added.push(t); } }
+      cut.hits.sort((a, z) => a[0] - z[0]); if (added.length) console.log(`recipe: a shake at ${added.join(', ')} s (the reference's handheld shots)`); }
     if (!RECUT && plan.length !== keep.length) console.log(`recipe: ${plan.length} shots in the recipe, ${keep.length} clips from your takes; per-shot settings applied to the first ${Math.min(plan.length, keep.length)}`);
     if (preset.bedStart != null && opt('bed-start') == null && cut.bed) cut.bedStart = preset.bedStart;
     if (preset.bedVol != null && cut.bed) cut.bedVol = preset.bedVol;
@@ -660,6 +664,14 @@ if (!flag('rebuild')) {
   const th = path.join(KIT, 'themes', opt('theme', (preset && preset.theme) || 'aigent') + '.js');
   if (!fs.existsSync(th)) die('No theme ' + th);
   fs.copyFileSync(th, path.join(build, 'theme.js'));
+  // a recipe's colours (Reel.md brand kit "colors", read from the reference's titles and captions): its accent goes on the
+  // theme's hero words, stickers, number tiles and cards, unless you named a theme yourself
+  if (recipe && !opt('theme') && preset && Array.isArray(preset.colors) && preset.colors.length) {
+    const hex = preset.colors.filter(c => /^#[0-9a-f]{6}$/i.test(c)), rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+    const lum = h => { const [r, g, b] = rgb(h); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }, sat = h => { const c = rgb(h), mx = Math.max(...c); return mx ? (mx - Math.min(...c)) / mx : 0; };
+    const accent = hex.find(h => sat(h) > 0.3 && lum(h) > 0.25) || hex.find(h => lum(h) > 0.5);
+    if (accent) { fs.appendFileSync(path.join(build, 'theme.js'), `\n// the reference's accent (Reel.md brand kit colors), set by kit/reel.cjs\nwindow.THEME.colors.accent = '${accent.toLowerCase()}';\n`); console.log(`theme: ${path.basename(th, '.js')}, accent ${accent.toLowerCase()} from the reference`); }
+  }
   // what was picked, per beat, and why: jobs/<name>/choices.json to edit (kit/choices.cjs)
   try {
     const x = CH.explain(build);

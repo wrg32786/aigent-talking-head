@@ -119,6 +119,8 @@ const EFFECTS = {
     css: `.fx{position:absolute;inset:-30%;background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,255,255,.0) 0deg 4deg,rgba(255,255,255,.55) 4.4deg 5deg);-webkit-mask:radial-gradient(circle at center,transparent 28%,#000 62%);mask:radial-gradient(circle at center,transparent 28%,#000 62%);opacity:0;animation:sl .8s linear forwards}@keyframes sl{0%{opacity:0;transform:rotate(0)}20%{opacity:1}100%{opacity:0;transform:rotate(8deg) scale(1.1)}}` },
   scanlines: { re: /scan ?lines|vhs|crt|retro tv/i, name: 'Scanlines', seconds: 1.5,
     css: `.fx{position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,.28) 0 2px,transparent 2px 5px);opacity:0;animation:sc 1.5s ease forwards}@keyframes sc{0%{opacity:0;background-position:0 0}20%{opacity:1}80%{opacity:1}100%{opacity:0;background-position:0 40px}}` },
+  spin: { re: /\bspin(ning)? (transition|cut)|\bspin\b|rotat(e|ing|ion) (transition|cut)/i, name: 'Spin', seconds: 0.6,
+    css: `.fx{position:absolute;inset:-40%;background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,255,255,.0) 0deg 10deg,rgba(255,255,255,.35) 12deg 14deg);filter:blur(6px);opacity:0;animation:sp .6s ease-in-out forwards}@keyframes sp{0%{opacity:0;transform:rotate(0)}40%{opacity:.9}100%{opacity:0;transform:rotate(200deg)}}` },
   confetti: { re: /confetti|celebrat/i, name: 'Confetti burst', seconds: 1.6,
     html: `<div class="fx">${Array.from({ length: 28 }, (_, i) => `<i style="--x:${(i * 37) % 100}%;--d:${(0.2 + ((i * 13) % 9) / 10).toFixed(2)}s;--c:${['#ffcc33', '#ff5f8a', '#4fd1c5', '#7c83ff', '#ffffff'][i % 5]};--r:${(i * 47) % 360}deg"></i>`).join('')}</div>`,
     css: `.fx{position:absolute;inset:0}.fx i{position:absolute;left:var(--x);top:-4%;width:1.6%;height:.9%;background:var(--c);border-radius:2px;transform:rotate(var(--r));animation:fall 1.6s cubic-bezier(.3,.6,.5,1) var(--d) both}@keyframes fall{0%{top:-4%;opacity:1}100%{top:104%;opacity:.8;transform:rotate(calc(var(--r) + 540deg))}}` },
@@ -127,13 +129,16 @@ function effectScene(key, { ref, t } = {}) {
   const e = EFFECTS[key]; if (!e) return null;
   return { kind: 'effect', name: e.name, seconds: e.seconds, box: { x: 0, y: 0, w: 1, h: 1 }, html: e.html || '<div class="fx"></div>', css: e.css, from: { reference: ref || null, t: t != null ? r3(t) : null, what: 'effect' } };
 }
+// the strings in a reference's description (rea-video VLM text: whole video or one shot), joined
+function textOf(v) {
+  const texts = [], walk = (x, d = 0) => { if (d > 6 || x == null) return; if (typeof x === 'string') texts.push(x); else if (Array.isArray(x)) x.slice(0, 200).forEach(y => walk(y, d + 1)); else if (typeof x === 'object') Object.values(x).forEach(y => walk(y, d + 1)); };
+  walk(v); return texts.join('\n');
+}
+// the effects a description names that the kit has a scene for
+const effectsIn = text => (text ? Object.entries(EFFECTS).filter(([, e]) => e.re.test(text)).map(([k]) => k) : []);
 // effect names in the reference's descriptions (rea-video VLM text, when it ran) the kit has no item for
 function effectsNamed(b) {
-  const texts = [], walk = (v, d = 0) => { if (d > 6 || v == null) return; if (typeof v === 'string') texts.push(v); else if (Array.isArray(v)) v.slice(0, 200).forEach(x => walk(x, d + 1)); else if (typeof v === 'object') Object.values(v).forEach(x => walk(x, d + 1)); };
-  walk(b && b.whole_video_vlm); for (const s of (b && b.shots) || []) walk(s && s.vlm);
-  const all = texts.join('\n'), out = [];
-  for (const [k, e] of Object.entries(EFFECTS)) if (e.re.test(all)) out.push(k);
-  return out;
+  return effectsIn([textOf(b && b.whole_video_vlm), ...((b && b.shots) || []).map(s => textOf(s && s.vlm))].join('\n'));
 }
 
-module.exports = { dir, check, normal, page, list, get, save, remove, stillPath, stickerScene, labelScene, effectScene, effectsNamed, EFFECTS, KINDS, hash };
+module.exports = { textOf, effectsIn, dir, check, normal, page, list, get, save, remove, stillPath, stickerScene, labelScene, effectScene, effectsNamed, EFFECTS, KINDS, hash };

@@ -259,6 +259,27 @@ function suggestBed(bpm, opts = {}) {
 function hexOK(h) { return typeof h === 'string' && /^#[0-9a-f]{6}$/i.test(h); }
 function lum(h) { const n = parseInt(h.slice(1), 16); return (0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255; }
 function satOf(h) { const n = parseInt(h.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, bl = n & 255; const mx = Math.max(r, g, bl), mn = Math.min(r, g, bl); return mx ? (mx - mn) / mx : 0; }
+// the job's transition: the one the reference uses most between shots (none when it only cuts)
+function jobTransition(shots) {
+  const n = {}; for (const s of shots.slice(1)) if (s.tx && s.tx.name) n[s.tx.name] = (n[s.tx.name] || 0) + 1;
+  const top = Object.entries(n).sort((a, z) => z[1] - a[1])[0];
+  return top && top[1] * 3 >= Math.max(1, shots.length - 1) ? top[0] : 'none';
+}
+// the kit theme closest to the reference's colours (its accent against each theme's accent, its darkest against the
+// theme's ink); the reference's accent then goes on top (reel.cjs). No colours read: neutral, the unbranded look.
+function themeFor(colours) {
+  if (!colours.length) return 'neutral';
+  const rgb = h => { const p = parseInt(h.slice(1), 16); return [p >> 16, (p >> 8) & 255, p & 255]; }, d = (a, c) => Math.hypot(...rgb(a).map((v, i) => v - rgb(c)[i]));
+  const dark = colours.slice().sort((a, c) => lum(a) - lum(c))[0];
+  let best = 'neutral', bd = Infinity;
+  for (const f of fs.readdirSync(path.join(__dirname, 'themes')).filter(x => x.endsWith('.js'))) {
+    const t = fs.readFileSync(path.join(__dirname, 'themes', f), 'utf8'), acc = (/accent:\s*'(#[0-9a-f]{6})'/i.exec(t) || [])[1], ink = (/ink:\s*'(#[0-9a-f]{6})'/i.exec(t) || [])[1];
+    if (!acc || !ink) continue;
+    const score = Math.min(...colours.map(c => d(c, acc))) + 0.5 * d(dark, ink) + (f === 'aigent.js' ? 60 : 0); // our brand only when it is clearly the match
+    if (score < bd) { bd = score; best = f.replace(/\.js$/, ''); }
+  }
+  return best;
+}
 function brandColours(b, titles) {
   const out = [];
   const add = h => { if (hexOK(h) && !out.some(x => dist(x, h) < 60)) out.push(h.toLowerCase()); };
@@ -362,7 +383,7 @@ function convert(b, extras = {}, opts = {}) {
     const fin = finishOf(m, (+s.end || 0) - (+s.start || 0));
     const cam = (s.aspects && s.aspects.camera && (s.aspects.camera.result || s.aspects.camera.measured)) || {};
     const move = cam.move || cam.motion;
-    return { n: i + 1, m, start: r2(s.start), end: r2(s.end), finish: fin.finish, finishWhy: fin.why, ...(fin.unread ? { unread: true } : {}), transitionIn: s.transition_in, framing: ((s.aspects && s.aspects.framing && (s.aspects.framing.result || s.aspects.framing.measured)) || {}).shot_size || null, cutaway: SPL.isCutaway(s), boxes: ((s.overlay && s.overlay.boxes) || []).filter(x => Array.isArray(x.bbox) && x.bbox[2] * x.bbox[3] >= 0.04), move: typeof move === 'string' ? move : null, shake: (s.aspects && s.aspects.camera && s.aspects.camera.measured && s.aspects.camera.measured.shake) };
+    return { n: i + 1, m, start: r2(s.start), end: r2(s.end), finish: fin.finish, finishWhy: fin.why, ...(fin.unread ? { unread: true } : {}), transitionIn: s.transition_in, tx: SPL.transitionFor(s.transition_in, s.transition), moves: SPL.moveFor(cam), vlmText: SC.textOf(s && s.vlm), framing: ((s.aspects && s.aspects.framing && (s.aspects.framing.result || s.aspects.framing.measured)) || {}).shot_size || null, cutaway: SPL.isCutaway(s), boxes: ((s.overlay && s.overlay.boxes) || []).filter(x => Array.isArray(x.bbox) && x.bbox[2] * x.bbox[3] >= 0.04), move: typeof move === 'string' ? move : null, shake: (s.aspects && s.aspects.camera && s.aspects.camera.measured && s.aspects.camera.measured.shake) };
   });
   const read = shots.filter(s => !s.unread);
   const ambient = gradeChoice(read);
@@ -418,7 +439,15 @@ function convert(b, extras = {}, opts = {}) {
       for (const c of cs) { if (n >= 3) break; const a = +c.t0, z = Math.max(+c.t1 || a + 1, a + 0.9); if (busy2(a, z)) continue; if (addScene({ ...scene, from: { ...scene.from, t: r2(a) } }, a, Math.min(z, a + 2.5))) n++; }
     });
   }
-  for (const k of SC.effectsNamed(b).slice(0, 3)) { const sh = shots[1 + scenes.filter(x => x.kind === 'effect').length * 2] || shots[0]; const a = Math.max(0, (sh ? sh.start : 0) - 0.1), e = SC.effectScene(k, { t: a }); if (e) addScene(e, a, a + e.seconds); }
+  { // effect scenes: a transition the kit has no name for (spin), and effects the reference's descriptions name, on the
+    // shot they were seen in (rea-video VLM text per shot), then the whole video's, three at most
+    const fx = [], seen = new Set();
+    for (const sh of shots) { if (sh.tx && sh.tx.scene) fx.push([sh.tx.scene, sh]); for (const k of SC.effectsIn(sh.vlmText)) if (!(sh.tx && sh.tx.name === k)) fx.push([k, sh]); }  // a flash already made as the cut's transition is not made twice
+    for (const k of SC.effectsNamed(b)) if (!fx.some(([x]) => x === k)) fx.push([k, null]);
+    for (const [k, sh0] of fx) { if (seen.size >= 3 || seen.has(k)) continue;
+      const sh = sh0 || shots[1 + seen.size * 2] || shots[0], a = Math.max(0, (sh ? sh.start : 0) - 0.1), e = SC.effectScene(k, { t: a });
+      if (e && addScene(e, a, a + e.seconds)) seen.add(k); }
+  }
   const card = {
     videomd: 1, name,
     description: `Recipe torn down from ${src.file || 'a reference reel'}: ${shots.length} shots in ${dur}s, ${titles.length} big titles, ${cs.style} captions${bpm ? `, music near ${Math.round(bpm)} BPM` : ''}. Measured by ${engine}; finishes, entrances and layers are best guesses.`,
@@ -428,20 +457,21 @@ function convert(b, extras = {}, opts = {}) {
   const L = ['---', RM.dumpYaml(card).trimEnd(), '---', '', `# Teardown: ${src.file || name}`, '',
     'Detected from the reference. Read the teardown report next to this file, change anything that looks wrong, then remake:',
     `\`npm run reel -- --recipe ${opts.recipePath || 'teardown/' + name + '/Reel.md'} --clip inbox/your-clip.mp4\``, '',
-    '## Brand kit', '- preset: auto', '- theme: aigent', `- colors: ${colours.join(', ') || 'none'}`, '- fonts: theme', '- logo: none', '',
+    '## Brand kit', '- preset: auto', `- theme: ${themeFor(colours)}`, `- colors: ${colours.join(', ') || 'none'}`, '- fonts: theme', '- logo: none', '',
     '## Music', `- bed: ${!hasMusic ? 'none' : bed ? bed.name : 'auto'}`, ...(hasMusic && bed && level && level.vol ? [`- bed-volume: ${level.vol}`] : []), `- bpm: ${bpm ? Math.round(bpm) : ''}`, `- beat-sync: ${hasMusic ? 'on' : 'off'}`, '',
     '## Style', `- look: ${look}`, `- captions: ${cs.style}`, ...(cs.position ? [`- caption-position: ${cs.position}`] : []), ...(cs.color ? [`- caption-color: ${cs.color}`] : []), ...(cs.outline ? [`- caption-outline: ${cs.outline}`] : []), ...(cs.shadow ? [`- caption-shadow: ${cs.shadow}`] : []), ...(cs.textCase && cs.style === 'one-word' ? [`- caption-case: ${cs.textCase}`] : []), ...(cs.layer ? [`- caption-layer: ${cs.layer}`] : []), `- titles: ${titles.length ? 'on' : 'off'}`, `- title-layer: ${layerDefault}`,
-    `- finish: ${jobFinish ? jobFinish.split(',').join(', ') : 'none'}`, `- transition: ${shots.some(s => /dissolve|fade|cross/.test(s.transitionIn || '')) ? 'crossfade' : 'none'}`,
+    `- finish: ${jobFinish ? jobFinish.split(',').join(', ') : 'none'}`, `- transition: ${jobTransition(shots)}`,
     `- punch: ${zoomShots || jumpCuts || avgShot < 3 ? 'on' : 'off'}`, '- effects: none', '',
     '## Shots', '', '```videomd-timeline'];
   for (const s of shots) {
     const f = [`#${pad2(s.n)} ${s.start}-${s.end}`, `story ${s.n === 1 ? 'hook' : s.n === shots.length ? 'payoff' : 'beat'}`];
     if (s.finish && s.finish !== jobFinish) f.push(`finish ${s.finish}`);
     if (big.includes(s.n)) f.push('punch big');
-    if (/dissolve|fade|cross/.test(s.transitionIn || '')) f.push('transition crossfade');
+    if (s.tx && s.tx.name && s.n > 1) f.push(`transition ${s.tx.name}`);
     if (s.framing) f.push(`framing ${s.framing}`);
     if (s.cutaway) f.push('cutaway on');
-    if (s.move) f.push(`camera~ ${s.move}`);
+    const mv = (s.moves || []).find(x => SPL.MOVES[x]); if (mv) f.push(`move ${mv}`);
+    if (s.n > 1 && ((s.moves || []).includes('shake') || (s.tx && s.tx.shake))) f.push('shake on');
     L.push(f.join(' | '));
   }
   L.push('```', '');

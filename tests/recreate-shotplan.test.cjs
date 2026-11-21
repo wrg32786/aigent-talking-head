@@ -124,4 +124,24 @@ t('sound effects: the reference types map to kit sounds', () => {
   assert.strictEqual(SPL.sfxId('unknown-thing'), '10-pop-bubble');
 });
 
+t('the reference\'s transitions and camera moves map to the kit\'s', () => {
+  const R = require('../kit/rules.cjs');
+  const cases = { flash: 'flash', dissolve: 'crossfade', whip: 'whip-left', slide: 'push-left', wipe: 'wipe', zoom: 'zoom', blur: 'blur', glitch: 'glitch', morph: 'warp', mg_transition: 'slice', effect: 'zoom-blur' };
+  for (const [k, v] of Object.entries(cases)) { const m = SPL.transitionFor(k); assert.strictEqual(m && m.name, v, k); assert.notStrictEqual(R.xfadeMode(v), undefined, v + ' is a kit transition'); }
+  assert.strictEqual(SPL.transitionFor('whip', { direction: 'right' }).name, 'whip-right');
+  assert.strictEqual(SPL.transitionFor('slide', { direction: 'up' }).name, 'swipe-up');
+  assert.strictEqual(SPL.transitionFor('fade', { via: 'white' }).name, 'dip-white');
+  for (const k of ['cut', 'jump', 'start', 'match', null]) assert.strictEqual(SPL.transitionFor(k), null, String(k));
+  assert.deepStrictEqual(SPL.transitionFor('shake'), { name: null, shake: true });
+  assert.deepStrictEqual(SPL.transitionFor('spin'), { name: null, scene: 'spin' }, 'a transition the kit lacks is a REF scene');
+  assert.ok(require('../kit/scenes.cjs').EFFECTS.spin, 'the spin scene exists');
+  assert.deepStrictEqual(SPL.moveFor({ move: 'push-in', support: 'fixed' }), ['push']);
+  assert.deepStrictEqual(SPL.moveFor({ move: 'pull-out' }), ['pull']);
+  assert.deepStrictEqual(SPL.moveFor({ move: 'pan / track', support: 'handheld' }), ['drift', 'shake']);
+  assert.deepStrictEqual(SPL.moveFor({ motion: 'static' }), []);
+  const RM = require('../kit/reelmd.cjs');
+  const plan = RM.shotSettings({ shots: [{ start: 0, end: 2, move: 'push' }, { start: 2, end: 4, shake: 'on', transition: 'flash' }] });
+  assert.strictEqual(plan[0].move, 'push'); assert.strictEqual(plan[1].shake, true); assert.strictEqual(plan[1].transition, 'flash');
+});
+
 console.log(`recreate-shotplan: ${n} passed`);

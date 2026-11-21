@@ -109,6 +109,32 @@ await t('Recreate tells the truth: music with no bed match is not "no music", no
   const { args } = C.compose(s), i = args.indexOf('--scenes-off');
   assert.ok(i >= 0 && args[i + 1] === id, args.join(' '));
 });
+await t('effects and colours: the reference\'s transitions, camera, spin as a scene, its theme and accent; Influence Effects off drops effect scenes', () => {
+  const shots = [['start', {}], ['flash', { move: 'push-in' }], ['spin', { support: 'handheld' }], ['flash', {}]].map(([tr, cam], i) => ({ start: i * 3, end: i * 3 + 3, transition_in: tr, faces: 1, aspects: { camera: { measured: cam } }, vlm: i === 3 ? 'confetti bursts as she laughs' : '' }));
+  const r = V.convert({ ...B, shots, packaging: { text_cues: [], stickers: [] }, x_palette: [{ hex: '#f4edd4' }, { hex: '#4b5a3a' }] }, {}, { dir: pkg });
+  assert.match(r.md, /#02 [^\n]*transition flash[^\n]*move push/); assert.match(r.md, /#03 [^\n]*shake on/);
+  assert.match(r.md, /- transition: flash/, 'the job transition is the one it uses most');
+  const fx = r.scenes.filter(x => x.kind === 'effect').map(x => x.name);
+  assert.ok(fx.includes('Spin') && fx.includes('Confetti burst'), 'a spin (no kit transition) and the confetti its description names: ' + fx);
+  const at = k => (r.md.match(new RegExp(`(\\d+(?:\\.\\d+)?)-[\\d.]+ \\| type scene \\| scene ${r.scenes.find(x => x.name === k).id}`)) || [])[1];
+  assert.strictEqual(+at('Confetti burst'), 8.9, 'on the shot its description names');
+  assert.match(r.md, /- theme: magazine/, 'cream and olive: the magazine theme');
+  // Influence: effect scenes follow the Effects switch, graphics the Graphics switch
+  V.saveScenes(r, pkg);
+  const cat = C.catalog({ fresh: true }), spin = r.scenes.find(x => x.name === 'Spin').id;
+  assert.strictEqual(C.partOf(cat.items[`graphic:${spin}`]), 'effects');
+  const ex = { name: 'r', shots: 4, transitions: { flash: 2 }, entrances: [], finishes: [], graphics: [spin], effects: [], music: { bed: null }, summary: { suggestions: [] } };
+  assert.ok(C.referenceLook(ex, 'influence', cat).picks[`graphic:${spin}`], 'on by default');
+  assert.ok(!C.referenceLook(ex, 'influence', cat, { effects: false }).picks[`graphic:${spin}`], 'Effects off drops it');
+  assert.ok(C.referenceLook(ex, 'influence', cat, { graphics: false }).picks[`graphic:${spin}`], 'Graphics off keeps it');
+});
+await t('Studio asks for the descriptions itself when a vision key is set, and only then', async () => {
+  const K = await import('../kit/studio/keys.mjs');
+  assert.deepStrictEqual(K.vlmEnv({ GEMINI_API_KEY: 'g' }), { GEMINI_API_KEY: 'g' });
+  const o = K.vlmEnv({ OPENAI_API_KEY: 'o' }); assert.ok(o.REA_VLM_API_KEY === 'o' && /openai/.test(o.REA_VLM_BASE_URL) && o.REA_VLM_MODEL);
+  assert.deepStrictEqual(K.vlmEnv({ REA_VLM_API_KEY: 'x', REA_VLM_BASE_URL: 'http://127.0.0.1:1' }), {});
+  assert.strictEqual(K.vlmEnv({}), null);
+});
 await t('a timer or number slot nobody took gets your own words, whole words, near its time', () => {
   const w = s => s.split(' ').map((x, i) => ({ start: i * 0.4, end: i * 0.4 + 0.3, word: x }));
   const W = w('so you only need five minutes a day to learn three easy tricks okay');
