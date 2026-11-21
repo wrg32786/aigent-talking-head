@@ -17,6 +17,17 @@ export function Style({ CAT, V, s, apply, patch, reloadCat, hidden, tab, setTab,
 }
 
 const MODE = [['recreate', 'Use all'], ['influence', 'Use parts'], ['off', 'Off']];
+const READING = ['queued', 'downloading', 'tearing'];
+// One short line when the reference set the Look (or is about to), with the way back to your own picks
+export function RefNotice({ s, patch, id = 'ref-notice' }) {
+  const r = s.reference, a = r.auto, reading = !r.extracted && r.mode !== 'off' && (r.status === 'running' || (r.queue || []).some(x => READING.includes(x.status)));
+  if (reading) return <div className="ref-notice glass-card" id={id} role="status"><span className="rn-spin" aria-hidden="true" /><p><b>Reading the reference.</b> We will set your look from it when it is ready.</p></div>;
+  if (!r.extracted || !a || r.mode === 'off') return null;
+  const back = () => patch({ reference: { mode: 'off' } }).then(() => toast('Back to your own look. The reference is off.', true)).catch(() => {});
+  return <div className="ref-notice glass-card" id={id} role="status" data-mode={a.mode}><Icon n="spark" />
+    <p><b>{a.mode === 'recreate' ? 'We set your look from the reference.' : 'We set your picks from the reference.'}</b> {a.mode === 'recreate' ? 'Change anything you like.' : 'Your Look and sound stay yours. Change anything you like.'}</p>
+    <Button id={id + '-back'} size="sm" variant="secondary" label="Back to my look" onClick={back} /></div>;
+}
 function SaveLook({ id, label, fromReference, reloadCat, apply, variant = 'ghost' }) {
   const [name, setName] = useState(''), [msg, setMsg] = useState('');
   const save = e => { e.preventDefault(); api('/api/pack/save', { name: name.trim(), fromReference: !!fromReference }).then(async j => { await reloadCat(); apply(j); setMsg(`Saved as the Look ${j.pack}`); toast(`Saved as the Look ${j.pack}`, true); }).catch(() => {}); };
@@ -37,6 +48,7 @@ function Looks({ CAT, V, s, apply, patch, reloadCat, hidden, go }) {
   return <section className="step" id="s-look" data-step="style" aria-labelledby="h-look" hidden={hidden}>
     <header className="sh look-h"><div><h2 id="h-look">Look</h2><p className="sub">One Look sets every layer. Change any layer below; the badge says where each choice came from.</p></div>
       <SaveLook id="save-look" label="Save as a new Look" reloadCat={reloadCat} apply={apply} variant="secondary" /></header>
+    <RefNotice s={s} patch={patch} />
     <div id="looks" className="packs looks" role="radiogroup" aria-label="Look">
       {looks.map(p => <button key={p.name || 'none'} className="pack" type="button" role="radio" data-look={p.name || ''} aria-checked={String((s.pack || null) === p.name)} title={p.description || (p.label || '').split(':')[0]} onClick={() => patch({ pack: p.name })}>
         <span className="pv">{p.preview ? <img src={file(p.preview)} alt="" loading="lazy" width={112} height={199} /> : <span className="ph">{p.name ? 'No preview' : 'Your picks only'}</span>}</span>
@@ -47,7 +59,7 @@ function Looks({ CAT, V, s, apply, patch, reloadCat, hidden, go }) {
       <span className="src src-ref">Reference</span>
       <div className="rc-t"><b>{ex.name || (item && item.url) || 'Your reference'}</b>
         <span className="fine">{[item && item.url ? item.url.replace(/^https?:\/\//, '').slice(0, 40) : null, sm.seconds ? `${Math.round(sm.seconds)} s` : null, ex.shots ? `${ex.shots} shots` : null, mu.bpm ? `${mu.bpm} BPM` : null].filter(Boolean).join(', ')}</span>
-        <span className="fine" id="ref-card-note">{r.mode === 'recreate' ? 'Using all of it: its cuts, captions and graphics.' : r.mode === 'influence' ? `Using its parts as soft defaults${(V.look && V.look.ref.length) ? `, ${V.look.ref.length} shown with REF below` : ''}.` : 'Off: kept here, not used.'}</span></div>
+        <span className="fine" id="ref-card-note">{r.mode === 'recreate' ? 'Using all of it: its Look, captions, titles, transitions, music and pace.' : r.mode === 'influence' ? 'Using its parts as soft defaults, with your Look and sound.' : 'Off: kept here, not used.'}</span></div>
       <div className="seg" role="radiogroup" aria-label="Use the reference" id="ref-card-mode">{MODE.map(([m, l]) => <button key={m} type="button" role="radio" aria-checked={r.mode === m ? 'true' : 'false'} data-mode={m} onClick={() => patch({ reference: { mode: m } })}>{l}</button>)}</div>
       <SaveLook id="save-ref-look" label="Save as a Look" fromReference reloadCat={reloadCat} apply={apply} />
       <Button id="ref-clear" size="sm" variant="ghost" label="Clear reference" onClick={clear} />
@@ -72,7 +84,10 @@ function Layers({ CAT, V, s, apply, patch, hidden, tab, setTab }) {
   const keyTabs = e => { if (!['ArrowRight', 'ArrowLeft'].includes(e.key)) return; const i = layers.findIndex(x => x.id === cur); const n = layers[(i + (e.key === 'ArrowRight' ? 1 : layers.length - 1)) % layers.length].id; setTab(n); requestAnimationFrame(() => document.getElementById('tab-' + n)?.focus()); };
   const setPick = (it, how, key) => { focusKey.current = key; patch({ picks: { [it.ref]: how } }); };
   const src = V && V.look ? { pack: new Set(V.look.pack), ref: new Set(V.look.ref), added: new Set(V.look.added) } : { pack: new Set(), ref: new Set(), added: new Set() };
-  const sourceOf = (it, st) => st === 'allow' ? (src.added.has(it.ref) ? 'ref' : 'you') : src.ref.has(it.ref) ? 'ref' : src.pack.has(it.ref) ? 'look' : null;
+  // a badge only on what is picked (or set by the Look): From reference, Yours or From the Look
+  const sourceOf = (it, st) => st === 'allow' ? (src.added.has(it.ref) ? 'ref' : 'you') : st ? null : src.pack.has(it.ref) ? 'look' : null;
+  const refOn = s.reference && s.reference.mode !== 'off' && s.reference.extracted;
+  const refIn = x => refOn ? x.items.filter(r => src.added.has(r) && pickState(s, CAT.items[r]) === 'allow').length : 0;
   return <section className="step" id="s-menu" data-step="style" aria-labelledby="h-menu" hidden={hidden}>
     <div className="block glass-card">
       <div className="bh"><h3 id="h-menu">Layers</h3>
@@ -84,10 +99,10 @@ function Layers({ CAT, V, s, apply, patch, hidden, tab, setTab }) {
       <div className="tabs" role="tablist" id="tabs" aria-label="Layers" ref={tabsRef} onKeyDown={keyTabs}>
         {layers.map(x => { const any = x.items.some(r => pickState(s, CAT.items[r])) || (x.id === 'audio' && (s.music.bed !== 'auto' || s.sound.sfx === 'off' || s.pace.tighten != null));
           return <button key={x.id} className="tab" role="tab" type="button" id={'tab-' + x.id} aria-selected={String(x.id === cur)} aria-controls="grid" tabIndex={x.id === cur ? 0 : -1} onClick={() => setTab(x.id)}>
-            {x.label}{any && <span className="pd" title="has your picks" aria-label="has your picks" />}</button>; })}
+            {x.label}{refIn(x) > 0 ? <span className="pd pd-ref" title="From reference" aria-label="has picks from the reference" /> : any && <span className="pd" title="has your picks" aria-label="has your picks" />}</button>; })}
       </div>
       <label className="tabselect"><span className="sr">Layer</span><select id="tabselect" value={cur} onChange={e => setTab(e.target.value)}>{layers.map(x => <option key={x.id} value={x.id}>{x.label} ({x.count})</option>)}</select></label>
-      <p id="tabhint" className="fine">{ql ? `Every layer, matching "${q.trim()}".` : L.hint || ''}</p>
+      <p id="tabhint" className="fine">{ql ? `Every layer, matching "${q.trim()}".` : L.hint || ''}{!ql && refIn(L) > 0 && <> <span className="src src-ref" id="layer-ref">From reference</span> {refIn(L)} here. Click any to change it.</>}</p>
       {!ql && cur === 'audio' && <Sound CAT={CAT} s={s} apply={apply} patch={patch} />}
       <div id="grid" className="layer-groups" role="tabpanel" aria-labelledby={'tab-' + cur} ref={gridRef}>
         {groups.length ? groups.map(g => <section key={g.label} className="lg" data-group={g.id} aria-label={g.label}>
@@ -100,7 +115,7 @@ function Layers({ CAT, V, s, apply, patch, hidden, tab, setTab }) {
   </section>;
 }
 
-const SRC = { you: 'YOU', ref: 'REF', look: 'LOOK' }, SRC_TIP = { you: 'Your pick', ref: 'From the reference', look: 'From the Look' };
+const SRC = { you: 'YOU', ref: 'REF', look: 'LOOK' }, SRC_TIP = { you: 'Your pick', ref: 'From reference', look: 'From the Look' };
 function Tile({ it, st, src, paused, setPick, setTip }) {
   const info = it.mode === 'info', kind = KIND_NAME[it.kind] || it.kind, canDeny = !info && it.mode !== 'one', did = 'd-' + it.ref.replace(/[^a-z0-9]/gi, '-');
   const still = paused && it.preview && it.preview.animated ? it.preview.still : null, showAnim = it.preview && (!paused || !it.preview.animated);
