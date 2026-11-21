@@ -148,7 +148,7 @@ def render_pair(spec: dict, dest: Path) -> None:
 
 
 def main() -> int:
-    plan = json.loads(Path(sys.argv[1]).read_text() if len(sys.argv) > 1 else sys.stdin.read())
+    plan = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8") if len(sys.argv) > 1 else sys.stdin.read())
     out_dir = Path(plan["outDir"])
     for spec in plan["sheets"]:
         dest = out_dir / f"{spec['id']}.jpg"

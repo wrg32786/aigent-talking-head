@@ -113,7 +113,7 @@ def run(src, out, fps=8.0, margin=0.18):
     sig = json.dumps([os.path.abspath(src), st.st_size, int(st.st_mtime), fps, margin, 2])
     if os.path.exists(out):
         try:
-            old = json.load(open(out))
+            old = json.load(open(out, encoding="utf-8"))
             if old.get('sig') == sig:
                 print(f"face zone: cached ({old.get('faces')} of {old.get('samples')} samples with a face) -> {out}")
                 return old

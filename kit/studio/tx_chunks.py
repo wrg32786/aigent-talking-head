@@ -29,7 +29,7 @@ def main():
     st = {"file": src, "duration": round(dur, 2), "chunk": chunk, "total": n, "done": [], "words": [], "model": model_name, "vad": VAD_VERSION}
     if os.path.exists(out):
         try:
-            old = json.load(open(out))
+            old = json.load(open(out, encoding="utf-8"))
             if old.get("chunk") == chunk and old.get("total") == n and old.get("model") == model_name and old.get("vad") == VAD_VERSION: st = old
         except Exception:
             pass
