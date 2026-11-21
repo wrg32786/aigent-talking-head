@@ -20,6 +20,7 @@
 | `wabbit` | Archivo Black caps, white | Chewy, accent | `overlap`: a brush tail under the hero's right corner | Archivo Black + Wascally Wabbit |
 | `instrument` | Instrument Serif Italic, white | Inter Tight 600, white | `stack` | the real pair; the `--look oneword` default |
 | `playfair` | Playfair Display 700, white | Inter Tight 500, white, with one word in Playfair Display Italic | `stack`, `accent: script` | the real pair; the `magazine` preset's pairing: a serif numeral, an italic serif word and sans in one phrase |
+| `anton` | Anton caps (condensed), white | Inter Tight 600, white | `stack` | the real pair: Anton + Inter Tight; the condensed pairing a reference with tall narrow type is matched to |
 | `dmserif` | DM Serif Display, white | Manrope 600, white, with one word in DM Serif Display Italic | `stack`, `accent: script` | the real pair: a high-contrast serif with a rounded sans |
 
 ## Examples
@@ -31,7 +32,7 @@ One title and one caption line in each pairing. `npm run fonts:examples` rebuild
 | ![literata](examples/literata.jpg) `literata` | ![bricolage](examples/bricolage.jpg) `bricolage` | ![pirata](examples/pirata.jpg) `pirata` | ![michroma](examples/michroma.jpg) `michroma` | ![redhat](examples/redhat.jpg) `redhat` |
 | ![jakarta](examples/jakarta.jpg) `jakarta` | ![grotesk-times](examples/grotesk-times.jpg) `grotesk-times` | ![avantgarde](examples/avantgarde.jpg) `avantgarde` | ![recoleta](examples/recoleta.jpg) `recoleta` | ![haas](examples/haas.jpg) `haas` |
 | ![wabbit](examples/wabbit.jpg) `wabbit` | ![modern](examples/modern.jpg) `modern` | ![druk](examples/druk.jpg) `druk` | ![elegant](examples/elegant.jpg) `elegant` | ![editorial](examples/editorial.jpg) `editorial` |
-| ![instrument](examples/instrument.jpg) `instrument` | | | | |
+| ![instrument](examples/instrument.jpg) `instrument` | ![anton](examples/anton.jpg) `anton` | | | |
 
 ## Lockups: the two faces together
 
@@ -78,3 +79,11 @@ Put the files in `kit/fonts/local/` (gitignored) and add `kit/fonts/local/pairin
 ```
 
 `file` is relative to that pairings file, or an absolute path. Then `--fonts druk-real`. You can also pass a pairing file directly: `--fonts /path/to/my-pairing.json` (one pairing object at the top level). Never commit licensed font files.
+
+## Matching the font in a reference
+
+A teardown reads the font of the words on screen and matches it to this library (`kit/fontmatch.py`, run by `npm run teardown`). It cuts a few big words out of the frames, draws the same words in the hero face of every pairing here, and takes the face whose letters cover the crop best. Each pairing has a `category` in `pairings.json` (sans, serif, condensed or blackletter), which is the kind of face the match reports, with the weight (regular, bold, black), the case and the colour. The result is one of three words: **Matched** (the letters sit on ours), **Close** (the same kind of face) or **Guess** (nothing near, this is the nearest).
+
+The match goes into the recipe as `- fonts: <pairing>` under Brand kit and `- font`, `- font-face` and `- font-match` under Style, so Recreate and Copy the look draw captions and titles with it. Your own `--fonts` still wins. A pairing that sets its titles in capitals is only picked for a reference that is in capitals.
+
+Only fonts in this folder are ever used: every one is SIL OFL 1.1 from [Google Fonts](https://github.com/google/fonts), committed unmodified with its licence text beside it (`OFL-<name>.txt`). Nothing is downloaded and no font is identified by name from the reference; we only say which of ours is nearest. Your own licensed fonts in `kit/fonts/local/` take part in the match too.
