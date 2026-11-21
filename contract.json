@@ -1,7 +1,7 @@
 {
   "contract": 1,
   "name": "aigent-talking-head",
-  "version": "1.24.0",
+  "version": "1.26.0",
   "summary": "Turn a phone clip into a captioned, styled 9:16 talking-head reel, locally.",
   "skill": "skills/aigent-talking-head/SKILL.md",
   "invoke": "npm run <command> -- <args>  (from the repo root; or node <script> <args>)",

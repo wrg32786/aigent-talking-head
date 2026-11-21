@@ -2,6 +2,27 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.26.0 (unreleased)
+
+Release notes: [docs/releases/v1.26.0.md](docs/releases/v1.26.0.md). B-roll like the reference, and a remake that keeps the eyes clear.
+
+- **B-roll length and content.** A reference cutaway's seconds and what it shows (`shotplan.brollOf`: "a screen recording of X", "X on screen", or the shot's description) ride on the recut plan, the shot (`broll <what>` in Reel.md) and the B-roll spot (`ref.seconds`, `ref.what`). Search and the idea use it ("Screen recording: X"), and the clip is cut to the reference's length.
+- **No invented glitch.** The recipe writes `glitch: on|off`; it is off unless the reference glitches. Reference shakes are kept (`REFSHAKES` in `kit/reel.cjs`).
+- **Graphics colours count.** The colour and tile of the reference's graphics count toward its accents (`brandColours`).
+- **Cards off the eyes.** With the face mask missing or on, a graphic that would cover the face above its lower 30% moves down to start at the chin, scaled to no less than 60% (`layoutPass` step 1b in `kit/overlay.html`).
+- **Tests.** `tests/studio-spots.test.mjs` and `tests/recreate-shotplan.test.cjs` cover the B-roll carry.
+
+## 1.25.0 (unreleased)
+
+Release notes: [docs/releases/v1.25.0.md](docs/releases/v1.25.0.md). Recreate from the first screen, and a calmer Look (built with Fable).
+
+- **Recreate from the first screen.** Footage has one quiet row, "Recreate a video": paste a link or upload a file with Recreate preselected (`web/src/RecreateStart.jsx`, the same reference APIs and `RefMode`). You stay on Footage while it is read.
+- **Why each pick.** The Look step's layer says what the reference picked and why in one line ("From the reference: glitch, seen 3 times between shots"), and a picked tile shows its reason on hover and focus (`look.why` from `lookSources`).
+- **Two labels for REF.** "From reference" for a built-in option the reference picked, "Made for you" for a scene made from it. One badge per tile, the same words in the Picks tray, the plan chips and the docs.
+- **A calmer tray and menu.** Picks is a count that opens your picks by layer, one line each with "+N", names only, with Undo reference and Clear all. More is down to Past videos, Setup check and API keys.
+- **Links no longer block Draft.** The reference queue runs in its own lane (`refTask` in `server.mjs`), still one download at a time, so Draft and Render run while links download. Switching videos still waits for a download. A Recreate draft whose reference is still being read says so plainly.
+- **Tests.** The Look, Recreate, scenes, polish, videos and agent browser tests, plus lane tests in `studio-agent.test.mjs` and `studio-videos.test.mjs`.
+
 ## 1.24.0 (unreleased)
 
 Release notes: [docs/releases/v1.24.0.md](docs/releases/v1.24.0.md). Effects and colours from the reference.
