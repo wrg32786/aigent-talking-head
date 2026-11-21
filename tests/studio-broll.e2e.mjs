@@ -9,7 +9,7 @@
 // - Generate: Estimate shows the cost, Generate runs against the mock and lands on the beat
 // - Record screen: getDisplayMedia with the webcam bubble, when this Chrome allows it
 // - render: the lane goes into cut.json with placements and credits.txt is written
-// - kit/assemble.cjs places full, top and pip inserts (pixel colours on a synthetic clip)
+// - kit/assemble.cjs places full, top, pip and frame inserts (pixel colours on a synthetic clip)
 // Needs Chrome and ffmpeg. Run: node tests/studio-broll.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
 import assert from 'assert';
 import http from 'http';
@@ -96,8 +96,17 @@ try {
     assert.strictEqual((await beatOf(2)).slot.place, 'full');
     await pg.click('#place-top'); await until(async () => (await beatOf(2)).slot.place === 'top');
     await pg.click('#place-pip'); await until(async () => (await beatOf(2)).slot.place === 'pip');
+    // framed cards: the preview draws the clip in the top card and you in the smaller card below, head over its edge
+    await pg.click('#place-frame'); await until(async () => (await beatOf(2)).slot.place === 'frame');
+    await pg.waitForSelector('#slot-prev.lay-frame .lay-you'); assert.strictEqual(await pg.getAttribute('#place-frame', 'aria-checked'), 'true');
+    const fb = await pg.evaluate(() => { const r = q => document.querySelector(q).getBoundingClientRect(); const c = r('#slot-prev video, #slot-prev img'), y = r('#slot-prev .lay-you'), h = r('#slot-prev .lay-you .hd'); return { clipBottom: c.bottom, youTop: y.top, youW: y.width, frameW: r('#slot-prev').width, headTop: h.top }; });
+    assert.ok(fb.clipBottom < fb.youTop && fb.youW < fb.frameW && fb.headTop < fb.youTop, 'framed preview: ' + JSON.stringify(fb));
+    await shot(pg, '#slot-set', 'broll-framed.png');
+    if (shots) { for (const th of ['light', 'dark']) { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); await pg.reload({ waitUntil: 'networkidle' }); await pg.click('#broll-lane .beat[data-beat="2"]'); await pg.waitForSelector('#slot-prev.lay-frame'); if (th === 'light') await shot(pg, '#beat-panel', 'broll-framed-light.png'); } }
     await pg.fill('#slot-dur', '1.5'); await pg.press('#slot-dur', 'Tab'); await until(async () => (await beatOf(2)).slot.dur === 1.5);
     await pg.click('#place-top'); await until(async () => (await beatOf(2)).slot.place === 'top');
+    await pg.waitForSelector('#slot-prev.lay-top .lay-you');
+    { const r = await pg.evaluate(() => { const b = q => document.querySelector(q).getBoundingClientRect(); return { clipBottom: b('#slot-prev video, #slot-prev img').bottom, headTop: b('#slot-prev .lay-you .hd').top }; }); assert.ok(r.headTop < r.clipBottom, 'split preview: the head over the panel edge ' + JSON.stringify(r)); }
     await shot(pg, '#s-broll', 'broll-lane.png');
     await pg.click('#broll-lane .beat[data-beat="1"]'); await pg.click('#btab-library'); await pg.waitForSelector('#bp-library .bthumb');
     await pg.click('#bp-library .bthumb'); await until(async () => (await beatOf(1)).slot);
@@ -197,19 +206,22 @@ try {
     const over = await pg.evaluate(() => [...document.querySelectorAll('#s-broll *')].filter(e => !e.closest('#broll-lane')).map(e => e.getBoundingClientRect().right).reduce((a, b) => Math.max(a, b), 0) - innerWidth); assert.ok(over <= 1, 'no sideways scroll: ' + over);
     await shot(pg, '#s-broll', 'broll-phone.png');
   });
-  await t('assemble: full, top and pip inserts land where they should (synthetic colours)', async () => {
+  await t('assemble: full, top, pip and frame inserts land where they should (synthetic colours)', async () => {
     const b = join(STATE, 'asm', 'build'); mkdirSync(b, { recursive: true });
     ff(['-f', 'lavfi', '-i', 'color=c=blue:s=1080x1920:r=24:d=6', '-f', 'lavfi', '-i', 'sine=f=300:d=6', '-shortest', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', join(b, 'base.mp4')]);
     ff(['-f', 'lavfi', '-i', 'color=c=red:s=1280x720:r=24:d=3', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', join(b, 'red.mp4')]);
     ff(['-f', 'lavfi', '-i', 'color=c=green:s=1280x720:r=24:d=3', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', join(b, 'green.mp4')]);
     ff(['-f', 'lavfi', '-i', 'color=c=yellow:s=640x480', '-frames:v', '1', join(b, 'y.png')]);
-    writeFileSync(join(b, 'cut.json'), JSON.stringify({ segs: [{ file: 'base.mp4', in: 0, out: 6 }], tail: 0, inserts: [{ file: 'red.mp4', at: 0.5, dur: 1 }, { file: 'green.mp4', at: 2, dur: 1, place: 'top' }, { file: 'y.png', at: 3.5, dur: 1, place: 'pip' }] }));
+    writeFileSync(join(b, 'cut.json'), JSON.stringify({ segs: [{ file: 'base.mp4', in: 0, out: 6 }], tail: 0, inserts: [{ file: 'red.mp4', at: 0.5, dur: 1 }, { file: 'green.mp4', at: 2, dur: 1, place: 'top' }, { file: 'y.png', at: 3.5, dur: 1, place: 'pip' }, { file: 'red.mp4', at: 4.6, dur: 0.7, place: 'frame' }] }));
     execFileSync(process.execPath, [join(ROOT, 'kit', 'assemble.cjs'), 'out.mp4'], { cwd: b, env: { ...process.env, NOBED: '1', NOSFX: '1' }, stdio: 'pipe' });
     const px = (tm, x, y) => [...execFileSync('ffmpeg', ['-v', 'error', '-ss', String(tm), '-i', join(b, 'out.mp4'), '-frames:v', '1', '-vf', `format=rgb24,crop=2:2:${x}:${y}`, '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'])].slice(0, 3);
     const is = (p, c) => ({ r: p[0] > 180 && p[1] < 80 && p[2] < 80, g: p[1] > 90 && p[0] < 80 && p[2] < 80, b: p[2] > 120 && p[0] < 60 && p[1] < 60, y: p[0] > 180 && p[1] > 180 && p[2] < 80 })[c];
     assert.ok(is(px(1, 540, 1500), 'r'), 'full cutaway covers the frame');
     assert.ok(is(px(2.5, 540, 300), 'g') && is(px(2.5, 540, 1500), 'b'), 'split: insert on top, speaker below');
     assert.ok(is(px(4, 820, 300), 'y') && is(px(4, 100, 100), 'b') && is(px(4, 540, 1500), 'b'), 'pip: a box top right');
+    // framed cards (kit/split.cjs): the clip in the top card, you in the smaller card below, the cream backdrop between
+    const cream = p => p[0] > 200 && p[1] > 200 && p[2] > 200;
+    assert.ok(is(px(5, 540, 400), 'r') && cream(px(5, 540, 970)) && is(px(5, 540, 1500), 'b') && cream(px(5, 20, 1500)) && cream(px(5, 20, 300)), 'frame: two cards on the backdrop');
     assert.ok(is(px(5.5, 540, 300), 'b'), 'gone after');
   });
   assert.deepStrictEqual(errs, [], 'page errors: ' + errs.join(' | '));
