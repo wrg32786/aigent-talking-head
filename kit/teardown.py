@@ -836,6 +836,18 @@ def cmd_extras(a):
         out["caption_look"]["layer_samples"] = caption_layer(a.video, cues, seg)
     except Exception as e:
         print(f"note: caption outline check failed: {e}")
+    # the type on screen against our own font library (kit/fontmatch.py): kind of face, weight, case, colour, nearest pairing
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import fontmatch
+        fm = fontmatch.match_video(a.video, cues, frame_at)
+        if fm:
+            out["font"] = fm
+            print(f"font: {fm['category']}, {fm['weight'] or 'weight not read'}, {fm['case']} case; nearest of ours {fm['face']} (pairing {fm['pairing']}, {fm['match']}, {fm['samples']} words read)")
+        else:
+            print("font: no big words on screen to read a font from")
+    except Exception as e:
+        print(f"note: font match failed: {e}")
     json.dump(out, open(a.out, "w"), indent=1)
     sys.stdout.flush()
     print(f"graphics: {sum(g['type'] == 'ordinal-sticker' for g in gx)} ordinal stickers, {sum(g['type'] == 'app-label' for g in gx)} app labels, {sum(g['type'] == 'screen-card' for g in gx)} screen cards")

@@ -39,6 +39,17 @@ function loadBreakdown(p) {
   return b;
 }
 
+// extras.json "font" -> { pairing, category, weight, case, color, face, match } or null. The pairing must be one in
+// kit/fonts/pairings.json (never a path or a name from the file), the match one of matched, close, guess.
+function fontOf(f) {
+  if (!f || typeof f !== 'object') return null;
+  const P = JSON.parse(fs.readFileSync(path.join(__dirname, 'fonts', 'pairings.json'), 'utf8')).pairings || {};
+  if (!f.pairing || !P[f.pairing]) return null;
+  const pick = (v, list) => (list.includes(v) ? v : null);
+  return { pairing: f.pairing, category: pick(f.category, ['sans', 'serif', 'condensed', 'blackletter', 'script', 'display']) || P[f.pairing].category || 'sans', weight: pick(f.weight, ['regular', 'bold', 'black']), case: pick(f.case, ['lower', 'upper', 'as-said']),
+    color: /^#[0-9a-f]{6}$/i.test(String(f.color || '')) ? f.color.toLowerCase() : null, face: String((P[f.pairing].display || {}).family || ''), match: pick(f.match, ['matched', 'close', 'guess']) || 'guess', score: Number.isFinite(+f.score) ? +f.score : null, samples: +f.samples || 0 };
+}
+
 function convert(b, extras = {}, opts = {}) {
   const src0 = b.source || {};
   const src = { ...src0, file: src0.file || src0.filename || (src0.path ? path.basename(src0.path) : undefined) };
@@ -58,6 +69,8 @@ function convert(b, extras = {}, opts = {}) {
   const cl2 = captionLook((extras.caption_look || {}).samples, owc ? owc.cues : null, (extras.caption_look || {}).layer_samples);
   if (cl2) Object.assign(cs, { outline: cl2.outline, shadow: cl2.shadow, lookN: cl2.n, layer: cl2.layer, layerN: cl2.layerN, layerBehind: cl2.layerBehind });
   const look = cs.style === 'one-word' ? 'one-word' : cs.style === 'pill' ? 'muse' : 'kinetic';
+  // the font read from the words on screen (extras.json "font", kit/fontmatch.py): only a pairing we ship is ever named
+  const font = fontOf(extras.font);
   const shots = (b.shots || []).map((s, i) => {
     const m = { ...((s.aspects && s.aspects.grade && s.aspects.grade.measured) || {}), ...(extras.shots && extras.shots[i] ? extras.shots[i] : {}) };
     if (s.x_scan != null && m.scan == null) m.scan = s.x_scan;
@@ -89,11 +102,11 @@ function convert(b, extras = {}, opts = {}) {
   const sfx = (((b.audio_plan || {}).sfx_merged) || []).filter(x => x && Number.isFinite(+x.t) && x.type && !(x.level_db < -60)).slice(0, 24)
     .map(x => ({ t: r2(x.t), dur: +x.dur || 0.2, type: String(x.type).toLowerCase().replace(/[_\s]+/g, '-').replace(/[^a-z-]/g, ''), on: x.on && x.on.type ? String(x.on.type).replace(/[^a-z_]/g, '') : null }));
   const { extraG, scenes } = placeScenes({ b, opts, src, shots, graphics, titles });
-  const ctx = { b, extras, opts, src, name, dur, engine, shots, titles, dropped, graphics, extraG, scenes, sfx, lines, speech, cs, look, colours, bpm, level, hasMusic, bed, beatEdit, jobFinish, ambient, layerDefault, zoomShots, jumpCuts, avgShot, big };
-  return { md: recipeMd(ctx), report: report(ctx), scenes, titles, shots, captionStyle: cs.style, captionPosition: cs.position, captionColor: cs.color, graphics, dropped, jobFinish, bpm, bed };
+  const ctx = { b, extras, opts, src, name, dur, engine, shots, titles, dropped, graphics, extraG, scenes, sfx, lines, speech, cs, look, font, colours, bpm, level, hasMusic, bed, beatEdit, jobFinish, ambient, layerDefault, zoomShots, jumpCuts, avgShot, big };
+  return { md: recipeMd(ctx), report: report(ctx), scenes, titles, shots, font, captionStyle: cs.style, captionPosition: cs.position, captionColor: cs.color, graphics, dropped, jobFinish, bpm, bed };
 }
 
-module.exports = { convert, saveScenes, stickerImage, pickTitles, mapGraphics, captionLook, gradeChoice, placeOf, captionStyle, oneWordStream, finishOf, suggestBed, loadBreakdown, ENTRANCE_MAP,
+module.exports = { convert, fontOf, saveScenes, stickerImage, pickTitles, mapGraphics, captionLook, gradeChoice, placeOf, captionStyle, oneWordStream, finishOf, suggestBed, loadBreakdown, ENTRANCE_MAP,
   placeScenes, musicOf, brandColours, themeFor, jobTransition, recipeMd, report };
 
 if (require.main === module) {
