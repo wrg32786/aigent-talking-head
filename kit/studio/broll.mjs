@@ -109,6 +109,21 @@ export function search(q, { source, kind, orientation } = {}) {
   return load().clips.filter(c => (!source || c.source === source) && (!kind || c.kind === kind) && (!orientation || (c.tags || []).includes(orientation))
     && qs.every(w => [c.name, c.source, c.author && c.author.name, ...(c.tags || [])].some(v => String(v || '').toLowerCase().includes(w))));
 }
+// the best library clips for some words, most matches first: a word matches a name or tag that holds it, or its stem
+// (clips, clip; editing, edit), so "phone setups" finds a clip tagged "phone" or "setup". At least one word must match;
+// a clip matching every word ranks above one that matches some.
+const stem = w => w.replace(/(ings?|ed|es|s)$/, '').replace(/(.)\1$/, '$1');
+export function rank(q, { exclude = new Set() } = {}) {
+  const qs = [...new Set(words(q))]; if (!qs.length) return [];
+  const out = [];
+  for (const c of load().clips) {
+    if (exclude.has(c.id)) continue;
+    const hay = [c.name, c.title, ...(c.tags || [])].map(v => String(v || '').toLowerCase()).join(' '), toks = new Set(words(hay).map(stem));
+    const n = qs.filter(w => hay.includes(w) || toks.has(stem(w))).length;
+    if (n) out.push({ c, n });
+  }
+  return out.sort((a, b) => b.n - a.n).map(x => ({ ...x.c, matched: x.n, of: qs.length }));
+}
 // credits.txt for a render: every clip used, with its source, author and license
 export function credits(clips, job) {
   const L = [`B-roll in ${job}`, ''];

@@ -189,6 +189,12 @@ export function applyPatch(s, p, cat = catalog()) {
   if (p.reference && p.reference.mode !== undefined) { if (!['influence', 'recreate', 'off'].includes(p.reference.mode)) errs.push('reference.mode: influence, recreate or off'); else { const was = s.reference.mode; s.reference.mode = p.reference.mode; log.push(`reference mode ${p.reference.mode}`);
     // Recreate or Influence sets the Look from the reference; Off takes it back out (your own picks stay)
     if (was !== s.reference.mode || (s.reference.mode !== 'off' && s.reference.extracted && !s.reference.auto)) { const a = setReferenceLook(s, cat); if (a) log.push(`set the look from the reference (${a.n} change${a.n === 1 ? '' : 's'})`); else if (was !== 'off' && s.reference.mode === 'off') log.push('back to your own look'); } } }
+  if (p.reference && p.reference.parts !== undefined) {
+    const q = p.reference.parts || {}, bad = Object.keys(q).filter(k => !REF_PARTS.some(x => x.id === k) || typeof q[k] !== 'boolean');
+    if (bad.length) errs.push(`reference.parts: { ${REF_PARTS.map(x => x.id).join(', ')} } each true or false`);
+    else { s.reference.parts = { ...refParts(s.reference), ...q }; log.push('reference parts: ' + Object.entries(q).map(([k, v]) => `${k} ${v ? 'on' : 'off'}`).join(', '));
+      if (s.reference.mode === 'influence' && s.reference.extracted) { const a = setReferenceLook(s, cat); if (a) log.push(`set the look from the reference (${a.n} change${a.n === 1 ? '' : 's'})`); } }
+  }
   if (p.clips !== undefined) { const c = p.clips ? slash(p.clips) : null; if (c && (c.includes('..') || !existsSync(join(resolve(ROOT, c), 'clips.json')))) errs.push(`clips: no clips.json in ${c}`); else if (c !== s.clips) { s.clips = c; log.push(c ? `clips folder ${c}` : 'clips folder cleared'); } }
   // footage: reorder or drop files the job already has (state.footage), or add a file already in the job's inbox
   if (p.footage !== undefined) {
@@ -325,7 +331,24 @@ export function extract(recipePath) {
     preset: br.preset && br.preset !== 'none' ? br.preset : null, look: st.look || null, captionStyle: st.captions || null,
     transitions: tcount, entrances: real('entrance', entrances), finishes: real('finish', finishes), graphics: real('graphic', graphics), effects: real('effect', effects),
     music: { bed: mu.bed && mu.bed !== 'none' ? mu.bed : null, energy: mu.energy || null, beatSync: mu['beat-sync'] || null }, punch: st.punch || null,
+    ran: ranOf(dirname(recipePath), r),
   };
+}
+// which parts of the breakdown ran, from what the teardown left beside its Reel.md, each with the fix when one did not:
+// the full reader (rea-video), the speech, the layers and grade (extras.json, the person mask), the contact sheet, the
+// sound effects and the music. The page shows them as one row with fix buttons, never a command.
+export function ranOf(dir, r = {}) {
+  const has = f => existsSync(join(dir, f)), rea = has(join('videomd', 'breakdown.json'));
+  let speech = (r.script || []).length > 0; if (!speech) { try { speech = !!JSON.parse(readFileSync(join(dir, 'speech.json'), 'utf8')).ok; } catch {} }
+  const mu = r.music || {};
+  return [
+    { id: 'reader', label: 'Full read', ok: rea, why: rea ? 'rea-video read it' : 'the built-in reader was used, it can miss shots and titles', fix: rea ? null : 'rea' },
+    { id: 'speech', label: 'Speech', ok: speech, why: speech ? 'its words and timing' : 'no words were read', fix: speech ? null : 'model' },
+    { id: 'layers', label: 'Layers and grade', ok: has('extras.json'), why: has('extras.json') ? 'front or behind, vignette, grain' : 'no layer hints or grade per shot', fix: has('extras.json') ? null : 'effects' },
+    { id: 'sheet', label: 'Contact sheet', ok: has('contact.jpg'), why: has('contact.jpg') ? 'one frame per shot' : 'no frames to show', fix: has('contact.jpg') ? null : 'effects' },
+    { id: 'sounds', label: 'Sound effects', ok: rea, why: (r.sfx || []).length ? `${r.sfx.length} found` : rea ? 'none in it' : 'needs the full read', fix: rea ? null : 'rea' },
+    { id: 'music', label: 'Music', ok: !!(mu.bpm || mu.bed) || rea, why: mu.bpm ? `${mu.bpm} BPM` : mu.bed && mu.bed !== 'none' ? mu.bed : 'no music', fix: null },
+  ];
 }
 // the teardown as facts a person or a model can act on: cuts and pacing, beats and music energy, caption style, what
 // was detected, and suggestions mapped onto the Studio menu (kind:id refs that exist, each with the reason)
@@ -387,12 +410,27 @@ export function referencePicks(ex, kinds = null, cat = catalog()) {
 //   recreate: every layer the reference read: its Look when it is a built-in one, captions, titles, transitions,
 //             finishes, graphics, effects, the music bed, beat sync and pace.
 //   influence: the same picks as soft defaults, but your Look, music and pace stay yours.
-const SOUND_REF = /^(bed|beatSync|editing):/;
-export function referenceLook(ex, mode, cat = catalog()) {
+// the parts of a reference Influence can take, each switched on or off on the reference card (reference.parts).
+// Recreate takes all of them, and its Look (the pack) too; Influence never sets the pack.
+export const REF_PARTS = [
+  { id: 'captions', label: 'Captions', kinds: ['captionStyle', 'captionEntrance', 'look'] },
+  { id: 'titles', label: 'Titles', kinds: ['entrance', 'titleLayer'] },
+  { id: 'transitions', label: 'Transitions', kinds: ['transition'] },
+  { id: 'grade', label: 'Grade', kinds: ['finish'] },
+  { id: 'effects', label: 'Effects', kinds: ['effect'] },
+  { id: 'graphics', label: 'Graphics', kinds: ['graphic'] },
+  { id: 'pace', label: 'Pace', kinds: ['editing'] },
+  { id: 'sound', label: 'Music and sound', kinds: ['bed', 'beatSync', 'sfx'] },
+  { id: 'fonts', label: 'Fonts and theme', kinds: ['font', 'theme'] },
+];
+export const INFLUENCE_PARTS = { captions: true, titles: true, transitions: true, grade: true, effects: true, graphics: true, pace: false, sound: false, fonts: true };
+const partOfKind = k => (REF_PARTS.find(p => p.kinds.includes(k)) || {}).id || null;
+export const refParts = r => ({ ...INFLUENCE_PARTS, ...((r && r.parts) || {}) });
+export function referenceLook(ex, mode, cat = catalog(), parts = null) {
   if (!ex || !['recreate', 'influence'].includes(mode)) return null;
   const picks = referencePicks(ex, null, cat);
   for (const x of (ex.summary && ex.summary.suggestions) || []) { const it = cat.items[x.ref]; if (it && it.mode !== 'info') picks[x.ref] = 'allow'; }
-  if (mode === 'influence') for (const r of Object.keys(picks)) if (SOUND_REF.test(r)) delete picks[r];
+  if (mode === 'influence') { const on = { ...INFLUENCE_PARTS, ...(parts || {}) }; for (const r of Object.keys(picks)) { const it = cat.items[r], part = it && partOfKind(it.kind); if (part && on[part] === false) delete picks[r]; } }
   for (const r of Object.keys(picks)) if (!cat.items[r] || cat.items[r].mode === 'info') delete picks[r];
   const out = { picks };
   if (mode === 'recreate' && ex.preset && cat.packs.some(x => x.name === ex.preset)) out.pack = ex.preset;
@@ -415,7 +453,7 @@ export function undoReferenceLook(s) {
 export function setReferenceLook(s, cat = catalog()) {
   const r = s.reference; if (!r) return null;
   if ((r.added && r.added.length) || r.prev || r.auto) undoReferenceLook(s);
-  const p = referenceLook(r.extracted, r.mode, cat); if (!p) return null;
+  const p = referenceLook(r.extracted, r.mode, cat, r.parts); if (!p) return null;
   const had = allowedRefs(s), prev = { one: {} };
   for (const ref of Object.keys(p.picks)) { const it = cat.items[ref]; if (it.kind !== 'bed' && it.mode === 'one') { const k = it.kind === 'editing' ? 'editing' : it.kind; prev.one[k] = ((s.picks[k] && s.picks[k].allow) || []).slice(); } }
   if (p.pack !== undefined) prev.pack = s.pack || null;
@@ -424,7 +462,7 @@ export function setReferenceLook(s, cat = catalog()) {
   const now = allowedRefs(s);
   r.added = Object.keys(p.picks).filter(x => !had.has(x) && now.has(x));
   r.prev = prev; r.applied = true;
-  r.auto = { mode: r.mode, n: r.added.length + (p.pack && p.pack !== prev.pack ? 1 : 0), pack: s.pack || null, bed: s.music.bed, at: Date.now() };
+  r.auto = { mode: r.mode, n: r.added.length + (p.pack && p.pack !== prev.pack ? 1 : 0), pack: s.pack || null, bed: s.music.bed, sound: r.mode === 'recreate' || !!refParts(r).sound, at: Date.now() };
   return r.auto;
 }
 

@@ -7,7 +7,7 @@ import { api, file, toast, grow, pickState, Icon, IconBtn, SITE, STATUS, KIND_NA
 import { upload } from './upload.js';
 import { canWrite, NO_WRITER } from './Scripts.jsx';
 import { FixActions } from './Fix.jsx';
-import { RefNotice } from './Style.jsx';
+import { RefNotice, RefParts } from './Style.jsx';
 
 export function Reference({ CAT, V, s, apply, patch }) {
   const r = s.reference, env = V.env, q = r.queue || [], t = env.tools || {};
@@ -90,7 +90,9 @@ function Breakdown({ CAT, V, s, apply, patch }) {
     </div>
     {/fallback/.test(engine || '') && <p className="fine ref-engine" id="ref-engine" role="note"><Badge label="Read by the built-in analyzer" variant="warning" /> It is rougher and can miss shots, titles and the grade. Get rea-video for the full read, then add this reference again. <FixActions V={V} id="rea" apply={apply} /></p>}
     <RefNotice s={s} patch={patch} id="ref-notice-td" />
-    {r.mode === 'influence' && !r.auto && <p className="fine" id="ref-mode-note">Influence sets its picks and keeps your Look and sound. Recreate uses all of it.</p>}
+    {r.mode === 'influence' && !r.auto && <p className="fine" id="ref-mode-note">Influence takes the parts you switch on. Recreate uses all of it.</p>}
+    {r.mode === 'influence' && <RefParts V={V} s={s} patch={patch} />}
+    {Array.isArray(ex.ran) && <RefRan V={V} s={s} apply={apply} ran={ex.ran} />}
     <div className="td-body">
       {r.contact ? <img src={file(r.contact)} alt="Contact sheet of the reference, one frame per shot" /> : <div className="empty-art"><Icon n="film" /></div>}
       <div>
@@ -119,6 +121,18 @@ function Breakdown({ CAT, V, s, apply, patch }) {
       </div>
     </div>
     {V.swap && V.swap.parts && V.swap.parts.length > 0 && <Swap CAT={CAT} sw={V.swap} s={s} apply={apply} patch={patch} />}
+  </div>;
+}
+
+// which parts of the breakdown ran, and a fix for each that did not
+function RefRan({ V, s, apply, ran }) {
+  const miss = ran.filter(x => !x.ok), fixes = [...new Set(miss.map(x => x.fix).filter(Boolean))], r = s.reference;
+  const again = () => api('/api/reference/item', { id: r.active, action: 'retry' }).then(v => { apply(v); toast('Reading the reference again', true); }).catch(() => {});
+  return <div className="ref-ran" id="ref-ran">
+    <ul className="ran" aria-label="What we read from the reference">{ran.map(x => <li key={x.id} className={x.ok ? 'ok' : 'miss'} title={x.why} data-part={x.id}><i aria-hidden="true" />{x.label}<span className="sr">{x.ok ? ', read' : ', not read: ' + x.why}</span></li>)}</ul>
+    {miss.length > 0 && <div className="ran-fix fine">{fixes.map(id => { const ls = miss.filter(x => x.fix === id).map(x => x.label), parts = ls.length > 1 ? ls.slice(0, -1).join(', ') + ' and ' + ls[ls.length - 1].toLowerCase() : ls[0], f = V.env && V.env.fixes && V.env.fixes[id];
+        return <div className="ran-row" key={id} data-fix={id}><span>{parts} did not run. <b>{f ? f.label : id}</b> reads {ls.length > 1 ? 'them' : 'it'}.</span><FixActions V={V} id={id} apply={apply} /></div>; })}
+      {r.active != null && <span><Button id="ref-again" variant="secondary" size="sm" label="Read it again" onClick={again} /> after a fix.</span>}</div>}
   </div>;
 }
 

@@ -265,6 +265,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-spots.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { sperrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio b-roll spots tests (tests/studio-spots.test.mjs: spots of 6 to 10 s from the captions, Add a spot, reference spots, counters, quotes and noun searches from the words, the first spot too, upload kinds, Approve with no key, MCP pick_broll, add_spot, add_testimonial)', errs: sperrs, warns: [] });
+    const rparts = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-recreate-parts.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { rparts.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio reference parts tests (tests/studio-recreate-parts.test.mjs: Influence takes the parts switched on, Recreate all, what the breakdown read with a fix for each part that did not)', errs: rparts, warns: [] });
     const lkerrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-look.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { lkerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
