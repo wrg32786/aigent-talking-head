@@ -22,6 +22,10 @@
 //   "beatSync": true                     snap punches, SFX, title entrances and fx hits to the bed's beat grid
 //                                        (default on when a bed is set; --no-beat-sync / false to leave times alone)
 //   "beatWindow": 0.12                   max snap distance in seconds; speech cuts never move
+//   "frame": { "name": "feed45", "h": 1350, "y0": 285, "expr": "..." }   a 4:5 or 1:1 version (kit/export-frame.cjs, with
+//                                        BASE): the picture and its masks slide up and down so the face-tracked window
+//                                        (kit/facewindow.cjs, expr) always lands on rows y0..y0+h; full b-roll is fitted
+//                                        to that frame and the split layouts halve it. The caller crops the frame out.
 //   "finish": "grain"                    optional film look on the picture (before titles): grain, vignette, chroma,
 //                                        scan-lines, warm, cool, teal, crushed, mono, bleach. A list or {grain:0.4}
 //                                        also works. Per segment: "finish" on a seg. No LUT or light-leak files.
@@ -72,6 +76,10 @@ const LEN = +(segs.reduce((a, s) => a + segLen(s), 0) + tail).toFixed(3);
 const hasAudio = f => { try { return execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'a', '-show_entries', 'stream=index', '-of', 'csv=p=0', f]).toString().trim() !== ''; } catch { return false; } };
 
 const BASE = process.env.BASE, BASEONLY = !!process.env.BASEONLY;
+// a 4:5 or 1:1 version: slide the picture (and every mask of it) so the window sits at FR.y0, black (or clear) outside
+const FR = C.frame && +C.frame.h > 0 && +C.frame.h < 1920 && C.frame.expr ? { h: Math.round(+C.frame.h), y0: Math.round(+C.frame.y0 || 0), expr: String(C.frame.expr).replace(/'/g, ''), top: +((C.frame.safe || {}).top || 0) } : null;
+if (FR && !BASE && !BASEONLY) { console.error('cut.json "frame" needs BASE=<the picture> (kit/export-frame.cjs sets it)'); process.exit(1); }
+const slide = clear => (FR && !BASEONLY ? `,crop=1080:${FR.h}:0:'${FR.expr}':exact=1,pad=1080:1920:0:${FR.y0}:color=${clear ? 'black@0' : 'black'}` : '');
 const args = ['-v', 'error', '-y'];
 const f = [];
 let idx = 0;
@@ -128,7 +136,7 @@ segs.forEach((s, i) => {
 if (BASE) {
   f.push(`${segs.map((_, i) => `[a${i}]`).join('')}concat=n=${segs.length}:v=0:a=1[ca]`);
   const b = inp('-i', BASE);
-  f.push(`[${b}:v]${V},scale=1080:1920,setsar=1,tpad=stop_duration=1:stop_mode=clone[g]`);
+  f.push(`[${b}:v]${V},scale=1080:1920,setsar=1${slide()},tpad=stop_duration=1:stop_mode=clone[g]`);
 } else {
   if (trans.some(Boolean)) {
     // named transitions: the outgoing shot holds its last frame for the blend, so every segment still starts on the
@@ -184,12 +192,12 @@ if (C.titles) {
   if (personFile) {
     const p = inp('-i', personFile);
     f.push(`[${pic}][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gt]`,
-      `[${p}:v]format=bgra,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS[pr]`,
+      `[${p}:v]format=bgra,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS${slide(true)}[pr]`,
       `[gt][pr]overlay=format=auto:eof_action=pass[gm]`);
     vcur = 'gm';
   } else if (maskFile) {
     const m = inp('-i', maskFile);
-    f.push(`[${pic}]split[gb][gp]`, `[gb][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gt]`, `[${m}:v]format=gray,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS[mk]`,
+    f.push(`[${pic}]split[gb][gp]`, `[gb][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gt]`, `[${m}:v]format=gray,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS${slide()}[mk]`,
       `[gp][mk]alphamerge[person]`, `[gt][person]overlay=format=auto:eof_action=pass[gm]`);
     vcur = 'gm';
   } else {
@@ -203,7 +211,7 @@ if (panelsOn) {
   f.push(`[${vcur}][${pp}:v]overlay=format=auto:eof_action=pass${offEn}[gpn]`); vcur = 'gpn';
   if (headFile) {
     const hm = inp('-i', headFile);
-    f.push(`[${hm}:v]format=gray,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS[hmk]`, `[gh][hmk]alphamerge[head]`, `[${vcur}][head]overlay=format=auto:eof_action=pass[gph]`);
+    f.push(`[${hm}:v]format=gray,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS${slide()}[hmk]`, `[gh][hmk]alphamerge[head]`, `[${vcur}][head]overlay=format=auto:eof_action=pass[gph]`);
     vcur = 'gph';
   }
 }
@@ -223,8 +231,8 @@ if (panelsOn) {
 let FZ = null; try { FZ = JSON.parse(fs.readFileSync('facezone.json', 'utf8')); } catch {}
 const bands = [];
 if (splitIns.length && splitMask) {
-  if (pmPerson) { const pi = inp('-i', pmPerson); f.push(`[${pi}:v]format=bgra,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS[pq0]`); }
-  else { const mi = inp('-i', pmMask); f.push(`[${mi}:v]format=gray,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS[mq]`, '[gq][mq]alphamerge[pq0]'); }
+  if (pmPerson) { const pi = inp('-i', pmPerson); f.push(`[${pi}:v]format=bgra,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS${slide(true)}[pq0]`); }
+  else { const mi = inp('-i', pmMask); f.push(`[${mi}:v]format=gray,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS${slide()}[mq]`, '[gq][mq]alphamerge[pq0]'); }
   if (splitIns.length === 1) bands.push('pq0'); else { const ls = splitIns.map((_, j) => `pq${j + 1}`); f.push(`[pq0]split=${ls.length}${ls.map(l => `[${l}]`).join('')}`); bands.push(...ls); }
 } else if (splitIns.length && !process.env.MASK_WARNED) console.warn('note: no person mask for the split b-roll; your head stays under the panel instead of over it (kit/mask.py)');
 const chromeFile = g => {
@@ -235,9 +243,10 @@ const chromeFile = g => {
 (C.inserts || []).forEach((s, k) => {
   const a0 = +s.at, d = +s.dur, i0 = +(s.in || 0), place = SPL.PLACES.includes(s.place) ? s.place : 'full';
   const still = s.image === true || /\.(jpe?g|png|webp)$/i.test(String(s.file));
-  const g = SPL.layout({ ...s, place }, SPL.faceOver(FZ, a0, d), { mask: splitMask });
+  const g = SPL.layout({ ...s, place }, SPL.faceOver(FZ, a0, d), { mask: splitMask, frame: FR });
   const pw = Math.round((+s.pipW || 460) / 2) * 2, ph = Math.round(pw * 9 / 32) * 2;
-  const [W, H] = g ? [g.panel.w, g.panel.h] : place === 'pip' ? [pw, ph] : [1080, 1920];
+  // full b-roll fills the frame it is shown in: the whole reel, or the 4:5 or 1:1 window
+  const [W, H] = g ? [g.panel.w, g.panel.h] : place === 'pip' ? [pw, ph] : [1080, FR ? FR.h : 1920];
   const n = still ? inp('-loop', '1', '-framerate', '24', '-t', (d + 0.5).toFixed(3), '-i', s.file) : inp('-i', s.file);
   const fit = still ? `scale=${Math.round(W * 1.1 / 2) * 2}:${Math.round(H * 1.1 / 2) * 2}:force_original_aspect_ratio=increase,crop=${Math.round(W * 1.1 / 2) * 2}:${Math.round(H * 1.1 / 2) * 2},zoompan=z='1+0.08*on/${Math.max(1, Math.round(d * 24))}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=24`
     : `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`;
@@ -254,8 +263,8 @@ const chromeFile = g => {
     return `hv${k}`;
   };
   if (g && place === 'top') {
-    const y = 960 - g.dy, sh = `color=c=black:s=1080x36:r=24:d=${(d + 0.1).toFixed(3)},format=rgba,${SPL.shadowGeq()},setpts=PTS+${a0}/TB[shd${k}]`;
-    f.push(`[${vcur}]split[vs${k}a][vs${k}b]`, `[vs${k}b]crop=1080:960:0:${y}[spk${k}]`, `[vs${k}a][spk${k}]overlay=0:960:${on}[vt${k}]`, `[vt${k}][ins${k}]overlay=0:0:eof_action=pass:${on}[vp${k}]`, sh, `[vp${k}][shd${k}]overlay=0:960:format=auto:eof_action=pass:${on}[vq${k}]`);
+    const seam = g.seam, y = seam - g.dy, sh = `color=c=black:s=1080x36:r=24:d=${(d + 0.1).toFixed(3)},format=rgba,${SPL.shadowGeq()},setpts=PTS+${a0}/TB[shd${k}]`;
+    f.push(`[${vcur}]split[vs${k}a][vs${k}b]`, `[vs${k}b]crop=1080:${g.panel.h}:0:${y}[spk${k}]`, `[vs${k}a][spk${k}]overlay=0:${seam}:${on}[vt${k}]`, `[vt${k}][ins${k}]overlay=0:${g.panel.y}:eof_action=pass:${on}[vp${k}]`, sh, `[vp${k}][shd${k}]overlay=0:${seam}:format=auto:eof_action=pass:${on}[vq${k}]`);
     vcur = band(`vq${k}`, false);
   } else if (g && place === 'frame') {
     const ch = inp('-loop', '1', '-framerate', '24', '-t', (d + 0.1).toFixed(3), '-i', chromeFile(g));
@@ -263,9 +272,9 @@ const chromeFile = g => {
       `[vt${k}][ins${k}]overlay=${g.panel.x}:${g.panel.y}:eof_action=pass:${on}[vp${k}]`, `[${ch}:v]format=rgba,setpts=PTS+${a0}/TB[chr${k}]`, `[vp${k}][chr${k}]overlay=0:0:format=auto:eof_action=pass:${on}[vq${k}]`);
     vcur = band(`vq${k}`, true);
   } else if (place === 'pip') {
-    const x = s.pipX != null ? Math.round(+s.pipX) : 1080 - pw - 8 - 44, y = s.pipY != null ? Math.round(+s.pipY) : 170;
+    const x = s.pipX != null ? Math.round(+s.pipX) : 1080 - pw - 8 - 44, y = FR ? Math.round(FR.y0 + (s.pipY != null ? +s.pipY * FR.h / 1920 : FR.top + 30)) : s.pipY != null ? Math.round(+s.pipY) : 170;
     f.push(`[${vcur}][ins${k}]overlay=${x}:${y}:eof_action=pass:${on}[vi${k}]`); vcur = `vi${k}`;
-  } else { f.push(`[${vcur}][ins${k}]overlay=eof_action=pass:${on}[vi${k}]`); vcur = `vi${k}`; }
+  } else { f.push(`[${vcur}][ins${k}]overlay=0:${FR ? FR.y0 : 0}:eof_action=pass:${on}[vi${k}]`); vcur = `vi${k}`; }
 });
 for (const l of bands) f.push(`[${l}]nullsink`);
 // The caption layer and the glitch shake go on in a second pass when there are captions. In one graph, the caption

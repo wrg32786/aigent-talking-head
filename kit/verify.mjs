@@ -34,15 +34,18 @@ const name = argv.find((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i
 if (!name) { console.error('Usage: npm run verify -- <job> [--file reel.mp4]'); process.exit(1); }
 let job = resolve(opt('jobs', join(ROOT, 'jobs')), name);
 if (!existsSync(job) && existsSync(resolve(name))) job = resolve(name);
-const build = join(job, 'build');
+// a 4:5 or 1:1 version is its own build (jobs/<job>/build-<name>/, kit/export-frame.cjs): its layout, face check and
+// window are checked there, against its own file (reel-vN-feed-4x5.mp4, reel-vN-square-1x1.mp4)
+const XBUILD = EXN && X.isReframed(EXN) && existsSync(join(job, 'build-' + EXN, 'cut.json'));
+const build = XBUILD ? join(job, 'build-' + EXN) : join(job, 'build');
 if (!existsSync(join(build, 'cut.json'))) { console.error('No ' + join(build, 'cut.json')); process.exit(1); }
 const sh = (c, a) => execFileSync(c, a, { stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 << 20 }).toString();
 const stderrOf = (c, a) => String(spawnSync(c, a, { encoding: 'utf8', maxBuffer: 64 << 20 }).stderr || '');
 
 let file = opt('file');
 if (!file) {
-  const reels = readdirSync(job).filter(f => (EXN ? new RegExp(`^reel(-fx)?-v\\d+-${EXN}\\.mp4$`) : /^reel(-fx)?-v\d+\.mp4$/).test(f)).map(f => join(job, f)).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
-  if (!reels.length) { console.error(EXN ? `No reel-vN-${EXN}.mp4 in ${job} (npm run export -- ${name} --export ${EXN})` : 'No reel-vN.mp4 in ' + job); process.exit(1); }
+  const reels = readdirSync(job).filter(f => (EXN ? new RegExp(`^reel(-fx)?-v\\d+-(${EXN}|${X.suffixOf(EXN)})\\.mp4$`) : /^reel(-fx)?-v\d+\.mp4$/).test(f)).map(f => join(job, f)).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+  if (!reels.length) { console.error(EXN ? `No reel-vN-${X.suffixOf(EXN)}.mp4 in ${job} (npm run export -- ${name} --export ${EXN})` : 'No reel-vN.mp4 in ' + job); process.exit(1); }
   file = reels[0];
 }
 file = resolve(file);

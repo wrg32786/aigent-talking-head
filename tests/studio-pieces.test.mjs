@@ -68,7 +68,7 @@ try {
     const o = await req('/api/outputs');
     assert.deepStrictEqual(o.versions.map(x => x.v), [2, 1]);
     assert.strictEqual(o.versions[0].settings.look, 'Mint Kinetic'); assert.strictEqual(o.versions[1].settings, null, 'v1 was made before settings');
-    assert.deepStrictEqual(o.versions[0].files.map(f => f.label), ['Reel', 'Export tiktok']);
+    assert.deepStrictEqual(o.versions[0].files.map(f => f.label), ['For Reels and Stories', 'For TikTok, a smaller file']);
     assert.strictEqual(o.versions[0].reopen, false, 'no snapshot, so it cannot re-open'); assert.ok(!o.jobs, 'This video only');
     const a = await req('/api/outputs?all=1'); const other = a.jobs.find(j => j.job === OTHER); assert.ok(other && other.versions === 1, JSON.stringify(a.jobs));
   });

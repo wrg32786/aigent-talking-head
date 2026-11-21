@@ -8,9 +8,9 @@
 import assert from 'assert';
 import http from 'http';
 import { spawn, spawnSync } from 'child_process';
-import { mkdirSync, mkdtempSync, rmSync } from 'fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
-import { join, dirname } from 'path';
+import { join, dirname, relative } from 'path';
 import { fileURLToPath } from 'url';
 import { chromium } from 'playwright-core';
 import { findChrome } from '../kit/chrome.mjs';
@@ -44,7 +44,12 @@ const mock = http.createServer((req, res) => {
   });
 });
 await new Promise(r => mock.listen(0, '127.0.0.1', r)); const M = `http://127.0.0.1:${mock.address().port}`;
-const env = { ...process.env, CI: '1', STUDIO_DIR: join(TMP, 'studio'), STUDIO_CHAT: '', BUFFER_API_KEY: '', R2_ACCESS_KEY_ID: '', R2_SECRET_ACCESS_KEY: '', CLOUDINARY_API_KEY: '', CLOUDINARY_API_SECRET: '',
+// a stand-in for kit/export.mjs (the engine tests cover the real one): it writes a small 4:5 file beside the reel
+const STUB = join(TMP, 'export-stub.mjs');
+writeFileSync(STUB, `import { spawnSync } from 'child_process'; import { createRequire } from 'module';
+const X = createRequire(import.meta.url)(${JSON.stringify(join(ROOT, 'kit', 'exports.cjs'))}), a = process.argv.slice(2), ex = a[a.indexOf('--export') + 1], file = a[a.indexOf('--file') + 1], out = X.outName(file, ex);
+spawnSync('ffmpeg', ['-y', '-v', 'error', '-i', file, '-t', '6', '-vf', 'crop=360:450:0:60', '-c:v', 'libx264', '-preset', 'ultrafast', '-c:a', 'aac', '-pix_fmt', 'yuv420p', out]); console.log(JSON.stringify({ ok: true, export: ex, file: out }));\n`);
+const env = { ...process.env, CI: '1', STUDIO_EXPORT: relative(ROOT, STUB), STUDIO_DIR: join(TMP, 'studio'), STUDIO_CHAT: '', BUFFER_API_KEY: '', R2_ACCESS_KEY_ID: '', R2_SECRET_ACCESS_KEY: '', CLOUDINARY_API_KEY: '', CLOUDINARY_API_SECRET: '',
   STUDIO_API_BASE_BUFFER: M + '/gql', STUDIO_API_BASE_R2: M + '/r2', STUDIO_API_BASE_PUBLIC: M + '/pub' };
 const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), '--port', '0', '--no-open'], { cwd: ROOT, env });
 const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out.slice(-400)))); });
@@ -105,10 +110,36 @@ try {
     assert.match(await pg.textContent('#post-result li[data-id="ch-fb"]'), /1 min 30 s/);
     await snap(pg, 'post-send-dark.png');
   });
+  await t('Instagram Feed: the note says which file goes where; Feed asks for the 4:5, one button makes it, and the Feed draft gets that file', async () => {
+    await pg.click('#post-back-channels'); await pg.waitForSelector('#post-where');
+    assert.strictEqual((await pg.textContent('#post-where p')).trim(), 'Reels and Stories get the 9:16 file. The Instagram Feed gets the 4:5 file.');
+    assert.strictEqual(await pg.$('#post-make-feed'), null, 'no button until a channel posts to the Feed');
+    assert.deepStrictEqual(await pg.$$eval('#post-place-ch-ig [role="radio"]', x => x.map(b => [b.textContent, b.getAttribute('aria-checked')])), [['Reels', 'true'], ['Feed', 'false']]);
+    assert.strictEqual(await pg.$('#post-place-ch-fb'), null, 'only Instagram has the choice');
+    assert.match(await pg.textContent('.post-ch-list li[data-id="ch-ig"] .pc-file'), /Gets reel-v1\.mp4/);
+    await pg.click('#post-place-ch-ig [data-place="feed"]'); await pg.waitForSelector('#post-make-feed');
+    assert.strictEqual((await pg.textContent('#post-make-feed')).trim(), 'Make the 4:5 version for the Feed');
+    await pg.waitForSelector('.post-ch-list li[data-id="ch-ig"] >> text=Will be skipped'); assert.match(await pg.textContent('.post-ch-list li[data-id="ch-ig"] .pc-file'), /Needs the 4:5 version/);
+    await pg.locator('#post-where').scrollIntoViewIfNeeded(); await snap(pg, 'post-feed-make-dark.png');
+    await pg.click('#post-make-feed'); await pg.waitForSelector('#post-feed-file', { timeout: 60000 });
+    assert.strictEqual(await pg.textContent('#post-feed-file'), 'reel-v1-feed-4x5.mp4'); assert.ok(existsSync(join(jobDir, 'reel-v1-feed-4x5.mp4')));
+    await pg.waitForSelector('#post-make-feed', { state: 'detached' }); await pg.waitForSelector('.post-ch-list li[data-id="ch-ig"] >> text=Will be skipped', { state: 'detached' });
+    assert.match(await pg.textContent('.post-ch-list li[data-id="ch-ig"] .pc-file'), /Gets reel-v1-feed-4x5\.mp4 \(4:5\)/);
+    assert.strictEqual(await pg.inputValue('#post-reel-pick'), `jobs/${JOB}/reel-v1.mp4`, 'the reel stays picked; the 4:5 is listed with its label');
+    assert.match(await pg.textContent('#post-reel-pick'), /reel-v1-feed-4x5\.mp4 \(For the Instagram Feed\)/);
+    await snap(pg, 'post-feed-note-dark.png');
+    await pg.click('#post-next-send'); await pg.waitForSelector('#post-send-go');
+    assert.match(await pg.textContent('#post-summary'), /reel-v1-feed-4x5\.mp4 to the Instagram Feed, reel-v1\.mp4 everywhere else/);
+    assert.strictEqual((await pg.textContent('#post-send-go')).trim(), 'Send to Buffer as drafts');
+    const n0 = posts.length; await pg.click('#post-send-go'); await pg.waitForFunction(n => document.querySelector('#post-result li[data-id="ch-ig"]') && /Feed, reel-v1-feed-4x5\.mp4/.test(document.querySelector('#post-result li[data-id="ch-ig"]').textContent), n0, { timeout: 60000 });
+    const sent = posts.slice(n0), ig = sent.find(p => p.channelId === 'ch-ig'), tt = sent.find(p => p.channelId === 'ch-tt');
+    assert.ok(sent.every(p => p.saveToDraft === true), 'drafts only'); assert.strictEqual(ig.metadata.instagram.type, 'post'); assert.notStrictEqual(ig.assets[0].video.url, tt.assets[0].video.url, 'the Feed got its own file');
+  });
   await t('light theme: the view reads in brand cream', async () => {
     await pg.evaluate(() => localStorage.setItem('studio.theme', 'light')); await pg.reload({ waitUntil: 'domcontentloaded' });
     await pg.waitForSelector('.post-ch-list li[data-id="ch-ig"]');
     assert.strictEqual(await pg.evaluate(() => document.documentElement.dataset.theme), 'light');
+    await pg.click('#post-place-ch-ig [data-place="feed"]'); await pg.waitForSelector('#post-feed-file'); await snap(pg, 'post-feed-note-light.png'); await pg.click('#post-place-ch-ig [data-place="reel"]');
     await snap(pg, 'post-channels-light.png');
     await pg.click('#post-part-connect'); await pg.waitForSelector('#post-buffer'); await snap(pg, 'post-connect-light.png');
     await pg.click('#post-part-send'); await pg.waitForSelector('#post-send-go'); await snap(pg, 'post-send-light.png');

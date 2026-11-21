@@ -192,3 +192,24 @@ main[data-step="render"][data-view="main"] { animation: step-in-10 var(--motion-
 .post-nav { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
 #post-empty { padding: 28px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 @media (max-width: 640px) { .post-card { padding: 12px; } .post-res-list li { grid-template-columns: 18px 1fr; } .post-res-list li .fine { grid-column: 2; } }
+/* sizes: one calm row of checkboxes under Render; the file labels on each output; where each file goes on Post */
+.sizes-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; padding: 10px 16px; margin: 10px 0 14px; border-radius: var(--card-radius, var(--radius-lg)); }
+.outputs { align-items: start; }
+.outputs figure[data-size="4:5"] video { aspect-ratio: 4 / 5; }
+.outputs figure[data-size="1:1"] video { aspect-ratio: 1; }
+.outputs figcaption .out-name { white-space: normal; }
+.sizes-row .lbl { margin: 0; }
+.size-opt { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; cursor: pointer; min-height: 32px; }
+.size-opt input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--primary); margin: 0; }
+.size-opt.locked { cursor: default; }
+.size-opt.locked input { opacity: .75; }
+.size-opt:has(input:disabled):not(.locked) { opacity: .6; cursor: default; }
+.out-name { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.out-name .out-use { font-weight: 600; font-size: 13.5px; }
+.out-name small { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.post-where { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 10px; padding: 8px 12px; border-radius: var(--radius); background: color-mix(in srgb, var(--primary) 8%, transparent); border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent); }
+.post-where > svg { width: 16px; height: 16px; flex: none; color: var(--primary); }
+.post-where p { margin: 0; flex: 1; min-width: 220px; color: var(--foreground); }
+.post-ch-list .pc-place { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 8px; padding-left: 28px; }
+.post-ch-list .pc-place .seg button { min-height: 28px; padding: 2px 12px; font-size: 12.5px; }
+@media (pointer: coarse) { .size-opt { min-height: 44px; } .post-ch-list .pc-place .seg button { min-height: 44px; } }
