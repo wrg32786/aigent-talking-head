@@ -1053,7 +1053,7 @@ try {
       ['Studio Cut step in Chrome: footage player, output picker, cut timeline, batch render, pull script (tests/studio-cut.e2e.mjs)', 'studio-cut.e2e.mjs'],
       ['Studio B-roll step in Chrome: lane, placements, API keys, stock, cards, ideas, generate and screen recording against mocks, assemble placements (tests/studio-broll.e2e.mjs)', 'studio-broll.e2e.mjs'],
       ['Studio B-roll that picks itself in Chrome: spots after a draft, the first spot too, cards with no key, Add a spot, upload kinds, a raw testimonial cut on whole words and played in the reel, MCP pick_broll, add_spot, add_testimonial (tests/studio-spots.e2e.mjs)', 'studio-spots.e2e.mjs'],
-      ['Studio Pieces and Outputs in Chrome: lines sorted by what they do, Use our best lines, Start over, reorder and drop, your clip drafts on whole words, the Outputs library with Edit this reel and Compare, MCP get_pieces, set_combo, choose_combo, list_outputs (tests/studio-pieces.e2e.mjs)', 'studio-pieces.e2e.mjs'],
+      ['Studio Pieces and Outputs in Chrome: lines sorted by what they do, Use our best lines, Clear my clip, reorder and drop, your clip drafts on whole words, the Outputs library with Edit this reel and Compare, MCP get_pieces, set_combo, choose_combo, list_outputs (tests/studio-pieces.e2e.mjs)', 'studio-pieces.e2e.mjs'],
       ['Studio Look in Chrome: one row of Looks, the reference card, 9 layers with every option once, REF, LOOK and YOU badges, Music and sounds as one layer, Clear reference as one undo, Save as a Look (tests/studio-look.e2e.mjs)', 'studio-look.e2e.mjs'],
       ['Studio settings that rule out others in Chrome: Single word captions turn off a caption entrance with one line and Undo, greyed tiles say why, one click switches, a Look with no titles, No music (tests/studio-conflicts.e2e.mjs)', 'studio-conflicts.e2e.mjs'],
       ['Studio agent and review in Chrome: drag to select on whole words, Note for my agent, Ask my agent with the step, Apply on a suggested change, a note on a stretch of the reel, the wizards, light theme and the phone (tests/studio-agent-ux.e2e.mjs)', 'studio-agent-ux.e2e.mjs'],
@@ -1101,17 +1101,24 @@ try {
     if (diff(frame('plain.mp4', 0.8), frame('tx.mp4', 0.8)) > 2) fail('segment 0 should not be punched');
     writeFileSync(join(b, 'cut.json'), JSON.stringify(cut));
   });
-  step('verify.mjs: ffprobe, loudness, stills + contact sheet, mask alpha, copy lint, overlap, --json; square export', () => {
+  step('verify.mjs: ffprobe, loudness, stills + contact sheet, mask alpha, copy lint, overlap, --json; square crop and the 4:5 Feed version', () => {
     const b = join(work, 'jobs', 'muse', 'build');
     rmSync(join(b, 'captions.js')); run(node, [join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--titles', '--style', 'pill'], b);
     const o = run(node, [join(KIT, 'verify.mjs'), 'muse', '--jobs', join(work, 'jobs'), '--json'], work);
     if (!/VERIFY PASS/.test(o)) fail('verify:\n' + o);
     const vj = JSON.parse(o.trim().split('\n').pop());
     if (!vj.ok || !existsSync(vj.contact) || !/no overlap between graphics, captions and titles/.test(o)) fail('verify --json / overlap check:\n' + o);
-    // export presets: a square export of the same reel is 1080x1080 and checks against its own size
-    const ex = JSON.parse(run(node, [join(KIT, 'export.mjs'), 'muse', '--jobs', join(work, 'jobs'), '--export', 'square', '--json'], work).trim().split('\n').pop());
-    const wh = run('ffprobe', ['-v', 'error', '-select_streams', 'v', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', ex.file]).trim();
-    if (wh !== '1080,1080' || ex.laidOut) fail('square export: ' + wh + ' ' + JSON.stringify(ex));
+    // export presets: the plain square crop of the same reel is 1080x1080 and checks against its own size
+    const probe = f => run('ffprobe', ['-v', 'error', '-select_streams', 'v', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', f]).trim();
+    const ex = JSON.parse(run(node, [join(KIT, 'export.mjs'), 'muse', '--jobs', join(work, 'jobs'), '--export', 'square', '--crop', '--json'], work).trim().split('\n').pop());
+    if (probe(ex.file) !== '1080,1080' || ex.laidOut || !/reel-v\d+-square-1x1\.mp4$/.test(ex.file)) fail('square export: ' + probe(ex.file) + ' ' + JSON.stringify(ex));
+    // the Instagram Feed version (4:5): its own build, the frame on the face, laid out again, 1080x1350, and it verifies
+    const fx = JSON.parse(run(node, [join(KIT, 'export.mjs'), 'muse', '--jobs', join(work, 'jobs'), '--export', 'feed45', '--json'], work).trim().split('\n').pop());
+    if (probe(fx.file) !== '1080,1350' || !fx.reframed || !/reel-v\d+-feed-4x5\.mp4$/.test(fx.file) || fx.faceHits) fail('feed 4:5 export: ' + probe(fx.file) + ' ' + JSON.stringify(fx));
+    if (!existsSync(join(work, 'jobs', 'muse', 'build-feed45', 'window.json'))) fail('feed 4:5 export: no build-feed45/window.json');
+    const fo = run(node, [join(KIT, 'verify.mjs'), 'muse', '--jobs', join(work, 'jobs'), '--export', 'feed45'], work);
+    if (!/VERIFY PASS/.test(fo) || !/1080x1350/.test(fo)) fail('verify --export feed45:\n' + fo);
+    run(node, [join(KIT, 'verify.mjs'), 'muse', '--jobs', join(work, 'jobs'), '--json'], work); // the 9:16 stills again, for the checks below
     const v = join(work, 'jobs', 'muse', 'verify');
     if (!existsSync(join(v, 'contact.png'))) fail('no contact sheet');
     if (readdirSync(v).filter(f => /title-mid/.test(f)).length !== 4 || readdirSync(v).filter(f => /big-punch/.test(f)).length !== 2) fail('verify stills: ' + readdirSync(v));

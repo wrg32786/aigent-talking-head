@@ -17,7 +17,7 @@ export function Stages({ v, id, onRetry }) {
       <summary>{done} of {v.list.length} steps done</summary>
       <ol className="stg-list">
         {v.list.map(x => <li key={x.id} data-state={x.state}><span className="stg-mark" aria-hidden="true">{x.state === 'done' ? <Icon n="check" /> : null}</span>
-          <span>{x.label}</span><span className="sr">{x.state === 'done' ? ', done' : x.state === 'now' ? ', in progress' : x.state === 'failed' ? ', stopped here' : ''}</span></li>)}
+          <span>{x.label}</span>{x.state === 'failed' ? <span className="stg-stop">, stopped here</span> : <span className="sr">{x.state === 'done' ? ', done' : x.state === 'now' ? ', in progress' : ''}</span>}</li>)}
       </ol>
     </details>
   </div>;

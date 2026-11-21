@@ -34,7 +34,7 @@
     { "id": "person", "label": "Person and background", "hint": "Titles behind your head, the room changing around you, you cut out.",
       "include": [{ "section": "title-layer" }, { "section": "editing", "ids": ["place-face"] },
         { "section": "effects", "ids": ["backdrop-word", "spotlight", "rabbit-hole", "red-collage", "pastel-word", "check-pills", "huge-strike", "crayon-write", "led-sign", "orbit", "shortcut-rain", "slow-push"] }] },
-    { "id": "color", "label": "Color and looks", "hint": "Grades, themes and the overall look.",
+    { "id": "color", "label": "Color grades", "hint": "Grades, themes and the overall look.",
       "include": [{ "section": "finishes", "ids": ["warm", "cool", "teal", "crushed", "mono", "bleach"] }, { "section": "effects", "ids": ["moody", "timeline"] }, { "section": "themes" }, { "section": "looks" }] },
     { "id": "overlays", "label": "Overlays and textures", "hint": "Grain, edges, floating layers.",
       "include": [{ "section": "finishes", "ids": ["grain", "vignette", "scan-lines"] }, { "section": "effects", "ids": ["glass-widgets", "shortcut-rain", "noise"] }, { "section": "transitions", "ids": ["light-leak"] }] },

@@ -5,7 +5,7 @@ import { NeedFix } from './Fix.jsx';
 import { copyText } from './Connect.jsx';
 import { api, file, toast, fmtS, cap1, Icon, matchChips } from './lib.jsx';
 import { Compare, Cleanup, Receipt } from './Review.jsx';
-import { Fold } from './ui.jsx';
+import { Fold, Hint } from './ui.jsx';
 
 // What Review and Render share (both stay mounted): the last draft's choices and receipt, the task log and a clock
 // while something runs. One copy, held by the App, so a redraft on Review is what Render sees.
@@ -44,7 +44,7 @@ export function ReviewStep({ CAT, V, s, apply, patch, hidden, run }) {
   if (s.reference.mode === 'recreate' && s.reference.out && s.reference.extracted) notes.unshift('Recreate: we follow the reference, and it sets the look.');
   // a draft is a plan, not a video: say so when it ends, so it never reads like a finished render
   const planReady = t && !running && t.kind === 'draft' && t.status === 'done';
-  const status = stale && !running ? 'Your clips changed since the draft. Draft again first.' : !fin.reel ? 'The reel is switched off under What to make, on Render.' : mine ? ticking : running ? '' : planReady || (isDrafted && !stale) ? 'Plan ready, no video yet. Check it below, then Render.' : t && t.kind === 'draft' ? took : 'A draft is a quick plan of the reel, with no video yet.';
+  const status = stale && !running ? 'Your clips changed since the draft. Draft again first.' : !fin.reel ? 'The reel is switched off under What to make, on Render.' : mine ? ticking : running ? '' : planReady || (isDrafted && !stale) ? 'Draft ready. Check it below, then go to Render.' : t && t.kind === 'draft' ? took : 'A draft is a quick plan of the reel, with no video yet.';
   // only when a reference or a saved look is in use: there is nothing to be close to otherwise
   const guided = !!(s.reference.extracted && s.reference.mode !== 'off') || !!s.styleLook;
   const match = guided ? matchChips(V.match || (V.edit && V.edit.match) || s.match) : [];
@@ -53,7 +53,7 @@ export function ReviewStep({ CAT, V, s, apply, patch, hidden, run }) {
     <header className="sh"><h2 id="h-review">Review</h2><p className="sub">Draft first, check what we picked, then render once.</p></header>
     <NeedFix V={V} ids={['ffmpeg', 'python', 'npm']} what="Drafting" apply={apply} />
     <div className="runbar glass-card" id="draft-bar">
-      <Button id="draft" size="lg" variant={good ? 'secondary' : 'primary'} label={isDrafted || stale ? 'Redraft' : 'Draft'} isDisabled={running || !s.job || (!s.footage.length && !s.clips) || !fin.reel}
+      <Button id="draft" size="lg" variant={good ? 'secondary' : 'primary'} label={isDrafted || stale ? 'Draft again' : 'Draft'} isDisabled={running || !s.job || (!s.footage.length && !s.clips) || !fin.reel}
         onClick={() => { run.clear(); api('/api/draft', {}).then(apply).catch(() => {}); }} />
       {mine && <Button id="cancel" variant="ghost" label="Cancel" onClick={() => api('/api/task/cancel', {}).then(apply)} />}
       <span id="elapsed" className="fine" role="status">{!s.job ? 'Name the reel at the top to start.' : status}</span>
@@ -97,8 +97,13 @@ export function Render({ CAT, V, s, apply, patch, hidden, go, run, openOutputs, 
   const needDraft = fin.reel && (!isDrafted || stale);
   const canRender = !running && !!s.job && !needDraft && (fin.reel || n > 0);
   const what = [fin.reel && 'the reel', fin.clips && n && `${n} clip${n > 1 ? 's' : ''}`, fin.plain && n && 'plain clips'].filter(Boolean);
-  const renderLabel = fin.reel ? `Render v${(V.outputs || []).filter(o => /reel-v\d+\.mp4$/.test(o)).length + 1}` : `Render ${what.join(' and ')}`;
-  const extra = [fin.clips && n ? `${n} clip${n > 1 ? 's' : ''}` : null, fin.plain && n ? 'plain clips' : null, s.export ? `sized for ${s.export}` : null].filter(Boolean);
+  // the version number lives in the file name only: Render the first time, Render again after
+  const renderLabel = fin.reel ? ((V.outputs || []).some(o => /reel-v\d+\.mp4$/.test(o)) ? 'Render again' : 'Render') : `Render ${what.join(' and ')}`;
+  const extra = [fin.clips && n ? `${n} clip${n > 1 ? 's' : ''}` : null, fin.plain && n ? 'plain clips' : null].filter(Boolean);
+  // sizes: the 9:16 is always made; the Feed 4:5 and the square are made in the same run when ticked
+  const SZ = V.sizes || { list: [], on: [], files: {} }, sizeOn = SZ.on || [];
+  const setSize = (id, on) => patch({ sizes: on ? [...sizeOn, id] : sizeOn.filter(x => x !== id) }).catch(() => {});
+  const useOf = o => (SZ.files && SZ.files[o] && SZ.files[o].use) || '';
   return <section className="step" id="s-render" data-step="render" aria-labelledby="h-render" hidden={hidden}>
     <header className="sh"><h2 id="h-render">Render</h2><p className="sub">Full quality, once. This is the only place that makes the video.</p></header>
     <NeedFix V={V} ids={['ffmpeg', 'python', 'chrome', 'npm']} what="Rendering" apply={apply} />
@@ -108,16 +113,22 @@ export function Render({ CAT, V, s, apply, patch, hidden, go, run, openOutputs, 
       {mine && <Button id="cancel" variant="ghost" label="Cancel" onClick={() => api('/api/task/cancel', {}).then(apply)} />}
       <span id="render-status" className="fine" role="status">{!s.job ? 'Name the reel at the top to start.' : needDraft && !running ? <>{stale ? 'Your clips changed since the draft. ' : ''}<button type="button" className="linkish" id="render-to-review" onClick={() => go('review', true)}>Draft it on Review first</button></> : mine ? ticking : running ? `${cap1(t.kind)} running` : t && t.kind === 'render' ? took : outputs.length ? '' : 'Ready when you are.'}</span>
     </div>
+    {fin.reel && SZ.list.length > 0 && <div className="sizes-row glass-card" id="sizes" role="group" aria-labelledby="sizes-l">
+      <span className="lbl" id="sizes-l">Sizes</span>
+      {SZ.list.map(z => <label key={z.id} className={'size-opt' + (z.always ? ' locked' : '')} title={z.always ? 'We always make this one. The other sizes are made from the same edit.' : undefined}>
+        <input type="checkbox" id={'size-' + z.id} checked={!!z.on} disabled={!!z.always || running} onChange={e => setSize(z.id, e.target.checked)} /><span>{z.label}</span></label>)}
+      <Hint id="sizes-hint" label="About sizes">One render makes every size you tick. The Instagram Feed does not take 9:16, so the 4:5 (1080 by 1350) and the square are their own versions: the frame follows your face and the captions are laid out again to fit.</Hint>
+    </div>}
     {mem && !running && <div id="mem-short" className="notes glass-card" role="alert"><p>{mem.message}</p>
       <div className="row">{(mem.options || []).map(o => <Button key={o.id} id={'mem-' + o.id} size="sm" variant={o.id === 'front' ? 'primary' : o.id === 'light' ? 'secondary' : 'ghost'} label={o.label} onClick={() => doRender(o.id)} />)}</div>
       <p className="fine">{(mem.options || []).map(o => `${o.label}: ${o.detail}`).join(' ')}</p></div>}
     {mine && <div id="progress"><ProgressBar label="Render running" isLabelHidden isIndeterminate /></div>}
     <div id="outputs" className="outputs">
-      {outputs.length ? outputs.map(o => <figure key={o} className="glass-card"><video src={file(o) + '?v=' + s.rev + '#t=1.2'} controls preload="metadata" aria-label={o} />
-        <figcaption><span>{o.split('/').pop()}</span>{canReopen.has(o) && <button type="button" className="btn ghost sm" data-reopen={o} disabled={running} onClick={() => reopen(o)}><Icon n="edit" />Edit this reel</button>}<a className="btn ghost sm" href={file(o) + '?download'} download={o.split('/').pop()}><Icon n="download" />Download</a></figcaption></figure>)
+      {outputs.length ? outputs.map(o => <figure key={o} className="glass-card" data-size={(SZ.files && SZ.files[o] && SZ.files[o].size) || '9:16'}><video src={file(o) + '?v=' + s.rev + '#t=1.2'} controls preload="metadata" aria-label={o} />
+        <figcaption><span className="out-name" title={o.split('/').pop()}>{useOf(o) ? <b className="out-use">{useOf(o)}</b> : <small className="fine mono">{o.split('/').pop()}</small>}</span>{canReopen.has(o) && <button type="button" className="btn ghost sm" data-reopen={o} disabled={running} onClick={() => reopen(o)}><Icon n="edit" />Edit this reel</button>}<a className="btn ghost sm" href={file(o) + '?download'} download={o.split('/').pop()}><Icon n="download" />Download</a></figcaption></figure>)
         : <div className="empty-art" id="render-empty"><Icon n="film" /><p>{mine ? 'Rendering. Your reel shows up here when it is done.' : 'Your finished reel shows up here.'}</p></div>}
     </div>
-    {outputs.length > 0 && !running && <div className="row render-next"><Button id="to-post" variant="secondary" label="Post it" icon={<Icon n="send" />} onClick={toPost} /><span className="fine">Send it to Buffer as a draft.</span></div>}
+    {outputs.length > 0 && !running && <div className="row render-next"><Button id="to-post" variant="secondary" label="Post it" icon={<Icon n="send" />} onClick={toPost} /><span className="fine">Each channel gets the size it needs, saved as drafts in Buffer.</span></div>}
     {earlier > 0 && <p className="fine" id="fin-library-note">{earlier} earlier reel{earlier === 1 ? '' : 's'} {earlier === 1 ? 'is' : 'are'} in <button type="button" className="linkish" id="fin-open-outputs" onClick={() => openOutputs && openOutputs()}>Outputs</button>. <button type="button" className="linkish" id="fin-open-new" onClick={() => openNewVideo && openNewVideo()}>New video</button> starts a new job if you want them kept apart.</p>}
     <CutOutputs V={V} s={s} bites={bites} />
     <Fold id="make-fold" title={<>What to make<span className="fine fold-sum" id="make-sum">{[fin.reel ? 'The reel' : null, ...extra].filter(Boolean).join(', ') || 'Nothing yet'}</span></>}>
@@ -126,7 +137,7 @@ export function Render({ CAT, V, s, apply, patch, hidden, go, run, openOutputs, 
           <Chip id="exp-reel" on={fin.reel} label="The reel" onClick={() => setFin({ reel: !fin.reel })} />
           <Chip id="exp-clips" on={fin.clips} disabled={!n} label={n ? `${n} clip${n > 1 ? 's' : ''} on their own` : 'Each clip on its own'} onClick={() => setFin({ clips: !fin.clips })} />
           <Chip id="exp-plain" on={fin.plain} disabled={!n} label="Plain clips, no edit" onClick={() => setFin({ plain: !fin.plain })} />
-          <label className="exp"><span className="lbl">Also sized for</span><select id="export" value={s.export || ''} onChange={e => patch({ export: e.target.value || null })}><option value="">Just the reel</option>{CAT.exports.map(x => <option key={x} value={x}>{x}</option>)}</select></label>
+          <label className="exp"><span className="lbl">Keep text clear of the buttons on</span><select id="export" value={s.export || ''} onChange={e => patch({ export: e.target.value || null })}><option value="">No app in mind</option>{CAT.exports.filter(x => !['feed45', 'square'].includes(x)).map(x => <option key={x} value={x}>{x}</option>)}</select></label>
         </div>
         <p className="fine">{n ? 'Each kept clip also renders as its own reel with the same look, in the same run. Plain clips are just the words you kept, joined.' : 'These come from the clips you keep on the Cut step.'}</p>
       </div>
@@ -136,7 +147,7 @@ export function Render({ CAT, V, s, apply, patch, hidden, go, run, openOutputs, 
   </section>;
 }
 
-// Under Review and Render: the task log and the same reel as an instruction for your agent, both closed
+// Under Review and Render: one closed fold, Details, with the same reel as an instruction for your agent and the task log
 export function RunFoot({ V, s, log }) {
   const c = V.compose, logRef = useRef(null);
   useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [log]);
@@ -144,9 +155,9 @@ export function RunFoot({ V, s, log }) {
   // the reel as an instruction for an agent (Copy in the For your agent fold); the page never shows the command
   const forAgent = `In my aigent-talking-head folder, make this reel by running npm run reel -- ${src} --name ${s.job || '<job>'} --draft ${(c.args || []).map(a => /[\s;]/.test(a) ? JSON.stringify(a) : a).join(' ')} and tell me when it is done.`;
   return <div className="step run-foot" id="run-foot">
-    <Fold id="log-fold" title="Log"><pre id="log" className="log" aria-live="off" ref={logRef}>{log}</pre></Fold>
-    <Fold id="cmd-fold" title="For your agent"><div className="row" id="cmd"><span className="fine grow">Your agent can make this same reel from its terminal.</span>
-      <Button id="cmd-copy" size="sm" variant="secondary" label="Copy for my agent" icon={<Icon n="copy" />} onClick={() => copyText(forAgent, 'Copied. Paste it into your agent.')} /></div></Fold>
+    <Fold id="details-fold" title="Details"><div className="row" id="cmd"><span className="fine grow">Your agent can make this same reel.</span>
+      <Button id="cmd-copy" size="sm" variant="secondary" label="Copy for my agent" icon={<Icon n="copy" />} onClick={() => copyText(forAgent, 'Copied. Paste it into your agent.')} /></div>
+      <span className="lbl" id="log-l">What ran</span><pre id="log" className="log" aria-live="off" aria-labelledby="log-l" ref={logRef}>{log}</pre></Fold>
   </div>;
 }
 

@@ -40,6 +40,7 @@ import * as SLK from './stylelooks.mjs';
 import { mount as mountFolders } from './folders.mjs';
 import { mountScenes } from './scene-routes.mjs';
 import { mount as mountPost } from './post-api.mjs';
+import * as SIZES from './sizes.mjs';
 
 const require = createRequire(import.meta.url);
 const SNAP = require('../snapshots.cjs');
@@ -146,7 +147,7 @@ function view(s) {
   let edit = null; try { edit = editOf(s, { combo, cut, broll }); } catch (e) { edit = { error: e.message }; }
   let look = null; try { look = lookSources(s); } catch {}
   const outputs = C.outputsOf(s), currentOutputs = currentOutputsOf(s);
-  return { seq: ++viewSeq, boot: BOOT, scenes: C.catalog().scenesSig || '', state: s, look, compose: comp, outputs, currentOutputs, draftPreview: draftPreviewOf(s), match: matchOf(s), styleLooks: SLK.list(), reopenable, scripts, cut, broll, pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: noTimeline(s) ? null : swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
+  return { seq: ++viewSeq, boot: BOOT, scenes: C.catalog().scenesSig || '', state: s, look, compose: comp, outputs, currentOutputs, sizes: SIZES.viewOf(s, outputs), draftPreview: draftPreviewOf(s), match: matchOf(s), styleLooks: SLK.list(), reopenable, scripts, cut, broll, pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: noTimeline(s) ? null : swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
 }
 
 // Copy the look (kit/studio/stylelooks.mjs): the reference's timeline is not used, so no "what to swap" and no spots from it
@@ -301,7 +302,7 @@ function renderSteps(s) {
   const comp = C.compose(s, { refPack: refPackName(s) });
   const args = ['--rebuild', '--name', s.job, '--json'];
   if (comp.lockString && comp.lockString !== s.lockedAtDraft) args.push('--lock', comp.lockString);
-  if (s.export) args.push('--export', s.export);
+  { const ex = SIZES.exportArg(s); if (ex) args.push('--export', ex); }
   // the b-roll lane goes into cut.json first (kit/studio/broll-run.mjs), with credits.txt for the clips it uses
   const bp = BRL.plan(s), steps = [];
   if (bp) { const f = join('jobs', s.job, 'broll.json'); writeFileSync(join(ROOT, f), JSON.stringify(bp, null, 1)); steps.push(['kit/studio/broll-run.mjs', ['apply', '--name', s.job, '--plan', f]]); }
@@ -647,6 +648,14 @@ function exportSteps(s, combo0, { clips, plain }) {
 // shows it; MCP get_edit reads it)
 // how many pieces the user sees: a Combo's back to back lines play as one range but count one each
 const pieceN = combo => combo.pieces.reduce((a, x) => a + (x.kind === 'piece' && x.lines ? x.lines.length : 1), 0);
+// the From part of Your edit, said one way: "our 4 best lines, 11 s" when they are our pick, "your 4 lines, 11 s"
+// when you chose or changed them, "4 lines, 11 s, picked by <agent>" when an agent did
+function fromText(s, combo) {
+  const own = combo.pieces.some(x => x.kind === 'piece'), n = own ? pieceN(combo) : combo.pieces.length, secs = `${Math.round(combo.seconds)} s`;
+  if (!own) return `${n} clip${n === 1 ? '' : 's'}, ${secs}`;
+  const by = piecesState(s, combo.source).by, lines = `line${n === 1 ? '' : 's'}`;
+  return by === 'ai' ? `our ${n} best ${lines}, ${secs}` : !by || by === 'you' || by === 'ai, changed by you' ? `your ${n} ${lines}, ${secs}` : `${n} ${lines}, ${secs}, picked by ${by}`;
+}
 function editOf(s, v) {
   const combo = v.combo, o = outputOf(s), cut = v.cut || {}, from = draftFrom(s, combo), fin = { ...C.defaultState().finish, ...(s.finish || {}) };
   const fmt = (CUT.FORMATS[o.format] || {}).label || o.format, aspect = CUT.aspectOf(o);
@@ -660,8 +669,8 @@ function editOf(s, v) {
   const next = !takes && !s.clips ? { step: 'footage', label: 'Add footage' } : !s.job ? { step: 'footage', label: 'Name the reel' } : !drafted && fin.reel ? { step: 'finish', label: 'Draft it' } : { step: 'finish', label: 'Render' };
   return {
     making: { text: making, format: fmt, aspect, goal: o.goal, length: (cut.summary && cut.summary.length) || null },
-    from: { takes, source: src, seconds: from === 'pieces' ? combo.seconds : (cut.seconds || null), mode: from, pieces: combo.pieces.length, text: from === 'pieces' ? `${(() => { const own = combo.pieces.some(x => x.kind === 'piece'), n = own ? pieceN(combo) : combo.pieces.length, w = own ? 'line' : 'clip'; return `${n} ${w}${n === 1 ? '' : 's'}`; })()}, ${Math.round(combo.seconds)} s, in your order${(() => { const by = piecesState(s, combo.source).by; return by && combo.pieces.some(x => x.kind === 'piece') ? (by === 'ai' ? ', our pick' : by === 'you' ? ', built by you' : `, ${by === 'ai, changed by you' ? 'our pick, changed by you' : 'set by ' + by}`) : ''; })()}` : takes ? `the whole take${takes > 1 ? ` (${takes} files)` : ''}` : 'no footage yet' },
-    look: { pack: s.pack || null, reference: ref, styleLook, picks, text: [styleLook ? `style look ${styleLook}` : s.pack || 'Studio picks', ref ? `reference (${ref === 'look' ? 'copy the look' : ref})` : null, picks ? `${picks} change${picks === 1 ? '' : 's'} by you` : null].filter(Boolean).join(', ') },
+    from: { takes, source: src, seconds: from === 'pieces' ? combo.seconds : (cut.seconds || null), mode: from, pieces: combo.pieces.length, text: from === 'pieces' ? fromText(s, combo) : takes ? `the whole take${takes > 1 ? ` (${takes} files)` : ''}` : 'no footage yet' },
+    look: { pack: s.pack || null, reference: ref, styleLook, picks, text: [styleLook ? `style look ${styleLook}` : s.pack || 'No Look', ref ? `reference (${ref === 'look' ? 'copy the look' : ref})` : null, picks ? `${picks} change${picks === 1 ? '' : 's'} by you` : null].filter(Boolean).join(', ') },
     broll: { spots, ideas: ((v.broll && v.broll.beats) || []).filter(b => b.idea && !b.slot).length, cutins: combo.pieces.filter(x => x.kind === 'testimonial').length, text: [spots ? `${spots} spot${spots === 1 ? '' : 's'}` : 'none yet', combo.pieces.some(x => x.kind === 'testimonial') ? `${combo.pieces.filter(x => x.kind === 'testimonial').length} testimonial` : null].filter(Boolean).join(', ') },
     sound: { bed: s.music.bed, sfx: s.sound.sfx, text: `${s.music.bed === 'auto' ? 'Music picked for you' : s.music.bed === 'none' ? 'No music' : s.music.bed}, sounds ${s.sound.sfx}` },
     drafted: !!drafted, stale: !!(s.drafted && !drafted && fin.reel), next,
@@ -673,10 +682,10 @@ function editOf(s, v) {
 // Combo's pieces and the files), so a version can say how it was made long after the session moved on.
 function saveSettings(s) {
   const dir = join(ROOT, 'jobs', s.job || '-'); let v = 0; try { v = Math.max(0, ...readdirSync(dir).map(f => +(f.match(/^reel-v(\d+)\.mp4$/) || [0, 0])[1])); } catch {} if (!v) return null;
-  const vw = view(s), e = vw.edit, combo = vw.combo, files = C.outputsOf(s).filter(f => new RegExp(`reel(-fx)?-v${v}(-[a-z0-9]+)?\\.mp4$`).test(f));
+  const vw = view(s), e = vw.edit, combo = vw.combo, files = C.outputsOf(s).filter(f => (SIZES.info(f) || {}).v === v);
   const key = draftKey(s), footage = C.footageKey(s), takes = C.takeNames(s);
   const out = { version: v, at: new Date().toISOString(), job: s.job, key, footage, takes, making: e.making.text, format: e.making.format, look: e.look.text, pack: s.pack || null, reference: e.look.reference, from: e.from.text, pieces: combo.pieces.map(x => ({ id: x.id, kind: x.kind, label: x.label, seconds: x.seconds, lines: x.lines || null })), count: pieceN(combo), seconds: combo.seconds,
-    broll: e.broll.text, sound: e.sound.text, export: s.export || null, files };
+    broll: e.broll.text, sound: e.sound.text, export: s.export || null, sizes: SIZES.sizesOf(s), files };
   try { writeFileSync(join(dir, `reel-v${v}.settings.json`), JSON.stringify(out, null, 1)); } catch {}
   const metaF = join(dir, `reel-v${v}.build`, 'meta.json');
   if (existsSync(metaF)) { try { const meta = JSON.parse(readFileSync(metaF, 'utf8')); writeFileSync(metaF, JSON.stringify({ ...meta, key, footage, takes, from: out.from }, null, 1) + '\n'); } catch {} }
@@ -731,9 +740,9 @@ function versionsOf(job, s = null) {
   const vs = [...new Set(files.map(f => +(f.match(/reel(?:-fx)?-v(\d+)[^/]*$/) || [0, 0])[1]).filter(Boolean))].sort((a, b) => b - a);
   return vs.map(v => { const ident = C.outputIdentity(job, v); let st = ident.settings;
 
-    const fs_ = files.filter(f => new RegExp(`/reel(-fx)?-v${v}(-[a-z0-9]+)?\\.mp4$`).test(f)), main = fs_.find(f => new RegExp(`/reel-v${v}\\.mp4$`).test(f)) || fs_[0];
+    const fs_ = files.filter(f => (SIZES.info(f) || {}).v === v), main = fs_.find(f => new RegExp(`/reel-v${v}\\.mp4$`).test(f)) || fs_[0];
     let at = null; try { at = statSync(join(ROOT, main)).mtime.toISOString(); } catch {}
-    return { v, reel: main, files: fs_.map(f => ({ path: f, label: /-fx-/.test(f) ? 'With effects' : new RegExp(`-v${v}\\.mp4$`).test(f) ? 'Reel' : 'Export ' + (f.match(/-v\d+-([a-z0-9]+)\.mp4$/) || [0, ''])[1] })).sort((a, b) => (a.label === 'Reel' ? 0 : a.label === 'With effects' ? 1 : 2) - (b.label === 'Reel' ? 0 : b.label === 'With effects' ? 1 : 2) || a.path.localeCompare(b.path)), at: (st && st.at) || at, seconds: main ? +(durOf(main) || 0).toFixed(1) || null : null,
+    return { v, reel: main, files: fs_.map(f => ({ path: f, label: SIZES.labelOf(f), size: (SIZES.info(f) || {}).size || null })).sort((a, b) => (r => r(a) - r(b))(x => x.path === main ? 0 : x.label === 'With effects' ? 1 : 2) || a.path.localeCompare(b.path)), at: (st && st.at) || at, seconds: main ? +(durOf(main) || 0).toFixed(1) || null : null,
       settings: st, reopen: !!(snaps[v] && snaps[v].snapshot),
       take: (ident.takes && ident.takes.length ? ident.takes.join(', ') : null), draft: ident.from || (st && st.from) || null, key: ident.key || null,
       current: !!(s && s.job === job && C.outputMatchesDraft(s, ident, draftKey(s))) }; });
@@ -903,6 +912,8 @@ const sceneApi = mountScenes({ json, readBody, update, chromeOk });
 const FOLDERS = mountFolders({ ROOT, json, readBody, extraFolders: () => { const st = S.load(); return [st.downloads, st.renders, st.broll && st.broll.library, join(ROOT, 'teardown-in', 'studio'), join(ROOT, 'jobs')]; },
   ensure: [join(ROOT, 'teardown-in', 'studio'), join(ROOT, 'jobs')] });
 const POSTR = mountPost({ ROOT, C, json, readBody });
+// sizes: make the 4:5 or 1:1 of a finished reel (kit/studio/sizes.mjs)
+const SIZER = SIZES.mount({ ROOT, C, json, readBody, runTask: (...a) => runTask(...a), needFor: k => needFor(k) });
 // the reference's b-roll parts, on its own clock as a fraction of its length, become spots (kit/studio/lane.mjs spots)
 // A Recreate draft re-cut to the reference's shots gives its cutaways on the draft's own clock: build/plan.json
 // shots first, else cut.json refShots (kit/recreate.cjs shotsOf).
@@ -1079,6 +1090,7 @@ async function api(req, res, u) {
   if (await FOLDERS(p, M, u, req, res)) return;
   if (await BRL.route(p, M, u, req, res)) return;
   if (await POSTR.route(p, M, u, req, res)) return;
+  if (await SIZER.route(p, M, u, req, res)) return;
   if (p === '/api/lines' && M === 'GET') return json(res, 200, await linesView(C.load(), u.searchParams.get('path')));
   if (p === '/api/lines' && M === 'POST') { const b = await readBody(req); const r = await editLines(b); return json(res, 200, { lines: r.view, ...view(r.s) }); }
   if (p === '/api/lines/render' && M === 'POST') {
@@ -1233,7 +1245,7 @@ async function api(req, res, u) {
     const s1 = C.load(); return json(res, 200, { ...view(s1), pieces: piecesOf(s1, rel), note });
   }
   if (p === '/api/outputs' && M === 'GET') return json(res, 200, outputsLib(C.load(), u.searchParams.get('all') === '1'));
-  if (p === '/api/edit' && M === 'GET') { const v = view(C.load()); return json(res, 200, { edit: v.edit, combo: v.combo, point: v.state.point || '', finish: v.state.finish, referenceMode: v.state.reference.mode, styleLook: v.state.styleLook || null, styleLooks: v.styleLooks, match: v.match }); }
+  if (p === '/api/edit' && M === 'GET') { const v = view(C.load()); return json(res, 200, { edit: v.edit, combo: v.combo, point: v.state.point || '', finish: v.state.finish, sizes: v.sizes.list.filter(z => z.on).map(z => ({ size: z.size, for: z.use, file: SIZES.nameOf(z.id) })), referenceMode: v.state.reference.mode, styleLook: v.state.styleLook || null, styleLooks: v.styleLooks, match: v.match }); }
   if (p === '/api/render' && M === 'POST') {
     // the one Render: the reel (from the draft), and in the same run the exports you ticked in Finish: each piece as its
     // own reel (clips) or as a plain clip (plain). Body { exports: { reel, clips, plain } } overrides finish for this run.

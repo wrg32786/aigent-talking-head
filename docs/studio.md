@@ -39,7 +39,7 @@ Two steps have a second view, behind a small switch above the step. **Picture** 
 | `#step=post` | Render, on Post |
 | `#menu=<layer>` | the step that owns the layer, with that layer open (`#menu=music` opens Music and sounds, `#menu=captions` opens Text and graphics) |
 
-**Your edit.** One quiet line above every step says what you are making (one reel, clips, plain clips; the aspect), from what (your N pieces in your order, or the whole take), the look, the b-roll spots and the sound, and offers the next action (Draft it, which opens Review, or Render). Click a part to open its step: the look opens Picture and the sound opens Music and sounds. With a reference in use the look part says `Recreating <name>` or `The look of <name>, your words`. When you change your pieces after a draft it says so. Agents read the same thing with `get_edit` (`GET /api/edit`). The chat sits on the right (behind the chat button on a phone). Dark is the default; switch to light with the sun button or in Settings.
+**Your edit.** One quiet line above every step after Start says what you are making (one reel, clips, plain clips; the aspect), from what ("our N best lines" when they are our pick, "your N lines" when you chose them, or the whole take), the look and the b-roll spots, and the sound once you change it. The one Next button is in the bar at the bottom. Click a part to open its step: the look opens Picture and the sound opens Music and sounds. With a reference in use the look part says `Recreating <name>` or `The look of <name>, your words`. When you change your pieces after a draft it says so. Agents read the same thing with `get_edit` (`GET /api/edit`). The chat sits on the right (behind the chat button on a phone). Dark is the default; switch to light with the sun button or in Settings.
 
 ![Studio in the light theme, the AIgent cream with deep teal: the Style step](studio/light.png)
 
@@ -192,7 +192,7 @@ The categories come from `kit/studio/categories.json`, which maps the engine's o
 | Camera effects | 11 | the effects marked camera in `effects/catalog.json` (slow push, lean in, locked on, over-the-shoulder zoom and more) plus punch-ins |
 | Speed and time | 3 | tighten, pause point, wave trim |
 | Person and background | 16 | title layers (front, behind the head, auto) and effects that use the person mask |
-| Color and looks | 16 | looks, film finishes, themes |
+| Color grades | 16 | looks, film finishes, themes |
 | Overlays and textures | 7 | grain, vignette, scan lines, glass widgets, shortcut rain, noise, light leak |
 | Glitch and distortion | 10 | glitch seams and effects |
 | Shapes, frames and split screens | 10 | reel frame, split headline, B-roll split, grid, versus, screen card, colour and chapter cards |
@@ -226,12 +226,12 @@ The page uses three words, one per layer. Each layer is a numbered tab, and the 
 | Layer | What it is |
 |---|---|
 | 1 **Raw take** | Your take in full, just as you filmed it. Play it, or click a word to jump there |
-| 2 **Best lines** | Every line of the take, sorted by what it does. The ones marked **Best** are the lines we recommend. Play any of them |
+| 2 **Best lines** | Every line of the take, sorted by what it does. **Best** marks the ones we recommend |
 | 3 **Clips** | Our best lines stitched into clips (the full edit and the short clips), with the quiet trimmed. Play each one as it will sound, and tick the ones to keep |
 
 **What's the point of this video?** One optional line at the top of Cut, up to 200 characters, for example "Show beginners they can build an app with AI in a weekend". It is saved with the video and it steers what we pick: the score of every line, the Best marks, the full edit and the clips. A line or a clip that serves it says **Fits your point**. When you change it, the lines are scored again and the suggested clips are found again; what you kept or dropped and the clips you added stay. Your agent and a model get the same line with every ask. The same field is on Start when you pick Copy the look.
 
-**What to make.** One line under the point sums up the choice, for example "Both: 1 full edit (~10 min) + 5 short clips, for organic". We set it from the take's length (up to 2 min: one full short; up to 10 min: clips; longer: a long form edit plus 5 clips). **Change** opens four rows of cards, and **Smart pick** puts our defaults back. With more than one take, **Take** picks the one to cut.
+**What to make.** One line at the end of Clips, beside **Find clips again**, sums up the choice, for example "Both: 1 full edit (~10 min) + 5 short clips, for organic" (a take shorter than the target leaves the length out). We set it from the take's length (up to 2 min: one full short; up to 10 min: clips; longer: a long form edit plus 5 clips). **Change** opens four rows of cards, and **Back to our pick** puts our defaults back. With more than one take, **Take** picks the one to cut.
 
 | Row | Cards | Notes |
 |---|---|---|
@@ -242,7 +242,7 @@ The page uses three words, one per layer. Each layer is a numbered tab, and the 
 
 ### Raw take
 
-The full take in the player, with its words under it once we have read them. Above it: how long the take is, how many lines it has, how many long pauses (and their seconds) and how many filler words. **See the best lines** opens the next layer.
+The full take in the player, with its words beside it once we have read them. Its length is on the Raw take tab.
 
 ### Best lines
 
@@ -418,7 +418,7 @@ The page uses `POST /api/footage/url { url }` and `POST /api/footage/import { id
 The breakdown is visual: four numbers (length, shots, BPM and energy, average shot), a timeline of the shots with a beat grid at the measured BPM, tags for what was found, and suggested picks you click to add (or Pick all). It also says which teardown engine ran; the built-in fallback is rougher, so treat its finds as guesses.
 
 - **Queue.** Paste several links at once; they download and tear down one at a time, in their own lane (a Draft or a Render can run meanwhile; a Draft on Recreate that needs a reference still being read says so), each with its status (waiting, downloading with a progress bar, breaking it down, ready, failed with the reason) and Stop, Try again, Remove and "Use this one" buttons. The newest ready one is used unless you pick another.
-- **Where it is (1.28.0).** While a reference is read, one line under its progress bar names the stage in plain words: Downloading, Finding cuts, Reading captions, Reading camera moves, Transcribing, Reading music and sounds, Reading graphics, Reading framing, Reading colours, Building the recipe. The bar follows the real stages, and a folded list under the line ("6 of 10 steps done") shows every stage with a check as each finishes. It shows on Start and in the reference view of Picture, and a reload shows the same line. When a stage stops, the line says which one ("We stopped while reading graphics. Nothing was changed.") with **Try again**. Agents see the same on each queue item as `stages` (`stage`, `label`, `percent`, `list`) in `studio_get_reference_teardown` and the state.
+- **Where it is (1.28.0).** While a reference is read, one line under its progress bar names the stage in plain words: Downloading, Finding cuts, Reading captions, Reading camera moves, Transcribing, Reading music and sounds, Reading graphics, Reading framing, Reading colors, Putting it together. The bar follows the real stages, and a folded list under the line ("6 of 10 steps done") shows every stage with a check as each finishes. It shows on Start and in the reference view of Picture, and a reload shows the same line. When a stage stops, the line says which one ("We stopped while reading graphics. Nothing was changed.") with **Try again**. Agents see the same on each queue item as `stages` (`stage`, `label`, `percent`, `list`) in `studio_get_reference_teardown` and the state.
 - **Downloaders.** YouTube, TikTok, X, Vimeo and most video pages go through [yt-dlp](https://github.com/yt-dlp/yt-dlp), an optional free program. The one-line installers add it to the kit's venv; without it, the reference view shows **Install** and the agent buttons (or put its standalone program on your PATH, or set `YTDLP=/path/to/yt-dlp`). It runs as a separate program; none of its code is in the kit. A direct video link is downloaded by Studio itself. Instagram uses the kit's [instaloader](https://github.com/instaloader/instaloader) helper (MIT): one public post, anonymous, never a login. Without yt-dlp, the link fails with the reason in plain words and the fix buttons.
 - **Where it goes.** By default `teardown-in/studio/<job>/` in the kit, which git ignores. Pick any folder in [Settings](#settings). Downloads never go into the repo's tracked files, and the teardown (`teardown/studio-<job>-r<id>/`: Reel.md, teardown.md, contact sheet) is gitignored too.
 - **Long videos.** Studio keeps the first 90 seconds for the teardown (`STUDIO_REF_MAX_SECONDS` changes it); with ffmpeg present yt-dlp downloads only that part.
@@ -632,7 +632,7 @@ Finish, the old last step before Post, is now two steps. **Review** drafts the r
 
 Draft first, check what we picked, then render once.
 
-- **Draft** (it reads **Redraft** once there is a draft) plans the reel; it makes no video. When it ends the step says "Plan ready, no video yet. Check it below, then Render." **Cancel** shows only while a draft runs.
+- **Draft** (it reads **Draft again** once there is a draft) plans the reel; it makes no video. When it ends the step says "Draft ready. Check it below, then go to Render." **Cancel** shows only while a draft runs.
 - **Draft from.** When you kept clips on the Cut step: **Your N clips** (the default) or **The whole take**. Your clips are cut once, on their audio-checked edges, and handed to the reel as they are (`--as-is`, with a `clips.json` beside them carrying each one's words), so nothing is transcribed or cut a second time.
 - **The draft preview.** A fast preview of the draft's cuts only, with no captions and no look. It is never a render from another draft or take.
 - **Next to your reference.** One row of chips that says how close the draft is to the reference, one word per part: **Matched**, **Close** or **Off** for Framing, Color, Captions, Graphics, Sounds and Pace. It shows only when the engine measured the draft against a reference, and only for the parts it measured.
@@ -648,12 +648,13 @@ When your clips changed after the draft, Review says "Your clips changed since t
 Full quality, once.
 
 - **Render vN** is the one Render button, with progress and **Cancel** while it runs. It stays off until the reel is drafted, and then offers **Draft it on Review first**. A cancel that lands after the render wrote its video keeps the video; the task ends done.
-- **The finished reel.** Render builds the reel, applies your choices edits, and lists this draft's output (`reel-vN.mp4` and the export) with a player, **Edit this reel** and a download link. **Post it** opens the Post view. A note counts the earlier reels and links to Outputs and New video.
-- **What to make** is a fold, with a one-line summary beside its name. Inside: **The reel**, **N clips on their own** (each clip as its own reel with the same look) and **Plain clips, no edit** (the words you kept, joined, no look, in seconds), plus **Also sized for**, the platform size. Any mix; Render makes them all in one run. With only clips or plain clips ticked there is nothing to draft.
+- **Sizes** is one small row under the Render button: **Reels and Stories 9:16** (always made, so its box stays ticked), **Instagram Feed 4:5** (1080x1350) and **Square 1:1**. Tick more than one and the same render makes them all. The Instagram Feed does not take a 9:16 video, so the 4:5 and the square are their own versions of the reel: the frame follows your face, and the captions, titles, graphics and b-roll are laid out again to fit, with all text kept off your face. No words are cut and the timing is the same. See [rendering.md](rendering.md#sizes-916-45-for-the-instagram-feed-11) for how the frame is found.
+- **The finished reel.** Render builds the reel, applies your choices edits, and lists every file of this draft with a plain label and its name: **For Reels and Stories** (`reel-v1.mp4`), **For the Instagram Feed** (`reel-v1-feed-4x5.mp4`), **Square, for feeds** (`reel-v1-square-1x1.mp4`). Each has a player, **Edit this reel** and a download link. **Post it** opens the Post view. A note counts the earlier reels and links to Outputs and New video.
+- **What to make** is a fold, with a one-line summary beside its name. Inside: **The reel**, **N clips on their own** (each clip as its own reel with the same look) and **Plain clips, no edit** (the words you kept, joined, no look, in seconds), plus **Keep text clear of the buttons on**, the app whose buttons and caption area the 9:16 reel leaves room for (Reels by default). Any mix; Render makes them all in one run. With only clips or plain clips ticked there is nothing to draft.
 - **Compare with the original, or comment on a frame** is a fold that shows once this draft has a rendered reel. See [Review your edit](#review-your-edit).
-- **Post** is the second view of Render (the switch above the step, or `#step=post`). It sends the reel to Buffer as a draft; see [posting.md](posting.md).
+- **Post** is the second view of Render (the switch above the step, or `#step=post`). It sends the reel to Buffer as a draft and says which file goes where: Reels and Stories get the 9:16 file, the Instagram Feed gets the 4:5 file. See [posting.md](posting.md).
 
-Under both Review and Render, the log is folded, and **For your agent** copies this reel as an instruction for your agent. Agents start the same runs with `studio_run` (`from: pieces | take` for a draft, `exports: { reel, clips, plain }` for a render) or set them with `finish` in `studio_set_selections` (the setting keeps its old name).
+Under both Review and Render, the log is folded, and **For your agent** copies this reel as an instruction for your agent. Agents start the same runs with `studio_run` (`from: pieces | take` for a draft, `exports: { reel, clips, plain }` for a render) or set them with `finish` in `studio_set_selections` (the setting keeps its old name). Sizes are `sizes` on both (`["4:5"]`, `["4:5", "1:1"]` or `[]`; the 9:16 is always made), and `get_edit` lists the sizes the next render makes with their file names.
 
 The effects pass (camera moves, person-mask effects) runs when the effects venv is set up; without it, Studio says the picked effects need it, with **Install** and the agent buttons, and the reel renders without them.
 
@@ -760,7 +761,7 @@ Studio will not switch while a draft, render, download, take, transcript or b-ro
 
 ## Wizards
 
-**Wizards** in the top bar (and in More) are three guided starts. Each step has **Let my agent decide**, which hands that choice to your agent in the chat.
+**Wizards** in the More menu are three guided starts. Each step has **Let my agent decide**, which hands that choice to your agent in the chat.
 
 - **Make a reel from a long take.** What it is for (Grow followers, Sell or sign up, Teach one thing, Full clean take, each setting the output), then a Look, then **Let AI choose** picks the pieces and opens Review. If the take is not transcribed yet, it transcribes first and opens Cut.
 - **Copy a reference.** Paste a reel link; Studio reads it on Recreate and opens Picture on **How the reference was made**.
@@ -777,7 +778,7 @@ API: `GET /api/wizard` (the wizards, goals and clip counts, from `kit/studio/wiz
 **Outputs** in the top bar (or **More**, Outputs) lists every finished render of this video, newest first, with the settings that made it: when, the source take and draft, the look, the length and how many pieces, and the b-roll. Every Render writes them beside the reel as `jobs/<job>/reel-vN.settings.json` (and the build key in `reel-vN.build/meta.json`), so a version can say how it was made after the session has moved on. When the footage changes, earlier reels stay here instead of on Render.
 
 - **Edit this reel** puts that version back in the editor exactly as it was (the same as Edit this reel on Render and `reopen_reel`) and opens Review; Render then makes the next version.
-- **Download** saves the reel. **Files** lists each export too.
+- **Download** saves the reel. **Files** lists every file of that version with what it is for (For Reels and Stories, For the Instagram Feed, Square, for feeds); it is open already when a version has more than one.
 - **Compare** two versions to play them side by side, with what changed between them marked.
 - **All videos** adds your other videos with how many versions each has and its latest look; pick one to open it.
 
@@ -796,7 +797,7 @@ Nothing is deleted from here.
 <img src="studio/more-menu.png" width="520" alt="The top bar with numbered steps, Wizards, Outputs, Connect agent, theme, Settings and the More menu open with Past videos, Setup check and API keys">
 <img src="studio/top-phone.png" width="260" alt="The top bar on a phone: the reel name and buttons on the first row and the six steps on a second row">
 
-**Wizards** opens the [wizards](#wizards). **Outputs** opens the [Outputs library](#outputs). The top bar always fits on one line: on a laptop only the current step shows its name (the others show their number, and hovering a step still names it), the setup pill shows just the count of what is missing, and Connect agent shrinks to its plug. **More** (the three dots) holds New video, Open a past video, Connect agent, Setup check, API keys and providers and the theme, and works with the keyboard: Enter or Space opens it, the arrow keys move, Enter picks, Escape closes. On a phone the steps get their own row under the reel name, and Wizards and Outputs move into More.
+The top bar always fits on one line. From 1280 px wide the step bar names every step in its short form (Start, Cut, Picture, Text, B-roll, Music, Review, Render); on a narrower window only the current step shows its name (the others show their number, and hovering a step still names it). The setup pill says how many things there are to fix, and Connect agent shrinks to its plug. **More** (the three dots) holds Past videos, Setup check, API keys, **Wizards** (the [wizards](#wizards)) and **Outputs** (the [Outputs library](#outputs)), each with its name, and works with the keyboard: Enter or Space opens it, the arrow keys move, Enter picks, Escape closes. On a phone the steps get their own row under the reel name, and the theme moves into More too.
 
 Longer explanations sit behind a small **i** next to the thing they explain (Footage from a link, Clean-up pass, Record screen in B-roll); click it to read, Escape or a click elsewhere closes it.
 

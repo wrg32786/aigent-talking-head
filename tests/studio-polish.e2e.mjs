@@ -64,21 +64,22 @@ try {
     await pg.keyboard.press('Enter');
     await pg.waitForSelector('#more-setup'); if (shots) { await pg.waitForTimeout(300); await pg.screenshot({ path: join(shots, 'more-menu.png'), clip: { x: 560, y: 0, width: 720, height: 280 } }); }
     const items = await pg.$$eval('.menu-item span', x => x.map(e => e.textContent));
-    assert.deepStrictEqual(items, ['Past videos', 'Setup check', 'API keys'], 'New video, Outputs, Wizards, Connect agent and the theme are already in the top bar');
-    for (const id of ['#new-video-open', '#outputs-open', '#wizards-open', '#connect-open', '#theme']) assert.ok(await pg.isVisible(id), id + ' is on the page');
+    assert.deepStrictEqual(items, ['Past videos', 'Setup check', 'API keys', 'Wizards', 'Outputs'], 'Wizards and Outputs are in More, with words; New video, Connect agent and the theme are in the top bar');
+    for (const id of ['#new-video-open', '#connect-open', '#theme']) assert.ok(await pg.isVisible(id), id + ' is on the page');
+    for (const id of ['#outputs-open', '#wizards-open']) assert.strictEqual(await pg.$(id), null, id + ' is not a bare icon in the top bar');
     const active = () => pg.evaluate(() => document.querySelector('.menu-item[data-focus]')?.id); // the menu keeps focus and points at the item
     assert.strictEqual(await active(), 'more-open-video'); // Enter opens on the first item
     await pg.keyboard.press('ArrowDown'); assert.strictEqual(await active(), 'more-setup'); await pg.keyboard.press('ArrowDown'); assert.strictEqual(await active(), 'more-keys');
     await pg.keyboard.press('ArrowUp'); await pg.keyboard.press('Enter');
     await pg.waitForSelector('#h-setup', { state: 'visible' }); await pg.waitForFunction(() => !document.querySelector('#more-setup'));
     await pg.keyboard.press('Escape'); await pg.waitForSelector('#h-setup', { state: 'hidden' });
-    // on a phone Wizards, Outputs and the theme button leave the top bar, so More carries them there (and only there)
+    // on a phone the theme button leaves the top bar too, so More carries it there (and only there)
     const vp = pg.viewportSize(); await pg.setViewportSize({ width: 390, height: 844 });
     const before = await pg.evaluate(() => document.documentElement.dataset.theme || 'dark');
     await pg.click('#more-open'); await pg.waitForSelector('#more-theme');
     assert.deepStrictEqual(await pg.$$eval('.menu-item span', x => x.map(e => e.textContent)), ['Past videos', 'Setup check', 'API keys', 'Wizards', 'Outputs', before === 'dark' ? 'Light theme' : 'Dark theme']);
     for (const id of ['#more-wizards', '#more-outputs']) assert.ok(await pg.isVisible(id), id);
-    for (const id of ['#wizards-open', '#outputs-open', '#theme']) assert.ok(!(await pg.isVisible(id)), id + ' is in More on a phone');
+    for (const id of ['#theme']) assert.ok(!(await pg.isVisible(id)), id + ' is in More on a phone');
     await pg.click('#more-theme');
     assert.notStrictEqual(await pg.evaluate(() => document.documentElement.dataset.theme), before);
     await pg.setViewportSize(vp);

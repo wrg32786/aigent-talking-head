@@ -66,7 +66,7 @@ try {
   await t('eight steps: Start, Cut, Picture, Text and graphics, B-roll, Music and sounds, Review, Render; old links land on the step that holds them now', async () => {
     await open(pg, '#step=footage');
     assert.deepStrictEqual(await pg.$$eval('#stepper button', x => x.map(b => b.dataset.step)), ['start', 'cut', 'picture', 'text', 'broll', 'music', 'review', 'render']);
-    assert.deepStrictEqual(await pg.$$eval('#stepper .sl', x => x.map(b => b.textContent)), ['Start', 'Cut', 'Picture', 'Text and graphics', 'B-roll', 'Music and sounds', 'Review', 'Render']);
+    assert.deepStrictEqual(await pg.$$eval('#stepper .sl', x => x.map(b => b.textContent)), ['Start', 'Cut', 'Picture', 'Text', 'B-roll', 'Music', 'Review', 'Render'], 'the step bar names every step, in its short form');
     await onStep(pg, 'start'); assert.ok(await pg.isVisible('#s-footage h2:has-text("Start")'));
     await open(pg, '#step=render');
     await onStep(pg, 'render'); assert.ok(await pg.isVisible('#s-render h2:has-text("Render")'));
@@ -82,13 +82,13 @@ try {
     await pg.click('#look-sub-style'); await pg.waitForSelector('#s-menu', { state: 'visible' }); assert.ok(!(await pg.$('#s-ref')));
   });
 
-  await t('Your edit: on every step, says what you make and from what, and follows your cuts', async () => {
+  await t('Your edit: on every step after Start, says what you make and from what, and follows your cuts', async () => {
     await api('/api/cut/set', { source: take, by: 'test', candidates: [{ kind: 'clip', label: 'First', ranges: [[0.95, 2.45]] }, { kind: 'clip', label: 'Last', ranges: [[5.9, 7.6]] }, { kind: 'clip', label: 'Middle', ranges: [[3.2, 4.9]], keep: false }] });
     for (const st of ['start', 'cut', 'picture', 'text', 'broll', 'music', 'review', 'render']) {
       await pg.click(`#stepper button[data-step="${st}"]`); await pg.waitForFunction(x => document.querySelector('main').dataset.step === x, st);
-      assert.ok(await pg.isVisible('#your-edit'), 'Your edit on ' + st);
+      if (st === 'start') assert.strictEqual(await pg.$('#your-edit'), null, 'no Your edit on Start, before there is an edit'); else assert.ok(await pg.isVisible('#your-edit'), 'Your edit on ' + st);
     }
-    await pg.waitForFunction(() => /2 clips, \d+ s, in your order/.test(document.querySelector('#your-edit [data-part="from"]').textContent));
+    await pg.waitForFunction(() => /^2 clips, \d+ s$/.test(document.querySelector('#your-edit [data-part="from"] dd').textContent));
     const e = await api('/api/edit'); assert.strictEqual(e.combo.pieces.length, 2); assert.deepStrictEqual(e.combo.pieces.map(x => x.id), ['c1', 'c2']); assert.strictEqual(e.edit.from.mode, 'pieces');
     assert.ok(/^1 reel/.test(e.edit.making.text), e.edit.making.text); assert.strictEqual(e.edit.next.label, 'Draft it');
     if (shots) { await pg.click('#stepper button[data-step="cut"]'); await pg.waitForTimeout(500); await pg.screenshot({ path: join(shots, 'redesign-cut-your-edit-dark.png') }); }
@@ -114,14 +114,23 @@ try {
     assert.ok(cj.precut && cj.clips.find(x => x.file === 'cuts/c1.mp4').words.length, 'clips.json carries the words');
     const st = await api('/api/state'); assert.strictEqual(st.state.drafted.from, 'pieces'); assert.strictEqual(st.edit.drafted, true);
     await pg.waitForFunction(() => document.querySelector('#render').getAttribute('aria-disabled') !== 'true');
-    assert.ok(/^Render v1$/.test(await pg.textContent('#render')));
+    assert.ok(/^Render$/.test(await pg.textContent('#render')));
   });
 
   await t('one Render makes the reel and each piece as its own reel in the same run', async () => {
     await toStep(pg, 'render'); await pg.waitForSelector('#s-render:not([hidden])');
     assert.strictEqual(await pg.isVisible('#exp-clips'), false, 'What to make starts closed'); await openMake(pg);
     await pg.click('#exp-clips'); await pg.waitForSelector('#exp-clips[aria-pressed="true"]');
+    // sizes: one small row; the 9:16 is always made, the Feed 4:5 is one tick and goes into the same run
+    assert.deepStrictEqual(await pg.$$eval('#sizes label', x => x.map(l => [l.textContent.trim(), l.querySelector('input').checked, l.querySelector('input').disabled])),
+      [['Reels and Stories 9:16', true, true], ['Instagram Feed 4:5', false, false], ['Square 1:1', false, false]]);
+    await pg.click('#size-feed45'); await pg.waitForFunction(() => document.querySelector('#size-feed45').checked);
+    assert.deepStrictEqual((await api('/api/state')).state.sizes, ['feed45']);
+    if (shots) { await pg.locator('#sizes').scrollIntoViewIfNeeded(); await pg.screenshot({ path: join(shots, 'render-sizes-dark.png') }); }
     await pg.click('#render'); const v = await waitTask(); assert.strictEqual(v.task.status, 'done', JSON.stringify(v.task).slice(0, 800)); assert.strictEqual(v.task.kind, 'render');
+    assert.ok(/--rebuild.*--export reels,feed45/.test(log(JOB)), 'one run, both sizes: ' + log(JOB).split('\n').pop());
+    await pg.waitForSelector('#outputs .out-use'); assert.strictEqual(await pg.textContent('#outputs .out-use'), 'For Reels and Stories');
+    await pg.click('#size-feed45'); await pg.waitForFunction(() => !document.querySelector('#size-feed45').checked);
     assert.ok(existsSync(join(ROOT, 'jobs', JOB, 'reel-v1.mp4')), 'the reel');
     for (const id of ['c1', 'c2']) { assert.ok(existsSync(join(ROOT, 'jobs', `${JOB}-${id}`, 'reel-v1.mp4')), id + ' as its own reel'); assert.ok(/--as-is/.test(log(`${JOB}-${id}`))); }
     assert.ok(!existsSync(join(ROOT, 'jobs', `${JOB}-c3`)), 'the dropped piece is not rendered');

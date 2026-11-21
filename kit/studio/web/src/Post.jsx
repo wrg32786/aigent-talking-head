@@ -23,7 +23,7 @@ const secs = s => s == null ? '' : s < 60 ? `${Math.round(s)} s` : `${Math.floor
 export function Post({ V, s, go }) {
   const [st, setSt] = useState(null), [keys, setKeys] = useState(null), [part, setPart] = useState(null);
   const load = async () => { const [a, k] = await Promise.all([api('/api/post'), api('/api/keys')]); setSt(a); setKeys(k); return a; };
-  useEffect(() => { load().catch(() => {}); }, [s.job, (V.outputs || []).length]);
+  useEffect(() => { load().catch(() => {}); }, [s.job, (V.outputs || []).join()]);
   const hostReady = st && st.host.pick && st.host[st.host.pick].ready;
   const connected = !!(st && st.buffer.set && hostReady);
   useEffect(() => { if (st && !part) setPart(connected ? 'channels' : 'connect'); }, [st]);
@@ -36,7 +36,7 @@ export function Post({ V, s, go }) {
         <button type="button" id={'post-part-' + id} aria-current={part === id ? 'step' : 'false'} disabled={id !== 'connect' && !connected} onClick={() => setPart(id)}>
           <span className="sn">{id === 'connect' && connected && part !== 'connect' ? <Icon n="check" /> : k + 1}</span>{label}</button></li>)}</ol>
       {part === 'connect' && <Connect st={st} keys={keys} reload={load} setKeys={j => { setKeys(x => ({ ...x, ...j })); load().catch(() => {}); }} next={() => setPart('channels')} connected={connected} />}
-      <Compose hidden={part !== 'channels' && part !== 'send'} part={part} setPart={setPart} st={st} s={s} reload={load} />
+      <Compose hidden={part !== 'channels' && part !== 'send'} part={part} setPart={setPart} st={st} s={s} reload={load} V={V} />
     </>}
   </section>;
 }
@@ -85,10 +85,10 @@ function Connect({ st, keys, setKeys, reload, next, connected }) {
   </div>;
 }
 
-function Compose({ hidden, part, setPart, st, s, reload }) {
+function Compose({ hidden, part, setPart, st, s, reload, V }) {
   const [chs, setChs] = useState(null), [err, setErr] = useState(''), [pick, setPick] = useState(st.channels || []);
-  const [reel, setReel] = useState(st.reels[0]), [caption, setCaption] = useState(''), [own, setOwn] = useState({}), [ytTitle, setYtTitle] = useState(''), [ytCat, setYtCat] = useState(st.youtubeCategory || '22'), [feed, setFeed] = useState(true);
-  const [checks, setChecks] = useState({}), [info, setInfo] = useState(null);
+  const [reel, setReel] = useState(st.reels[0]), [caption, setCaption] = useState(''), [own, setOwn] = useState({}), [ytTitle, setYtTitle] = useState(''), [ytCat, setYtCat] = useState(st.youtubeCategory || '22'), [feed, setFeed] = useState(true), [place, setPlace] = useState({}), [feedUrl, setFeedUrl] = useState(''), [making, setMaking] = useState(false);
+  const [checks, setChecks] = useState({}), [info, setInfo] = useState(null), [feedFile, setFeedFile] = useState(null);
   const [mode, setMode] = useState('draft'), [due, setDue] = useState(''), [confirm, setConfirm] = useState(false), [url, setUrl] = useState('');
   const [job, setJob] = useState(null), [result, setResult] = useState(null);
   const loaded = useRef(false);
@@ -96,24 +96,35 @@ function Compose({ hidden, part, setPart, st, s, reload }) {
   useEffect(() => { if (!hidden && !loaded.current) { loaded.current = true; loadChs(); } }, [hidden]);
   useEffect(() => { if (!st.reels.includes(reel)) setReel(st.reels[0]); }, [st.reels.join()]);
   // per-channel warnings: length, shape, caption limits (the server measures the reel)
-  useEffect(() => { if (hidden || !chs) return; const t = setTimeout(() => api('/api/post/check', { reel, channels: pick, caption, captions: own, youtubeTitle: ytTitle }).then(j => { setInfo(j.info); setChecks(Object.fromEntries(j.channels.map(c => [c.id, c]))); }).catch(() => {}), 250); return () => clearTimeout(t); }, [hidden, chs, reel, pick.join(), caption, JSON.stringify(own), ytTitle]);
+  useEffect(() => { if (hidden || !chs) return; const t = setTimeout(() => api('/api/post/check', { reel, channels: pick, caption, captions: own, youtubeTitle: ytTitle, placements: place }).then(j => { setInfo(j.info); setFeedFile(j.feed || null); setChecks(Object.fromEntries(j.channels.map(c => [c.id, c]))); }).catch(() => {}), 250); return () => clearTimeout(t); }, [hidden, chs, reel, pick.join(), caption, JSON.stringify(own), ytTitle, JSON.stringify(place), st.reels.join(), making]);
   useEffect(() => { if (!job || job.status !== 'running') return; const t = setInterval(() => api('/api/post/send?id=' + job.id).then(j => { setJob(j); if (j.status === 'done') { setResult(j.result); reload().catch(() => {}); } if (j.status === 'failed') toast(j.error); }).catch(() => {}), 700); return () => clearInterval(t); }, [job && job.id, job && job.status]);
   const picked = (chs || []).filter(c => pick.includes(c.id)), services = new Set(picked.map(c => c.service));
   const limit = picked.reduce((m, c) => c.rules && c.rules.caption ? Math.min(m, c.rules.caption) : m, Infinity);
   const blocked = picked.filter(c => checks[c.id] && !checks[c.id].ok);
   const host = st.host.pick;
+  // the Instagram Feed takes 4:5 to 1.91:1, so a channel set to Feed gets the 4:5 of the same version
+  const toFeed = picked.filter(c => c.service === 'instagram' && place[c.id] === 'feed'), feedMissing = toFeed.length > 0 && (!feedFile || feedFile.missing);
+  const task = V && V.task, taskRunning = !!(task && task.status === 'running');
+  useEffect(() => { if (making && !taskRunning) { setMaking(false); reload().catch(() => {}); } }, [taskRunning]);
+  const makeFeed = () => api('/api/sizes/make', { size: 'feed45', file: reel }).then(() => setMaking(true)).catch(() => {});
+  const name = f => String(f || '').split('/').pop();
+  // a reel by its version, not its file name (the file name stays in the tooltip and on Download)
+  const verName = f => { const m = name(f).match(/^reel-v(\d+)/); return m ? `Version ${m[1]}` : name(f); };
+  // a channel set to the Feed while the 4:5 is not made yet: the one fixable reason, said once on its row with the fix
+  const needsFeed = c => feedMissing && c.service === 'instagram' && place[c.id] === 'feed';
   const toggle = id => setPick(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
-  const canSend = picked.length > blocked.length && (mode !== 'schedule' || due) && (mode !== 'now' || confirm) && (host !== 'url' || /^https:\/\//.test(url.trim())) && !(job && job.status === 'running');
+  const canSend = picked.length > blocked.length && (mode !== 'schedule' || due) && (mode !== 'now' || confirm) && (host !== 'url' || /^https:\/\//.test(url.trim())) && !(job && job.status === 'running') && !making;
   const send = async () => {
     setResult(null);
-    try { const j = await api('/api/post/send', { reel, channels: pick, caption, captions: Object.fromEntries(Object.entries(own).filter(([id, v]) => pick.includes(id) && v != null)), mode, dueAt: mode === 'schedule' ? new Date(due).toISOString() : undefined, confirmNow: mode === 'now' ? confirm : undefined, youtubeTitle: ytTitle || undefined, youtubeCategory: ytCat, shareToFeed: feed, ...(host === 'url' ? { url: url.trim() } : {}) }); setJob({ id: j.id, status: 'running', phase: 'start' }); } catch {}
+    try { const j = await api('/api/post/send', { reel, channels: pick, caption, captions: Object.fromEntries(Object.entries(own).filter(([id, v]) => pick.includes(id) && v != null)), mode, dueAt: mode === 'schedule' ? new Date(due).toISOString() : undefined, confirmNow: mode === 'now' ? confirm : undefined, youtubeTitle: ytTitle || undefined, youtubeCategory: ytCat, shareToFeed: feed, placements: Object.fromEntries(toFeed.map(c => [c.id, 'feed'])), ...(host === 'url' ? { url: url.trim(), ...(feedUrl.trim() ? { feedUrl: feedUrl.trim() } : {}) } : {}) }); setJob({ id: j.id, status: 'running', phase: 'start' }); } catch {}
   };
   if (hidden) return null;
   return <div className="post-compose">
     {part === 'channels' && <>
       <div className="glass-card post-card" id="post-reel">
-        <label className="col"><span className="lbl">Reel</span><select id="post-reel-pick" value={reel} onChange={e => setReel(e.target.value)}>{st.reels.map(r => <option key={r} value={r}>{r.split('/').pop()}</option>)}</select></label>
-        <div className="post-reel-row"><video src={file(reel) + '#t=1.2'} preload="metadata" muted aria-label={'Preview of ' + reel.split('/').pop()} /><p className="fine" id="post-reel-info">{info ? [secs(info.seconds), info.width && `${info.width}x${info.height}`, info.vcodec && (info.vcodec === 'h264' ? 'H.264' : `${info.vcodec}, re-encoded to H.264 when sent`), info.size && `${Math.round(info.size / 1e6 * 10) / 10} MB`].filter(Boolean).join(', ') : ''}</p></div>
+        <label className="col"><span className="lbl">Reel</span><select id="post-reel-pick" value={reel} onChange={e => setReel(e.target.value)}>{st.reels.map(r => <option key={r} value={r}>{verName(r)}{st.files && st.files[r] ? ` (${st.files[r].use})` : ''}</option>)}</select></label>
+        <div className="post-reel-row"><video src={file(reel) + '#t=1.2'} preload="metadata" muted aria-label={'Preview of ' + reel.split('/').pop()} /><p className="fine" id="post-reel-info" title={info ? [name(reel), info.width && `${info.width}x${info.height}`, info.size && `${Math.round(info.size / 1e6 * 10) / 10} MB`].filter(Boolean).join(', ') : undefined}>{info ? secs(info.seconds) : ''}</p></div>
+        <div className="post-where" id="post-where"><Icon n="info" /><p className="fine">{st.where || 'Reels and Stories get the 9:16 file. The Instagram Feed gets the 4:5 file.'}</p></div>
       </div>
       <div className="glass-card post-card" id="post-channels">
         <div className="row"><h3 className="lbl">Channels</h3><Button id="post-reload-channels" size="sm" variant="ghost" label="Reload" onClick={() => loadChs(true)} /></div>
@@ -122,8 +133,12 @@ function Compose({ hidden, part, setPart, st, s, reload }) {
         {chs && !chs.length && <p className="fine">No channels in your Buffer account yet. Connect Instagram, TikTok, YouTube and others in Buffer, then Reload.</p>}
         {chs && <ul className="post-ch-list">{chs.map(c => { const on = pick.includes(c.id), ck = checks[c.id]; return <li key={c.id} data-id={c.id} data-service={c.service} className={on ? 'on' : ''}>
           <label><input type="checkbox" checked={on} onChange={() => toggle(c.id)} /><span className="pc-n"><b>{c.name}</b><small className="fine">{SERVICE[c.service] || c.service}{c.rules && c.rules.max ? `, up to ${secs(c.rules.max)}` : ''}</small></span>
-            {on && ck && !ck.ok && <Badge label="Will be skipped" variant="error" />}{on && ck && ck.ok && ck.warn.length > 0 && <Badge label="Check" variant="warning" />}</label>
-          {on && ck && (ck.block.length > 0 || ck.warn.length > 0) && <p className="fine pc-why">{[...ck.block, ...ck.warn].join(' ')}</p>}
+            {on && ck && !ck.ok && <Badge label={needsFeed(c) ? "Can't post yet" : "Can't post this one"} variant={needsFeed(c) ? 'warning' : 'error'} />}{on && ck && ck.ok && ck.warn.length > 0 && <Badge label="Check" variant="warning" />}</label>
+          {on && c.service === 'instagram' && <div className="pc-place"><span className="fine" id={'post-place-l-' + c.id}>Post to</span><div className="seg" role="radiogroup" aria-labelledby={'post-place-l-' + c.id} id={'post-place-' + c.id}>
+            {[['reel', 'Reels'], ['feed', 'Feed']].map(([v, l]) => <button key={v} type="button" role="radio" data-place={v} aria-checked={(place[c.id] || 'reel') === v} onClick={() => setPlace(p => ({ ...p, [c.id]: v }))}>{l}</button>)}</div>
+            <span className="fine pc-file" title={place[c.id] === 'feed' ? (feedFile && !feedFile.missing ? name(feedFile.file) : undefined) : name(reel)}>{place[c.id] === 'feed' ? (feedFile && !feedFile.missing ? 'Gets the 4:5 version' : 'Needs the 4:5 version.') : 'Gets the 9:16 version'}</span>
+            {needsFeed(c) && <Button id={c.id === (toFeed[0] || {}).id ? 'post-make-feed' : undefined} size="sm" variant="primary" label="Make it" aria-label={st.makeFeed || 'Make the 4:5 version for the Feed'} isLoading={making || taskRunning} isDisabled={taskRunning} onClick={makeFeed} />}</div>}
+          {on && ck && !needsFeed(c) && (ck.block.length > 0 || ck.warn.length > 0) && <p className="fine pc-why">{[...ck.block, ...ck.warn].join(' ')}</p>}
         </li>; })}</ul>}
       </div>
       <div className="glass-card post-card" id="post-caption">
@@ -149,13 +164,14 @@ function Compose({ hidden, part, setPart, st, s, reload }) {
         {mode === 'schedule' && <label className="col"><span className="lbl">Date and time (your time zone)</span><input type="datetime-local" id="post-due" value={due} onChange={e => setDue(e.target.value)} /></label>}
         {mode === 'now' && <label className="post-confirm"><input type="checkbox" id="post-confirm-now" checked={confirm} onChange={e => setConfirm(e.target.checked)} /> Yes, publish this now on {picked.length} channel{picked.length === 1 ? '' : 's'}</label>}
         {host === 'url' && <label className="col"><span className="lbl">Public link to the MP4</span><input id="post-url" type="url" spellCheck="false" placeholder="https://..." value={url} onChange={e => setUrl(e.target.value)} /><small className="fine">Not Dropbox or Google Drive. It has to stay up until every post has gone out.</small></label>}
-        <p className="fine" id="post-summary">{reel.split('/').pop()} to {picked.length - blocked.length} channel{picked.length - blocked.length === 1 ? '' : 's'}{blocked.length ? ` (${blocked.length} skipped: too long or over a limit)` : ''}, hosted on {HOSTS.find(h => h[0] === host)[1]}.</p>
+        {host === 'url' && toFeed.length > 0 && <label className="col"><span className="lbl">Public link to the 4:5 MP4, for the Feed</span><input id="post-feed-url" type="url" spellCheck="false" placeholder="https://..." value={feedUrl} onChange={e => setFeedUrl(e.target.value)} /></label>}
+        <p className="fine" id="post-summary">{toFeed.length > 0 && !feedMissing ? `${name(feedFile.file)} to the Instagram Feed, ${name(reel)} everywhere else: ` : `${name(reel)} to `}{picked.length - blocked.length} channel{picked.length - blocked.length === 1 ? '' : 's'}{blocked.length ? ` (${blocked.length} skipped: too long or over a limit)` : ''}, hosted on {HOSTS.find(h => h[0] === host)[1]}.</p>
         <div className="row"><Button id="post-send-go" size="lg" variant="primary" label={MODE_LABEL[mode]} isDisabled={!canSend} isLoading={job && job.status === 'running'} onClick={send} />{job && job.status === 'running' && <span className="fine" role="status" id="post-phase">{PHASE[job.phase] || job.phase}</span>}</div>
         {job && job.status === 'failed' && <p className="fine kr-res" role="alert" id="post-error">{job.error}</p>}
       </div>
       {result && <div className="glass-card post-card" id="post-result" role="status">
         <h3 className="lbl">{result.sent ? `Sent to ${result.sent} channel${result.sent === 1 ? '' : 's'}${result.mode === 'draft' ? ' as drafts' : ''}` : 'Nothing was sent'}</h3>
-        <ul className="post-res-list">{result.results.map(r => <li key={r.channelId} data-id={r.channelId} className={r.ok ? 'ok' : 'bad'}><Icon n={r.ok ? 'check' : 'x'} /><b>{r.name}</b><span className="fine">{r.ok ? `${r.status || 'created'}${r.dueAt ? ', ' + new Date(r.dueAt).toLocaleString() : ''}` : r.error}</span></li>)}</ul>
+        <ul className="post-res-list">{result.results.map(r => <li key={r.channelId} data-id={r.channelId} className={r.ok ? 'ok' : 'bad'}><Icon n={r.ok ? 'check' : 'x'} /><b>{r.name}</b><span className="fine">{r.ok ? `${r.placement === 'feed' ? 'Feed, ' + name(r.file) + ', ' : ''}${r.status || 'created'}${r.dueAt ? ', ' + new Date(r.dueAt).toLocaleString() : ''}` : r.error}</span></li>)}</ul>
         <p className="fine">{result.keepLink} <a href={result.review} target="_blank" rel="noreferrer">Review in Buffer</a></p>
       </div>}
       <div className="row post-nav"><Button id="post-back-channels" variant="ghost" label="Channels" icon={<Icon n="left" />} onClick={() => setPart('channels')} /></div>

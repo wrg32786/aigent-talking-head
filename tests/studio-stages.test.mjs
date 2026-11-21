@@ -6,7 +6,7 @@ import * as S from '../kit/studio/stages.mjs';
 let n = 0; const ok = (name, f) => { f(); n++; console.log('ok ' + name); };
 
 ok('the stage list is the ten plain names and the shares add up to 100', () => {
-  assert.deepStrictEqual(S.STAGES.map(x => x.label), ['Downloading', 'Finding cuts', 'Reading captions', 'Reading camera moves', 'Transcribing', 'Reading music and sounds', 'Reading graphics', 'Reading framing', 'Reading colours', 'Building the recipe']);
+  assert.deepStrictEqual(S.STAGES.map(x => x.label), ['Downloading', 'Finding cuts', 'Reading captions', 'Reading camera moves', 'Transcribing', 'Reading music and sounds', 'Reading graphics', 'Reading framing', 'Reading colors', 'Putting it together']);
   assert.strictEqual(S.STAGES.reduce((a, x) => a + x.w, 0), 100);
 });
 

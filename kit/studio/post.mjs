@@ -17,6 +17,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import * as KEYS from './keys.mjs';
 import * as S from './settings.mjs';
+import * as SZ from './sizes.mjs';
 
 const ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const bad = (m, code = 400, extra) => Object.assign(new Error(m), { code }, extra || {});
@@ -96,8 +97,17 @@ export async function ensureH264(file, outDir) {
 }
 
 // per channel: can this reel go there, and what to warn about
-export function checkChannel(ch, info, { text, title } = {}) {
-  const r = RULES[ch.service] || { name: ch.service }, warn = [], block = [];
+// placement 'feed' (Instagram only): a Feed post, which Instagram takes from 4:5 to 1.91:1 only. feed is what
+// SZ.fileFor found: the 4:5 of the same version, or missing. A 9:16 file is never sent to the Feed in its place.
+export const FEED_MIN = 4 / 5, FEED_MAX = 1.91;
+export const placementOf = (ch, placements) => ch && ch.service === 'instagram' && placements && (placements[ch.id] || placements.instagram) === 'feed' ? 'feed' : 'reel';
+export function checkChannel(ch, info, { text, title, placement, feed } = {}) {
+  const isFeed = placement === 'feed' && ch.service === 'instagram';
+  const r = isFeed ? { ...RULES.instagram, name: 'The Instagram Feed', tall: false } : RULES[ch.service] || { name: ch.service }, warn = [], block = [];
+  if (isFeed) {
+    if (!feed || feed.missing || !info) block.push(`${SZ.MAKE_FEED} first. A 9:16 video only goes to Reels and Stories.`);
+    else if (info.width && info.height && (info.width / info.height < FEED_MIN - 0.01 || info.width / info.height > FEED_MAX + 0.01)) block.push(`The Instagram Feed takes 4:5 to 1.91:1; this file is ${info.width}x${info.height}.`);
+  }
   const s = info && info.seconds;
   if (s != null && r.max && s > r.max) (r.hard ? block : warn).push(`${r.name} takes up to ${fmtLen(r.max)}; this reel is ${fmtLen(s)}.`);
   if (s != null && r.min && s < r.min) block.push(`${r.name} needs at least ${r.min} s; this reel is ${fmtLen(s)}.`);
@@ -146,7 +156,7 @@ export async function testBuffer(key, { env, fetchImpl } = {}) {
 }
 const CREATE = `mutation StudioCreatePost($input: CreatePostInput!) { createPost(input: $input) { __typename ... on PostActionSuccess { post { id status dueAt } } ... on MutationError { message } } }`;
 // the createPost input for one channel (exported for the tests)
-export function postInput(ch, { url, text, mode = 'draft', dueAt, title, categoryId, shareToFeed = true, aiGenerated, firstFrameMs } = {}) {
+export function postInput(ch, { url, text, mode = 'draft', dueAt, title, categoryId, shareToFeed = true, aiGenerated, firstFrameMs, placement } = {}) {
   const input = { channelId: ch.id, schedulingType: 'automatic', text: text || '', assets: [{ video: { url, ...(firstFrameMs != null && ['instagram', 'tiktok', 'pinterest'].includes(ch.service) ? { metadata: { thumbnailOffset: Math.max(0, Math.round(firstFrameMs)) } } : {}) } }], source: SOURCE };
   if (mode === 'draft') { input.mode = 'addToQueue'; input.saveToDraft = true; }
   else if (mode === 'queue') input.mode = 'addToQueue';
@@ -154,7 +164,7 @@ export function postInput(ch, { url, text, mode = 'draft', dueAt, title, categor
   else if (mode === 'now') input.mode = 'shareNow';
   else throw bad(`mode: ${MODES.join(', ')}`);
   const meta = {};
-  if (ch.service === 'instagram') meta.instagram = { type: 'reel', shouldShareToFeed: shareToFeed !== false, ...(aiGenerated ? { isAiGenerated: true } : {}) };
+  if (ch.service === 'instagram') meta.instagram = placement === 'feed' ? { type: 'post', shouldShareToFeed: true, ...(aiGenerated ? { isAiGenerated: true } : {}) } : { type: 'reel', shouldShareToFeed: shareToFeed !== false, ...(aiGenerated ? { isAiGenerated: true } : {}) };
   if (ch.service === 'facebook') meta.facebook = { type: 'reel' };
   if (ch.service === 'youtube') meta.youtube = { title: ytTitle(title, text), categoryId: String(categoryId || '22'), ...(aiGenerated ? { isAiGenerated: true } : {}) };
   if (ch.service === 'tiktok' && aiGenerated) meta.tiktok = { isAiGenerated: true };
@@ -273,19 +283,20 @@ export function reelsOf(job) {
   if (!job) return [];
   const d = join(ROOT, 'jobs', job); if (!existsSync(d)) return [];
   let names = []; try { names = readdirSync(d); } catch {}
-  return names.filter(f => /^reel(-fx)?-v\d+(-[a-z0-9]+)?\.mp4$/.test(f)).sort((a, b) => (+(b.match(/v(\d+)/) || [0, 0])[1]) - (+(a.match(/v(\d+)/) || [0, 0])[1]) || a.localeCompare(b)).map(f => `jobs/${job}/${f}`);
+  return SZ.sortFiles(names.filter(SZ.isReel)).map(f => `jobs/${job}/${f}`);
 }
 const histPath = job => join(ROOT, 'jobs', job, 'post', 'posts.json');
 export function history(job) { if (!job) return []; try { const j = JSON.parse(readFileSync(histPath(job), 'utf8')); return Array.isArray(j) ? j : []; } catch { return []; } }
 function remember(job, entry) { if (!job) return; const h = history(job); h.unshift(entry); mkdirSync(dirname(histPath(job)), { recursive: true }); writeFileSync(histPath(job), JSON.stringify(h.slice(0, 50), null, 1) + '\n'); }
 // the same file uploaded before (same size and time) keeps its link, so a second send does not upload again
-const cachedUrl = (job, rel, host) => { try { const st = statSync(resolve(ROOT, rel)), sig = `${st.size}:${Math.round(st.mtimeMs)}`; const hit = history(job).find(h => h.reel === rel && h.sig === sig && h.host === host && h.url); return hit ? { url: hit.url, sig } : { sig }; } catch { return {}; } };
+const cachedUrl = (job, rel, host) => { try { const st = statSync(resolve(ROOT, rel)), sig = `${st.size}:${Math.round(st.mtimeMs)}`; for (const h of history(job)) { if (h.host !== host) continue; if (h.reel === rel && h.sig === sig && h.url) return { url: h.url, sig }; if (h.feed && h.feed.reel === rel && h.feed.sig === sig && h.feed.url) return { url: h.feed.url, sig }; } return { sig }; } catch { return {}; } };
 
 // the Post step and the agent: what is set up
 export function status({ job, env = process.env } = {}) {
   const st = S.load(), k = KEYS.status(env).find(x => x.id === 'buffer');
   return { buffer: { set: k.set, from: k.from, tested: k.tested }, host: hostStatus(env, st), channels: (st.post && st.post.channels) || [], youtubeCategory: (st.post && st.post.youtubeCategory) || '22', categories: YT_CATEGORIES, rules: RULES, modes: MODES,
-    reels: reelsOf(job), history: history(job).slice(0, 5), ready: !!(k.set) };
+    reels: reelsOf(job), files: Object.fromEntries(reelsOf(job).map(f => [f, { use: SZ.labelOf(f), size: (SZ.info(f) || {}).size || null, feed: (x => ({ file: x.file, missing: x.missing }))(SZ.fileFor(f, 'feed', ROOT)) }])), where: SZ.WHERE, makeFeed: SZ.MAKE_FEED,
+    history: history(job).slice(0, 5), ready: !!(k.set) };
 }
 
 // one send: reel (a path under the kit or absolute) or url, channels (ids; services like "instagram" pick every channel of
@@ -321,31 +332,53 @@ export async function send(o, { env = process.env, fetchImpl = fetch, onPhase = 
   const unknown = want.filter(w => !all.some(c => c.id === w || c.service === w.toLowerCase()));
   if (!picked.length) throw bad(`None of those channels are in your Buffer account${unknown.length ? ` (${unknown.join(', ')})` : ''}. Connect them in Buffer first.`, 404);
   const textOf = c => (o.captions && o.captions[c.id] != null ? o.captions[c.id] : o.caption) || '';
-  const checks = picked.map(c => ({ c, ...checkChannel(c, info, { text: textOf(c), title: o.youtubeTitle }) }));
+  // the Feed gets the 4:5 of the same version (kit/studio/sizes.mjs); with your own link, the link you paste for it
+  const plOf = c => placementOf(c, o.placements);
+  let feed = null;
+  if (picked.some(c => plOf(c) === 'feed')) {
+    const u = host === 'url' && o.feedUrl ? checkUrl(o.feedUrl) : null; if (u && !u.ok) throw bad(u.error);
+    if (!rel) feed = { missing: !u, url: u ? u.url : null, info: u ? { width: 1080, height: 1350 } : null, file: null };
+    else { const f = SZ.fileFor(rel, 'feed', ROOT); feed = { ...f, abs: f.file && !f.missing ? resolve(ROOT, f.file) : null, url: u ? u.url : null }; feed.info = feed.abs ? probe(feed.abs) : null; if (host === 'url' && !u) feed.missing = true; }
+  }
+  const checks = picked.map(c => { const pl = plOf(c); return { c, pl, ...checkChannel(c, pl === 'feed' ? feed.info : info, { text: textOf(c), title: o.youtubeTitle, placement: pl, feed }) }; });
   const go = checks.filter(x => x.ok);
-  const results = checks.filter(x => !x.ok).map(x => ({ channelId: x.c.id, service: x.c.service, name: x.c.name, ok: false, skipped: true, error: x.block.join(' '), warn: x.warn }));
-  let url = o.url || null, encoded = null, uploaded = false, sig = null;
+  const results = checks.filter(x => !x.ok).map(x => ({ channelId: x.c.id, service: x.c.service, name: x.c.name, ...(x.c.service === 'instagram' ? { placement: x.pl } : {}), ok: false, skipped: true, ...(x.pl === 'feed' && feed.missing ? { needs: 'feed45' } : {}), error: x.block.join(' '), warn: x.warn }));
+  let url = o.url || null, encoded = null, uploaded = false, sig = null, feedOut = null;
+  // one file to a public link: re-encode when needed, reuse the link of the same file, else upload
+  const hostFile = async (fabs, frel) => {
+    onPhase('encode');
+    const e = await ensureH264(fabs, join(ROOT, 'jobs', o.job || '_post', 'post')), cache = cachedUrl(o.job, frel, host);
+    if (cache.url && !e.encoded) return { url: cache.url, sig: cache.sig, encoded: null, uploaded: false, info: e.info };
+    onPhase('upload');
+    const up = host === 'r2' ? await uploadR2(e.file, { env, fetchImpl, job: o.job, st }) : await uploadCloudinary(e.file, { env, fetchImpl, job: o.job, st });
+    return { url: up.url, sig: cache.sig, encoded: e.encoded ? { why: e.why, file: relative(ROOT, e.file) } : null, uploaded: true, info: e.info };
+  };
+  const pubOk = async link => { if (o.checkLink === false) return; onPhase('check'); const pub = await checkPublic(link, { fetchImpl, env }); if (!pub.ok) throw bad(pub.error, 400, { url: link }); };
   if (go.length) {
-    if (host === 'url') { const u = checkUrl(url); if (!u.ok) throw bad(u.error); url = u.url; }
-    else {
-      onPhase('encode');
-      const e = await ensureH264(abs, join(ROOT, 'jobs', o.job || '_post', 'post')); encoded = e.encoded ? { why: e.why, file: relative(ROOT, e.file) } : null; info = e.info || info;
-      const cache = cachedUrl(o.job, rel, host); sig = cache.sig;
-      if (cache.url && !e.encoded) url = cache.url;
-      else { onPhase('upload'); url = (host === 'r2' ? await uploadR2(e.file, { env, fetchImpl, job: o.job, st }) : await uploadCloudinary(e.file, { env, fetchImpl, job: o.job, st })).url; uploaded = true; }
+    const goMain = go.filter(x => x.pl !== 'feed'), goFeed = go.filter(x => x.pl === 'feed');
+    if (goMain.length) {
+      if (host === 'url') { const u = checkUrl(url); if (!u.ok) throw bad(u.error); url = u.url; }
+      else { const h = await hostFile(abs, rel); url = h.url; sig = h.sig; encoded = h.encoded; uploaded = h.uploaded; info = h.info || info; }
+      await pubOk(url);
+    } else if (host !== 'url') url = null;
+    if (goFeed.length) {
+      if (host === 'url') feedOut = { reel: feed.file, url: feed.url, sig: null, uploaded: false };
+      else { const h = await hostFile(feed.abs, feed.file); feedOut = { reel: feed.file, url: h.url, sig: h.sig, uploaded: h.uploaded, encoded: h.encoded }; }
+      await pubOk(feedOut.url);
     }
-    if (o.checkLink !== false) { onPhase('check'); const pub = await checkPublic(url, { fetchImpl, env }); if (!pub.ok) throw bad(pub.error, 400, { url }); }
     onPhase('buffer');
     for (const x of go) {
-      const input = postInput(x.c, { url, text: textOf(x.c), mode, dueAt, title: o.youtubeTitle, categoryId: o.youtubeCategory || (st.post && st.post.youtubeCategory), shareToFeed: o.shareToFeed, aiGenerated: o.aiGenerated });
+      const isFeed = x.pl === 'feed';
+      const input = postInput(x.c, { url: isFeed ? feedOut.url : url, text: textOf(x.c), mode, dueAt, title: o.youtubeTitle, categoryId: o.youtubeCategory || (st.post && st.post.youtubeCategory), shareToFeed: o.shareToFeed, aiGenerated: o.aiGenerated, placement: x.pl });
+      const base = { channelId: x.c.id, service: x.c.service, name: x.c.name, ...(x.c.service === 'instagram' ? { placement: x.pl } : {}), file: isFeed ? feedOut.reel : rel };
       try {
         const d = await gql(CREATE, { input }, { env, fetchImpl }), r = d.createPost || {};
-        if (r.post) results.push({ channelId: x.c.id, service: x.c.service, name: x.c.name, ok: true, postId: r.post.id, status: r.post.status || (mode === 'draft' ? 'draft' : null), dueAt: r.post.dueAt || null, warn: x.warn });
-        else results.push({ channelId: x.c.id, service: x.c.service, name: x.c.name, ok: false, error: r.message || 'Buffer did not create the post.', warn: x.warn });
-      } catch (e) { results.push({ channelId: x.c.id, service: x.c.service, name: x.c.name, ok: false, error: e.message, warn: x.warn }); if (e.code === 401) break; }
+        if (r.post) results.push({ ...base, ok: true, postId: r.post.id, status: r.post.status || (mode === 'draft' ? 'draft' : null), dueAt: r.post.dueAt || null, warn: x.warn });
+        else results.push({ ...base, ok: false, error: r.message || 'Buffer did not create the post.', warn: x.warn });
+      } catch (e) { results.push({ ...base, ok: false, error: e.message, warn: x.warn }); if (e.code === 401) break; }
     }
   }
-  const out = { at: new Date().toISOString(), job: o.job || null, reel: rel, sig, host, url, uploaded, encoded, mode, dueAt, seconds: info && info.seconds, results, unknown,
+  const out = { at: new Date().toISOString(), job: o.job || null, reel: rel, sig, host, url, uploaded: uploaded || !!(feedOut && feedOut.uploaded), encoded, ...(feedOut ? { feed: feedOut } : {}), mode, dueAt, seconds: info && info.seconds, results, unknown,
     sent: results.filter(r => r.ok).length, review: 'https://publish.buffer.com', keepLink: host !== 'url' ? 'Keep the file in your bucket until every post has gone out: Buffer fetches it when it publishes.' : 'Keep that link working until every post has gone out: Buffer fetches it when it publishes.' };
   remember(o.job, out);
   // remember the channels for next time

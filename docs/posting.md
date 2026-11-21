@@ -19,10 +19,22 @@ The Post step is the last step in Studio. It sends a rendered reel to your [Buff
 The step shows one part at a time:
 
 1. **Connect.** Your Buffer key (saved and tested in place) and the video host with only that host's fields. Next stays off until both are saved. Once they are, Studio opens straight on Channels next time.
-2. **Channels.** Pick the reel (the newest render is picked), tick channels from your Buffer account, and write one caption. Per-channel options are folded away: a caption for one channel, the YouTube title and category, and whether an Instagram Reel also shows in the feed.
+2. **Channels.** Pick the reel (the newest render is picked), tick channels from your Buffer account, and write one caption. Under the reel a note says which file goes where: Reels and Stories get the 9:16 file, the Instagram Feed gets the 4:5 file. Each Instagram channel has **Post to: Reels or Feed** (Reels by default), and shows the file it will get. Per-channel options are folded away: a caption for one channel, the YouTube title and category, and whether an Instagram Reel also shows in the feed.
 3. **Send.** Drafts (the default), Queue, Schedule (a date and time) or Post now. Post now asks you to tick "Yes, publish this now" first. The result lists every channel with its Buffer status or the reason it failed, and a link to review the drafts in Buffer.
 
 Studio remembers the channels you picked last time.
+
+## The Instagram Feed gets the 4:5 file
+
+Instagram only takes a 9:16 video as a Reel or a Story. A Feed post has to be between 4:5 and 1.91:1, and a 9:16 upload is refused there. So:
+
+- A channel set to **Reels** gets the reel you picked (`reel-v1.mp4`).
+- A channel set to **Feed** gets the 4:5 file of the same version (`reel-v1-feed-4x5.mp4`) on its own link, as an Instagram post. You do not pick it; Studio finds it.
+- When that version has no 4:5 file yet, the Feed channel's row says **Can't post yet. Needs the 4:5 version.** with one button, **Make it**. It makes the file from the same edit (the frame follows your face and the captions are laid out again), with progress in the page, and the channel is ready when it is done. Ticking **Instagram Feed 4:5** on Render makes it with the reel in the first place.
+- A 9:16 file is never sent to the Feed in its place.
+- With **My own link** as the host, paste a second link for the 4:5 file.
+
+Nothing about how posts go out changes: they are still saved as Buffer drafts unless you pick something else.
 
 ![The Post step, Send: Drafts picked and the result for each channel](studio/post-send.png)
 
@@ -41,7 +53,7 @@ Studio remembers the channels you picked last time.
   | X | plays natively up to 2 min 20 s (warning) | 280 (Premium allows more) |
   | Threads | up to 5 min | 500 |
 
-  Instagram, Facebook and YouTube also warn when the video is not 9:16. Buffer counts UTF-16 units, so emoji count double.
+  Instagram Reels, Facebook and YouTube also warn when the video is not 9:16. An Instagram Feed post is checked against 4:5 to 1.91:1 instead. Buffer counts UTF-16 units, so emoji count double.
 - **The public link.** After the upload Studio opens the public link the way Buffer will. If it needs a sign-in, is missing, or is a web page instead of a video, the send stops and says how to fix it (usually: turn on public access for the bucket).
 - **The same file twice.** Sending the same render again reuses its link instead of uploading again.
 
@@ -62,7 +74,7 @@ Buffer allows 150 requests per 15 minutes on Free (450 on Essentials, 1,500 on T
 ## For your agent
 
 - `buffer_channels`: your channels (id, name, service) with each network's limits, and whether a key and host are set up.
-- `buffer_post_reel`: `channels` (ids, or a service such as `instagram` for every channel of that network), `caption` and optional `captions` per channel id, `reel` (default: the newest render of the Studio job) or `url`, `mode` (`draft` by default, `queue`, `schedule` with `dueAt`, or `now` with `confirmNow: true`), `youtubeTitle`, `youtubeCategory`, `shareToFeed`. It returns each channel's Buffer post id or the error.
+- `buffer_post_reel`: `channels` (ids, or a service such as `instagram` for every channel of that network), `caption` and optional `captions` per channel id, `reel` (default: the newest render of the Studio job) or `url`, `mode` (`draft` by default, `queue`, `schedule` with `dueAt`, or `now` with `confirmNow: true`), `youtubeTitle`, `youtubeCategory`, `shareToFeed`, and `placements` for Instagram (`{ "<channel id>": "feed" }` or `{ "instagram": "feed" }`; the default is `reel`). A Feed placement is sent the 4:5 file of the same version; when it is missing that channel comes back skipped with `needs: "feed45"`, so make it (`render` with `export: "feed45"`, or `studio_run` with `sizes: ["4:5"]`) and send again. It returns each channel's Buffer post id, the file it got, or the error.
 - `setup_status` includes `posting`: whether a Buffer key and a host are set up. Posting is optional and never blocks anything else.
 
 Buffer also runs an official MCP server at `https://mcp.buffer.com/mcp` for general Buffer work (queues, ideas, analytics). Studio's tool is the one that knows about your local renders and hosting.
@@ -70,5 +82,5 @@ Buffer also runs an official MCP server at `https://mcp.buffer.com/mcp` for gene
 ## Not in this version
 
 - OAuth "Connect Buffer" for a hosted, multi-user Studio (BYOK personal keys only for now)
-- First comments, Instagram Stories, TikTok titles, thumbnails, and notification publishing for Instagram personal profiles
+- First comments, Instagram Stories as their own placement, Feed placements on networks other than Instagram, TikTok titles, thumbnails, and notification publishing for Instagram personal profiles
 - Deleting the uploaded file from R2 or Cloudinary after the posts go out
