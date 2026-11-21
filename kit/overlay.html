@@ -192,7 +192,7 @@ function kineticLayout(c,y){const key=c[0]+'@'+y;if(kCache[key])return kCache[ke
  const sp=B*sc*.32,lh=lines.map(l=>Math.max(...l.map(k=>k.size))*1.02),tot=lh.reduce((a,b)=>a+b,0);let yy=y-tot/2;
  lines.forEach((l,li)=>{const w=l.reduce((a,k)=>a+k.w,0)+sp*(l.length-1);let x=540-w/2;const cy=yy+lh[li]/2;l.forEach(k=>{k.x=x;k.y=cy;x+=k.w+sp});yy+=lh[li]});
  return kCache[key]=toks}
-function kineticSolo(c,t){const y=zoneAt(t)==='move'?ALTY:(c[4].y||KY),toks=kineticLayout(c,y);ctx.save();ctx.textAlign='left';ctx.textBaseline='middle';
+function kineticSolo(c,t){const y=splitY(t)||(zoneAt(t)==='move'?ALTY:(c[4].y||KY)),toks=kineticLayout(c,y);ctx.save();ctx.textAlign='left';ctx.textBaseline='middle';
  for(const k of toks){const dt=t-k.a+.04;if(dt<0)continue;ctx.save();ctx.font=k.font;ctx.letterSpacing=k.kind==='emph'?(TRK*k.size)+'px':'0px';shadow(ctx,k.size);
   if(k.kind==='emph'){const q=cl(dt/.22),s=q<1?1.5-.5*overshoot(q,.2):1;ctx.globalAlpha*=cl(dt/.05);ctx.translate(k.x+k.w/2,k.y);ctx.scale(s,s);ctx.fillStyle=CY;ctx.fillText(k.txt,-k.w/2,0)}
   else if(k.kind==='script'){const q=expo(cl(dt/.35));ctx.beginPath();ctx.rect(k.x-20,k.y-k.size,(k.w+40)*q,k.size*2);ctx.clip();ctx.fillStyle=IV;ctx.fillText(k.txt,k.x,k.y)}
@@ -343,7 +343,7 @@ function capEnter(m,h,dt,seed){const txt=h.txt,n=txt.length,s=h.size,W=ctx.measu
   if(m==='compute'&&dt<.08+k*.03)ctx.restore()}}
 function kinetic(c,t){const o=c[4];if(o.lockup===false)return kineticSolo(c,t);const cd=cardAt(t),pl=cd?null:placeOf(o),ps=pl?placeSpec(pl,LKP.K,'K'):null;
  // on a colour card the words sit mid-card (under the numeral on a chapter card) in the card's ink, flat
- const y=cd?(cd[4].chapter!=null?1290:960):zoneAt(t)==='move'?ALTY:(o.y||(ps&&ps.y)||KY);
+ const y=cd?(cd[4].chapter!=null?1290:960):splitY(t)||(zoneAt(t)==='move'?ALTY:(o.y||(ps&&ps.y)||KY));
  const R0=lockup(wordsOf(c),o,y,ps?ps.P:LKP.K),R=cd?{...R0,hc:cd.ink,pc:cd.ink,parts:R0.parts.map(p=>({...p,outline:false}))}:R0;ctx.save();ctx.textBaseline='alphabetic';if(pl)placeXf(pl,R.box);FLAT=!!cd;
  const ce=CENTR.includes(o.entrance)?o.entrance:CENTR.includes(CAP.captionEntrance)?CAP.captionEntrance:'pop';
  R.heroes.forEach(h=>{const dt=t-h.a+.04;if(dt<0)return;if(ce!=='pop'){ctx.save();ctx.font=h.font;ctx.letterSpacing=h.track+'px';ctx.fillStyle=R.hc;shadow(ctx,h.size);capEnter(ce,h,dt,Math.round(h.a*100));ctx.restore();return}const q=cl(dt/.22),s=q<1?1.5-.5*overshoot(q,.2):1;ctx.save();ctx.font=h.font;ctx.letterSpacing=h.track+'px';ctx.textAlign='center';ctx.fillStyle=R.hc;shadow(ctx,h.size);ctx.globalAlpha*=cl(dt/.05);ctx.translate(h.x,h.y-h.asc/2);ctx.scale(s,s);ctx.fillText(h.txt,0,h.asc/2);ctx.restore()});
@@ -373,6 +373,15 @@ function typeCard(c,t){ctx.save();ctx.globalAlpha=1;ctx.fillStyle=c.bg;ctx.fillR
 // partner face. The hero comes in big in the display face (an italic serif reads best) with a short blur, holds, and
 // the rest of the phrase builds under it, small. Every fourth hero takes the accent colour.
 const OW={small:.62,body:1.25,hero:2.3,under:.62},INS=(window.LOCKOVER||{}).inserts||[],insertAt=t=>INS.find(s=>t>=s.at&&t<s.at+s.dur);
+// split and framed b-roll (kit/split.cjs) move your picture for their span: every caption style sits on the line the layout
+// leaves ("y" in lockover.js), off your face
+const splitY=t=>{const s=INS.find(s=>s.split&&t>=s.at&&t<s.at+s.dur);return s?s.y:0};
+// on the framed layout's light backdrop the captions flip to dark ink (lightness inverted, hue kept), drawn on a scratch
+// canvas so their own filters and halos stay as they are
+const splitLight=t=>INS.some(s=>s.split&&s.light&&t>=s.at&&t<s.at+s.dur);let INKC=null;
+function inked(draw){const keep=ctx;if(!INKC){INKC=document.createElement('canvas');INKC.width=1080;INKC.height=1920}
+ const x=INKC.getContext('2d');x.setTransform(1,0,0,1,0,0);x.globalAlpha=1;x.filter='none';x.clearRect(0,0,1080,1920);ctx=x;
+ try{draw()}finally{ctx=keep}ctx.save();ctx.filter='invert(1) hue-rotate(180deg)';ctx.drawImage(INKC,0,0);ctx.restore()}
 {let n=0;flips.forEach(c=>{if(c[3]===0)c.owN=n++})}
 // with several pairings ("fonts": "a,b,c") the oneword track changes pairing every three phrases, whole pairs only.
 // Everything else on screen (cards, titles, stickers) takes the pairing of the phrase it comes up with, or of the card or
@@ -488,7 +497,7 @@ function oneWordSeq(t,only){if(!OWSEQ)return;const x=OWSEQ.find(x=>t>=x.s&&t<x.e
  ctx.save();{const k=LXF(x.c,t);if(k===0){ctx.restore();return}if(k)xfApply(k)}oneWordDraw(x.c,x.w,x.s,t,over.length&&y<760?150:y);ctx.restore()}
 // one-word (the simple style): while a title is up it is the one word on screen, so the caption waits
 const titleUp=t=>(zoneAt(t)!=='hide'&&TITLES.some(c=>t>=c[0]&&t<c[1]))||(CPOS==='top'&&flips.some(c=>c[3]===9&&t>=c[0]+.1&&t<c[1])); // a top caption also waits for an ordinal word
-function caption(c,t){const st=c[4].style||CSTYLE;if(st==='one-word'&&OWSEQ)return;if(st==='one-word'&&titleUp(t))return;const yo=zoneAt(t)==='move'?ALTY:0;if(st==='kinetic')return kinetic(c,t);if(st==='oneword')return oneword(c,t);if(st==='pill')return pill(c,t,yo);if(st==='hormozi')return boldCap(c,t,false,yo);if(st==='karaoke')return boldCap(c,t,true,yo);if(st==='one-word')return oneWord(c,t,yo);glyphs(c[2],fit([c[2]],S,CSZ,980),540,yo||CYB,t-c[0],CCOL||IV,true)}
+function caption(c,t){if(splitLight(t)&&ctx.canvas!==INKC)return inked(()=>caption(c,t));const st=c[4].style||CSTYLE;if(st==='one-word'&&OWSEQ)return;if(st==='one-word'&&titleUp(t))return;const yo=splitY(t)||(zoneAt(t)==='move'?ALTY:0);if(st==='kinetic')return kinetic(c,t);if(st==='oneword')return oneword(c,t);if(st==='pill')return pill(c,t,yo);if(st==='hormozi')return boldCap(c,t,false,yo);if(st==='karaoke')return boldCap(c,t,true,yo);if(st==='one-word')return oneWord(c,t,yo);glyphs(c[2],fit([c[2]],S,CSZ,980),540,yo||CYB,t-c[0],CCOL||IV,true)}
 // Graphics (kit/graphics.json): mode 9 ordinal sticker, 10 app label, 11 screen card, 12 to 38 below. Original generic designs. Your
 // icon or screen recording comes in through gfx.js (render.mjs writes it: image URLs, and a video as a frame list);
 // without one the kit draws a neutral glyph or placeholder window.

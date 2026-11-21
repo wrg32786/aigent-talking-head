@@ -13,12 +13,24 @@ Release notes: [docs/releases/v1.19.0.md](docs/releases/v1.19.0.md). Recreate re
 - **Cut points.** An end set inside a clean pause stays in it: the next line is no longer pulled back in when Whisper times its first word early (`/api/cut/set` moved 6.75 s to 8.04 s past a pause at 6.63 to 7.20 s). A transcript that runs early or late as a whole is moved onto the sound (`kit/cutpoints.cjs` `offsetOf`, `align`), once the audio is read; the cached transcript records `aligned`.
 - **Tests and docs.** `tests/recreate-shotplan.test.cjs` (in `npm run check`), a `--recut` smoke step on one continuous take with a 6-shot reference, `--recut` asserted in `tests/studio-recreate-pieces.test.mjs`; `docs/reel-md.md`, `docs/studio.md`, the MCP `studio_add_reference_url` description.
 
-## 1.17.2 (unreleased)
+## 1.18.2 (unreleased)
 
-Release notes: [docs/releases/v1.17.2.md](docs/releases/v1.17.2.md). Recreate drafts from your pieces.
+Release notes: [docs/releases/v1.18.2.md](docs/releases/v1.18.2.md). Recreate drafts from your pieces.
 
 - **Recreate keeps your pieces.** With a reference on Recreate, Draft used the whole take even when you kept pieces on Cut (`fromPieces = ... && !recreate` in `draftSteps`), so a line you cut out came back. The draft was saved under the take's key while Your edit and Finish asked for the pieces' key, so after every draft Studio still said "Your pieces changed since the draft" (`drafted: false, stale: true`) and Render never came on. Recreate now drafts from your pieces, already cut (`--as-is`), with the reference's Reel.md as the recipe, and the draft counts as done.
 - **Tests.** `tests/studio-recreate-pieces.test.mjs` (in `npm run smoke`, it needs ffmpeg).
+
+## 1.18.0 (unreleased)
+
+Release notes: [docs/releases/v1.18.0.md](docs/releases/v1.18.0.md). B-roll: the split panel sits behind your head, and a new framed layout.
+
+- **Split top panel, behind your head.** The split now moves you so the top of your head reaches a little (72 px, `overlap` on the insert) into the panel's lower edge, and draws your head over the panel with the person mask, so the panel sits behind it, with a soft shadow along the seam. It follows your face over the insert (`build/facezone.json`); `faceY` is the fallback. Without the mask your head stays just under the seam instead of being cut by it (`kit/split.cjs`, `kit/assemble.cjs`).
+- **Framed cards.** A new placement, `"place": "frame"`: the b-roll in a rounded card up top and you, smaller than the split's bottom half, in a rounded card below, your head breaking out over its top edge (the person mask again). Thin blue border and a soft glow on a cream to lavender backdrop; `frameColor` and `frameBg` on the insert change them. In Studio it is **Framed cards** under How it sits on the B-roll step; MCP `fill_slot` and `suggest_broll` take `place: "frame"`.
+- **Captions off your face on both.** For the span of a split or framed insert, every caption style sits on the line the layout leaves (above your head on the panel, between the cards on the frame), the face zone moves with your picture so the face keep-out and `npm run verify` check where your face is on screen, and on the cream backdrop the captions draw in dark ink (`kit/overlay.html`, `kit/render.mjs`, `kit/reel.cjs`).
+- **The person mask covers split spans.** A rebuild with split or framed inserts masks those spans too, and turns the mask on for the job when the effects are set up (`--no-mask` keeps it off). When only the split wants the mask and it cannot run (memory, a missing model), the reel still renders, with your head under the panel.
+- **Placement preview.** The preview beside the placement chips draws where the clip and you sit (split, framed, picture in picture). Fixes the Split chip picking up the top bar's styles (it sat lower than the others).
+- **Checks.** `npm run check` flags an insert with an unknown `place`.
+- **Tests and docs.** `tests/studio-broll.test.mjs` (the layouts: head into the panel, no-mask fallback, the framed card smaller than the split, your picture covering the card, the caption line between the cards, face zones moved) and `tests/studio-broll.e2e.mjs` (Framed cards in the page with its preview, and a framed insert assembled on synthetic colours); docs/studio.md, docs/mcp.md, AGENTS.md and the Studio skill.
 
 ## 1.17.1 (unreleased)
 

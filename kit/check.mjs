@@ -16,6 +16,7 @@ import { createRequire } from 'module';
 const R = createRequire(import.meta.url)('./rules.cjs');
 const SFXPLAN = createRequire(import.meta.url)('./sfx-plan.cjs');
 const B = createRequire(import.meta.url)('./beats.cjs');
+const SPLITL = createRequire(import.meta.url)('./split.cjs');
 const KIT = dirname(fileURLToPath(import.meta.url)), ROOT = dirname(KIT);
 const argv = process.argv.slice(2), warnOnly = argv.includes('--warn-only');
 const target = argv.find(a => !a.startsWith('--'));
@@ -83,7 +84,7 @@ function checkJob(captionsFile, cutFile, label) {
     for (const k of Object.keys(C.sfx || {})) if (!R.SFX[k] && !(C.sounds || {})[k]) errs.push(`sfx "${k}": use ${Object.keys(R.SFX).join(', ')}, or add it to "sounds" in cut.json`);
     for (const h of C.sfxHits || []) if (!SFXPLAN.lookup(h.id)) errs.push(`sfxHits "${h.id}" is not in kit/sfx/sfx.json`);
     for (const [k, s] of Object.entries(C.sounds || {})) if (!s.file || !existsSync(resolve(dirname(cutFile), s.file))) errs.push(`sounds.${k}: no file at ${s.file}`);
-    for (const [k, s] of (C.inserts || []).entries()) { if (!s.file || !existsSync(resolve(dirname(cutFile), s.file))) errs.push(`inserts[${k}]: no file at ${s.file}`); if (!(+s.dur > 0) || +s.at < 0 || +s.at + +s.dur > TL.total + 0.01) errs.push(`inserts[${k}]: at ${s.at} + dur ${s.dur} is outside the ${TL.total} s cut`); }
+    for (const [k, s] of (C.inserts || []).entries()) { if (s.place != null && !SPLITL.PLACES.includes(s.place)) errs.push(`inserts[${k}]: place "${s.place}" (${SPLITL.PLACES.join(', ')})`); if (!s.file || !existsSync(resolve(dirname(cutFile), s.file))) errs.push(`inserts[${k}]: no file at ${s.file}`); if (!(+s.dur > 0) || +s.at < 0 || +s.at + +s.dur > TL.total + 0.01) errs.push(`inserts[${k}]: at ${s.at} + dur ${s.dur} is outside the ${TL.total} s cut`); }
     if (C.bed) { const lib = R.isBed(C.bed);
       if (!existsSync(lib ? R.bedFile(C.bed) : resolve(dirname(cutFile), String(C.bed)))) errs.push(lib ? `bed "${C.bed}": kit/music/${R.BEDS[C.bed].file} is missing (beds.json lists it)` : `bed "${C.bed}": not a library bed (npm run music) and no such file`); }
     const seams = TL.seams.map(x => x.toFixed(2));

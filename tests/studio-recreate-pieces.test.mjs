@@ -1,4 +1,4 @@
-// Recreate drafts from your pieces (1.17.2), with no Chrome, no keys and no network (a stand-in transcriber and reel):
+// Recreate drafts from your pieces (1.18.2), with no Chrome, no keys and no network (a stand-in transcriber and reel):
 // - with a reference on Recreate and pieces kept on Cut, the draft is your pieces, already cut (--as-is), with the
 //   reference's Reel.md as the recipe; the line you cut out stays out
 // - after the draft, Your edit says drafted (not stale) and the next thing is Render, so Render comes on

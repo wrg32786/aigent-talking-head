@@ -125,10 +125,6 @@ Your agent installs everything up front (Python, the downloaders, the Whisper mo
 
 <img src="docs/studio/look-layers-light.png" width="720" alt="The same Look step in the light theme">
 
-**A reference sets your Look.** Pick **Use all** (Recreate) and we set every layer from the reference: its Look, captions, titles, transitions, grade, effects, music and pace. **Use parts** (Influence) sets its picks and keeps your Look and sound. A short line says so, each choice it set is badged REF, and **Back to my look** takes out only what it set. If the reference is still being read, Studio says so and sets it when it is ready.
-
-<img src="docs/studio/reference-sets-look.png" width="420" alt="We set your look from the reference. Change anything you like, with Back to my look, the cinematic Look picked from the reference, Use all on, and amber dots on the layers it set"> <img src="docs/studio/reference-sets-look-light.png" width="420" alt="The same notice in the light theme">
-
 **Two separate chats.** The Studio chat and your terminal conversation are separate channels. Studio shows only what you type on the page, your agent's replies to it and its Studio actions, never the terminal conversation. Each message shows whether it is queued, seen by your agent or answered. Edits from either place update the page live, and when the agent changes the edit from the terminal, Studio can show a one-line note such as "picked caption style kinetic (from the terminal)" (a setting, on by default). An agent can't be interrupted in the middle of a step: messages wait until its next step, and a Claude Code hook tells it how many Studio messages are waiting.
 
 <p>

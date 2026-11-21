@@ -672,6 +672,22 @@ const baseSig = () => { const c = JSON.parse(fs.readFileSync(path.join(build, 'c
 const ensureBase = () => { const bf = path.join(build, 'base.mp4'), sf = path.join(build, 'base.sig'), sig = baseSig();
   if (fs.existsSync(bf) && fs.existsSync(sf) && fs.readFileSync(sf, 'utf8') === sig) { console.log('base.mp4: picture unchanged, reused'); return; }
   sh(process.execPath, [path.join(KIT, 'assemble.cjs'), 'base.mp4'], build, { BASEONLY: '1' }); fs.writeFileSync(sf, sig); };
+// split and framed b-roll (kit/split.cjs) move your picture for their spans, so the face zone moves with it there and
+// the captions keep clear of where your face is on screen; they also need the person mask over those spans to put the
+// top of your head over the panel (on by default, --no-mask keeps the head under the panel)
+const SPL = require('./split.cjs');
+const splitIns = () => (cut.inserts || []).filter(s => SPL.SPLIT.includes(s.place) && +s.dur > 0);
+const fxReady = () => fs.existsSync(path.join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python'));
+function splitZones(fz) {
+  const ins = splitIns(); if (!ins.length) return fz.zones;
+  const mask = !flag('no-mask') && fxReady(), zones = fz.zones.slice();
+  for (const s of ins) {
+    const g = SPL.layout(s, SPL.faceOver(fz, +s.at, +s.dur), { mask });
+    for (let i = Math.max(0, Math.floor(+s.at * fz.fps)); i < Math.min(zones.length, Math.ceil((+s.at + +s.dur) * fz.fps)); i++) zones[i] = SPL.mapZone(zones[i], g);
+  }
+  return zones;
+}
+if (splitIns().length && !cut.mask && !flag('no-mask') && fxReady()) { cut.mask = 'mask.mkv'; fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); }
 // face keep-out (Will, 2026-11-19): find the face in every moment of the picture (kit/facezone.py, YuNet, cached) and hand
 // the zone to the layout pass, so no caption, title or kinetic word lands on the eyes, nose, mouth or chin. --no-face-safe
 // keeps the zone for the check (facecheck.json) but does not move anything.
@@ -682,7 +698,7 @@ const ensureBase = () => { const bf = path.join(build, 'base.mp4'), sf = path.jo
       ensureBase();
       execFileSync(fs.existsSync(fxPyF) ? fxPyF : PY, [path.join(KIT, 'facezone.py'), 'base.mp4', 'facezone.json'], { cwd: build, stdio: 'inherit', env: { ...process.env, PYTHONUTF8: '1' } });
       const fz = JSON.parse(fs.readFileSync(path.join(build, 'facezone.json'), 'utf8')), caps = R.readCaptions(capF);
-      caps.faceTrack = { fps: fz.fps, zones: fz.zones };
+      caps.faceTrack = { fps: fz.fps, zones: splitZones(fz) };
       if (flag('no-face-safe')) caps.faceSafe = false;
       fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
     } catch (e) { console.warn('note: face zone skipped (' + String(e.message).split('\n')[0] + '); captions are not kept off the face this run'); }
@@ -700,11 +716,11 @@ if (flag('rebuild') && flag('no-mask') && (cut.mask || cut.headMask || cut.perso
   console.log('titles in front: no person mask this render (--no-mask); remove the flag and set "mask": "mask.mkv" in cut.json to put it back');
 }
 // memory for the mask (kit/memcheck.cjs; kit/mask.py checks again before it loads the model)
-if (cut.titles && cut.mask) { const mc = require('./memcheck.cjs').renderCheck(build, { model: opt('mask') });
+if ((cut.titles || splitIns().length) && cut.mask) { const mc = require('./memcheck.cjs').renderCheck(build, { model: opt('mask') });
   if (mc.needed) console.log(mc.ok ? `memory: ${mc.freeGB} GB free, the ${mc.model} mask needs about ${mc.needGB} GB` : `WARNING: ${mc.message} (--no-mask puts titles in front; --mask mediapipe is the lighter mask)`); }
 // person mask only for titles that sit behind the head (needs npm run effects:setup)
-if (cut.titles && cut.mask) {
-  const capsNow = R.readCaptions(path.join(build, 'captions.js'));
+if ((cut.titles || splitIns().length) && cut.mask) {
+  let capsNow = {}; try { capsNow = R.readCaptions(path.join(build, 'captions.js')); } catch {}
   const behind = R.resolveTitles(capsNow, cut).filter(t => t.layer === 'behind')
     .concat((capsNow.flips || []).filter(f => f.mode === 9 && f.layer === 'behind').map(f => ({ start: f.start, end: f.end })));
   // captions behind the person (caption-layer behind, or auto at the top): mask every caption span
@@ -718,6 +734,8 @@ if (cut.titles && cut.mask) {
   // screen cards behind the head: mask their spans, then cut the head out of the person mask (kit/headmask.py)
   const panels = R.panelsBehind(capsNow).map(f => ({ start: f.start, end: Math.min(f.end, LEN) }));
   if (panels.length && cut.panels) { behind.push(...panels); console.log(`screen cards behind the top of the head: mask over ${panels.length} card span${panels.length > 1 ? 's' : ''}`); }
+  const splits = splitIns().map(x => ({ start: +x.at, end: Math.min(+x.at + +x.dur, LEN) }));
+  if (splits.length) { behind.push(...splits); console.log(`split b-roll: mask over ${splits.length} span${splits.length > 1 ? 's' : ''} so your head sits in front of the panel`); }
   if (!behind.length) {
     console.log('title layer: all titles and stickers in front; skipping the person mask');
   } else {
@@ -728,7 +746,10 @@ if (cut.titles && cut.mask) {
       ensureBase(); // BASEONLY drops sfx and bed; reused when the picture has not changed
       const win = behind.map(t => `${Math.max(0, t.start - 0.1).toFixed(2)}-${Math.min(LEN, t.end + 0.1).toFixed(2)}`).join(',');
       const maskArgs = [path.join(KIT, 'mask.py'), 'base.mp4', spec.file || 'mask.mkv', ...(win ? ['--windows', win] : []), ...(spec.model ? ['--model', spec.model] : []), ...(spec.person ? ['--person', spec.person] : [])];
-      sh(fxPy, maskArgs, build);
+      // when only split b-roll wants the mask, a mask that cannot run (memory, a missing model) does not stop the reel:
+      // the head stays under the panel (kit/split.cjs) instead
+      if (splits.length === behind.length) { try { sh(fxPy, maskArgs, build); } catch (e) { process.env.SPLIT_NO_MASK = '1'; console.warn('note: the person mask did not run, so on the split b-roll your head stays under the panel this render'); } }
+      else sh(fxPy, maskArgs, build);
       // a title behind the head stays readable: measure from the mask how much of its letters the head covers
       // (kit/cover.py); over cut.json "behindMax" (default 0.22) it moves in front, a face title to the slot above
       // the head, and the overlay is drawn again
