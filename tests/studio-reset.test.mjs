@@ -1,6 +1,7 @@
 // Uploading or selecting new footage starts a fresh edit: leftover B-roll from the last draft must
 // not stay on the timeline, and there is a way to clear all B-roll (with undo). Files are never
-// deleted. The same over HTTP and over MCP (clear_broll, fill_slot clear+all).
+// deleted. Finish must show only the current draft (never a render from another take), and earlier
+// reels stay in the Outputs library. The same over HTTP and over MCP (clear_broll, fill_slot clear+all).
 // Run: node tests/studio-reset.test.mjs   (npm run check runs it too)
 import assert from 'assert';
 import { spawn, spawnSync } from 'child_process';
@@ -99,10 +100,33 @@ try {
     assert.deepStrictEqual(s.footage, footage);
   });
 
+
+  await t('core: adding footage stamps earlier reels with the previous draft key, and they no longer match', () => {
+    const dir = join(ROOT, 'jobs', JOB);
+    mkdirSync(dir, { recursive: true });
+    copyFileSync(CLIP, join(dir, 'reel-v1.mp4'));
+    writeFileSync(join(dir, 'reel-v1.settings.json'), JSON.stringify({ version: 1, at: '2026-11-20T10:00:00.000Z', look: 'Mint Kinetic', from: 'the whole take' }));
+    mkdirSync(join(dir, 'reel-v1.build'), { recursive: true });
+    writeFileSync(join(dir, 'reel-v1.build', 'meta.json'), JSON.stringify({ reel: 'reel-v1.mp4', saved: '2026-11-20T10:00:00.000Z', kit: '1.18.1', media: [] }) + '\n');
+    const s = editedBoard(JOB, { keepLook: true });
+    const prev = C.draftStamp(s);
+    const r = C.addFootage(s, `inbox/studio/${JOB}/two.mp4`);
+    assert.strictEqual(r.reset, true);
+    const st = JSON.parse(readFileSync(join(dir, 'reel-v1.settings.json'), 'utf8'));
+    assert.strictEqual(st.key, prev.key, JSON.stringify(st));
+    assert.deepStrictEqual(st.takes, ['take.mp4']);
+    const meta = JSON.parse(readFileSync(join(dir, 'reel-v1.build', 'meta.json'), 'utf8'));
+    assert.strictEqual(meta.key, prev.key);
+    const ident = C.outputIdentity(JOB, 1);
+    assert.strictEqual(C.outputMatchesDraft(s, ident, 'take:' + C.footageKey(s)), false, 'stale after the new file');
+    assert.strictEqual(C.draftIsCurrent(s), false);
+  });
+
   // HTTP + MCP
   mkdirSync(join(ROOT, 'inbox', 'studio', JOB), { recursive: true });
   copyFileSync(CLIP, join(ROOT, 'inbox', 'studio', JOB, 'take.mp4'));
   writeDraft(JOB);
+  writeFileSync(join(ROOT, 'jobs', JOB, 'choices.json'), JSON.stringify({ beats: [] }) + '\n');
   const BR = await import('../kit/studio/broll.mjs');
   const clip = BR.add(CLIP, { name: 'old-broll.mp4', source: 'upload', title: 'Old b-roll' });
   const board = editedBoard(JOB, { clipId: clip.id });
@@ -132,6 +156,7 @@ try {
     assert.strictEqual(r.status, 200, r.text);
     assert.strictEqual(r.j.reset, true);
     assert.ok(/fresh edit/.test(r.j.note));
+    assert.ok(/Outputs/.test(r.j.note) && /New video/.test(r.j.note), r.j.note);
     assert.ok(r.j.state.footage.some(f => f.endsWith('new-take.mp4')));
     assert.ok(r.j.state.footage.some(f => f.endsWith('take.mp4')), 'the first file stays in the list');
     assert.strictEqual(r.j.state.cut, null);
@@ -142,6 +167,41 @@ try {
     assert.ok(existsSync(join(ROOT, 'jobs', JOB, 'build', 'cut.json')), 'the old draft files stay on disk');
     assert.ok(existsSync(join(ROOT, 'inbox', 'studio', JOB, 'take.mp4')), 'the old take stays on disk');
     assert.ok(existsSync(join(LIB, clip.file)) || BR.get(clip.id), 'the library clip is not deleted');
+    assert.ok((r.j.outputs || []).some(f => f.endsWith('reel-v1.mp4')), 'the old reel stays on disk and in the library list');
+    assert.deepStrictEqual(r.j.currentOutputs || [], [], 'Finish must not play the earlier take');
+    assert.strictEqual(r.j.draftPreview, null);
+    const ch = await req('/api/choices');
+    assert.strictEqual(ch.j.stale, true);
+    assert.strictEqual(ch.j.choices, null);
+    const lib = await req('/api/outputs');
+    const v1 = (lib.j.versions || []).find(v => v.v === 1);
+    assert.ok(v1, 'old reel is in Outputs');
+    assert.strictEqual(v1.current, false);
+    assert.ok(v1.take && /take\.mp4/.test(v1.take), JSON.stringify(v1));
+    assert.ok(v1.reel && v1.files.some(f => f.path.endsWith('reel-v1.mp4')));
+  });
+
+
+  await t('Finish: after a new draft, only a render that matches the current build key is current', async () => {
+    const s = C.load();
+    s.draftStale = false;
+    s.drafted = { key: 'take:' + C.footageKey(s), from: 'take', at: Date.now() };
+    C.save(s);
+    writeDraft(s.job);
+    let r = await req('/api/state');
+    assert.deepStrictEqual(r.j.currentOutputs || [], [], 'a new draft without a render must not show the old reel');
+    assert.ok((r.j.outputs || []).some(f => f.endsWith('reel-v1.mp4')));
+    const dir = join(ROOT, 'jobs', s.job);
+    copyFileSync(CLIP, join(dir, 'reel-v2.mp4'));
+    writeFileSync(join(dir, 'reel-v2.settings.json'), JSON.stringify({ version: 2, at: new Date().toISOString(), job: s.job, key: s.drafted.key, footage: C.footageKey(s), takes: C.takeNames(s), from: 'the whole take' }));
+    r = await req('/api/state');
+    assert.deepStrictEqual(r.j.currentOutputs, [`jobs/${s.job}/reel-v2.mp4`], JSON.stringify(r.j.currentOutputs));
+    assert.ok(r.j.outputs.includes(`jobs/${s.job}/reel-v1.mp4`));
+    const lib = await req('/api/outputs');
+    const by = Object.fromEntries((lib.j.versions || []).map(v => [v.v, v]));
+    assert.strictEqual(by[2].current, true);
+    assert.strictEqual(by[1].current, false);
+    assert.ok(by[2].take);
   });
 
   await t('Clear all B-roll: confirm path clears every slot, undo puts them back, the library is unchanged', async () => {

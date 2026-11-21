@@ -10,8 +10,8 @@ import { api, file, toast, Icon, IconBtn } from './lib.jsx';
 export const clock = t => { const s = Math.max(0, +t || 0), m = Math.floor(s / 60), r = s - m * 60; return `${m}:${r < 10 ? '0' : ''}${r.toFixed(1)}`; };
 
 // ---------- show original ----------
-export function Compare({ V, s, apply }) {
-  const outs = V.outputs || [], hasRef = !!s.reference.file;
+export function Compare({ V, s, apply, outputs }) {
+  const outs = outputs || V.currentOutputs || [], hasRef = !!s.reference.file;
   const [pick, setPick] = useState(outs[0] || ''), [mode, setMode] = useState(hasRef ? 'side' : 'build'), [op, setOp] = useState(50), [off, setOff] = useState(0);
   const [t, setT] = useState(0), [dur, setDur] = useState(0), [playing, setPlaying] = useState(false), [refSound, setRefSound] = useState(false);
   const [draw, setDraw] = useState(false), [box, setBox] = useState(null), [note, setNote] = useState(''), [sending, setSending] = useState(false);
@@ -22,7 +22,7 @@ export function Compare({ V, s, apply }) {
   const sync = (force) => { const b = bv.current, r = rv.current; if (!b || !r || !r.duration) return; const want = Math.max(0, Math.min(r.duration - 0.05, b.currentTime + off)); if (force || Math.abs(r.currentTime - want) > 0.12) r.currentTime = want; };
   useEffect(() => { let id; const tick = () => { const b = bv.current; if (b) { setT(b.currentTime); sync(false); } id = requestAnimationFrame(tick); }; if (playing) id = requestAnimationFrame(tick); return () => cancelAnimationFrame(id); }, [playing, off]);
   useEffect(() => { sync(true); }, [off]);
-  if (!outs.length) return <div className="review glass-card" id="compare"><h3>Show original</h3><p className="fine">Render once to compare your reel with {hasRef ? 'the reference' : 'a reference'} here.</p></div>;
+  if (!outs.length) return <div className="review glass-card" id="compare"><h3>Show original</h3><p className="fine">Render this draft to compare it with {hasRef ? 'the reference' : 'a reference'} here. Earlier reels stay in Outputs.</p></div>;
   const play = () => { const b = bv.current, r = rv.current; if (!b) return; if (b.paused) { sync(true); b.play().catch(() => {}); r && r.play().catch(() => {}); setPlaying(true); setDraw(false); } else { b.pause(); r && r.pause(); setPlaying(false); } };
   const seek = x => { const b = bv.current; if (!b) return; b.currentTime = x; setT(x); sync(true); };
   const ended = () => { rv.current && rv.current.pause(); setPlaying(false); };

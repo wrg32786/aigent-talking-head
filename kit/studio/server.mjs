@@ -136,7 +136,8 @@ function view(s) {
   let combo = { pieces: [], seconds: 0, key: '' }; try { combo = comboOf(s); } catch {}
   let edit = null; try { edit = editOf(s, { combo, cut, broll }); } catch (e) { edit = { error: e.message }; }
   let look = null; try { look = lookSources(s); } catch {}
-  return { seq: ++viewSeq, boot: BOOT, state: s, look, compose: comp, outputs: C.outputsOf(s), reopenable, scripts, cut, broll, pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
+  const outputs = C.outputsOf(s), currentOutputs = currentOutputsOf(s);
+  return { seq: ++viewSeq, boot: BOOT, state: s, look, compose: comp, outputs, currentOutputs, draftPreview: draftPreviewOf(s), reopenable, scripts, cut, broll, pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
 }
 
 // what a finished draft says (a draft is a plan: no video until Render)
@@ -263,7 +264,7 @@ function renderSteps(s) {
   // the b-roll lane goes into cut.json first (kit/studio/broll-run.mjs), with credits.txt for the clips it uses
   const bp = BRL.plan(s), steps = [];
   if (bp) { const f = join('jobs', s.job, 'broll.json'); writeFileSync(join(ROOT, f), JSON.stringify(bp, null, 1)); steps.push(['kit/studio/broll-run.mjs', ['apply', '--name', s.job, '--plan', f]]); }
-  steps.push([process.env.STUDIO_REEL || 'kit/reel.cjs', args]);
+  steps.push([process.env.STUDIO_REEL || 'kit/reel.cjs', args, { STUDIO_DRAFT_KEY: draftKey(s), STUDIO_FOOTAGE_KEY: C.footageKey(s) }]);
   let fx = null;
   if (comp.effects.length && env().effectsReady) {
     const ch = readChoices(s); fx = C.fxPlan(ch, comp.effects);
@@ -591,23 +592,72 @@ function editOf(s, v) {
 function saveSettings(s) {
   const dir = join(ROOT, 'jobs', s.job || '-'); let v = 0; try { v = Math.max(0, ...readdirSync(dir).map(f => +(f.match(/^reel-v(\d+)\.mp4$/) || [0, 0])[1])); } catch {} if (!v) return null;
   const vw = view(s), e = vw.edit, combo = vw.combo, files = C.outputsOf(s).filter(f => new RegExp(`reel(-fx)?-v${v}(-[a-z0-9]+)?\\.mp4$`).test(f));
-  const out = { version: v, at: new Date().toISOString(), job: s.job, making: e.making.text, format: e.making.format, look: e.look.text, pack: s.pack || null, reference: e.look.reference, from: e.from.text, pieces: combo.pieces.map(x => ({ id: x.id, kind: x.kind, label: x.label, seconds: x.seconds, lines: x.lines || null })), count: pieceN(combo), seconds: combo.seconds,
+  const key = draftKey(s), footage = C.footageKey(s), takes = C.takeNames(s);
+  const out = { version: v, at: new Date().toISOString(), job: s.job, key, footage, takes, making: e.making.text, format: e.making.format, look: e.look.text, pack: s.pack || null, reference: e.look.reference, from: e.from.text, pieces: combo.pieces.map(x => ({ id: x.id, kind: x.kind, label: x.label, seconds: x.seconds, lines: x.lines || null })), count: pieceN(combo), seconds: combo.seconds,
     broll: e.broll.text, sound: e.sound.text, export: s.export || null, files };
   try { writeFileSync(join(dir, `reel-v${v}.settings.json`), JSON.stringify(out, null, 1)); } catch {}
+  const metaF = join(dir, `reel-v${v}.build`, 'meta.json');
+  if (existsSync(metaF)) { try { const meta = JSON.parse(readFileSync(metaF, 'utf8')); writeFileSync(metaF, JSON.stringify({ ...meta, key, footage, takes, from: out.from }, null, 1) + '\n'); } catch {} }
   return out;
 }
-function versionsOf(job) {
+
+// reels rendered from the current draft only (the build key in reel-vN.settings.json / reel-vN.build/meta.json)
+function currentOutputsOf(s) {
+  if (!s || !s.job || !C.draftIsCurrent(s)) return [];
+  const cur = new Set(versionsOf(s.job, s).filter(v => v.current).map(v => v.v));
+  return C.outputsOf(s).filter(f => cur.has(+(f.match(/reel(?:-fx)?-v(\d+)/) || [0, 0])[1]));
+}
+// a fast preview of the current draft: the cut segments, no captions or look. Never a render from another draft.
+const slash = x => String(x).replace(/\\/g, '/').replace(/^\.\//, '');
+function previewRel(s, raw) {
+  if (!raw || typeof raw !== 'string' || /^[a-z]+:/i.test(raw)) return null;
+  const cand = [];
+  if (raw.startsWith('/')) {
+    const rel = raw.startsWith(ROOT) ? raw.slice(ROOT.length).replace(/^[\\/]+/, '') : null;
+    if (rel) cand.push(rel);
+  } else {
+    cand.push(raw, join('jobs', s.job, 'build', raw), join('jobs', s.job, raw));
+  }
+  for (const c of cand) {
+    const rel = slash(c);
+    const abs = resolve(ROOT, rel);
+    if (!abs.startsWith(ROOT) || !existsSync(abs)) continue;
+    const r = rel.split(sep).join('/');
+    if (SERVE.some(p => r.startsWith(p))) return r;
+  }
+  return null;
+}
+function draftPreviewOf(s) {
+  if (!s || !s.job || !C.draftIsCurrent(s)) return null;
+  const cutF = join(ROOT, 'jobs', s.job, 'build', 'cut.json');
+  if (!existsSync(cutF)) return null;
+  let cut; try { cut = JSON.parse(readFileSync(cutF, 'utf8')); } catch { return null; }
+  const segs = [];
+  for (const x of cut.segs || []) {
+    const file = previewRel(s, x.file || x.src);
+    if (!file) continue;
+    const a = +(x.in ?? x.src_in ?? 0), b = +(x.out ?? x.src_out ?? 0);
+    if (!(b > a)) continue;
+    segs.push({ file, in: +a.toFixed(3), out: +b.toFixed(3) });
+  }
+  if (!segs.length) return null;
+  return { segs, seconds: +segs.reduce((a, x) => a + x.out - x.in, 0).toFixed(2) };
+}
+function versionsOf(job, s = null) {
   const dir = join(ROOT, 'jobs', job); if (!existsSync(dir)) return [];
   const files = C.outputsOf({ job }), snaps = Object.fromEntries((() => { try { return SNAP.list(dir); } catch { return []; } })().map(x => [x.v, x]));
   const vs = [...new Set(files.map(f => +(f.match(/reel(?:-fx)?-v(\d+)[^/]*$/) || [0, 0])[1]).filter(Boolean))].sort((a, b) => b - a);
-  return vs.map(v => { let st = null; try { st = JSON.parse(readFileSync(join(dir, `reel-v${v}.settings.json`), 'utf8')); } catch {}
+  return vs.map(v => { const ident = C.outputIdentity(job, v); let st = ident.settings;
+
     const fs_ = files.filter(f => new RegExp(`/reel(-fx)?-v${v}(-[a-z0-9]+)?\\.mp4$`).test(f)), main = fs_.find(f => new RegExp(`/reel-v${v}\\.mp4$`).test(f)) || fs_[0];
     let at = null; try { at = statSync(join(ROOT, main)).mtime.toISOString(); } catch {}
     return { v, reel: main, files: fs_.map(f => ({ path: f, label: /-fx-/.test(f) ? 'With effects' : new RegExp(`-v${v}\\.mp4$`).test(f) ? 'Reel' : 'Export ' + (f.match(/-v\d+-([a-z0-9]+)\.mp4$/) || [0, ''])[1] })).sort((a, b) => (a.label === 'Reel' ? 0 : a.label === 'With effects' ? 1 : 2) - (b.label === 'Reel' ? 0 : b.label === 'With effects' ? 1 : 2) || a.path.localeCompare(b.path)), at: (st && st.at) || at, seconds: main ? +(durOf(main) || 0).toFixed(1) || null : null,
-      settings: st, reopen: !!(snaps[v] && snaps[v].snapshot) }; });
+      settings: st, reopen: !!(snaps[v] && snaps[v].snapshot),
+      take: (ident.takes && ident.takes.length ? ident.takes.join(', ') : null), draft: ident.from || (st && st.from) || null, key: ident.key || null,
+      current: !!(s && s.job === job && C.outputMatchesDraft(s, ident, draftKey(s))) }; });
 }
 function outputsLib(s, all) {
-  const out = { job: s.job, versions: s.job ? versionsOf(s.job) : [] };
+  const out = { job: s.job, versions: s.job ? versionsOf(s.job, s) : [] };
   if (all) out.jobs = C.listVideos(s.job).filter(x => x.job !== s.job && x.outputs).slice(0, 60).map(x => { const vs = versionsOf(x.job), last = vs[0];
     return { job: x.job, at: x.at, versions: vs.length, look: last && last.settings ? last.settings.look : null, seconds: last ? last.seconds : null }; });
   return out;
@@ -965,7 +1015,7 @@ async function api(req, res, u) {
     // the page shows the short ask (attach.kind fix); the agent reads the whole instruction
     return json(res, 200, await chatTurn(text, false, { kind: 'fix', fix: String(b.id), label: FX.describe(String(b.id)).label }));
   }
-  if (p === '/api/footage/remove' && M === 'POST') { const b = await readBody(req); const s = update(st => { const n = (st.footage || []).length; st.footage = st.footage.filter(f => f !== b.path); if (st.footage.length !== n) C.onFootageListChanged(st); }); return json(res, 200, view(s)); }
+  if (p === '/api/footage/remove' && M === 'POST') { const b = await readBody(req); const s = update(st => { const n = (st.footage || []).length, stamp = C.draftStamp(st); st.footage = st.footage.filter(f => f !== b.path); if (st.footage.length !== n) C.onFootageListChanged(st, { stamp }); }); return json(res, 200, view(s)); }
   if (p === '/api/reference' && M === 'POST') {
     const b = await readBody(req), s = C.load();
     if (b.url || b.urls) { const added = addLinks([].concat(b.urls || [], b.url || [])); return json(res, 202, { added, ...view(C.load()) }); }
@@ -1099,9 +1149,10 @@ async function api(req, res, u) {
     return json(res, 200, { reopened: r, ...view(C.load()) });
   }
   if (p === '/api/task/cancel' && M === 'POST') { if (task && task.status === 'running') { task.cancel = true; task.proc && task.proc.kill('SIGTERM'); } return json(res, 200, view(C.load())); }
-  if (p === '/api/choices' && M === 'GET') { const s = C.load(), ch = readChoices(s); return json(res, 200, { choices: ch, receipt: receiptOf(s, ch) }); }
+  if (p === '/api/choices' && M === 'GET') { const s = C.load(); if (!C.draftIsCurrent(s)) return json(res, 200, { choices: null, receipt: null, stale: true }); const ch = readChoices(s); return json(res, 200, { choices: ch, receipt: receiptOf(s, ch) }); }
   if (p === '/api/choices' && M === 'POST') {
     const b = await readBody(req), s = C.load(), cur = readChoices(s);
+    if (!C.draftIsCurrent(s) || !cur) return json(res, 409, { error: 'Draft this footage first.' });
     if (!cur) return json(res, 400, { error: 'make a draft first' });
     for (const k of ['beats', 'titles', 'graphics']) if (Array.isArray(b[k])) cur[k] = b[k];
     writeFileSync(choicesPath(s), JSON.stringify(cur, null, 2) + '\n');

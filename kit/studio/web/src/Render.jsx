@@ -7,7 +7,7 @@ import { api, file, toast, fmtS, cap1, Icon } from './lib.jsx';
 import { Compare, Cleanup, Receipt } from './Review.jsx';
 import { Fold } from './ui.jsx';
 
-export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
+export function Render({ CAT, V, s, apply, patch, hidden, log, setLog, openOutputs, openNewVideo }) {
   const t = V.task, c = V.compose, running = t && t.status === 'running';
   const [mem, setMem] = useState(null);
   // a render that needs the person mask checks free memory first (kit/memcheck.cjs); short, the server answers 409 with
@@ -40,7 +40,7 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
   const combo = V.combo || { pieces: [], seconds: 0, from: 'take' }, ed = V.edit || {}, fin = { reel: true, clips: false, plain: false, from: 'auto', ...(s.finish || {}) };
   const reopen = o => api('/api/reopen', { reel: o }).then(j => { apply(j); loadChoices(); toast(`${o.split('/').pop()} is back in the editor. Render makes the next version.`, true); }).catch(() => {});
   const canReopen = new Set(V.reopenable || []);
-  const outputs = (V.outputs || []).slice(0, 6);
+  const outputs = (V.currentOutputs || []).slice(0, 6), earlier = Math.max(0, (V.outputs || []).length - (V.currentOutputs || []).length);
   const n = combo.pieces.length, lineN = combo.pieces.reduce((a, x) => a + (x.kind === 'piece' && x.lines ? x.lines.length : 1), 0), fromPieces = combo.from === 'pieces';
   const setFin = p => patch({ finish: p }).catch(() => {});
   // drafted: the server's record of the last draft (s.drafted) matches what you have now; a session from before 1.13.0
@@ -87,8 +87,9 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
       <p className="fine">{(mem.options || []).map(o => `${o.label}: ${o.detail}`).join(' ')}</p></div>}
     {running && <div id="progress"><ProgressBar label={`${cap1(t.kind)} running`} isLabelHidden isIndeterminate /></div>}
     <div id="notes" className="notes">{notes.map((n, i) => <p key={i}>{n}</p>)}</div>
-    {(isDrafted || drafted || outputs.length > 0) && <>
-      {!hidden && <Compare V={V} s={s} apply={apply} />}
+    {earlier > 0 && <p className="fine" id="fin-library-note">{earlier} earlier reel{earlier === 1 ? '' : 's'} {earlier === 1 ? 'is' : 'are'} in <button type="button" className="linkish" id="fin-open-outputs" onClick={() => openOutputs && openOutputs()}>Outputs</button>. <button type="button" className="linkish" id="fin-open-new" onClick={() => openNewVideo && openNewVideo()}>New video</button> starts a new job if you want them kept apart.</p>}
+    {(isDrafted || drafted) && <>
+      {!hidden && <Compare V={V} s={s} apply={apply} outputs={outputs} />}
       <Receipt r={receipt} />
       <Cleanup V={V} s={s} apply={apply} drafted={drafted} />
       <details className="fold glass-card" id="choices-fold" ref={foldRef}><summary>Picks and why</summary>
@@ -97,13 +98,33 @@ export function Render({ CAT, V, s, apply, patch, hidden, log, setLog }) {
     <div id="outputs" className="outputs">
       {outputs.length ? outputs.map(o => <figure key={o} className="glass-card"><video src={file(o) + '?v=' + s.rev + '#t=1.2'} controls preload="metadata" aria-label={o} />
         <figcaption><span>{o.split('/').pop()}</span>{canReopen.has(o) && <button type="button" className="btn ghost sm" data-reopen={o} disabled={running} onClick={() => reopen(o)}><Icon n="edit" />Edit this reel</button>}<a className="btn ghost sm" href={file(o) + '?download'} download={o.split('/').pop()}><Icon n="download" />Download</a></figcaption></figure>)
-        : <div className="empty-art"><Icon n="film" /><p>{s.job ? 'Your reels show up here.' : 'Name the reel at the top to start.'}</p></div>}
+        : isDrafted && !stale && V.draftPreview ? <DraftPreview preview={V.draftPreview} s={s} />
+        : <div className="empty-art" id="fin-plan"><Icon n="film" /><p>{!s.job ? 'Name the reel at the top to start.' : isDrafted && !stale ? 'Plan ready, no video yet. Check the picks below, then Render.' : 'Your current draft shows up here after you render it. Earlier reels stay in Outputs.'}</p></div>}
     </div>
     <CutOutputs V={V} s={s} bites={bites} />
     <Fold id="log-fold" title="Log"><pre id="log" className="log" aria-live="off" ref={logRef}>{log}</pre></Fold>
     <Fold id="cmd-fold" title="For your agent"><div className="row" id="cmd"><span className="fine grow">Your agent can make this same reel from its terminal.</span>
       <Button id="cmd-copy" size="sm" variant="secondary" label="Copy for my agent" icon={<Icon n="copy" />} onClick={() => copyText(forAgent, 'Copied. Paste it into your agent.')} /></div></Fold>
   </section>;
+}
+
+// a fast preview of the current draft: the cut segments only, no captions or look
+function DraftPreview({ preview, s }) {
+  const segs = preview.segs || [], v = useRef(null), [i, setI] = useState(0), [playing, setPlaying] = useState(false);
+  const seg = segs[i];
+  useEffect(() => { const el = v.current; if (!el || !seg) return;
+    const go = () => { try { el.currentTime = seg.in; } catch {} if (playing) el.play().catch(() => {}); };
+    if (el.readyState >= 1) go(); else el.addEventListener('loadedmetadata', go, { once: true });
+  }, [i, seg && seg.file, seg && seg.in, playing]);
+  const onTime = () => { const el = v.current; if (!el || !seg) return; if (el.currentTime >= seg.out - 0.05) { if (i + 1 < segs.length) setI(i + 1); else { el.pause(); setPlaying(false); setI(0); } } };
+  if (!seg) return null;
+  return <figure className="glass-card draft-preview" id="draft-preview">
+    <video ref={v} src={file(seg.file) + '?v=' + s.rev} preload="auto" playsInline onTimeUpdate={onTime} aria-label="Draft preview, cuts only" />
+    <figcaption>
+      <span>Draft preview, {Math.round(preview.seconds)} s, cuts only</span>
+      <button type="button" className="btn ghost sm" id="draft-preview-play" onClick={() => { const el = v.current; if (!el) return; if (playing) { el.pause(); setPlaying(false); } else setPlaying(true); }}>{playing ? 'Pause' : 'Play'}</button>
+    </figcaption>
+  </figure>;
 }
 
 function Chip({ id, on, label, onClick, disabled }) {

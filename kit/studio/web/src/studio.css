@@ -247,6 +247,9 @@ main[data-step="footage"] .step[data-step="footage"], main[data-step="cut"] .ste
 .outputs figcaption { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; font-size: 13px; }
 .outputs figcaption span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .outputs .empty-art { grid-column: 1 / -1; border: 1.5px dashed var(--input); border-radius: var(--radius-lg); }
+.outputs .draft-preview { grid-column: 1 / -1; max-width: 360px; }
+#fin-library-note { margin: 12px 0 0; }
+#fin-library-note .linkish { font-weight: 600; }
 .fold { margin-top: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
 .fold > summary { cursor: pointer; padding: 10px 14px; font-weight: 650; font-size: 14px; list-style: none; display: flex; align-items: center; gap: 8px; }
 .fold > summary::before { content: ""; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .15s; opacity: .6; }
@@ -1051,6 +1054,8 @@ dialog.outputs .fb-h { align-items: flex-start; } dialog.outputs .fb-h > div:fir
 .ov header { display: flex; align-items: center; justify-content: space-between; }
 .ov dl { margin: 0; display: grid; gap: 3px; } .ov dl div { display: grid; grid-template-columns: 76px 1fr; gap: 6px; font-size: 12px; } .ov dt { color: var(--muted-foreground); } .ov dd { margin: 0; }
 .ov footer { display: flex; flex-wrap: wrap; gap: 6px; } .ov p { margin: 0; }
+.ov-flags { display: flex; gap: 4px; align-items: center; }
+.ov footer .ov-download { text-decoration: none; }
 .ov-files { margin: 0; padding-left: 18px; font-size: 12px; }
 .out-cmp { padding: 12px; border-radius: 14px; } .oc-vids { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .oc-vids figure { margin: 0; } .oc-vids video { width: 100%; max-height: 320px; background: #000; border-radius: 10px; } .oc-vids figcaption { font-size: 12px; text-align: center; }

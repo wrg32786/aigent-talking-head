@@ -87,12 +87,12 @@ export function act(s, id, action) {
   const x = (s.takes || []).find(y => y.id === id);
   if (!x) throw Object.assign(new Error(`no take ${id}`), { code: 404 });
   if (action === 'keep') { x.kept = true; if (x.status === 'ready' && x.file) C.addFootage(s, x.file); return; }
-  if (action === 'unkeep') { x.kept = false; const n = (s.footage || []).length; s.footage = s.footage.filter(f => f !== x.file); if (s.footage.length !== n) C.onFootageListChanged(s); return; }
+  if (action === 'unkeep') { x.kept = false; const n = (s.footage || []).length, stamp = C.draftStamp(s); s.footage = s.footage.filter(f => f !== x.file); if (s.footage.length !== n) C.onFootageListChanged(s, { stamp }); return; }
   if (action === 'discard') {
     if (x.status === 'recording' || x.status === 'converting') throw Object.assign(new Error('wait until the take is saved'), { code: 409 });
-    const n = (s.footage || []).length;
+    const n = (s.footage || []).length, stamp = C.draftStamp(s);
     s.footage = s.footage.filter(f => f !== x.file);
-    if (s.footage.length !== n) C.onFootageListChanged(s);
+    if (s.footage.length !== n) C.onFootageListChanged(s, { stamp });
     for (const f of [x.file, x.thumb, x.status === 'failed' ? x.raw : null]) if (f) rmSync(join(ROOT, f), { force: true });
     s.takes = s.takes.filter(y => y.id !== id); return;
   }

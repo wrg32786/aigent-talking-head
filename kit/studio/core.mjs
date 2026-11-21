@@ -196,9 +196,10 @@ export function applyPatch(s, p, cat = catalog()) {
       else if (new Set(want).size !== want.length) errs.push('footage: a file is listed twice');
       else if (JSON.stringify(want) !== JSON.stringify(s.footage)) {
         const adding = want.some(f => !s.footage.includes(f)), had = hasEdit(s), sameSet = want.length === s.footage.length && want.every(f => s.footage.includes(f));
+        const stamp = draftStamp(s);
         s.footage = want; s.clips = null;
-        if (adding && had) { onFootageAdded(s, { hadEdit: true }); log.push(footageResetNote(s)); }
-        else if (!sameSet) onFootageListChanged(s, { added: adding, hadEdit: had });
+        if (adding && had) { onFootageAdded(s, { hadEdit: true, stamp }); log.push(footageResetNote(s)); }
+        else if (!sameSet) onFootageListChanged(s, { added: adding, hadEdit: had, stamp });
         log.push(`footage ${want.length ? want.map(f => basename(f)).join(', ') : 'none'}`);
       }
     }
@@ -535,6 +536,53 @@ export function freshSession(s, { job = null, keepLook = true } = {}) {
 // the footage identity a draft is tied to (order matters). Used to hide a leftover jobs/<job>/build
 // when the user has started a new edit on the same job.
 export const footageKey = s => JSON.stringify([s.footage || [], s.clips || null]);
+export const takeNames = s => (s.footage || []).map(f => String(f).split(/[/\\]/).pop());
+// the draft and footage identity to stamp on existing reels before the board's footage changes
+export function draftStamp(s) {
+  return { key: (s.drafted && s.drafted.key) || ('take:' + footageKey(s)), footage: footageKey(s), takes: takeNames(s), from: (s.drafted && s.drafted.from) || null };
+}
+function versionOfReel(f) { return +(String(f).match(/reel(?:-fx)?-v(\d+)/) || [0, 0])[1] || 0; }
+// what reel-vN.settings.json and reel-vN.build/meta.json say this render was made from
+export function outputIdentity(job, v) {
+  const dir = join(ROOT, 'jobs', job);
+  let settings = null, meta = null, mtime = 0;
+  try { settings = JSON.parse(readFileSync(join(dir, `reel-v${v}.settings.json`), 'utf8')); } catch {}
+  try { meta = JSON.parse(readFileSync(join(dir, `reel-v${v}.build`, 'meta.json'), 'utf8')); } catch {}
+  try { mtime = statSync(join(dir, `reel-v${v}.mp4`)).mtimeMs; } catch {}
+  return { v, settings, meta, key: (settings && settings.key) || (meta && meta.key) || null, footage: (settings && settings.footage) || (meta && meta.footage) || null, takes: (settings && settings.takes) || (meta && meta.takes) || [], from: (settings && settings.from) || (meta && meta.from) || null, mtime };
+}
+// write the draft key onto existing reels that do not have one yet, so Finish can hide them when the
+// footage changes and the Outputs library can name the source take and draft. Never moves or deletes a file.
+export function tagJobOutputs(s, stamp = draftStamp(s)) {
+  if (!s || !s.job || !stamp) return 0;
+  const dir = jobDir(s); if (!dir || !existsSync(dir)) return 0;
+  let files = []; try { files = readdirSync(dir); } catch { return 0; }
+  const vs = [...new Set(files.map(f => versionOfReel(f)).filter(Boolean))];
+  let n = 0;
+  for (const v of vs) {
+    const id = outputIdentity(s.job, v);
+    if (id.key) continue;
+    const st = { ...(id.settings || { version: v, job: s.job }), key: stamp.key, footage: stamp.footage, takes: stamp.takes, from: stamp.from || (id.settings && id.settings.from) || null };
+    if (!st.at) { try { st.at = statSync(join(dir, `reel-v${v}.mp4`)).mtime.toISOString(); } catch { st.at = new Date().toISOString(); } }
+    try { writeFileSync(join(dir, `reel-v${v}.settings.json`), JSON.stringify(st, null, 1)); n++; } catch {}
+    const metaDir = join(dir, `reel-v${v}.build`);
+    if (existsSync(metaDir)) {
+      try { writeFileSync(join(metaDir, 'meta.json'), JSON.stringify({ ...(id.meta || {}), key: stamp.key, footage: stamp.footage, takes: stamp.takes, ...(st.from ? { from: st.from } : {}) }, null, 1) + '\n'); } catch {}
+    }
+  }
+  return n;
+}
+// true when this reel was rendered from the current draft. Match on the key saved in reel-vN.settings.json
+// or reel-vN.build/meta.json. Untagged older reels only count when there is no current draft key, or the
+// file was written at or after this draft.
+export function outputMatchesDraft(s, ident, wantKey) {
+  if (!s || !ident || !draftIsCurrent(s)) return false;
+  if (ident.key) return ident.key === wantKey;
+  if (ident.footage) return ident.footage === footageKey(s) && (!wantKey || wantKey === 'take:' + footageKey(s));
+  if (!s.drafted || !s.drafted.key) return true;
+  if (s.drafted.at && ident.mtime && ident.mtime >= s.drafted.at - 2000) return true;
+  return false;
+}
 // false when the session says the on-disk draft is leftover (a new upload, or footage that no longer
 // matches). When drafted was never set, a build folder still counts, so older tests and jobs stay valid.
 export function draftIsCurrent(s) {
@@ -596,11 +644,12 @@ export function resetEdit(s, { keepLook = s.keepLook === true } = {}) {
 }
 export function footageResetNote(s) {
   return s.keepLook === true
-    ? 'Started a fresh edit for this footage and kept your look. Cuts, b-roll and the draft are cleared. Files stay on disk, and the last reel stays in Outputs.'
-    : 'Started a fresh edit for this footage. Cuts, b-roll, the look and the draft are cleared. Files stay on disk, and the last reel stays in Outputs.';
+    ? 'Started a fresh edit for this footage and kept your look. Cuts, b-roll and the draft are cleared. Earlier reels stay in Outputs. Use New video if you want this as its own job.'
+    : 'Started a fresh edit for this footage. Cuts, b-roll, the look and the draft are cleared. Earlier reels stay in Outputs. Use New video if you want this as its own job.';
 }
-// call before the new path is pushed when you already know hadEdit; or after, by passing { hadEdit }
-export function onFootageAdded(s, { hadEdit } = {}) {
+// stamp: the draft identity from before the footage list changed, so earlier reels keep their own key
+export function onFootageAdded(s, { hadEdit, stamp } = {}) {
+  if (stamp) tagJobOutputs(s, stamp);
   const had = hadEdit === undefined ? hasEdit(s) : hadEdit;
   if (had) { resetEdit(s, { keepLook: s.keepLook === true }); return true; }
   clearBrollTimeline(s);
@@ -612,12 +661,14 @@ export function addFootage(s, relp) {
   const path = slash(relp);
   if ((s.footage || []).includes(path)) return { added: false, reset: false, note: null };
   const had = hasEdit(s);
+  const stamp = draftStamp(s);
   s.footage = [...(s.footage || []), path];
   s.clips = null;
-  const reset = onFootageAdded(s, { hadEdit: had });
+  const reset = onFootageAdded(s, { hadEdit: had, stamp });
   return { added: true, reset, note: reset ? footageResetNote(s) : null };
 }
-export function onFootageListChanged(s, { added = false, hadEdit = false } = {}) {
+export function onFootageListChanged(s, { added = false, hadEdit = false, stamp } = {}) {
+  if (stamp) tagJobOutputs(s, stamp);
   if (added && hadEdit) return onFootageAdded(s, { hadEdit: true });
   clearBrollTimeline(s);
   return false;
