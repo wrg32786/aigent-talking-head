@@ -170,10 +170,10 @@ TOOLS.push(
   { name: 'studio_start', description: 'Start Studio in the background if it is not running (same as npm run studio:agent), open it in the user\'s browser, and return its URL. Then call studio_wait_for_message to listen to the Studio chat. ' + CHANNEL_RULE,
     inputSchema: { type: 'object', properties: { port: { type: 'number', description: 'default 4757' }, open: { type: 'boolean', description: 'open the browser, default true' } }, additionalProperties: false },
     direct: async a => { seen(); const r = await Launch.start({ port: studioPort(a), open: a.open !== false }); return { ...r, next: 'Tell the user Studio is open at ' + r.url + ', then call studio_wait_for_message.' }; } },
-  { name: 'studio_wait_for_message', description: 'Listen to the Studio page chat: waits up to timeout_s (default 45, max 240) for the user to type in Studio, then returns those messages (marked seen on the page) with the session context (picks, reference teardown, task). Answer each with studio_reply, change the edit with studio_set_selections (origin studio) or other studio_ tools, then call this again. Returns { messages: [] , timedOut: true } when nothing came; call it again to keep listening. While it waits the page shows you as listening. ' + CHANNEL_RULE,
-    inputSchema: { type: 'object', properties: { timeout_s: { type: 'number', description: 'seconds to wait, default 45 (keep under your client\'s tool timeout)' } }, additionalProperties: false },
+  { name: 'studio_wait_for_message', description: 'Listen to the Studio page chat: waits up to timeout_s (default 20, max 30, so a message typed in your terminal waits at most that long) for the user to type in Studio, then returns those messages (marked seen on the page) with the session context (picks, reference teardown, task). Answer each with studio_reply, change the edit with studio_set_selections (origin studio) or other studio_ tools, then call this again. Returns { messages: [] , timedOut: true } when nothing came; call it again to keep listening. While it waits the page shows you as listening. ' + CHANNEL_RULE,
+    inputSchema: { type: 'object', properties: { timeout_s: { type: 'number', description: 'seconds to wait, default 20, at most 30: your terminal input waits until this returns' } }, additionalProperties: false },
     direct: async a => {
-      const until = Date.now() + Math.min(Math.max(+a.timeout_s || 45, 1), 240) * 1000;
+      const until = Date.now() + Math.min(Math.max(+a.timeout_s || 20, 1), 30) * 1000; // short, so the terminal is never kept waiting long
       let beat = 0;
       try {
         for (;;) {

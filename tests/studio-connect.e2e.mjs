@@ -80,7 +80,12 @@ try {
     if (shots) await pg.screenshot({ path: join(shots, 'connect-connected.png') });
     assert.match(await pg.textContent('#connect-open'), /Claude Code/);
     assert.strictEqual((await api('/api/settings')).settings.agent, 'claude');
+    // the sheet closes by itself once the agent listens, so the chat beside it is free
+    await pg.waitForFunction(() => { const d = document.querySelector('dialog#connect, #connect'); return !d || !(d.open || d.matches(':popover-open')); }, null, { timeout: 8000 });
+    await pg.click('#connect-open'); await pg.waitForSelector('#connect-status');
+    await pg.click('#connect .copyblock .icon-btn').catch(() => {});
     await pg.keyboard.press('Escape');
+    await pg.waitForFunction(() => { const d = document.querySelector('dialog#connect, #connect'); return !d || !(d.open || d.matches(':popover-open')); }, null, { timeout: 4000 });
     await listening;
     // Settings has Connect agent and the Setup check
     await pg.click('#open-settings'); await pg.click('#settings-setup'); await pg.waitForSelector('#setup-list li[data-id="ffmpeg"]');

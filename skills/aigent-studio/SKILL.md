@@ -18,7 +18,7 @@ Studio is a page on the user's computer (http://127.0.0.1:4757) where they drop 
 ## The loop
 
 1. `studio_start` (or `npm run studio:agent`) and tell the user the URL.
-2. `studio_wait_for_message` (default 45 s). When it returns messages:
+2. `studio_wait_for_message` (default 20 s, at most 30, so a message typed in the terminal never waits long). When it returns messages:
    - act on them: `studio_set_selections` (origin studio), `studio_add_reference_url` then `studio_get_reference_teardown`, `studio_run` (draft or render; `from: pieces | take`, `exports`), `get_edit` (what the user is making, from what), `explain` after a draft;
    - answer each with `studio_reply { replyTo: <id>, text }` (add `patch` to change the edit in the same call). Plain, short sentences. For a bigger change, or one the user should decide on, send it as `suggest: { patch, combo, step, label }` instead: the page shows an Apply button and nothing changes until they click it.
    - a message that starts "(On the Cut step)" (or another step) came from **Ask my agent** on that step. A note "from 0:04 to 0:09" is about that stretch of the reel or take; one "at 0:04" is one frame (its `attach` has `t`, `end`, the box and the frame image).

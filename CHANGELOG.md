@@ -2,6 +2,14 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.22.1 (unreleased)
+
+Release notes: [docs/releases/v1.22.1.md](docs/releases/v1.22.1.md). Two rough spots from the first live agent test.
+
+- **Connect agent gets out of the way.** The sheet closes by itself a moment after your agent is listening ("Claude Code is connected. Type in the chat."), so the chat composer and its Send are free. Escape closes it wherever the focus is.
+- **The terminal never waits long.** `studio_wait_for_message` waits 20 s by default and at most 30 (it was 45, up to 240), so a message typed in your terminal waits at most that long while the agent listens to Studio. The skill says so.
+- **Tests.** `tests/studio-connect.e2e.mjs` checks the sheet closes on its own once the agent listens, and on Escape.
+
 ## 1.22.0 (unreleased)
 
 Release notes: [docs/releases/v1.22.0.md](docs/releases/v1.22.0.md). What the reference has and the menu lacks is made for the menu.

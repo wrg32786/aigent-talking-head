@@ -1,5 +1,5 @@
 // Connect agent: pick your terminal agent, copy what it needs (with this install's real paths), and watch it connect.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Drawer } from '@astryxdesign/core/Drawer';
 import { Badge } from '@astryxdesign/core/Badge';
 import { StatusDot } from '@astryxdesign/core/StatusDot';
@@ -26,6 +26,20 @@ export function Connect({ V, apply, open, setOpen }) {
   useEffect(() => {
     if (!open) return;
     api('/api/connect').then(j => { setInfo(j); setPick(p => p || j.selected || 'claude'); }).catch(() => {});
+  }, [open]);
+  // once your agent is listening, the sheet closes by itself so the chat beside it is free to use
+  const was = useRef(null), k = connState(V.env.agent || {}).k;
+  useEffect(() => {
+    const before = was.current; was.current = k;
+    if (!open || k !== 'on' || before === null || before === 'on') return;
+    const t = setTimeout(() => { setOpen(false); toast(`${(V.env.agent || {}).name || 'Your agent'} is connected. Type in the chat.`, true); }, 1500);
+    return () => clearTimeout(t);
+  }, [k, open]);
+  // Escape always closes it, wherever the focus is
+  useEffect(() => {
+    if (!open) return;
+    const esc = e => { if (e.key === 'Escape' && !e.defaultPrevented) setOpen(false); };
+    window.addEventListener('keydown', esc, true); return () => window.removeEventListener('keydown', esc, true);
   }, [open]);
   const choose = id => { setPick(id); api('/api/settings', { agent: id }).then(apply).catch(() => {}); };
   const a = V.env.agent || {}, st = connState(a), ag = info && info.agents.find(x => x.id === pick);
