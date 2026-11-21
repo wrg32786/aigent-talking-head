@@ -192,14 +192,17 @@ try {
     const b = atBack(0.6);
     if (!b.titles.n) fail('explicit behind: hero should be on the titles layer');
   });
-  step('one-word: the title is its word, every other spoken word still shows, back to back', () => {
+  step('one-word: the title is its word, nothing is in the caption bar while it is up, the words come back after it', () => {
     const at = layered(join(work, 'one-word-title'), { captionStyle: 'one-word', flips: [
       { start: 0, end: 0.9, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam', flicker: false, layer: 'behind' },
-      { start: 0, end: 2, text: 'Record one take', mode: 0, words: [[0, 0.6, 'Record'], [0.6, 1.2, 'one'], [1.2, 2, 'take']] }] }, [0.3, 0.75, 1.5]);
-    const a = at(0.3), b = at(1.5), m = at(0.75);
+      { start: 0, end: 2, text: 'Record one take', mode: 0, words: [[0, 0.6, 'Record'], [0.6, 1.2, 'one'], [1.2, 2, 'take']] }] }, [0.3, 0.75, 1.0, 1.5]);
+    const a = at(0.3), b = at(1.5), m = at(0.75), n1 = at(1.0);
     if (!a.titles.n) fail('title word missing');
     if (a.front.n) fail('one-word: the spoken word the title shows should not be drawn twice');
-    if (!m.front.n) fail('one-word: a spoken word under a title that is not its word must still show');
+    // since 1.28.0 (Studio report 4, item 2): a word said under a title is not drawn while the title is up; one said in its
+    // last 0.3 s comes up when the title has left
+    if (m.front.n) fail('one-word: while a title is up the caption bar shows nothing');
+    if (n1.titles.n || !n1.front.n) fail('one-word: a word said at the end of a title should come up when the title has left');
     if (a.titles.y1 - a.titles.y0 > 330) fail('one-word title should be a single word, ink height ' + (a.titles.y1 - a.titles.y0));
     if (b.titles.n || !b.front.n) fail('one-word: after the title the caption word should be the only word');
     if (b.front.y1 - b.front.y0 > 330) fail('one-word caption should be one line, ink height ' + (b.front.y1 - b.front.y0));
