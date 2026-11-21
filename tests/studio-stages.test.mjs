@@ -95,7 +95,7 @@ ok('each stage keeps when it started and how long it took; the view gives the pa
 
 ok('times read as plain words', () => {
   assert.deepStrictEqual([0, 9, 45, 60, 80, 125, 599, 600, 754].map(S.tookWords), ['0 s', '9 s', '45 s', '1 min', '1 min 20 s', '2 min 5 s', '9 min 59 s', '10 min', '12 min']);
-  assert.ok(!/—/.test([0, 80, 754].map(S.tookWords).join('')));
+  assert.ok(!/\u2014/.test([0, 80, 754].map(S.tookWords).join('')));
 });
 
 ok('a stage that stops says after how long, and a restart drops the running clock', () => {

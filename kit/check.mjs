@@ -366,6 +366,7 @@ if (target) {
     // Studio report 4 (camera moves, B-roll runs, the last piece, the breakdown's progress)
     for (const [f, what] of [
       ['motion.test.mjs', 'camera moves you can see (tests/motion.test.mjs: the move size measured per shot, carried in the recipe as move-size, sized by Subtle, Medium or Strong with Medium the default, sized again on a rebuild, the Studio control)'],
+      ['fastrun.test.mjs', 'fast run and the whole fit (tests/fastrun.test.mjs: a run cuts on the beats or half beats of the bed, each picture whole and sharp over its own blur, a cut.json run made by the build as one insert, a wide clip whole in the split panel, a run of fast cuts in a reference as one B-roll slot, Studio run clips and their credits)'],
       ['piece-edges.test.mjs', 'the two ends of a piece (tests/piece-edges.test.mjs: the last piece ends with its closing sentence and a word said after it is left out, the cut clear of both words; a piece starts on the first frame at the lens inside the quiet before its first word, read with YuNet; a draft does both and --keep-ends does neither)'],
     ]) {
       const e2 = [];

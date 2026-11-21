@@ -98,6 +98,7 @@ Since 1.28.0 a teardown also says where the reference shows B-roll, in a `## B-r
 | What | How it is found | In the block |
 | --- | --- | --- |
 | A framed panel over the speaker | the screen cards above; one that touches the next in the same place is one slot, and a panel the detector loses for a moment is followed by its border | `kind panel`, its place, size and border |
+| A run of fast cuts | three or more full-frame cutaways in a row, each under 0.6 s with no gap, are one slot: `run 5 | step 0.21` (how many cuts, and the middle length of one). A remake fills it with a fast run of your own clips or pictures, cut on the beat |
 | A full cutaway | a shot with no face, or a face that is not the speaker's. A shot with the speaker on screen is never a cutaway, even when they are quiet or behind a microphone | `kind full` |
 | A split screen | a hard edge from side to side near the middle that is there for only part of the reel | `kind split` |
 

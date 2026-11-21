@@ -54,6 +54,8 @@ const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const C = JSON.parse(fs.readFileSync('cut.json', 'utf8'));
+// an insert with no file to play is left out: a fast run whose files are missing (kit/fastrun.cjs marks it "skip")
+if (C.inserts) C.inserts = C.inserts.filter(s => s && s.file && !s.skip);
 const out = process.argv[2] || 'out.mp4';
 const KIT = __dirname;
 const R = require('./rules.cjs');
@@ -167,6 +169,7 @@ if (BASEONLY) {
 // split and framed b-roll (kit/split.cjs) draw the top of your head over the panel: your picture cut out by the person
 // mask, so it needs the graded picture once more before the titles go on
 const SPL = require('./split.cjs');
+const FRUN = require('./fastrun.cjs');
 const splitIns = (C.inserts || []).filter(s => SPL.SPLIT.includes(s.place));
 const pmSpec = splitIns.length ? R.maskSpec(C) : {};
 const pmPerson = pmSpec.person && fs.existsSync(pmSpec.person) ? pmSpec.person : null, pmMask = pmSpec.file && fs.existsSync(pmSpec.file) ? pmSpec.file : null;
@@ -224,6 +227,10 @@ if (panelsOn) {
 // fill the bottom half, your head over the panel's lower edge, see below), "frame" (framed cards, below) or "pip" (a 16:9 box "pipW" wide,
 // default 460, with a thin white edge, top right; "pipX" and "pipY" move it). A still picture ("image": true, or a
 // .jpg, .png or .webp file) holds for the span with a slow push in.
+// "fit": "whole" shows the clip whole, sharp over its own blurred copy; "fill" crops it to fill. Left out, a clip in the
+// split or framed panel is whole when filling would crop more than a fifth of it away, and fills otherwise.
+// "run": ["a.png", "b.mp4", ...] is a fast run (kit/fastrun.cjs): kit/reel.cjs makes one clip of them, cut on the
+// bed's beats or half beats ("step": "beat" | "half" | seconds), and it plays here as one insert.
 // "place": "frame" (Framed, kit/split.cjs): the b-roll in a rounded card up top and you smaller in a card below, your head
 // over its top edge, on a soft backdrop. "top" now moves you so the top of your head reaches a little into the panel
 // and draws it over the panel with the person mask (the panel sits behind your head); without the mask, the head
@@ -250,7 +257,17 @@ const chromeFile = g => {
   const n = still ? inp('-loop', '1', '-framerate', '24', '-t', (d + 0.5).toFixed(3), '-i', s.file) : inp('-i', s.file);
   const fit = still ? `scale=${Math.round(W * 1.1 / 2) * 2}:${Math.round(H * 1.1 / 2) * 2}:force_original_aspect_ratio=increase,crop=${Math.round(W * 1.1 / 2) * 2}:${Math.round(H * 1.1 / 2) * 2},zoompan=z='1+0.08*on/${Math.max(1, Math.round(d * 24))}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=24`
     : `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`;
-  const src = still ? `[${n}:v]${V},${fit}` : `[${n}:v]trim=${i0}:${(i0 + d).toFixed(3)},${V},${fit}`;
+  // "fit": "whole" (kit/fastrun.cjs): the clip is shown whole, sharp over its own blurred copy, instead of cropped to
+  // fill. It is the default in the split and framed panels when filling would crop more than a fifth of the picture
+  // away (a 16:9 clip in the split panel lost its outer 37 percent); "fit": "fill" keeps the crop. A fast run is whole.
+  const whole = FRUN.fitFor({ ...s, place }, s.fit || !['top', 'frame'].includes(place) ? null : FRUN.sizeOf(s.file), W, H) === 'whole';
+  let src = still ? `[${n}:v]${V},${fit}` : `[${n}:v]trim=${i0}:${(i0 + d).toFixed(3)},${V},${fit}`;
+  if (whole) {
+    // a still keeps its slow push in: it is made a little small and grows to fill its room, never cropped
+    const [w2, h2] = still ? [Math.round(W * 1.1 / 2) * 2, Math.round(H * 1.1 / 2) * 2] : [W, H];
+    f.push(`[${n}:v]${still ? '' : `trim=${i0}:${(i0 + d).toFixed(3)},`}${V},setsar=1[wi${k}]`, ...FRUN.wholeFit(`wi${k}`, `wo${k}`, w2, h2, `i${k}`, { inset: still ? 1 / 1.08 : 1 }));
+    src = still ? `[wo${k}]zoompan=z='1+0.08*on/${Math.max(1, Math.round(d * 24))}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=24` : `[wo${k}]null`;
+  }
   const on = `enable='between(t,${a0},${(a0 + d).toFixed(3)})'`, win = `trim=start=${a0}:end=${(a0 + d + 0.05).toFixed(3)}`;
   // "fx" (a reference B-roll slot's treatment, kit/broll-slots.cjs): motion push | pull | drift with zoom, shake, a
   // glitch on the way in, colour bw | muted | vivid | warm | cool, and in / out: fade, flash, zoom, glitch, slide-*

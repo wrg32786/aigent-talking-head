@@ -83,7 +83,7 @@ try {
     assert.deepStrictEqual(asked, [['a.mp4', 1], ['b.mp4', 1]], 'the second piece of a.mp4 plays on from the first: not looked at');
     assert.deepStrictEqual(r.moved.map(m => [m.seg, m.why]), [[0, 'lens'], [2, 'lens']]);
     for (const i of [0, 2]) { assert.ok(segs[i].in > 0.85 && segs[i].in <= 1.4 - PE.LENS.lead + 1e-6, `piece ${i + 1} starts at the lens and before its first word: ${segs[i].in}`); }
-    assert.strictEqual(segs[1].in, 2.95); assert.ok(r.lines.every(l => !/—/.test(l)) && /no word touched/.test(r.lines[0]));
+    assert.strictEqual(segs[1].in, 2.95); assert.ok(r.lines.every(l => !/\u2014/.test(l)) && /no word touched/.test(r.lines[0]));
     // the sound of the first word starts before the transcript says: the start stays ahead of the sound
     const s2 = mk(); PE.lensStarts({ segs: s2, words: () => words, fileOf: i => s2[i].file, python: 'x', poseFn: (py, f, sp) => sp.map(([a, b, fps]) => Array.from({ length: Math.round((b - a) * fps) }, (_, i) => [+(a + i / fps).toFixed(3), a < 0.3 ? 0.62 : 0.5, 0.02, 0.15])), firstSound: () => 1.2 });
     assert.strictEqual(s2[0].in, +(1.2 - PE.LENS.lead).toFixed(3));

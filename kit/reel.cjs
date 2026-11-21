@@ -859,6 +859,14 @@ if (cut.sfxMap) {
   } }
 // copy lint and title/sound rules: printed, not blocking (npm run check -- <name> and npm run verify fail on errors)
 try { sh(process.execPath, [path.join(KIT, 'check.mjs'), build, '--warn-only'], build); } catch {}
+// fast runs (kit/fastrun.cjs): an insert with "run": [files] becomes one clip, cut on the bed's beats or half beats
+// when there is a bed (build/beat-grid.json), and plays as one insert. Made again only when its files or times change.
+if ((cut.inserts || []).some(x => Array.isArray(x.run))) {
+  const FRUN = require('./fastrun.cjs');
+  try { const lines = FRUN.resolve(cut, build, B.wantBeatSync(cut) && cut.bed ? B.loadGrid(build) : null); lines.forEach(l => console.log(l)); fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); }
+  catch (e) { die('fast run: ' + String(e.stderr || e.message).trim().split('\n').slice(-3).join(' ')); }
+}
+
 // base.mp4 (the graded picture alone, BASEONLY) is made once per picture: the face zone and the person mask both read it,
 // and a rebuild that only changes captions, titles, sounds or layers reuses it (base.sig: the cut without those keys)
 const LAYER_KEYS = new Set(['overlay', 'titles', 'mask', 'maskModel', 'person', 'panels', 'headMask', 'sfx', 'sfxHits', 'sfxMap', 'sfxCap', 'bed', 'bedStart', 'bedVol', 'bedNoFade', 'bedFadeOut', 'export', 'behindMax', 'maskClear']);

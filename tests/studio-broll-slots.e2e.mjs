@@ -66,7 +66,7 @@ try {
     assert.ok(/covers the whole frame/.test(await pg.locator('#broll-needs .need[data-slot="3"] .need-d').textContent()));
     assert.deepStrictEqual((await c1.locator('.need-acts').innerText()).split('\n').map(x => x.trim()).filter(Boolean), ['Upload', 'Copy for my agent', 'Skip']);
     assert.strictEqual(await pg.locator('.need-stock').count(), 0, 'no stock button without a key'); assert.strictEqual(await pg.locator('.need-send').count(), 0, 'no agent connected');
-    assert.ok(/3 slots need a clip from you/.test(await pg.textContent('#s-broll .sub')));
+    assert.strictEqual((await pg.textContent('#broll-count')).trim(), '0 of 3 B-roll spots filled.', 'the step says how many slots the reference has and how many are filled'); assert.ok(/3 still need a clip from you/.test(await pg.textContent('#s-broll .sub')));
     assert.strictEqual(await pg.locator('#broll-lane .spot.needs').count(), 3, 'the lane marks them');
   });
   await t('the step face is calm: keys and Add a spot in More, sources behind Choose something else, no engine words', async () => {
@@ -75,7 +75,7 @@ try {
     assert.strictEqual(await pg.isVisible('#open-keys'), false); assert.strictEqual(await pg.isVisible('#broll-add-spot'), false);
     assert.strictEqual(await pg.locator('#btab-library').count(), 0, 'the source tabs are folded away');
     await pg.click('#broll-more'); await pg.waitForSelector('#btab-library');
-    assert.deepStrictEqual(await pg.locator('.btabs .tab').allInnerTexts(), ['Library', 'Upload', 'Stock', 'Make a card', 'Record my screen', 'Generate (paid)']);
+    assert.deepStrictEqual(await pg.locator('.btabs .tab').allInnerTexts(), ['Library', 'Fast run', 'Upload', 'Stock', 'Make a card', 'Record my screen', 'Generate (paid)']);
     await pg.click('#broll-more-fold > summary'); assert.ok(await pg.isVisible('#open-keys')); assert.ok(await pg.isVisible('#broll-add-spot'));
     await pg.click('#broll-more-fold > summary');
     await shot(pg, 'broll-slots-dark.png');
@@ -90,7 +90,7 @@ try {
     await pg.click('#broll-needs .need[data-slot="3"] .need-skip');
     await pg.waitForSelector('#broll-needs .need.skipped[data-slot="3"]');
     assert.ok(/Skipped/.test(await pg.textContent('#broll-needs .need[data-slot="3"]')) && /You stay on screen here/.test(await pg.textContent('#broll-needs .need[data-slot="3"]')));
-    assert.ok(/2 slots need a clip/.test(await pg.textContent('#s-broll .sub')));
+    assert.ok(/2 still need a clip/.test(await pg.textContent('#s-broll .sub')));
     assert.strictEqual((await api('/api/broll')).beats.filter(b => b.need).length, 3, 'the slot is still in the plan');
     await pg.click('#broll-needs .need[data-slot="3"] .need-undo'); await pg.waitForSelector('#broll-needs .need[data-slot="3"]:not(.skipped)');
   });

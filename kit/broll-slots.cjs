@@ -60,8 +60,9 @@ function detect(cands, measured = [], { faces = [], script = [] } = {}) {
     const m = measured[i] || {}, at = Array.isArray(m.at) && m.at.length === 2 && m.at[1] > m.at[0] ? m.at : [c.start, c.end];
     const box = Array.isArray(c.box) && c.box.length === 4 ? c.box.map(Number) : null, kind = KINDS.includes(c.kind) ? c.kind : kindOf(box);
     return { start: r2(at[0]), end: r2(at[1]), kind, box: kind === 'full' ? null : box, border: hexOK(c.border) ? c.border.toLowerCase() : null, shows: [cleanWhat(c.shows)].filter(Boolean), shot: c.shot || null, source: c.source || null, fx: fxOf(m) };
-  }).filter(s => s.end - s.start >= 0.4).sort((a, b) => a.start - b.start);
-  const same = (a, b) => a.kind === b.kind && (!a.box || !b.box || a.box.every((v, k) => Math.abs(v - b.box[k]) < 0.06));
+  }).sort((a, b) => a.start - b.start);
+  out = fastRuns(out).filter(s => s.run || s.end - s.start >= 0.4);
+  const same = (a, b) => !a.run && !b.run && a.kind === b.kind && (!a.box || !b.box || a.box.every((v, k) => Math.abs(v - b.box[k]) < 0.06));
   const merged = [];
   for (const s of out) {
     const p = merged[merged.length - 1];
@@ -78,8 +79,26 @@ function detect(cands, measured = [], { faces = [], script = [] } = {}) {
     const layer = s.box && f && s.box[1] < f.eyeY + 0.55 * f.faceH && s.kind !== 'full' ? 'behind' : 'front';
     const says = script.filter(l => l.end > s.start + 0.2 && l.start < s.end - 0.2).map(l => String(l.say || l.text || '')).join(' ').replace(/\s+/g, ' ').trim();
     return { n: i + 1, start: s.start, end: s.end, kind: s.kind, layer, ...(s.box ? { y: r3(s.box[1] + s.box[3] / 2), w: r3(s.box[2]), h: r3(s.box[3]) } : {}), ...(s.border ? { border: s.border } : {}),
-      ...(s.shows.length ? { shows: s.shows.slice(0, 3).join(', ') } : {}), ...(s.shot ? { shot: s.shot } : {}), ...(s.source ? { source: s.source } : {}), fx: s.fx, ...(says ? { says: says.slice(0, 160) } : {}) };
+      ...(s.shows.length ? { shows: s.shows.slice(0, 3).join(', ') } : {}), ...(s.shot ? { shot: s.shot } : {}), ...(s.source ? { source: s.source } : {}), ...(s.run ? { run: s.run, step: s.step } : {}), fx: s.fx, ...(says ? { says: says.slice(0, 160) } : {}) };
   });
+}
+// A fast run: three or more full-frame cutaways in a row, each under 0.6 s, with no gap between them (the reference
+// cuts five pictures 0.21 s apart over one line). They are one slot: "run" is how many cuts, "step" the middle
+// length of one. Shorter cutaways that are not part of a run are still dropped by the caller.
+const RUN = { max: 0.6, gap: 0.08, min: 3 };
+function fastRuns(list) {
+  const out = []; let i = 0;
+  const quick = s => s.kind === 'full' && !s.box && s.end - s.start <= RUN.max && s.end - s.start > 0.04;
+  while (i < list.length) {
+    let j = i;
+    if (quick(list[i])) while (j + 1 < list.length && quick(list[j + 1]) && list[j + 1].start - list[j].end <= RUN.gap && list[j + 1].start >= list[j].end - RUN.gap) j++;
+    if (j - i + 1 >= RUN.min) {
+      const g = list.slice(i, j + 1);
+      out.push({ ...g[0], end: g[g.length - 1].end, shows: [...new Set(g.flatMap(x => x.shows))], run: g.length, step: r2(median(g.map(x => x.end - x.start))), fx: fxOf({ in: 'cut', out: 'cut' }) }); // each picture pushes in on its own (kit/fastrun.cjs)
+      i = j + 1;
+    } else out.push(list[i++]);
+  }
+  return out;
 }
 
 // the Reel.md block for the slots (kit/teardown.mjs writes it; kit/reelmd.cjs reads it back as recipe.broll)
@@ -94,11 +113,12 @@ function blockLines(slots) {
     if (s.source) f.push(`source~ ${one(s.source)}`);
     const x = s.fx || fxOf();
     f.push(`motion ${x.motion}`, `zoom ${x.zoom}`, `shake ${x.shake ? 'on' : 'off'}`, `glitch ${x.glitch ? 'on' : 'off'}`, `colour ${x.colour}`, `in ${x.in}`, `out ${x.out}`);
+    if (s.run) f.push(`run ${s.run}`, `step ${s.step}`);
     if (s.says) f.push(`says~ ${one(s.says)}`);
     return f.join(' | ');
   });
 }
-const BLOCK_NOTE = 'Where the reference shows B-roll, what it showed and how it is treated: `kind` is full (it covers the frame), panel (a framed window over the speaker), split or pip. A remake keeps a slot at each of these moments. Give a slot your own clip with `src <file>` (a path next to this file), or fill it on the B-roll step in Studio; a slot with no clip stays in the plan as "needs B-roll".';
+const BLOCK_NOTE = 'Where the reference shows B-roll, what it showed and how it is treated: `kind` is full (it covers the frame), panel (a framed window over the speaker), split or pip. `run 5 | step 0.21` is a fast run: five pictures cut 0.21 s apart, filled as one slot. A remake keeps a slot at each of these moments. Give a slot your own clip with `src <file>` (a path next to this file), or fill it on the B-roll step in Studio; a slot with no clip stays in the plan as "needs B-roll".';
 function appendBlock(md, slots) {
   const body = String(md).replace(/\n## B-roll\n[\s\S]*?\n```\n(?=\n|$)/, '\n');
   if (!slots.length) return body;
@@ -118,6 +138,7 @@ function fromRecipe(recipe) {
       ...Object.fromEntries(['y', 'w', 'h'].map(k => [k, num(v(g, k))]).filter(([, x]) => x != null)), ...(hexOK(v(g, 'border')) ? { border: String(v(g, 'border')).toLowerCase() } : {}),
       ...(v(g, 'shows') && v(g, 'shows') !== true ? { shows: String(v(g, 'shows')) } : {}), ...(v(g, 'shot') && v(g, 'shot') !== true ? { shot: String(v(g, 'shot')) } : {}),
       ...(v(g, 'source') && v(g, 'source') !== true ? { source: String(v(g, 'source')) } : {}), ...(g.src && g.src !== true ? { src: String(g.src) } : {}), ...(v(g, 'says') && v(g, 'says') !== true ? { says: String(v(g, 'says')) } : {}),
+      ...(num(v(g, 'run')) >= 2 ? { run: Math.round(num(v(g, 'run'))), step: num(v(g, 'step')) > 0 ? num(v(g, 'step')) : 0.25 } : {}),
       fx: fxOf({ motion: v(g, 'motion'), zoom: v(g, 'zoom'), shake: v(g, 'shake'), glitch: v(g, 'glitch'), colour: v(g, 'colour') ?? v(g, 'color'), in: v(g, 'in'), out: v(g, 'out') }) }));
   }
   const cands = [];
@@ -172,7 +193,7 @@ function wantScore(text) {
 }
 const slotOut = (s, a, b, words, extra = {}) => ({ n: 0, start: a, end: b, kind: s.kind, layer: s.layer || 'front', ...(s.y != null ? { y: s.y } : {}), ...(s.w != null ? { w: s.w } : {}), ...(s.h != null ? { h: s.h } : {}),
   ...(s.border ? { border: s.border } : {}), fx: { ...fxOf(s.fx) }, what: s.shows || null, shot: s.shot || (s.kind === 'panel' ? 'screen recording' : null), ...(s.source ? { source: s.source } : {}),
-  line: textUnder(words, a, b), ...extra, state: s.src ? 'filled' : 'needs', ...(s.src ? { file: s.src, by: 'recipe' } : {}) });
+  ...(s.run ? { run: s.run, step: s.step } : {}), line: textUnder(words, a, b), ...extra, state: s.src ? 'filled' : 'needs', ...(s.src ? { file: s.src, by: 'recipe' } : {}) });
 const number = list => list.sort((p, q) => p.start - q.start).map((s, i) => ({ ...s, n: i + 1 }));
 // a full cutaway hides the speaker: it stays off the hook and the last line unless the reference covered its own
 function guardFull(s, a, b, { len, lines, refLen, ref }) {
@@ -188,7 +209,10 @@ function guardFull(s, a, b, { len, lines, refLen, ref }) {
 function forRecreate(refSlots, { k = 1, len, words = [], refLen = null, log = () => {} } = {}) {
   const lines = linesOf(words), out = [], RL = refLen || (len / (k || 1));
   for (const s of refSlots) {
-    let [a, b] = snap(s.start * k, s.end * k, words, len);
+    // a fast run keeps its own pace: it is as long as its cuts take (the music is not scaled), at least a second
+    const own = s.run ? clamp(s.run * (+s.step || 0.25), 1, 4) : null;
+    let [a, b] = snap(s.start * k, own ? s.start * k + own : s.end * k, words, len);
+    if (own) b = r3(Math.min(len, a + own));
     [a, b] = guardFull(s, a, b, { len, lines, refLen: RL, ref: s });
     const prev = out[out.length - 1];
     if (prev && a < prev.end + 0.15) a = r3(prev.end + 0.15);
@@ -223,7 +247,7 @@ function forLook(lookBroll, { len, words = [], log = () => {} } = {}) {
 function lookSummary(refSlots, dur) {
   const total = refSlots.reduce((a, s) => a + (s.end - s.start), 0), by = k => refSlots.filter(s => s.kind === k).length;
   return { perMin: dur ? r2(refSlots.length * 60 / dur) : 0, share: dur ? r2(Math.min(1, total / dur)) : 0, kinds: Object.fromEntries(KINDS.map(k => [k, by(k)]).filter(([, n]) => n)),
-    slots: refSlots.slice(0, 12).map(s => ({ kind: s.kind, layer: s.layer || 'front', dur: r2(s.end - s.start), ...(s.y != null ? { y: s.y } : {}), ...(s.w != null ? { w: s.w } : {}), ...(s.h != null ? { h: s.h } : {}), ...(s.border ? { border: s.border } : {}), ...(s.shot ? { shot: s.shot } : {}), fx: fxOf(s.fx) })) };
+    slots: refSlots.slice(0, 12).map(s => ({ kind: s.kind, layer: s.layer || 'front', dur: r2(s.end - s.start), ...(s.y != null ? { y: s.y } : {}), ...(s.w != null ? { w: s.w } : {}), ...(s.h != null ? { h: s.h } : {}), ...(s.border ? { border: s.border } : {}), ...(s.shot ? { shot: s.shot } : {}), ...(s.run ? { run: s.run, step: s.step } : {}), fx: fxOf(s.fx) })) };
 }
 
 // ---------- what a slot needs, in plain words ----------
@@ -233,6 +257,9 @@ const EDGE_WORDS = { cut: 'cuts in', fade: 'fades in', pop: 'pops in', 'slide-up
 function brief(slot) {
   const secs = r2(slot.end - slot.start), shot = slot.shot || (slot.kind === 'panel' ? 'screen recording' : 'clip');
   const an = /^[aeiou]/i.test(shot) ? 'an' : 'a';
+  // a fast run asks for several pictures, not one clip
+  if (slot.run) return { what: `a fast run of ${slot.run} clips or pictures${slot.what && slot.ref ? ` (the reference showed ${slot.what})` : ''}`, seconds: secs, shape: KIND_WORDS[slot.kind] || KIND_WORDS.full,
+    treat: `one every ${(+slot.step || 0.25).toFixed(2)} s, on the beat`, line: slot.line || '', frame: 'any shape, each one is shown whole', run: slot.run, step: +slot.step || 0.25 };
   // the reference's own subject is a hint, not the answer: your words may be about something else
   const what = slot.what && slot.ref ? `${an} ${shot} (the reference showed ${slot.what})` : slot.what ? `${an} ${shot} of ${slot.what}` : slot.line ? `${an} ${shot} that fits "${slot.line.length > 70 ? slot.line.slice(0, 68).trim() + '...' : slot.line}"` : `${an} ${shot}`;
   const fx = slot.fx || fxOf(), treat = [MOTION_WORDS[fx.motion], fx.shake && 'a little shake', fx.glitch && 'a glitch', fx.colour !== 'none' && (fx.colour === 'bw' ? 'black and white' : fx.colour + ' colour'), EDGE_WORDS[fx.in]].filter(Boolean);
@@ -243,6 +270,10 @@ function brief(slot) {
 // the ready instruction for an agent that can capture it (Copy for my agent, Send to my agent)
 function agentAsk(slot, { job = '', spot = null } = {}) {
   const b = brief(slot);
+  if (slot.run) return [`B-roll for my reel${job ? ` "${job}"` : ''}, slot ${slot.n}${spot != null ? ` (spot ${spot} on the B-roll step)` : ''}: a fast run.`,
+    `Capture ${slot.run} or more stills or short clips (my sites, screens or products), any shape; each is shown whole for about ${b.step.toFixed(2)} s, cut on the beat.`,
+    b.line ? `It plays while I say: "${b.line}".` : '',
+    `Use only pages and apps I am allowed to show, nothing private on screen. Add each one with add_broll, then make the run with add_broll and run set to their ids${spot != null ? ` on beat ${spot}` : ''}, and tell me.`].filter(Boolean).join(' ');
   return [`B-roll for my reel${job ? ` "${job}"` : ''}, slot ${slot.n}${spot != null ? ` (spot ${spot} on the B-roll step)` : ''}.`,
     `Capture ${slot.what && slot.ref ? `${/^[aeiou]/i.test(slot.shot || 'screen recording') ? 'an' : 'a'} ${slot.shot || 'screen recording'} that fits what I say` : b.what}, about ${Math.max(2, Math.ceil(b.seconds + 1))} seconds, ${b.frame}, no sound needed.`,
     slot.what && slot.ref ? `The reference showed ${slot.what} at this moment.` : '',
@@ -286,4 +317,4 @@ function clearFaces(flips, fz, H = 1920) {
   return moved;
 }
 
-module.exports = { KINDS, MOTIONS, COLOURS, EDGES, BLOCK, BLOCK_NOTE, fxOf, kindOf, cleanWhat, detect, blockLines, appendBlock, fromRecipe, ownsCard, linesOf, snap, wantScore, forRecreate, forLook, lookSummary, brief, agentAsk, flipOf, insertOf, clearFaces };
+module.exports = { fastRuns, RUN, KINDS, MOTIONS, COLOURS, EDGES, BLOCK, BLOCK_NOTE, fxOf, kindOf, cleanWhat, detect, blockLines, appendBlock, fromRecipe, ownsCard, linesOf, snap, wantScore, forRecreate, forLook, lookSummary, brief, agentAsk, flipOf, insertOf, clearFaces };
