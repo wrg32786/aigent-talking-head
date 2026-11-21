@@ -13,6 +13,7 @@ Release notes: [docs/releases/v1.17.1.md](docs/releases/v1.17.1.md). A reference
 - **Still being read.** A reference that is downloading or being broken down shows "Reading the reference. We will set your look from it when it is ready." and sets it when it is.
 - **Fixes.** The Copy a reference wizard asked for a mode named `all`, which was refused, so it never switched to Use all; it now sets Recreate. Finish's Make button counts lines like Your edit (it said 3 pieces where Your edit said 7).
 - **For your agent.** `studio_set_selections` with `reference.mode` does the same (its description says what each mode sets); the Studio skill says to tell the user in one line.
+- **Smoke.** A Studio Chrome test that hangs is stopped after 6 minutes with its log (`SMOKE_E2E_TIMEOUT`), instead of holding every result until the CI step times out.
 - **Tests and docs.** `tests/studio-refstyle.test.mjs` (in `npm run check`) and new cases in `tests/studio-look.e2e.mjs` (in `npm run smoke`); docs/studio.md.
 
 ## 1.17.0 (unreleased)

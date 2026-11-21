@@ -150,7 +150,8 @@ try {
     assert.deepStrictEqual(errs, []);
   });
 } finally {
-  await browser.close(); srv.kill(); media.close();
+  release(); media.closeAllConnections(); media.close();
+  await browser.close(); srv.kill();
   rmSync(join(ROOT, 'teardowns', 'studio', JOB), { recursive: true, force: true }); rmSync(join(ROOT, 'teardown-in', 'studio', JOB), { recursive: true, force: true });
   rmSync(STATE, { recursive: true, force: true });
   for (const d of [LOOK, `ref-${JOB}`]) rmSync(join(ROOT, 'packs', 'local', d), { recursive: true, force: true });
