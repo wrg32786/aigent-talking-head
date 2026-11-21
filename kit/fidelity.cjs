@@ -1,7 +1,7 @@
 // The fidelity read-out: after a Recreate or Copy the look draft, how close the plan is to what it copies, per part.
 // Written to build/match.json. Everything here is worked out from the plan, without rendering, so it is an estimate:
 // what we set, measured the cheap way, against what the reference (or the look) asked for.
-//   { version: 1, mode: "recreate" | "look", against, overall, parts: { framing, grade, captions, stickers, sfx, pace } }
+//   { version: 1, mode: "recreate" | "look", against, overall, parts: { framing, grade, captions, stickers, sfx, pace, font } }
 // Each part has score (0 to 100, or null when it could not be measured), a short note, and its numbers:
 //   framing   per shot the face height and eye line we get against the target (shares of the frame), and the mean miss
 //   grade     the mean Lab distance between your sampled frames and the target, before and after the LUT. The finish
@@ -10,6 +10,9 @@
 //   stickers  how many, and the shape
 //   sfx       how many and how many per 10 s, as placed (the density cap in kit/assemble.cjs can thin them later)
 //   pace      the mean shot length
+//   font      the pairing we draw with against the one the teardown matched to the reference's type (kit/fontmatch.py).
+//             It carries its own word: Matched, Close or Guess, which is how sure the teardown was; Off when you
+//             picked your own font over it. No score when no font was read
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -67,11 +70,22 @@ function pacePart(shots, len, target) {
   return { score: Math.round(ratio(mean, target.shotMean) * 100), note: `a cut every ${mean} s against ${target.shotMean} s${target.skipped ? `; ${target.skipped} wanted cut${target.skipped === 1 ? '' : 's'} left out (no quiet between your words there)` : ''}`, shots: { ours: n, target: target.shots != null ? target.shots : null }, shotMean: { ours: mean, target: target.shotMean } };
 }
 
+// target: { pairing, kind, face, match } from the recipe's or the look's Brand kit fonts and Style font, font-face, font-match
+const FONT_WORD = { matched: ['Matched', 95], close: ['Close', 80], guess: ['Guess', 50] };
+function fontPart(caps, target) {
+  if (!target || !target.pairing || !FONT_WORD[target.match]) return { score: null, note: 'no font read from the reference' };
+  const ours = String((caps && caps.fonts) || 'theme').split(',')[0].trim(), kind = target.kind || 'kind not read';
+  if (ours !== target.pairing) return { score: 30, word: 'Off', note: `your own pick (${ours}); the reference reads as ${kind}, our ${target.face || target.pairing}`, ours, target: target.pairing, kind: target.kind || null, match: target.match };
+  const [word, score] = FONT_WORD[target.match];
+  return { score, word, note: `${kind}, drawn in ${target.face || target.pairing}${target.match === 'guess' ? '; nothing in our fonts is near it, this is the nearest' : target.match === 'close' ? '; the same kind of face' : ''}`, ours, target: target.pairing, kind: target.kind || null, match: target.match };
+}
+const fontTarget = (style, brand) => (style && style['font-match'] && brand && brand.fonts && !/^(none|theme)$/i.test(String(brand.fonts)) ? { pairing: String(brand.fonts).split(',')[0].trim(), kind: style.font || null, face: style['font-face'] || null, match: String(style['font-match']).toLowerCase() } : null);
+
 // plan: build/plan.json; cut, caps: the job's cut.json and captions.js; grade: kit/grade-match.cjs match() result;
 // target: { against, style, stickers: { count, shape, spoken }, sfx: { count, per10 }, pace: { shotMean, shots, skipped } }
 function measure({ mode, plan, cut, caps, grade, target }) {
   const len = ((cut && cut.segs) || []).reduce((a, s) => a + s.out - s.in, 0);
-  const parts = { framing: framingPart(plan && plan.shots), grade: gradePart(grade), captions: captionsPart(caps, target.style), stickers: stickersPart(caps && caps.flips, target.stickers), sfx: sfxPart(cut, len, target.sfx), pace: pacePart(plan && plan.shots, len, target.pace) };
+  const parts = { framing: framingPart(plan && plan.shots), grade: gradePart(grade), captions: captionsPart(caps, target.style), stickers: stickersPart(caps && caps.flips, target.stickers), sfx: sfxPart(cut, len, target.sfx), pace: pacePart(plan && plan.shots, len, target.pace), font: fontPart(caps, target.font) };
   const scored = Object.values(parts).map(p => p.score).filter(x => x != null);
   return { version: VERSION, mode, against: target.against || null, overall: scored.length ? Math.round(scored.reduce((a, x) => a + x, 0) / scored.length) : null, estimate: true, parts };
 }
@@ -80,7 +94,7 @@ function measure({ mode, plan, cut, caps, grade, target }) {
 function targetOfRecipe(recipe, { k = 1, len = 0, skipped = 0 } = {}) {
   const v = (g, key) => (g[key] !== undefined ? g[key] : g[key + '~']), ord = (recipe.graphics || []).filter(g => v(g, 'type') === 'ordinal-sticker');
   const dur = +(recipe.card && recipe.card.source && recipe.card.source.duration) || (recipe.shots.length ? recipe.shots[recipe.shots.length - 1].end : 0) || 1, sfx = (recipe.sfx || []).filter(x => x.start * k < len - 0.1);
-  return { against: (recipe.card && recipe.card.name) || null, style: recipe.style || {},
+  return { against: (recipe.card && recipe.card.name) || null, style: recipe.style || {}, font: fontTarget(recipe.style, recipe.brand),
     stickers: { count: ord.length, shape: ord.length ? (ord.filter(g => v(g, 'shape') === 'starburst').length * 2 >= ord.length ? 'starburst' : 'seal') : null, spoken: true },
     sfx: { count: sfx.length, per10: len ? r1(sfx.length / len * 10) : 0 },
     pace: { shotMean: recipe.shots.length ? +(dur * k / recipe.shots.length).toFixed(2) : null, shots: recipe.shots.length, skipped } };
@@ -88,7 +102,7 @@ function targetOfRecipe(recipe, { k = 1, len = 0, skipped = 0 } = {}) {
 // what a Copy the look draft is held against: the look's own rules on your edit's length
 function targetOfLook(look, { len = 0, skipped = 0, planned = null } = {}) {
   const st = (look.stickers || {}).ordinal;
-  return { against: look.name, style: look.style || {},
+  return { against: look.name, style: look.style || {}, font: fontTarget(look.style, look.brand),
     stickers: st ? { count: Math.max(1, Math.round((+st.per10 || 0.5) * len / 10)), shape: st.shape || 'seal' } : { count: 0, shape: null },
     sfx: { count: look.sfx.count ? Math.max(1, Math.round((+look.sfx.per10 || 1) * len / 10)) : 0, per10: look.sfx.per10 || 0 },
     pace: { shotMean: look.pace.shotMean, shots: planned, skipped } };
@@ -99,4 +113,4 @@ function read(build) { try { const m = JSON.parse(fs.readFileSync(path.join(buil
 function drop(build) { fs.rmSync(path.join(build, FILE), { force: true }); }
 const line = m => `match: ${m.overall == null ? 'not measured' : m.overall + ' of 100 overall'} (${Object.entries(m.parts).map(([k, p]) => `${k} ${p.score == null ? 'n/a' : p.score}`).join(', ')}); an estimate from the plan, in build/${FILE}`;
 
-module.exports = { measure, targetOfRecipe, targetOfLook, write, read, drop, line, framingPart, gradePart, captionsPart, stickersPart, sfxPart, pacePart, FILE, VERSION };
+module.exports = { measure, targetOfRecipe, targetOfLook, write, read, drop, line, framingPart, gradePart, captionsPart, stickersPart, sfxPart, pacePart, fontPart, fontTarget, FILE, VERSION };

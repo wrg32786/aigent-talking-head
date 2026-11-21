@@ -170,6 +170,9 @@ function Layers({ step, bare, CAT, V, s, apply, patch, tab, setTab }) {
   // one short line for the layer: the first pick with its reason, and how many more
   const refLine = x => { const p = refPicks(x); if (!p.length) return null; const first = p.find(r => why[r]) || p[0], more = p.length - 1;
     return `From the reference: ${nameOf(CAT.items[first])}${why[first] ? ', ' + why[first] : ''}${more > 0 ? `, and ${more} more` : ''}.`; };
+  // the Fonts layer says whose font the next draft uses while a reference's style is copied (kit/studio/reference.mjs)
+  const rf = V && V.refFont, fontLine = !rf ? null : rf.locked ? `Your font is used, not the one from your ${rf.from === 'look' ? 'saved look' : 'reference'}.`
+    : `From your ${rf.from === 'look' ? 'saved look' : 'reference'}: ${rf.font ? `${rf.font.face || 'its font'}${rf.font.kind ? ', ' + rf.font.kind : ''}` : 'its fonts'}. Pick one here to use yours instead.`;
   if (!L) return null;
   const grid = <div id="grid" className="layer-groups" role={bare ? 'group' : 'tabpanel'} aria-labelledby={bare ? undefined : 'tab-' + cur} aria-label={bare ? L.label : undefined} data-layer={cur} ref={gridRef}>
     {groups.length ? groups.map(g => <section key={g.key || g.label} className="lg" data-group={g.id} aria-label={g.label}>
@@ -194,7 +197,7 @@ function Layers({ step, bare, CAT, V, s, apply, patch, tab, setTab }) {
         </div>
       </div>
       <label className="tabselect"><span className="sr">Layer</span><select id="tabselect" value={cur} onChange={e => setTab(e.target.value)}>{layers.map(x => <option key={x.id} value={x.id}>{x.label} ({x.count})</option>)}</select></label>
-      <p id="tabhint" className="fine">{ql ? `Every step, matching "${q.trim()}".` : L.hint || ''}{!ql && refIn(L) > 0 && <span className="layer-ref" id="layer-ref" data-n={refIn(L)}>{refLine(L)}</span>}</p>
+      <p id="tabhint" className="fine">{ql ? `Every step, matching "${q.trim()}".` : L.hint || ''}{!ql && refIn(L) > 0 && <span className="layer-ref" id="layer-ref" data-n={refIn(L)}>{refLine(L)}</span>}{!ql && cur === 'fonts' && fontLine && <span className="layer-ref" id="font-ref" data-locked={String(!!(V.refFont && V.refFont.locked))}>{fontLine}</span>}</p>
       <ChangeNote s={s} patch={patch} />
       {!ql && cur === 'motion' && <div className="layer-extra" id="motion-extra"><Switch id="punch" size="sm" label="Zoom punch on the cuts" value={s.pace.punch !== 'off'} onChange={on => patch({ pace: { punch: on ? 'on' : 'off' } })} /></div>}
       {grid}

@@ -21,7 +21,7 @@ const { execFileSync } = require('child_process');
 const KIT = __dirname, ROOT = path.dirname(KIT);
 const X = require('./exports.cjs'), R = require('./rules.cjs'), FW = require('./facewindow.cjs'), SPL = require('./split.cjs');
 
-const BIG = /\.(mp4|mov|m4v|mkv|webm|wav|mp3|m4a|aac|flac)$/i, GEN = /^(boxes|layout|facecheck|graphics|words|lockups|oneword|layers|legibility|window)\.json$|^(lockover|gfx)\.js$|^base\.sig$|^frame-chrome-.*\.png$|^overlay\.html$/i;
+const BIG = /\.(mp4|mov|m4v|mkv|webm|wav|mp3|m4a|aac|flac)$/i, GEN = /^(boxes|layout|facecheck|textcheck|graphics|words|lockups|oneword|layers|legibility|window)\.json$|^(lockover|gfx)\.js$|^base\.sig$|^frame-chrome-.*\.png$|^overlay\.html$/i;
 const lenOf = cut => (cut.segs || []).reduce((a, s) => a + (s.out - s.in) + (s.pad || 0), 0) + (cut.tail ?? 0.3);
 const writeCaps = (f, caps) => fs.writeFileSync(f, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
 // the picture of a cut, without the layers on it: two builds with the same key show the same base.mp4
@@ -124,11 +124,11 @@ function make({ jobDir, src, name, reel, out, base = null, masks = null, python 
   if (LEN > P.maxSec) log(`note: the reel is ${LEN.toFixed(1)} s, longer than ${P.label} allows (${P.maxSec} s); this version is trimmed`);
   execFileSync('ffmpeg', X.ffmpegArgs(name, full, out, LEN, { y0: fixedY }), { stdio: 'inherit' });
   if (!keep) fs.rmSync(full, { force: true });
-  let LAY = null, FC = null; try { LAY = JSON.parse(fs.readFileSync(path.join(dir, 'layout.json'), 'utf8')); } catch {} try { FC = JSON.parse(fs.readFileSync(path.join(dir, 'facecheck.json'), 'utf8')); } catch {}
+  let LAY = null, FC = null; try { LAY = JSON.parse(fs.readFileSync(path.join(dir, 'layout.json'), 'utf8')); } catch {} try { FC = JSON.parse(fs.readFileSync(path.join(dir, 'facecheck.json'), 'utf8')); } catch {} let TC = null; try { TC = JSON.parse(fs.readFileSync(path.join(dir, 'textcheck.json'), 'utf8')); } catch {}
   const n = a => (LAY ? LAY.elements.filter(e => String(e.action).includes(a)).length : 0);
   const layout = LAY ? { safeArea: n('safe-area'), moved: n('shift'), hidden: LAY.elements.filter(e => e.action === 'hide').length, face: n('face') } : null;
-  log(`${name}: ${out}${layout ? ` (${layout.safeArea} placed inside the frame, ${layout.face} moved off the face${FC ? ', ' + FC.overlapMoments + ' moments with text on the face' : ''})` : ''}`);
-  return { name, file: out, dir, size: `${P.w}x${P.h}`, label: P.use || P.label, seconds: +Math.min(LEN, P.maxSec).toFixed(2), window: st, layout, faceHits: FC ? FC.overlapMoments : null, masks: !!mk };
+  log(`${name}: ${out}${layout ? ` (${layout.safeArea} placed inside the frame, ${layout.face} moved off the face${FC ? ', ' + FC.overlapMoments + ' moments with text on the face' : ''}${TC ? ', ' + TC.clashFrames + ' frames with two words on the same spot' : ''})` : ''}`);
+  return { name, file: out, dir, size: `${P.w}x${P.h}`, label: P.use || P.label, seconds: +Math.min(LEN, P.maxSec).toFixed(2), window: st, layout, faceHits: FC ? FC.overlapMoments : null, textClashes: TC ? TC.clashFrames : null, masks: !!mk };
 }
 
 module.exports = { make, picKey, lenOf, splitZones };

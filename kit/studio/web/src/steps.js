@@ -32,8 +32,9 @@ export const LAYER_LABEL = { audio: 'Music and sounds' };
 export const nextStep = next => (!next || !next.step ? null : next.step === 'finish' ? (/^render/i.test(next.label || '') ? 'render' : 'review') : stepOf(next.step));
 // how close the draft is to the reference, one word per part. The engine writes build/match.json as
 // { overall, parts: { framing: { score: 0 to 100, note }, ... } } (kit/fidelity.cjs); a flat { framing: 0 to 1 } reads too.
-// A part with no score (n/a) is left out
-export const MATCH_PARTS = [['framing', 'Framing'], ['grade', 'Color'], ['captions', 'Captions'], ['stickers', 'Graphics'], ['sfx', 'Sounds'], ['pace', 'Pace']];
+// A part with no score (n/a) is left out. A part may carry its own word: the font says Matched, Close or Guess (how sure
+// the teardown was of the font it read), or Off when you picked your own
+export const MATCH_PARTS = [['framing', 'Framing'], ['grade', 'Color'], ['captions', 'Captions'], ['font', 'Font'], ['stickers', 'Graphics'], ['sfx', 'Sounds'], ['pace', 'Pace']];
 export const matchWord = v => (v >= 0.9 ? 'Matched' : v >= 0.7 ? 'Close' : 'Off');
-const matchPart = (m, k) => { const p = m.parts && typeof m.parts[k] === 'object' ? m.parts[k] : null, raw = p ? p.score : m[k]; if (typeof raw !== 'number' || !isFinite(raw)) return null; return { v: p ? raw / 100 : raw, note: (p && p.note) || null }; };
-export const matchChips = m => (m && typeof m === 'object' ? MATCH_PARTS.map(([k, label]) => { const x = matchPart(m, k); return x ? { id: k, label, word: matchWord(x.v), note: x.note } : null; }).filter(Boolean) : []);
+const matchPart = (m, k) => { const p = m.parts && typeof m.parts[k] === 'object' ? m.parts[k] : null, raw = p ? p.score : m[k]; if (typeof raw !== 'number' || !isFinite(raw)) return null; return { v: p ? raw / 100 : raw, note: (p && p.note) || null, word: (p && typeof p.word === 'string' && p.word) || null }; };
+export const matchChips = m => (m && typeof m === 'object' ? MATCH_PARTS.map(([k, label]) => { const x = matchPart(m, k); return x ? { id: k, label, word: x.word || matchWord(x.v), note: x.note } : null; }).filter(Boolean) : []);

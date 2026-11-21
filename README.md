@@ -219,7 +219,7 @@ Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FRE
 | Caption styles, plus 9 letter-by-letter entrances for hero words | 7 | [Effects menu](docs/effects.md#caption-entrances) (animated previews) |
 | Title entrances, in front of or behind your head | 9 | [Effects menu](docs/effects.md#title-entrances) (animated previews) |
 | Film finishes | 10 | [Film finishes](#film-finishes) |
-| Font pairings (SIL OFL) | 19 | [kit/fonts](kit/fonts/README.md) |
+| Font pairings (SIL OFL) | 20 | [kit/fonts](kit/fonts/README.md) |
 | Brand presets | 11 | [Presets](#presets) |
 | Editing principles built in: mixed serif and sans, titles placed around the head, colour and chapter cards, music by energy, mapped and capped sounds, punch-ins, no dead air | 7, all in `--preset magazine` | [Guide](docs/guide.md#editing-principles-built-in), [effects menu](docs/effects.md#editing-principles) |
 | Sound effects and CC0 music beds, beat-synced | 37 and 11 | [Music beds](kit/music/README.md) |

@@ -1363,7 +1363,7 @@ button.rp-made { cursor: pointer; } button.rp-made:hover { background: color-mix
 .match-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; }
 .match-chip { display: inline-flex; gap: 6px; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 12.5px; border: 1px solid var(--border); }
 .match-chip b { font-weight: 650; }
-.match-chip.matched b { color: var(--success); } .match-chip.close b { color: var(--warning); } .match-chip.off b { color: var(--destructive); }
+.match-chip.matched b { color: var(--success); } .match-chip.close b { color: var(--warning); } .match-chip.off b { color: var(--destructive); } .match-chip.guess b { color: var(--muted-foreground); }
 #draft-view { margin-top: 14px; }
 .render-next { margin-top: 12px; align-items: center; } .render-next .fine { margin: 0; }
 .fold-sum { margin-left: 10px; font-weight: 500; }

@@ -114,6 +114,7 @@ Measured on the 40 second demo reel in `kit/example/demo-reel/` (20 shots, effec
 - **Caption look**: on a test list reel, plain white lower-case words with no outline and no shadow were read as `caption-outline none`, `caption-shadow none`, `caption-case lower`; the same check on our outlined captions reads an outline.
 - **Caption layer**: on a test list reel whose top words lose their tails behind the hair, 9 words met the person and 7 read behind, so the Style says `caption-layer: behind`. Words that only graze the soft edge of the mask are not counted, so a reel with captions well clear of the head gives no verdict and the default (auto) applies.
 - **Graphics**: on a test list reel (5 numbered stickers, app tiles, screen recordings), all 5 stickers and their place were found (one word guessed), 4 of 5 app labels (a white tile was missed), and the screen recordings as 8 cards.
+- **Font**: on a test list reel with plain white lower-case words in a bold sans, 18 words read as `sans bold`, lower case, white, nearest of ours Inter Tight (`haas`), Close. In the test, words drawn in each of our own faces come back as that face at caption size, and faces we do not ship (DejaVu, Liberation) land in the right kind as Close. A font far from everything we ship reads as Guess. We never name the reference's own font, only the nearest of ours.
 - **rea-video's own verdict** on how footage was made (live action, AI, 3D) is not used by the mapping. Without a vision model it can be wrong; it called parts of the real demo footage AI.
 
 Always show the user the teardown report and contact sheet, and let them change the Reel.md before the remake renders.
@@ -127,6 +128,18 @@ Always show the user the teardown report and contact sheet, and let them change 
 - `contact.jpg`: sampled frames with the detected titles boxed and labelled.
 - `videomd/`: rea-video's VIDEO.md package, `breakdown.json` and `report.html` (or `fallback.json` from the built-in analyzer).
 - `titles.json`, `extras.json`, `speech.json`: intermediate data. `extras.json` `shots[]` holds each shot's grade stats, and since 1.28.0 `face` (`h`, `eye_y`, `cx`, the box `x0 y0 x1 y1`, and `n` of `of` samples with a face) and `lab` (`mean`, `std`); `graphics[]` holds each ordinal sticker's `shape`, `spikes`, `color` and `layer`.
+
+## The font
+
+The teardown reads the font of the words on screen and matches it to the fonts in `kit/fonts/` (`kit/fontmatch.py`; how it works and where the fonts come from is in [kit/fonts/README.md](../kit/fonts/README.md#matching-the-font-in-a-reference)). `extras.json` `font` holds `category` (sans, serif, condensed or blackletter), `weight` (regular, bold or black), `case`, `color`, `face`, `pairing`, `match` (matched, close or guess), `score`, `samples` and the four nearest faces. The recipe gets `- fonts: <pairing>` under Brand kit and three Style lines:
+
+```
+- font: sans bold
+- font-face: Inter Tight
+- font-match: close
+```
+
+A Recreate or Copy the look draft draws its captions and titles with that pairing, and `build/match.json` has a `font` part with the same word. Change `- fonts:` in the Reel.md, or pass `--fonts <pairing>`, to use another. Delete the `font-match` line and the recipe's font is treated like any preset's: an explicit `--look` goes over it.
 
 ## Stage lines
 
