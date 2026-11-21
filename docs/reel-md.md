@@ -110,6 +110,13 @@ Every section is optional except the card. Anything left out falls back to the p
 | caption-entrance | `pop`, `unfurl`, `cascade`, `orbit`, `warp`, `crystallize`, `compute`, `levitate`, `undulate`, `typewriter` (default pop) | `--caption-entrance`, how kinetic hero words come in: pop springs the whole word; the others move letter by letter (unfurl opens each letter from its left edge, cascade drops them in, orbit swings them in on an arc, warp stretches and settles, crystallize gathers scattered blurred letters, compute decodes from random characters, levitate floats them up, undulate rides a wave that calms). A caption flip's own `entrance` wins |
 | titles | `on` or `off` | `--no-titles` |
 | title-layer | `front`, `behind`, `auto` | `--title-layer` |
+| title-lockup | `two-line`, `one-line` | two-line draws the rest of the phrase small with the key word, in every caption style. A teardown sets it when the reference's titles are two lines |
+| title-key-case, title-partner-case | `upper`, `lower`, `as-said` | the case of the key word and of the small partner line |
+| title-key-color, title-partner-color | a `#rrggbb` colour, `accent` or `text` | their colours |
+| title-glow | `off`, `soft`, `strong` | a glow in the key word's colour on titles and kinetic key words |
+| title-dim | `off`, or `0.05` to `0.8` | how much darker the picture goes while a title is up |
+| title-entrance | a title entrance | the entrance of every title that names none (it may repeat). A teardown writes `blur-rise` when it could not read the entrance of an italic serif key word |
+| caption-face | `display`, `partner` | one-word captions in the pairing's key face (default) or its partner face |
 | finish | finish names, comma list, or `none` (on the whole reel) | `--finish` |
 | finish-pool | finish names to vary across shots | the preset's `finishPool` |
 | transition | a name from `kit/transitions.json` | segment `transition` |

@@ -66,7 +66,8 @@ function pickTitles(b, max = 10) {
 // "Inthe age of At,/be the signal,", "360 Days" for 347 Days.) Returns a short reason when it is not, else null:
 //   the read itself was unsure (OCR confidence under 0.85);
 //   a word with no vowel in it, or letters and punctuation run together, which is how a misread looks;
-//   the speaker says something else at that moment (under two thirds of the title's words are in the speech near it).
+//   the speaker says something else at that moment (under two thirds of the title's words are in the speech near it,
+//   or a number in it is not the number said).
 function textDoubt(t, speechWords) {
   const txt = String(t.text || ''), toks = txt.split(/[\s/|]+/).filter(Boolean);
   if (t.conf != null && t.conf < 0.85) return `read with low confidence (${Math.round(t.conf * 100)}%)`;
@@ -77,6 +78,8 @@ function textDoubt(t, speechWords) {
   }
   if (/[,;:]\s*\/|,\s*$/.test(txt)) return 'stray punctuation in it';
   const ws = toks.map(norm).filter(w => w.length >= 2), near = (speechWords || []).filter(w => w[0] <= t.end + 0.6 && w[1] >= t.start - 1.2).map(w => norm(w[2])).filter(Boolean);
+  // a number that is not the number said ("360 Days" for 347 days)
+  { const num = w => (/\d/.test(w) ? w.replace(/[^0-9]/g, '') : null), mine = ws.map(num).filter(Boolean), theirs = near.map(num).filter(Boolean); if (mine.length && theirs.length && mine.some(m => !theirs.includes(m))) return 'not the number said at that moment'; }
   if (ws.length >= 2 && near.length >= 2) { const hit = ws.filter(w => near.some(n => sameWord(n, w))).length; if (hit / ws.length < 0.67) return 'not what is said at that moment'; }
   return null;
 }
