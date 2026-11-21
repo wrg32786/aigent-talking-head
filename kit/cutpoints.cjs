@@ -223,7 +223,9 @@ function snapRange([a, b], words, env, dur, opts = {}) {
   let idx = W.map((w, k) => k).filter(k => W[k][1] > a + 0.02 && W[k][0] < b - 0.02);
   // an end inside a clean pause stays in it: a word whose sound starts after that pause is the next line, left out
   // (and a start inside one leaves out the word that ends before it)
-  const { gaps } = activity(env, o), inGap = x => gaps.find(g => g.pEnd <= x && x <= g.nOn && g.nOn - g.pEnd >= o.tailMin + o.leadMin);
+  // A clean pause has no whole word inside it (words inside mean the audio there is not a pause the transcript agrees with)
+  const { gaps } = activity(env, o), clean = g => !W.some(w => w[0] >= g.pEnd - 0.02 && w[1] <= g.nOn + 0.02 && w[1] - w[0] >= 0.05);
+  const inGap = x => gaps.find(g => g.pEnd <= x && x <= g.nOn && g.nOn - g.pEnd >= o.tailMin + o.leadMin && clean(g));
   const gb = inGap(b), ga = inGap(a);
   if (gb && idx.length > 1) idx = idx.filter((k, j) => j === 0 || W[k][0] < gb.pEnd);
   if (ga && idx.length > 1) idx = idx.filter((k, j) => j === idx.length - 1 || W[k][1] > ga.nOn);
