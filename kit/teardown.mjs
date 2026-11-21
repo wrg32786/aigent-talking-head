@@ -67,6 +67,7 @@ if (!existsSync(video)) die('Not found: ' + video);
 const name = (opt('name') || basename(video).replace(/\.[^.]+$/, '')).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'reference';
 const out = resolve(opt('out', join(ROOT, 'teardown', name)));
 mkdirSync(out, { recursive: true });
+if (!process.env.PYTHONUTF8) process.env.PYTHONUTF8 = '1'; // every Python step reads, writes and prints utf-8, whatever the Windows code page
 const run = (cmd, args, o = {}) => { console.log('>', basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { stdio: 'inherit', ...o }); };
 
 // "stage <id>" lines say where the breakdown is. Studio reads them (kit/studio/stages.mjs) for its status line.

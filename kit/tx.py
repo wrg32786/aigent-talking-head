@@ -4,6 +4,11 @@
 #   env TX_PROMPT="the script text" hints the words you read (Studio sets it for takes filmed from a script).
 #   env TX_MODEL=large-v3 for the repeat-word check (catches "build, build"); default small.en is faster.
 import sys, json, glob, os
+for _s in (sys.stdout, sys.stderr):   # the words are printed: utf-8, whatever the Windows code page
+    try:
+        _s.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 from faster_whisper import WhisperModel
 files = sys.argv[1:] or sorted(glob.glob("seg*.mp4") + glob.glob("clip-*.mp4"))
 m = WhisperModel(os.environ.get("TX_MODEL", "small.en"), device="cpu", compute_type="int8")

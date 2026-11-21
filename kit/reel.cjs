@@ -114,6 +114,9 @@ const RF = require('./reframe.cjs');
 const FID = require('./fidelity.cjs');
 
 const KIT = __dirname, ROOT = path.dirname(KIT);
+// every Python step we start reads, writes and prints utf-8, whatever the Windows code page (a word outside it in the
+// transcript must not stop a draft)
+if (!process.env.PYTHONUTF8) process.env.PYTHONUTF8 = '1';
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };

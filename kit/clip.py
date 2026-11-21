@@ -40,10 +40,13 @@
 #
 # Then pick clips into cut.json: {"file":"../clips/clip-004.mp4","in":0,"out":<duration>} and assemble.
 import sys, os, json, re, subprocess, argparse
-try:
-    sys.stdout.reconfigure(line_buffering=True)   # progress lines reach Studio as they happen
-except Exception:
-    pass
+# progress lines reach Studio as they happen; utf-8 so a word outside the Windows code page (a music note from Whisper,
+# an accented name) cannot stop the draft when the output is a pipe
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+    except Exception:
+        pass
 
 ap = argparse.ArgumentParser()
 ap.add_argument("src", nargs="+")
