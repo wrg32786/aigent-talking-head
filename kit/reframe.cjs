@@ -10,6 +10,8 @@
 //   - the head stays inside the frame: the crown (estimated from the face box) and the chin keep a margin from the top
 //     and bottom edges, the face box from the sides. The zoom and the zoom centre are held back to make sure, and the
 //     result says so (clamped, held)
+//   - capMoves(): a camera move or a big punch layered on a reframed segment is held to the same headroom, and left
+//     out on a segment that is already as close as its target (we never push in on a close-up)
 // The face keep-out zone (kit/facezone.py) is measured after the crop, so captions follow the new framing.
 'use strict';
 const { execFileSync } = require('child_process');
@@ -70,22 +72,24 @@ function cropFor(ours, target, opts = {}) {
   const v = ours.eyeY, vt = target.eyeY, cxT = target.cx != null ? target.cx : 0.5;
   const done = (z, px, py, held) => {
     const got = { faceH: r3(ours.faceH * z), eyeY: r3(move(v, z, py)), cx: r3(move(ours.cx, z, px)) };
-    return { zoom: r3(z), punchX: r3(px), punchY: r3(py), clamped: !!held, ...(held ? { held } : {}), want: r3(want), got,
+    return { zoom: r3(z), punchX: r3(px), punchY: r3(py), clamped: !!held, ...(held ? { held } : {}), ...(closer ? { closer: true } : {}), want: r3(want), got, head: [r3(top), r3(bot)],
       diff: { faceH: r3(got.faceH - target.faceH), eyeY: r3(got.eyeY - target.eyeY), cx: r3(got.cx - cxT) } };
   };
+  // the face box, and the head around it: the crown is above the face box (hair, a cap), the chin just under it
+  const y0 = ours.y0 != null ? ours.y0 : ours.eyeY - ours.faceH * 0.42, y1 = ours.y1 != null ? ours.y1 : ours.eyeY + ours.faceH * 0.58;
+  const x0 = ours.x0 != null ? ours.x0 : ours.cx - ours.faceH * 0.65, x1 = ours.x1 != null ? ours.x1 : ours.cx + ours.faceH * 0.65;
+  const fh = Math.max(0.01, y1 - y0), top = Math.max(0, y0 - fh * CROWN), bot = Math.min(1, y1 + fh * CHIN);
   // Your face is already as big as the target, or bigger: the take stays as filmed. We cannot zoom out, and any zoom
   // to move the eye line would only make the face bigger still. With no zoom there is no room to shift the picture.
-  if (want <= 1 + SAME) return done(1, 0.5, 0.5, null);
+  // opts.take is the middle face of the whole file: a moment you lean back in a close take is not pushed in either.
+  const closer = target.faceH / Math.max(ours.faceH, (opts.take && opts.take.faceH) || 0) <= 1 + SAME;
+  if (closer) return done(1, 0.5, 0.5, null);
   // the zoom the eye line alone would need (from the top or the bottom edge); it may ask for a little more than the
   // face height does, up to EYE_EXTRA past the face height target
   const zEye = vt < v ? (1 - vt) / Math.max(0.05, 1 - v) : vt / Math.max(0.05, v);
   let z = want, held = null;
   if (zEye > z) z = Math.min(zEye, want * EYE_EXTRA);
   if (z > zMax + 1e-6) { z = zMax; held = 'source'; }
-  // the face box, and the head around it: the crown is above the face box (hair, a cap), the chin just under it
-  const y0 = ours.y0 != null ? ours.y0 : ours.eyeY - ours.faceH * 0.42, y1 = ours.y1 != null ? ours.y1 : ours.eyeY + ours.faceH * 0.58;
-  const x0 = ours.x0 != null ? ours.x0 : ours.cx - ours.faceH * 0.65, x1 = ours.x1 != null ? ours.x1 : ours.cx + ours.faceH * 0.65;
-  const fh = Math.max(0.01, y1 - y0), top = Math.max(0, y0 - fh * CROWN), bot = Math.min(1, y1 + fh * CHIN);
   // a head that already touches an edge of your take cannot get a margin there; it keeps the edge it has
   const mTop = Math.min(HEADROOM, top), mBot = Math.min(HEADROOM, 1 - bot);
   // the head (crown to chin) and the face box (side to side) must fit the frame at this zoom
@@ -123,19 +127,24 @@ function steady(faces) {
 }
 
 // Set the crop on every segment of every shot. shotStart[j] is the first segment of shot j; targets[j] the face to
-// match there (null: none known); faces[i] your face in segment i (null: no face found). fallback: the target for a
-// shot with none of its own (the median of the others). Returns one entry per shot for plan.json and the log lines.
-function applyToSegs({ segs, shotStart, targets, faces, maxZoom: zMax = 2.2, fallback = null }) {
+// match there (null: none known); faces[i] your face in segment i (null: no face found); takes[i] the middle face of
+// segment i's file (optional). fallback: the target for a shot with none of its own (the median of the others).
+// A segment with no face found, in a take that is already as close as the target, is held at zoom 1 like the segments
+// beside it, so the punch by shot size does not jump in on it. Returns one entry per shot for plan.json and the log lines.
+function applyToSegs({ segs, shotStart, targets, faces, takes = [], maxZoom: zMax = 2.2, fallback = null }) {
   const out = [], lines = [];
   shotStart.forEach((k, j) => {
     const end = shotStart[j + 1] != null ? shotStart[j + 1] : segs.length;
     const target = targets[j] || fallback, own = !!targets[j];
     let first = null;
     for (let i = k; i < end; i++) {
-      const c = target && faces[i] ? cropFor(faces[i], target, { maxZoom: zMax }) : null;
+      const take = takes[i] || null;
+      if (target && !faces[i] && take && target.faceH / take.faceH <= 1 + SAME) { Object.assign(segs[i], { zoom: 1, punchX: 0.5, punchY: 0.5, reframed: true, closer: true }); delete segs[i].head; continue; }
+      const c = target && faces[i] ? cropFor(faces[i], target, { maxZoom: zMax, take }) : null;
       if (!c) continue;
-      Object.assign(segs[i], { zoom: c.zoom, punchX: c.punchX, punchY: c.punchY });
+      Object.assign(segs[i], { zoom: c.zoom, punchX: c.punchX, punchY: c.punchY, head: c.head });
       segs[i].reframed = true;
+      if (c.closer) segs[i].closer = true; else delete segs[i].closer;
       if (!first) first = c;
     }
     if (!first) { out.push(null); return; }
@@ -146,6 +155,35 @@ function applyToSegs({ segs, shotStart, targets, faces, maxZoom: zMax = 2.2, fal
   return { shots: out, lines };
 }
 
+// Camera moves and big punches layered on a reframed segment (call this last, in place, once the moves are set). A
+// segment already as close as its target gets none: we do not push in on it. On the others a move is shortened, and a
+// big punch left out, where its closest point would crop the top of the head or the chin.
+// big: the big punch's extra zoom (kit/rules.cjs PUNCH.big). Returns log lines.
+function capMoves(segs, { big = 0.12 } = {}) {
+  let closer = 0, cut = 0;
+  for (const s of segs) {
+    if (!s.reframed || (!s.push && !s.bigPunch)) continue;
+    if (s.closer) { delete s.push; delete s.bigPunch; closer++; continue; }
+    if (!Array.isArray(s.head)) continue;
+    const [top, bot] = s.head, z = +s.zoom || 1, py = s.punchY != null ? +s.punchY : 0.5;
+    const mTop = Math.min(HEADROOM, top), mBot = Math.min(HEADROOM, 1 - bot);
+    // the closest zoom this zoom centre holds the head at
+    const zOk = Math.min(top < py - 1e-6 ? (py - mTop) / (py - top) : Infinity, bot > py + 1e-6 ? (1 - mBot - py) / (bot - py) : Infinity);
+    let hit = false;
+    if (s.bigPunch && z * (1 + big) > zOk + 1e-4) { delete s.bigPunch; hit = true; }
+    if (s.push && z * (1 + Math.abs(s.push)) > zOk + 1e-4) {
+      const p = Math.floor((zOk / z - 1) * 1000) / 1000;
+      if (p >= 0.01) s.push = Math.sign(s.push) * p; else delete s.push;
+      hit = true;
+    }
+    if (hit) cut++;
+  }
+  const lines = [];
+  if (closer) lines.push(`reframe: camera moves left out on ${closer} segment${closer === 1 ? '' : 's'} already as close as the target`);
+  if (cut) lines.push(`reframe: camera moves shortened or left out on ${cut} segment${cut === 1 ? '' : 's'} so the top of your head and your chin stay in the frame`);
+  return lines;
+}
+
 // the middle face of a list of targets (per value), for shots with none of their own
 function medianFace(list) {
   const fs = list.filter(Boolean);
@@ -154,4 +192,4 @@ function medianFace(list) {
   return { faceH: med('faceH'), eyeY: med('eyeY'), cx: med('cx') };
 }
 
-module.exports = { cropFor, measure, steady, applyToSegs, medianFace, maxZoom, parseFace, fmtFace, fromMeasure, classOf, CLASSES, CLASS_WORDS, MAX_UPSCALE, EYE_EXTRA, MARGIN, HEADROOM, CROWN, CHIN, SAME };
+module.exports = { cropFor, capMoves, measure, steady, applyToSegs, medianFace, maxZoom, parseFace, fmtFace, fromMeasure, classOf, CLASSES, CLASS_WORDS, MAX_UPSCALE, EYE_EXTRA, MARGIN, HEADROOM, CROWN, CHIN, SAME };

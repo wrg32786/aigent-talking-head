@@ -77,15 +77,16 @@ function sourceSize(files) {
 // { framing (what you get), target, crop, clamped, held } or null where the old zoom stays, or null when nothing was matched.
 function reframeShots({ segs, shotStart, targets, build, python, sources = [], log = console.log, what = 'the reference' }) {
   if (!targets.some(Boolean)) { log(`reframe: ${what} has no face measured (an older teardown, or the speaker is never on screen); framing by shot size as before`); return null; }
-  const faces = segs.map(() => null), files = [...new Set(segs.map(s => s.file))];
+  const faces = segs.map(() => null), takes = segs.map(() => null), files = [...new Set(segs.map(s => s.file))];
   for (const file of files) {
     const idx = segs.map((s, i) => (s.file === file ? i : -1)).filter(i => i >= 0);
     const got = RF.measure(python, path.resolve(build, file), idx.map(i => [segs[i].in, segs[i].out]), { samples: 5 });
-    RF.steady(got).forEach((f, n) => { faces[idx[n]] = f; });
+    const mid = RF.medianFace(got); // the take's own framing: a close take is not pushed in where no face was found or you lean back
+    RF.steady(got).forEach((f, n) => { faces[idx[n]] = f; takes[idx[n]] = mid; });
   }
   if (!faces.some(Boolean)) { log('reframe: we found no face in your take (or Python with opencv is missing); framing by shot size as before'); return null; }
   const size = sourceSize([...sources, ...files.map(f => path.resolve(build, f))]), zMax = size ? RF.maxZoom(size.w, size.h) : 2.2;
-  const res = RF.applyToSegs({ segs, shotStart, targets, faces, maxZoom: zMax, fallback: RF.medianFace(targets) });
+  const res = RF.applyToSegs({ segs, shotStart, targets, faces, takes, maxZoom: zMax, fallback: RF.medianFace(targets) });
   const done = res.shots.filter(Boolean);
   if (!done.length) return null;
   const avg = k => done.reduce((a, x) => a + Math.abs(x.framing[k] - x.target[k]), 0) / done.length;

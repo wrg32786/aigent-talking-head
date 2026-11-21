@@ -112,6 +112,38 @@ t('steady and applyToSegs: measure noise is taken out, a shot with no target bor
   assert.deepStrictEqual(Object.keys(r.shots[0]).slice(0, 3), ['framing', 'target', 'crop']);
 });
 
+t('a close take: a segment with no face found is held at zoom 1 like the ones beside it, and no camera move pushes in on it', () => {
+  const f = { faceH: 0.30, eyeY: 0.4, cx: 0.5 }, target = { faceH: 0.17, eyeY: 0.33, cx: 0.5 };
+  const segs = [{ zoom: 1.16 }, { zoom: 1.16, push: 0.07 }, { zoom: 1.16, bigPunch: true }, { zoom: 1.16 }];
+  const res = RF.applyToSegs({ segs, shotStart: [0], targets: [target], faces: [f, null, f, f], takes: [f, f, f, f], maxZoom: 2.2 });
+  assert.ok(segs.every(s => s.zoom === 1 && s.reframed && s.closer), JSON.stringify(segs));
+  assert.ok(res.shots[0] && res.shots[0].crop.zoom === 1);
+  const lines = RF.capMoves(segs, { big: 0.12 });
+  assert.ok(segs.every(s => !s.push && !s.bigPunch) && /left out on 2 segments/.test(lines.join('\n')), lines.join(' | ') + JSON.stringify(segs));
+  // without the take's middle face (an older caller) a faceless segment keeps what it had
+  const old = [{ zoom: 1.16 }, { zoom: 1.16, push: 0.07 }];
+  RF.applyToSegs({ segs: old, shotStart: [0], targets: [target], faces: [f, null], maxZoom: 2.2 });
+  assert.ok(old[1].zoom === 1.16 && old[1].push === 0.07 && !old[1].reframed);
+  // a moment you lean back in a close take is not pushed in either
+  const lean = RF.cropFor({ faceH: 0.14, eyeY: 0.4, cx: 0.5 }, target, { maxZoom: 2.2, take: f });
+  assert.ok(lean.zoom === 1 && lean.closer);
+});
+
+t('capMoves: a move on a reframed shot is shortened, and a big punch left out, where the head would leave the frame', () => {
+  const ours = { faceH: 0.2, eyeY: 0.25, cx: 0.5, y0: 0.17, y1: 0.37, x0: 0.4, x1: 0.6 }, target = { faceH: 0.3, eyeY: 0.3, cx: 0.5 };
+  const segs = [{ push: 0.3 }, { bigPunch: true }, { push: -0.3 }, { push: 0.02 }];
+  RF.applyToSegs({ segs, shotStart: [0], targets: [target], faces: [ours, ours, ours, ours], maxZoom: 3 });
+  assert.ok(segs.every(s => s.zoom > 1.2 && Array.isArray(s.head) && !s.closer), JSON.stringify(segs));
+  const z = segs[0].zoom, py = segs[0].punchY, [top, bot] = segs[0].head, at = (p, k) => p * k - (k - 1) * py;
+  const lines = RF.capMoves(segs, { big: 0.2 });
+  for (const s of segs) { const k = z * (1 + Math.abs(s.push || 0)); assert.ok(at(top, k) >= Math.min(RF.HEADROOM, top) - 2e-3 && at(bot, k) <= 1 - Math.min(RF.HEADROOM, 1 - bot) + 2e-3, `the head stays in at the closest point of the move: ${JSON.stringify(s)}`); }
+  assert.ok(segs[0].push > 0.05 && segs[0].push < 0.3 && !segs[1].bigPunch && segs[2].push < -0.05 && segs[2].push > -0.3 && segs[3].push === 0.02, JSON.stringify(segs));
+  assert.ok(/shortened or left out/.test(lines.join('\n')), lines.join(' | '));
+  // a shot with room keeps its move, and a segment that was not reframed is never touched
+  const roomy = [{ reframed: true, zoom: 1.2, punchY: 0.4, head: [0.3, 0.5], push: 0.07 }, { zoom: 1.16, push: 0.07, bigPunch: true }];
+  assert.ok(!RF.capMoves(roomy).length && roomy[0].push === 0.07 && roomy[1].push === 0.07 && roomy[1].bigPunch);
+});
+
 t('Reel.md: the shot keys face and lab round trip into the shot settings; shot sizes by face height', () => {
   assert.deepStrictEqual(RF.parseFace('0.18@0.36'), { faceH: 0.18, eyeY: 0.36, cx: 0.5 });
   assert.deepStrictEqual(RF.parseFace(RF.fmtFace({ faceH: 0.159, eyeY: 0.323, cx: 0.46 })), { faceH: 0.159, eyeY: 0.323, cx: 0.46 });
