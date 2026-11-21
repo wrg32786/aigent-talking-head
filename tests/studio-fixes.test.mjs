@@ -74,7 +74,8 @@ const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data',
 const req = async (p, body) => { const r = await fetch(url + p, { method: body !== undefined ? 'POST' : 'GET', headers: body !== undefined ? { 'content-type': 'application/json' } : {}, body: body !== undefined ? JSON.stringify(body) : undefined }); return { status: r.status, j: await r.json().catch(() => ({})) }; };
 const until = async (fn, ms = 20000) => { const end = Date.now() + ms; for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) throw new Error('timed out'); await sleep(150); } };
 // the view with each fix's instruction taken out: what the page can show as text
-const shown = v => JSON.stringify({ ...v, env: { ...v.env, fixes: Object.fromEntries(Object.entries(v.env.fixes || {}).map(([k, f]) => [k, { ...f, prompt: null }])) } });
+// the instructions for an agent (each fix's prompt, and env.restart for Studio stopped) are the only place a command may be
+const shown = v => JSON.stringify({ ...v, env: { ...v.env, restart: null, fixes: Object.fromEntries(Object.entries(v.env.fixes || {}).map(([k, f]) => [k, { ...f, prompt: null }])) } });
 try {
   await req('/api/state', { job: JOB });
   await t('server: the setup list and the page state carry fix ids and plain words, never a command', async () => {
@@ -86,6 +87,8 @@ try {
     const v = (await req('/api/state')).j;
     assert.deepStrictEqual(Object.keys(v.env.setup.missing), ['ffmpeg', 'chrome', 'ytdlp', 'effects', 'rea']);
     assert.ok(v.env.fixes.rea.prompt.includes(ROOT));
+    assert.ok(v.env.restart.startsWith(`AIgent Studio stopped. In my aigent-talking-head folder (${ROOT}), start it again by running npm run studio:agent`), v.env.restart);
+    assert.ok(!/\u2014/.test(v.env.restart), 'no em dash');
     assert.ok(!CMD.test(shown(v)), shown(v).match(new RegExp('.{60}(' + CMD.source + ').{40}'))?.[0]);
   });
   await t('server: a draft that cannot work says what is missing and carries the fix ids', async () => {

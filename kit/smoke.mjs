@@ -1061,6 +1061,7 @@ try {
       ['Studio Recreate drafts from your pieces: --as-is with the reference recipe, the cut line stays out, drafted and not stale after, Render next (tests/studio-recreate-pieces.test.mjs)', 'studio-recreate-pieces.test.mjs'],
       ['Studio Recreate and Influence in Chrome: a switch per part on Influence, a part off takes its picks out, what the breakdown read with fix buttons (tests/studio-recreate.e2e.mjs)', 'studio-recreate.e2e.mjs'],
       ['Studio review tools in Chrome: what to swap, show original, comments, clean-up pass, edit receipt (tests/studio-review.e2e.mjs)', 'studio-review.e2e.mjs'],
+      ['Studio stopping and the wizards in Chrome: Copy a reference opens its link screen, the Studio stopped bar with Copy for my agent, the wizards say Studio is not running with Try again, both come back when Studio does (tests/studio-offline.e2e.mjs)', 'studio-offline.e2e.mjs'],
     ];
     const jobs = Math.max(1, +process.env.SMOKE_E2E_JOBS || 2), out = new Array(E2E.length);
     const one = k => new Promise(done => { const t0 = Date.now(), c = spawn(node, [join(dirname(KIT), 'tests', E2E[k][1])], { cwd: dirname(KIT), stdio: ['ignore', 'pipe', 'pipe'], env: process.env });

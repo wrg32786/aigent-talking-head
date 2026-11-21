@@ -41,6 +41,8 @@ export function describe(id, root = ROOT) {
   return { id, label: d.label, why: d.why, install: !!d.step, user: !!d.user, link: d.link || null, linkLabel: d.linkLabel || null, prompt: prompt(id, root) };
 }
 export const all = (root = ROOT) => Object.fromEntries(IDS.map(id => [id, describe(id, root)]));
+// Studio stopped while the page was open: the page keeps this from its last state and copies it for the agent
+export const restartPrompt = (root = ROOT) => `AIgent Studio stopped. In my aigent-talking-head folder (${root}), start it again by running npm run studio:agent, then tell me when the page is back. If it stopped by itself, send me the last 40 lines of jobs/.studio/server.log so we can see why.`;
 // one sentence for an error: "<a and b> missing, so <what> cannot <do> yet."
 export function missingLine(ids, what) {
   const names = ids.map(id => (DEFS[id] || { label: id }).label);

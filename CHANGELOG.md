@@ -2,6 +2,16 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.27.2 (unreleased)
+
+Release notes: [docs/releases/v1.27.2.md](docs/releases/v1.27.2.md). "Wizards failed to fetch", from a live test on Windows.
+
+- **Studio stopped, said plainly.** When the Studio server stops while the page is open, every call failed with the browser's bare "Failed to fetch", and the Wizards sheet sat on Loading with that line. The page now shows a Studio stopped bar with Copy for my agent (a prompt to start Studio again and send `jobs/.studio/server.log` if it stopped by itself), and reconnects by itself when Studio is back (`StudioOffline` in `kit/studio/web/src/App.jsx`, `setOffline` in `lib.jsx`; the instruction is `env.restart`, from `restartPrompt` in `kit/studio/fixes.mjs`, kept from the last state). Calls say "Studio is not running" instead of "Failed to fetch".
+- **The wizards load again.** The Wizards sheet has Try again when it could not load, and loads by itself when Studio comes back.
+- **Copy a reference opens its own screen.** Picking Copy a reference showed the Clips screen, and Let my agent decide threw there (the screen checked `ref`, the wizard is `reference`, since 1.17.0).
+- **A background error no longer stops Studio.** An error thrown in a download, transcript or teardown callback is logged to the server log and Studio keeps running (`uncaughtException` and `unhandledRejection` in `kit/studio/server.mjs`); an error before Studio listens still stops it.
+- **Tests.** `tests/studio-offline.e2e.mjs` (in `npm run smoke`); `tests/studio-fixes.test.mjs` checks the restart instruction.
+
 ## 1.27.1 (unreleased)
 
 Release notes: [docs/releases/v1.27.1.md](docs/releases/v1.27.1.md). Fixes from Fable's final review of Recreate, and a live test.
