@@ -162,7 +162,7 @@ try {
     assert.strictEqual(await pg.getAttribute('#picks-panel .chip[data-pick="graphic:lower-third"]', 'title'), 'From reference');
     assert.strictEqual((await pg.textContent('#picks-undo-ref')).trim(), 'Undo reference'); assert.strictEqual((await pg.textContent('#clear-picks')).trim(), 'Clear all');
     if (shots) { await pg.waitForTimeout(300); await pg.screenshot({ path: join(shots, 'picks-tray-dark.png') }); }
-    await pg.click('#picks-panel .pk-g[data-layer="transitions"] .pk-more'); await pg.waitForSelector('#tab-transitions[aria-selected="true"]'); await pg.waitForSelector('#picks-panel', { state: 'detached' });
+    await pg.click('#picks-panel .pk-g[data-layer="transitions"] .pk-more'); await pg.waitForSelector('#tab-transitions[aria-selected="true"]'); await pg.waitForFunction(() => { const e = document.getElementById('picks-panel'); return !e || e.hasAttribute('data-closed'); });
     assert.strictEqual(await pg.getAttribute('main', 'data-step'), 'picture', 'Transitions is a Picture layer');
     await pg.click('#picks-open'); await pg.click('#picks-panel .chip[data-pick="transition:whip"]');
     await until(async () => !(await api('/api/state')).state.picks.transition.allow.includes('whip')); await pg.keyboard.press('Escape');
