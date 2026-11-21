@@ -864,10 +864,25 @@ ol.conn-steps > li::before { content: counter(cs); position: absolute; left: 0; 
 .bp-h { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; } .bp-h .fine { margin: 0; }
 .slot-set { display: grid; grid-template-columns: 150px 1fr; gap: 14px; align-items: start; }
 .slot-prev video, .slot-prev img { width: 150px; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 10px; background: #000; }
+/* placement preview (kit/split.cjs): where the clip sits and where you sit, drawn in the 9:16 frame */
+.slot-prev[class*='lay-'] { position: relative; container-type: inline-size; width: 150px; aspect-ratio: 9 / 16; border-radius: 10px; overflow: hidden; background: #000; }
+.slot-prev.lay-full { aspect-ratio: auto; overflow: visible; background: none; }
+.slot-prev.lay-top video, .slot-prev.lay-top img, .slot-prev.lay-frame video, .slot-prev.lay-frame img, .slot-prev.lay-pip video, .slot-prev.lay-pip img { position: absolute; z-index: 1; aspect-ratio: auto; border-radius: 0; }
+.slot-prev.lay-top video, .slot-prev.lay-top img { left: 0; top: 0; width: 100%; height: 50%; }
+.lay-you { position: absolute; z-index: 2; pointer-events: none; background: linear-gradient(180deg, #3b4049, #22252a); --hd: 26cqw; --hb: 40cqw; --bw: 64cqw; --bh: 42cqw; }
+.lay-you i { position: absolute; left: 50%; transform: translateX(-50%); background: #9aa3b2; }
+.lay-you .hd { width: var(--hd); height: var(--hd); bottom: var(--hb); border-radius: 50%; }
+.lay-you .bd { width: var(--bw); height: var(--bh); bottom: 0; border-radius: 50% 50% 0 0 / 60% 60% 0 0; }
+.lay-top .lay-you { left: 0; right: 0; top: 50%; bottom: 0; --hb: 72cqw; --bw: 72cqw; --bh: 74cqw; }
+.slot-prev.lay-frame { background: linear-gradient(180deg, #f4ede3, #e7e2f3); }
+.slot-prev.lay-frame video, .slot-prev.lay-frame img { left: 5%; top: 3.75%; width: 90%; height: 39.6%; border-radius: 7px; box-shadow: 0 0 0 1.5px #3d8bff, 0 0 10px #3d8bff66; }
+.lay-frame .lay-you { left: 8.9%; width: 82.2%; top: 57.8%; height: 38.5%; --hb: 53cqw; --bw: 62cqw; --bh: 55cqw; border-radius: 7px; box-shadow: 0 0 0 1.5px #3d8bff, 0 0 10px #3d8bff66; }
+.lay-pip .lay-you { inset: 0; --hd: 34cqw; --hb: 66cqw; --bw: 82cqw; --bh: 70cqw; }
+.slot-prev.lay-pip video, .slot-prev.lay-pip img { z-index: 3; right: 6%; left: auto; top: 9%; width: 43%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; box-shadow: 0 0 0 1.5px #fff; }
 .seg-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip.place i { width: 12px; height: 20px; border-radius: 3px; border: 1.5px solid currentColor; position: relative; }
 .chip.place i::after { content: ''; position: absolute; background: currentColor; opacity: .55; }
-.chip.place.full i::after { inset: 0; } .chip.place.top i::after { left: 0; right: 0; top: 0; height: 50%; } .chip.place.pip i::after { right: 1px; top: 2px; width: 6px; height: 4px; opacity: .9; }
+.chip.place.plc-full i::after { inset: 0; } .chip.place.plc-top i::after { left: 0; right: 0; top: 0; height: 50%; } .chip.place.plc-pip i::after { right: 1px; top: 2px; width: 6px; height: 4px; opacity: .9; } .chip.place.plc-frame i::after { left: 1px; right: 1px; top: 1.5px; height: 6px; border-radius: 1.5px; opacity: .9; box-shadow: 1px 9px 0 -0.5px currentColor; }
 .slot-set input[type=number] { width: 70px; }
 .bpanel { display: flex; flex-direction: column; gap: 10px; }
 .bpanel input:not([type=checkbox]), .bpanel select, .bpanel textarea, .key-row input, .model-in input, #broll-lib { min-height: 34px; border-radius: 8px; border: 1px solid var(--input); background: var(--background); color: var(--foreground); padding: 6px 10px; font: inherit; font-size: 14px; }
@@ -890,7 +905,7 @@ ol.conn-steps > li::before { content: counter(cs); position: absolute; left: 0; 
 .src-list li { display: grid; grid-template-columns: 16px 130px 1fr; align-items: center; gap: 8px; font-size: 14px; color: var(--muted-foreground); }
 .src-list li.on { color: var(--foreground); } .src-list li .fine { margin: 0; }
 .model-in { margin-top: 10px; } .model-in .fine { margin: 0; }
-@media (max-width: 640px) { .slot-set { grid-template-columns: 1fr; } .slot-prev video, .slot-prev img { width: 110px; } .beat { min-width: 104px; } }
+@media (max-width: 640px) { .slot-set { grid-template-columns: 1fr; } .slot-prev video, .slot-prev img { width: 110px; } .slot-prev[class*='lay-']:not(.lay-full) { width: 110px; } .beat { min-width: 104px; } }
 /* Words and brands */
 #glossary { width: 100%; font: inherit; resize: vertical; }
 .brand-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }

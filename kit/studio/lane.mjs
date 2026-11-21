@@ -1,9 +1,11 @@
 // The b-roll lane: one slot per beat of the drafted reel. A beat is one segment of build/cut.json (output time, after
 // the cut), with the caption words that fall in it. A slot puts a library clip over part of its beat:
-//   { clip, place: full | top | pip, offset (seconds into the beat), dur, in (seconds into the clip) }
+//   { clip, place: full | top | pip | frame, offset (seconds into the beat), dur, in (seconds into the clip) }
 // and becomes a cut.json insert at render (kit/studio/broll-run.mjs, kit/assemble.cjs).
-export const PLACES = ['full', 'top', 'pip'];
-export const PLACE_LABEL = { full: 'Full cutaway', top: 'Split top panel', pip: 'Picture in picture' };
+// top: the split, its panel behind the top of your head; frame: two rounded cards, you in the smaller one with your head
+// over its top edge (kit/split.cjs)
+export const PLACES = ['full', 'top', 'pip', 'frame'];
+export const PLACE_LABEL = { full: 'Full cutaway', top: 'Split top panel', pip: 'Picture in picture', frame: 'Framed cards' };
 const r2 = x => +(+x).toFixed(2);
 
 export function beats(cut, caps) {

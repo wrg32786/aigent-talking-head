@@ -7,6 +7,7 @@ import { dirname, join, isAbsolute } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { findChrome } from './chrome.mjs';
 import * as FC from './framecap.mjs';
+const SPL = createRequire(import.meta.url)('./split.cjs');
 // Run from the job's build/ folder (holds captions.js):  node <kit>/render.mjs <durationSec> [t1,t2,... for stills only]
 // Writes ovl/%04d.png (and ovlt/%04d.png when captions.js has kinetic titles), or stills/t<sec>.png.
 // STILLS_LAYERS=1 with a stills-only run writes stills-front/ and stills-titles/ so a mask can put titles behind the person.
@@ -42,7 +43,9 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
   }
   // font lockup overrides from cut.json ("lockup" for the job, "hero" per flip start) -> lockover.js
   { let C = {}; try { C = JSON.parse(readFileSync(join(ROOT, 'cut.json'), 'utf8')); } catch {}
-    writeFileSync(join(ROOT, 'lockover.js'), 'window.LOCKOVER=' + JSON.stringify({ lockup: C.lockup || null, hero: C.hero || null, titleLayer: C.titleLayer || null, inserts: (C.inserts || []).filter(s => !s.place || s.place === 'full').map(s => ({ at: +s.at, dur: +s.dur, y: s.y, tint: s.tint, line: s.line, arc: s.arc })) }) + ';\n'); }
+    writeFileSync(join(ROOT, 'lockover.js'), 'window.LOCKOVER=' + JSON.stringify({ lockup: C.lockup || null, hero: C.hero || null, titleLayer: C.titleLayer || null, inserts: [...(C.inserts || []).filter(s => !s.place || s.place === 'full').map(s => ({ at: +s.at, dur: +s.dur, y: s.y, tint: s.tint, line: s.line, arc: s.arc })),
+      // split and framed b-roll (kit/split.cjs): the captions sit on the line the layout leaves for them, off your face
+      ...(C.inserts || []).filter(s => SPL.SPLIT.includes(s.place)).map(s => ({ at: +s.at, dur: +s.dur, y: s.y || SPL.layout(s, null, { mask: !!C.mask }).capY, tint: s.tint, split: s.place, light: SPL.lightBg(s) }))] }) + ';\n'); }
   if (!existsSync(join(ROOT, 'fxzones.js'))) writeFileSync(join(ROOT, 'fxzones.js'), 'window.FXZONES=[];\n');
   // graphics (modes 10, 11, 19 and 26): icon and screen images as file URLs; a screen recording becomes a short frame list
   // (build/gfx/, 12 fps) so the card can play it frame-accurately. Fonts for the ordinal word, the label, the code

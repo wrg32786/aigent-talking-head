@@ -13,6 +13,18 @@ Release notes: [docs/releases/v1.18.1.md](docs/releases/v1.18.1.md). Uploading n
 - **MCP.** New `clear_broll` (`undo` puts the last clear back). `fill_slot` with `clear` and `all` does the same.
 - **Tests and docs.** `tests/studio-reset.test.mjs` (in `npm run check`); docs/studio.md, docs/mcp.md, AGENTS.md and the Studio skill.
 
+## 1.18.0 (unreleased)
+
+Release notes: [docs/releases/v1.18.0.md](docs/releases/v1.18.0.md). B-roll: the split panel sits behind your head, and a new framed layout.
+
+- **Split top panel, behind your head.** The split now moves you so the top of your head reaches a little (72 px, `overlap` on the insert) into the panel's lower edge, and draws your head over the panel with the person mask, so the panel sits behind it, with a soft shadow along the seam. It follows your face over the insert (`build/facezone.json`); `faceY` is the fallback. Without the mask your head stays just under the seam instead of being cut by it (`kit/split.cjs`, `kit/assemble.cjs`).
+- **Framed cards.** A new placement, `"place": "frame"`: the b-roll in a rounded card up top and you, smaller than the split's bottom half, in a rounded card below, your head breaking out over its top edge (the person mask again). Thin blue border and a soft glow on a cream to lavender backdrop; `frameColor` and `frameBg` on the insert change them. In Studio it is **Framed cards** under How it sits on the B-roll step; MCP `fill_slot` and `suggest_broll` take `place: "frame"`.
+- **Captions off your face on both.** For the span of a split or framed insert, every caption style sits on the line the layout leaves (above your head on the panel, between the cards on the frame), the face zone moves with your picture so the face keep-out and `npm run verify` check where your face is on screen, and on the cream backdrop the captions draw in dark ink (`kit/overlay.html`, `kit/render.mjs`, `kit/reel.cjs`).
+- **The person mask covers split spans.** A rebuild with split or framed inserts masks those spans too, and turns the mask on for the job when the effects are set up (`--no-mask` keeps it off). When only the split wants the mask and it cannot run (memory, a missing model), the reel still renders, with your head under the panel.
+- **Placement preview.** The preview beside the placement chips draws where the clip and you sit (split, framed, picture in picture). Fixes the Split chip picking up the top bar's styles (it sat lower than the others).
+- **Checks.** `npm run check` flags an insert with an unknown `place`.
+- **Tests and docs.** `tests/studio-broll.test.mjs` (the layouts: head into the panel, no-mask fallback, the framed card smaller than the split, your picture covering the card, the caption line between the cards, face zones moved) and `tests/studio-broll.e2e.mjs` (Framed cards in the page with its preview, and a framed insert assembled on synthetic colours); docs/studio.md, docs/mcp.md, AGENTS.md and the Studio skill.
+
 ## 1.17.1 (unreleased)
 
 Release notes: [docs/releases/v1.17.1.md](docs/releases/v1.17.1.md). A reference sets your Look for you.
