@@ -77,6 +77,9 @@ const shot = async (page, sel, name) => {
 };
 const beatOf = async n => (await api('/api/broll')).beats[n - 1];
 
+// 1.28.0: the other sources sit behind "Choose something else" while a spot has an idea or a clip, and Add a spot is in More
+const tab = async (pg, sel) => { if (!(await pg.$(sel))) await pg.click('#broll-more'); await pg.click(sel); };
+const more = async pg => { if (!(await pg.$('#broll-more-fold[open]'))) await pg.click('#broll-more-fold > summary'); };
 const browser = patient(await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--auto-accept-this-tab-capture', '--auto-select-desktop-capture-source=Entire screen', '--enable-usermedia-screen-capturing'] }));
 try {
   await api('/api/settings', { chat: { backend: 'keywords' } });
@@ -95,7 +98,7 @@ try {
   await t('the lane: three beats after the draft; upload onto beat 2; placements and timing; clear', async () => {
     const d = await api('/api/draft', {}); assert.ok(!d.error, d.error); const v = await waitTask(); assert.strictEqual(v.task.status, 'done', JSON.stringify(v.task));
     await pg.waitForSelector('#broll-lane .beat[data-beat="3"]');
-    await pg.click('#broll-lane .beat[data-beat="2"]'); await pg.click('#btab-upload');
+    await pg.click('#broll-lane .beat[data-beat="2"]'); await tab(pg, '#btab-upload');
     await pg.setInputFiles('#broll-file', DESK);
     await pg.waitForSelector('#broll-lane .beat[data-beat="2"].filled', { timeout: 20000 });
     assert.strictEqual((await beatOf(2)).slot.place, 'full');
@@ -113,12 +116,12 @@ try {
     await pg.waitForSelector('#slot-prev.lay-top .lay-you');
     { const r = await pg.evaluate(() => { const b = q => document.querySelector(q).getBoundingClientRect(); return { clipBottom: b('#slot-prev video, #slot-prev img').bottom, headTop: b('#slot-prev .lay-you .hd').top }; }); assert.ok(r.headTop < r.clipBottom, 'split preview: the head over the panel edge ' + JSON.stringify(r)); }
     await shot(pg, '#s-broll', 'broll-lane.png');
-    await pg.click('#broll-lane .beat[data-beat="1"]'); await pg.click('#btab-library'); await pg.waitForSelector('#bp-library .bthumb');
+    await pg.click('#broll-lane .beat[data-beat="1"]'); await tab(pg, '#btab-library'); await pg.waitForSelector('#bp-library .bthumb');
     await pg.click('#bp-library .bthumb'); await until(async () => (await beatOf(1)).slot);
     await pg.click('#slot-clear'); await until(async () => !(await beatOf(1)).slot);
   });
   await t('API keys and providers: save a key (never shown again), Test key works, the Pexels source turns on', async () => {
-    await pg.click('#broll-lane .beat[data-beat="3"]'); await pg.click('#btab-stock');
+    await pg.click('#broll-lane .beat[data-beat="3"]'); await tab(pg, '#btab-stock');
     await pg.waitForSelector('#stock-keys'); await pg.click('#stock-keys');
     await pg.waitForSelector('#keys .key-row[data-id="pexels"]');
     assert.ok(/Not set/.test(await pg.textContent('#key-status-pexels')));
@@ -133,7 +136,7 @@ try {
     await pg.keyboard.press('Escape'); await pg.waitForSelector('#keys', { state: 'hidden' }).catch(() => {});
   });
   await t('stock: search the mock Pexels, credit and link shown, Use puts it on beat 3', async () => {
-    await pg.click('#btab-library'); await pg.click('#btab-stock');
+    await tab(pg, '#btab-library'); await tab(pg, '#btab-stock');
     await pg.waitForSelector('#stock-q'); await pg.fill('#stock-q', 'sales dashboard'); await pg.click('#stock-go');
     await pg.waitForSelector('#bp-stock .bthumb.stock'); assert.strictEqual(await pg.$$eval('#bp-stock .bthumb.stock', x => x.length), 3);
     assert.ok(/Ana Lens/.test(await pg.textContent('#bp-stock'))); assert.strictEqual(await pg.getAttribute('#bp-stock .attrib a', 'href'), 'https://www.pexels.com');
@@ -142,7 +145,7 @@ try {
     await until(async () => { const b = await beatOf(3); return b.slot && b.slot.clip.source === 'pexels'; });
   });
   await t('Make: a counter card rendered here lands on beat 1', async () => {
-    await pg.click('#broll-lane .beat[data-beat="1"]'); await pg.click('#btab-make');
+    await pg.click('#broll-lane .beat[data-beat="1"]'); await tab(pg, '#btab-make');
     await pg.click('#mk-kind-counter'); await pg.fill('#mk-to', '1200'); await pg.fill('#mk-prefix', '$'); await pg.fill('#mk-label', 'saved a month');
     await pg.click('#mk-go'); await until(async () => { const b = await beatOf(1); return b.slot && b.slot.clip.source === 'agent'; }, 60000);
   });
@@ -158,14 +161,14 @@ try {
   });
   await t('Generate: off until allowed; Estimate shows the cost; Generate runs against the mock Higgsfield and lands on the beat', async () => {
     await api('/api/broll/slot', { beat: 1, clear: true });
-    await pg.click('#broll-lane .beat[data-beat="1"]'); await pg.click('#btab-generate'); await pg.waitForSelector('#gen-keys');
+    await pg.click('#broll-lane .beat[data-beat="1"]'); await tab(pg, '#btab-generate'); await pg.waitForSelector('#gen-keys');
     await pg.click('#gen-keys'); await pg.waitForSelector('#keys .key-row[data-id="higgsfield"]');
     await pg.fill('#key-in-higgsfield', HFID); await pg.fill('#key-in2-higgsfield', HFSEC); await pg.click('#key-save-higgsfield');
     await pg.waitForFunction(() => /Saved on this computer/.test(document.querySelector('#key-status-higgsfield').textContent));
     await pg.click('#allow-generate'); await pg.click('#save-broll-settings'); await until(async () => (await api('/api/broll')).generate.on);
     assert.ok(!(await pg.content()).includes(HFSEC));
     await pg.keyboard.press('Escape'); await wait(300);
-    await pg.click('#btab-library'); await pg.click('#btab-generate');
+    await tab(pg, '#btab-library'); await tab(pg, '#btab-generate');
     await pg.waitForSelector('#gen-prompt'); await pg.fill('#gen-prompt', 'A slow push in on a laptop showing a sales dashboard');
     await pg.click('#gen-est'); await pg.waitForSelector('#gen-confirm'); assert.strictEqual(await pg.textContent('#gen-cost'), '$0.42');
     await shot(pg, '#beat-panel', 'broll-generate.png');
@@ -189,7 +192,7 @@ try {
     await until(async () => !(await beatOf(3)).idea && (await beatOf(2)).slot.place === 'top');
   });
   await t('Record screen with the webcam bubble (when this Chrome can share a screen)', async () => {
-    await pg.click('#broll-lane .beat[data-beat="2"]'); await pg.click('#btab-record'); await pg.waitForSelector('#rec-screen');
+    await pg.click('#broll-lane .beat[data-beat="2"]'); await tab(pg, '#btab-record'); await pg.waitForSelector('#rec-screen');
     const can = await pg.evaluate(async () => { try { const s = await navigator.mediaDevices.getDisplayMedia({ video: true }); s.getTracks().forEach(t => t.stop()); return true; } catch (e) { return e.name; } });
     if (can !== true) { console.log(`  (skipped: this Chrome refused getDisplayMedia: ${can})`); return; }
     const before = (await beatOf(2)).slot.clip.id;

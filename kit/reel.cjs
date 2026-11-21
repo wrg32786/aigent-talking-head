@@ -210,6 +210,8 @@ if (opt('recipe')) {
 // no timeline: its brand, music and style lines are read like a Reel.md's, and kit/lookplan.cjs plans the cuts,
 // stickers, titles and sounds from your own words. Nothing from the reference's script, text or times is used.
 let LOOK = null;
+// the B-roll slots of this draft (kit/broll-slots.cjs), kept in build/plan.json "broll"
+let BROLL = [];
 if (opt('style-look')) {
   if (recipe) die('Use --style-look or --recipe, not both: a recipe re-cuts the reference\'s timeline, a style look keeps only its style.');
   LOOK = SL.load(opt('style-look'));
@@ -525,8 +527,26 @@ if (!flag('rebuild')) {
     // Copy the look: the look's sticker on your own key words (ordinals, numbers, the words of your --goal, then names
     // and words you repeat), clear of your titles. Never a generic word: fewer stickers instead.
     if (LOOK) { const st = LK.stickers(LOOK, S.timeline(segs, build), RC.lengthOf(segs), { busy: (R.readCaptions(path.join(build, 'captions.js')).flips || []).filter(f => f.mode === 7), goal: GOAL, names: GLOSS.flatMap(e => GL.tok(e.say)) }); gfx.push(...st.flips); st.lines.forEach(l => console.log(l)); }
+    // B-roll slots (kit/broll-slots.cjs): where the reference shows B-roll, on your clock. Recreate: its moments
+    // mapped to your words. Copy the look: as many a minute, the same kinds, on your lines that fit. A slot is kept
+    // in the plan whether or not there is a clip for it. Its screen cards are the slots now, so they leave the graphics.
+    const BS = require('./broll-slots.cjs');
+    const refSlots = recipe && !LOOK ? BS.fromRecipe(recipe).map(x => (x.src ? { ...x, src: path.resolve(path.dirname(path.resolve(recipe.file || 'Reel.md')), x.src) } : x)) : [];
+    if (refSlots.length) for (let i = gfx.length - 1; i >= 0; i--) if (gfx[i].mode === 11 && !gfx[i].src && BS.ownsCard(refSlots, gfx[i])) gfx.splice(i, 1);
     // Recreate: the reference's graphics at its times scaled to your edit, like its shots and sounds
     if (RECUT && gfx.length && RC.scaleGraphics(gfx, SCALE)) console.log(`recut: ${gfx.length} graphics from the reference at its times, scaled by ${SCALE.k.toFixed(2)}`);
+    {
+      const words = S.timeline(segs, build), len = RC.lengthOf(segs);
+      BROLL = LOOK ? BS.forLook(LOOK.broll, { len, words, log: console.log }) : BS.forRecreate(refSlots, { k: RECUT && SCALE ? SCALE.k : 1, len, words, refLen: SCALE ? SCALE.ref : null, log: console.log });
+      BROLL = BROLL.filter(x => !x.file || fs.existsSync(x.file) || (console.warn(`b-roll: slot ${x.n}: no file ${x.file}; the slot stays empty`), Object.assign(x, { state: 'needs' }), delete x.file, true));
+      if (BROLL.length) {
+        gfx.push(...BROLL.filter(x => x.kind === 'panel').map(BS.flipOf));
+        const ins = BROLL.filter(x => x.kind !== 'panel').map(BS.insertOf).filter(Boolean);
+        if (ins.length) { cut.inserts = [...(cut.inserts || []).filter(x => x.slot == null), ...ins.map(x => ({ ...x, file: path.relative(build, x.file).split(path.sep).join('/') }))].sort((a, b) => a.at - b.at); fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); }
+        const need = BROLL.filter(x => x.state === 'needs');
+        console.log(`b-roll: ${BROLL.length} slot${BROLL.length === 1 ? '' : 's'} ${LOOK ? 'from the look, on your lines' : RECUT ? "at the reference's moments on your edit" : 'from the recipe'} (${BROLL.map(x => `${x.kind} ${x.start}-${x.end}s`).join(', ')})${need.length ? `; ${need.length} need${need.length === 1 ? 's' : ''} a clip: ${need.map(x => `#${x.n} ${BS.brief(x).what}`).join('; ')}` : ''}`);
+      }
+    }
     // scenes (kit/scenes.cjs): what the menu had no item for, made from the reference (its scenes.json, else the
     // library) or picked from the menu (--scenes). {{text}} shows a word you say then, never the reference's words.
     {
@@ -742,7 +762,7 @@ if (!flag('rebuild')) {
   // build/plan.json: what this draft took from the recipe, for other tools (kit/recreate.cjs; docs/reel-md.md)
   if (recipe) {
     const cutNow = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8')), capsNow = R.readCaptions(path.join(build, 'captions.js'));
-    const plan0 = RC.planOf({ recipe, scale: SCALE, rc: RECUT, cut: cutNow, shakes: REFSHAKES, sounds: REFSOUNDS, flips: capsNow.flips || [], theme: path.basename(th, '.js'), accent, mode: LOOK ? 'look' : null, look: LOOK ? LOOK.name : null, goal: GOAL }); if (GOAL && !plan0.goal) plan0.goal = GOAL; const plan = RC.writePlan(build, plan0);
+    const plan0 = RC.planOf({ recipe, scale: SCALE, rc: RECUT, cut: cutNow, shakes: REFSHAKES, sounds: REFSOUNDS, flips: capsNow.flips || [], theme: path.basename(th, '.js'), accent, mode: LOOK ? 'look' : null, look: LOOK ? LOOK.name : null, goal: GOAL, broll: BROLL }); if (GOAL && !plan0.goal) plan0.goal = GOAL; const plan = RC.writePlan(build, plan0);
     // build/match.json: how close this draft is to what it copies, per part (kit/fidelity.cjs; an estimate from the plan)
     if (RECUT) {
       const len = RC.lengthOf(cutNow.segs), target = LOOK ? FID.targetOfLook(LOOK, { len, skipped: RECUT.skipped.length, planned: LOOKPLAN.plan.length }) : FID.targetOfRecipe(recipe, { k: SCALE.k, len, skipped: RECUT.skipped.length });
@@ -845,6 +865,8 @@ if (splitIns().length && !cut.mask && !flag('no-mask') && fxReady()) { cut.mask 
       const fz = JSON.parse(fs.readFileSync(path.join(build, 'facezone.json'), 'utf8')), caps = R.readCaptions(capF);
       caps.faceTrack = { fps: fz.fps, zones: splitZones(fz) };
       if (flag('no-face-safe')) caps.faceSafe = false;
+      // a B-roll panel never sits on your face: it moves down under your chin, smaller when the frame runs out (kit/broll-slots.cjs)
+      { const n = require('./broll-slots.cjs').clearFaces(caps.flips || [], fz); if (n) console.log(`b-roll: ${n} panel${n === 1 ? '' : 's'} moved under your chin`); }
       fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
     } catch (e) { console.warn('note: face zone skipped (' + String(e.message).split('\n')[0] + '); captions are not kept off the face this run'); }
   } }

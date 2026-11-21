@@ -16,7 +16,7 @@ const fs = require('fs');
 const path = require('path');
 
 const KIT = __dirname, ROOT = path.dirname(KIT);
-const SHOTS_BLOCK = 'videomd-timeline', TITLES_BLOCK = 'reel-titles', SCRIPT_BLOCK = 'reel-script', GRAPHICS_BLOCK = 'reel-graphics', CARDS_BLOCK = 'reel-cards', SFX_BLOCK = 'reel-sfx';
+const SHOTS_BLOCK = 'videomd-timeline', TITLES_BLOCK = 'reel-titles', SCRIPT_BLOCK = 'reel-script', GRAPHICS_BLOCK = 'reel-graphics', BROLL_BLOCK = 'reel-broll', CARDS_BLOCK = 'reel-cards', SFX_BLOCK = 'reel-sfx';
 const CARDS = require('./cards.cjs');
 // where a title or caption can sit around the head (kit/overlay.html placeSpec); center is the default band
 const PLACES = ['left', 'right', 'above', 'chest', 'face', 'center'];
@@ -143,8 +143,10 @@ function parse(text, file = 'Reel.md') {
   const graphics = graphicLines.map(l => parseLine(l, file + ' graphics'));
   const cards = cardLines.map(l => parseLine(l, file + ' cards'));
   const sfx = sfxLines.map(l => parseLine(l, file + ' sfx'));
+  // ## B-roll: where the reference shows B-roll and how it is treated (kit/broll-slots.cjs)
+  const broll = (fenced(body, BROLL_BLOCK) || []).map(l => parseLine(l, file + ' b-roll'));
   const title = (body.match(/^#\s+(.+)$/m) || [])[1];
-  return { file, card, title, brand, music, style, aliases, shots, titles, script, graphics, cards, sfx, notes: (S._intro || '').replace(/^#\s+.+$/m, '').trim() };
+  return { file, card, title, brand, music, style, aliases, shots, titles, script, graphics, broll, cards, sfx, notes: (S._intro || '').replace(/^#\s+.+$/m, '').trim() };
 }
 
 function validate(r) {

@@ -918,12 +918,19 @@ const SIZER = SIZES.mount({ ROOT, C, json, readBody, runTask: (...a) => runTask(
 // A Recreate draft re-cut to the reference's shots gives its cutaways on the draft's own clock: build/plan.json
 // shots first, else cut.json refShots (kit/recreate.cjs shotsOf).
 // Each carries the cutaway's length and what it showed (Reel.md shot broll), so the spot matches it.
-const refBroll = (s, cut, job = s.job) => { if (!s.reference || s.reference.mode === 'off' || noTimeline(s)) return [];
+// 1.28.0: a draft from a reference or a look plans its B-roll slots itself (build/plan.json "broll", kit/broll-slots.cjs):
+// each slot is a spot, with what it should show and how it is treated, in Recreate and in Copy the look.
+const planSlots = job => { const p = job ? RC.readPlan(join(ROOT, 'jobs', String(job), 'build')) : null; return p && Array.isArray(p.broll) ? p.broll : []; };
+const refBroll = (s, cut, job = s.job) => {
+  const ps = planSlots(job);
+  if (ps.length) return ps.map(x => ({ at: +x.start + 0.05, seconds: +(+x.end - +x.start).toFixed(2), label: 'B-roll', detail: x.what ? `it shows ${x.what}` : x.ref ? 'the reference shows B-roll here' : 'the look has B-roll here', ...(x.what ? { what: x.what } : {}), slot: x }));
+  if (!s.reference || s.reference.mode === 'off' || noTimeline(s)) return [];
   const rs = RC.shotsOf(job ? join(ROOT, 'jobs', String(job), 'build') : null, cut).filter(x => x.cutaway);
   if (rs.length) return rs.map(x => ({ at: +x.start + 0.05, seconds: +(+x.end - +x.start).toFixed(2), label: 'B-roll', detail: x.broll ? `it shows ${x.broll}` : 'the reference cuts away here', ...(x.broll ? { what: x.broll } : {}) }));
   const sw = swapOf(s); if (!sw || !sw.seconds) return [];
   return (sw.parts || []).filter(p => p.kind === 'broll').map(p => ({ frac: p.at / sw.seconds, ...(p.end != null && p.end > p.at ? { fracLen: (p.end - p.at) / sw.seconds } : {}), label: p.label, detail: p.detail, ...(p.what ? { what: p.what } : {}) })); };
 const BRL = mountBroll({ ROOT, C, update, json, readBody, serveFile: (...a) => serveFile(...a), CH, capturePage, chromeOk, refParts: refBroll,
+  askAgent: (text, attach) => (S.load().chat.backend === 'agent' ? chatTurn(text, false, attach) : null),
   transcribe: (rel, done) => { startTranscribe(rel, () => done(null)); if (MEDIA.transcribing(rel)) watchTx(rel, done); }, wordsOf, energyOf });
 // startTranscribe calls back only on success; a raw upload also wants to hear a failure
 function watchTx(rel, done) { const t = setInterval(() => { const x = (C.load().tx || {})[rel]; if (x && x.status === 'failed') { clearInterval(t); done(Object.assign(new Error(x.error || 'transcription failed'), { fix: x.fix })); } else if (!MEDIA.transcribing(rel)) clearInterval(t); }, 500); }

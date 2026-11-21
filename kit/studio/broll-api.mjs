@@ -19,6 +19,8 @@ import * as S from './settings.mjs';
 import * as CUT from './cut.mjs';
 import { spawn } from 'child_process';
 import { mkdirSync } from 'fs';
+import { createRequire } from 'module';
+const BS = createRequire(import.meta.url)('../broll-slots.cjs');
 
 const bad = (m, code = 400, extra) => Object.assign(new Error(m), { code }, extra || {});
 const clean = t => String(t == null ? '' : t).replace(/\u2014/g, ', ').slice(0, 300);
@@ -27,9 +29,9 @@ export const TYPES = { testimonial: 'Testimonial', 'product-demo': 'Product demo
 // what each spot role likes to show, from your library first
 const ROLE_TYPES = { proof: ['testimonial', 'product-demo'], tip: ['screen-recording', 'product-demo'], story: ['lifestyle'], other: ['lifestyle'] };
 
-export function mount({ ROOT, C, update, json, readBody, serveFile, CH, capturePage, chromeOk, refParts = () => [], transcribe = null, wordsOf = () => null, energyOf = async () => null }) {
-  const jobState = (s, job = s.job) => { s.broll = s.broll || {}; const b = s.broll[job] = s.broll[job] || {}; b.slots = b.slots || {}; b.ideas = b.ideas || {}; b.asks = b.asks || []; b.gens = b.gens || []; b.marks = b.marks || []; b.raws = b.raws || []; b.cutins = b.cutins || []; return b; };
-  const peek = (s, job = s.job) => ({ slots: {}, ideas: {}, asks: [], gens: [], marks: [], raws: [], cutins: [], ...(((s.broll || {})[job]) || {}) });
+export function mount({ ROOT, C, update, json, readBody, serveFile, CH, capturePage, chromeOk, refParts = () => [], askAgent = () => null, transcribe = null, wordsOf = () => null, energyOf = async () => null }) {
+  const jobState = (s, job = s.job) => { s.broll = s.broll || {}; const b = s.broll[job] = s.broll[job] || {}; b.slots = b.slots || {}; b.ideas = b.ideas || {}; b.asks = b.asks || []; b.gens = b.gens || []; b.marks = b.marks || []; b.raws = b.raws || []; b.cutins = b.cutins || []; b.skips = b.skips || {}; return b; };
+  const peek = (s, job = s.job) => ({ slots: {}, ideas: {}, asks: [], gens: [], marks: [], raws: [], cutins: [], skips: {}, ...(((s.broll || {})[job]) || {}) });
   function draftOf(job, s = C.load()) {
     // leftover jobs/<job>/build from a previous edit must not drive the timeline once the footage changed
     if (job === s.job && !C.draftIsCurrent(s)) return null;
@@ -55,12 +57,24 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
   }
   function view(s, job = s.job) {
     const d = job ? draftOf(job, s) : null, b = peek(s, job), lib = BR.load().clips, byId = Object.fromEntries(lib.map(c => [c.id, c]));
-    const beats = d ? d.beats.map(bt => { const sl = b.slots[bt.n], c = sl && byId[sl.clip]; return { ...bt, slot: sl && c ? { ...sl, ...LANE.timing(sl, bt, c), clip: clipBrief(c) } : null, idea: b.ideas[bt.n] ? { ...b.ideas[bt.n], clip: b.ideas[bt.n].clip ? clipBrief(byId[b.ideas[bt.n].clip]) : null } : null }; }) : [];
+    const stockOn = ['pexels', 'pixabay'].some(p => KEYS.isSet(p));
+    const beats = d ? d.beats.map(bt => { const sl = b.slots[bt.n], c = sl && byId[sl.clip]; return { ...bt, slot: sl && c ? { ...sl, ...LANE.timing(sl, bt, c), clip: clipBrief(c) } : null, idea: b.ideas[bt.n] ? { ...b.ideas[bt.n], clip: b.ideas[bt.n].clip ? clipBrief(byId[b.ideas[bt.n].clip]) : null } : null,
+      ...(needOf(bt, sl && c, b, job, stockOn) || {}), ...(underOf(bt, d.beats) ? { under: underOf(bt, d.beats) } : {}) }; }) : [];
     const st = S.load();
     return { job, draft: !!d, beats, length: d ? d.len : 0, asks: b.asks, gens: b.gens.slice(-8), sources: sources(), library: { dir: BR.libDir(), count: lib.length },
       generate: { on: !!st.broll.generate, providers: GEN.list(st) }, places: LANE.PLACE_LABEL, auto: autoOn(), types: TYPES, card: chromeOk(),
       raws: b.raws.slice(-6), cutins: b.cutins.map(x => ({ ...x, clip: clipBrief(byId[x.clip]) })).filter(x => x.clip), testimonials: lib.filter(c => c.type === 'testimonial' && c.raw).slice(0, 24).map(clipBrief),
       undo: !!(b.undo && b.undo.slots) };
+  }
+  // a spot that lies under a plan slot which started on an earlier spot (the slot runs on over it): the slot's number
+  const underOf = (bt, beats) => { if (bt.ref && bt.ref.slot) return null; const o = beats.find(x => x.ref && x.ref.slot && x.n !== bt.n && +x.ref.slot.start < bt.end - 0.2 && +x.ref.slot.end > bt.start + 0.2); return o ? o.ref.slot.n : null; };
+  // A B-roll slot from the plan with no clip on it: what it needs, in plain words (kit/broll-slots.cjs brief), the
+  // ready instruction for an agent, and whether stock can be tried (a key is set). One per slot; skipped ones say so.
+  function needOf(bt, filled, b, job, stockOn) {
+    const sl = bt.ref && bt.ref.slot; if (!sl || filled || (sl.by === 'recipe' && sl.file)) return null; // a slot the recipe gave its own file is already filled
+    const slot = { ...sl, line: sl.line || bt.text }, br = BS.brief(slot);
+    return { need: { slot: sl.n, kind: sl.kind, what: br.what, line: br.line, seconds: br.seconds, shape: br.shape, treat: br.treat, frame: br.frame, like: !!sl.ref, skipped: !!b.skips[sl.n],
+      stock: stockOn ? (LANE.nounQuery(sl.what || '') || sl.what || LANE.nounQuery(slot.line) || null) : null, ask: BS.agentAsk(slot, { job, spot: bt.n }) } };
   }
   // the render step's plan: every filled slot as an insert, and the credits
   function plan(s) {
@@ -68,16 +82,19 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     const ins = LANE.inserts(b.slots, d.beats, id => byId[id], c => BR.pathOf(c));
     const used = [...new Set(ins.map(x => x.clip))].map(id => byId[id]);
     for (const c of used) BR.update(c.id, { usedIn: s.job });
-    return { inserts: ins, credits: used.length ? BR.credits(used, s.job) : '' };
+    // skipped: the plan's slots you chose to leave empty (kit/studio/broll-run.mjs keeps them out of the render)
+    return { inserts: ins, credits: used.length ? BR.credits(used, s.job) : '', skipped: Object.keys(b.skips || {}).filter(k => b.skips[k]).map(Number) };
   }
   const beatOk = (s, n) => { const d = draftOf(s.job, s); if (!d) throw bad('make a draft first: the beats come from it'); const bt = d.beats.find(x => x.n === +n); if (!bt) throw bad(`no beat ${n} (the draft has ${d.beats.length})`); return bt; };
   function fill(s0, n, clipId, o = {}) {
     const bt = beatOk(s0, n); if (clipId && !BR.get(clipId)) throw bad(`no b-roll ${clipId}`, 404);
     return update(s => { const b = jobState(s);
       if (!clipId) { delete b.slots[n]; return; }
-      const prev = b.slots[n] || {}, place = LANE.PLACES.includes(o.place) ? o.place : prev.place || 'full';
+      // on a reference B-roll slot the clip sits the way the reference's did, unless you pick another way
+      const rs = bt.ref && bt.ref.slot, prev = b.slots[n] || {}, place = LANE.PLACES.includes(o.place) ? o.place : prev.place || (rs && LANE.KIND_PLACE[rs.kind]) || 'full';
+      if (rs) delete b.skips[rs.n];
       b.slots[n] = { clip: clipId, place, offset: o.offset != null ? +o.offset : prev.clip === clipId ? prev.offset : null, dur: o.dur != null ? +o.dur : prev.clip === clipId ? prev.dur : null, in: o.in != null ? Math.max(0, +o.in) : prev.clip === clipId ? prev.in || 0 : 0, by: o.by || 'you', why: o.why ? clean(o.why) : prev.clip === clipId ? prev.why || null : null };
-      b.slots[n].at = +(bt.start + (b.slots[n].offset != null ? b.slots[n].offset : 0.2)).toFixed(2);
+      b.slots[n].at = +(bt.start + (b.slots[n].offset != null ? b.slots[n].offset : rs ? Math.max(0, +rs.start - bt.start) : 0.2)).toFixed(2);
       delete b.ideas[n];
       if (o.by && o.by !== 'you' && !o.quiet) C.applyPatch(s, { reply: `${o.by} put ${BR.get(clipId).name} on spot ${n} (${LANE.PLACE_LABEL[place].toLowerCase()}).`, from: 'assistant', kind: 'action' });
     });
@@ -94,6 +111,8 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     const out = [];
     for (const bt of d.beats) {
       if (j.slots[bt.n] || bt.seconds < 1.2) continue;
+      // a spot under a plan slot that started on an earlier spot is taken: nothing else goes on top of that slot
+      if (underOf(bt, d.beats)) continue;
       const p = LANE.pick(bt); if (!p && !bt.ref) continue;
       const offset = LANE.offsetFor(bt, p && p.word, d.caps), at = bt.start + offset;
       if (!all && !bt.ref && [...taken, ...out.map(x => x.at)].some(t => Math.abs(t - at) < gap)) continue;
@@ -106,6 +125,10 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
       if (!hit && bt.text) { const r = BR.rank(LANE.nounQuery(bt.text) + ' ' + bt.text, { exclude: used }).find(c => c.matched >= 2); if (r) hit = r; }
       if (!hit && want.length) hit = lib.find(c => want.includes(c.type) && !used.has(c.id) && !(c.raw && c.type === 'testimonial' && j.cutins.some(x => x.clip === c.id))) || null;
       if (hit) used.add(hit.id);
+      // a plan slot with nothing in your library is not an idea: its card says "Needs B-roll" with what to show
+      const rs = bt.ref && bt.ref.slot;
+      if (rs && !hit) continue;
+      if (rs && hit) { out.push({ beat: bt.n, at: +rs.start, offset: +Math.max(0, rs.start - bt.start).toFixed(2), dur: +(rs.end - rs.start).toFixed(2), idea: `${hit.name} from your library`, why: `It matches what this slot should show${rs.what ? ` (${rs.what})` : ''}.`, role, query: wq || null, card: null, clip: hit.id, place: LANE.KIND_PLACE[rs.kind] || 'full', source: 'reference' }); continue; }
       const place = hit && hit.type === 'screen-recording' ? 'top' : hit && hit.type === 'testimonial' ? 'pip' : 'full';
       // a tip about a tool, an app or a screen: a screen recording of it first, then stock
       const screen = !hit && !(p && p.card) && role === 'tip' && p && p.query;
@@ -128,10 +151,14 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     if (!autoOn()) return autoRun;
     autoRun = autoRun.then(async () => {
       const s = C.load(); if (s.job !== job || !draftOf(job, s)) return;
-      const ideas = pickIdeas(s); if (!ideas.length) return; saveIdeas(ideas, 'Studio');
+      const ideas = pickIdeas(s); if (ideas.length) saveIdeas(ideas, 'Studio');
       let placed = 0;
       for (const x of ideas) { try { await approveIdea(C.load(), x.beat, 'Studio', { quiet: true, noFallback: true }); placed++; } catch {} }
-      update(st => { if (st.job === job) C.applyPatch(st, { reply: `B-roll picked itself: ${placed} of ${ideas.length} spot${ideas.length === 1 ? '' : 's'} filled from what you said${placed < ideas.length ? ', the rest wait for Approve' : ''}. Swap or remove any on the B-roll step.`, from: 'assistant', kind: 'action' }); });
+      // one count that matches the step: what was placed, what waits for a yes, and the slots that need a clip from you
+      const vw = view(C.load()), needs = vw.beats.filter(x => x.need && !x.need.skipped).length, waits = ideas.length - placed;
+      if (!ideas.length && !needs) return;
+      const parts = [placed ? `${placed} placed from what you said` : null, waits ? `${waits} idea${waits === 1 ? ' waits' : 's wait'} for you` : null, needs ? `${needs} slot${needs === 1 ? '' : 's'} need${needs === 1 ? 's' : ''} a clip` : null].filter(Boolean);
+      update(st => { if (st.job === job) C.applyPatch(st, { reply: `B-roll picked itself: ${parts.join(', ')}. See the B-roll step.`, from: 'assistant', kind: 'action' }); });
     }).catch(e => console.error('b-roll auto: ' + e.message));
     return autoRun;
   }
@@ -310,6 +337,20 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
       const b = await readBody(req), c = BR.get(b.clip); if (!c || !c.raw) throw bad('clip: a testimonial piece from a raw upload (Upload, It is raw)', 404);
       const v = update(st => { const j = jobState(st); j.cutins = j.cutins.filter(x => x.clip !== c.id); if (!b.remove) j.cutins.push({ clip: c.id, after: b.after ? String(b.after) : null }); });
       return json(res, 200, { broll: view(v), state: v });
+    }
+    // a slot that needs B-roll: skip it (or take the skip back), try stock for it (only with a key), or send the
+    // ready instruction to your agent
+    if (p === '/api/broll/need' && M === 'POST') {
+      const b = await readBody(req), bt = beatOk(s, b.beat), rs = bt.ref && bt.ref.slot; if (!rs) throw bad(`spot ${b.beat} is not a B-roll slot from the plan`);
+      if (b.action === 'skip' || b.action === 'unskip') { const v = update(st => { const j = jobState(st); if (b.action === 'skip') { j.skips[rs.n] = true; delete j.ideas[bt.n]; } else delete j.skips[rs.n]; }); return json(res, 200, { broll: view(v), state: v }); }
+      const nd = (view(s).beats.find(x => x.n === bt.n) || {}).need; if (!nd) throw bad('that slot already has a clip');
+      if (b.action === 'stock') {
+        const prov = ['pexels', 'pixabay'].find(k => KEYS.isSet(k)); if (!prov) throw bad('Add a free Pexels or Pixabay key first. It stays on this computer.', 400, { needKey: 'pexels' });
+        const r = await BR.searchStock(prov, { query: nd.stock || 'screen', orientation: rs.kind === 'full' ? 'portrait' : 'landscape' }); if (!r.length) throw bad(`${KEYS.byId(prov).name} found nothing for "${nd.stock}". Upload a clip, or ask your agent to capture it.`, 404);
+        const c = await BR.downloadStock(prov, r[0]), v = fill(C.load(), bt.n, c.id, { by: 'you', why: `Stock for "${nd.stock}".` }); return json(res, 200, { clip: clipBrief(c), broll: view(v), state: v });
+      }
+      if (b.action === 'send') { const r = await askAgent(nd.ask, { kind: 'broll', slot: rs.n, beat: bt.n, label: nd.what }); if (!r) throw bad('Connect your agent first (Connect agent, top right).'); return json(res, 200, r); }
+      throw bad('action: skip, unskip, stock or send');
     }
     if (p === '/api/broll/idea' && M === 'POST') { const b = await readBody(req);
       if (b.action === 'dismiss') { const v = update(st => { delete jobState(st).ideas[+b.beat]; }); return json(res, 200, { broll: view(v) }); }

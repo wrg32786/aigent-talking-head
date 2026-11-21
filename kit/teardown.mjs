@@ -178,6 +178,36 @@ stage('recipe');
 const res = V.convert(b, extras, { name, bpms, recipePath: relative(ROOT, join(out, 'Reel.md')) });
 writeFileSync(join(out, 'Reel.md'), res.md);
 writeFileSync(join(out, 'teardown.md'), res.report);
+// B-roll: where the reference shows it (screen panels, split screens, shots with no speaker), what it showed and how
+// it is treated (kit/broll_fx.py measures the motion, shake, glitch, colour and the way in and out). kit/broll-slots.cjs
+{
+  const BS = require('./broll-slots.cjs');
+  const cands = [];
+  for (const g of (res.graphics || []).filter(g => g.type === 'screen-card')) {
+    const e = ((extras.graphics || []).filter(x => x.type === 'screen-card' && Array.isArray(x.bbox)).sort((a, z) => Math.abs(a.start - g.start) - Math.abs(z.start - g.start))[0]) || null;
+    cands.push({ start: g.start, end: g.end, kind: 'panel', box: e && Math.abs(e.start - g.start) < 0.5 ? e.bbox : [(1 - (g.w || 0.66)) / 2, (g.y || 0.68) - 0.11, g.w || 0.66, 0.22], border: g.border, shows: g.named || g.subject, shot: 'screen recording', source: g.sourceGuess });
+  }
+  for (const sh of (res.shots || []).filter(x => x.cutaway)) cands.push({ start: sh.start, end: sh.end, kind: 'full', shows: sh.broll || null });
+  let measured = [];
+  if (pyHas('cv2')) {
+    const spF = join(out, 'broll-splits.json');
+    if (!spawnSync(PY, [join(KIT, 'broll_fx.py'), 'splits', video, '--out', spF], { stdio: 'inherit' }).status) for (const sp of JSON.parse(readFileSync(spF, 'utf8'))) if (!cands.some(c => c.start < sp.end && c.end > sp.start)) cands.push({ start: sp.start, end: sp.end, kind: 'split', box: sp.box });
+    cands.sort((a, z) => a.start - z.start);
+    if (cands.length) {
+      const inF = join(out, 'broll-in.json'), mF = join(out, 'broll.json');
+      writeFileSync(inF, JSON.stringify(cands.map((c, i) => ({ n: i + 1, start: c.start, end: c.end, box: c.kind === 'full' ? null : c.box, border: c.border || null }))));
+      if (!spawnSync(PY, [join(KIT, 'broll_fx.py'), 'measure', video, '--slots', inF, '--out', mF], { stdio: 'inherit' }).status) measured = JSON.parse(readFileSync(mF, 'utf8'));
+      else console.warn('note: the B-roll effects were not read (the slots keep their times and shape)');
+    }
+  } else if (cands.length) console.warn('note: opencv is missing, so the B-roll effects were not read (the slots keep their times and shape)');
+  cands.sort((a, z) => a.start - z.start);
+  const faces = (res.shots || []).filter(x => x.face).map(x => ({ start: x.start, end: x.end, eyeY: x.face.eyeY, faceH: x.face.faceH }));
+  const script = ((b.speech && b.speech.lines) || []).map(l => ({ start: +l.start, end: +l.end, say: l.text }));
+  const slots = BS.detect(cands, measured, { faces, script });
+  res.md = BS.appendBlock(res.md, slots);
+  writeFileSync(join(out, 'Reel.md'), res.md);
+  console.log(`b-roll: ${slots.length} slot${slots.length === 1 ? '' : 's'} in the reference${slots.length ? ' (' + slots.map(x => `${x.kind} ${x.start}-${x.end}s${x.shows ? ' ' + x.shows : ''}, ${x.fx.motion}, in ${x.fx.in}`).join('; ') + ')' : ''}`);
+}
 { const added = V.saveScenes(res, out, { library: !flag('no-scenes') }); if (res.scenes.length) console.log(`scenes: ${res.scenes.length} made from the reference (${res.scenes.map(x => x.name).join(', ')}), ${added.length} new in the menu with a REF badge`); }
 const r = RM.load(join(out, 'Reel.md'));
 const { errs } = RM.validate(r);

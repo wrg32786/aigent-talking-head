@@ -65,6 +65,9 @@ const shot = async (pg, sel, name) => {
   await pg.screenshot({ path: join(shots, name), clip: { x: Math.max(0, b.x - 8), y: Math.max(0, top - 8), width: Math.min(vp.width - Math.max(0, b.x - 8), b.width + 16), height: Math.min(vp.height - top, b.height + 16) } });
 };
 
+// 1.28.0: the other sources sit behind "Choose something else" while a spot has an idea or a clip, and Add a spot is in More
+const tab = async (pg, sel) => { if (!(await pg.$(sel))) await pg.click('#broll-more'); await pg.click(sel); };
+const more = async pg => { if (!(await pg.$('#broll-more-fold[open]'))) await pg.click('#broll-more-fold > summary'); };
 const browser = patient(await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox'] }));
 let client;
 try {
@@ -85,11 +88,11 @@ try {
     const s3 = await until(async () => { const b = await spot(3); return b.slot ? b : null; }, 60000);
     assert.strictEqual(s3.slot.clip.source, 'agent'); assert.strictEqual(s3.slot.by, 'Studio'); assert.ok(/doubled/.test(s3.slot.why), s3.slot.why);
     const s1 = await spot(1); assert.ok(s1.idea && !s1.slot, 'the first spot waits: a search with no key and nothing in the library'); assert.ok(s1.idea.offset >= 1.2 && s1.idea.why);
-    await until(async () => (await api('/api/state')).state.chat.some(m => /B-roll picked itself: 1 of 2 spots/.test(m.text || '')));
+    await until(async () => (await api('/api/state')).state.chat.some(m => /B-roll picked itself: 1 placed from what you said, 1 idea waits for you/.test(m.text || '')));
     await pg.waitForSelector('#broll-lane .spot[data-beat="3"].filled');
     assert.ok(/picked/.test(await pg.textContent('#broll-lane .spot[data-beat="3"] .sp-by')));
     await pg.click('#broll-lane .spot[data-beat="1"]'); await pg.waitForSelector('#beat-idea');
-    assert.ok(/Picked from your words/.test(await pg.textContent('#beat-idea'))); assert.ok((await pg.textContent('#idea-why')).length > 10);
+    assert.ok(/^Idea: /.test(await pg.textContent('#beat-idea')), 'a waiting idea reads as an idea'); { const tx = await pg.textContent('#beat-idea'); assert.ok(!/Stock:|\(full cutaway\)|You talk about/.test(tx) && /covers the whole screen|panel|top half|small box|card above/.test(tx), 'plain words, no search term as a title: ' + tx); }
     assert.strictEqual(await pg.$('#ye-next'), null, 'no second Next button on B-roll');
     assert.ok(/1 spot/.test(await pg.textContent('#your-edit [data-part="broll"]')));
   });
@@ -99,7 +102,7 @@ try {
     await pg.waitForSelector('#slot-why'); await pg.waitForSelector('#broll-lane .spot[data-beat="1"].filled');
   });
   await t('Add a spot: the spot splits and the placed b-roll stays on its words', async () => {
-    await pg.click('#broll-lane .spot[data-beat="2"]'); await pg.click('#broll-add-spot'); await pg.waitForSelector('#add-spot');
+    await pg.click('#broll-lane .spot[data-beat="2"]'); await more(pg); await pg.click('#broll-add-spot'); await pg.waitForSelector('#add-spot');
     await pg.fill('#add-spot-at', '6'); await pg.click('#add-spot-go');
     await pg.waitForSelector('#broll-lane .spot[data-beat="4"]'); const b = (await api('/api/broll')).beats;
     assert.strictEqual(b.length, 4); assert.ok(b[3].slot && /doubled/.test(b[3].slot.why), 'the counter moved with its words to spot 4');
@@ -108,12 +111,13 @@ try {
     await theme(pg, 'dark');
   });
   await t('Upload asks what it is: a screen recording keeps its kind', async () => {
-    await pg.click('#broll-lane .spot[data-beat="2"]'); await pg.click('#btab-upload'); await pg.waitForSelector('#up-type');
+    await pg.click('#broll-lane .spot[data-beat="2"]'); await tab(pg, '#btab-upload'); await pg.waitForSelector('#up-type');
     await pg.selectOption('#up-type', 'screen-recording'); await pg.setInputFiles('#broll-file', DESK);
     const s2 = await until(async () => { const b = await spot(2); return b.slot ? b : null; }); assert.strictEqual(s2.slot.clip.type, 'screen-recording');
   });
   let piece;
   await t('a raw testimonial is cut into pieces on whole words, then plays in the reel with its own sound', async () => {
+    if (!(await pg.$('#up-type'))) await tab(pg, '#btab-upload');
     await pg.selectOption('#up-type', 'testimonial'); assert.ok(await pg.isChecked('#up-raw'), 'a testimonial is raw by default');
     await pg.setInputFiles('#broll-file', TESTI);
     await pg.waitForSelector('#up-raws .raw.done', { timeout: 60000 });

@@ -252,7 +252,31 @@ const chromeFile = g => {
     : `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`;
   const src = still ? `[${n}:v]${V},${fit}` : `[${n}:v]trim=${i0}:${(i0 + d).toFixed(3)},${V},${fit}`;
   const on = `enable='between(t,${a0},${(a0 + d).toFixed(3)})'`, win = `trim=start=${a0}:end=${(a0 + d + 0.05).toFixed(3)}`;
-  f.push(`${src},setsar=1${s.bw ? ',hue=s=0' : ''}${place === 'pip' ? ',pad=iw+8:ih+8:4:4:white' : ''},setpts=PTS+${a0}/TB[ins${k}]`);
+  // "fx" (a reference B-roll slot's treatment, kit/broll-slots.cjs): motion push | pull | drift with zoom, shake, a
+  // glitch on the way in, colour bw | muted | vivid | warm | cool, and in / out: fade, flash, zoom, glitch, slide-*
+  // or cut. All of it is drawn on the insert's own picture, on its own clock (0 at its first frame).
+  const X = s.fx && typeof s.fx === 'object' ? s.fx : {}, fxl = [], N = Math.max(1, Math.round(d * 24));
+  if (!still && (['push', 'pull', 'drift'].includes(X.motion) || X.in === 'zoom')) {
+    const z = Math.max(1.03, Math.min(1.4, X.motion === 'pull' ? 2 - (+X.zoom || 0.93) : X.motion === 'push' ? +X.zoom || 1.07 : 1.06)), g0 = (z - 1).toFixed(4);
+    const ze = X.motion === 'push' ? `1+${g0}*on/${N}` : X.motion === 'pull' ? `${z.toFixed(4)}-${g0}*on/${N}` : X.motion === 'drift' ? `${z.toFixed(4)}` : '1';
+    const zin = X.in === 'zoom' ? `+0.22*max(0\,1-on/8)` : '';
+    const xe = X.motion === 'drift' ? `(iw-iw/zoom)*on/${N}` : 'iw/2-(iw/zoom/2)';
+    fxl.push(`zoompan=z='${ze}${zin}':x='${xe}':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=24`);
+  }
+  if (X.shake) fxl.push(`scale=${W + 24}:${H + 24},crop=${W}:${H}:'12+7*sin(n*12.9898)':'12+7*cos(n*78.233)'`);
+  const tone = { bw: 'hue=s=0', muted: 'eq=saturation=0.55', vivid: 'eq=saturation=1.45:contrast=1.06', warm: 'colorbalance=rs=0.08:gs=0.02:bs=-0.08', cool: 'colorbalance=rs=-0.07:bs=0.09' }[X.colour];
+  if (tone) fxl.push(tone);
+  if (X.glitch || X.in === 'glitch') fxl.push(`rgbashift=rh=14:bh=-14:gv=4:enable='lt(t,0.25)'`, `noise=alls=28:allf=t:enable='lt(t,0.2)'`);
+  if (X.in === 'flash') fxl.push(`fade=t=in:st=0:d=0.18:color=white`);
+  if (X.out === 'flash') fxl.push(`fade=t=out:st=${Math.max(0, d - 0.18).toFixed(3)}:d=0.18:color=white`);
+  const alphaIn = X.in === 'fade' || X.in === 'pop', alphaOut = X.out === 'fade' || X.out === 'pop';
+  if (alphaIn || alphaOut) fxl.push('format=yuva420p', ...(alphaIn ? [`fade=t=in:st=0:d=${X.in === 'pop' ? 0.12 : 0.3}:alpha=1`] : []), ...(alphaOut ? [`fade=t=out:st=${Math.max(0, d - 0.3).toFixed(3)}:d=0.3:alpha=1`] : []));
+  // slides move the whole insert: its place on your picture is worked out per frame (t on the reel's clock)
+  const sl = (v, axis) => { const span = axis === 'x' ? 1080 : (FR ? FR.h : 1920), tin = `max(0\,1-(t-${a0})/0.3)`, tout = `max(0\,(t-${(a0 + d - 0.3).toFixed(3)})/0.3)`, sq = e => `${e}*${e}`;
+    const m = { x: { 'slide-left': 1, 'slide-right': -1 }, y: { 'slide-up': 1, 'slide-down': -1 } }[axis], i = m[X.in] || 0, o = m[X.out] || 0;
+    return `${v}${i ? `${i > 0 ? '+' : '-'}${span}*${sq(tin)}` : ''}${o ? `${o > 0 ? '-' : '+'}${span}*${sq(tout)}` : ''}`; };
+  const slides = /^slide-/.test(X.in || '') || /^slide-/.test(X.out || '');
+  f.push(`${src},setsar=1${s.bw ? ',hue=s=0' : ''}${fxl.length ? ',' + fxl.join(',') : ''}${place === 'pip' ? ',pad=iw+8:ih+8:4:4:white' : ''},setpts=PTS+${a0}/TB[ins${k}]`);
   // the top of your head over the panel (or the card's top edge): rows y0..y1 of your picture, moved like it
   const band = (cur, scale) => {
     if (!g.band || !bands.length) return cur;
@@ -274,7 +298,7 @@ const chromeFile = g => {
   } else if (place === 'pip') {
     const x = s.pipX != null ? Math.round(+s.pipX) : 1080 - pw - 8 - 44, y = FR ? Math.round(FR.y0 + (s.pipY != null ? +s.pipY * FR.h / 1920 : FR.top + 30)) : s.pipY != null ? Math.round(+s.pipY) : 170;
     f.push(`[${vcur}][ins${k}]overlay=${x}:${y}:eof_action=pass:${on}[vi${k}]`); vcur = `vi${k}`;
-  } else { f.push(`[${vcur}][ins${k}]overlay=0:${FR ? FR.y0 : 0}:eof_action=pass:${on}[vi${k}]`); vcur = `vi${k}`; }
+  } else { f.push(`[${vcur}][ins${k}]overlay=${slides ? `x='${sl('0', 'x')}':y='${sl(String(FR ? FR.y0 : 0), 'y')}':eval=frame` : `0:${FR ? FR.y0 : 0}`}:eof_action=pass:${on}[vi${k}]`); vcur = `vi${k}`; }
 });
 for (const l of bands) f.push(`[${l}]nullsink`);
 // The caption layer and the glitch shake go on in a second pass when there are captions. In one graph, the caption

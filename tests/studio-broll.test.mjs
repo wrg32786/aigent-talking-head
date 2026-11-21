@@ -138,8 +138,8 @@ try {
   });
   await t('split layouts: the split panel behind the top of your head, framed cards with your head over the edge (kit/split.cjs)', async () => {
     const SPL = createRequire(import.meta.url)('../kit/split.cjs');
-    assert.deepStrictEqual(LANE.PLACES, ['full', 'top', 'pip', 'frame']); assert.strictEqual(LANE.PLACE_LABEL.frame, 'Framed cards');
-    assert.deepStrictEqual(SPL.PLACES, LANE.PLACES, 'one list of placements');
+    assert.deepStrictEqual(LANE.PLACES, ['full', 'top', 'pip', 'frame', 'card']); assert.strictEqual(LANE.PLACE_LABEL.frame, 'Framed cards');
+    assert.deepStrictEqual(SPL.PLACES, LANE.PLACES.filter(x => x !== 'card'), 'one list of placements (the panel is drawn in the overlay, not by assemble)');
     const face = { crown: 400, cx: 600 };
     const top = SPL.layout({ place: 'top' }, face);
     assert.strictEqual(top.dy, 960 - 72 - 400, 'the top of the head 72 px into the panel'); assert.deepStrictEqual([top.band.y0 < 888, top.band.y1], [true, 960]);
