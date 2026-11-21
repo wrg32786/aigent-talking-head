@@ -180,6 +180,15 @@ try {
     assert.strictEqual((await req('/api/pieces', { topics: [{ label: 'help', lines: [1] }] })).status, 400);
     const back = await req('/api/pieces', { topics: [] }); assert.strictEqual(back.pieces.topicsBy, 'rules');
   });
+  await t('server: get_cuts returns the pacing, and a new point keeps the clips an agent picked', async () => {
+    await req('/api/state', { pace: { tighten: 0.25 } }); assert.strictEqual((await req('/api/cut')).pacing, 'very', 'GET /api/cut (get_cuts) has pacing');
+    await req('/api/state', { pace: { tighten: 'off' } }); assert.strictEqual((await req('/api/cut')).pacing, 'natural');
+    const set = await req('/api/cut/set', { by: 'claude-code', candidates: [{ start: 1, end: 9, score: 90, reason: 'agent pick A' }, { start: 12, end: 20, score: 70, reason: 'agent pick B' }] });
+    assert.strictEqual(set.status, 200, JSON.stringify(set).slice(0, 300)); assert.notStrictEqual(set.cut.scoredBy, 'rules');
+    const r = await req('/api/state', { point: 'why my friends doubted me' });
+    assert.strictEqual(r.cut.scoredBy, set.cut.scoredBy, 'still the agent\'s clips'); assert.deepStrictEqual(r.cut.candidates.map(c => c.reason), set.cut.candidates.map(c => c.reason));
+    assert.strictEqual(r.cut.point, 'why my friends doubted me');
+  });
   await t('MCP: the point, topics and pacing are in the tools agents already have (no new tool)', async () => {
     const src = readFileSync(join(ROOT, 'kit', 'mcp.mjs'), 'utf8');
     const tool = name => { const i = src.indexOf(`{ name: '${name}'`); assert.ok(i > 0, name); return src.slice(i, src.indexOf('\n  { name:', i + 10)); };

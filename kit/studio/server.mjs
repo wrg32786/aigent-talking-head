@@ -135,12 +135,14 @@ function env() {
 // every view carries a rising seq (and this run's boot id) so the page can drop a reply that is older than an event it
 // already applied, e.g. a POST answer that lands after the SSE state for a download that failed right away
 const BOOT = Date.now().toString(36); let viewSeq = 0;
+// natural, tight or very: an ad with no pacing chosen is Very tight, as its draft is
+function pacingFor(cut, comp) { const ad = cut.output && cut.output.goal === 'ad' && !comp.args.includes('--tighten') && !comp.args.includes('--no-tighten'); return PACING.pacingOf(ad ? [...comp.args, '--tighten', '0.25'] : comp.args).id; }
 function view(s) {
   let comp; try { comp = C.compose(s, { refPack: refPackName(s) }); } catch (e) { comp = { args: [], errs: [e.message], notes: [] }; }
   let scripts = []; try { scripts = SC.list(s.job); } catch {}
   let cut = null; try { cut = cutView(s); } catch (e) { cut = { error: e.message, candidates: [] }; }
   // the Pacing choice on the Cut step (kit/studio/pacing.mjs), read from the flags the next draft gets
-  if (cut && !cut.error) { const ad = cut.output && cut.output.goal === 'ad' && !comp.args.includes('--tighten') && !comp.args.includes('--no-tighten'); cut.pacing = PACING.pacingOf(ad ? [...comp.args, '--tighten', '0.25'] : comp.args).id; cut.pacings = PACING.PACING.map(({ id, label, says }) => ({ id, label, says })); cut.point = s.point || ''; }
+  if (cut && !cut.error) { cut.pacing = pacingFor(cut, comp); cut.pacings = PACING.PACING.map(({ id, label, says }) => ({ id, label, says })); cut.point = s.point || ''; }
   let broll = null; try { broll = BRL.view(s); } catch (e) { broll = { error: e.message, beats: [] }; }
   let reopenable = []; try { reopenable = s.job ? SNAP.list(join(ROOT, 'jobs', s.job)).filter(x => x.snapshot).map(x => `jobs/${s.job}/${x.reel}`) : []; } catch {}
   let combo = { pieces: [], seconds: 0, key: '' }; try { combo = comboOf(s); } catch {}
@@ -390,7 +392,9 @@ async function findCuts(rel, scorer = 'auto', { keepPicks = false } = {}) {
   const env = await energyOf(rel), cands = CUT.candidates(words, o, { duration: durOf(rel), point: s.point }).map(c => snapOne(c, words, env, durOf(rel)));
   // finding again after the point changed (keepPicks): what you kept or dropped stays, and so do the clips you added
   if (keepPicks && s.cut && s.cut.source === rel) { const was = Object.fromEntries((s.cut.candidates || []).map(c => [c.id, c]));
-    for (const c of cands) if (was[c.id]) c.keep = was[c.id].keep;
+    // (the ids are positions, so a pick is carried only onto a clip that still covers the same stretch of the take)
+    const len = c => (c.ranges || []).reduce((n, [x, y]) => n + (y - x), 0), shared = (p, q) => (p.ranges || []).reduce((n, [a, b]) => n + (q.ranges || []).reduce((m, [x, y]) => m + Math.max(0, Math.min(b, y) - Math.max(a, x)), 0), 0);
+    for (const c of cands) { const w = was[c.id]; if (w && w.by !== 'you' && shared(c, w) >= 0.5 * Math.min(len(c), len(w))) c.keep = w.keep; }
     for (const c of (s.cut.candidates || []).filter(c => c.by === 'you')) cands.push({ ...c, order: cands.length }); }
   const summary = CUT.summary(o, durOf(rel)), st = S.load(), a = CH.presence();
   const who = scorer !== 'auto' ? scorer : st.chat.backend === 'agent' && a.connected ? 'agent' : LLM.provider(KEYS.envWithKeys(), st.chat) ? 'model' : 'rules';
@@ -807,7 +811,7 @@ const relOf = p => (p.startsWith(ROOT + sep) ? p.slice(ROOT.length + 1) : p).spl
 function refDir(s) { const st = S.load(); return st.downloads ? join(st.downloads, s.job) : join(ROOT, 'teardown-in', 'studio', s.job); }
 const setItem = (id, fn) => update(st => { const it = (st.reference.queue || []).find(x => x.id === id); if (it) fn(it, st); });
 function useItem(st, it) {
-  st.reference = { ...st.reference, active: it.id, file: it.file, url: it.url, status: 'ready', out: it.out, extracted: it.extracted, contact: it.contact || null, applied: false, auto: null };
+  st.reference = { ...st.reference, active: it.id, file: it.file, url: it.url, status: 'ready', out: it.out, extracted: it.extracted, contact: it.contact || null, applied: false, auto: null, stages: it.stages || null };
   C.setReferenceLook(st); // Recreate or Influence: the Look is set from it now, so nobody has to pick it again
 }
 function addLinks(urls) {
@@ -964,7 +968,8 @@ async function api(req, res, u) {
     if (r.errs.length) return json(res, 400, { error: r.errs.join('; '), errs: r.errs });
     C.save(s); pushState();
     // a new point changes what we recommend: the lines rescore by themselves, the suggested clips are found again
-    if (patch.point !== undefined && r.log.some(l => /^(point:|no point set)/.test(l)) && s.cut && s.cut.source && (s.cut.candidates || []).length && MEDIA.transcript(s.cut.source)) {
+    // (only the rules' own clips: clips your agent or a model picked stay, they read the new point from get_cuts)
+    if (patch.point !== undefined && r.log.some(l => /^(point:|no point set)/.test(l)) && s.cut && s.cut.source && s.cut.scoredBy === 'rules' && !s.cut.pending && (s.cut.candidates || []).length && MEDIA.transcript(s.cut.source)) {
       try { await findCuts(s.cut.source, 'rules', { keepPicks: true }); } catch (e) { console.error(e.message); }
       return json(res, 200, { ...view(C.load()), log: r.log });
     }
@@ -992,7 +997,7 @@ async function api(req, res, u) {
     let radd = null;
     const s = update(st => {
       if (kind === 'footage') radd = C.addFootage(st, relp);
-      if (kind === 'reference') { st.reference = { ...st.reference, file: relp, url: null, status: 'uploaded', extracted: null, out: null, applied: false }; }
+      if (kind === 'reference') { st.reference = { ...st.reference, file: relp, url: null, status: 'uploaded', extracted: null, out: null, applied: false, stages: null }; } // an earlier breakdown's "We stopped while" is not this file's
       if (kind === 'music') { st.music.upload = relp; st.music.bed = 'upload'; }
     });
     if (radd && radd.reset) { C.applyPatch(s, { reply: radd.note, from: 'studio', kind: 'action' }); C.save(s); pushState(); }
@@ -1066,6 +1071,8 @@ async function api(req, res, u) {
   if (p === '/api/cut' && M === 'GET') {
     const s = C.load(), v = cutView(s), t = v.source && MEDIA.transcript(v.source);
     v.point = s.point || '';
+    // the Pacing choice, as the state view gives it (get_cuts returns it as pacing)
+    if (!v.error) { let comp = { args: [] }; try { comp = C.compose(s, { refPack: refPackName(s) }); } catch {} v.pacing = pacingFor(v, comp); }
     return json(res, 200, { ...v, lengthSeconds: Object.fromEntries(Object.entries(CUT.FORMATS).map(([k, f]) => [k, f.lengths])), sentences: t ? CUT.sentences(t.words).map(x => ({ i: x.i, start: x.start, end: x.end, text: x.text })) : null });
   }
   // the stitched previews of the Cut step: for every clip, the stretches of the take it plays, in order, with the
@@ -1183,7 +1190,7 @@ async function api(req, res, u) {
     else if (b.action === 'remove') {
       if (['downloading', 'tearing'].includes(it.status) && refTask && refTask.status === 'running') { refTask.cancel = true; refTask.proc && refTask.proc.kill('SIGTERM'); }
       if (it.file && b.deleteFile !== false) rmSync(it.file, { force: true });
-      update(st => { st.reference.queue = st.reference.queue.filter(x => x.id !== id); if (st.reference.active === id) { C.undoReferenceLook(st); } if (st.reference.active === id) { st.reference = { ...st.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null }; C.syncRefFont(st); } });
+      update(st => { st.reference.queue = st.reference.queue.filter(x => x.id !== id); if (st.reference.active === id) { C.undoReferenceLook(st); } if (st.reference.active === id) { st.reference = { ...st.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null, stages: null }; C.syncRefFont(st); } });
     } else return json(res, 400, { error: 'action: use, retry or remove' });
     return json(res, 200, view(C.load()));
   }
@@ -1196,7 +1203,7 @@ async function api(req, res, u) {
     let n = 0;
     const st = update(x => { x.undoRef = JSON.parse(JSON.stringify({ reference: x.reference, picks: x.picks, pack: x.pack || null, music: x.music, fontLock: !!x.fontLock }));
       n = C.undoReferenceLook(x);
-      x.reference = { ...x.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null, added: [], prev: null, auto: null }; C.syncRefFont(x); });
+      x.reference = { ...x.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null, added: [], prev: null, auto: null, stages: null }; C.syncRefFont(x); });
     return json(res, 200, { ...view(st), note: `Cleared the reference${n ? ` and the ${n} pick${n === 1 ? '' : 's'} it added` : ''}. Undo puts it back.` });
   }
   if (p === '/api/reference/apply' && M === 'POST') {
