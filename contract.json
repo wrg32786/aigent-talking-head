@@ -142,15 +142,15 @@
         { "name": "draft", "type": "boolean", "default": false, "description": "stop after captions.js so it can be edited" },
         { "name": "rebuild", "type": "boolean", "default": false, "description": "re-render and re-assemble an edited job (use with --name)" },
         { "name": "force", "type": "boolean", "default": false, "description": "re-clip and redraft over an existing job" },
-        { "name": "export", "type": "enum", "values": ["tiktok", "reels", "shorts", "feed45", "square"], "values_from": "kit/exports.cjs NAMES", "default": null, "description": "lay the reel out for that platform's safe area and also write reel-vN-<name>.mp4 (crop, length and bitrate caps in kit/exports.json); kept in cut.json for later --rebuild runs" },
-        { "name": "json", "type": "boolean", "default": false, "description": "print one JSON result line at the end: { ok, job, dir, reel, export, exportPreset, seconds, layout: { moved, hidden, safeArea }, verify } (or { ok: false, error })" }
+        { "name": "export", "type": "enum", "values": ["tiktok", "reels", "shorts", "feed45", "square"], "values_from": "kit/exports.cjs NAMES", "default": null, "description": "lay the reel out for that platform's safe area and also write reel-vN-<name>.mp4 (length and bitrate caps in kit/exports.json); several with commas (reels,feed45,square) make every size in one run. feed45 and square are versions of their own, reel-vN-feed-4x5.mp4 (1080x1350, the Instagram Feed) and reel-vN-square-1x1.mp4: the frame follows the face and the layout is made again inside it (kit/export-frame.cjs). Kept in cut.json for later --rebuild runs" },
+        { "name": "json", "type": "boolean", "default": false, "description": "print one JSON result line at the end: { ok, job, dir, reel, export, exportPreset, exports: [{ name, file, size, label }], seconds, layout: { moved, hidden, safeArea }, verify } (or { ok: false, error })" }
       ],
       "outputs": [
         "jobs/<name>/clips/clips.json and clips.md (best take per sentence, retakes flagged)",
         "jobs/<name>/build/cut.json, captions.js, theme.js and overlay frames",
         "jobs/<name>/build/plan.json with --recipe: what the draft took from the recipe (shots, transitions, moves, shakes, sounds, scenes, theme, accent; docs/reel-md.md)",
         "jobs/<name>/reel-vN.mp4 (a new number each run; earlier versions are kept)",
-        "jobs/<name>/reel-vN-<export>.mp4 with --export",
+        "jobs/<name>/reel-vN-<export>.mp4 with --export (reel-vN-feed-4x5.mp4 for feed45, reel-vN-square-1x1.mp4 for square, each with its own build in jobs/<name>/build-<export>/)",
         "jobs/<name>/build/layout.json: what the layout pass moved clear of a graphic, hid while one was up, or placed inside the export's safe area",
         "jobs/<name>/choices.json: every pick per beat (transition, finish, punch, title entrance, place, layer, graphics, music, sound) with its reason, to edit and apply with npm run choices"
       ],
@@ -189,7 +189,7 @@
     {
       "name": "export",
       "script": "kit/export.mjs",
-      "summary": "Export a finished reel for one platform: 9:16, 4:5 or 1:1, with its length cap, bitrate cap and faststart.",
+      "summary": "Export a finished reel for one platform: 9:16 with its length cap, bitrate cap and faststart, or its own 4:5 (Instagram Feed) or 1:1 version, the frame following the face and the layout made again inside it.",
       "positional": [
         { "name": "job", "type": "string", "required": true, "description": "job name in jobs/ (or a job folder)" }
       ],
@@ -197,9 +197,10 @@
         { "name": "export", "type": "enum", "values": ["tiktok", "reels", "shorts", "feed45", "square"], "values_from": "kit/exports.cjs NAMES", "default": null, "description": "the platform preset (kit/exports.json)" },
         { "name": "file", "type": "path", "default": "newest reel-vN.mp4 in the job", "description": "the reel to export" },
         { "name": "jobs", "type": "path", "default": "jobs/", "description": "jobs folder" },
+        { "name": "crop", "type": "boolean", "default": false, "description": "feed45 and square only: the plain crop from the middle of the reel instead of the face-tracked version" },
         { "name": "json", "type": "boolean", "default": false, "description": "print one JSON result line at the end" }
       ],
-      "outputs": ["jobs/<job>/reel-vN-<export>.mp4"],
+      "outputs": ["jobs/<job>/reel-vN-<export>.mp4 (reel-vN-feed-4x5.mp4, reel-vN-square-1x1.mp4)", "jobs/<job>/build-<export>/ for feed45 and square: the build of that version, with window.json (where the frame sits) and its own layout.json and facecheck.json"],
       "success": "prints the export path and the verify command",
       "failures": ["No reel-vN.mp4 in <job>", "--export must be ...", "a note when the reel was not laid out for that export (rebuild with --export)"]
     },

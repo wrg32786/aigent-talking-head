@@ -52,7 +52,7 @@ npm run reel -- --recipe jobs/my-reel/Reel.md --clips jobs/my-reel/clips --name 
 npm run verify -- my-reel --export reels                     # 5. VERIFY PASS, then look at jobs/my-reel/verify/contact.png
 ```
 
-You get `jobs/my-reel/reel-v1.mp4` and `reel-v1-reels.mp4` (inside Instagram's safe area). Exports: `tiktok`, `reels`, `shorts`, `feed45` (4:5), `square`.
+You get `jobs/my-reel/reel-v1.mp4` and `reel-v1-reels.mp4` (inside Instagram's safe area). Exports: `tiktok`, `reels`, `shorts`, `feed45` (4:5), `square`. For the Instagram Feed, which refuses 9:16, add it to the list: `--export reels,feed45` also makes `reel-v1-feed-4x5.mp4` (1080x1350), framed on your face and laid out again.
 
 - Just captions and titles, one command: `npm run reel` (newest video in `inbox/`).
 - Change something: edit `jobs/<name>/build/captions.js` or `build/cut.json`, then `npm run reel -- --rebuild --name <name>`.

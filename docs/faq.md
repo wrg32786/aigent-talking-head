@@ -58,7 +58,7 @@ No. Titles and graphics can be set behind your head, but only your hair and crow
 
 ### Which platforms can it export for?
 
-Five presets: `tiktok`, `reels` (Instagram and Facebook), `shorts` (YouTube), `feed45` (4:5) and `square` (1:1). Each sets the frame size, bitrate, length cap and the platform's safe area. Run `npm run verify -- <job> --export <name>` to check one.
+Five presets: `tiktok`, `reels` (Instagram and Facebook), `shorts` (YouTube), `feed45` (4:5) and `square` (1:1). Each sets the frame size, bitrate, length cap and the platform's safe area. The Instagram Feed does not take a 9:16 video, so `feed45` makes a 1080x1350 version of its own (`reel-v1-feed-4x5.mp4`): the frame follows your face and the captions, titles and graphics are laid out again inside it. `--export reels,feed45` makes both in one run; in Studio, tick Instagram Feed 4:5 on the Render step. Run `npm run verify -- <job> --export <name>` to check one.
 
 ### Can I use my own brand fonts and colours?
 

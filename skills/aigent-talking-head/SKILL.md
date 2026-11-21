@@ -168,15 +168,17 @@ Common short-form editing advice built in as options; `--preset magazine` or `- 
 
 ## Exports
 
-`--export <name>` on `reel` (or `npm run export -- <job> --export <name>` for a finished reel) writes `reel-vN-<name>.mp4` beside the reel. Presets are in `kit/exports.json`:
+`--export <name>` on `reel` (or `npm run export -- <job> --export <name>` for a finished reel) writes `reel-vN-<name>.mp4` beside the reel. Several with commas make every size in one run: `--export reels,feed45` gives `reel-v1.mp4` (9:16, for Reels and Stories) and `reel-v1-feed-4x5.mp4` (for the Instagram Feed, which refuses 9:16). Presets are in `kit/exports.json`:
 
 | Name | Frame | Length cap | Safe area (top, bottom, left, right px) |
 |---|---|---|---|
 | `tiktok` | 1080x1920 | 600 s | 160, 440, 60, 140 |
 | `reels` | 1080x1920 | 180 s | 220, 420, 60, 120 |
 | `shorts` | 1080x1920 | 180 s | 160, 380, 60, 140 |
-| `feed45` | 1080x1350 (4:5 crop) | 140 s | 60, 120, 60, 60 |
-| `square` | 1080x1080 (1:1 crop) | 140 s | 50, 90, 50, 50 |
+| `feed45` | 1080x1350 (4:5, `reel-vN-feed-4x5.mp4`) | 140 s | 60, 120, 60, 60 |
+| `square` | 1080x1080 (1:1, `reel-vN-square-1x1.mp4`) | 140 s | 50, 90, 50, 50 |
+
+`feed45` and `square` are not crops. Each is its own version of the reel: the frame follows the face up and down (still inside a shot, an eased move at a cut, headroom kept), and captions, titles, stickers, cards and b-roll are laid out again inside it and kept off the face. The words and timing are the same. Its build is `jobs/<job>/build-<name>/`.
 
 Render with `--export` (not just `npm run export`) so the layout pass moves titles, captions and graphics inside the safe area. `npm run verify -- <job> --export <name>` checks the size, the length cap and the safe area, and shades the UI zones red on the stills.
 
