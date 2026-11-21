@@ -10,8 +10,28 @@ const { themeFor, jobTransition } = require('./palette.cjs');
 // brand names the breakdown read (rea-video packaging.brands or video_context.brands), for a title's role
 const colourless = b => [].concat((b.packaging && b.packaging.brands) || [], (b.video_context && b.video_context.brands) || []).map(x => typeof x === 'string' ? x : x && (x.name || x.text)).filter(Boolean);
 
+// The look of the reference's titles as Style lines (read back by kit/reelmd.cjs titleLookOf). The pairing that carries
+// the two faces is Brand kit fonts; title-key and title-partner say what was read, for the user.
+function titleLookLines(t, font) {
+  if (!t) return [];
+  const L = [], k = t.key, p = t.partner;
+  L.push(`- title-lockup: ${t.lockup}`, `- title-key: ${[k.italic ? 'italic' : null, k.category || 'kind not read'].filter(Boolean).join(' ')}`);
+  if (t.lockup === 'two-line') {
+    if (k.case) L.push(`- title-key-case: ${k.case}`);
+    if (k.color) L.push(`- title-key-color: ${k.color}`);
+    L.push(`- title-partner: ${[p.category || 'kind not read', p.place].filter(Boolean).join(' ')}`);
+    if (p.case) L.push(`- title-partner-case: ${p.case}`);
+    if (p.color) L.push(`- title-partner-color: ${p.color}`);
+  }
+  L.push(`- title-glow: ${t.glow || 'off'}`, `- title-dim: ${t.dim || 'off'}`);
+  if (t.entrance) L.push(`- title-entrance: ${t.entrance}`);
+  // one-word captions in the partner face when the words on screen read as the partner's kind, not the key word's
+  if (t.pairing && font && p && p.category && font.category === p.category && font.category !== k.category) L.push('- caption-face: partner');
+  return L;
+}
+
 function recipeMd(c) {
-  const { b, opts, src, name, dur, engine, shots, titles, graphics, extraG, sfx, lines, cs, look, font, colours, bpm, level, hasMusic, bed, jobFinish, layerDefault, zoomShots, jumpCuts, avgShot, big } = c;
+  const { tlook, b, opts, src, name, dur, engine, shots, titles, graphics, extraG, sfx, lines, cs, look, font, colours, bpm, level, hasMusic, bed, jobFinish, layerDefault, zoomShots, jumpCuts, avgShot, big } = c;
   const card = {
     videomd: 1, name,
     description: `Recipe torn down from ${src.file || 'a reference reel'}: ${shots.length} shots in ${dur}s, ${titles.length} big titles, ${cs.style} captions${bpm ? `, music near ${Math.round(bpm)} BPM` : ''}. Measured by ${engine}; finishes, entrances and layers are best guesses.`,
@@ -21,11 +41,11 @@ function recipeMd(c) {
   const L = ['---', RM.dumpYaml(card).trimEnd(), '---', '', `# Teardown: ${src.file || name}`, '',
     'Detected from the reference. Read the teardown report next to this file, change anything that looks wrong, then remake:',
     `\`npm run reel -- --recipe ${opts.recipePath || 'teardown/' + name + '/Reel.md'} --clip inbox/your-clip.mp4\``, '',
-    '## Brand kit', '- preset: auto', `- theme: ${themeFor(colours)}`, `- colors: ${colours.join(', ') || 'none'}`, `- fonts: ${font ? font.pairing : 'theme'}`, '- logo: none', '',
+    '## Brand kit', '- preset: auto', `- theme: ${themeFor(colours)}`, `- colors: ${colours.join(', ') || 'none'}`, `- fonts: ${tlook && tlook.pairing ? tlook.pairing : font ? font.pairing : 'theme'}`, '- logo: none', '',
     '## Music', `- bed: ${!hasMusic ? 'none' : bed ? bed.name : 'auto'}`, ...(hasMusic && bed && level && level.vol ? [`- bed-volume: ${level.vol}`] : []), `- bpm: ${bpm ? Math.round(bpm) : ''}`, `- beat-sync: ${hasMusic ? 'on' : 'off'}`, '',
     '## Style', `- look: ${look}`, `- captions: ${cs.style}`, ...(cs.position ? [`- caption-position: ${cs.position}`] : []), ...(cs.color ? [`- caption-color: ${cs.color}`] : []), ...(cs.outline ? [`- caption-outline: ${cs.outline}`] : []), ...(cs.shadow ? [`- caption-shadow: ${cs.shadow}`] : []), ...(cs.textCase && cs.style === 'one-word' ? [`- caption-case: ${cs.textCase}`] : []), ...(cs.layer ? [`- caption-layer: ${cs.layer}`] : []),
     // the font read from the words on screen, matched to a pairing we ship (kit/fontmatch.py); the pairing itself is Brand kit fonts
-    ...(font ? [`- font: ${[font.category, font.weight].filter(Boolean).join(' ')}`, `- font-face: ${font.face}`, `- font-match: ${font.match}`] : []), `- titles: ${titles.length ? 'on' : 'off'}`, `- title-layer: ${layerDefault}`,
+    ...(font ? [`- font: ${[font.category, font.weight].filter(Boolean).join(' ')}`, `- font-face: ${font.face}`, `- font-match: ${font.match}`] : tlook && tlook.pairing ? [`- font: ${tlook.key.category}`, '- font-match: close'] : []), `- titles: ${titles.length ? 'on' : 'off'}`, ...titleLookLines(tlook, font), `- title-layer: ${layerDefault}`,
     `- finish: ${jobFinish ? jobFinish.split(',').join(', ') : 'none'}`, `- transition: ${jobTransition(shots)}`, `- glitch: ${shots.some(s => s.tx && s.tx.name === 'glitch') ? 'on' : 'off'}`,
     `- punch: ${zoomShots || jumpCuts || avgShot < 3 ? 'on' : 'off'}`, '- effects: none', '',
     '## Shots', '', '```videomd-timeline'];
@@ -50,6 +70,7 @@ function recipeMd(c) {
     titles.forEach(t => {
       const f = [`#${pad2(t.n)} ${t.start}-${t.end}`];
       if (t.entrance) f.push(`entrance ${t.entrance}`);
+      if (t.lowConfidence) f.push(`check ${String(t.why || 'text').replace(/\s*\|\s*/g, ' ')}`); // text the teardown is not sure of: fix it before a draft
       f.push(`layer ${t.layer || 'front'}`, `role ${SPL.roleOf(t.text, t.start, t.n - 1, colourless(b))}`, `text ${t.text}`);
       L.push(f.join(' | '));
     });

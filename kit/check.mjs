@@ -31,12 +31,12 @@ function checkJob(captionsFile, cutFile, label) {
   }
   for (const k of ['card', 'cta']) if (CAP[k]) for (const v of Object.values(CAP[k])) if (typeof v === 'string') R.lintCopy(v).errs.forEach(x => errs.push(`${k}: ${x}`));
   const raw = flips.filter(f => f.mode === R.TITLE_MODE);
-  if (raw.length > R.ENTRANCES.length && !CAP.entranceRepeat) errs.push(`${raw.length} titles; there are ${R.ENTRANCES.length} entrances and none repeats in one video`);
+  if (raw.length > R.ENTRANCES.length && !CAP.entranceRepeat && !CAP.titleEntrance) errs.push(`${raw.length} titles; there are ${R.ENTRANCES.length} entrances and none repeats in one video`);
   const seen = {};
   for (const t of raw) if (t.entrance) {
     if (!R.ENTRANCES.includes(t.entrance)) errs.push(`title ${t.start}s: unknown entrance "${t.entrance}" (${R.ENTRANCES.join(', ')})`);
     // a repeat is allowed when you chose it (a titles lock with fewer entrances than titles, or npm run choices --apply)
-    if (seen[t.entrance] && !CAP.entranceRepeat) errs.push(`title ${t.start}s: entrance "${t.entrance}" already used at ${seen[t.entrance]}s`);
+    if (seen[t.entrance] && !CAP.entranceRepeat && !CAP.titleEntrance) errs.push(`title ${t.start}s: entrance "${t.entrance}" already used at ${seen[t.entrance]}s`);
     seen[t.entrance] = t.start;
   }
   const sorted = raw.slice().sort((a, b) => a.start - b.start);
@@ -353,6 +353,7 @@ if (target) {
     catch (e) { toerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'words never overlap (tests/text-overlap.test.mjs: every text box on every frame for 9:16, 4:5 and 1:1; a said word leaves when a title enters, a title over a word, two titles, caption lines, an ordinal word)', errs: toerrs, warns: [] });
     for (const [f, what] of [['title-rules.test.mjs', 'titles and the caption bar (tests/title-rules.test.mjs: nothing in the bar while a title is up, the minimum never carries a word past a title, the title check fails on a word drawn under a title and passes with the rule on, beat snap lines and a title\'s own caption word, the partner line, glow and dim, a label that repeats the caption, the shadow on a low-contrast word)'],
+      ['title-look.test.mjs', 'the look of a reference\'s titles (tests/title-look.test.mjs: two lines, an italic serif key word and a sans partner in capitals, their colours, glow and dim read from drawn frames; the pairing, the Style lines and blur-rise for an unread entrance in the recipe; title text we are not sure of is marked)'],
       ['fontmatch.test.mjs', 'font match tests (tests/fontmatch.test.mjs: words drawn in blackletter, sans, serif and condensed faces come back as their own kind and pairing; weight, case, colour; faces we do not ship land in the right kind)'],
       ['studio-fonts.test.mjs', 'Studio font tests (tests/studio-fonts.test.mjs: a reference clears an older font pick and its own font is used, a font picked after it holds, a new reference, a new video and new footage clear it, Font: Matched, Close or Guess)']]) {
       const e = [];
