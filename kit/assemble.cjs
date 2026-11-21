@@ -143,6 +143,15 @@ if (BASEONLY) {
   console.log('wrote base', out, 'len', LEN);
   process.exit(0);
 }
+// split and framed b-roll (kit/split.cjs) draw the top of your head over the panel: your picture cut out by the person
+// mask, so it needs the graded picture once more before the titles go on
+const SPL = require('./split.cjs');
+const splitIns = (C.inserts || []).filter(s => SPL.SPLIT.includes(s.place));
+const pmSpec = splitIns.length ? R.maskSpec(C) : {};
+const pmPerson = pmSpec.person && fs.existsSync(pmSpec.person) ? pmSpec.person : null, pmMask = pmSpec.file && fs.existsSync(pmSpec.file) ? pmSpec.file : null;
+const splitMask = !process.env.SPLIT_NO_MASK && !!(pmPerson || pmMask);
+let G0 = 'g';
+if (splitIns.length && splitMask && !pmPerson) { f.push('[g]split[gsp][gq]'); G0 = 'gsp'; vcur = G0; }
 // kinetic titles sit between the picture and the person: picture -> titles -> person cut out by the mask -> captions
 const ovlOff = (process.env.OVL_OFF || '').split(',').filter(Boolean).map(w => w.split('-').map(Number)).filter(([a, b]) => b > a);
 const offEn = ovlOff.length ? `:enable='not(${ovlOff.map(([a, b]) => `between(t,${a},${b})`).join('+')})'` : '';
@@ -152,8 +161,8 @@ const offEn = ovlOff.length ? `:enable='not(${ovlOff.map(([a, b]) => `between(t,
 const panelsOn = !!(C.panels && fs.existsSync(path.dirname(path.resolve(C.panels))));
 const headFile = panelsOn && C.headMask && fs.existsSync(C.headMask) ? C.headMask : null;
 if (panelsOn && !headFile && !process.env.MASK_WARNED) console.warn(`note: no head mask${C.headMask ? ' (' + C.headMask + ' not found)' : ''}; screen cards go in front of the presenter (kit/headmask.py)`);
-let pic = 'g';
-if (headFile) { f.push('[g]split[g0][gh]'); pic = 'g0'; }
+let pic = G0;
+if (headFile) { f.push(`[${G0}]split[g0][gh]`); pic = 'g0'; }
 if (C.titles) {
   const t = inp('-framerate', '24', '-i', C.titles);
   const spec = require('./rules.cjs').maskSpec(C);
@@ -175,7 +184,7 @@ if (C.titles) {
     f.push(`[${pic}][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gm]`); vcur = 'gm';
   }
 }
-if (vcur === 'g') vcur = pic;
+if (vcur === G0) vcur = pic;
 if (panelsOn) {
   const pp = inp('-framerate', '24', '-i', C.panels);
   f.push(`[${vcur}][${pp}:v]overlay=format=auto:eof_action=pass${offEn}[gpn]`); vcur = 'gpn';
@@ -191,29 +200,61 @@ if (panelsOn) {
 // and white. Captions in the oneword look move up into the insert's open space ("y", default 640) and can take a
 // "tint" to match its light.
 // "place" (Studio's b-roll lane, kit/studio/broll-run.mjs): "full" (the default, as above), "top" (split: the insert fills the top half and you
-// fill the bottom half, cropped around "faceY", default 0.4 of the frame height) or "pip" (a 16:9 box "pipW" wide,
+// fill the bottom half, your head over the panel's lower edge, see below), "frame" (framed cards, below) or "pip" (a 16:9 box "pipW" wide,
 // default 460, with a thin white edge, top right; "pipX" and "pipY" move it). A still picture ("image": true, or a
 // .jpg, .png or .webp file) holds for the span with a slow push in.
+// "place": "frame" (Framed, kit/split.cjs): the b-roll in a rounded card up top and you smaller in a card below, your head
+// over its top edge, on a soft backdrop. "top" now moves you so the top of your head reaches a little into the panel
+// and draws it over the panel with the person mask (the panel sits behind your head); without the mask, the head
+// stays just under the seam. Both follow your face per moment (build/facezone.json), "faceY" when there is none.
+let FZ = null; try { FZ = JSON.parse(fs.readFileSync('facezone.json', 'utf8')); } catch {}
+const bands = [];
+if (splitIns.length && splitMask) {
+  if (pmPerson) { const pi = inp('-i', pmPerson); f.push(`[${pi}:v]format=bgra,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS[pq0]`); }
+  else { const mi = inp('-i', pmMask); f.push(`[${mi}:v]format=gray,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS[mq]`, '[gq][mq]alphamerge[pq0]'); }
+  if (splitIns.length === 1) bands.push('pq0'); else { const ls = splitIns.map((_, j) => `pq${j + 1}`); f.push(`[pq0]split=${ls.length}${ls.map(l => `[${l}]`).join('')}`); bands.push(...ls); }
+} else if (splitIns.length && !process.env.MASK_WARNED) console.warn('note: no person mask for the split b-roll; your head stays under the panel instead of over it (kit/mask.py)');
+const chromeFile = g => {
+  const ex = SPL.chromeGeq(g), file = `frame-chrome-${require('crypto').createHash('sha1').update(ex).digest('hex').slice(0, 10)}.png`;
+  if (!fs.existsSync(file)) execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=black:s=1080x1920,format=rgba', '-vf', ex, '-frames:v', '1', file]);
+  return file;
+};
 (C.inserts || []).forEach((s, k) => {
-  const a0 = +s.at, d = +s.dur, i0 = +(s.in || 0), place = ['top', 'pip'].includes(s.place) ? s.place : 'full';
+  const a0 = +s.at, d = +s.dur, i0 = +(s.in || 0), place = SPL.PLACES.includes(s.place) ? s.place : 'full';
   const still = s.image === true || /\.(jpe?g|png|webp)$/i.test(String(s.file));
+  const g = SPL.layout({ ...s, place }, SPL.faceOver(FZ, a0, d), { mask: splitMask });
   const pw = Math.round((+s.pipW || 460) / 2) * 2, ph = Math.round(pw * 9 / 32) * 2;
-  const [W, H] = place === 'top' ? [1080, 960] : place === 'pip' ? [pw, ph] : [1080, 1920];
+  const [W, H] = g ? [g.panel.w, g.panel.h] : place === 'pip' ? [pw, ph] : [1080, 1920];
   const n = still ? inp('-loop', '1', '-framerate', '24', '-t', (d + 0.5).toFixed(3), '-i', s.file) : inp('-i', s.file);
   const fit = still ? `scale=${Math.round(W * 1.1 / 2) * 2}:${Math.round(H * 1.1 / 2) * 2}:force_original_aspect_ratio=increase,crop=${Math.round(W * 1.1 / 2) * 2}:${Math.round(H * 1.1 / 2) * 2},zoompan=z='1+0.08*on/${Math.max(1, Math.round(d * 24))}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=24`
     : `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`;
   const src = still ? `[${n}:v]${V},${fit}` : `[${n}:v]trim=${i0}:${(i0 + d).toFixed(3)},${V},${fit}`;
-  const on = `enable='between(t,${a0},${(a0 + d).toFixed(3)})'`;
+  const on = `enable='between(t,${a0},${(a0 + d).toFixed(3)})'`, win = `trim=start=${a0}:end=${(a0 + d + 0.05).toFixed(3)}`;
   f.push(`${src},setsar=1${s.bw ? ',hue=s=0' : ''}${place === 'pip' ? ',pad=iw+8:ih+8:4:4:white' : ''},setpts=PTS+${a0}/TB[ins${k}]`);
-  if (place === 'top') {
-    const y = Math.max(0, Math.min(960, Math.round((s.faceY != null ? +s.faceY : 0.4) * 1920 - 480)));
-    f.push(`[${vcur}]split[vs${k}a][vs${k}b]`, `[vs${k}b]crop=1080:960:0:${y}[spk${k}]`, `[vs${k}a][spk${k}]overlay=0:960:${on}[vt${k}]`, `[vt${k}][ins${k}]overlay=0:0:eof_action=pass:${on}[vi${k}]`);
+  // the top of your head over the panel (or the card's top edge): rows y0..y1 of your picture, moved like it
+  const band = (cur, scale) => {
+    if (!g.band || !bands.length) return cur;
+    const lbl = bands.shift(), sy0 = Math.max(0, Math.round((g.band.y0 - g.dy) / g.s)), sy1 = Math.min(1920, Math.round((g.band.y1 - g.dy) / g.s));
+    if (sy1 - sy0 < 8) { f.push(`[${lbl}]nullsink`); return cur; }
+    const hgt = Math.round((sy1 - sy0) * g.s / 2) * 2, oy = Math.round(sy0 * g.s + g.dy);
+    f.push(`[${lbl}]${win},crop=1080:${sy1 - sy0}:0:${sy0}${scale ? `,scale=${g.sw}:${hgt}` : ''}[hb${k}]`, `[${cur}][hb${k}]overlay=${g.dx}:${oy}:format=auto:eof_action=pass:${on}[hv${k}]`);
+    return `hv${k}`;
+  };
+  if (g && place === 'top') {
+    const y = 960 - g.dy, sh = `color=c=black:s=1080x36:r=24:d=${(d + 0.1).toFixed(3)},format=rgba,${SPL.shadowGeq()},setpts=PTS+${a0}/TB[shd${k}]`;
+    f.push(`[${vcur}]split[vs${k}a][vs${k}b]`, `[vs${k}b]crop=1080:960:0:${y}[spk${k}]`, `[vs${k}a][spk${k}]overlay=0:960:${on}[vt${k}]`, `[vt${k}][ins${k}]overlay=0:0:eof_action=pass:${on}[vp${k}]`, sh, `[vp${k}][shd${k}]overlay=0:960:format=auto:eof_action=pass:${on}[vq${k}]`);
+    vcur = band(`vq${k}`, false);
+  } else if (g && place === 'frame') {
+    const ch = inp('-loop', '1', '-framerate', '24', '-t', (d + 0.1).toFixed(3), '-i', chromeFile(g));
+    f.push(`[${vcur}]split[vs${k}a][vs${k}b]`, `[vs${k}b]${win},scale=${g.sw}:${g.sh}[spk${k}]`, `[vs${k}a][spk${k}]overlay=${g.dx}:${g.dy}:eof_action=pass:${on}[vt${k}]`,
+      `[vt${k}][ins${k}]overlay=${g.panel.x}:${g.panel.y}:eof_action=pass:${on}[vp${k}]`, `[${ch}:v]format=rgba,setpts=PTS+${a0}/TB[chr${k}]`, `[vp${k}][chr${k}]overlay=0:0:format=auto:eof_action=pass:${on}[vq${k}]`);
+    vcur = band(`vq${k}`, true);
   } else if (place === 'pip') {
     const x = s.pipX != null ? Math.round(+s.pipX) : 1080 - pw - 8 - 44, y = s.pipY != null ? Math.round(+s.pipY) : 170;
-    f.push(`[${vcur}][ins${k}]overlay=${x}:${y}:eof_action=pass:${on}[vi${k}]`);
-  } else f.push(`[${vcur}][ins${k}]overlay=eof_action=pass:${on}[vi${k}]`);
-  vcur = `vi${k}`;
+    f.push(`[${vcur}][ins${k}]overlay=${x}:${y}:eof_action=pass:${on}[vi${k}]`); vcur = `vi${k}`;
+  } else { f.push(`[${vcur}][ins${k}]overlay=eof_action=pass:${on}[vi${k}]`); vcur = `vi${k}`; }
 });
+for (const l of bands) f.push(`[${l}]nullsink`);
 // The caption layer and the glitch shake go on in a second pass when there are captions. In one graph, the caption
 // frames together with the person mask and the b-roll inserts ran ffmpeg at a tenth of real time or less (2026-11-11,
 // oneword look); split in two, both passes run faster than real time.

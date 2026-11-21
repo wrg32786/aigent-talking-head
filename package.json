@@ -1,7 +1,7 @@
 {
   "name": "aigent-talking-head",
   "private": true,
-  "version": "1.17.0",
+  "version": "1.18.0",
   "description": "Talking-head video pipeline: raw footage or HeyGen takes to a captioned, themed 9:16 reel.",
   "type": "commonjs",
   "engines": {
