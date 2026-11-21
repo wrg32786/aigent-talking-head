@@ -233,7 +233,8 @@ const EDGE_WORDS = { cut: 'cuts in', fade: 'fades in', pop: 'pops in', 'slide-up
 function brief(slot) {
   const secs = r2(slot.end - slot.start), shot = slot.shot || (slot.kind === 'panel' ? 'screen recording' : 'clip');
   const an = /^[aeiou]/i.test(shot) ? 'an' : 'a';
-  const what = slot.what ? `${an} ${shot} of ${slot.what}` : slot.line ? `${an} ${shot} that fits "${slot.line.length > 70 ? slot.line.slice(0, 68).trim() + '...' : slot.line}"` : `${an} ${shot}`;
+  // the reference's own subject is a hint, not the answer: your words may be about something else
+  const what = slot.what && slot.ref ? `${an} ${shot} (the reference showed ${slot.what})` : slot.what ? `${an} ${shot} of ${slot.what}` : slot.line ? `${an} ${shot} that fits "${slot.line.length > 70 ? slot.line.slice(0, 68).trim() + '...' : slot.line}"` : `${an} ${shot}`;
   const fx = slot.fx || fxOf(), treat = [MOTION_WORDS[fx.motion], fx.shake && 'a little shake', fx.glitch && 'a glitch', fx.colour !== 'none' && (fx.colour === 'bw' ? 'black and white' : fx.colour + ' colour'), EDGE_WORDS[fx.in]].filter(Boolean);
   return { what, seconds: secs, shape: KIND_WORDS[slot.kind] || KIND_WORDS.full, treat: treat.join(', '), line: slot.line || '',
     // 16:9 for a panel or the top of a split, upright for a full cutaway
@@ -243,7 +244,8 @@ function brief(slot) {
 function agentAsk(slot, { job = '', spot = null } = {}) {
   const b = brief(slot);
   return [`B-roll for my reel${job ? ` "${job}"` : ''}, slot ${slot.n}${spot != null ? ` (spot ${spot} on the B-roll step)` : ''}.`,
-    `Capture ${b.what}, about ${Math.max(2, Math.ceil(b.seconds + 1))} seconds, ${b.frame}, no sound needed.`,
+    `Capture ${slot.what && slot.ref ? `${/^[aeiou]/i.test(slot.shot || 'screen recording') ? 'an' : 'a'} ${slot.shot || 'screen recording'} that fits what I say` : b.what}, about ${Math.max(2, Math.ceil(b.seconds + 1))} seconds, ${b.frame}, no sound needed.`,
+    slot.what && slot.ref ? `The reference showed ${slot.what} at this moment.` : '',
     b.line ? `It plays while I say: "${b.line}".` : '',
     slot.source ? `The reference showed ${slot.source}. Check the address with me before you record it.` : '',
     `In the reel it is ${b.shape}${b.treat ? ` (${b.treat})` : ''}; we add that, so record it plain.`,
