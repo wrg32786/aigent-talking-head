@@ -19,7 +19,7 @@ export function YourEdit({ V, s, go, step }) {
     <span className="ye-h lbl">Your edit</span>
     <dl className="ye-list">{parts.map(([k, label, text, to]) => <div key={k} className="ye-i" data-part={k}>
       <dt>{label}</dt><dd><button type="button" className="ye-link" onClick={() => go(to, true)} aria-label={`${label}: ${text}. Open ${stepName(to)}`}>{text}</button></dd></div>)}</dl>
-    {e.stale && <span className="ye-warn fine" id="ye-stale" role="status"><Icon n="ban" />Pieces changed since the draft</span>}
+    {e.stale && <span className="ye-warn fine" id="ye-stale" role="status"><Icon n="ban" />Your clips changed since the draft</span>}
     {to && to !== step && <button type="button" className="btn ghost sm ye-next" id="ye-next" onClick={() => go(to, true)}>{next.label}<Icon n="right" /></button>}
   </section>;
 }
