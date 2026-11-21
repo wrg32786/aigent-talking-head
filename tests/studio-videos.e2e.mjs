@@ -68,8 +68,8 @@ try {
     assert.ok(existsSync(join(STATE, 'videos', OLD + '.json')));
   });
 
-  await t('More, Open a past video: the old job with its date and reel count; opening it brings its footage back', async () => {
-    await pg.click('#more-open'); await pg.waitForSelector('#more-open-video', { timeout: 15e3 }); await pg.click('#more-open-video');
+  await t('More, Past videos: the old job with its date and reel count; opening it brings its footage back', async () => {
+    await pg.click('#more-open'); await pg.waitForSelector('#more-open-video', { timeout: 15e3 }); assert.strictEqual((await pg.textContent('#more-open-video')).trim(), 'Past videos'); assert.strictEqual(await pg.$('#more-new-video'), null, 'New video is the + by the name, not repeated in More'); await pg.click('#more-open-video');
     await pg.waitForSelector(`dialog#new-video[open] #nv-list button[data-job="${OLD}"]`, { timeout: 15e3 });
     const row = await pg.textContent(`#nv-list button[data-job="${OLD}"]`);
     assert.ok(/1 reel/.test(row), row);

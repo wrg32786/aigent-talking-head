@@ -47,7 +47,7 @@ try {
     if (shots) { await pg.goto(url + '/#step=style', { waitUntil: 'networkidle' }); await pg.waitForTimeout(900); await pg.screenshot({ path: join(shots, 'liquid-glass.png') }); }
   });
 
-  await t('More menu: keyboard opens it, arrows move, Enter runs Connect agent; the theme item flips the theme', async () => {
+  await t('More menu: only what is nowhere else on the page, short labels; keyboard opens it, arrows move, Enter runs Setup check', async () => {
     // a hash change moves focus to the step heading on the next frame (App go(step, true)); let that land first, or it
     // can take focus off the More button between focus() and Enter on a slow runner
     await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' });
@@ -55,19 +55,22 @@ try {
     await pg.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     await pg.focus('#more-open'); assert.strictEqual(await pg.evaluate(() => document.activeElement.id), 'more-open');
     await pg.keyboard.press('Enter');
-    await pg.waitForSelector('#more-connect'); if (shots) { await pg.waitForTimeout(300); await pg.screenshot({ path: join(shots, 'more-menu.png'), clip: { x: 560, y: 0, width: 720, height: 280 } }); }
+    await pg.waitForSelector('#more-setup'); if (shots) { await pg.waitForTimeout(300); await pg.screenshot({ path: join(shots, 'more-menu.png'), clip: { x: 560, y: 0, width: 720, height: 280 } }); }
     const items = await pg.$$eval('.menu-item span', x => x.map(e => e.textContent));
-    assert.deepStrictEqual(items.slice(0, 6), ['New video', 'Open a past video', 'Outputs', 'Wizards', 'Connect agent', 'Setup check']);
+    assert.deepStrictEqual(items, ['Past videos', 'Setup check', 'API keys'], 'New video, Outputs, Wizards, Connect agent and the theme are already in the top bar');
+    for (const id of ['#new-video-open', '#outputs-open', '#wizards-open', '#connect-open', '#theme']) assert.ok(await pg.isVisible(id), id + ' is on the page');
     const active = () => pg.evaluate(() => document.querySelector('.menu-item[data-focus]')?.id); // the menu keeps focus and points at the item
-    assert.strictEqual(await active(), 'more-new-video'); // Enter opens on the first item
-    await pg.keyboard.press('ArrowDown'); await pg.keyboard.press('ArrowDown'); assert.strictEqual(await active(), 'more-outputs'); await pg.keyboard.press('ArrowDown'); assert.strictEqual(await active(), 'more-wizards'); await pg.keyboard.press('ArrowDown'); assert.strictEqual(await active(), 'more-connect');
-    await pg.keyboard.press('ArrowDown'); assert.strictEqual(await active(), 'more-setup');
+    assert.strictEqual(await active(), 'more-open-video'); // Enter opens on the first item
+    await pg.keyboard.press('ArrowDown'); assert.strictEqual(await active(), 'more-setup'); await pg.keyboard.press('ArrowDown'); assert.strictEqual(await active(), 'more-keys');
     await pg.keyboard.press('ArrowUp'); await pg.keyboard.press('Enter');
-    await pg.waitForSelector('#connect-install'); await pg.waitForFunction(() => !document.querySelector('#more-connect'));
-    await pg.keyboard.press('Escape'); await pg.waitForFunction(() => !document.querySelector('dialog#connect[open]'));
+    await pg.waitForSelector('#h-setup', { state: 'visible' }); await pg.waitForFunction(() => !document.querySelector('#more-setup'));
+    await pg.keyboard.press('Escape'); await pg.waitForSelector('#h-setup', { state: 'hidden' });
+    // on a phone the theme button leaves the top bar, so More carries it there (and only there)
+    const vp = pg.viewportSize(); await pg.setViewportSize({ width: 390, height: 844 });
     const before = await pg.evaluate(() => document.documentElement.dataset.theme || 'dark');
     await pg.click('#more-open'); await pg.click('#more-theme');
     assert.notStrictEqual(await pg.evaluate(() => document.documentElement.dataset.theme), before);
+    await pg.setViewportSize(vp);
     await pg.click('#theme'); assert.strictEqual(await pg.evaluate(() => document.documentElement.dataset.theme), before);
     assert.strictEqual(await pg.getAttribute('#theme', 'data-mode'), before);
   });

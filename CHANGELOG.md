@@ -2,6 +2,17 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.25.0 (unreleased)
+
+Release notes: [docs/releases/v1.25.0.md](docs/releases/v1.25.0.md). Recreate from the first screen, and a calmer Look (built with Fable).
+
+- **Recreate from the first screen.** Footage has one quiet row, "Recreate a video": paste a link or upload a file with Recreate preselected (`web/src/RecreateStart.jsx`, the same reference APIs and `RefMode`). You stay on Footage while it is read.
+- **Why each pick.** The Look step's layer says what the reference picked and why in one line ("From the reference: glitch, seen 3 times between shots"), and a picked tile shows its reason on hover and focus (`look.why` from `lookSources`).
+- **Two labels for REF.** "From reference" for a built-in option the reference picked, "Made for you" for a scene made from it. One badge per tile, the same words in the Picks tray, the plan chips and the docs.
+- **A calmer tray and menu.** Picks is a count that opens your picks by layer, one line each with "+N", names only, with Undo reference and Clear all. More is down to Past videos, Setup check and API keys.
+- **Links no longer block Draft.** The reference queue runs in its own lane (`refTask` in `server.mjs`), still one download at a time, so Draft and Render run while links download. Switching videos still waits for a download. A Recreate draft whose reference is still being read says so plainly.
+- **Tests.** The Look, Recreate, scenes, polish, videos and agent browser tests, plus lane tests in `studio-agent.test.mjs` and `studio-videos.test.mjs`.
+
 ## 1.24.0 (unreleased)
 
 Release notes: [docs/releases/v1.24.0.md](docs/releases/v1.24.0.md). Effects and colours from the reference.

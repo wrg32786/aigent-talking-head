@@ -91,6 +91,13 @@ try {
     assert.strictEqual(C.settleStale(s), 2); assert.strictEqual(s.task.status, 'cancelled'); assert.strictEqual(s.tx.a.status, 'failed');
     assert.strictEqual(C.videoBusy(s), null);
   });
+  await t('busy: a reference link being read (its own lane, not the task) still refuses the switch; a waiting or finished one does not', () => {
+    const s = busyBoard(B); s.task = null; s.reference.queue = [{ id: 1, status: 'ready' }, { id: 2, status: 'queued' }];
+    assert.strictEqual(C.videoBusy(s), null);
+    for (const st of ['downloading', 'tearing']) { s.reference.queue[1].status = st; assert.strictEqual(C.videoBusy(s), 'A reference link is still downloading');
+      assert.throws(() => C.switchVideo(s, { name: 'nv-y-' + P }), e => e.code === 409 && /reference link is still downloading/.test(e.message)); }
+    assert.strictEqual(C.settleStale(s), 1); assert.strictEqual(s.reference.queue[1].status, 'failed'); assert.match(s.reference.queue[1].error, /Studio stopped/); assert.strictEqual(C.videoBusy(s), null);
+  });
   // over HTTP, with the real server
   const env = { ...process.env, CI: '1', STUDIO_DIR: STATE, STUDIO_CHAT: '', ANTHROPIC_API_KEY: '', OPENAI_API_KEY: '' };
   const base = busyBoard(A); base.imports = [{ id: 9, status: 'downloading' }]; base.chat = []; C.save(base);
