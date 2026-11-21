@@ -845,19 +845,19 @@ function pump() {
       const recipe = join(ROOT, out, 'Reel.md');
       if (!existsSync(recipe)) throw new Error('teardown wrote no Reel.md');
       const ex = C.extract(recipe);
-      STG.finish(run);
+      STG.finish(run, Date.now());
       setItem(it.id, (x, st) => { x.status = 'ready'; x.progress = 100; x.stages = stages(); x.extracted = ex; x.contact = existsSync(join(ROOT, out, 'contact.jpg')) ? `${out}/contact.jpg`.split(sep).join('/') : null; if (title) x.title = title;
         if (!st.reference.active || st.reference.active === x.id || !(st.reference.queue || []).some(q => q.id === st.reference.active && q.status === 'ready')) useItem(st, x); });
       return { extracted: ex };
     }, {
-      step: i => { if (i === 1) { STG.feed(run, 'stage cuts'); setItem(it.id, x => { x.status = 'tearing'; x.progress = 100; x.stages = stages(); }); } },
+      step: i => { if (i === 1) { STG.feed(run, 'stage cuts', Date.now()); setItem(it.id, x => { x.status = 'tearing'; x.progress = 100; x.stages = stages(); }); } },
       line: l => {
-        const m = /^progress (\d+)%/.exec(l); if (m && +m[1] !== lastP && (+m[1] - lastP >= 5 || +m[1] === 100)) { lastP = +m[1]; STG.feed(run, l); setItem(it.id, x => { if (x.status === 'downloading') { x.progress = lastP; x.stages = stages(lastP / 100); } }); }
-        else if (!m && STG.feed(run, l)) setItem(it.id, x => { x.stages = stages(run.stage === 'download' ? Math.max(0, lastP) / 100 : undefined); });
+        const m = /^progress (\d+)%/.exec(l); if (m && +m[1] !== lastP && (+m[1] - lastP >= 5 || +m[1] === 100)) { lastP = +m[1]; STG.feed(run, l, Date.now()); setItem(it.id, x => { if (x.status === 'downloading') { x.progress = lastP; x.stages = stages(lastP / 100); } }); }
+        else if (!m && STG.feed(run, l, Date.now())) setItem(it.id, x => { x.stages = stages(run.stage === 'download' ? Math.max(0, lastP) / 100 : undefined); });
         if (l.startsWith('{"file"')) { try { const j = JSON.parse(l); title = j.title; setItem(it.id, x => { x.title = j.title; x.seconds = j.seconds; x.trimmed = j.trimmed; }); } catch {} }
       },
       lane: 'reference',
-      end: (status, lines) => { if (status !== 'done') setItem(it.id, x => { if (x.status !== 'ready') { x.status = status === 'cancelled' ? 'cancelled' : 'failed'; if (status === 'cancelled') delete x.stages; else { STG.fail(run); x.stages = stages(); } const e = lines.filter(l => /download failed|error|Error|failed|not found/i.test(l) && !l.startsWith('$')).pop(); x.fix = F.fixOf(e); x.error = (e || lines[lines.length - 1] || 'failed').replace(/^download failed: /, '').slice(0, 300); } }); },
+      end: (status, lines) => { if (status !== 'done') setItem(it.id, x => { if (x.status !== 'ready') { x.status = status === 'cancelled' ? 'cancelled' : 'failed'; if (status === 'cancelled') delete x.stages; else { STG.fail(run, Date.now()); x.stages = stages(); } const e = lines.filter(l => /download failed|error|Error|failed|not found/i.test(l) && !l.startsWith('$')).pop(); x.fix = F.fixOf(e); x.error = (e || lines[lines.length - 1] || 'failed').replace(/^download failed: /, '').slice(0, 300); } }); },
     });
   } catch (e) { setItem(it.id, x => { x.status = 'failed'; x.error = e.message; }); }
 }
@@ -1155,17 +1155,17 @@ async function api(req, res, u) {
     if (b.url || b.urls) { const added = addLinks([].concat(b.urls || [], b.url || [])); return json(res, 202, { added, ...view(C.load()) }); }
     const t = teardownSteps(s, null);
     const run = STG.newRun(), stages = () => STG.view(run, { skip: ['download'] });
-    STG.feed(run, 'stage cuts');
+    STG.feed(run, 'stage cuts', Date.now());
     update(st => { st.reference.status = 'running'; st.reference.url = b.url || null; st.reference.out = t.out; st.reference.stages = stages(); });
     runTask('teardown', () => t.steps, () => {
       const recipe = join(ROOT, t.out, 'Reel.md');
       if (!existsSync(recipe)) throw new Error('teardown wrote no Reel.md');
       const ex = C.extract(recipe);
-      STG.finish(run);
+      STG.finish(run, Date.now());
       update(st => { st.reference.status = 'ready'; st.reference.stages = stages(); st.reference.extracted = ex; st.reference.out = t.out; st.reference.contact = existsSync(join(ROOT, t.out, 'contact.jpg')) ? `${t.out}/contact.jpg`.split(sep).join('/') : null; st.reference.auto = null; C.setReferenceLook(st); });
       return { extracted: ex };
-    }, { line: l => { if (STG.feed(run, l)) update(st => { st.reference.stages = stages(); }); },
-      end: status => { if (status !== 'done') update(st => { C.settleReference(st); if (status === 'cancelled') delete st.reference.stages; else { STG.fail(run); st.reference.stages = stages(); } }); } }); // failed or cancelled: not "running" forever
+    }, { line: l => { if (STG.feed(run, l, Date.now())) update(st => { st.reference.stages = stages(); }); },
+      end: status => { if (status !== 'done') update(st => { C.settleReference(st); if (status === 'cancelled') delete st.reference.stages; else { STG.fail(run, Date.now()); st.reference.stages = stages(); } }); } }); // failed or cancelled: not "running" forever
     return json(res, 202, view(C.load()));
   }
   if (p === '/api/reference/url' && M === 'POST') {

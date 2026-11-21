@@ -88,9 +88,13 @@ try {
     assert.deepStrictEqual(await pg.evaluate(() => [document.querySelector('main').dataset.step, document.querySelector('main').dataset.view]), ['picture', 'reference'], 'the Breakdown is a view of Picture');
     const st = await pg.$$eval('#ref-ran .ran li', x => x.map(e => [e.dataset.part, e.className]));
     assert.deepStrictEqual(Object.fromEntries(st), { reader: 'ok', speech: 'miss', layers: 'miss', sheet: 'miss', sounds: 'ok', music: 'ok' });
-    const txt = await pg.textContent('#ref-ran'); assert.match(txt, /did not run/);
+    const txt = await pg.textContent('#ref-ran');
+    // layers and the contact sheet stopped (no extras.json): that is never the Effects pass, so no install button for
+    // it; the row says to read it again (report 4, item 15: the page asked to install what was installed)
+    assert.match(await pg.textContent('#ran-stopped'), /Layers and grade and contact sheet did not finish\. Nothing is missing on this computer\./);
+    assert.strictEqual(await pg.$('#ref-ran [data-fix="effects"]'), null, 'no Effects pass prompt'); assert.ok(!/Effects pass/.test(txt), txt);
     assert.ok(!/npm |pip |python3? |\$ /.test(txt), 'no terminal command: ' + txt);
-    assert.ok(await pg.$('#ref-ran .ran-fix button'), 'a fix button');
+    assert.strictEqual(await pg.$('#ref-again'), null, 'this reference came with no link or file to read again, so no button that would do nothing');
     for (const th of ['dark', 'light']) { await theme(pg, th, '#step=reference'); await pg.waitForSelector('#ref-ran'); await pg.$eval('#ref-ran', e => e.scrollIntoView({ block: 'center' })); if (shots) { await pg.waitForTimeout(300); await (await pg.$('#ref-out')).screenshot({ path: join(shots, `recreate-ran-${th}.png`) }); } }
   });
   await t('the Breakdown is calm: the same mode control, parts switches in Influence, the rest behind Details', async () => {

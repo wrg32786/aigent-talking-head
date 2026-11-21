@@ -76,6 +76,13 @@ try {
     assert.strictEqual(await pg.locator('#recreate-stages .stg-list li[data-state="done"] .stg-mark .ic').count(), 6, 'a check on each finished stage');
     assert.ok((await pg.locator('#recreate-stages .stg-fold > summary').textContent()).includes('6 of 10'));
     const bar = await pg.locator('#recreate-stages [role="progressbar"]').getAttribute('aria-valuenow'); assert.strictEqual(+bar, it.stages.percent);
+    // "is it stuck?": the live line says how long this stage has run and counts up; finished stages keep their time
+    const secs = async () => { const m = /^, (\d+) s$/.exec(await pg.textContent('#recreate-stages-time')); assert.ok(m, 'the stage time reads ", N s": ' + await pg.textContent('#recreate-stages-time')); return +m[1]; };
+    const s0 = await secs(); await until(async () => (await secs()) >= s0 + 2, 8000);
+    assert.match(await pg.locator('#recreate-stages .stg-line').textContent(), /^Reading graphics, \d+ s$/);
+    assert.ok(Number.isFinite(it.stages.since) && Math.abs(Date.now() - it.stages.since) < 60000, 'the server says when the stage started');
+    const took = await pg.$$eval('#recreate-stages .stg-list li', els => els.map(e => (e.querySelector('.stg-took') || {}).textContent || null));
+    assert.ok(/^, \d+ s$/.test(took[1]) && took.slice(1, 6).every(Boolean), 'each finished stage keeps its time: ' + JSON.stringify(took)); assert.strictEqual(took[6], null, 'the running stage counts on the live line'); assert.strictEqual(took[8], null);
     await shot(pg, 'ref-stages-dark.png');
   });
 
@@ -98,7 +105,7 @@ try {
     writeFileSync(join(HOLD, 'fail'), '');
     await pg.waitForSelector('#recreate-stages .stg-failed');
     const msg = await pg.locator('#recreate-stages .stg-failed').textContent();
-    assert.ok(msg.includes('We stopped while reading graphics.'), msg); assert.ok(!/\u2014|Error|exit|node /.test(msg), msg);
+    assert.ok(/We stopped while reading graphics, after \d+ s\./.test(msg), msg); assert.ok(!/\u2014|Error|exit|node /.test(msg), msg);
     const it = await item(); assert.strictEqual(it.status, 'failed'); assert.strictEqual(it.stages.failed, 'graphics');
     await pg.click('#recreate-stages .stg-fold > summary');
     assert.strictEqual((await states(pg))[6], 'failed');
