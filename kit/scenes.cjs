@@ -47,7 +47,8 @@ function normal(sc) {
   s.made = s.made || new Date().toISOString(); s.by = s.by || 'reference';
   return s;
 }
-const hash = s => crypto.createHash('sha1').update(JSON.stringify([s.kind, s.html || '', s.css || '', +s.seconds || 0, s.box || null])).digest('hex');
+// the same look is the same scene: where it sat (its box) does not make a new one
+const hash = s => crypto.createHash('sha1').update(JSON.stringify([s.kind, s.html || '', s.css || '', +s.seconds || 0])).digest('hex');
 
 // the page: the scene alone on a clear frame of the box's size, its text slot filled
 function page(sc, text) {

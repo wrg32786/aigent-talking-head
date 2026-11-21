@@ -39,6 +39,7 @@
 //            --capture-sources captures the recipe's confirmed screen-card sources (public pages) first, see kit/capture.mjs.
 //          --scenes id,id  place these scenes from the library (kit/scenes.cjs; effects and graphics made from a reference
 //            or by your agent) once each, spread over the reel. Recipe graphics of type scene play from its scenes.json.
+//          --scenes-off id,id  leave these scenes out, the recipe's own too (forbidden on the Look step).
 //          --clip <file>  the video to use (same as passing the path; reads well with --recipe)
 //            A recipe's graphics (ordinal stickers, app labels, screen cards) land at the recipe's times; icon and src
 //            paths are relative to the recipe, and anything left out is drawn as a neutral placeholder.
@@ -98,7 +99,7 @@ const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['words', 'scenes', 'pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
+const VALUED = new Set(['words', 'scenes', 'scenes-off', 'pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const JSON_OUT = flag('json');
@@ -477,12 +478,16 @@ if (!flag('rebuild')) {
         Object.assign(g, { mode: 39, scene: sc.id, sceneName: sc.name, html: sc.html, css: sc.css || '', seconds: sc.seconds, x: sc.box.x, y: sc.box.y, w: sc.box.w, h: sc.box.h, layer: 'front', ...(text ? { text } : {}), ...(sc.loop ? { loop: true } : {}) });
         return null;
       };
-      for (let i = gfx.length - 1; i >= 0; i--) { const g = gfx[i]; if (g.mode !== 39) continue; const sc = local[g.scene] || SC.get(g.scene);
+      const off = new Set(String(opt('scenes-off') || '').split(',').map(x => x.trim()).filter(Boolean)); // forbidden on the Look step
+      for (let i = gfx.length - 1; i >= 0; i--) { const g = gfx[i]; if (g.mode !== 39) continue; if (off.has(g.scene)) { console.log(`scene ${g.scene} at ${g.start}s: forbidden, left out`); gfx.splice(i, 1); continue; } const sc = local[g.scene] || SC.get(g.scene);
         const why = !sc ? `scene ${g.scene} at ${g.start}s: not in the recipe's scenes.json or the scene library` : fill(g, sc);
-        if (why) { console.log('recipe graphic dropped: ' + why); gfx.splice(i, 1); } }
+        if (why) { console.log('recipe graphic dropped: ' + why); gfx.splice(i, 1); continue; }
+        // an effect lands on a cut: the nearest seam of your edit, when one is within a second
+        if (sc.kind === 'effect' && seams.length) { const near = seams.reduce((b, x) => Math.abs(x - g.start) < Math.abs(b - g.start) ? x : b, seams[0]); if (Math.abs(near - g.start) <= 1) { const d = g.end - g.start; g.start = +Math.max(0, near - 0.1).toFixed(3); g.end = +(g.start + d).toFixed(3); } } }
       // picked on the Look step: each once, spread over the reel; an effect on the cut nearest its spot, a graphic on a word
       const picked = String(opt('scenes') || '').split(',').map(x => x.trim()).filter(Boolean);
       picked.forEach((id, i) => {
+        if (off.has(id)) return;
         const sc = local[id] || SC.get(id); if (!sc) { console.log(`scene ${id}: not in the scene library, left out`); return; }
         if (gfx.some(g => g.scene === id)) return;
         let at = len * (i + 1) / (picked.length + 1);

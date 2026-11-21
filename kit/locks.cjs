@@ -112,7 +112,7 @@ function applyCut(locks, cut, opts = {}) {
     const pick = cycle(locks.transitions, opts.weights && opts.weights.transitions);
     let k = 0, changed = 0;
     segs.forEach((s, i) => {
-      if (!i || s.jump) return;
+      if (!i || s.jump || s.recut) return; // a Recreate re-cut seam is a hard cut, as in the reference
       const cur = s.transition || 'glitch';
       // repick: a pack with transition weights re-picks the seams that only carry its default, for weighted variety
       const auto = opts.repick && (!s.transition || s.transition === opts.defaultTransition);

@@ -84,6 +84,7 @@
         { "name": "recipe", "type": "path", "default": null, "description": "a Reel.md recipe (docs/reel-md.md)" },
         { "name": "recipe-titles", "type": "boolean", "default": false, "description": "use the recipe's title text and times, only where you say that text" },
         { "name": "scenes", "type": "string", "default": null, "description": "comma list of scene ids (ref-...) from the scene library (scenes/local/, kit/scenes.cjs): each placed once, spread over the reel, an effect on a cut, a graphic on a word" },
+        { "name": "scenes-off", "type": "string", "default": null, "description": "comma list of scene ids (ref-...) to leave out, the recipe's own scenes too (forbidden on the Studio Look step)" },
         { "name": "recut", "type": "boolean", "default": false, "description": "re-cut your edit to the recipe's shot plan: lengths scaled, cuts on word boundaries, the reference framing per shot, its sound effects at scaled times, titles matched by role (Studio Recreate)" },
         { "name": "capture-sources", "type": "boolean", "default": false, "description": "capture the recipe's confirmed screen-card sources first (public pages)" },
         { "name": "theme", "type": "string", "default": "aigent", "description": "a theme in kit/themes/ (aigent, neutral, or your own)" },
