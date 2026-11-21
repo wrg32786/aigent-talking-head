@@ -3,8 +3,8 @@
 //   2 Best lines  every line sorted by what it does, the ones we recommend marked Best (Pieces.jsx)
 //   3 Clips       those lines stitched into clips (the full edit and the short clips), the quiet trimmed; Play plays
 //                 the stitched result on the take itself, and a tick keeps a clip. The kept clips are what moves on
-// On top: the point of the video (one optional line that steers our picks) and What to make (format, length, output,
-// goal), folded. Pacing, one control on Clips, says how much quiet comes out; it changes the stitched previews at once
+// On top: the point of the video (one optional line that steers our picks). What to make (format, length, output,
+// goal) sits at the end of Clips, the layer it changes, with Find clips again. Pacing, one control on Clips, says how much quiet comes out; it changes the stitched previews at once
 // and is what the draft uses. Nothing renders here. (The server and agents still say candidates, pieces, the Combo and
 // bites; the page says lines and clips.)
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -139,7 +139,7 @@ export function PointField({ s, apply, id = 'point', compact }) {
 
 const LAYERS = [
   ['raw', 'Raw take', 'Your take in full, just as you filmed it. Play it, or click a word to jump there.'],
-  ['lines', 'Best lines', 'Every line of the take, sorted by what it does. The ones marked Best are the lines we recommend. Play any of them.'],
+  ['lines', 'Best lines', 'Every line of the take, sorted by what it does. Best marks the ones we recommend.'],
   ['clips', 'Clips', 'Our best lines stitched into clips, with the quiet trimmed. Play each one as it will sound, and tick the ones to keep.'],
 ];
 const KIND_ONE = { full: 'Full edit', part: 'Part', clip: 'Short clip', ad: 'Ad cut' };
@@ -149,12 +149,13 @@ const secsOf = x => (x < 60 ? `${Math.round(x)} s` : clock(x));
 function ClipRow({ c, pv, n, playing, onPlay, onKeep, onRemove, muted, sel, onSel, rendered }) {
   const secs = pv ? pv.seconds : c.seconds, saved = pv ? pv.saved : 0;
   return <li className={'clip-row k-' + (c.kind || 'clip') + (c.keep ? '' : ' off') + (muted ? ' muted' : '') + (sel ? ' sel' : '')} data-id={c.id} data-keep={c.keep ? '1' : '0'} onClick={onSel}>
-    {onKeep ? <input type="checkbox" className="clip-keep" id={'keep-' + c.id} checked={!!c.keep} aria-label={`Keep ${c.label}`} onChange={e => onKeep(e.target.checked)} onClick={e => e.stopPropagation()} />
+    {muted ? <input type="checkbox" className="clip-keep" id={'keep-' + c.id} checked={false} disabled readOnly aria-label={`${c.label}, not used while Your clip is kept`} title="Not used while Your clip is kept" />
+      : onKeep ? <input type="checkbox" className="clip-keep" id={'keep-' + c.id} checked={!!c.keep} aria-label={`Keep ${c.label}`} onChange={e => onKeep(e.target.checked)} onClick={e => e.stopPropagation()} />
       : <span className="clip-keep fixed" aria-hidden="true"><Icon n="check" /></span>}
     <div className="clip-main">
       <div className="clip-h"><label htmlFor={onKeep ? 'keep-' + c.id : undefined}><b>{c.label}</b></label>
         <span className="fine clip-m">{[n ? `${n} line${n === 1 ? '' : 's'} stitched` : null, secsOf(secs), saved >= 0.2 ? `${saved.toFixed(1)} s of quiet out` : null].filter(Boolean).join(', ')}</span>
-        {c.fits && <span className="pz-fits">{FITS}</span>}{c.trimmed && <Badge label="Trimmed by you" variant="neutral" />}{c.byName && <Badge label={`By ${c.byName}`} variant="cyan" />}</div>
+        {c.fits && <Badge label={FITS} variant="cyan" />}{c.trimmed && <Badge label="Trimmed by you" variant="neutral" />}{c.byName && <Badge label={`By ${c.byName}`} variant="cyan" />}</div>
       {c.reason && <p className="clip-why">{c.reason}</p>}
       {c.text && <p className="clip-tx">"{c.text}"</p>}
       {rendered && <a className="cd-out" href={file(rendered)} target="_blank" rel="noreferrer"><Icon n="film" />{rendered.split('/').slice(-2).join('/')}</a>}
@@ -203,57 +204,50 @@ export function Cut({ V, s, apply, go }) {
   const keptCands = cut.candidates.filter(c => c.keep), movingN = ownOn ? 1 : keptCands.length + bites.length;
   const movingS = ownOn ? ((pv && pv.clips.own) || own).seconds : [...keptCands, ...bites].reduce((a, c) => a + (pv && pv.clips[c.id] ? pv.clips[c.id].seconds : c.seconds || 0), 0);
   const count = { raw: dur ? clock(dur) : '', lines: P ? String(P.pieces.filter(p => !['aside', 'retake'].includes(p.category)).length) : '', clips: cut.candidates.length + bites.length + (own ? 1 : 0) || '' };
-  const marks = (tr && tr.marks) || [], pauses = marks.filter(m => m.type === 'silence'), fillers = marks.filter(m => m.type === 'filler').length;
+  const marks = (tr && tr.marks) || [];
   const pace = (cut.pacings || []).find(x => x.id === cut.pacing);
   return <section className="step" id="s-cut" data-step="cut" aria-labelledby="h-cut">
-    <header className="sh"><h2 id="h-cut">Cut</h2><p className="sub">From your raw take, to the best lines, to the clips that move on. Our picks are a smart start, so you can just hit Next.</p></header>
+    <header className="sh"><h2 id="h-cut">Cut</h2><p className="sub">From your raw take, to the best lines, to the clips that move on. Our picks are a good start, so you can go straight on to Picture.</p></header>
     <PointField s={s} apply={apply} />
-    <div className="cut-sum glass-card" id="cut-summary-box">
-      <span className="lbl cs-l">What to make</span><p id="cut-summary" className="cs-t">{cut.summary}</p>
-      {cut.output && cut.output.auto ? <Badge label={`Smart pick for a ${clock(cut.seconds)} take`} variant="cyan" /> : <Button id="cut-reset" size="sm" variant="ghost" label="Smart pick" onClick={() => api('/api/cut/output', { reset: true }).then(apply)} />}
-      <Button id="cut-change" size="sm" variant="ghost" label={pickOpen ? 'Done' : 'Change'} aria-expanded={pickOpen ? 'true' : 'false'} onClick={() => setPickOpen(!pickOpen)} />
-      {cut.footage && cut.footage.length > 1 && <label className="inl"><span className="fine">Take</span><select id="cut-source" value={src || ''} onChange={e => set({ source: e.target.value })}>{cut.footage.map(f => <option key={f.path} value={f.path}>{f.path.split('/').pop()} ({clock(f.seconds)})</option>)}</select></label>}
-    </div>
-    {pickOpen && <Picker cut={cut} set={set} key={src} />}
     <div className="cut-layers" role="tablist" aria-label="The three layers of the Cut step" id="cut-layers">
       {LAYERS.map(([id, label], k) => <button key={id} type="button" role="tab" id={'cut-layer-' + id} aria-selected={layer === id ? 'true' : 'false'} aria-controls="cut-body" className="cut-layer" onClick={() => setLayer(id)}>
         <span className="cl-n" aria-hidden="true">{k + 1}</span><span className="cl-t">{label}</span>{count[id] !== '' && <span className="cl-c mono">{count[id]}</span>}</button>)}
     </div>
-    <p className="cut-explain" id="cut-explain">{LAYERS.find(l => l[0] === layer)[2]}</p>
+    <p className="cut-explain" id="cut-explain">{LAYERS.find(l => l[0] === layer)[2]}{layer === 'lines' && combo.ids.length > 0 ? ' A number on a line is its place in your clip.' : ''}</p>
     {tx && tx.status === 'running' && <div className="tx-run" id="cut-tx"><ProgressBar label="Reading the words of your take" value={tx.total ? Math.round(100 * tx.done / tx.total) : undefined} isIndeterminate={!tx.total} />
       <span className="fine">Reading the words{tx.total ? `, part ${Math.min(tx.done + 1, tx.total)} of ${tx.total}` : ''}. Lines and clips show up when it is done. Safe to leave this page.</span></div>}
     {tx && tx.status === 'failed' && <p className="err" role="alert">{tx.error}</p>}
     {tx && tx.status === 'failed' && tx.fix && <FixActions V={V} id={tx.fix} apply={apply} />}
     <div className={'cut-body v-' + layer} id="cut-body" role="tabpanel" aria-labelledby={'cut-layer-' + layer} data-layer={layer}>
-      <div className="cut-play">{src && <Player apply={apply} path={src} tx={tx} playerRef={player} onAddRange={r => add(r, 'clip')} />}</div>
+      <div className="cut-play">{src && <Player apply={apply} path={src} tx={tx} playerRef={player} onAddRange={r => add(r, 'clip')} playingNote={stitch.playing ? `Playing: ${stitch.playing === 'own' ? 'Your clip' : (c => (c ? (c.kind === 'full' && (!c.label || c.label === 'Best version') ? 'Full edit' : c.label || c.name || 'a clip') : 'a clip'))([...cut.candidates, ...bites].find(x => x.id === stitch.playing))}` : null} />}</div>
       <div className="cut-side">
-        {layer === 'raw' && <div className="raw-facts glass-card" id="cut-raw">
-          <span><b>{dur ? clock(dur) : '...'}</b> long</span>
-          {P && <span><b>{P.pieces.length}</b> line{P.pieces.length === 1 ? '' : 's'}</span>}
-          {tr && <span><b>{pauses.length}</b> long pause{pauses.length === 1 ? '' : 's'}{pauses.length ? ` (${pauses.reduce((a, m) => a + m.to - m.from, 0).toFixed(1)} s)` : ''}</span>}
-          {tr && fillers > 0 && <span><b>{fillers}</b> filler word{fillers === 1 ? '' : 's'}</span>}
-          <Button id="cut-to-lines" size="sm" variant="secondary" label="See the best lines" onClick={() => setLayer('lines')} />
-        </div>}
         {layer === 'lines' && <Pieces V={V} apply={apply} player={player} src={src} stitch={stitch} spans={spans('own')} onClips={() => setLayer('clips')} />}
         {layer === 'clips' && <div className="cut-clips" id="cut-clips">
           <div className="cut-clips-bar glass-card">
             <div className="pacing" id="pacing" data-pacing={cut.pacing || 'natural'}><span className="lbl" id="pacing-l">Pacing</span>
-              <SegmentedControl label="Pacing" value={cut.pacing || 'natural'} size="sm" onChange={v => { stitch.stop(); api('/api/state', { pace: { tighten: v === 'natural' ? 'off' : v === 'tight' ? 0.45 : 0.25 } }).then(apply).catch(() => {}); }}>
+              <SegmentedControl label="Pacing" value={cut.pacing || 'natural'} size="md" onChange={v => { stitch.stop(); api('/api/state', { pace: { tighten: v === 'natural' ? 'off' : v === 'tight' ? 0.45 : 0.25 } }).then(apply).catch(() => {}); }}>
                 {(cut.pacings || []).map(x => <SegmentedControlItem key={x.id} value={x.id} label={x.label} />)}</SegmentedControl>
               <span className="fine" id="pacing-says">{pace ? pace.says : ''} We only trim quiet between words, never a word.</span></div>
-            <Button id="cut-find" size="sm" variant={cut.candidates.length ? 'ghost' : 'primary'} label={cut.candidates.length ? 'Find clips again' : 'Find the clips'} isLoading={!!(tx && tx.status === 'running')} onClick={() => find()} />
           </div>
           {scored && <p className="fine" id="cut-scored">{scored}</p>}
           {cut.note && <p className="fine" id="cut-note">{cut.note}</p>}
           {own || cut.candidates.length || bites.length ? <ol className="clip-list" id="cut-candidates" aria-label="Clips">
             {own && <ClipRow c={own} pv={pv && pv.clips.own} n={combo.ids.length} playing={stitch.playing === 'own'} onPlay={() => stitch.play('own', spans('own'))} onKeep={on => api('/api/pieces', { path: src, off: !on }).then(apply).catch(() => {})} />}
-            {ownOn && (cut.candidates.length > 0 || bites.length > 0) && <li className="clip-note fine" id="cut-own-wins">Your own clip is what moves on. Untick it to use the clips below instead.</li>}
+            {ownOn && (cut.candidates.length > 0 || bites.length > 0) && <li className="clip-note fine" id="cut-own-wins">Only Your clip moves on. Untick it to use the clips below.</li>}
             {cut.candidates.map(c => <ClipRow key={c.id} c={{ ...c, label: c.kind === 'full' && (!c.label || c.label === 'Best version') ? 'Full edit' : c.label || KIND_ONE[c.kind] }} pv={pv && pv.clips[c.id]} n={linesIn(c.ranges)} muted={ownOn} sel={sel === c.id} onSel={() => setSel(c.id)} playing={stitch.playing === c.id} rendered={renderedFor(c)}
               onPlay={() => { setSel(c.id); stitch.play(c.id, spans(c.id) || c.ranges); }} onKeep={on => edit(c.id, { keep: on })} onRemove={c.by === 'you' ? () => edit(c.id, { remove: true }) : null} />)}
             {bites.map(b => <ClipRow key={b.id} c={{ id: b.id, kind: 'clip', label: b.name || 'Clip', keep: true, seconds: pv && pv.clips[b.id] ? pv.clips[b.id].seconds : 0, reason: b.reason || null, byName: b.by && b.by !== 'you' ? b.by : null }} pv={pv && pv.clips[b.id]} n={b.lines.length} muted={ownOn}
               playing={stitch.playing === b.id} onPlay={() => stitch.play(b.id, spans(b.id))} onRemove={() => api('/api/lines', { path: src, action: 'remove', id: b.id }).then(apply).catch(() => {})} />)}
           </ol> : <div className="empty-art"><Icon n="grid" /><p>{tx && tx.status === 'running' ? 'Clips show up here once we have read the words.' : cut.pending === 'transcript' ? 'Reading the words, then finding the clips.' : 'Find the clips to see our suggestions, each with its length and why.'}</p></div>}
           {(own || cut.candidates.length > 0 || bites.length > 0) && <p className="clips-kept" id="cut-hint" data-kept={movingN}><Icon n="check" /><span id="cut-kept">{movingN ? `${movingN} clip${movingN === 1 ? '' : 's'} kept, ${secsOf(movingS)}. ${movingN === 1 ? 'It moves' : 'They move'} on to the next steps as one reel.` : 'No clip is kept, so the whole take moves on.'}</span></p>}
+          <div className="cut-sum glass-card" id="cut-summary-box">
+            <span className="lbl cs-l">What to make</span><p id="cut-summary" className="cs-t">{cut.summary}</p>
+            {!(cut.output && cut.output.auto) && <Button id="cut-reset" size="sm" variant="ghost" label="Back to our pick" onClick={() => api('/api/cut/output', { reset: true }).then(apply)} />}
+            <Button id="cut-change" size="sm" variant="ghost" label={pickOpen ? 'Done' : 'Change'} aria-expanded={pickOpen ? 'true' : 'false'} onClick={() => setPickOpen(!pickOpen)} />
+            {cut.footage && cut.footage.length > 1 && <label className="inl"><span className="fine">Take</span><select id="cut-source" value={src || ''} onChange={e => set({ source: e.target.value })}>{cut.footage.map(f => <option key={f.path} value={f.path}>{f.path.split('/').pop()} ({clock(f.seconds)})</option>)}</select></label>}
+            <Button id="cut-find" size="sm" variant={cut.candidates.length ? 'secondary' : 'primary'} label={cut.candidates.length ? 'Find clips again' : 'Find the clips'} isLoading={!!(tx && tx.status === 'running')} onClick={() => find()} />
+          </div>
+          {pickOpen && <Picker cut={cut} set={set} key={src} />}
           {src && dur > 0 && cut.candidates.length > 0 && <details className="clips-tl" id="cut-trim" open={tlOpen} onToggle={e => setTlOpen(e.currentTarget.open)}><summary>Trim on the timeline</summary>
             {tlOpen && <Timeline cut={cut} peaks={peaks} marks={marks} now={now} dur={dur} sel={sel} setSel={setSel} onSeek={seek} onEdit={edit} onAdd={add} />}</details>}
         </div>}

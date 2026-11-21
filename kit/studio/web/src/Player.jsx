@@ -69,7 +69,7 @@ export function useStitch(player) {
   return { playing, play, stop };
 }
 
-export function Player({ path, tx, onClose, playerRef, onAddRange, apply, children }) {
+export function Player({ path, tx, onClose, playerRef, onAddRange, apply, children, playingNote }) {
   const { info, peaks, src, proxy } = useMedia(path);
   const t = useTranscript(path, tx);
   const vid = useRef(null), box = useRef(null);
@@ -114,7 +114,8 @@ export function Player({ path, tx, onClose, playerRef, onAddRange, apply, childr
   const txRun = tx && tx.status === 'running';
   return <div className="player glass-card" id="player" ref={box} data-path={path}>
     <div className="pl-top"><b className="pl-name">{path.split('/').pop()}</b>
-      <span className="fine">{dur ? clock(dur) : ''}{info && info.info ? `, ${info.info.width}x${info.info.height}, ${nice(info.info.size)}` : ''}{proxy ? (proxy.status === 'ready' ? ', playing a preview copy' : proxy.status === 'making' ? ', making a preview copy' : '') : ''}</span>
+      <span className="fine" title={info && info.info ? `${info.info.width}x${info.info.height}, ${nice(info.info.size)}` : undefined}>{dur ? clock(dur) : ''}{proxy ? (proxy.status === 'ready' ? ', playing a preview copy' : proxy.status === 'making' ? ', making a preview copy' : '') : ''}</span>
+      {playingNote && <span className="pl-note" id="player-note" role="status">{playingNote}</span>}
       {onClose && <IconBtn n="x" label="Close the player" onClick={onClose} className="pl-x" />}</div>
     <div className="pl-stage"><video ref={vid} id="player-video" src={src || undefined} preload="metadata" playsInline onClick={() => { const v = vid.current; v.paused ? v.play().catch(() => {}) : v.pause(); }}
       onTimeUpdate={e => { const v = e.currentTarget; setNow(v.currentTime); if (stopAt != null && v.currentTime >= stopAt) { v.pause(); setStopAt(null); } }}

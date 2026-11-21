@@ -648,6 +648,14 @@ function exportSteps(s, combo0, { clips, plain }) {
 // shows it; MCP get_edit reads it)
 // how many pieces the user sees: a Combo's back to back lines play as one range but count one each
 const pieceN = combo => combo.pieces.reduce((a, x) => a + (x.kind === 'piece' && x.lines ? x.lines.length : 1), 0);
+// the From part of Your edit, said one way: "our 4 best lines, 11 s" when they are our pick, "your 4 lines, 11 s"
+// when you chose or changed them, "4 lines, 11 s, picked by <agent>" when an agent did
+function fromText(s, combo) {
+  const own = combo.pieces.some(x => x.kind === 'piece'), n = own ? pieceN(combo) : combo.pieces.length, secs = `${Math.round(combo.seconds)} s`;
+  if (!own) return `${n} clip${n === 1 ? '' : 's'}, ${secs}`;
+  const by = piecesState(s, combo.source).by, lines = `line${n === 1 ? '' : 's'}`;
+  return by === 'ai' ? `our ${n} best ${lines}, ${secs}` : !by || by === 'you' || by === 'ai, changed by you' ? `your ${n} ${lines}, ${secs}` : `${n} ${lines}, ${secs}, picked by ${by}`;
+}
 function editOf(s, v) {
   const combo = v.combo, o = outputOf(s), cut = v.cut || {}, from = draftFrom(s, combo), fin = { ...C.defaultState().finish, ...(s.finish || {}) };
   const fmt = (CUT.FORMATS[o.format] || {}).label || o.format, aspect = CUT.aspectOf(o);
@@ -661,8 +669,8 @@ function editOf(s, v) {
   const next = !takes && !s.clips ? { step: 'footage', label: 'Add footage' } : !s.job ? { step: 'footage', label: 'Name the reel' } : !drafted && fin.reel ? { step: 'finish', label: 'Draft it' } : { step: 'finish', label: 'Render' };
   return {
     making: { text: making, format: fmt, aspect, goal: o.goal, length: (cut.summary && cut.summary.length) || null },
-    from: { takes, source: src, seconds: from === 'pieces' ? combo.seconds : (cut.seconds || null), mode: from, pieces: combo.pieces.length, text: from === 'pieces' ? `${(() => { const own = combo.pieces.some(x => x.kind === 'piece'), n = own ? pieceN(combo) : combo.pieces.length, w = own ? 'line' : 'clip'; return `${n} ${w}${n === 1 ? '' : 's'}`; })()}, ${Math.round(combo.seconds)} s, in your order${(() => { const by = piecesState(s, combo.source).by; return by && combo.pieces.some(x => x.kind === 'piece') ? (by === 'ai' ? ', our pick' : by === 'you' ? ', built by you' : `, ${by === 'ai, changed by you' ? 'our pick, changed by you' : 'set by ' + by}`) : ''; })()}` : takes ? `the whole take${takes > 1 ? ` (${takes} files)` : ''}` : 'no footage yet' },
-    look: { pack: s.pack || null, reference: ref, styleLook, picks, text: [styleLook ? `style look ${styleLook}` : s.pack || 'Studio picks', ref ? `reference (${ref === 'look' ? 'copy the look' : ref})` : null, picks ? `${picks} change${picks === 1 ? '' : 's'} by you` : null].filter(Boolean).join(', ') },
+    from: { takes, source: src, seconds: from === 'pieces' ? combo.seconds : (cut.seconds || null), mode: from, pieces: combo.pieces.length, text: from === 'pieces' ? fromText(s, combo) : takes ? `the whole take${takes > 1 ? ` (${takes} files)` : ''}` : 'no footage yet' },
+    look: { pack: s.pack || null, reference: ref, styleLook, picks, text: [styleLook ? `style look ${styleLook}` : s.pack || 'No Look', ref ? `reference (${ref === 'look' ? 'copy the look' : ref})` : null, picks ? `${picks} change${picks === 1 ? '' : 's'} by you` : null].filter(Boolean).join(', ') },
     broll: { spots, ideas: ((v.broll && v.broll.beats) || []).filter(b => b.idea && !b.slot).length, cutins: combo.pieces.filter(x => x.kind === 'testimonial').length, text: [spots ? `${spots} spot${spots === 1 ? '' : 's'}` : 'none yet', combo.pieces.some(x => x.kind === 'testimonial') ? `${combo.pieces.filter(x => x.kind === 'testimonial').length} testimonial` : null].filter(Boolean).join(', ') },
     sound: { bed: s.music.bed, sfx: s.sound.sfx, text: `${s.music.bed === 'auto' ? 'Music picked for you' : s.music.bed === 'none' ? 'No music' : s.music.bed}, sounds ${s.sound.sfx}` },
     drafted: !!drafted, stale: !!(s.drafted && !drafted && fin.reel), next,
