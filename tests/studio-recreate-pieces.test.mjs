@@ -2,7 +2,7 @@
 // - with a reference on Recreate and pieces kept on Cut, the draft is your pieces, already cut (--as-is), with the
 //   reference's Reel.md as the recipe; the line you cut out stays out
 // - after the draft, Your edit says drafted (not stale) and the next thing is Render, so Render comes on
-// Run: node tests/studio-recreate-pieces.test.mjs   (npm run check runs it too)
+// Run: node tests/studio-recreate-pieces.test.mjs   (npm run smoke runs it too; it needs ffmpeg)
 import assert from 'assert';
 import { spawn, execFileSync } from 'child_process';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, copyFileSync } from 'fs';
