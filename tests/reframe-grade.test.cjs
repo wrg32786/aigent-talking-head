@@ -3,6 +3,8 @@
 // kit/grade_match.py) and ffmpeg skip with a note when those are missing.
 // - cropFor: the zoom is the target face height over yours, the eye line and centre land on the target, the zoom is
 //   held at the source's limit, a little extra zoom is allowed to reach the eye line, the face box stays inside
+// - a take already as close as the target (or closer) keeps zoom 1; the crown and the chin stay in the frame at the
+//   zoom limit (headroom), and the result says it was held
 // - a landscape take (1920x1080 into 9:16) may zoom to 2.2, a 1080x1920 one to 3
 // - steady: a locked-off take's small measure noise is taken out, a real move is kept
 // - the Reel.md shot keys "face" and "lab" round trip, and reach the recipe's shot settings
@@ -52,6 +54,47 @@ t('cropFor: a little extra zoom to reach the eye line, and the face box stays in
   const big = RF.cropFor({ faceH: 0.3, eyeY: 0.5, cx: 0.5, y0: 0.35, y1: 0.68, x0: 0.25, x1: 0.75 }, { faceH: 0.8, eyeY: 0.1, cx: 0.5 }, { maxZoom: 3 });
   const y0 = 0.35 * big.zoom - (big.zoom - 1) * big.punchY, y1 = 0.68 * big.zoom - (big.zoom - 1) * big.punchY, x0 = 0.25 * big.zoom - (big.zoom - 1) * big.punchX, x1 = 0.75 * big.zoom - (big.zoom - 1) * big.punchX;
   assert.ok(y0 >= RF.MARGIN - 0.002 && y1 <= 1 - RF.MARGIN + 0.002 && x0 >= RF.MARGIN - 0.002 && x1 <= 1 - RF.MARGIN + 0.002, `face box inside: ${[x0, y0, x1, y1].map(v => v.toFixed(3))}`);
+});
+
+t('cropFor: a take already as close as the target, or closer, is left as filmed (zoom 1, no shift)', () => {
+  // the t7 case: a selfie close-up (face 0.216 of the frame) against a medium close-up look (0.162 to 0.182)
+  for (const th of [0.162, 0.182, 0.216, 0.22]) {
+    const c = RF.cropFor({ faceH: 0.216, eyeY: 0.455, cx: 0.577, y0: 0.36, y1: 0.576, x0: 0.42, x1: 0.73 }, { faceH: th, eyeY: 0.323, cx: 0.5 }, { maxZoom: 3 });
+    assert.deepStrictEqual([c.zoom, c.punchX, c.punchY, c.clamped], [1, 0.5, 0.5, false], 'target ' + th);
+    assert.strictEqual(c.got.faceH, 0.216); assert.strictEqual(c.got.eyeY, 0.455);
+  }
+  // a face only a little bigger than the target used to get up to 15% of zoom for the eye line: not any more
+  const near1 = RF.cropFor({ faceH: 0.171, eyeY: 0.47, cx: 0.56 }, { faceH: 0.162, eyeY: 0.323, cx: 0.5 }, { maxZoom: 3 });
+  assert.strictEqual(near1.zoom, 1, 'want ' + near1.want);
+  // a clearly wider take is still zoomed
+  assert.ok(RF.cropFor({ faceH: 0.12, eyeY: 0.4, cx: 0.5 }, { faceH: 0.162, eyeY: 0.323, cx: 0.5 }, { maxZoom: 3 }).zoom > 1.3);
+  // through applyToSegs: every segment of a close take keeps zoom 1 and nothing is marked held
+  const segs = [{ in: 0, out: 5 }, { in: 5, out: 9 }], face = { faceH: 0.216, eyeY: 0.455, cx: 0.577 };
+  const r = RF.applyToSegs({ segs, shotStart: [0, 1], targets: [{ faceH: 0.162, eyeY: 0.323, cx: 0.5 }, { faceH: 0.182, eyeY: 0.323, cx: 0.5 }], faces: [face, face], maxZoom: 3 });
+  assert.deepStrictEqual(segs.map(s => [s.zoom, s.punchX, s.punchY]), [[1, 0.5, 0.5], [1, 0.5, 0.5]]); assert.ok(r.shots.every(s => !s.clamped) && !r.lines.length);
+});
+
+t('cropFor: headroom is kept at the zoom limit: the crown and the chin stay in the frame, and the result says it was held', () => {
+  // where the top of the head (the face box top less CROWN of its height) and the chin end up after the crop
+  const ends = (o, c) => { const fh = o.y1 - o.y0, top = Math.max(0, o.y0 - fh * RF.CROWN), bot = Math.min(1, o.y1 + fh * RF.CHIN); return [top * c.zoom - (c.zoom - 1) * c.punchY, bot * c.zoom - (c.zoom - 1) * c.punchY]; };
+  const inside = (o, c, msg) => { const [a, b] = ends(o, c); assert.ok(a >= RF.HEADROOM - 0.002 && b <= 1 - RF.HEADROOM + 0.002, `${msg}: crown ${a.toFixed(3)}, chin ${b.toFixed(3)}, zoom ${c.zoom}`); };
+  // the target asks for a face that fills the frame: the zoom stops where the head still fits, well under the source limit
+  const o1 = { faceH: 0.2, eyeY: 0.45, cx: 0.5, y0: 0.37, y1: 0.57, x0: 0.4, x1: 0.6 }, c1 = RF.cropFor(o1, { faceH: 0.9, eyeY: 0.3, cx: 0.5 }, { maxZoom: 5 });
+  inside(o1, c1, 'head fits'); near(c1.zoom, (1 - 2 * RF.HEADROOM) / (0.2 * (1 + RF.CROWN + RF.CHIN)), 0.002); assert.ok(c1.zoom < 5 && c1.clamped && c1.held === 'headroom');
+  // at the source limit with a high eye-line target: the zoom is the limit, the zoom centre gives way so the crown stays in
+  const o2 = { faceH: 0.1, eyeY: 0.3, cx: 0.5, y0: 0.26, y1: 0.36, x0: 0.44, x1: 0.56 }, c2 = RF.cropFor(o2, { faceH: 0.4, eyeY: 0.1, cx: 0.5 }, { maxZoom: 2.2 });
+  assert.strictEqual(c2.zoom, 2.2); assert.strictEqual(c2.clamped, true); inside(o2, c2, 'crown kept at the limit');
+  assert.ok(c2.got.eyeY > 0.1, 'the eye line stops short of the target rather than cropping the head: ' + c2.got.eyeY);
+  // a low eye-line target: the chin stays in
+  const o3 = { faceH: 0.1, eyeY: 0.6, cx: 0.5, y0: 0.56, y1: 0.66, x0: 0.44, x1: 0.56 }, c3 = RF.cropFor(o3, { faceH: 0.3, eyeY: 0.95, cx: 0.5 }, { maxZoom: 3 });
+  inside(o3, c3, 'chin kept'); assert.strictEqual(c3.held, 'headroom');
+  // a head that already touches the top of your take keeps that edge: no zoom pushes it further out
+  const o4 = { faceH: 0.2, eyeY: 0.14, cx: 0.5, y0: 0.06, y1: 0.26, x0: 0.4, x1: 0.6 }, c4 = RF.cropFor(o4, { faceH: 0.3, eyeY: 0.33, cx: 0.5 }, { maxZoom: 3 });
+  assert.ok(c4.zoom > 1 && c4.punchY === 0, `anchored to the top: zoom ${c4.zoom}, punchY ${c4.punchY}`);
+  // with room to spare nothing is held, and applyToSegs says why a shot was held
+  assert.ok(!RF.cropFor({ faceH: 0.082, eyeY: 0.58, cx: 0.55 }, { faceH: 0.164, eyeY: 0.32, cx: 0.48 }, { maxZoom: 2.2 }).clamped);
+  const r = RF.applyToSegs({ segs: [{ in: 0, out: 4 }], shotStart: [0], targets: [{ faceH: 0.9, eyeY: 0.3, cx: 0.5 }], faces: [o1], maxZoom: 5 });
+  assert.strictEqual(r.shots[0].clamped, true); assert.strictEqual(r.shots[0].held, 'headroom'); assert.ok(/top of your head/.test(r.lines[0]), r.lines[0]);
 });
 
 t('maxZoom: a 1920x1080 take into 9:16 may zoom to about 2.2, a 1080x1920 take to 3, a 4K one no further', () => {

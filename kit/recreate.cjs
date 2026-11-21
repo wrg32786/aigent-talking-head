@@ -74,7 +74,7 @@ function sourceSize(files) {
 // Reframe every shot to a face target (kit/reframe.cjs). shotStart[j]: the first segment of shot j; targets[j]: the
 // face to match ({ faceH, eyeY, cx }) or null. A shot with no target of its own borrows the middle one. Your face is
 // measured per segment (kit/framing.py). Sets zoom, punchX and punchY on the segments; returns per shot
-// { framing (what you get), target, crop, clamped } or null where the old zoom stays, or null when nothing was matched.
+// { framing (what you get), target, crop, clamped, held } or null where the old zoom stays, or null when nothing was matched.
 function reframeShots({ segs, shotStart, targets, build, python, sources = [], log = console.log, what = 'the reference' }) {
   if (!targets.some(Boolean)) { log(`reframe: ${what} has no face measured (an older teardown, or the speaker is never on screen); framing by shot size as before`); return null; }
   const faces = segs.map(() => null), files = [...new Set(segs.map(s => s.file))];
@@ -102,7 +102,7 @@ function matchShots({ recipe, segs, rc, build, python, sources = [], reframe = t
   const shots = recipe ? RM.shotSettings(recipe) : [], out = { framing: null, grade: null };
   if (reframe) {
     const fr = reframeShots({ segs, shotStart: rc.shotStart, targets: faceTargets || rc.shotOf.map(k => (shots[k] || {}).face || null), build, python, sources, log, what });
-    if (fr) { out.framing = fr; fr.forEach((f, j) => { if (!f || !rc.plan[j]) return; rc.zoom[j] = f.crop.zoom; Object.assign(rc.plan[j], { zoom: f.crop.zoom, face: f.framing, faceTarget: f.target, crop: f.crop, ...(f.clamped ? { clamped: true } : {}) }); }); }
+    if (fr) { out.framing = fr; fr.forEach((f, j) => { if (!f || !rc.plan[j]) return; rc.zoom[j] = f.crop.zoom; Object.assign(rc.plan[j], { zoom: f.crop.zoom, face: f.framing, faceTarget: f.target, crop: f.crop, ...(f.clamped ? { clamped: true, ...(f.held ? { held: f.held } : {}) } : {}) }); }); }
   } else log('reframe: off; framing by shot size');
   if (grade) {
     // a cutaway's colour is not the speaker's grade

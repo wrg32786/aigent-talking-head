@@ -422,7 +422,7 @@ async function previewOf(s, rel) {
 async function editCut(b) {
   const c0 = C.load().cut, env = c0 && b.snap !== false && (b.add || b.ranges) ? await energyOf(c0.source) : null;
   return update(x => {
-    const c = x.cut; if (!c) throw Object.assign(new Error('find cuts first'), { code: 400 });
+    const c = x.cut; if (!c) throw Object.assign(new Error('find the clips first (Clips on the Cut step, or get_cuts find true)'), { code: 400 });
     const dur = durOf(c.source), list = c.candidates;
     if (b.add) {
       const ranges = CUT.cleanRanges(b.add.ranges, dur), kind = ['full', 'part', 'clip', 'ad'].includes(b.add.kind) ? b.add.kind : 'clip';
@@ -455,7 +455,7 @@ async function setCuts(b) {
       score: x.score == null ? null : Math.max(0, Math.min(100, Math.round(+x.score))), reason: String(x.reason || '').replace(/\u2014/g, ', ').slice(0, 200), text: CUT.textIn(words, ranges), keep: x.keep !== false, order: k };
   }).map(c => snapOne(c, words, env, dur));
   const by = CH.prettyName(String(b.by || CH.presence().client || 'your agent'));
-  return update(x => { x.cut = { source: rel, summary: CUT.summary(outputOf(x), dur), candidates: list, scoredBy: by, pending: null, at: Date.now() }; C.applyPatch(x, { reply: `${by} picked ${list.length} cut${list.length > 1 ? 's' : ''} on the Cut step.`, from: 'assistant', kind: 'action' }); });
+  return update(x => { x.cut = { source: rel, summary: CUT.summary(outputOf(x), dur), candidates: list, scoredBy: by, pending: null, at: Date.now() }; C.applyPatch(x, { reply: `${by} picked ${list.length} clip${list.length > 1 ? 's' : ''} on the Cut step.`, from: 'assistant', kind: 'action' }); });
 }
 // ---------- the Lines view: a long take as lines, keep or retake, grouped into named bites (kit/studio/cut.mjs lines) ----------
 const LINES = new Map(); // source -> { key, lines }, the snapped lines of a transcript
@@ -480,7 +480,7 @@ const bad = m => Object.assign(new Error(m), { code: 400 });
 // keep or retake per line, and the bites: add, update (name, lines in order), remove, move, the clean take, or set them all (the agent)
 async function editLines(b) {
   const s0 = C.load(), rel = cutSource(s0, b.path || b.source); if (!rel) throw bad('add footage first');
-  const L = await linesOf(rel); if (!L) throw bad('transcribe the footage first (Find cuts or Transcribe on the Cut step)');
+  const L = await linesOf(rel); if (!L) throw bad('we need the words of the take first (open the Cut step, or get_cuts find true)');
   const ids = new Set(L.map(l => l.id)), idOf = v => (typeof v === 'number' || /^\d+$/.test(String(v)) ? 'l' + (+v) : String(v));
   const lineList = v => { if (!Array.isArray(v) || !v.length) throw bad('lines: [line ids or numbers], in the order you want them'); const out = v.map(idOf); const miss = out.filter(x => !ids.has(x)); if (miss.length) throw bad(`no line ${miss.join(', ')}`); return [...new Set(out)]; };
   const by = b.by ? CH.prettyName(String(b.by)) : null;
@@ -497,7 +497,7 @@ async function editLines(b) {
       const fresh = b.bites.slice(0, 30).map(y => { ls.seq++; return { id: 'b' + ls.seq, name: name(y.name, `Bite ${ls.seq}`), lines: lineList(y.lines), by: by || 'your agent', kind: 'clip', reason: y.reason ? String(y.reason).replace(/\u2014/g, ', ').slice(0, 160) : null }; });
       ls.bites = b.replace === false ? ls.bites.concat(fresh) : keepTake.concat(fresh); ls.by = by;
       if (b.clean) { const take = CUT.cleanTake(L, ls.keep); if (take.length) { ls.bites = ls.bites.filter(y => y.id !== 'take'); ls.bites.unshift({ id: 'take', name: 'Clean take', lines: take, by: by || 'your agent', kind: 'full' }); } }
-      note = `${by || 'Your agent'} picked ${fresh.length} bite${fresh.length === 1 ? '' : 's'} on the Cut step${b.clean ? ', plus the clean take' : ''}.`; }
+      note = `${by || 'Your agent'} made ${fresh.length} clip${fresh.length === 1 ? '' : 's'} from your lines on the Cut step${b.clean ? ', plus the clean take' : ''}.`; }
     else if (b.action) {
       const k = ls.bites.findIndex(y => y.id === b.id); if (k < 0) throw Object.assign(new Error(`no bite ${b.id}`), { code: 404 }); const it = ls.bites[k];
       if (b.action === 'update') { if (b.name != null) it.name = name(b.name, it.name); if (b.lines) it.lines = lineList(b.lines); }
@@ -520,10 +520,10 @@ async function biteSteps(s, ids, path) {
 
 function cutSteps(s, ids, over) {
   const c = over || s.cut; if (!s.job) throw Object.assign(new Error('name the job first'), { code: 400 });
-  if (!c || !c.candidates.length) throw Object.assign(new Error('find cuts first'), { code: 400 });
+  if (!c || !c.candidates.length) throw Object.assign(new Error('find the clips first (Clips on the Cut step, or get_cuts find true)'), { code: 400 });
   const o = outputOf(s), src = c.source;
   const keep = c.candidates.filter(x => (ids ? ids.includes(x.id) : x.keep)).sort((a, b) => a.order - b.order);
-  if (!keep.length) throw Object.assign(new Error('keep at least one cut'), { code: 400 });
+  if (!keep.length) throw Object.assign(new Error('keep at least one clip'), { code: 400 });
   const comp = C.compose(s, { refPack: refPackName(s) }); if (comp.errs.length) throw Object.assign(new Error(comp.errs.join('; ')), { code: 400 });
   const base = comp.args.slice(); const e = base.indexOf('--export'); if (e >= 0) base.splice(e, 2);
   const tight = o.goal === 'ad' && !base.includes('--tighten') && !base.includes('--no-tighten') ? ['--tighten', '0.25'] : [];
@@ -1207,7 +1207,7 @@ async function api(req, res, u) {
     // { choose: true } Let AI choose; { ids, reasons, by } your Combo; { add, remove, move: { id, to } } one piece;
     // { clear: true }; { cats: { <piece id>: category } } move pieces to another category (null puts the rules' back)
     const b = await readBody(req), s0 = C.load(), rel = cutSource(s0, b.path); if (!rel) return json(res, 400, { error: 'add footage first' });
-    if (!(await linesOf(rel))) return json(res, 400, { error: 'transcribe the footage first (Find cuts or Transcribe on the Cut step)' });
+    if (!(await linesOf(rel))) return json(res, 400, { error: 'we need the words of the take first (open the Cut step, or get_cuts find true)' });
     const P = piecesOf(s0, rel), by = Object.fromEntries(P.pieces.map(x => [x.id, x])), who = b.by ? CH.prettyName(String(b.by)) : 'you';
     for (const id of [...(Array.isArray(b.ids) ? b.ids : []), b.add, b.remove, b.move && b.move.id].filter(x => x != null)) if (!by[id]) return json(res, 400, { error: `no piece ${id} (get_pieces lists them)` });
     if (b.cats) for (const [id, c] of Object.entries(b.cats)) { if (!by[id]) return json(res, 400, { error: `no piece ${id}` }); if (c !== null && !PIECES.CAT_IDS.includes(c)) return json(res, 400, { error: `category: ${PIECES.CAT_IDS.join(', ')}` }); }
@@ -1241,7 +1241,7 @@ async function api(req, res, u) {
     const fin = { ...C.defaultState().finish, ...(s0.finish || {}), ...(b.exports && typeof b.exports === 'object' ? Object.fromEntries(['reel', 'clips', 'plain'].filter(k => b.exports[k] !== undefined).map(k => [k, !!b.exports[k]])) : {}) };
     if (!fin.reel && !fin.clips && !fin.plain) return json(res, 400, { error: 'pick something to make: the reel, clips or plain clips' });
     const combo = comboOf(s0);
-    if (!fin.reel && !combo.pieces.length) return json(res, 400, { error: 'keep a piece on the Cut step first, or turn the reel back on' });
+    if (!fin.reel && !combo.pieces.length) return json(res, 400, { error: 'keep a clip on the Cut step first, or turn the reel back on' });
     if (!fin.reel) {
       const miss = needFor('render'); if (miss) return json(res, 400, miss);
       const x = exportSteps(s0, combo, fin);
@@ -1368,7 +1368,7 @@ async function api(req, res, u) {
     if (w.goal) { setOut(WIZ.GOALS[w.goal].out); done.push(`goal: ${WIZ.GOALS[w.goal].label}`); next = 'look'; }
     if (w.look) { update(x => { C.applyPatch(x, { pack: w.look }); }); done.push(`look: ${w.look}`); next = 'choose'; }
     if (w.choose) {
-      if (!(await linesOf(rel))) { if (!MEDIA.transcript(rel)) startTranscribe(rel, () => findCuts(rel, 'auto').catch(e => console.error(e.message))); pending = 'transcript'; next = 'cut'; note = 'Transcribing the take first. Let AI choose on Cut when it is ready.'; }
+      if (!(await linesOf(rel))) { if (!MEDIA.transcript(rel)) startTranscribe(rel, () => findCuts(rel, 'auto').catch(e => console.error(e.message))); pending = 'transcript'; next = 'cut'; note = 'Reading the words of the take first. Use our best lines on Cut when it is ready.'; }
       else { update(st => { const r = CUT.range(outputOf(st)), mn = r[0], mx = r[1] == null ? r[0] * 1.33 : r[1], ch = PIECES.choose(piecesOf(st, rel).pieces, { min: mn, max: mx });
         st.pieces = st.pieces || {}; st.pieces[rel] = { ...piecesState(st, rel), ids: ch.ids, reasons: ch.reasons, by: 'ai' }; note = `Picked ${ch.ids.length} lines, ${Math.round(ch.seconds)} s, for your clip. Draft it on Review.`; });
         done.push('combo: AI chose'); next = 'finish'; }

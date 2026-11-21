@@ -4,9 +4,12 @@
 // kit/assemble.cjs terms: zoom, punchX and punchY (the zoom centre).
 //   - the zoom is the reference's face height over yours, never under 1 (we cannot zoom out of your take) and never
 //     over what your source holds without obvious blur (maxZoom)
+//   - a take whose face is already as big as the target, or bigger, is left as filmed: zoom 1, no shift
 //   - a little more zoom (up to EYE_EXTRA past the face height target) is allowed when that is what it takes to reach
-//     the eye line, never when your face is already bigger than the target
-//   - the face box stays inside the frame with a margin
+//     the eye line
+//   - the head stays inside the frame: the crown (estimated from the face box) and the chin keep a margin from the top
+//     and bottom edges, the face box from the sides. The zoom and the zoom centre are held back to make sure, and the
+//     result says so (clamped, held)
 // The face keep-out zone (kit/facezone.py) is measured after the crop, so captions follow the new framing.
 'use strict';
 const { execFileSync } = require('child_process');
@@ -15,7 +18,11 @@ const path = require('path');
 const MAX_UPSCALE = 3.92;   // the most the source picture is blown up in all: cover scale times zoom
 const ZOOM_CAP = 3;         // whatever the source, never closer than this
 const EYE_EXTRA = 1.15;     // extra zoom allowed to reach the eye line
-const MARGIN = 0.03;        // the face box keeps this share of the frame from every edge
+const MARGIN = 0.03;        // the face box keeps this share of the frame from the left and right edges
+const HEADROOM = 0.03;      // the crown and the chin keep this share of the frame from the top and bottom edges
+const CROWN = 0.45;         // the top of the head sits about this share of the face height above the face box
+const CHIN = 0.05;          // and the chin this share below it
+const SAME = 0.02;          // a face within this of the target size counts as already there
 const r3 = x => +(+x).toFixed(3);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
@@ -54,34 +61,44 @@ const move = (p, z, c) => p * z - (z - 1) * c;
 const centreFor = (p, q, z) => (z > 1.0001 ? clamp((p * z - q) / (z - 1), 0, 1) : 0.5);
 
 // ours, target: { faceH, eyeY, cx } (ours may carry the face box y0, y1, x0, x1). Returns the crop and what it gives.
+// held says what stopped the zoom short of the target: 'source' (the blur limit) or 'headroom' (the head would leave
+// the frame); clamped is true for either.
 function cropFor(ours, target, opts = {}) {
   const zMax = opts.maxZoom || 2.2;
   if (!ours || !target || !(ours.faceH > 0) || !(target.faceH > 0)) return null;
   const want = target.faceH / ours.faceH;
-  // the zoom the eye line alone would need (from the top or the bottom edge)
-  const v = ours.eyeY, vt = target.eyeY;
+  const v = ours.eyeY, vt = target.eyeY, cxT = target.cx != null ? target.cx : 0.5;
+  const done = (z, px, py, held) => {
+    const got = { faceH: r3(ours.faceH * z), eyeY: r3(move(v, z, py)), cx: r3(move(ours.cx, z, px)) };
+    return { zoom: r3(z), punchX: r3(px), punchY: r3(py), clamped: !!held, ...(held ? { held } : {}), want: r3(want), got,
+      diff: { faceH: r3(got.faceH - target.faceH), eyeY: r3(got.eyeY - target.eyeY), cx: r3(got.cx - cxT) } };
+  };
+  // Your face is already as big as the target, or bigger: the take stays as filmed. We cannot zoom out, and any zoom
+  // to move the eye line would only make the face bigger still. With no zoom there is no room to shift the picture.
+  if (want <= 1 + SAME) return done(1, 0.5, 0.5, null);
+  // the zoom the eye line alone would need (from the top or the bottom edge); it may ask for a little more than the
+  // face height does, up to EYE_EXTRA past the face height target
   const zEye = vt < v ? (1 - vt) / Math.max(0.05, 1 - v) : vt / Math.max(0.05, v);
-  // the eye line may ask for more zoom than the face height does: allowed up to EYE_EXTRA past the face height target,
-  // and not at all when your face is already bigger than the target (more zoom would only make that miss worse)
-  let z = Math.max(1, want);
-  if (zEye > z) z = Math.min(zEye, Math.max(z, want * EYE_EXTRA));
-  const clamped = z > zMax + 1e-6;
-  z = clamp(z, 1, zMax);
-  // the face box must fit the frame at this zoom
+  let z = want, held = null;
+  if (zEye > z) z = Math.min(zEye, want * EYE_EXTRA);
+  if (z > zMax + 1e-6) { z = zMax; held = 'source'; }
+  // the face box, and the head around it: the crown is above the face box (hair, a cap), the chin just under it
   const y0 = ours.y0 != null ? ours.y0 : ours.eyeY - ours.faceH * 0.42, y1 = ours.y1 != null ? ours.y1 : ours.eyeY + ours.faceH * 0.58;
   const x0 = ours.x0 != null ? ours.x0 : ours.cx - ours.faceH * 0.65, x1 = ours.x1 != null ? ours.x1 : ours.cx + ours.faceH * 0.65;
-  const fit = Math.min((1 - 2 * MARGIN) / Math.max(0.01, y1 - y0), (1 - 2 * MARGIN) / Math.max(0.01, x1 - x0));
-  if (z > fit) z = Math.max(1, fit);
-  let py = centreFor(v, vt, z), px = centreFor(ours.cx, target.cx != null ? target.cx : 0.5, z);
-  if (z > 1.0001) {
-    if (move(y0, z, py) < MARGIN) py = clamp((y0 * z - MARGIN) / (z - 1), 0, 1);
-    if (move(y1, z, py) > 1 - MARGIN) py = clamp((y1 * z - (1 - MARGIN)) / (z - 1), 0, 1);
-    if (move(x0, z, px) < MARGIN) px = clamp((x0 * z - MARGIN) / (z - 1), 0, 1);
-    if (move(x1, z, px) > 1 - MARGIN) px = clamp((x1 * z - (1 - MARGIN)) / (z - 1), 0, 1);
-  }
-  const got = { faceH: r3(ours.faceH * z), eyeY: r3(move(v, z, py)), cx: r3(move(ours.cx, z, px)) };
-  return { zoom: r3(z), punchX: r3(px), punchY: r3(py), clamped, want: r3(want), got,
-    diff: { faceH: r3(got.faceH - target.faceH), eyeY: r3(got.eyeY - target.eyeY), cx: r3(got.cx - (target.cx != null ? target.cx : 0.5)) } };
+  const fh = Math.max(0.01, y1 - y0), top = Math.max(0, y0 - fh * CROWN), bot = Math.min(1, y1 + fh * CHIN);
+  // a head that already touches an edge of your take cannot get a margin there; it keeps the edge it has
+  const mTop = Math.min(HEADROOM, top), mBot = Math.min(HEADROOM, 1 - bot);
+  // the head (crown to chin) and the face box (side to side) must fit the frame at this zoom
+  const fit = Math.max(1, Math.min((1 - mTop - mBot) / Math.max(0.01, bot - top), (1 - 2 * MARGIN) / Math.max(0.01, x1 - x0)));
+  if (z > fit + 1e-6) { z = fit; held = 'headroom'; }
+  if (!(z > 1.0001)) return done(1, 0.5, 0.5, held);
+  let py = centreFor(v, vt, z), px = centreFor(ours.cx, cxT, z);
+  // the zoom centre is moved, if it must be, so the crown and the chin stay in the frame
+  const pyHi = clamp((top * z - mTop) / (z - 1), 0, 1), pyLo = clamp((bot * z - (1 - mBot)) / (z - 1), 0, 1);
+  if (py > pyHi + 1e-6) { py = pyHi; held = held || 'headroom'; } else if (py < pyLo - 1e-6) { py = pyLo; held = held || 'headroom'; }
+  if (move(x0, z, px) < MARGIN) px = clamp((x0 * z - MARGIN) / (z - 1), 0, 1);
+  if (move(x1, z, px) > 1 - MARGIN) px = clamp((x1 * z - (1 - MARGIN)) / (z - 1), 0, 1);
+  return done(z, px, py, held);
 }
 
 // measure spans [[a, b]] of a video with kit/framing.py. Returns one { faceH, eyeY, cx, ... } or null per span;
@@ -123,8 +140,8 @@ function applyToSegs({ segs, shotStart, targets, faces, maxZoom: zMax = 2.2, fal
     }
     if (!first) { out.push(null); return; }
     out.push({ framing: { faceH: first.got.faceH, eyeY: first.got.eyeY, cx: first.got.cx }, target: { faceH: r3(target.faceH), eyeY: r3(target.eyeY), cx: r3(target.cx != null ? target.cx : 0.5) },
-      crop: { zoom: first.zoom, punchX: first.punchX, punchY: first.punchY }, ...(first.clamped ? { clamped: true } : {}), ...(own ? {} : { borrowed: true }) });
-    if (first.clamped) lines.push(`reframe: shot ${j + 1} wants ${first.want}x to match the face height, held at ${first.zoom}x (the most your source holds without blur)`);
+      crop: { zoom: first.zoom, punchX: first.punchX, punchY: first.punchY }, ...(first.clamped ? { clamped: true, held: first.held } : {}), ...(own ? {} : { borrowed: true }) });
+    if (first.clamped) lines.push(first.held === 'headroom' ? `reframe: shot ${j + 1} is held at ${first.zoom}x${first.zoom < first.want ? ` (it wants ${first.want}x)` : ''} so the top of your head and your chin stay in the frame` : `reframe: shot ${j + 1} wants ${first.want}x to match the face height, held at ${first.zoom}x (the most your source holds without blur)`);
   });
   return { shots: out, lines };
 }
@@ -137,4 +154,4 @@ function medianFace(list) {
   return { faceH: med('faceH'), eyeY: med('eyeY'), cx: med('cx') };
 }
 
-module.exports = { cropFor, measure, steady, applyToSegs, medianFace, maxZoom, parseFace, fmtFace, fromMeasure, classOf, CLASSES, CLASS_WORDS, MAX_UPSCALE, EYE_EXTRA, MARGIN };
+module.exports = { cropFor, measure, steady, applyToSegs, medianFace, maxZoom, parseFace, fmtFace, fromMeasure, classOf, CLASSES, CLASS_WORDS, MAX_UPSCALE, EYE_EXTRA, MARGIN, HEADROOM, CROWN, CHIN, SAME };

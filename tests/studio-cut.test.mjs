@@ -181,7 +181,7 @@ try {
     const s = (await call('set_cuts', { candidates: [{ kind: 'clip', ranges: [[0.3, 14]], score: 88, reason: 'Opens with the question \u2014 strong hook' }, { kind: 'ad', ranges: [[20, 34]], score: 70, reason: 'Clear CTA' }] }));
     assert.deepStrictEqual(s.candidates.map(x => x.id), ['c1', 'ad1']); assert.ok(!/\u2014/.test(s.candidates[0].reason));
     const c = (await req('/api/cut')).j; assert.ok(/claude/i.test(c.scoredBy), c.scoredBy);
-    assert.ok((await req('/api/state')).j.state.chat.some(m => m.kind === 'action' && /picked 2 cuts/.test(m.text)));
+    assert.ok((await req('/api/state')).j.state.chat.some(m => m.kind === 'action' && /picked 2 clips/.test(m.text)));
   });
   await t('lines and bites: every line with keep or retake; bites in your order; the clean take; the agent picks over MCP and the page says so', async () => {
     let L = (await req('/api/lines')).j; assert.ok(L.lines.length > 20 && L.lines[0].id === 'l1' && L.lines[0].text && L.lines[0].seconds > 0, JSON.stringify(L).slice(0, 300));
@@ -203,7 +203,7 @@ try {
     assert.deepStrictEqual(sb.bites.map(x => x.name), ['Clean take', 'The setup', 'Ad']); assert.deepStrictEqual(sb.bites[2].lines, ['l7', 'l1']);
     r = (await req('/api/lines')).j; assert.ok(/claude/i.test(r.by) && r.bites[1].by === r.by && !/—/.test(r.bites[1].reason), r.by);
     assert.ok(!r.lines[1].keep && !r.bites[0].lines.includes('l2'), 'the agent marked line 2 a retake, so the clean take leaves it out');
-    assert.ok((await req('/api/state')).j.state.chat.some(m => m.kind === 'action' && /picked 2 bites on the Cut step, plus the clean take/.test(m.text)));
+    assert.ok((await req('/api/state')).j.state.chat.some(m => m.kind === 'action' && /made 2 clips from your lines on the Cut step, plus the clean take/.test(m.text)));
     r = (await req('/api/lines', { id: r.bites[2].id, action: 'move', dir: -1 })).j.lines; assert.strictEqual(r.bites[1].name, 'Ad');
   });
   await t('footage order: move a clip in place (by index or the whole order), remove one, the rest stay in order', async () => {
