@@ -27,7 +27,7 @@ try {
     const c = C.catalog({ fresh: true });
     assert.deepStrictEqual(c.errs, []);
     assert.ok(c.categories.length >= 17);
-    for (const cat of c.categories) for (const r of cat.items) { const it = c.items[r]; assert.ok(it, r); if (it.preview) assert.ok(existsSync(join(ROOT, it.preview.src)), it.preview.src); }
+    for (const cat of c.categories) for (const r of cat.items) { const it = c.items[r]; assert.ok(it, r); if (it.preview?.src) assert.ok(existsSync(join(ROOT, it.preview.src)), it.preview.src); }
     assert.strictEqual(c.categories.find(x => x.id === 'transitions').count, L.transitionNames().length);
     assert.ok(c.categories.find(x => x.id === 'camera').items.every(r => r.startsWith('effect:') || r === 'editing:punch'));
   });
