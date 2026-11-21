@@ -103,9 +103,9 @@ try {
     });
     await t(`${theme}: For your agent copies this reel as an instruction; no step shows a command`, async () => {
       await open(pg, '#step=render'); await pg.waitForSelector('#s-render:not([hidden])');
-      await pg.click('#cmd-fold .fold2-h'); await pg.click('#cmd-copy');
+      await pg.click('#details-fold .fold2-h'); await pg.click('#cmd-copy');
       assert.match(await clip(), /^In my aigent-talking-head folder, make this reel by running npm run reel -- /);
-      await open(pg, '#step=review'); await pg.waitForSelector('#s-review:not([hidden])'); assert.ok(await pg.$('#run-foot #cmd-fold'), 'the same fold under Review');
+      await open(pg, '#step=review'); await pg.waitForSelector('#s-review:not([hidden])'); assert.ok(await pg.$('#run-foot #details-fold'), 'the same fold under Review');
       // every step and both second views (the reference view of Picture, the Post view of Render): [link, step, view]
       for (const [st, step, view] of [['start', 'start', 'main'], ['cut', 'cut', 'main'], ['picture', 'picture', 'main'], ['reference', 'picture', 'reference'], ['text', 'text', 'main'], ['broll', 'broll', 'main'], ['music', 'music', 'main'], ['review', 'review', 'main'], ['render', 'render', 'main'], ['post', 'render', 'post']]) {
         await open(pg, '#step=' + st); await pg.waitForSelector(`main[data-step="${step}"][data-view="${view}"] .step:not([hidden]) h2`); await noCmd(pg, 'body', 'step ' + st); }

@@ -58,7 +58,7 @@ try {
     assert.strictEqual(await pg.locator('#recreate-stages .stg-now').count(), 1, 'one live line');
     assert.strictEqual(await pg.locator('#recreate-stages .stg-fold').evaluate(e => e.open), false, 'the list is folded');
     const labels = await pg.$$eval('#recreate-stages .stg-list li', els => els.map(e => e.children[1].textContent));
-    assert.deepStrictEqual(labels, ['Downloading', 'Finding cuts', 'Reading captions', 'Reading camera moves', 'Transcribing', 'Reading music and sounds', 'Reading graphics', 'Reading framing', 'Reading colours', 'Building the recipe']);
+    assert.deepStrictEqual(labels, ['Downloading', 'Finding cuts', 'Reading captions', 'Reading camera moves', 'Transcribing', 'Reading music and sounds', 'Reading graphics', 'Reading framing', 'Reading colors', 'Putting it together']);
     assert.strictEqual((await states(pg))[0], 'now');
     const it = await item(); assert.strictEqual(it.stages.stage, 'download'); assert.ok(it.stages.percent <= 10);
   });

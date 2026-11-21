@@ -154,7 +154,7 @@ try {
     assert.ok(r.pieces.pieces.filter(x => x.fits).length >= 3); assert.strictEqual(r.pieces.point, POINT);
     assert.strictEqual((await req('/api/edit')).point, POINT, 'get_edit reads it'); assert.strictEqual((await req('/api/cut')).point, POINT, 'get_cuts reads it');
     const ch = await req('/api/pieces', { choose: true }); assert.match(ch.note, /^Picked \d+ lines, \d+ s, for your clip/); assert.ok(Object.values(ch.pieces.combo.reasons).some(x => x.includes(PT.FITS)));
-    assert.match(ch.edit.from.text, /^\d+ lines?, /, 'Your edit says lines: ' + ch.edit.from.text);
+    assert.match(ch.edit.from.text, /^our \d+ best lines?, \d+ s$/, 'Your edit says lines: ' + ch.edit.from.text);
   });
   await t('server: a new point finds the suggested clips again and keeps what you dropped', async () => {
     await req('/api/pieces', { clear: true }); await req('/api/state', { point: '' });

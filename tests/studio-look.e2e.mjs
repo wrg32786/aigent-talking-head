@@ -62,7 +62,7 @@ try {
 
   await t('Picture: one row of Looks, the reference card, 4 layer tabs; Text and graphics has 3', async () => {
     await open(pg, '#step=picture'); await pg.waitForSelector('#looks .pack[data-look="magazine"][aria-checked="true"]');
-    assert.ok(/built in/.test(await pg.textContent('#looks .pack[data-look="magazine"]')));
+    assert.strictEqual((await pg.textContent('#looks .pack[data-look="magazine"] b')).trim(), 'Magazine', 'a built-in Look shows its plain name and no second line');
     assert.ok(/Hormozi hook/.test(await pg.textContent('#ref-card'))); assert.strictEqual(await pg.getAttribute('#ref-card-mode [data-mode="influence"]', 'aria-checked'), 'true');
     assert.ok(/Influence/.test(await pg.textContent('#ref-card-mode [aria-checked="true"]')));
     assert.deepStrictEqual(await pg.$$eval('#ref-card-mode [role="radio"]', x => x.map(e => e.textContent.trim())), ['Recreate', 'Copy the look', 'Influence', 'Off'], 'one vocabulary on the card');

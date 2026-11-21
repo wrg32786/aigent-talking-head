@@ -32,10 +32,10 @@ const errs = [];
 try {
   const pg = await browser.newPage({ viewport: { width: 1280, height: 860 } });
   pg.on('pageerror', e => errs.push(e.message));
-  await pg.goto(url + '/#step=footage', { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#wizards-open');
+  await pg.goto(url + '/#step=footage', { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#more-open');
 
   await t('wizards: Copy a reference opens the link screen, Let my agent decide works', async () => {
-    await pg.click('#wizards-open'); await pg.waitForSelector('#wz-list');
+    await pg.click('#more-open'); await pg.click('#more-wizards'); await pg.waitForSelector('#wz-list');
     await pg.click('.wz-pick[data-wizard="reference"]');
     await pg.waitForSelector('#wz-url-in');
     assert.strictEqual(await pg.$('#wz-clips-go'), null, 'Copy a reference shows the clips screen');
@@ -53,9 +53,9 @@ try {
 
   await t('Studio starts again: the bar goes by itself and the wizards load', async () => {
     const back = start(port); srv = back.srv; await back.url;
-    await pg.goto(url + '/#step=footage', { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#wizards-open');
+    await pg.goto(url + '/#step=footage', { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#more-open');
     await stop(srv);
-    await pg.click('#wizards-open'); await pg.waitForSelector('#wz-retry', { timeout: 10000 });
+    await pg.click('#more-open'); await pg.click('#more-wizards'); await pg.waitForSelector('#wz-retry', { timeout: 10000 });
     const said = await pg.textContent('#wz-err');
     assert.match(said, /Studio is not running/); assert.doesNotMatch(said, /Failed to fetch/);
     const again = start(port); srv = again.srv; await again.url;

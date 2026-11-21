@@ -1,6 +1,6 @@
 // Post (the second view of the Render step) in a real Chrome, against a local mock of Buffer, R2 and the public link check (no network, no real keys):
 // - Connect: Next stays off until the Buffer key is saved and a host is saved; R2 fields and the key pair; Check host
-// - Channels: the reel, your Buffer channels, Facebook Reels marked "Will be skipped" for a 100 s reel, the caption count
+// - Channels: the reel, your Buffer channels, Facebook Reels marked "Can't post this one" for a 100 s reel, the caption count
 // - Send: Drafts is the default and names the button; Post now needs the tick; a send lands as Buffer drafts and the
 //   result lists each channel
 // - light and dark themes; no sideways scroll on a 375 px phone; no page errors
@@ -91,7 +91,7 @@ try {
     await pg.click('#post-next-channels'); await pg.waitForSelector('.post-ch-list li[data-id="ch-ig"]');
     await pg.waitForFunction(() => /1 min 40 s/.test(document.querySelector('#post-reel-info').textContent));
     await pg.check('.post-ch-list li[data-id="ch-ig"] input'); await pg.check('.post-ch-list li[data-id="ch-fb"] input'); await pg.check('.post-ch-list li[data-id="ch-tt"] input');
-    await pg.waitForSelector('.post-ch-list li[data-id="ch-fb"] >> text=Will be skipped');
+    await pg.waitForSelector('.post-ch-list li[data-id="ch-fb"] >> text=Can\'t post this one');
     await pg.fill('#post-caption-in', 'Editing ate my weekends. Now it takes ten minutes. #aigent');
     await pg.waitForSelector('#post-caption-count >> text=/ 2200');
     await snap(pg, 'post-channels-dark.png');
@@ -116,17 +116,18 @@ try {
     assert.strictEqual(await pg.$('#post-make-feed'), null, 'no button until a channel posts to the Feed');
     assert.deepStrictEqual(await pg.$$eval('#post-place-ch-ig [role="radio"]', x => x.map(b => [b.textContent, b.getAttribute('aria-checked')])), [['Reels', 'true'], ['Feed', 'false']]);
     assert.strictEqual(await pg.$('#post-place-ch-fb'), null, 'only Instagram has the choice');
-    assert.match(await pg.textContent('.post-ch-list li[data-id="ch-ig"] .pc-file'), /Gets reel-v1\.mp4/);
+    assert.match(await pg.textContent('.post-ch-list li[data-id="ch-ig"] .pc-file'), /Gets the 9:16 version/);
     await pg.click('#post-place-ch-ig [data-place="feed"]'); await pg.waitForSelector('#post-make-feed');
-    assert.strictEqual((await pg.textContent('#post-make-feed')).trim(), 'Make the 4:5 version for the Feed');
-    await pg.waitForSelector('.post-ch-list li[data-id="ch-ig"] >> text=Will be skipped'); assert.match(await pg.textContent('.post-ch-list li[data-id="ch-ig"] .pc-file'), /Needs the 4:5 version/);
+    assert.strictEqual((await pg.textContent('#post-make-feed')).trim(), 'Make it'); assert.strictEqual(await pg.getAttribute('#post-make-feed', 'aria-label'), 'Make the 4:5 version for the Feed');
+    assert.ok(await pg.$('.post-ch-list li[data-id="ch-ig"] #post-make-feed'), 'the fix sits on the channel row'); assert.strictEqual(await pg.$('.post-ch-list li[data-id="ch-ig"] .pc-why'), null, 'the reason is said once');
+    await pg.waitForSelector('.post-ch-list li[data-id="ch-ig"] >> text=Can\'t post yet'); assert.match(await pg.textContent('.post-ch-list li[data-id="ch-ig"] .pc-file'), /Needs the 4:5 version/);
     await pg.locator('#post-where').scrollIntoViewIfNeeded(); await snap(pg, 'post-feed-make-dark.png');
-    await pg.click('#post-make-feed'); await pg.waitForSelector('#post-feed-file', { timeout: 60000 });
-    assert.strictEqual(await pg.textContent('#post-feed-file'), 'reel-v1-feed-4x5.mp4'); assert.ok(existsSync(join(jobDir, 'reel-v1-feed-4x5.mp4')));
-    await pg.waitForSelector('#post-make-feed', { state: 'detached' }); await pg.waitForSelector('.post-ch-list li[data-id="ch-ig"] >> text=Will be skipped', { state: 'detached' });
-    assert.match(await pg.textContent('.post-ch-list li[data-id="ch-ig"] .pc-file'), /Gets reel-v1-feed-4x5\.mp4 \(4:5\)/);
+    await pg.click('#post-make-feed'); await pg.waitForSelector('.post-ch-list li[data-id="ch-ig"] .pc-file >> text=Gets the 4:5 version', { timeout: 60000 });
+    assert.strictEqual(await pg.getAttribute('.post-ch-list li[data-id="ch-ig"] .pc-file', 'title'), 'reel-v1-feed-4x5.mp4', 'the file name is in the tooltip only'); assert.ok(existsSync(join(jobDir, 'reel-v1-feed-4x5.mp4')));
+    await pg.waitForSelector('#post-make-feed', { state: 'detached' }); await pg.waitForSelector('.post-ch-list li[data-id="ch-ig"] >> text=Can\'t post yet', { state: 'detached' });
+    assert.match(await pg.textContent('.post-ch-list li[data-id="ch-ig"] .pc-file'), /Gets the 4:5 version/);
     assert.strictEqual(await pg.inputValue('#post-reel-pick'), `jobs/${JOB}/reel-v1.mp4`, 'the reel stays picked; the 4:5 is listed with its label');
-    assert.match(await pg.textContent('#post-reel-pick'), /reel-v1-feed-4x5\.mp4 \(For the Instagram Feed\)/);
+    assert.match(await pg.textContent('#post-reel-pick'), /Version 1 \(For the Instagram Feed\)/);
     await snap(pg, 'post-feed-note-dark.png');
     await pg.click('#post-next-send'); await pg.waitForSelector('#post-send-go');
     assert.match(await pg.textContent('#post-summary'), /reel-v1-feed-4x5\.mp4 to the Instagram Feed, reel-v1\.mp4 everywhere else/);
@@ -139,7 +140,7 @@ try {
     await pg.evaluate(() => localStorage.setItem('studio.theme', 'light')); await pg.reload({ waitUntil: 'domcontentloaded' });
     await pg.waitForSelector('.post-ch-list li[data-id="ch-ig"]');
     assert.strictEqual(await pg.evaluate(() => document.documentElement.dataset.theme), 'light');
-    await pg.click('#post-place-ch-ig [data-place="feed"]'); await pg.waitForSelector('#post-feed-file'); await snap(pg, 'post-feed-note-light.png'); await pg.click('#post-place-ch-ig [data-place="reel"]');
+    await pg.click('#post-place-ch-ig [data-place="feed"]'); await pg.waitForSelector('.post-ch-list li[data-id="ch-ig"] .pc-file >> text=Gets the 4:5 version'); await snap(pg, 'post-feed-note-light.png'); await pg.click('#post-place-ch-ig [data-place="reel"]');
     await snap(pg, 'post-channels-light.png');
     await pg.click('#post-part-connect'); await pg.waitForSelector('#post-buffer'); await snap(pg, 'post-connect-light.png');
     await pg.click('#post-part-send'); await pg.waitForSelector('#post-send-go'); await snap(pg, 'post-send-light.png');

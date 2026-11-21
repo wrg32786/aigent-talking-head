@@ -98,12 +98,12 @@ try {
       // the take plays on every layer; its words show only on the raw take
       assert.ok(await pg.isVisible('#player #player-video'), id + ': the player'); await pg.waitForSelector('#player-transcript .w', { state: 'attached' });
       assert.strictEqual(await pg.isVisible('#player-transcript'), id === 'raw', id + ': the transcript');
-      assert.strictEqual(await pg.isVisible('#cut-raw'), id === 'raw'); assert.strictEqual(await pg.isVisible('#pieces'), id === 'lines'); assert.strictEqual(await pg.isVisible('#cut-clips'), id === 'clips');
+      assert.strictEqual(await pg.isVisible('#cut-summary-box'), id === 'clips', id + ': What to make sits on Clips only'); assert.strictEqual(await pg.isVisible('#pieces'), id === 'lines'); assert.strictEqual(await pg.isVisible('#cut-clips'), id === 'clips');
     }
     assert.strictEqual(new Set(said).size, 3, 'each layer has its own line');
-    // the raw facts: how long, how many lines, the one long pause
-    await layer('raw'); const facts = await pg.textContent('#cut-raw'); assert.ok(new RegExp(`${SENT.length} lines`).test(facts) && /1 long pause/.test(facts), facts);
-    await pg.click('#cut-to-lines'); await pg.waitForSelector('#cut-body[data-layer="lines"]');
+    // Raw take is the take and its words, with no row of numbers above it; the length is on its tab
+    await layer('raw'); assert.strictEqual(await pg.$('#cut-raw'), null); assert.match(await pg.textContent('#cut-layer-raw .cl-c'), /^\d+:\d\d$/);
+    await layer('lines');
     for (const id of ['clips', 'lines']) {
       await layer(id); await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForSelector(`#cut-body[data-layer="${id}"]`);
       assert.deepStrictEqual(await sel(), ['cut-layer-' + id], id + ' after a reload');
@@ -213,7 +213,7 @@ try {
     await pg.waitForFunction(() => /^2 clips kept, /.test(document.querySelector('#cut-kept').textContent)); assert.notStrictEqual(await kept(), before);
     assert.strictEqual(await pg.getAttribute('#cut-hint', 'data-kept'), '2'); assert.strictEqual(await pg.isChecked('#keep-' + B.id), false);
     assert.deepStrictEqual(await cutIds(), [A.id, S.id], 'the server leaves it out of the reel');
-    let e = await api('/api/edit'); assert.ok(/^2 clips, \d+ s, in your order/.test(e.edit.from.text), e.edit.from.text);
+    let e = await api('/api/edit'); assert.ok(/^2 clips, \d+ s$/.test(e.edit.from.text), e.edit.from.text);
     await pg.click('#keep-' + A.id); await pg.click('#keep-' + S.id); await pg.waitForSelector(row(S.id) + '[data-keep="0"]'); await pg.waitForSelector(row(A.id) + '[data-keep="0"]');
     await pg.waitForFunction(() => document.querySelector('#cut-kept').textContent === 'No clip is kept, so the whole take moves on.');
     e = await api('/api/edit'); assert.strictEqual(e.combo.pieces.length, 0); assert.strictEqual(e.edit.from.mode, 'take');
@@ -234,10 +234,10 @@ try {
     await pg.click('#combo-to-clips'); await pg.waitForSelector(row('own') + '[data-keep="1"]');
     assert.strictEqual(await pg.$eval('#cut-candidates li.clip-row', e => e.dataset.id), 'own', 'your clip is the first row');
     assert.ok(/^Your clip$/.test(await pg.textContent(row('own') + ' .clip-h b'))); assert.ok(/^3 lines stitched, /.test(await pg.textContent(row('own') + ' .clip-m')));
-    assert.strictEqual(await pg.textContent('#cut-own-wins'), 'Your own clip is what moves on. Untick it to use the clips below instead.');
+    assert.strictEqual(await pg.textContent('#cut-own-wins'), 'Only Your clip moves on. Untick it to use the clips below.');
     await pg.waitForFunction(() => /^1 clip kept, \d+ s\. It moves on to the next steps as one reel\.$/.test(document.querySelector('#cut-kept').textContent));
     let e = await api('/api/edit'); assert.ok(e.combo.pieces.length && e.combo.pieces.every(x => x.kind === 'piece'), JSON.stringify(e.combo.pieces.map(x => x.kind)));
-    assert.deepStrictEqual(e.combo.pieces.flatMap(x => x.lines), mine); assert.ok(/^3 lines, \d+ s, in your order, built by you/.test(e.edit.from.text), e.edit.from.text);
+    assert.deepStrictEqual(e.combo.pieces.flatMap(x => x.lines), mine); assert.ok(/^your 3 lines, \d+ s$/.test(e.edit.from.text), e.edit.from.text);
     await shot(pg, 'cut-layers-clips.png');
     await pg.click('#keep-own'); await pg.waitForSelector(row('own') + '[data-keep="0"]');
     await pg.waitForSelector('#cut-own-wins', { state: 'detached' }); await pg.waitForFunction(() => /^3 clips kept, /.test(document.querySelector('#cut-kept').textContent));
@@ -245,8 +245,8 @@ try {
     assert.strictEqual((await api('/api/pieces')).combo.off, true); assert.deepStrictEqual((await api('/api/pieces')).combo.ids, mine, 'your lines stay picked');
     await pg.click('#keep-own'); await pg.waitForSelector(row('own') + '[data-keep="1"]'); await pg.waitForSelector('#cut-own-wins');
     assert.ok((await api('/api/edit')).combo.pieces.every(x => x.kind === 'piece'));
-    // Start over empties your clip; the suggested clips move on again
-    await layer('lines'); assert.strictEqual(await pg.textContent('#pieces-own'), 'Start over'); await pg.click('#pieces-own');
+    // Clear my clip empties your clip; the suggested clips move on again
+    await layer('lines'); assert.strictEqual(await pg.textContent('#pieces-own'), 'Clear my clip'); await pg.click('#pieces-own');
     await until(async () => (await api('/api/pieces')).combo.ids.length === 0); await pg.waitForSelector('#pieces-own', { state: 'detached' });
     await layer('clips'); await pg.waitForSelector(row(A.id)); assert.strictEqual(await pg.$(row('own')), null);
     assert.ok((await api('/api/edit')).combo.pieces.every(x => x.kind === 'cut'));
@@ -292,8 +292,8 @@ try {
     await noOldWords('Best lines');
     assert.ok(/^Use our \d+ best lines$/.test(await pg.textContent('#pieces-choose'))); assert.strictEqual(await pg.textContent('#combo-h'), 'Your clip');
     await pg.click('#pieces-grid .pz .pz-more'); await showAll(false);
-    await layer('raw'); await pg.waitForSelector('#cut-raw'); await noOldWords('Raw take');
-    await pg.click('#cut-change'); await api('/api/pieces', { clear: true }); await api('/api/lines', { action: 'set', bites: [] });
+    await layer('raw'); await pg.waitForSelector('#player-transcript'); await noOldWords('Raw take');
+    await layer('clips'); await pg.click('#cut-change'); await api('/api/pieces', { clear: true }); await api('/api/lines', { action: 'set', bites: [] });
   });
 
   await t('new footage on a board with an edit is a new video: the point clears', async () => {

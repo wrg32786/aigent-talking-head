@@ -57,7 +57,7 @@ try {
     assert.deepStrictEqual(['reel-v1.mp4', 'reel-v1-feed-4x5.mp4', 'reel-v1-square-1x1.mp4', 'reel-fx-v1.mp4', 'reel-v1-feed45.mp4', 'reel-v3-tiktok.mp4'].map(SZ.labelOf),
       ['For Reels and Stories', 'For the Instagram Feed', 'Square, for feeds', 'With effects', 'For the Instagram Feed', 'For TikTok, a smaller file']);
     for (const l of SZ.SIZES.flatMap(z => [z.label, z.use]).concat(SZ.WHERE, SZ.MAKE_FEED)) assert.ok(!/\u2014|--/.test(l), l);
-    assert.deepStrictEqual(SZ.SIZES.map(z => z.label), ['Reels and Stories 9:16', 'Instagram Feed 4:5 (1080x1350)', 'Square 1:1']);
+    assert.deepStrictEqual(SZ.SIZES.map(z => z.label), ['Reels and Stories 9:16', 'Instagram Feed 4:5', 'Square 1:1']);
     assert.deepStrictEqual(SZ.sortFiles(['reel-v1.mp4', 'reel-v2-feed-4x5.mp4', 'reel-v2.mp4', 'reel-fx-v2.mp4', 'reel-v10-square-1x1.mp4', 'reel-v10.mp4']), ['reel-v10.mp4', 'reel-v10-square-1x1.mp4', 'reel-fx-v2.mp4', 'reel-v2.mp4', 'reel-v2-feed-4x5.mp4', 'reel-v1.mp4']);
     assert.ok(SZ.isReel('reel-v1-feed-4x5.mp4') && !SZ.isReel('reel-v1.pre.mp4') && !SZ.isReel('notes-v1.mp4'));
     mkdirSync(jobDir, { recursive: true }); writeFileSync(join(jobDir, 'reel-v1.mp4'), ''); writeFileSync(join(jobDir, 'reel-v2.mp4'), ''); writeFileSync(join(jobDir, 'reel-v2-feed-4x5.mp4'), '');
