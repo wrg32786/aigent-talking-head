@@ -200,7 +200,7 @@ function Testimonials({ B, V, after }) {
 
 export function BRoll({ V, apply, go, openKeys }) {
   const B = V.broll || { beats: [], sources: [], asks: [], gens: [], generate: { providers: [] }, library: {} };
-  const [sel, setSel] = useState(null), [tab, setTab] = useState('library'), [busy, setBusy] = useState(''), [addAt, setAddAt] = useState(null);
+  const [sel, setSel] = useState(null), [tab, setTab] = useState('library'), [busy, setBusy] = useState(''), [addAt, setAddAt] = useState(null), [confirmClear, setConfirmClear] = useState(false);
   const beat = B.beats.find(b => b.n === sel) || null;
   useEffect(() => { if (!beat && B.beats.length) setSel((B.beats.find(b => b.idea) || B.beats.find(b => b.slot) || B.beats[0]).n); }, [B.beats.length]);
   // a reply can land after a newer live update (an agent's idea, a clear from the API). Merging it into this render's V
@@ -210,6 +210,7 @@ export function BRoll({ V, apply, go, openKeys }) {
   const fill = async (o, j) => { if (j) return after(j); try { after(await api('/api/broll/slot', { beat: beat.n, ...o })); } catch {} };
   const idea = async (n, action) => { setBusy('idea' + n); try { after(await api('/api/broll/idea', { beat: n, action })); } catch {} setBusy(''); };
   const suggest = async () => { setBusy('suggest'); try { const j = await api('/api/broll/suggest', {}); after(j); toast(j.count ? `${j.count} idea${j.count === 1 ? '' : 's'} to approve` : 'Every spot that needs b-roll has some. Add a spot or swap one.', !!j.count); } catch {} setBusy(''); };
+  const clearAll = async (undo) => { setBusy('clear'); try { const j = await api('/api/broll/clear', undo ? { undo: true } : {}); after(j); setConfirmClear(false); toast(j.note || (undo ? 'B-roll is back on the timeline.' : 'Cleared b-roll from every spot.'), true); } catch {} setBusy(''); };
   const auto = async on => { try { after(await api('/api/broll/auto', { on })); } catch {} };
   const addSpot = async e => { e.preventDefault(); try { after(await api('/api/broll/spot', { at: +addAt })); setAddAt(null); } catch {} };
   const ask = async (a, yes) => {
@@ -241,6 +242,11 @@ export function BRoll({ V, apply, go, openKeys }) {
           </button>)}
         </div>
         <div className="blane-scale" aria-hidden="true">{B.beats.map(b => <i key={b.n} style={{ left: (b.start / L * 100) + '%' }} />)}</div>
+        <p className="fine broll-clear-row" id="broll-clear-row">{filled} of {B.beats.length} spots have b-roll.
+          {filled > 0 && !confirmClear && <> <button type="button" className="linkish" id="broll-clear-all" onClick={() => setConfirmClear(true)}>Clear all B-roll</button>.</>}
+          {confirmClear && <span className="broll-clear-confirm" id="broll-clear-confirm"> Clear b-roll from every spot? <Button id="broll-clear-yes" size="sm" variant="primary" label="Clear all" isLoading={busy === 'clear'} onClick={() => clearAll(false)} /><Button id="broll-clear-no" size="sm" variant="ghost" label="Cancel" onClick={() => setConfirmClear(false)} /></span>}
+          {!!B.undo && !confirmClear && <span className="broll-undo" id="broll-undo"> B-roll cleared. <button type="button" className="linkish" id="broll-undo-btn" onClick={() => clearAll(true)}>Undo</button></span>}
+        </p>
         {beat && <div className="beat-panel glass" id="beat-panel">
           <div className="bp-h"><b>Spot {beat.n} at {clock(beat.start)}</b><span className="fine">{t1(beat.start)} to {t1(beat.end)} s · "{beat.text}"</span></div>
           {beat.ref && <p className="fine sp-refnote" id="spot-ref"><Icon n="film" />The reference cuts to b-roll here{beat.ref.detail ? `: ${beat.ref.detail}` : ''}.</p>}

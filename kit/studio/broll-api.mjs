@@ -31,6 +31,8 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
   const jobState = (s, job = s.job) => { s.broll = s.broll || {}; const b = s.broll[job] = s.broll[job] || {}; b.slots = b.slots || {}; b.ideas = b.ideas || {}; b.asks = b.asks || []; b.gens = b.gens || []; b.marks = b.marks || []; b.raws = b.raws || []; b.cutins = b.cutins || []; return b; };
   const peek = (s, job = s.job) => ({ slots: {}, ideas: {}, asks: [], gens: [], marks: [], raws: [], cutins: [], ...(((s.broll || {})[job]) || {}) });
   function draftOf(job, s = C.load()) {
+    // leftover jobs/<job>/build from a previous edit must not drive the timeline once the footage changed
+    if (job === s.job && !C.draftIsCurrent(s)) return null;
     const b = join(ROOT, 'jobs', String(job || '-'), 'build'); let cut = null, caps = null;
     try { cut = JSON.parse(readFileSync(join(b, 'cut.json'), 'utf8')); } catch { return null; }
     try { const g = {}; new Function('window', readFileSync(join(b, 'captions.js'), 'utf8'))(g); caps = g.CAPTIONS; } catch {}
@@ -57,7 +59,8 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     const st = S.load();
     return { job, draft: !!d, beats, length: d ? d.len : 0, asks: b.asks, gens: b.gens.slice(-8), sources: sources(), library: { dir: BR.libDir(), count: lib.length },
       generate: { on: !!st.broll.generate, providers: GEN.list(st) }, places: LANE.PLACE_LABEL, auto: autoOn(), types: TYPES, card: chromeOk(),
-      raws: b.raws.slice(-6), cutins: b.cutins.map(x => ({ ...x, clip: clipBrief(byId[x.clip]) })).filter(x => x.clip), testimonials: lib.filter(c => c.type === 'testimonial' && c.raw).slice(0, 24).map(clipBrief) };
+      raws: b.raws.slice(-6), cutins: b.cutins.map(x => ({ ...x, clip: clipBrief(byId[x.clip]) })).filter(x => x.clip), testimonials: lib.filter(c => c.type === 'testimonial' && c.raw).slice(0, 24).map(clipBrief),
+      undo: !!(b.undo && b.undo.slots) };
   }
   // the render step's plan: every filled slot as an insert, and the credits
   function plan(s) {
@@ -241,7 +244,33 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     if (p === '/api/broll/stock/add' && M === 'POST') { const b = await readBody(req); const c = await BR.downloadStock(b.provider, b.item); const v = b.beat != null ? fill(C.load(), b.beat, c.id, { place: b.place, by: b.by }) : C.load(); return json(res, 200, { clip: clipBrief(c), broll: view(v) }); }
     if (p === '/api/broll/make' && M === 'POST') { const b = await readBody(req); const c = await makeCard(b.spec || {}); const v = b.beat != null ? fill(C.load(), b.beat, c.id, { place: b.place, by: b.by }) : C.load(); return json(res, 200, { clip: clipBrief(c), broll: view(v) }); }
     if (p === '/api/broll/capture' && M === 'POST') { const b = await readBody(req); const c = await captureClip(String(b.url || '')); const v = b.beat != null ? fill(C.load(), b.beat, c.id, { place: b.place || 'pip', by: b.by }) : C.load(); return json(res, 200, { clip: clipBrief(c), broll: view(v) }); }
-    if (p === '/api/broll/slot' && M === 'POST') { const b = await readBody(req); const v = fill(s, b.beat, b.clear ? null : b.clip || (peek(s).slots[b.beat] || {}).clip, { ...b, by: b.by ? CH.prettyName(String(b.by)) : 'you' }); return json(res, 200, { broll: view(v), state: v }); }
+    if (p === '/api/broll/clear' && M === 'POST') {
+      const b = await readBody(req).catch(() => ({}));
+      const v = update(st => {
+        const j = jobState(st);
+        if (b.undo) {
+          if (!j.undo || !j.undo.slots) throw bad('nothing to undo');
+          j.slots = { ...j.undo.slots }; delete j.undo; return;
+        }
+        if (!Object.keys(j.slots || {}).length) throw bad('no b-roll on the timeline to clear');
+        j.undo = { slots: JSON.parse(JSON.stringify(j.slots)), at: Date.now() };
+        j.slots = {};
+      });
+      return json(res, 200, { broll: view(v), state: v, note: b.undo ? 'B-roll is back on the timeline.' : 'Cleared b-roll from every spot. Undo puts it back. Library clips are unchanged.' });
+    }
+    if (p === '/api/broll/slot' && M === 'POST') {
+      const b = await readBody(req);
+      if (b.clear && (b.all || b.beat == null)) {
+        const v = update(st => {
+          const j = jobState(st);
+          if (!Object.keys(j.slots || {}).length) throw bad('no b-roll on the timeline to clear');
+          j.undo = { slots: JSON.parse(JSON.stringify(j.slots)), at: Date.now() };
+          j.slots = {};
+        });
+        return json(res, 200, { broll: view(v), state: v, note: 'Cleared b-roll from every spot. Undo puts it back. Library clips are unchanged.' });
+      }
+      const v = fill(s, b.beat, b.clear ? null : b.clip || (peek(s).slots[b.beat] || {}).clip, { ...b, by: b.by ? CH.prettyName(String(b.by)) : 'you' }); return json(res, 200, { broll: view(v), state: v });
+    }
     if (p === '/api/broll/ideas' && M === 'POST') {
       const b = await readBody(req), by = b.by ? CH.prettyName(String(b.by)) : 'the rules', d = draftOf(s.job); if (!d) throw bad('make a draft first: the beats come from it');
       if (!Array.isArray(b.ideas)) throw bad('ideas: [{ beat, idea, query or clip or card, place }]');

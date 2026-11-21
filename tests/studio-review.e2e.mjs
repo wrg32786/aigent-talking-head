@@ -4,7 +4,7 @@
 // - comment on the preview: drag a box on a frame, send it, and the chat line carries the frame and the box
 // - clean-up pass: a real draft from a clips folder with a filler word, a long pause and a retake, reviewed and
 //   applied; the redraft's cut.json has the cuts as jump cuts and is shorter; the edit receipt lists the clean-up
-// The "reel" Studio compares against is the synthetic clips joined by ffmpeg, so the test does not wait for a render.
+// The "reel" Studio compares against is the synthetic clips joined by ffmpeg, tagged as this draft (the test does not wait for a render).
 // Needs Chrome and ffmpeg. Run: node tests/studio-review.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
 import assert from 'assert';
 import http from 'http';
@@ -41,6 +41,24 @@ const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), 
 const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out))); });
 const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json();
 const waitTask = async (ms = 10 * 60e3) => { const t0 = Date.now(); let v; do { await new Promise(r => setTimeout(r, 1000)); v = await api('/api/state'); } while ((!v.task || v.task.status === 'running') && Date.now() - t0 < ms); return v; };
+const asCurrentDraft = async (job, version = 1) => {
+  const cur = await api('/api/state');
+  const key = (cur.combo && cur.combo.from === 'pieces' && cur.combo.key)
+    ? 'pieces:' + cur.combo.key
+    : 'take:' + JSON.stringify([cur.state.footage || [], cur.state.clips || null]);
+  writeFileSync(join(ROOT, 'jobs', job, `reel-v${version}.settings.json`), JSON.stringify({
+    version, at: new Date().toISOString(), job, key,
+    footage: JSON.stringify([cur.state.footage || [], cur.state.clips || null]),
+    takes: (cur.state.footage || []).map(f => String(f).split('/').pop()),
+    from: (cur.edit && cur.edit.from && cur.edit.from.text) || (cur.combo && cur.combo.from === 'pieces' ? 'your pieces' : 'the whole take'),
+  }));
+  if (!cur.edit || !cur.edit.drafted) {
+    const st = JSON.parse(readFileSync(join(STATE, 'state.json'), 'utf8'));
+    st.drafted = { key, from: (cur.combo && cur.combo.from) || 'take', at: Date.now() };
+    delete st.draftStale;
+    writeFileSync(join(STATE, 'state.json'), JSON.stringify(st, null, 2));
+  }
+};
 const c3 = c => c.segs.filter(s => /clip-003/.test(s.file));
 // a screenshot of one panel, scrolled below the sticky header
 const shot = async (page, sel, name) => {
@@ -83,6 +101,7 @@ try {
     // the reel Studio compares against: the clips joined (a stand-in for a render, which this test does not wait for)
     writeFileSync(join(STATE, 'list.txt'), ['001', '002', '003', '004', '006'].map(k => `file '${join(CL, `clip-${k}.mp4`)}'`).join('\n'));
     execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', join(STATE, 'list.txt'), '-vf', 'scale=540:960', '-c:v', 'libx264', '-preset', 'ultrafast', '-c:a', 'aac', join(JOBDIR, 'reel-v1.mp4')]);
+    await asCurrentDraft(JOB);
     await pg.goto(url + '/#step=render', { waitUntil: 'networkidle' });
     await pg.waitForSelector('#cl-list li');
     const kinds = await pg.$$eval('#cl-list li', x => x.map(e => e.querySelector('.badge, [class*="badge"], span').textContent));
@@ -100,6 +119,7 @@ try {
     assert.ok(segLen(before) - segLen(after) > 0.9, `${segLen(before)} -> ${segLen(after)}`);
     assert.ok(!after.segs.some(s => /clip-005/.test(s.file)));
     assert.ok(existsSync(join(JOBDIR, 'cleanup.json')));
+    await asCurrentDraft(JOB);
   });
 
   await t('edit receipt: the draft in plain lines, with the clean-up', async () => {
