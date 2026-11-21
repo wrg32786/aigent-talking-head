@@ -109,6 +109,7 @@ const PY = process.env.PYTHON || [path.join(ROOT, '.venv', 'Scripts', 'python.ex
 const GL = require('./glossary.cjs');
 const BR = require('./brands.cjs');
 const CP = require('./cutpoints.cjs');
+const SFXPLAN = require('./sfx-plan.cjs');
 const many = k => argv.flatMap((a, i) => (a === '--' + k && argv[i + 1] && !argv[i + 1].startsWith('--') ? [argv[i + 1]] : []));
 
 let srcs = positional.slice();
@@ -291,14 +292,27 @@ if (!flag('rebuild')) {
     const after = keep.reduce((a, c) => a + spansOf(c).reduce((x, [p, q]) => x + q - p, 0), 0), n = keep.reduce((a, c) => a + cutsOf(c).length, 0);
     console.log(`clean-up: ${n} cut${n === 1 ? '' : 's'} inside clips, ${(CLEAN.keep || []).length} retake${(CLEAN.keep || []).length === 1 ? '' : 's'} kept, ${(CLEAN.drop || []).length} clip${(CLEAN.drop || []).length === 1 ? '' : 's'} left out (${(before - after).toFixed(1)} s shorter before pauses)`);
   }
-  const segs = [], clipStart = [];
-  keep.forEach((c, ci) => { clipStart.push(segs.length); spansOf(c).forEach(([a, b], k) => segs.push({ file: rel(path.join(clipsDir, path.basename(c.file))), in: a, out: b, ...(k ? { jump: true } : {}), ...(ci === 0 && k === 0 ? { fadeIn: 0.25 } : {}) })); });
+  const segs = [], clipStart = [], segClip = [];
+  keep.forEach((c, ci) => { clipStart.push(segs.length); spansOf(c).forEach(([a, b], k) => segClip.push(c) && segs.push({ file: rel(path.join(clipsDir, path.basename(c.file))), in: a, out: b, ...(k ? { jump: true } : {}), ...(ci === 0 && k === 0 ? { fadeIn: 0.25 } : {}) })); });
   if (TIGHT) { const was = keep.reduce((a, c) => a + +c.dur, 0), now = segs.reduce((a, s) => a + s.out - s.in, 0), n = segs.filter(s => s.jump).length; console.log(`no dead air: ${n} pause${n === 1 ? '' : 's'} over ${TIGHT} s cut to jumps (${(was - now).toFixed(1)} s shorter)${TIGHTENED.some(x => x.noise) ? `, ${TIGHTENED.filter(x => x.noise).length} with a short noise inside it cut too` : ''}`); }
   // big punch on the cut after the hook and the cut into the payoff (with 3+ clips); a jump inside a line keeps the toggle
   const wantPunch = flag('no-punch') ? false : (preset && preset.punch === false ? false : true);
   if (wantPunch && keep.length >= 3) { segs[clipStart[1]].bigPunch = true; segs[clipStart[keep.length - 1]].bigPunch = true; }
+  // --recut (Studio's Recreate): your edit re-cut to the recipe's shot plan, on word boundaries, with the reference's
+  // framing per shot (kit/shotplan.cjs). The recipe's per-shot settings then go to these shots, not to your clips.
+  let RECUT = null;
+  if (flag('recut') && recipe && recipe.shots.length >= 2) {
+    const SPL = require('./shotplan.cjs'), envs = new Map();
+    const envOf = i => { const f = path.join(clipsDir, path.basename(segClip[i].file)); if (!envs.has(f)) envs.set(f, CP.envelopeSync(f)); return envs.get(f); };
+    const quiet = (i, a, b) => { const e = envOf(i); return e ? SPL.quietFrom(CP, e)(a, b) : null; };
+    const plan0 = RM.shotSettings(recipe);
+    if (keep.length >= 3) segs.forEach(x => { delete x.bigPunch; });
+    RECUT = SPL.recut(segs, i => segClip[i].words || [], plan0, quiet);
+    segs.splice(0, segs.length, ...RECUT.segs);
+    console.log(`recut: ${RECUT.plan.length} shots from the recipe's ${plan0.length} (scaled to ${segs.reduce((a, x) => a + x.out - x.in, 0).toFixed(1)} s), cuts at ${RECUT.cuts.map(c => c.t + ' s (' + c.on + ')').join(', ') || 'none'}${RECUT.skipped.length ? `; no quiet near ${RECUT.skipped.map(x => x.at + ' s').join(', ')}, those shots play as one` : ''}`);
+  }
   let t = 0; const seams = [], jumpSeams = new Set();
-  segs.forEach((s, i) => { if (i) { seams.push(+t.toFixed(3)); if (s.jump) jumpSeams.add(+t.toFixed(3)); } t += s.out - s.in; });
+  segs.forEach((s, i) => { if (i) { seams.push(+t.toFixed(3)); if (s.jump || s.recut) jumpSeams.add(+t.toFixed(3)); } t += s.out - s.in; });
   // sound, fewer and deeper: a whoosh on the big-punch cuts (or the first cut), the boom (loudest) into the payoff;
   // every seam keeps its glitch hit, but not a sound
   const big = segs.map((s, i) => (s.bigPunch ? i : -1)).filter(i => i > 0).map(i => seams[i - 1]);
@@ -340,8 +354,15 @@ if (!flag('rebuild')) {
   if (recipe) {
     const plan = RM.shotSettings(recipe);
     // per-shot settings go to each clip (its first segment, or every segment for a finish, when pauses were tightened)
-    plan.forEach((p, i) => { const k = clipStart[i]; if (k == null) return; const sg = segs[k], subs = segs.slice(k, clipStart[i + 1] ?? segs.length); if (p.finish) subs.forEach(x => { x.finish = p.finish; }); if (p.bigPunch && wantPunch) sg.bigPunch = true; if (p.transition && i) sg.transition = p.transition; });
-    if (plan.length !== keep.length) console.log(`recipe: ${plan.length} shots in the recipe, ${keep.length} clips from your takes; per-shot settings applied to the first ${Math.min(plan.length, keep.length)}`);
+    if (RECUT) {
+      RECUT.shotStart.forEach((k, j) => { const p = plan[RECUT.shotOf[j]] || {}, sg = segs[k], subs = segs.slice(k, RECUT.shotStart[j + 1] ?? segs.length); if (p.finish) subs.forEach(x => { x.finish = p.finish; }); if (p.bigPunch && wantPunch) sg.bigPunch = true; if (p.transition && j) sg.transition = p.transition; });
+      cut.refShots = RECUT.plan;
+      // the reference's sound effects, scaled to your edit, as the kit's sounds (the cap still thins them)
+      const len = segs.reduce((a, x) => a + x.out - x.in, 0), R0 = +(recipe.card.source && recipe.card.source.duration) || recipe.shots[recipe.shots.length - 1].end || len, k = len / R0;
+      const hits = (recipe.sfx || []).map(x => ({ id: x.sound || require('./shotplan.cjs').sfxId(x.type), t: +(x.start * k).toFixed(3), ref: true })).filter(h => h.t < len - 0.1 && SFXPLAN.lookup(h.id));
+      if (hits.length) { cut.sfx = {}; cut.sfxHits = (cut.sfxHits || []).concat(hits); console.log(`recut: ${hits.length} sound effects from the reference at its times, scaled (${hits.map(h => h.id + '@' + h.t).join(', ')})`); }
+    } else plan.forEach((p, i) => { const k = clipStart[i]; if (k == null) return; const sg = segs[k], subs = segs.slice(k, clipStart[i + 1] ?? segs.length); if (p.finish) subs.forEach(x => { x.finish = p.finish; }); if (p.bigPunch && wantPunch) sg.bigPunch = true; if (p.transition && i) sg.transition = p.transition; });
+    if (!RECUT && plan.length !== keep.length) console.log(`recipe: ${plan.length} shots in the recipe, ${keep.length} clips from your takes; per-shot settings applied to the first ${Math.min(plan.length, keep.length)}`);
     if (preset.bedStart != null && opt('bed-start') == null && cut.bed) cut.bedStart = preset.bedStart;
     if (preset.bedVol != null && cut.bed) cut.bedVol = preset.bedVol;
     cut.recipe = recipe.card.name;
@@ -403,7 +424,8 @@ if (!flag('rebuild')) {
     } else {
       const mine = (caps.flips || []).filter(f => f.mode === 7).sort((a, b) => a.start - b.start), used = new Set();
       const set = new Set();
-      mine.forEach((f, i) => { const r = rt[i]; if (!r) return; if (r.entrance && !used.has(r.entrance)) { f.entrance = r.entrance; used.add(r.entrance); set.add(f); } if (r.layer) f.layer = r.layer; if (r.place) f.place = r.place; if (r.lockup) f.lockup = r.lockup; });
+      const byRole = RECUT ? require('./shotplan.cjs').matchRoles(mine, rt) : null; // Recreate: by what each title does (hook, number, timer, brand)
+      mine.forEach((f, i) => { const r = byRole ? byRole.get(f) : rt[i]; if (!r) return; if (r.entrance && !used.has(r.entrance)) { f.entrance = r.entrance; used.add(r.entrance); set.add(f); } if (r.layer) f.layer = r.layer; if (r.place) f.place = r.place; if (r.lockup) f.lockup = r.lockup; });
       mine.forEach(f => { if (!set.has(f) && f.entrance && used.has(f.entrance)) delete f.entrance; }); // each entrance once; the engine fills the rest
       console.log(`recipe titles: entrance, layer and place pattern applied to ${Math.min(mine.length, rt.length)} of your ${mine.length} titles (pass --recipe-titles to use the recipe's text)`);
     }

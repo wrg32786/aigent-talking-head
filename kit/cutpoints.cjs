@@ -146,6 +146,24 @@ function retime(words, env) {
 }
 
 const r3 = x => +(+x).toFixed(3);
+// A transcript that runs early or late as a whole (the first word timed at 0.63 s when the sound starts at 0.90 s):
+// the shift, within 0.5 s, where the words (0.1 to 1.5 s long) cover the most sound and the gaps between them the
+// least. With 4 or more words, a shift over 40 ms that scores clearly better than none is used. Returns { shift, n }
+// (shift 0 when unsure).
+function offsetOf(words, env) {
+  if (!isEnv(env) || !Array.isArray(words)) return { shift: 0, n: 0 };
+  const A = activity(env), N = A.act.length, pre = new Float64Array(N + 1);
+  for (let i = 0; i < N; i++) pre[i + 1] = pre[i] + A.act[i];
+  const W = words.filter(w => w[1] - w[0] >= 0.1 && w[1] - w[0] < 1.5);
+  if (W.length < 4) return { shift: 0, n: W.length };
+  // how much of the words' time sounds, minus how much of the gaps between them does, with the words moved by s
+  const frac = (a, b) => { const i0 = Math.max(0, Math.min(N, A.i(a))), i1 = Math.max(0, Math.min(N, A.i(b))); return i1 > i0 ? (pre[i1] - pre[i0]) / (i1 - i0) : 0; };
+  const score = sh => { let x = 0; for (let k = 0; k < W.length; k++) { x += frac(W[k][0] + sh, W[k][1] + sh); const nx = W[k + 1]; if (nx && nx[0] - W[k][1] >= 0.1) x -= frac(W[k][1] + sh + 0.03, nx[0] + sh - 0.03); } return x / W.length; };
+  let best = 0, bs = score(0); const s0 = bs;
+  for (let k = -50; k <= 50; k++) { const sh = k / 100, v = score(sh); if (v > bs + 1e-9) { bs = v; best = sh; } }
+  return Math.abs(best) > 0.04 && bs >= 0.5 && bs - s0 >= 0.1 ? { shift: r3(best), n: W.length } : { shift: 0, n: W.length };
+}
+function align(words, env) { const { shift } = offsetOf(words, env); return shift ? words.map(w => [r3(Math.max(0, w[0] + shift)), r3(Math.max(0, w[1] + shift)), ...w.slice(2)]) : words; }
 // the end cut after word L (N is the word after it, or null)
 function endEdge(L, N, env, D, o, W = []) {
   const { gaps } = activity(env, o), te = L[1], tol = Math.min(0.08, 0.25 * Math.max(0, L[1] - L[0])), from = te - tol;
@@ -201,8 +219,14 @@ function startEdge(F, P, env, D, o) {
 function snapRange([a, b], words, env, dur, opts = {}) {
   const o = { ...SNAP, ...opts };
   if (!isEnv(env)) return { range: [a, b], points: [] };
-  const D = dur || env.seconds || env.e.length * env.hop, W = retime(words || [], env);
+  const D = dur || env.seconds || env.e.length * env.hop, W = retime(opts.aligned ? (words || []) : align(words || [], env), env);
   let idx = W.map((w, k) => k).filter(k => W[k][1] > a + 0.02 && W[k][0] < b - 0.02);
+  // an end inside a clean pause stays in it: a word whose sound starts after that pause is the next line, left out
+  // (and a start inside one leaves out the word that ends before it)
+  const { gaps } = activity(env, o), inGap = x => gaps.find(g => g.pEnd <= x && x <= g.nOn && g.nOn - g.pEnd >= o.tailMin + o.leadMin);
+  const gb = inGap(b), ga = inGap(a);
+  if (gb && idx.length > 1) idx = idx.filter((k, j) => j === 0 || W[k][0] < gb.pEnd);
+  if (ga && idx.length > 1) idx = idx.filter((k, j) => j === idx.length - 1 || W[k][1] > ga.nOn);
   if (!idx.length) idx = W.map((w, k) => k).filter(k => W[k][0] >= a - 0.02 && W[k][1] <= b + 0.02); // a line of one 0 s word
   if (!idx.length) return { range: [r3(a), r3(b)], points: [] };
   const fi = idx[0], li = idx[idx.length - 1], F = W[fi], L = W[li];
@@ -281,7 +305,7 @@ function edgeReport(env, words, c, edge) {
   return { midWord: !!(w && sounding(env, c)), word: w ? w[2] : null, pad: r3(pad) };
 }
 
-module.exports = { SNAP, ACCEPT, SR, HOP, WIN, EnvBuilder, envelopeFromSamples, envelopeOf, envelopeSync, toJSON, fromJSON, isEnv, activity, sounding, retime, endEdge, startEdge, snapRange, snapRanges, mergeRanges, tightenSpans, pausesIn, noisesIn, edgeReport, HIDDEN, NOISE };
+module.exports = { offsetOf, align, SNAP, ACCEPT, SR, HOP, WIN, EnvBuilder, envelopeFromSamples, envelopeOf, envelopeSync, toJSON, fromJSON, isEnv, activity, sounding, retime, endEdge, startEdge, snapRange, snapRanges, mergeRanges, tightenSpans, pausesIn, noisesIn, edgeReport, HIDDEN, NOISE };
 
 if (require.main === module) {
   const [cmd, file, inF] = process.argv.slice(2), fs = require('fs');

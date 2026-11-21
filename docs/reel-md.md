@@ -132,7 +132,23 @@ Every section is optional except the card. Anything left out falls back to the p
 | punch | `big` | that segment's `bigPunch` |
 | transition | a transition name | the transition into that segment |
 | src, in, out | a file and its in and out points | full segments (see below) |
+| framing | the reference's shot size: `close-up`, `extreme close-up`, `medium close-up`, `medium shot`, `wide` | with `--recut` (Studio's Recreate), that shot's punch: close-up 1.16, extreme close-up 1.3, medium close-up 1.06, medium or wider 1, never the same two shots in a row |
+| cutaway | `on`: the reference cut away from the speaker here (B-roll, a screen) | `cut.json` `refShots` marks the shot, for B-roll |
 | any `key~` | a guess, written by a teardown (VIDEO.md marks inferred keys with `~`) | not used by the render |
+
+**Recut** (`npm run reel -- --recipe <Reel.md> --recut`, and every Studio Recreate draft): your edit is re-cut to the shot list. The shot lengths are scaled to your edit's length, and each cut goes on a word boundary: a seam you already have when one is near, else the quiet between two words read from the audio (`kit/shotplan.cjs`, with `kit/cutpoints.cjs`). A cut never lands inside a word: the quiet must hold the fade on both sides (at least 0.14 s). With no quiet near a reference cut, that cut is left out and the two shots play as one. The audio runs on across a new cut, only the picture changes (no glitch hit on it), and each shot gets its line's settings and framing. `cut.json` `refShots` lists the shots.
+
+**Sound effects** (fenced `reel-sfx`, optional, written by a teardown): the reference's sounds and when they play. With `--recut` the times are scaled to your edit and placed as `cut.json` `sfxHits` (the density cap still applies), instead of the default whoosh and boom.
+
+```reel-sfx
+#01 2-2.2 | type pop | sound 11-pop-sticker
+#02 6-6.6 | type ding | sound 14-ui-notification | on~ cut
+```
+
+| Key | Values | Maps to |
+|---|---|---|
+| type | what the reference's sound is: `pop`, `ding`, `click`, `whoosh`, `swipe`, `boom`, `riser`, `typing`, `shutter`, `cash`, `shimmer`, `glitch`, `tick`, `sub` | the kit sound when `sound` is left out (anything else: `10-pop-bubble`) |
+| sound | a kit sound id (`npm run menu`, `kit/sfx/sfx.json`) | the `sfxHits` id |
 
 **Titles** (fenced `reel-titles`): one line per kinetic title.
 
@@ -143,6 +159,7 @@ Every section is optional except the card. Anything left out falls back to the p
 | accent | `script`, or a word index | three faces in one phrase: one partner word in the pairing's italic serif (the `playfair` and `dmserif` pairings do this on every phrase) |
 | layer | `front`, `behind`, `auto` | the title's `layer` |
 | hero | word indexes, comma list | the title's `hero` |
+| role | `hook`, `number`, `timer`, `brand` or `line` (a teardown writes it) | with `--recut`, your titles take the entrance, layer and place of the recipe title with the same role (the hook claim up front, a number, a time, a brand name), then the rest in order |
 | text | the words | the title's `text` |
 
 **Cards** (fenced `reel-cards`, optional): one line per colour card, times on the reel clock. The frame cuts to one flat colour while your voice runs on, and the caption words you are saying sit on it in the card's ink. With `chapter N` it is a numbered chapter card: a big serif numeral with your words under it, one per list item.

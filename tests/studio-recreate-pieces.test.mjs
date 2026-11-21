@@ -49,7 +49,7 @@ try {
     const d = await api('/api/draft', {}); assert.ok(!d.error, JSON.stringify(d).slice(0, 300)); assert.strictEqual(d.from, 'pieces');
     const v = await waitTask(); assert.strictEqual(v.task.status, 'done', JSON.stringify(v.task).slice(0, 600));
     const L = readFileSync(join(ROOT, 'jobs', JOB, 'fake-reel.log'), 'utf8');
-    assert.ok(/--as-is/.test(L) && /--recipe \S*Reel\.md/.test(L), L);
+    assert.ok(/--as-is/.test(L) && /--recipe \S*Reel\.md/.test(L) && /--recut/.test(L), L);
     assert.ok(/cuts\/c1\.mp4/.test(L) && /cuts\/c2\.mp4/.test(L) && !/cuts\/c3\.mp4/.test(L) && !/rc-take\.mp4/.test(L), 'your pieces, not the whole take: ' + L);
     assert.ok(!/--pack/.test(L.split('\n')[0]), 'the recipe, not a pack');
   });

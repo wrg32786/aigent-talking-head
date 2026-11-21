@@ -230,7 +230,7 @@ function draftSteps(s) {
   const comp = C.compose(s, { refPack: ref });
   if (comp.errs.length) throw Object.assign(new Error(comp.errs.join('; ')), { code: 400 });
   let args = comp.args.slice();
-  if (recreate) { const i = args.indexOf('--pack'); if (i >= 0) args.splice(i, 2); args.push('--recipe', join(s.reference.out, 'Reel.md')); }
+  if (recreate) { const i = args.indexOf('--pack'); if (i >= 0) args.splice(i, 2); args.push('--recipe', join(s.reference.out, 'Reel.md'), '--recut'); }
   // your pieces (the Combo) when you kept any: cut once, here, and handed to the reel as they are (--as-is). Recreate
   // runs on them too, with the reference's Reel.md as the recipe, so the draft is what Your edit says it is (it used
   // to switch to the whole take, so the draft's key never matched and Render could not come on)
