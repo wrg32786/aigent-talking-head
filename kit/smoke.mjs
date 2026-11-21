@@ -1052,6 +1052,7 @@ try {
       ['Studio Connect agent, teleprompter speed and pop-out, footage from a link, in Chrome (tests/studio-connect.e2e.mjs)', 'studio-connect.e2e.mjs'],
       ['Studio Cut step in Chrome: footage player, output picker, cut timeline, batch render, pull script (tests/studio-cut.e2e.mjs)', 'studio-cut.e2e.mjs'],
       ['Studio B-roll step in Chrome: lane, placements, API keys, stock, cards, ideas, generate and screen recording against mocks, assemble placements (tests/studio-broll.e2e.mjs)', 'studio-broll.e2e.mjs'],
+      ['Studio B-roll slot cards in Chrome: one Needs B-roll card per slot with Upload, Copy for my agent and Skip, keys and tabs folded away, a clip on a slot sits as a panel (tests/studio-broll-slots.e2e.mjs)', 'studio-broll-slots.e2e.mjs'],
       ['Studio B-roll that picks itself in Chrome: spots after a draft, the first spot too, cards with no key, Add a spot, upload kinds, a raw testimonial cut on whole words and played in the reel, MCP pick_broll, add_spot, add_testimonial (tests/studio-spots.e2e.mjs)', 'studio-spots.e2e.mjs'],
       ['Studio Pieces and Outputs in Chrome: lines sorted by what they do, Use our best lines, Start over, reorder and drop, your clip drafts on whole words, the Outputs library with Edit this reel and Compare, MCP get_pieces, set_combo, choose_combo, list_outputs (tests/studio-pieces.e2e.mjs)', 'studio-pieces.e2e.mjs'],
       ['Studio Look in Chrome: one row of Looks, the reference card, 9 layers with every option once, REF, LOOK and YOU badges, Music and sounds as one layer, Clear reference as one undo, Save as a Look (tests/studio-look.e2e.mjs)', 'studio-look.e2e.mjs'],
@@ -1202,6 +1203,9 @@ try {
     let cv = false; try { run(fpy, ['-c', 'import cv2, numpy']); cv = true; } catch {}
     if (!cv) { console.log('  (facezone.py checks skipped: no OpenCV)'); return; }
     run(fpy, [join(dirname(KIT), 'tests', 'test_facezone.py')], work);
+    // what the teardown reads from a reference's B-roll (kit/broll_fx.py), on a fixture it draws: a panel that pops in
+    // and pushes, a black and white cutaway that shakes, a split screen
+    try { execFileSync(process.execPath, [join(dirname(KIT), 'tests', 'broll-fx.test.mjs')], { stdio: 'pipe', env: { ...process.env, PYTHON: fpy } }); } catch (e) { fail('B-roll effects reader (tests/broll-fx.test.mjs): ' + String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=s=540x960:r=24:d=1', '-pix_fmt', 'yuv420p', 'noface.mp4'], work);
     run(fpy, [join(KIT, 'facezone.py'), 'noface.mp4', 'noface-zone.json'], work);
     const z = JSON.parse(readFileSync(join(work, 'noface-zone.json'), 'utf8'));

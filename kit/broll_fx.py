@@ -267,7 +267,7 @@ def measure(video, slots):
         foot = [x for x in fr if x[0] >= z - 0.7][::-1]
         kin, t_in = _edge(head, box, before, mid[0][1] if mid else None)
         kout, t_out = _edge(foot, box, after, mid[-1][1] if mid else None, leaving=True)
-        mo = _motion(mid[:: max(1, int(round(fps / 12)))], box)
+        mo = _motion(mid, box)  # every frame: a shake that flips each frame is invisible at every second one
         r = {"n": s.get("n"), **mo, "glitch": _glitch([x for x in fr if a + 0.1 <= x[0] <= z - 0.1], box), "colour": _colour(mid, box, lead or tail),
              "in": kin, "out": kout, "at": [round(t_in if t_in is not None else a, 2), round(t_out if t_out is not None else z, 2)]}
         out.append(r)
@@ -288,7 +288,12 @@ def splits(video, step=0.25, min_len=0.75):
         e = np.abs(g[y0 + 2:y1 + 2] - g[y0 - 2:y1 - 2])
         share = (e > 22).mean(axis=1)
         k = int(np.argmax(share))
-        rows.append((t, (y0 + k) / h if share[k] > 0.8 else None, g))
+        # a split runs from edge to edge; the top of a panel stops short of both
+        m = max(4, g.shape[1] // 8)
+        if (e[k, :m] > 22).mean() < 0.25 or (e[k, -m:] > 22).mean() < 0.25:
+            share[k] = 0
+        # a seam is one row that stands out: most of its columns step hard, and the rows around it do not
+        rows.append((t, (y0 + k) / h if share[k] > 0.55 and share[k] > 3 * float(np.median(share)) + 0.1 else None, g))
     cap.release()
     spans, cur = [], None
     for t, y, g in rows:
