@@ -9,7 +9,7 @@
 import assert from 'assert';
 import http from 'http';
 import { spawn, spawnSync } from 'child_process';
-import { mkdtempSync, rmSync, existsSync, readFileSync, statSync, writeFileSync } from 'fs';
+import { mkdtempSync, mkdirSync, rmSync, existsSync, readFileSync, statSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname, isAbsolute } from 'path';
 import { fileURLToPath } from 'url';
@@ -161,6 +161,19 @@ try {
     // a missing ffmpeg: the user line says it needs their password when the fix is sudo
     const { tellUser } = await import('../kit/setup.mjs');
     assert.strictEqual(tellUser({ id: 'ffmpeg', label: 'ffmpeg and ffprobe', fix: 'sudo apt-get install -y ffmpeg' }), 'Installing ffmpeg and ffprobe needs your password: run sudo apt-get install -y ffmpeg');
+    // an ffmpeg with no drawtext filter (Homebrew's plain formula) is not ready, and the fix names ffmpeg-full on a Mac
+    const { ffmpegFixFor } = await import('../kit/setup.mjs');
+    assert.match(ffmpegFixFor('nodrawtext', 'brew'), /^brew install ffmpeg-full, then put "\$\(brew --prefix ffmpeg-full\)\/bin" first on PATH/);
+    assert.match(ffmpegFixFor('broken', 'brew'), /^brew upgrade ffmpeg/);
+    assert.match(ffmpegFixFor('nodrawtext', 'apt'), /drawtext/);
+    assert.strictEqual(ffmpegFixFor('ready', 'brew'), null);
+    if (process.platform !== 'win32') {
+      const fake = join(STATE, 'fake-ffmpeg'); mkdirSync(fake, { recursive: true });
+      writeFileSync(join(fake, 'ffmpeg'), '#!/bin/sh\necho " ... scale V->V Scale the input video."\n', { mode: 0o755 }); writeFileSync(join(fake, 'ffprobe'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+      const nd = spawnSync(process.execPath, [join(ROOT, 'kit', 'setup.mjs'), '--check', '--json'], { cwd: ROOT, encoding: 'utf8', env: { ...env, PATH: [fake, dirname(process.execPath), '/usr/bin', '/bin'].join(':') } });
+      const f = JSON.parse(nd.stdout).items.find(x => x.id === 'ffmpeg');
+      assert.strictEqual(f.status, 'missing'); assert.match(f.detail, /no drawtext filter/); assert.match(f.fix, /drawtext|ffmpeg-full/);
+    }
     client = new Client({ name: 'claude-code', version: '0.0.0-test' });
     await client.connect(new StdioClientTransport({ command: process.execPath, args: [join(ROOT, 'kit', 'mcp.mjs')], cwd: ROOT, env: { ...env, STUDIO_PORT: url.split(':').pop() }, stderr: 'ignore' }));
     const st = (await client.callTool({ name: 'setup_status', arguments: {} })).structuredContent;
