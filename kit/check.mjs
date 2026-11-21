@@ -206,6 +206,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'reframe-grade.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
     catch (e) { rgerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'reframe and grade match tests (tests/reframe-grade.test.cjs: the crop that puts your face on the reference face, the zoom limit of the source, the face box kept inside, the Reel.md face and lab keys, YuNet end to end, the skin-protected LUT, one LUT when the shots agree, the assembler applying both)', errs: rgerrs, warns: [] });
+    const fwerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'facewindow.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
+    catch (e) { fwerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Instagram Feed 4:5 and square 1:1 tests (tests/facewindow.test.cjs: the face-tracked window stays inside the picture, follows the face, holds still on a still shot, eases at a cut; the ffmpeg formula matches; file names and plain labels; split and framed b-roll fitted to the frame; a short reel rendered to 1080x1350 with everything inside the safe area and off the face)', errs: fwerrs, warns: [] });
     const slerrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'stylelook.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
     catch (e) { slerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
@@ -266,6 +270,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-post.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { posterrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio post tests (tests/studio-post.test.mjs: Buffer, R2 and Cloudinary against a mock, links refused, per-channel limits, drafts by default, post now needs a confirm, H.264, MCP Buffer tools)', errs: posterrs, warns: [] });
+    const szerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-sizes.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { szerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio sizes tests (tests/studio-sizes.test.mjs: 9:16 always, the Feed 4:5 and square as sizes, one --export list, plain file labels, the Feed file of a version, make a size, MCP sizes)', errs: szerrs, warns: [] });
     const ses = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-session.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { ses.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }

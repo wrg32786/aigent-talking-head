@@ -121,7 +121,16 @@ try {
     await toStep(pg, 'render'); await pg.waitForSelector('#s-render:not([hidden])');
     assert.strictEqual(await pg.isVisible('#exp-clips'), false, 'What to make starts closed'); await openMake(pg);
     await pg.click('#exp-clips'); await pg.waitForSelector('#exp-clips[aria-pressed="true"]');
+    // sizes: one small row; the 9:16 is always made, the Feed 4:5 is one tick and goes into the same run
+    assert.deepStrictEqual(await pg.$$eval('#sizes label', x => x.map(l => [l.textContent.trim(), l.querySelector('input').checked, l.querySelector('input').disabled])),
+      [['Reels and Stories 9:16', true, true], ['Instagram Feed 4:5 (1080x1350)', false, false], ['Square 1:1', false, false]]);
+    await pg.click('#size-feed45'); await pg.waitForFunction(() => document.querySelector('#size-feed45').checked);
+    assert.deepStrictEqual((await api('/api/state')).state.sizes, ['feed45']);
+    if (shots) { await pg.locator('#sizes').scrollIntoViewIfNeeded(); await pg.screenshot({ path: join(shots, 'render-sizes-dark.png') }); }
     await pg.click('#render'); const v = await waitTask(); assert.strictEqual(v.task.status, 'done', JSON.stringify(v.task).slice(0, 800)); assert.strictEqual(v.task.kind, 'render');
+    assert.ok(/--rebuild.*--export reels,feed45/.test(log(JOB)), 'one run, both sizes: ' + log(JOB).split('\n').pop());
+    await pg.waitForSelector('#outputs .out-use'); assert.strictEqual(await pg.textContent('#outputs .out-use'), 'For Reels and Stories');
+    await pg.click('#size-feed45'); await pg.waitForFunction(() => !document.querySelector('#size-feed45').checked);
     assert.ok(existsSync(join(ROOT, 'jobs', JOB, 'reel-v1.mp4')), 'the reel');
     for (const id of ['c1', 'c2']) { assert.ok(existsSync(join(ROOT, 'jobs', `${JOB}-${id}`, 'reel-v1.mp4')), id + ' as its own reel'); assert.ok(/--as-is/.test(log(`${JOB}-${id}`))); }
     assert.ok(!existsSync(join(ROOT, 'jobs', `${JOB}-c3`)), 'the dropped piece is not rendered');

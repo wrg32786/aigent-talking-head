@@ -9,6 +9,7 @@ import { createRequire } from 'module';
 import { loadMenu } from '../menu.mjs';
 import * as CF from './conflicts.mjs';
 import * as SLK from './stylelooks.mjs';
+import * as SZ from './sizes.mjs';
 
 const require = createRequire(import.meta.url);
 export const STUDIO = dirname(fileURLToPath(import.meta.url));
@@ -125,7 +126,7 @@ export function defaultState() {
   return { format: 'aigent-studio', version: 1, rev: 0, job: null, footage: [], clips: null,
     reference: { file: null, url: null, mode: 'influence', status: 'none', out: null, extracted: null, applied: false, queue: [], active: null },
     pack: null, picks: {}, music: { bed: 'auto', energy: 'auto', upload: null }, sound: { sfx: 'on', cap: 'on' }, pace: { tighten: null, punch: 'on' },
-    export: 'reels', chat: [], task: null, outputs: [], takes: [], output: null, cut: null, tx: {}, lines: {}, broll: {},
+    export: 'reels', sizes: [], chat: [], task: null, outputs: [], takes: [], output: null, cut: null, tx: {}, lines: {}, broll: {},
     finish: { from: 'auto', reel: true, clips: false, plain: false }, drafted: null, styleLook: null };
 }
 export function load() {
@@ -174,7 +175,7 @@ export const effectsReady = () => existsSync(join(ROOT, 'effects', '.venv'));
 export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
   const errs = [], log = [];
   if (!p || typeof p !== 'object') return { errs: ['patch must be an object'], log, noop: false };
-  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands', 'finish', 'switchFor', 'undoChange', 'styleLook'];
+  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands', 'finish', 'switchFor', 'undoChange', 'styleLook', 'sizes'];
   for (const k of Object.keys(p)) if (!known.includes(k)) errs.push(`unknown field "${k}" (${known.join(', ')})`);
   if (p.undoChange) {
     const u = s.lastChange && s.lastChange.undo; if (!u) { errs.push('undoChange: nothing to undo'); return { errs, log, noop: false }; }
@@ -231,6 +232,8 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
     if (p.pace.keepPauses !== undefined) { const k = [].concat(p.pace.keepPauses || []).map(String); if (k.some(x => !/^[\w-]+@\d+(\.\d+)?$/.test(x))) errs.push('pace.keepPauses: clip-id@seconds, from choices.json "pauses"'); else { s.pace.keepPauses = k; log.push(k.length ? `keep pauses ${k.join(', ')}` : 'cut every long pause'); } }
   }
   if (p.export !== undefined) { if (p.export && !cat.exports.includes(p.export)) errs.push(`export: ${cat.exports.join(', ')}`); else { s.export = p.export || null; log.push(`export ${s.export}`); } }
+  // sizes: the versions a render makes beside the 9:16 reel (kit/studio/sizes.mjs)
+  if (p.sizes !== undefined) { const z = SZ.norm(p.sizes); if (z.bad.length) errs.push(`sizes: 9:16 (always made), 4:5 or 1:1 (not ${z.bad.join(', ')})`); else { s.sizes = z.sizes; log.push(`sizes 9:16${z.sizes.map(x => ', ' + SZ.SIZES.find(y => y.id === x).size).join('')}`); } }
   if (p.reference && p.reference.mode !== undefined) { if (!SLK.MODES.includes(p.reference.mode)) errs.push('reference.mode: influence, recreate, look or off'); else { const was = s.reference.mode; s.reference.mode = p.reference.mode; log.push(`reference mode ${p.reference.mode}`);
     // Recreate or Influence sets the Look from the reference; Off takes it back out (your own picks stay)
     if (was !== s.reference.mode || (s.reference.mode !== 'off' && s.reference.extracted && !s.reference.auto)) { const a = setReferenceLook(s, cat); if (a) log.push(`set the look from the reference (${a.n} change${a.n === 1 ? '' : 's'})`); else if (was !== 'off' && s.reference.mode === 'off') log.push('back to your own look'); } } }
@@ -369,7 +372,7 @@ export function compose(s, { refPack = null } = {}) {
   // your words and brand logos (kit/glossary.cjs, kit/brands.cjs), short enough for any command line
   if (Array.isArray(s.glossary) && s.glossary.length) args.push('--glossary', s.glossary.map(e => `${e.heard.join(' | ')} = ${e.say}${e.after && e.after.length ? ' after ' + e.after.join(', ') : ''}`).join('; '));
   if (Array.isArray(s.brands) && s.brands.length) args.push('--brands', JSON.stringify(s.brands.map(b => ({ word: b.word, logo: KIT_BRANDS.includes(b.logo) ? join(ROOT, b.logo) : join(brandsDir(), b.logo) }))));
-  if (s.export) args.push('--export', s.export);
+  { const ex = SZ.exportArg(s); if (ex) args.push('--export', ex); }
   const fx = s.picks.effect ? s.picks.effect.allow.filter(x => !s.picks.effect.deny.includes(x)) : [];
   if (fx.length) notes.push(`effects for the effects pass: ${fx.join(', ')} (run after the reel; needs the effects pass set up)`);
   if ((s.picks.effect || {}).deny?.length) notes.push(`forbidden effects: ${s.picks.effect.deny.join(', ')}`);
@@ -484,7 +487,7 @@ export function vibes(text, s, cat = catalog()) {
 export function jobDir(s) { return s.job ? join(ROOT, 'jobs', s.job) : null; }
 export function outputsOf(s) {
   const d = jobDir(s); if (!d || !existsSync(d)) return [];
-  return readdirSync(d).filter(f => /^reel(-fx)?-v\d+(-[a-z0-9]+)?\.mp4$/.test(f)).sort((a, b) => (+(b.match(/v(\d+)/) || [0, 0])[1]) - (+(a.match(/v(\d+)/) || [0, 0])[1]) || a.localeCompare(b)).map(f => `jobs/${s.job}/${f}`);
+  return SZ.sortFiles(readdirSync(d).filter(SZ.isReel)).map(f => `jobs/${s.job}/${f}`);
 }
 
 // ---------- videos: start fresh, open a past one ----------
@@ -493,7 +496,7 @@ export function outputsOf(s) {
 // it again puts you back where you were. What carries over: your words (glossary) and the counters; with
 // keepLook, the look too (pack, picks, music, sound, pace, export, brand logos, the saved style look). Keys, settings and the agent
 // connection live in other files and are never touched here.
-export const LOOK_KEYS = ['pack', 'picks', 'music', 'sound', 'pace', 'export', 'brands', 'styleLook'];
+export const LOOK_KEYS = ['pack', 'picks', 'music', 'sound', 'pace', 'export', 'sizes', 'brands', 'styleLook'];
 const KEEP_KEYS = ['format', 'version', 'rev', 'updated', 'chatSeq', 'refSeq', 'importSeq', 'commentSeq', 'videoSeq', 'glossary'];
 const VIDEO_EXT = /\.(mp4|mov|m4v|webm|mkv)$/i;
 export const videosDir = () => join(stateDir(), 'videos');
@@ -625,6 +628,7 @@ export function resetEdit(s, { keepLook = s.keepLook === true } = {}) {
     s.sound = clone(d.sound);
     s.pace = clone(d.pace);
     s.export = d.export;
+    s.sizes = [];
     delete s.brands;
     s.styleLook = null;
   }
