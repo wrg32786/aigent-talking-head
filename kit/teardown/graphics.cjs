@@ -27,6 +27,8 @@ function mapGraphics(b, extras) {
         x: g.bbox && g.bbox[2] > 0.5 ? r2(cl(g.bbox[0] + g.bbox[2] / 2, 0.2, 0.8)) : 0.5,
         y: cy != null ? r2(cl(cy, 0.18, 0.5)) : 0.3,
         ...(wid ? { size: Math.round(cl(wid * 1080 / 2, 180, 560)) } : {}),
+        // a spiky starburst keeps its shape and point count; the round seal is the default and carries nothing
+        ...(g.shape === 'starburst' ? { shape: 'starburst', spikes: Math.round(cl(+g.spikes || 12, 6, 24)) } : {}),
         ...(g.head_ratio && g.face_w && g.head_cy && cy != null ? { head: r2(g.head_ratio), headY: r2((cy - g.head_cy) * 1920 / (g.face_w * 1080)), faceW: g.face_w } : {}) });
     } else if (g.type === 'app-label') {
       Object.assign(o, { text: clean(g.text), cue: g.cue, tile: g.tile, x: g.bbox ? r2(cl(g.bbox[0], 0.02, 0.7)) : 0.08, y: g.bbox ? r2(cl(g.bbox[1], 0.05, 0.85)) : 0.5,
