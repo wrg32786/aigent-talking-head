@@ -1,9 +1,9 @@
 // The Look step (1.16.0) in a real Chrome, with no keys and no network:
-// - one row of Looks, the reference card (Use all, Use parts, Off, Save as a Look, Clear reference), 9 layer tabs
+// - one row of Looks, the reference card (Recreate, Influence, Off, and a More menu with Save as a Look, Clear reference and Breakdown), 9 layer tabs
 // - every option shows in exactly one layer; search looks across all of them
 // - badges: REF, LOOK and YOU; Music and SFX holds the sound panel
 // - Clear reference takes its picks out as one undo; Save as a Look from the reference
-// - the reference sets your Look (1.17.1): Use all and Use parts set the layers, a short notice, REF badges and an amber
+// - the reference sets your Look (1.17.1): Recreate and Influence set the layers, the card says so, REF badges and an amber
 //   dot on the layers it set, your change wins, Back to my look, and a reference still being read sets it when ready
 // - screenshots, dark and light, phone
 // Needs Chrome. Run: node tests/studio-look.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
@@ -56,7 +56,13 @@ try {
     await pg.goto(url + '/#step=style', { waitUntil: 'networkidle' }); await pg.waitForSelector('#looks .pack[data-look="magazine"][aria-checked="true"]');
     assert.ok(/built in/.test(await pg.textContent('#looks .pack[data-look="magazine"]')));
     assert.ok(/Hormozi hook/.test(await pg.textContent('#ref-card'))); assert.strictEqual(await pg.getAttribute('#ref-card-mode [data-mode="influence"]', 'aria-checked'), 'true');
-    assert.ok(/Use parts/.test(await pg.textContent('#ref-card-mode [aria-checked="true"]')));
+    assert.ok(/Influence/.test(await pg.textContent('#ref-card-mode [aria-checked="true"]')));
+    assert.deepStrictEqual(await pg.$$eval('#ref-card-mode [role="radio"]', x => x.map(e => e.textContent.trim())), ['Recreate', 'Influence', 'Off'], 'one vocabulary on the card');
+    assert.ok(!/Use all|Use parts/.test(await pg.textContent('#s-look')));
+    assert.match(await pg.textContent('#ref-card-meta'), /^\d+ s, \d+ shots$/); assert.strictEqual(await pg.$('#ref-notice'), null, 'the card says it once');
+    await pg.click('#ref-more'); for (const id of ['#save-ref-look', '#ref-clear', '#ref-open']) await pg.waitForSelector(id, { state: 'visible' });
+    assert.deepStrictEqual(await pg.$$eval('#ref-more-panel .menu-item', x => x.map(e => e.textContent.trim())), ['Save as a Look', 'Clear reference', 'Breakdown']);
+    await pg.keyboard.press('Escape'); await pg.waitForSelector('#ref-open', { state: 'detached' });
     assert.deepStrictEqual(await pg.$$eval('#tabs .tab', x => x.map(e => e.textContent.trim())), ['Text', 'Fonts', 'Graphics', 'Transitions', 'Color and finish', 'Motion', 'Music and SFX', 'B-roll', 'Layout']);
   });
   await t('every option shows once across the layers; search looks across all of them', async () => {
@@ -67,7 +73,7 @@ try {
     await pg.fill('#filter', 'glitch'); await pg.waitForSelector('#grid .lg-h'); assert.ok(/Transitions/.test(await pg.textContent('#grid'))); await pg.fill('#filter', '');
   });
   await t('badges: REF on what the reference set, LOOK on what the Look sets, YOU on your picks', async () => {
-    await api('/api/state', { reference: { mode: 'influence' } }); // Use parts sets its picks
+    await api('/api/state', { reference: { mode: 'influence' } }); // Influence sets its picks
     await pg.click('#tab-transitions'); await pg.waitForSelector('#grid .tile .pick[data-focus="p:transition:glitch"]');
     assert.strictEqual(await pg.$eval('#grid .tile:has(.pick[data-focus="p:transition:glitch"]) .src', e => e.dataset.src), 'ref');
     const v = await api('/api/state'); const look = v.look.pack.find(r => r.startsWith('transition:') && !v.look.ref.includes(r));
@@ -81,63 +87,68 @@ try {
     await pg.click('#tab-audio'); await pg.waitForSelector('#s-music #bed'); assert.strictEqual(await pg.$$eval('#s-music', x => x.length), 1, 'one sound panel');
     await pg.click('#tab-text'); assert.strictEqual(await pg.$('#s-music'), null, 'not on the other layers');
   });
-  await t('Use parts adds the picks with REF; Clear reference takes them out as one undo; Undo puts them back', async () => {
+  await t('Influence adds the picks with REF; Clear reference takes them out as one undo; Undo puts them back', async () => {
     await api('/api/reference/apply', {}); await pg.click('#tab-graphics');
     await pg.waitForSelector('#grid .tile:has(.pick[data-focus="p:graphic:lower-third"][aria-pressed="true"]) .src[data-src="ref"]');
-    await pg.click('#ref-clear'); await pg.waitForSelector('#ref-undo'); assert.strictEqual(await pg.$('#ref-card'), null);
+    await pg.click('#ref-more'); await pg.click('#ref-clear'); await pg.waitForSelector('#ref-undo'); assert.strictEqual(await pg.$('#ref-card'), null);
     assert.strictEqual(await pg.getAttribute('#grid .tile .pick[data-focus="p:graphic:lower-third"]', 'aria-pressed'), 'false');
     assert.ok(await pg.$('#grid .tile:has(.pick[data-focus="p:transition:crossfade"]) .src[data-src="you"]') || true);
     await pg.click('#ref-undo-btn'); await pg.waitForSelector('#ref-card');
     await pg.waitForSelector('#grid .tile .pick[data-focus="p:graphic:lower-third"][aria-pressed="true"]');
   });
   await t('Save as a Look from the reference: it joins the Looks row as saved from a reference', async () => {
-    await pg.click('#save-ref-look'); await pg.fill('#save-ref-look-name', LOOK); await pg.click('#save-ref-look-form button[type="submit"]');
+    await pg.click('#ref-more'); await pg.click('#save-ref-look'); await pg.fill('#save-ref-look-name', LOOK); await pg.click('#save-ref-look-form button[type="submit"]');
     await pg.waitForSelector(`#looks .pack[data-look="${LOOK}"][aria-checked="true"]`);
     assert.ok(/saved from a reference/.test(await pg.textContent(`#looks .pack[data-look="${LOOK}"]`)));
     const pk = JSON.parse(readFileSync(join(ROOT, 'packs', 'local', LOOK, 'pack.json'), 'utf8')); assert.match(pk.label, /Hormozi hook/); assert.ok((pk.locks.transitions || []).includes('glitch') || pk.style.transition === 'glitch', JSON.stringify(pk).slice(0, 400));
     await pg.keyboard.press('Escape');
   });
   const top = (pg, name) => shot(pg, name, 1100);
-  await t('Use all sets the Look from the reference, says so, and badges each layer it set', async () => {
+  await t('Recreate sets the Look from the reference, says so, and badges each layer it set', async () => {
     await pg.goto(url + '/#step=style', { waitUntil: 'networkidle' }); await pg.reload({ waitUntil: 'networkidle' }); await pg.waitForSelector('#ref-card');
-    await pg.click('#ref-card-mode [data-mode="off"]'); await pg.waitForSelector('#ref-notice', { state: 'detached' });
-    await pg.click('#ref-card-mode [data-mode="recreate"]'); await pg.waitForSelector('#ref-notice[data-mode="recreate"]');
-    assert.match(await pg.textContent('#ref-notice'), /We set your look from the reference\. Change anything you like\./);
+    await pg.click('#ref-card-mode [data-mode="off"]'); await pg.waitForSelector('#ref-card[data-mode="off"]'); assert.match(await pg.textContent('#ref-card-mode-hint'), /Kept here, not used\./);
+    await pg.click('#ref-card-mode [data-mode="recreate"]'); await pg.waitForSelector('#ref-card[data-mode="recreate"]');
+    assert.match(await pg.textContent('#ref-card-mode-hint'), /Your take re-cut to its shots, with its look, titles, sounds and music\./);
+    await pg.waitForSelector('#looks.by-ref'); assert.match(await pg.textContent('#looks-by-ref'), /Set by your reference/); assert.strictEqual(await pg.$('#ref-notice'), null, 'the card says it once');
+    assert.ok(await pg.evaluate(() => document.querySelector('#ref-card').getBoundingClientRect().bottom <= document.querySelector('#looks').getBoundingClientRect().top), 'the card is above the Looks row');
     await pg.waitForSelector('#tab-graphics .pd-ref'); await pg.waitForSelector('#tab-transitions .pd-ref');
     await pg.click('#tab-graphics'); await pg.waitForSelector('#layer-ref'); assert.match(await pg.textContent('#tabhint'), /From reference 2 here/);
     for (const g of EX.graphics) await pg.waitForSelector(`#grid .tile:has(.pick[data-focus="p:graphic:${g}"][aria-pressed="true"]) .src[data-src="ref"]`);
-    for (const th of ['dark', 'light']) { await theme(pg, th); await pg.click('#tab-graphics'); await pg.waitForSelector('#ref-notice'); await top(pg, `refstyle-recreate-${th}.png`); }
+    for (const th of ['dark', 'light']) { await theme(pg, th); await pg.click('#tab-graphics'); await pg.waitForSelector('#ref-card'); await top(pg, `refstyle-recreate-${th}.png`); }
     await theme(pg, 'dark');
   });
-  await t('you can change any layer it set; Back to my look takes out only what the reference set', async () => {
+  await t('you can change any layer it set; Off takes out only what the reference set', async () => {
     await pg.click('#tab-graphics');
     await pg.click('#grid .tile .pick[data-focus="p:graphic:sticker-pop"]'); await pg.waitForSelector('#grid .tile .pick[data-focus="p:graphic:sticker-pop"][aria-pressed="false"]');
     await pg.click('#grid .tile .pick[data-focus="p:graphic:sticker-pop"]'); await pg.waitForSelector('#grid .tile:has(.pick[data-focus="p:graphic:sticker-pop"]) .src[data-src="you"]');
-    await pg.click('#ref-notice-back'); await pg.waitForSelector('#ref-notice', { state: 'detached' });
+    await pg.click('#ref-card-mode [data-mode="off"]'); await pg.waitForSelector('#ref-card[data-mode="off"]'); await pg.waitForSelector('#looks:not(.by-ref)');
     assert.strictEqual(await pg.getAttribute('#ref-card-mode [data-mode="off"]', 'aria-checked'), 'true');
     await pg.waitForSelector('#grid .tile .pick[data-focus="p:graphic:lower-third"][aria-pressed="false"]');
     assert.strictEqual(await pg.getAttribute('#grid .tile .pick[data-focus="p:graphic:sticker-pop"]', 'aria-pressed'), 'true', 'your change stays');
     assert.strictEqual(await pg.$('#tab-graphics .pd-ref'), null);
   });
-  await t('Use parts on the Reference view says so too', async () => {
-    await pg.click('#ref-card-mode [data-mode="influence"]'); await pg.waitForSelector('#ref-notice[data-mode="influence"]');
-    assert.match(await pg.textContent('#ref-notice'), /We set your picks from the reference\. Your Look and sound stay yours\./);
-    await pg.click('#ref-open'); await pg.waitForSelector('#ref-notice-td');
-    for (const th of ['dark', 'light']) { await theme(pg, th); await pg.click('#ref-open').catch(() => {}); await pg.waitForSelector('#ref-notice-td'); await top(pg, `refstyle-influence-reference-${th}.png`); }
+  await t('Influence on the Reference view says so too, with the same mode control', async () => {
+    await pg.click('#ref-card-mode [data-mode="influence"]'); await pg.waitForSelector('#ref-card[data-mode="influence"]');
+    await pg.click('#ref-more'); await pg.click('#ref-open'); await pg.waitForSelector('#ref-notice-td[data-mode="influence"]');
+    assert.match(await pg.textContent('#ref-notice-td'), /We set your picks from the reference\. Your Look and sound stay yours\./);
+    assert.deepStrictEqual(await pg.$$eval('#ref-mode [role="radio"]', x => x.map(e => e.textContent.trim())), ['Recreate', 'Influence', 'Off'], 'the same vocabulary in the Breakdown');
+    assert.strictEqual(await pg.getAttribute('#ref-mode [data-mode="influence"]', 'aria-checked'), 'true'); assert.strictEqual(await pg.getAttribute('#ref-mode', 'role'), 'radiogroup');
+    assert.strictEqual(await pg.textContent('#ref-mode-hint'), await pg.textContent('#ref-card-mode-hint'));
+    for (const th of ['dark', 'light']) { await theme(pg, th); if (!(await pg.isVisible('#ref-out'))) { await pg.click('#ref-more'); await pg.click('#ref-open'); } await pg.waitForSelector('#ref-notice-td'); await top(pg, `refstyle-influence-reference-${th}.png`); }
     await theme(pg, 'dark');
   });
   await t('a reference still being read says so, then sets the Look when it is ready', async () => {
     await api('/api/settings', { downloads: join(STATE, 'dl') });
     await pg.goto(url + '/#step=style', { waitUntil: 'networkidle' }); await pg.reload({ waitUntil: 'networkidle' }); await pg.waitForSelector('#ref-card');
-    await pg.click('#ref-clear'); await pg.waitForSelector('#ref-undo');
+    await pg.click('#ref-more'); await pg.click('#ref-clear'); await pg.waitForSelector('#ref-undo');
     await api('/api/state', { reference: { mode: 'recreate' } });
     await api('/api/reference/url', { urls: [`http://127.0.0.1:${media.address().port}/ref.mp4`] });
     await pg.waitForSelector('#ref-notice .rn-spin'); assert.match(await pg.textContent('#ref-notice'), /Reading the reference\. We will set your look from it when it is ready\./);
     for (const th of ['dark', 'light']) { await theme(pg, th); await pg.waitForSelector('#ref-notice .rn-spin'); await top(pg, `refstyle-reading-${th}.png`); }
     await theme(pg, 'dark'); release();
-    await pg.waitForSelector('#ref-notice[data-mode="recreate"]', { timeout: 30000 });
+    await pg.waitForSelector('#ref-card[data-mode="recreate"]', { timeout: 30000 }); await pg.waitForSelector('#ref-notice', { state: 'detached' });
     await pg.waitForSelector('#looks .pack[data-look="cinematic"][aria-checked="true"]');
-    for (const th of ['dark', 'light']) { await theme(pg, th); await pg.waitForSelector('#ref-notice[data-mode="recreate"]'); await top(pg, `refstyle-ready-${th}.png`); }
+    for (const th of ['dark', 'light']) { await theme(pg, th); await pg.waitForSelector('#ref-card[data-mode="recreate"]'); await top(pg, `refstyle-ready-${th}.png`); }
     await theme(pg, 'dark');
   });
   await t('the phone layout fits', async () => {
@@ -146,7 +157,7 @@ try {
     if (shots) await pg.screenshot({ path: join(shots, 'redesign-look-phone-dark.png'), fullPage: false });
     await pg.evaluate(() => localStorage.setItem('studio.theme', 'light')); await pg.reload({ waitUntil: 'networkidle' }); await pg.waitForSelector('#ref-card');
     if (shots) await pg.screenshot({ path: join(shots, 'redesign-look-phone-light.png'), fullPage: false });
-    if (shots) { await pg.waitForSelector('#ref-notice'); await pg.screenshot({ path: join(shots, 'refstyle-phone-light.png') }); await pg.evaluate(() => localStorage.setItem('studio.theme', 'dark')); await pg.reload({ waitUntil: 'networkidle' }); await pg.waitForSelector('#ref-notice'); await pg.screenshot({ path: join(shots, 'refstyle-phone-dark.png') }); }
+    if (shots) { await pg.waitForSelector('#ref-card'); await pg.screenshot({ path: join(shots, 'refstyle-phone-light.png') }); await pg.evaluate(() => localStorage.setItem('studio.theme', 'dark')); await pg.reload({ waitUntil: 'networkidle' }); await pg.waitForSelector('#ref-card'); await pg.screenshot({ path: join(shots, 'refstyle-phone-dark.png') }); }
     assert.deepStrictEqual(errs, []);
   });
 } finally {

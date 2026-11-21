@@ -26,10 +26,10 @@ Six steps across the top: Footage, Cut, Look, B-roll, Finish, Post. Each one is 
    - **Recreate:** the draft uses the reference's Reel.md as the recipe (`--recipe --recut`). Your kept pieces (or your one take) are re-cut to the reference's shot plan, scaled to your length, every cut on a word boundary in the quiet between words, and each shot gets the reference's framing as a punch in or out. Its sound effects play at its times (scaled), a quiet music stem means no bed, the boxes and stickers it drew become graphics slots, and your titles take the style of the reference title doing the same job (hook, number, timer, brand).
 3. **Look.** One Look sets every layer; change any layer and a badge says where each choice came from. See [Look and its 9 layers](#look-and-its-9-layers).
    - **Looks.** One row: the built-in packs and the Looks you saved. **Save as a new Look** writes `packs/local/<name>/pack.json` (validated, gitignored) so you can reuse it with `--pack <name>`; with a reference in use, its look is saved too.
-   - **The reference card**, when a reference is broken down: **Use all** (recreate), **Use parts** (influence, soft defaults), **Off**, **Save as a Look** and **Clear reference**.
-   - **The reference sets your Look.** Pick **Use all** (Recreate) and we set every layer from the reference: its Look, captions, titles, transitions, grade, effects, music, beat sync and pace. **Use parts** (Influence) sets the same picks as soft defaults and keeps your Look and sound. A short line says so, each choice it set is badged **REF** (From reference) and its layers get an amber dot. Change anything you like; your change is yours. **Back to my look** (the same as Off) takes out only what the reference set and gives back your own caption style, Look and music. A reference that is still being read says so and sets the Look when it is ready.
-   - **Influence takes the parts you switch on.** On **Use parts** the reference card shows one switch per part: captions, titles, transitions, grade, effects, graphics, pace, music and sound, fonts and theme. Pace and sound start off, so they stay yours. Turn one off and its picks come out of your Look; turn it on and they come back (`reference.parts`).
-   - **What we read.** The Breakdown lists which parts of the reference were read (the full read, speech, layers and grade, the contact sheet, sound effects, music). For any that did not run it names what reads it, with Install and Copy for my agent buttons, then Read it again.
+   - **The reference card**, when a reference is broken down: its name, length and shots, one control (**Recreate**, **Influence**, **Off**, the same words as in the Breakdown) with one line on what it does, and **More** (Save as a Look, Clear reference, Breakdown). On Recreate the card sits above the Looks row, which dims with "Set by your reference", and one row of chips says what it brings: shots, framing, cutaways, sounds, no music, and **N made for you**, which opens the layer with those REF scenes.
+   - **The reference sets your Look.** Pick **Recreate** and we set every layer from the reference: its Look, captions, titles, transitions, grade, effects, music, beat sync and pace. **Influence** sets the same picks as soft defaults and keeps your Look and sound. A short line says so, each choice it set is badged **REF** (From reference) and its layers get an amber dot. Change anything you like; your change is yours. **Back to my look** (the same as Off) takes out only what the reference set and gives back your own caption style, Look and music. A reference that is still being read says so and sets the Look when it is ready.
+   - **Influence takes the parts you switch on.** On **Influence** the reference card shows one switch per part: captions, titles, transitions, grade, effects, graphics, pace, music and sound, fonts and theme. Pace and sound start off, so they stay yours. Turn one off and its picks come out of your Look; turn it on and they come back (`reference.parts`).
+   - **What we read.** The Breakdown is short: the same mode control, a row only when part of the reference was not read, the part switches, and **Details** (length, shots, pace, the shot timeline, the contact sheet) and **Pick parts by hand** closed until you open them. It lists which parts of the reference were read (the full read, speech, layers and grade, the contact sheet, sound effects, music). For any that did not run it names what reads it, with Install and Copy for my agent buttons, then Read it again.
    - **B-roll at its cutaways.** A Recreate draft puts B-roll spots where the reference cuts away from the speaker, on your edit's own clock. Suggest tries your library first (the best match on a clip's name and tags), and on a tip about a tool or a screen it suggests a screen recording before stock.
    - **Layers.** Every effect the engine has, as looping previews, in 9 layers. Click a tile to pick it; press F, right-click it, or use its forbid button to forbid it. Hover or focus a tile for its description. Search looks across every layer. Music, sound effects and pace sit in the Music and SFX layer.
 4. **B-roll.** One slot per beat of the draft: fill it from your library, an upload, stock, a card, a screen recording or a generate, and pick full cutaway, split top panel, picture in picture or framed cards. See [B-roll](#b-roll).
@@ -42,7 +42,7 @@ Six steps across the top: Footage, Cut, Look, B-roll, Finish, Post. Each one is 
 
 ## Look and its 9 layers
 
-![The Look step: a row of Looks, the Hormozi hook reference card with Use all, Use parts and Off, and the Graphics layer with a REF badge on lower-third](studio/look-layers.png)
+![The Look step: a row of Looks, the Hormozi hook reference card with Recreate, Influence and Off, and the Graphics layer with a REF badge on lower-third](studio/look-layers.png)
 
 The Look step used to show 17 tabs where 58 options sat in two or three. It now shows 9 layers, and every option lives in exactly one (`layers` in `kit/studio/categories.json`, computed by `layersOf` in `kit/studio/core.mjs`):
 
@@ -60,9 +60,9 @@ The Look step used to show 17 tabs where 58 options sat in two or three. It now 
 
 `layerOrder` says which layer claims an option first when two tabs share it, `owners` moves one to a named layer, and `hidden` drops a second name for the same thing (`oneword`, which is `one-word`). `tests/studio-look.test.mjs` (in `npm run check`) fails when an option lands in no layer or in two.
 
-**Badges.** A tile says where its choice came from: **YOU** (your pick), **REF** (the reference suggests it, or Use parts added it) or **LOOK** (the Look sets it).
+**Badges.** A tile says where its choice came from: **YOU** (your pick), **REF** (the reference suggests it, or Influence added it) or **LOOK** (the Look sets it).
 
-**Clear reference** takes the reference off and every pick Use parts added with it, and puts back the Look or bed it changed. Your own picks stay. It is one undo: **Undo** under the Looks row puts it all back (`POST /api/reference/clear`, `{ undo: true }`; `clear_reference` for your agent). Nothing on disk is deleted: the reference stays in the Reference list.
+**Clear reference** takes the reference off and every pick Influence added with it, and puts back the Look or bed it changed. Your own picks stay. It is one undo: **Undo** under the Looks row puts it all back (`POST /api/reference/clear`, `{ undo: true }`; `clear_reference` for your agent). Nothing on disk is deleted: the reference stays in the Reference list.
 
 **Save as a Look** on the reference card saves the reference's look as a Look of its own, beside the built-in ones (`POST /api/pack/save { fromReference }`; `save_look`). Save as a new Look keeps the reference's look too when one is in use.
 
@@ -618,7 +618,7 @@ Studio will not switch while a draft, render, download, take, transcript or b-ro
 **Wizards** in the top bar (and in More) are three guided starts. Each step has **Let my agent decide**, which hands that choice to your agent in the chat.
 
 - **Make a reel from a long take.** What it is for (Grow followers, Sell or sign up, Teach one thing, Full clean take, each setting the output), then a Look, then **Let AI choose** picks the pieces and opens Finish. If the take is not transcribed yet, it transcribes first and opens Cut.
-- **Copy a reference.** Paste a reel link; Studio reads it with Use all on and opens Look, Reference.
+- **Copy a reference.** Paste a reel link; Studio reads it on Recreate and opens Look, Reference.
 - **Clips and ads from one take.** 3, 5 or 8 clips, with 15 s and 30 s ad cuts if you tick them; it finds them on whole words and opens Cut.
 
 <img src="studio/wizards.png" width="560" alt="The Make a reel wizard, step 1 of 3: Grow followers, Sell or sign up, Teach one thing and Full clean take, and Let my agent decide">

@@ -2,7 +2,7 @@
 // - 9 layers, every option in exactly one (categories.json layers), the old duplicates where the plan puts them, and a
 //   layer map that loses an option or names an unknown one is an error (npm run check runs this)
 // - the badges: where each choice came from (the Look, the reference, you)
-// - Clear reference takes the reference and every pick Use parts added, as one undo; Undo puts it all back
+// - Clear reference takes the reference and every pick Influence added, as one undo; Undo puts it all back
 // - Save as a Look keeps the reference's look
 // - MCP: clear_reference and save_look, and the catalog by layer
 // Run: node tests/studio-look.test.mjs   (npm run check runs it too)
@@ -22,7 +22,7 @@ const C = await import('../kit/studio/core.mjs');
 let n = 0; const t = async (name, fn) => { await fn(); n++; console.log('ok ' + name); };
 const cat = C.catalog(), first = k => Object.values(cat.items).find(i => i.kind === k && i.mode !== 'info').id;
 const TR = 'glitch', EN = first('entrance'), GR = 'lower-third';
-// a reference already broken down: what Use parts would add
+// a reference already broken down: what Influence would add
 const EX = { name: 'Hormozi hook', shots: 23, transitions: { [TR]: 3 }, entrances: [EN], finishes: [], graphics: [GR], effects: [], music: {}, summary: { seconds: 31, music: { bpm: 128 } } };
 mkdirSync(SDIR, { recursive: true });
 writeFileSync(join(SDIR, 'state.json'), JSON.stringify({ ...C.defaultState(), job: JOB, pack: 'magazine', reference: { ...C.defaultState().reference, status: 'ready', mode: 'influence', extracted: EX } }));

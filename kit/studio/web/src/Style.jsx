@@ -3,7 +3,8 @@ import { Button } from '@astryxdesign/core/Button';
 import { Switch } from '@astryxdesign/core/Switch';
 import { Kbd } from '@astryxdesign/core/Kbd';
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
-import { api, file, toast, pickState, isPaused, Icon, IconBtn, KIND_NAME } from './lib.jsx';
+import { api, file, toast, pickState, isPaused, Icon, IconBtn, KIND_NAME, RM } from './lib.jsx';
+import { RefMode, RefNotice, RefParts, RefPlan } from './RefCard.jsx';
 import { upload } from './upload.js';
 import { WordsBrands } from './Brands.jsx';
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react';
@@ -11,48 +12,15 @@ import { contextOf, blockOf, needsOf, controlOf } from '../../conflicts.mjs';
 
 export function Style({ CAT, V, s, apply, patch, reloadCat, hidden, tab, setTab, go }) {
   return <>
-    <Looks CAT={CAT} V={V} s={s} apply={apply} patch={patch} reloadCat={reloadCat} hidden={hidden} go={go} />
+    <Looks CAT={CAT} V={V} s={s} apply={apply} patch={patch} reloadCat={reloadCat} hidden={hidden} go={go} setTab={setTab} />
     <Layers CAT={CAT} V={V} s={s} apply={apply} patch={patch} hidden={hidden} tab={tab} setTab={setTab} />
     {!hidden && <WordsBrands s={s} patch={patch} apply={apply} />}
   </>;
 }
 
-const MODE = [['recreate', 'Use all'], ['influence', 'Use parts'], ['off', 'Off']];
-const READING = ['queued', 'downloading', 'tearing'];
-// One short line when the reference set the Look (or is about to), with the way back to your own picks
-// Influence: which parts of the reference to take, one switch each (reference.parts)
-// What Recreate takes besides the Look (its shot plan, framing, cutaways and sounds), and what was made for the menu
-// from it (kit/scenes.cjs): the scenes a reference had that the menu did not, with a REF badge on the Look step
-export function RefPlan({ ex, mode }) {
-  const pl = ex && ex.plan, made = (ex && ex.scenes) || [];
-  const bits = mode === 'recreate' && pl ? [pl.shots > 1 && `${pl.shots} shots`, pl.framing && pl.framing.length && `framing ${pl.framing.slice(0, 3).join(', ')}`, pl.cutaways && `${pl.cutaways} cutaway spot${pl.cutaways === 1 ? '' : 's'} for B-roll`, pl.sounds && `${pl.sounds} sound effect${pl.sounds === 1 ? '' : 's'}`, pl.noBed && 'no music bed'].filter(Boolean) : [];
-  if (!bits.length && !made.length) return null;
-  return <>{bits.length > 0 && <p className="ref-plan" id="ref-plan">Also from it: {bits.join(', ')}.</p>}
-    {made.length > 0 && <p className="ref-made" id="ref-made">Made for your menu: {made.map((x, i) => <span key={x.id}>{i ? ', ' : ''}<b>{x.name}</b></span>)}. On the Look step with a REF badge, for every job.</p>}</>;
-}
-
-export function RefParts({ V, s, patch }) {
-  const parts = (V.env && V.env.refParts) || [], on = { ...((V.env && V.env.influenceParts) || {}), ...(s.reference.parts || {}) };
-  if (!parts.length) return null;
-  return <div className="ref-parts" id="ref-parts">
-    <span className="lbl">Take</span>
-    <div className="chips" role="group" aria-label="Parts of the reference to take">{parts.map(p => <button key={p.id} type="button" id={'ref-part-' + p.id} className={'chip' + (on[p.id] ? ' on' : '')} aria-pressed={String(!!on[p.id])}
-      onClick={() => patch({ reference: { parts: { [p.id]: !on[p.id] } } })}><Icon n={on[p.id] ? 'check' : 'plus'} />{p.label}</button>)}</div>
-  </div>;
-}
-
-export function RefNotice({ s, patch, id = 'ref-notice' }) {
-  const r = s.reference, a = r.auto, reading = !r.extracted && r.mode !== 'off' && (r.status === 'running' || (r.queue || []).some(x => READING.includes(x.status)));
-  if (reading) return <div className="ref-notice glass-card" id={id} role="status"><span className="rn-spin" aria-hidden="true" /><p><b>Reading the reference.</b> We will set your look from it when it is ready.</p></div>;
-  if (!r.extracted || !a || r.mode === 'off') return null;
-  const back = () => patch({ reference: { mode: 'off' } }).then(() => toast('Back to your own look. The reference is off.', true)).catch(() => {});
-  return <div className="ref-notice glass-card" id={id} role="status" data-mode={a.mode}><Icon n="spark" />
-    <p><b>{a.mode === 'recreate' ? 'We set your look from the reference.' : 'We set your picks from the reference.'}</b> {a.mode === 'recreate' ? 'Change anything you like.' : (a.sound ? 'Your Look stays yours. Change anything you like.' : 'Your Look and sound stay yours. Change anything you like.')}</p>
-    <Button id={id + '-back'} size="sm" variant="secondary" label="Back to my look" onClick={back} /></div>;
-}
-function SaveLook({ id, label, fromReference, reloadCat, apply, variant = 'ghost' }) {
+function SaveLook({ id, label, reloadCat, apply, variant = 'ghost' }) {
   const [name, setName] = useState(''), [msg, setMsg] = useState('');
-  const save = e => { e.preventDefault(); api('/api/pack/save', { name: name.trim(), fromReference: !!fromReference }).then(async j => { await reloadCat(); apply(j); setMsg(`Saved as the Look ${j.pack}`); toast(`Saved as the Look ${j.pack}`, true); }).catch(() => {}); };
+  const save = e => { e.preventDefault(); api('/api/pack/save', { name: name.trim() }).then(async j => { await reloadCat(); apply(j); setMsg(`Saved as the Look ${j.pack}`); toast(`Saved as the Look ${j.pack}`, true); }).catch(() => {}); };
   return <Popover className="pop" id={id + '-pop'}><PopoverButton className={'btn sm ' + variant} id={id}>{label}</PopoverButton>
     <PopoverPanel anchor={{ to: 'bottom end', gap: 8, padding: 8 }} className="popover glass pop-panel" transition><form id={id + '-form'} onSubmit={save}><label className="lbl" htmlFor={id + '-name'}>Name the Look</label>
       <div className="row"><input id={id + '-name'} placeholder="my-look" pattern="[a-z0-9][a-z0-9\-]{1,40}" required value={name} onChange={e => setName(e.target.value)} /><Button type="submit" size="sm" variant="primary" label="Save" /></div>
@@ -60,35 +28,61 @@ function SaveLook({ id, label, fromReference, reloadCat, apply, variant = 'ghost
   </Popover>;
 }
 
-// One row of Looks (the built-in packs and the ones you saved), then the reference card when one is in use
-function Looks({ CAT, V, s, apply, patch, reloadCat, hidden, go }) {
+// The reference card's More menu: Save as a Look (asks for a name in place), Clear reference and the Breakdown
+function RefMoreItems({ close, reloadCat, apply, clear, open }) {
+  const [naming, setNaming] = useState(false), [name, setName] = useState('');
+  const save = e => { e.preventDefault(); api('/api/pack/save', { name: name.trim(), fromReference: true }).then(async j => { await reloadCat(); apply(j); toast(`Saved as the Look ${j.pack}`, true); close(); }).catch(() => {}); };
+  return <>
+    <button type="button" className="menu-item" id="save-ref-look" aria-expanded={String(naming)} aria-controls="save-ref-look-form" onClick={() => setNaming(v => !v)}><Icon n="plus" /><span>Save as a Look</span></button>
+    {naming && <form id="save-ref-look-form" className="ref-more-form" onSubmit={save}><label className="lbl" htmlFor="save-ref-look-name">Name the Look</label>
+      <div className="row"><input id="save-ref-look-name" placeholder="my-look" pattern="[a-z0-9][a-z0-9\-]{1,40}" required autoFocus value={name} onChange={e => setName(e.target.value)} /><Button type="submit" size="sm" variant="primary" label="Save" /></div></form>}
+    <button type="button" className="menu-item" id="ref-clear" onClick={() => { close(); clear(); }}><Icon n="trash" /><span>Clear reference</span></button>
+    <button type="button" className="menu-item" id="ref-open" onClick={() => { close(); open(); }}><Icon n="film" /><span>Breakdown</span></button>
+  </>;
+}
+function RefMore(props) {
+  return <Popover className="pop ref-more-pop">{({ close }) => <>
+    <PopoverButton className="btn sm ghost ref-more" id="ref-more">More<Icon n="down" /></PopoverButton>
+    <PopoverPanel anchor={{ to: 'bottom end', gap: 8, padding: 8 }} className="menu-panel glass ref-more-panel" id="ref-more-panel" transition><RefMoreItems close={close} {...props} /></PopoverPanel>
+  </>}</Popover>;
+}
+
+// One row of Looks (the built-in packs and the ones you saved) and the reference card when one is in use. In Recreate
+// the reference sets the Look, so its card comes first and the Looks row steps back
+function Looks({ CAT, V, s, apply, patch, reloadCat, hidden, go, setTab }) {
   const r = s.reference, ex = r.extracted, item = (r.queue || []).find(x => x.id === r.active);
   const looks = [{ name: null, label: 'Your picks only' }, ...CAT.packs.filter(p => !/^ref-/.test(p.name))];
   const clear = () => api('/api/reference/clear', {}).then(j => { apply(j); toast(j.note, true); }).catch(() => {});
   const undo = () => api('/api/reference/clear', { undo: true }).then(j => { apply(j); toast(j.note, true); }).catch(() => {});
-  const sm = (ex && ex.summary) || {}, mu = sm.music || {};
-  return <section className="step" id="s-look" data-step="style" aria-labelledby="h-look" hidden={hidden}>
-    <header className="sh look-h"><div><h2 id="h-look">Look</h2><p className="sub">One Look sets every layer. Change any layer below; the badge says where each choice came from.</p></div>
-      <SaveLook id="save-look" label="Save as a new Look" reloadCat={reloadCat} apply={apply} variant="secondary" /></header>
-    <RefNotice s={s} patch={patch} />
-    <div id="looks" className="packs looks" role="radiogroup" aria-label="Look">
+  const sm = (ex && ex.summary) || {}, byRef = !!ex && r.mode === 'recreate';
+  // the made chip: open the layer that holds the scenes made from the reference and bring that group into view
+  const showMade = made => { const layer = made[0] && made[0].kind === 'effect' ? 'color' : 'graphics'; setTab(layer);
+    let n = 0; const find = () => { const g = document.querySelector(`#grid[aria-labelledby="tab-${layer}"] [data-group="ref-made"]`); if (g) g.scrollIntoView({ block: 'center', behavior: RM ? 'auto' : 'smooth' }); else if (n++ < 30) requestAnimationFrame(find); }; requestAnimationFrame(find); };
+  const row = <div className="looks-wrap" key="looks">
+    {byRef && <p className="fine looks-by-ref" id="looks-by-ref">Set by your reference</p>}
+    <div id="looks" className={'packs looks' + (byRef ? ' by-ref' : '')} role="radiogroup" aria-label="Look" aria-describedby={byRef ? 'looks-by-ref' : undefined}>
       {looks.map(p => <button key={p.name || 'none'} className="pack" type="button" role="radio" data-look={p.name || ''} aria-checked={String((s.pack || null) === p.name)} title={p.description || (p.label || '').split(':')[0]} onClick={() => patch({ pack: p.name })}>
         <span className="pv">{p.preview ? <img src={file(p.preview)} alt="" loading="lazy" width={112} height={199} /> : <span className="ph">{p.name ? 'No preview' : 'Your picks only'}</span>}</span>
         <b>{p.name || 'None'}</b><small className="fine">{!p.name ? 'kit defaults' : p.shipped ? 'built in' : /reference/i.test(p.label || '') ? 'saved from a reference' : 'your saved Look'}</small>
       </button>)}
     </div>
-    {ex ? <div className="ref-card glass-card" id="ref-card">
+  </div>;
+  const card = ex ? <div className={'ref-card glass-card' + (byRef ? ' first' : '')} id="ref-card" key="card" data-mode={r.mode}>
+    <div className="rc-h">
       <span className="src src-ref">Reference</span>
       <div className="rc-t"><b>{ex.name || (item && item.url) || 'Your reference'}</b>
-        <span className="fine">{[item && item.url ? item.url.replace(/^https?:\/\//, '').slice(0, 40) : null, sm.seconds ? `${Math.round(sm.seconds)} s` : null, ex.shots ? `${ex.shots} shots` : null, mu.bpm ? `${mu.bpm} BPM` : null].filter(Boolean).join(', ')}</span>
-        <span className="fine" id="ref-card-note">{r.mode === 'recreate' ? 'Using all of it: its Look, captions, titles, transitions, music and pace, with your take re-cut to its shots and framing.' : r.mode === 'influence' ? 'Using the parts you switch on, as soft defaults. Your Look stays yours.' : 'Off: kept here, not used.'}</span></div>
-      <div className="seg" role="radiogroup" aria-label="Use the reference" id="ref-card-mode">{MODE.map(([m, l]) => <button key={m} type="button" role="radio" aria-checked={r.mode === m ? 'true' : 'false'} data-mode={m} onClick={() => patch({ reference: { mode: m } })}>{l}</button>)}</div>
-      <SaveLook id="save-ref-look" label="Save as a Look" fromReference reloadCat={reloadCat} apply={apply} />
-      <Button id="ref-clear" size="sm" variant="ghost" label="Clear reference" onClick={clear} />
-      <button type="button" className="linkish" id="ref-open" onClick={() => go && go('reference', true)}>Breakdown</button>
-      {r.mode === 'influence' && <RefParts V={V} s={s} patch={patch} />}
-      <RefPlan ex={ex} mode={r.mode} />
-    </div> : s.undoRef ? <p className="fine ref-undo" id="ref-undo">Reference cleared. <button type="button" className="linkish" id="ref-undo-btn" onClick={undo}>Undo</button></p> : null}
+        <span className="fine" id="ref-card-meta">{[sm.seconds ? `${Math.round(sm.seconds)} s` : null, ex.shots ? `${ex.shots} shots` : null].filter(Boolean).join(', ')}</span></div>
+      <RefMore reloadCat={reloadCat} apply={apply} clear={clear} open={() => go && go('reference', true)} />
+    </div>
+    <RefMode id="ref-card-mode" mode={r.mode} patch={patch} />
+    {r.mode === 'influence' && <RefParts V={V} s={s} patch={patch} />}
+    <RefPlan ex={ex} mode={r.mode} onMade={showMade} />
+  </div> : s.undoRef ? <p className="fine ref-undo" id="ref-undo" key="undo">Reference cleared. <button type="button" className="linkish" id="ref-undo-btn" onClick={undo}>Undo</button></p> : null;
+  return <section className="step" id="s-look" data-step="style" aria-labelledby="h-look" hidden={hidden}>
+    <header className="sh look-h"><div><h2 id="h-look">Look</h2><p className="sub">One Look sets every layer. Change any layer below; the badge says where each choice came from.</p></div>
+      <SaveLook id="save-look" label="Save as a new Look" reloadCat={reloadCat} apply={apply} variant="secondary" /></header>
+    {!ex && <RefNotice s={s} patch={patch} />}
+    {byRef ? [card, row] : [row, card]}
   </section>;
 }
 

@@ -1,7 +1,8 @@
 // Recreate and Influence on the reference card (1.21.0) in a real Chrome, with no keys and no network:
-// - Influence (Use parts) shows one switch per part of the reference; turning one off takes its picks out of your
+// - Influence shows one switch per part of the reference; turning one off takes its picks out of your
 //   Look, turning it back on puts them back; Recreate and Off hide the switches
-// - the Breakdown shows which parts of the reference were read, and a fix button (no command) for each that was not
+// - the Breakdown shows which parts of the reference were read, and a fix button (no command) for each that was not;
+//   the same Recreate, Influence, Off control as the card; stats, timeline and contact sheet behind Details
 // - screenshots, dark and light
 // Needs Chrome. Run: node tests/studio-recreate.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
 import assert from 'assert';
@@ -49,7 +50,7 @@ try {
   pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
   await pg.addInitScript(() => localStorage.setItem('studio.paused', '1'));
 
-  await t('Use parts shows a switch per part; Off and Use all hide them', async () => {
+  await t('Influence shows a switch per part; Off and Recreate hide them', async () => {
     await pg.goto(url + '/#step=style', { waitUntil: 'networkidle' }); await pg.waitForSelector('#ref-card');
     assert.strictEqual(await pg.$('#ref-parts'), null, 'no switches when Off');
     await pg.click('#ref-card-mode [data-mode="influence"]'); await pg.waitForSelector('#ref-card #ref-parts');
@@ -57,7 +58,8 @@ try {
     assert.deepStrictEqual(labels, ['Captions', 'Titles', 'Transitions', 'Grade', 'Effects', 'Graphics', 'Pace', 'Music and sound', 'Fonts and theme']);
     assert.strictEqual(await pg.getAttribute('#ref-card #ref-part-transitions', 'aria-pressed'), 'true');
     assert.strictEqual(await pg.getAttribute('#ref-card #ref-part-sound', 'aria-pressed'), 'false', 'sound stays yours by default');
-    assert.match(await pg.textContent('#ref-card-note'), /parts you switch on/);
+    assert.match(await pg.textContent('#ref-card-mode-hint'), /Only the parts you switch on, as soft defaults\./);
+    assert.strictEqual(await pg.$('#ref-card-note'), null);
   });
   await t('a switch off takes that part out of your Look, and on puts it back', async () => {
     const before = await allowed('transition'); assert.ok(before.includes('crossfade'), 'the reference set its transition: ' + before);
@@ -69,18 +71,33 @@ try {
     const v = await api('/api/state'); assert.strictEqual(v.state.reference.parts.transitions, true);
   });
   await t('the Breakdown says what was read and offers a fix for the rest, never a command', async () => {
-    await pg.click('#ref-open'); await pg.waitForSelector('#ref-ran');
+    await pg.click('#ref-more'); await pg.click('#ref-open'); await pg.waitForSelector('#ref-ran');
     const st = await pg.$$eval('#ref-ran .ran li', x => x.map(e => [e.dataset.part, e.className]));
     assert.deepStrictEqual(Object.fromEntries(st), { reader: 'ok', speech: 'miss', layers: 'miss', sheet: 'miss', sounds: 'ok', music: 'ok' });
     const txt = await pg.textContent('#ref-ran'); assert.match(txt, /did not run/);
     assert.ok(!/npm |pip |python3? |\$ /.test(txt), 'no terminal command: ' + txt);
     assert.ok(await pg.$('#ref-ran .ran-fix button'), 'a fix button');
-    for (const th of ['dark', 'light']) { await theme(pg, th); await pg.click('#ref-open').catch(() => {}); await pg.waitForSelector('#ref-ran'); await pg.$eval('#ref-ran', e => e.scrollIntoView({ block: 'center' })); if (shots) { await pg.waitForTimeout(300); await (await pg.$('#ref-out')).screenshot({ path: join(shots, `recreate-ran-${th}.png`) }); } }
+    for (const th of ['dark', 'light']) { await theme(pg, th); await pg.waitForSelector('#ref-ran'); await pg.$eval('#ref-ran', e => e.scrollIntoView({ block: 'center' })); if (shots) { await pg.waitForTimeout(300); await (await pg.$('#ref-out')).screenshot({ path: join(shots, `recreate-ran-${th}.png`) }); } }
   });
-  await t('Use all: no switches, the note says it re-cuts to its shots', async () => {
+  await t('the Breakdown is calm: the same mode control, parts switches in Influence, the rest behind Details', async () => {
+    assert.deepStrictEqual(await pg.$$eval('#ref-mode [role="radio"]', x => x.map(e => e.textContent.trim())), ['Recreate', 'Influence', 'Off']);
+    assert.strictEqual(await pg.getAttribute('#ref-mode [data-mode="influence"]', 'aria-checked'), 'true');
+    assert.match(await pg.textContent('#ref-mode-hint'), /Only the parts you switch on/);
+    assert.ok(await pg.isVisible('#ref-out #ref-parts'), 'the part switches stay in view');
+    for (const id of ['#ref-mode-note', '#ref-out .sugg-h .lbl']) assert.strictEqual(await pg.$(id), null, id + ' is gone');
+    assert.ok(!/Your agent sees this breakdown|Its picks|beat grid/.test(await pg.textContent('#ref-out')));
+    assert.strictEqual(await pg.$eval('#ref-details', e => e.open), false, 'Details starts closed'); assert.ok(!(await pg.isVisible('#ref-details .stats')));
+    await pg.click('#ref-details > summary'); await pg.waitForSelector('#ref-details .stats', { state: 'visible' }); assert.ok(await pg.isVisible('#ref-details .timeline'));
+    await pg.click('#ref-details > summary');
+  });
+  await t('Recreate: no switches, the hint says it re-cuts to its shots, the card sits above a dimmed Looks row', async () => {
     await pg.goto(url + '/#step=style', { waitUntil: 'networkidle' }); await pg.waitForSelector('#ref-card');
     await pg.click('#ref-card-mode [data-mode="recreate"]'); await pg.waitForSelector('#ref-card-mode [data-mode="recreate"][aria-checked="true"]');
-    assert.strictEqual(await pg.$('#ref-card #ref-parts'), null); assert.match(await pg.textContent('#ref-card-note'), /re-cut to its shots/);
+    assert.strictEqual(await pg.$('#ref-card #ref-parts'), null); assert.match(await pg.textContent('#ref-card-mode-hint'), /Your take re-cut to its shots, with its look, titles, sounds and music\./);
+    await pg.waitForSelector('#looks.by-ref'); assert.strictEqual((await pg.textContent('#looks-by-ref')).trim(), 'Set by your reference');
+    const pos = await pg.evaluate(() => [document.querySelector('#ref-card').getBoundingClientRect().bottom, document.querySelector('#looks').getBoundingClientRect().top, +getComputedStyle(document.querySelector('#looks')).opacity]);
+    assert.ok(pos[0] <= pos[1], 'the card is above the Looks row: ' + pos); assert.ok(pos[2] < 1, 'the Looks row is dimmed');
+    assert.ok(await pg.$eval('#ref-card #ref-plan', e => /shots/.test(e.textContent)), 'plan chips in Recreate');
     for (const th of ['dark', 'light']) { await theme(pg, th); await pg.waitForSelector('#ref-card'); await shot(pg, `recreate-useall-${th}.png`); }
     assert.deepStrictEqual(errs, []);
   });

@@ -1,5 +1,6 @@
 // Scenes made from a reference on the Look step (1.22.0), in a real Chrome, no keys, no network:
-// - the reference card says what Recreate brings (shots, framing, cutaways, sounds, no bed) and what was made for the menu
+// - the reference card says what Recreate brings as chips (shots, framing, cutaways, sounds, no music) and what was made
+//   for the menu; the made chip opens the layer that holds it; the plan chips show only in Recreate
 // - the made scene is a Graphics tile with a REF badge and its own still (rendered like a Make card); picking it sticks
 // - one your agent adds shows up without a reload; taking it out removes the tile and the pick
 // - screenshots, dark and light
@@ -47,10 +48,18 @@ try {
   await pg.goto(url + '/#step=style', { waitUntil: 'networkidle' }); await pg.waitForSelector('#ref-card');
 
   await t('the reference card says what Recreate brings and what was made for the menu', async () => {
-    const plan = await pg.textContent('#ref-plan'), mine = await pg.textContent('#ref-made');
-    assert.ok(/8 shots/.test(plan) && /close-up/.test(plan) && /2 cutaway spots/.test(plan) && /3 sound effects/.test(plan) && /no music bed/.test(plan), plan);
-    assert.ok(mine.includes(made.name) && /REF badge/.test(mine), mine);
-    assert.ok(!/—/.test(plan + mine), 'no em dashes');
+    const chips = await pg.$$eval('#ref-card #ref-plan .rp-chip', x => x.map(e => e.textContent.trim()));
+    assert.deepStrictEqual(chips, ['8 shots', 'close-up, medium shot', '2 cutaways', '3 sounds', 'No music', '1 made for you']);
+    const mine = await pg.getAttribute('#ref-card #ref-made', 'title'); assert.strictEqual(mine, made.name, 'the made chip names what was made');
+    assert.ok(!/\u2014/.test(chips.join(' ') + mine), 'no em dashes');
+    assert.strictEqual(await pg.$('#ref-card-note'), null, 'no paragraph on the card');
+  });
+  await t('the made chip opens the layer that holds the scene', async () => {
+    await pg.click('#tab-text'); await pg.waitForSelector('#tab-text[aria-selected="true"]');
+    await pg.click('#ref-card #ref-made'); await pg.waitForSelector('#tab-graphics[aria-selected="true"]');
+    await pg.waitForSelector('#grid[aria-labelledby="tab-graphics"] [data-group="ref-made"]');
+    await pg.waitForFunction(() => { const r = document.querySelector('#grid [data-group="ref-made"]').getBoundingClientRect(); return r.top < innerHeight && r.bottom > 0; }, null, { timeout: 8000 });
+    await pg.evaluate(() => scrollTo(0, 0));
   });
   await t('the made scene is a Graphics tile with a REF badge and its own still; picking it sticks', async () => {
     await pg.click('#tab-graphics'); await pg.waitForSelector(tile(made.id));
@@ -77,6 +86,13 @@ try {
     await api('/api/scenes/' + made.id, undefined, 'DELETE');
     await pg.click('#tab-graphics'); await pg.waitForFunction(sel => !document.querySelector(sel), tile(made.id), { timeout: 15000 });
     const s = (await api('/api/state')).state; assert.ok(!((s.picks.graphic || {}).allow || []).includes(made.id));
+  });
+  await t('plan chips only in Recreate, the made chip in any mode but Off', async () => {
+    await pg.evaluate(() => scrollTo(0, 0));
+    await pg.click('#ref-card-mode [data-mode="influence"]'); await pg.waitForSelector('#ref-card-mode [data-mode="influence"][aria-checked="true"]');
+    assert.deepStrictEqual(await pg.$$eval('#ref-card #ref-plan .rp-chip', x => x.map(e => e.textContent.trim())), ['1 made for you']);
+    await pg.click('#ref-card-mode [data-mode="off"]'); await pg.waitForSelector('#ref-card #ref-plan', { state: 'detached' });
+    await pg.click('#ref-card-mode [data-mode="recreate"]'); await pg.waitForSelector('#ref-card #ref-plan [data-plan="shots"]');
   });
   assert.deepStrictEqual(errs, []);
 } finally {

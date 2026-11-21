@@ -80,6 +80,7 @@ try {
 
   await t('what to swap: parts with times; a time seeks the reference; Use picks the look', async () => {
     await pg.goto(url + '/#step=reference', { waitUntil: 'networkidle' });
+    await pg.waitForSelector('#ref-byhand > summary'); assert.strictEqual(await pg.$eval('#ref-byhand', e => e.open), false, 'Pick parts by hand starts closed'); await pg.click('#ref-byhand > summary');
     await pg.waitForSelector('#swap .sw-list li');
     const rows = await pg.$$eval('#swap .sw-list li .sw-k', x => x.map(e => e.textContent));
     assert.strictEqual(rows[0], 'Hook'); assert.ok(rows.includes('Cut') && rows.includes('Title') && rows.includes('CTA'), rows.join());
