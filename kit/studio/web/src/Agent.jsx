@@ -76,8 +76,8 @@ export function Wizards({ CAT, V, s, apply, patch, go, open, setOpen, openChat }
         <div className="wz-looks" role="radiogroup" aria-label="Look">{looks.map(p => <button key={p.name} type="button" role="radio" className="wz-look" data-look={p.name} aria-checked={s.pack === p.name ? 'true' : 'false'} disabled={busy}
           onClick={() => step({ wizard: 'reel', look: p.name }).then(j => j && setN(2))}>{p.preview ? <img src={file(p.preview)} alt="" width={64} height={114} loading="lazy" /> : <span className="ph" />}<b>{p.name}</b></button>)}</div>
         <div className="row"><Button variant="ghost" size="sm" label="Keep my Look" onClick={() => setN(2)} /><Decide k={1} /></div></>;
-      return <><h3 className="wz-q">Let AI choose the lines</h3><p className="fine">It picks a hook first and the call to action last, on whole words, to fit the length. You check the draft on Review.</p>
-        <div className="row"><Button id="wz-choose" variant="primary" label="Let AI choose" isLoading={busy} onClick={() => step({ wizard: 'reel', choose: true }, true)} /><Decide k={2} /></div></>;
+      return <><h3 className="wz-q">Use our best lines</h3><p className="fine">It picks a hook first and the call to action last, on whole words, to fit the length. You check the draft on Review.</p>
+        <div className="row"><Button id="wz-choose" variant="primary" label="Use our best lines" isLoading={busy} onClick={() => step({ wizard: 'reel', choose: true }, true)} /><Decide k={2} /></div></>;
     }
     if (w === 'reference') return <><h3 className="wz-q">Paste a reel you like</h3><p className="fine">A link from Instagram, TikTok, YouTube or a file link. Studio reads its titles, colors, cuts and sound.</p>
       <form className="wz-url" onSubmit={e => { e.preventDefault(); if (!url.trim()) { setErr('Paste a link first.'); return; } step({ wizard: 'reference', url: url.trim() }, true); }}>
