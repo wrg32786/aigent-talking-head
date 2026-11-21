@@ -28,6 +28,7 @@ const draw = (caps, dur, { env = {}, stills = null } = {}) => {
   const j = f => (existsSync(join(d, f)) ? JSON.parse(readFileSync(join(d, f), 'utf8')) : null);
   return { d, log, words: j('words.json') || [], held: j('words-held.json') || [], lockups: j('lockups.json') || [] };
 };
+const hasFf = (() => { try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); return true; } catch { return false; } })();
 const rgba = png => execFileSync('ffmpeg', ['-v', 'error', '-i', png, '-f', 'rawvideo', '-pix_fmt', 'rgba', '-'], { maxBuffer: 64 << 20 });
 const base = { captionStyle: 'one-word', captionColor: '#ffffff', captionOutline: 'none', captionShadow: 'none', fonts: 'pirata', titleLayer: 'front' };
 
@@ -45,7 +46,7 @@ const report = { ...base, flips: [
   const tc = titleCheck(r.d, { dur: 14.5 });
   ok(tc.ran && tc.frames === 16, `the check reads two frames before to five after the title's start and its end (${tc.frames} frames)`);
   ok(tc.fails.some(f => /^frame 307 /.test(f) && /"designer"/.test(f) && /is up/.test(f)), 'the check fails on frame 307: "designer" in the bar while the title is up: ' + tc.fails.join(' | '));
-  ok(tc.fails.some(f => /^frame 307 /.test(f) && /letter pixels/.test(f) && /ovl\/0307\.png/.test(f)), 'the check finds the word in the drawn text layer (build/ovl/0307.png): ' + tc.fails.join(' | '));
+  if (!hasFf) console.log('skip the drawn text layer check (needs ffmpeg)'); else ok(tc.fails.some(f => /^frame 307 /.test(f) && /letter pixels/.test(f) && /ovl\/0307\.png/.test(f)), 'the check finds the word in the drawn text layer (build/ovl/0307.png): ' + tc.fails.join(' | '));
   ok(tc.fails.some(f => /"for" is in the caption bar just after its own title/.test(f)), 'the check fails on the key word in the bar after its title has left: ' + tc.fails.join(' | '));
 }
 { const r = draw(report, 14.5);

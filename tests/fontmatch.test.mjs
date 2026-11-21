@@ -10,6 +10,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..'), FM = join(ROOT, 'kit', 'fontmatch.py');
 const PY = process.env.PYTHON || [join(ROOT, '.venv', 'Scripts', 'python.exe'), join(ROOT, '.venv', 'bin', 'python')].find(f => existsSync(f)) || (process.platform === 'win32' ? 'py' : 'python3');
+try { execFileSync(PY, ['-c', 'import cv2, PIL'], { stdio: 'ignore' }); } catch { console.log('skip font match tests (needs Python with OpenCV and Pillow, from requirements.txt)'); process.exit(0); }
 let pass = 0, failed = 0;
 const ok = (c, m) => { if (c) pass++; else { failed++; console.error('FAIL ' + m); } };
 const dir = mkdtempSync(join(tmpdir(), 'fontmatch-'));

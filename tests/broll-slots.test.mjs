@@ -9,7 +9,7 @@
 //   a key, Skip and back, a clip placed on it sits as a panel, and the render step keeps the slot's state in plan.json
 // Run: node tests/broll-slots.test.mjs   (npm run check runs it too)
 import assert from 'assert';
-import { spawn, execFileSync } from 'child_process';
+import { spawn, spawnSync, execFileSync } from 'child_process';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
@@ -161,7 +161,7 @@ try {
       const s2 = await req('/api/broll/need', { beat: needs[0].n, action: 'send' }); assert.strictEqual(s2.status, 400); assert.ok(/Connect your agent/.test(s2.j.error));
       { const free = (await req('/api/broll')).j.beats.find(b => !b.ref); assert.strictEqual((await req('/api/broll/need', { beat: free.n, action: 'skip' })).status, 400, 'only a plan slot'); }
     });
-    await t('Studio: a clip on a slot sits as a panel for the slot length; the render step draws it and keeps every slot state', async () => {
+    if (spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' }).status !== 0) console.log('skip a clip on a slot (needs ffmpeg)'); else await t('Studio: a clip on a slot sits as a panel for the slot length; the render step draws it and keeps every slot state', async () => {
       const clip = join(STATE, 'screen.mp4');
       execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=640x360:rate=24:duration=8', '-pix_fmt', 'yuv420p', clip]);
       const up = await fetch(`${url}/api/broll/upload?name=screen.mp4&type=screen-recording&beat=${needs[0].n}`, { method: 'POST', body: readFileSync(clip) }); const uj = await up.json(); assert.strictEqual(up.status, 200, JSON.stringify(uj));
