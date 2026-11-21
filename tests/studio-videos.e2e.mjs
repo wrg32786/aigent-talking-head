@@ -1,7 +1,8 @@
 // New video in a real Chrome, on synthetic media (tests/fixtures/studio-media.mjs):
 // - the + by the job name opens one small dialog: a name (cleaned like the job field), Keep my look on, Start fresh
-// - Start fresh clears the footage for the new job, keeps the look, lands on Footage and deletes nothing
+// - Start fresh clears the footage for the new job, keeps the look, lands on Start and deletes nothing
 // - More, Open a past video lists the old job with its date and reel count; opening it brings its footage back
+// - a switch made by your agent (new_video) moves the page from Picture to Start
 // - the dialog closes with Escape, and the page logs no errors. Dark and light screenshots with --shots <dir>.
 // Needs Chrome and ffmpeg. Run: node tests/studio-videos.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
 import assert from 'assert';
@@ -40,7 +41,7 @@ try {
   await api('/api/state', { footage: [TAKE] });
   const errs = [], ctx = await browser.newContext({ viewport: { width: 1280, height: 820 } }), pg = await ctx.newPage();
   pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
-  const ready = async hash => { await pg.goto(url + '/' + (hash || '#step=style'), { waitUntil: 'networkidle' }); await pg.waitForSelector('#new-video-open', { timeout: 30e3 }); await pg.waitForFunction(j => document.querySelector('#job').value === j, OLD, { timeout: 30e3 }); };
+  const ready = async hash => { await pg.goto(url + '/' + (hash || '#step=style'), { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#new-video-open', { timeout: 30e3 }); await pg.waitForFunction(j => document.querySelector('#job').value === j, OLD, { timeout: 30e3 }); };
   const openDialog = async () => { await pg.click('#new-video-open'); await pg.waitForSelector('dialog#new-video[open] #nv-name', { timeout: 15e3 }); await pg.waitForFunction(() => document.activeElement && document.activeElement.id === 'nv-name', null, { timeout: 15e3 }); };
 
   await t('the + by the job name opens New video: a cleaned name, Keep my look on, Start fresh; Escape closes it', async () => {
@@ -56,10 +57,10 @@ try {
     if (shots) { await pg.waitForTimeout(500); await pg.screenshot({ path: join(shots, 'newvideo-dark.png') }); }
   });
 
-  await t('Start fresh: a clean board for the new job on Footage, the look kept, nothing deleted', async () => {
+  await t('Start fresh: a clean board for the new job on Start, the look kept, nothing deleted', async () => {
     await pg.click('#nv-start');
     await pg.waitForFunction(j => document.querySelector('#job').value === j, NEW, { timeout: 15e3 });
-    await pg.waitForFunction(() => !document.querySelector('dialog#new-video[open]') && document.querySelector('main').dataset.step === 'footage', null, { timeout: 15e3 });
+    await pg.waitForFunction(() => !document.querySelector('dialog#new-video[open]') && document.querySelector('main').dataset.step === 'start', null, { timeout: 15e3 });
     assert.deepStrictEqual(await pg.evaluate(() => [document.querySelectorAll('main').length, document.querySelectorAll('#chat').length]), [1, 1], 'one board, one chat');
     const v = await api('/api/state');
     assert.strictEqual(v.state.job, NEW); assert.deepStrictEqual(v.state.footage, []); assert.strictEqual(v.state.pack, 'cinematic'); assert.strictEqual(v.state.music.bed, 'none');
@@ -79,7 +80,7 @@ try {
     await pg.waitForFunction(j => document.querySelector('#job').value === j, OLD, { timeout: 15e3 });
     const v = await api('/api/state');
     assert.deepStrictEqual(v.state.footage, [TAKE]); assert.strictEqual(v.outputs.length, 1);
-    await pg.waitForFunction(() => document.querySelector('main').dataset.step === 'footage');
+    await pg.waitForFunction(() => document.querySelector('main').dataset.step === 'start');
   });
 
   await t('light theme: the same dialog reads on a light ground', async () => {
@@ -93,11 +94,11 @@ try {
     await pg.click('#nv-cancel'); await pg.waitForFunction(() => !document.querySelector('dialog#new-video[open]'));
     assert.strictEqual((await api('/api/state')).state.job, OLD, 'Cancel changes nothing');
   });
-  await t('a switch made by your agent (new_video) moves the page to Footage with the new name', async () => {
-    await pg.click('#stepper button[data-step="look"]'); await pg.waitForFunction(() => document.querySelector('main').dataset.step === 'look');
+  await t('a switch made by your agent (new_video) moves the page to Start with the new name', async () => {
+    await pg.click('#stepper button[data-step="picture"]'); await pg.waitForFunction(() => document.querySelector('main').dataset.step === 'picture');
     const AG = NEW + '-agent';
     await api('/api/videos/new', { name: AG });
-    await pg.waitForFunction(j => document.querySelector('#job').value === j && document.querySelector('main').dataset.step === 'footage', AG, { timeout: 15e3 });
+    await pg.waitForFunction(j => document.querySelector('#job').value === j && document.querySelector('main').dataset.step === 'start' && !!document.querySelector('#s-footage:not([hidden])'), AG, { timeout: 15e3 });
   });
   assert.deepStrictEqual(errs, []);
   console.log(`\n${n} studio New video checks passed`);

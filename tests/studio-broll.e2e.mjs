@@ -60,6 +60,11 @@ const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), 
 let out = '';
 const url = await new Promise((ok, bad) => { srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out))); });
 const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json();
+// Studio keeps a live connection, so the page never goes network idle: wait for the stepper, and for the step a link names
+const STEP_OF = { reference: 'picture', post: 'render' };
+const ready = async (pg, hash = '') => { await pg.waitForSelector('#stepper'); const st = (hash.match(/step=([a-z]+)/) || [])[1]; if (st) await pg.waitForSelector(`#stepper [aria-current="step"][data-step="${STEP_OF[st] || st}"]`); };
+const open = async (pg, hash) => { await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await ready(pg, hash); };
+const reload = async pg => { await pg.reload({ waitUntil: 'domcontentloaded' }); await ready(pg); };
 const upload = async (kind, f, name) => (await fetch(`${url}/api/upload?kind=${kind}&name=${encodeURIComponent(name)}`, { method: 'POST', body: readFileSync(f) })).json();
 const until = async (fn, ms = 20000) => { const end = Date.now() + ms; for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) throw new Error('timed out'); await wait(150); } };
 const waitTask = async (ms = 120e3) => { await wait(400); return until(async () => { const v = await api('/api/state'); return v.task && v.task.status !== 'running' ? v : null; }, ms); };
@@ -83,7 +88,7 @@ try {
   pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|getDisplayMedia|NotAllowed|NotSupported/.test(m.text())) errs.push(m.text()); });
 
   await t('before a draft the step says where the beats come from', async () => {
-    await pg.goto(url + '/#step=broll', { waitUntil: 'networkidle' });
+    await open(pg, '#step=broll');
     await pg.waitForSelector('#broll-empty'); assert.ok(/from a draft/.test(await pg.textContent('#broll-empty')));
     assert.strictEqual(await pg.textContent('#stepper button[data-step="broll"] .sl'), 'B-roll');
   });
@@ -102,7 +107,7 @@ try {
     const fb = await pg.evaluate(() => { const r = q => document.querySelector(q).getBoundingClientRect(); const c = r('#slot-prev video, #slot-prev img'), y = r('#slot-prev .lay-you'), h = r('#slot-prev .lay-you .hd'); return { clipBottom: c.bottom, youTop: y.top, youW: y.width, frameW: r('#slot-prev').width, headTop: h.top }; });
     assert.ok(fb.clipBottom < fb.youTop && fb.youW < fb.frameW && fb.headTop < fb.youTop, 'framed preview: ' + JSON.stringify(fb));
     await shot(pg, '#slot-set', 'broll-framed.png');
-    if (shots) { for (const th of ['light', 'dark']) { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); await pg.reload({ waitUntil: 'networkidle' }); await pg.click('#broll-lane .beat[data-beat="2"]'); await pg.waitForSelector('#slot-prev.lay-frame'); if (th === 'light') await shot(pg, '#beat-panel', 'broll-framed-light.png'); } }
+    if (shots) { for (const th of ['light', 'dark']) { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); await reload(pg); await pg.click('#broll-lane .beat[data-beat="2"]'); await pg.waitForSelector('#slot-prev.lay-frame'); if (th === 'light') await shot(pg, '#beat-panel', 'broll-framed-light.png'); } }
     await pg.fill('#slot-dur', '1.5'); await pg.press('#slot-dur', 'Tab'); await until(async () => (await beatOf(2)).slot.dur === 1.5);
     await pg.click('#place-top'); await until(async () => (await beatOf(2)).slot.place === 'top');
     await pg.waitForSelector('#slot-prev.lay-top .lay-you');
@@ -201,7 +206,7 @@ try {
   await t('Settings links to API keys and providers; the phone layout fits', async () => {
     await pg.click('#open-settings'); await pg.waitForSelector('#settings-keys'); assert.ok(/Pexels/.test(await pg.textContent('#keys-summary')));
     await pg.keyboard.press('Escape'); await wait(300);
-    await pg.setViewportSize({ width: 390, height: 844 }); await pg.goto(url + '/#step=broll', { waitUntil: 'networkidle' }); await pg.waitForSelector('#broll-lane');
+    await pg.setViewportSize({ width: 390, height: 844 }); await open(pg, '#step=broll'); await pg.waitForSelector('#broll-lane');
     // the step itself fits (the top bar's own pills depend on what this computer has installed)
     const over = await pg.evaluate(() => [...document.querySelectorAll('#s-broll *')].filter(e => !e.closest('#broll-lane')).map(e => e.getBoundingClientRect().right).reduce((a, b) => Math.max(a, b), 0) - innerWidth); assert.ok(over <= 1, 'no sideways scroll: ' + over);
     await shot(pg, '#s-broll', 'broll-phone.png');

@@ -21,6 +21,10 @@ const env = { ...process.env, CI: '1', STUDIO_DIR: STATE, STUDIO_CHAT: '', ANTHR
 const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), '--port', '0', '--no-open'], { cwd: ROOT, env });
 const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out))); });
 const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json();
+// Studio keeps a live connection, so the page never goes network idle: wait for the stepper, and for the step a link names
+const STEP_OF = { reference: 'picture', post: 'render' };
+const ready = async (pg, hash = '') => { await pg.waitForSelector('#stepper'); const st = (hash.match(/step=([a-z]+)/) || [])[1]; if (st) await pg.waitForSelector(`#stepper [aria-current="step"][data-step="${STEP_OF[st] || st}"]`); };
+const open = async (pg, hash) => { await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await ready(pg, hash); };
 let n = 0; const t = async (name, fn) => { await fn(); n++; console.log('ok ' + name); };
 
 const browser = patient(await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required', ...(process.env.FAKE_VIDEO ? ['--use-file-for-fake-video-capture=' + process.env.FAKE_VIDEO] : [])] }));
@@ -29,7 +33,7 @@ try {
   await t('record a take with the fake camera: countdown, 9:16 crop, mp4, in the footage', async () => {
     const pg = await browser.newPage({ viewport: { width: 1280, height: 860 } }), errs = [];
     pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
-    await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' });
+    await open(pg, '#step=start');
     await pg.click('#record-now');
     await pg.click('#rec-enable');
     await pg.waitForFunction(() => { const v = document.querySelector('#recorder video'); return v && v.videoWidth > 0 && !v.paused; }, null, { timeout: 15000 });
@@ -70,7 +74,7 @@ try {
     await api('/api/scripts', { title: 'Morning reels', wpm: 160, text: '[hook]\nI film every reel before my first coffee.\n[body]\nThe light is soft, the house is quiet [pause] and nobody needs me yet.\nTwenty minutes gets me three takes.\n[cta]\nTry it tomorrow and tell me how it went.' });
     const pg = await browser.newPage({ viewport: { width: 1280, height: 900 } }), errs = [];
     pg.on('pageerror', e => errs.push(e.message));
-    await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' });
+    await open(pg, '#step=start');
     if (await pg.$('#recorder')) await pg.click('#recorder .rec-head .icon-btn');
     await pg.click('.sc-item:has-text("Morning reels")');
     await pg.waitForFunction(() => /\d+ words, about/.test(document.querySelector('#script-stats')?.textContent || ''));
@@ -100,7 +104,7 @@ try {
   await t('a blocked camera shows one clear line and a retry', async () => {
     const pg = await browser.newPage({ viewport: { width: 1280, height: 860 } });
     await pg.addInitScript(() => { navigator.mediaDevices.getUserMedia = () => Promise.reject(Object.assign(new Error('denied'), { name: 'NotAllowedError' })); });
-    await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' });
+    await open(pg, '#step=start');
     if (!(await pg.$('#recorder'))) await pg.click('#record-now');
     await pg.click('#rec-enable');
     await pg.waitForSelector('text=Camera or mic blocked');
@@ -109,7 +113,7 @@ try {
   });
   await t('phone layout: the recorder fits without sideways scroll', async () => {
     const pg = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
-    await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' });
+    await open(pg, '#step=start');
     if (!(await pg.$('#recorder'))) await pg.click('#record-now');
     await pg.click('#rec-enable');
     await pg.waitForFunction(() => { const v = document.querySelector('#recorder video'); return v && v.videoWidth > 0; }, null, { timeout: 15000 });

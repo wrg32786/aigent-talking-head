@@ -65,7 +65,7 @@ function SaveStyleLook({ saved, from }) {
   const [name, setName] = useState(''), [busy, setBusy] = useState(false);
   const save = async (e, close) => { e.preventDefault(); const n = name.trim(); if (!n) return; setBusy(true);
     const ok = await saved.save(n); setBusy(false); if (ok) { toast(`Saved the look as ${n}. It is on Start for your next video.`, true); setName(''); close(); } else toast('We could not save that look. Try another name.'); };
-  return <Popover className="pop" id="save-style-look-pop">{({ close }) => <><PopoverButton className="btn sm secondary" id="save-style-look">Save as a look</PopoverButton>
+  return <Popover className="pop" id="save-style-look-pop">{({ close }) => <><PopoverButton className="btn sm outline" id="save-style-look">Save as a look</PopoverButton>
     <PopoverPanel anchor={{ to: 'bottom end', gap: 8, padding: 8 }} className="popover glass pop-panel" transition><form id="save-style-look-form" onSubmit={e => save(e, close)}><label className="lbl" htmlFor="save-style-look-name">Name the look</label>
       <div className="row"><input id="save-style-look-name" placeholder={String(from || 'my look').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'my-look'} required maxLength={40} autoFocus value={name} onChange={e => setName(e.target.value)} /><Button type="submit" size="sm" variant="primary" label="Save" isLoading={busy} /></div>
       <span className="fine">Use it on any new video from Start, Copy the look.</span></form></PopoverPanel></>}
@@ -131,7 +131,7 @@ function Looks({ CAT, V, s, apply, patch, reloadCat, go, setTab, looks: saved })
   </div> : s.undoRef ? <p className="fine ref-undo" id="ref-undo" key="undo">Reference cleared. <button type="button" className="linkish" id="ref-undo-btn" onClick={undo}>Undo</button></p> : null;
   return <section className="step" id="s-look" data-step="picture" aria-labelledby="h-look">
     <header className="sh look-h"><div><h2 id="h-look">Picture</h2><p className="sub">Pick one Look, then change the color, motion, transitions or layout below if you want to.</p></div>
-      <SaveLook id="save-look" label="Save as a new Look" reloadCat={reloadCat} apply={apply} variant="secondary" /></header>
+      <SaveLook id="save-look" label="Save as a new Look" reloadCat={reloadCat} apply={apply} variant="outline" /></header>
     {!ex && <RefNotice s={s} patch={patch} />}
     {byRef || picked ? [card, row] : [row, card]}
   </section>;

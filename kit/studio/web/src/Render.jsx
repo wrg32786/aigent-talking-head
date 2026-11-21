@@ -45,7 +45,9 @@ export function ReviewStep({ CAT, V, s, apply, patch, hidden, run }) {
   // a draft is a plan, not a video: say so when it ends, so it never reads like a finished render
   const planReady = t && !running && t.kind === 'draft' && t.status === 'done';
   const status = stale && !running ? 'Your pieces changed since the draft. Draft again first.' : !fin.reel ? 'The reel is switched off under What to make, on Render.' : mine ? ticking : running ? '' : planReady || (isDrafted && !stale) ? 'Plan ready, no video yet. Check it below, then Render.' : t && t.kind === 'draft' ? took : 'A draft is a quick plan of the reel, with no video yet.';
-  const match = matchChips(V.match || (V.edit && V.edit.match) || s.match);
+  // only when a reference or a saved look is in use: there is nothing to be close to otherwise
+  const guided = !!(s.reference.extracted && s.reference.mode !== 'off') || !!s.styleLook;
+  const match = guided ? matchChips(V.match || (V.edit && V.edit.match) || s.match) : [];
   const good = isDrafted && !stale;
   return <section className="step" id="s-review" data-step="review" aria-labelledby="h-review" hidden={hidden}>
     <header className="sh"><h2 id="h-review">Review</h2><p className="sub">Draft first, check what we picked, then render once.</p></header>
@@ -62,7 +64,7 @@ export function ReviewStep({ CAT, V, s, apply, patch, hidden, run }) {
     </div>
     {mine && <div id="progress"><ProgressBar label={`${cap1(t.kind)} running`} isLabelHidden isIndeterminate /></div>}
     {notes.length > 0 && <div id="notes" className="notes">{notes.map((x, i) => <p key={i}>{x}</p>)}</div>}
-    {good && match.length > 0 && <div className="match glass-card" id="match"><span className="lbl" id="match-h">Next to your reference</span>
+    {good && match.length > 0 && <div className="match glass-card" id="match"><span className="lbl" id="match-h">How close to your reference</span>
       <ul className="match-chips" id="match-chips" aria-labelledby="match-h">{match.map(m => <li key={m.id} className={'match-chip ' + m.word.toLowerCase()} data-part={m.id} data-match={m.word.toLowerCase()}><span>{m.label}</span><b>{m.word}</b></li>)}</ul></div>}
     <div id="draft-view" className="outputs">
       {good && V.draftPreview ? <DraftPreview preview={V.draftPreview} s={s} />
@@ -96,7 +98,7 @@ export function Render({ CAT, V, s, apply, patch, hidden, go, run, openOutputs, 
   const canRender = !running && !!s.job && !needDraft && (fin.reel || n > 0);
   const what = [fin.reel && 'the reel', fin.clips && n && `${n} clip${n > 1 ? 's' : ''}`, fin.plain && n && 'plain clips'].filter(Boolean);
   const renderLabel = fin.reel ? `Render v${(V.outputs || []).filter(o => /reel-v\d+\.mp4$/.test(o)).length + 1}` : `Render ${what.join(' and ')}`;
-  const extra = [fin.clips && n ? `${n} clip${n > 1 ? 's' : ''}` : null, fin.plain && n ? 'plain clips' : null, s.export || null].filter(Boolean);
+  const extra = [fin.clips && n ? `${n} clip${n > 1 ? 's' : ''}` : null, fin.plain && n ? 'plain clips' : null, s.export ? `sized for ${s.export}` : null].filter(Boolean);
   return <section className="step" id="s-render" data-step="render" aria-labelledby="h-render" hidden={hidden}>
     <header className="sh"><h2 id="h-render">Render</h2><p className="sub">Full quality, once. This is the only place that makes the video.</p></header>
     <NeedFix V={V} ids={['ffmpeg', 'python', 'chrome', 'npm']} what="Rendering" apply={apply} />

@@ -45,13 +45,18 @@ const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), 
 const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out))); });
 const port = +url.split(':').pop();
 const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json();
+// Studio keeps a live connection, so the page never goes network idle: wait for the stepper, and for the step a link names
+const STEP_OF = { reference: 'picture', post: 'render' };
+const ready = async (pg, hash = '') => { await pg.waitForSelector('#stepper'); const st = (hash.match(/step=([a-z]+)/) || [])[1]; if (st) await pg.waitForSelector(`#stepper [aria-current="step"][data-step="${STEP_OF[st] || st}"]`); };
+const open = async (pg, hash) => { await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await ready(pg, hash); };
+const reload = async pg => { await pg.reload({ waitUntil: 'domcontentloaded' }); await ready(pg); };
 const upload = async (kind, f, name) => (await fetch(`${url}/api/upload?kind=${kind}&name=${encodeURIComponent(name)}`, { method: 'POST', body: readFileSync(f) })).json();
 const until = async (fn, ms = 20000) => { const end = Date.now() + ms; for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) throw new Error('timed out'); await wait(150); } };
 const waitTask = async (ms = 3 * 60e3) => { await wait(400); return until(async () => { const v = await api('/api/state'); return v.task && v.task.status !== 'running' ? v : null; }, ms); };
 const log = job => { try { return readFileSync(join(ROOT, 'jobs', job, 'fake-reel.log'), 'utf8'); } catch { return ''; } };
 const spot = async k => (await api('/api/broll')).beats[k - 1];
 const cleanJobs = () => { rmSync(join(ROOT, 'jobs', JOB), { recursive: true, force: true }); rmSync(join(ROOT, 'inbox', 'studio', JOB), { recursive: true, force: true }); };
-const theme = async (pg, th) => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); await pg.reload({ waitUntil: 'networkidle' }); await pg.waitForSelector('#broll-lane'); };
+const theme = async (pg, th) => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); await reload(pg); await pg.waitForSelector('#broll-lane'); };
 const shot = async (pg, sel, name) => {
   if (!shots) return;
   await pg.evaluate(q => { const e = document.querySelector(q); e.scrollIntoView({ block: 'start' }); const h = document.querySelector('header.top'); scrollBy(0, -((h ? h.offsetHeight : 0) + 12)); }, sel);
@@ -73,7 +78,7 @@ try {
   pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
 
   await t('after a draft b-roll picks itself: the first spot too, a counter card for "doubled", the rest wait with why', async () => {
-    await pg.goto(url + '/#step=broll', { waitUntil: 'networkidle' }); await pg.waitForSelector('#broll-empty');
+    await open(pg, '#step=broll'); await pg.waitForSelector('#broll-empty');
     assert.ok(/picks itself/.test(await pg.textContent('#broll-empty')));
     const d = await api('/api/draft', {}); assert.ok(!d.error, d.error); assert.strictEqual((await waitTask()).task.status, 'done');
     await pg.waitForSelector('#broll-lane .spot[data-beat="3"]');
@@ -139,7 +144,7 @@ try {
     const lb = await call('list_broll', {}); assert.strictEqual(lb.testimonials.length, 2); assert.ok(lb.raws.some(r => r.status === 'done'));
   });
   await t('the phone layout fits', async () => {
-    await pg.setViewportSize({ width: 390, height: 844 }); await pg.goto(url + '/#step=broll', { waitUntil: 'networkidle' }); await pg.waitForSelector('#broll-lane');
+    await pg.setViewportSize({ width: 390, height: 844 }); await open(pg, '#step=broll'); await pg.waitForSelector('#broll-lane');
     const over = await pg.evaluate(() => [...document.querySelectorAll('#s-broll *')].filter(e => !e.closest('#broll-lane')).map(e => e.getBoundingClientRect().right).reduce((a, b) => Math.max(a, b), 0) - innerWidth); assert.ok(over <= 1, 'no sideways scroll: ' + over);
     await shot(pg, '#s-broll', 'redesign-broll-phone-dark.png');
     await theme(pg, 'light'); await shot(pg, '#s-broll', 'redesign-broll-phone-light.png'); await theme(pg, 'dark');

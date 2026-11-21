@@ -47,6 +47,11 @@ const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), 
 const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out))); });
 const port = url.split(':').pop();
 const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json();
+// Studio keeps a live connection, so the page never goes network idle: wait for the stepper, and for the step a link names
+const STEP_OF = { reference: 'picture', post: 'render' };
+const ready = async (pg, hash = '') => { await pg.waitForSelector('#stepper'); const st = (hash.match(/step=([a-z]+)/) || [])[1]; if (st) await pg.waitForSelector(`#stepper [aria-current="step"][data-step="${STEP_OF[st] || st}"]`); };
+const open = async (pg, hash) => { await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await ready(pg, hash); };
+const reload = async pg => { await pg.reload({ waitUntil: 'domcontentloaded' }); await ready(pg); };
 const browser = patient(await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required'] }));
 const errsOf = pg => { const e = []; pg.on('pageerror', x => e.push(x.message)); pg.on('console', m => { if (m.type() === 'error' && !/favicon/.test(m.text())) e.push(m.text()); }); return e; };
 const SCRIPT = ['[hook]', 'Three things I wish I knew before my first reel.', 'One: film more than you need.', 'Two: the first second decides everything.', '[pause]', 'Three: say it like you talk.', '[cta]', 'Follow for the next one.'].join('\n');
@@ -57,7 +62,7 @@ try {
   await t('Connect agent: header and chat open it, commands carry the real paths, the status turns to connected, the choice is remembered', async () => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 } }), pg = await ctx.newPage(), errs = errsOf(pg);
     await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: url });
-    await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' });
+    await open(pg, '#step=start');
     assert.match(await pg.textContent('#connect-open'), /Connect agent/);
     await pg.click('#chat-open').catch(() => {}); await pg.click('#chat-connect'); await pg.waitForSelector('#connect-steps');
     assert.match(await pg.textContent('#connect-status'), /Waiting for your agent/);
@@ -94,7 +99,7 @@ try {
     await ctx.close();
     // phone: the remembered agent, no sideways scroll
     const ph = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1.5, isMobile: true, hasTouch: true });
-    await ph.goto(url + '/#connect', { waitUntil: 'networkidle' }); await ph.waitForSelector('#connect-steps');
+    await open(ph, '#connect'); await ph.waitForSelector('#connect-steps');
     assert.strictEqual(await ph.getAttribute('.agent-card[data-agent="claude"]', 'aria-checked'), 'true');
     assert.ok(await ph.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'no sideways scroll');
     if (shots) await ph.screenshot({ path: join(shots, 'connect-phone.png') });
@@ -102,9 +107,9 @@ try {
   });
   await t('teleprompter: plus, minus and arrows change the WPM as it scrolls, remembered; rehearse scrolls with no take', async () => {
     const pg = await browser.newPage({ viewport: { width: 1280, height: 860 } }), errs = errsOf(pg);
-    await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' });
+    await open(pg, '#step=start');
     await pg.evaluate(() => { localStorage.setItem('studio.rec.wpm', '150'); localStorage.setItem('studio.rp.pip', '0'); });
-    await pg.reload({ waitUntil: 'networkidle' });
+    await reload(pg);
     await pg.click('#record-now'); await pg.click('#rec-enable');
     await pg.waitForFunction(() => { const v = document.querySelector('#recorder video'); return v && v.videoWidth > 0; }, null, { timeout: 15000 });
     await pg.getByRole('switch', { name: 'Teleprompter' }).click(); await pg.fill('#rec-script', SCRIPT);
@@ -125,14 +130,14 @@ try {
     if (shots) await pg.screenshot({ path: join(shots, 'teleprompter-speed.png') });
     await pg.click('#rec-rehearse-stop');
     assert.strictEqual((await api('/api/state')).state.takes.length, 0, 'rehearsal records nothing');
-    await pg.reload({ waitUntil: 'networkidle' });
+    await reload(pg);
     assert.strictEqual(await pg.evaluate(() => localStorage.getItem('studio.rec.wpm')), '150');
     assert.deepStrictEqual(errs, []);
     await pg.close();
   });
   await t('teleprompter pop-out: its own window, synced both ways (speed, mirror, rehearse, record, stop); closing it brings it back', async () => {
     const pg = await browser.newPage({ viewport: { width: 1280, height: 860 } }), errs = errsOf(pg);
-    await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' });
+    await open(pg, '#step=start');
     if (!(await pg.$('#recorder'))) await pg.click('#record-now');
     await pg.click('#rec-enable');
     await pg.waitForFunction(() => { const v = document.querySelector('#recorder video'); return v && v.videoWidth > 0; }, null, { timeout: 15000 });
@@ -173,8 +178,8 @@ try {
   });
   await t('footage from a link: a Drive link downloads with progress into the footage; a private one shows the login line', async () => {
     const pg = await browser.newPage({ viewport: { width: 1280, height: 860 } }), errs = errsOf(pg);
-    await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' });
-    await pg.evaluate(() => localStorage.setItem('studio.rec.open', '0')); await pg.reload({ waitUntil: 'networkidle' });
+    await open(pg, '#step=start');
+    await pg.evaluate(() => localStorage.setItem('studio.rec.open', '0')); await reload(pg);
     await pg.fill('#footage-link', 'https://drive.google.com/file/d/1PrivateTakeXYZ/view'); await pg.click('#footage-link-add');
     await pg.waitForSelector('.imp.failed >> text=This link needs a login');
     await pg.fill('#footage-link', 'https://drive.google.com/file/d/1BigDriveTakeXYZ/view?usp=sharing'); await pg.click('#footage-link-add');

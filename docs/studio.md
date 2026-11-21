@@ -1,6 +1,6 @@
 # Studio
 
-Studio is a local web page over the kit. Drop in your footage, add a reference reel if you have one, click the effects you want from a visual menu, set the music and pace, then draft, review and render. It runs on your computer, needs no account and no cloud, and drives the same engine as the CLI and the MCP server.
+Studio is a local web page over the kit. Drop in your footage, say if a video you like should guide the edit, pick the picture, the text and the sound from visual menus, then draft, review and render. It runs on your computer, needs no account and no cloud, and drives the same engine as the CLI and the MCP server.
 
 ```
 npm run studio
@@ -12,36 +12,90 @@ That starts Studio on http://127.0.0.1:4757 and opens your browser. `--port <n>`
 
 ![The same Cut step in the light theme](studio/light.png)
 
-Six steps across the top: Footage, Cut, Look, B-roll, Finish, Post. Each one is its own screen with Back and Next at the bottom, and a step shows a check when it is done. **Look** has two views, **Your look** (packs, effects, sound and pace) and **Reference**. Old links still land: `#step=style` and `#step=reference` open Look, `#step=render` opens Finish.
+Eight steps across the top (1.28.0): **Start**, **Cut**, **Picture**, **Text and graphics**, **B-roll**, **Music and sounds**, **Review**, **Render**. The steps you see come first, sound has its own step, and the last two check the edit and make the video. Each one is its own screen with Back and Next at the bottom, and a step shows a check when it is done.
 
-**Your edit.** One quiet line above every step says what you are making (one reel, clips, plain clips; the aspect), from what (your N pieces in your order, or the whole take), the look, the b-roll spots and the sound, and offers the next action (Draft it, Render). Click a part to open its step. When you change your pieces after a draft it says so. Agents read the same thing with `get_edit` (`GET /api/edit`). The chat sits on the right (behind the chat button on a phone). Dark is the default; switch to light with the sun button or in Settings.
+| Step | What you do there |
+| --- | --- |
+| Start | Add or film your footage, and say what should guide the edit: just your footage, a video to recreate, or a look to copy |
+| Cut | Say what to make from the take and choose the pieces |
+| Picture | Pick one Look, then color and finish, motion, transitions and layout |
+| Text and graphics | Captions and titles, fonts, graphics, and your own words and logos |
+| B-roll | Fill the spots of the draft with clips, cards and screen recordings |
+| Music and sounds | The music, the sound effects and the pace |
+| Review | Draft, then check what we picked and why |
+| Render | Make the video, compare it with the original, and post it |
+
+Two steps have a second view, behind a small switch above the step. **Picture** has **How the reference was made** (the breakdown of your reference; the switch shows once a reference is in). **Render** has **Post** (Buffer drafts, see [posting.md](posting.md)).
+
+**Old links still land.** Before 1.28.0 there were six steps: Footage, Cut, Look, B-roll, Finish and Post. A link or bookmark with an old name opens the step that holds the same thing now:
+
+| Old link | Opens |
+| --- | --- |
+| `#step=footage` | Start |
+| `#step=look`, `#step=style` | Picture |
+| `#step=reference` | Picture, on How the reference was made |
+| `#step=finish` | Review |
+| `#step=render` | Render |
+| `#step=post` | Render, on Post |
+| `#menu=<layer>` | the step that owns the layer, with that layer open (`#menu=music` opens Music and sounds, `#menu=captions` opens Text and graphics) |
+
+**Your edit.** One quiet line above every step says what you are making (one reel, clips, plain clips; the aspect), from what (your N pieces in your order, or the whole take), the look, the b-roll spots and the sound, and offers the next action (Draft it, which opens Review, or Render). Click a part to open its step: the look opens Picture and the sound opens Music and sounds. With a reference in use the look part says "Recreating <name>" or "The look of <name>, your words". When you change your pieces after a draft it says so. Agents read the same thing with `get_edit` (`GET /api/edit`). The chat sits on the right (behind the chat button on a phone). Dark is the default; switch to light with the sun button or in Settings.
 
 ![Studio in the light theme, the AIgent cream with deep teal: the Style step](studio/light.png)
 
 ## What you can do
 
-1. **Footage.** Drag clips onto the page or pick files (mp4, mov, m4v, webm, mkv), or paste a public Dropbox or Google Drive share link or a plain video URL (see [Footage from a link](#footage-from-a-link)). They go to `inbox/studio/<job>/`. An assistant can also point the session at a clips folder (`clips` in `studio_set_selections`, refused when it has no clips.json), reorder or drop files (`footage`: the paths from the session in the order to use; an unknown or repeated file is refused), and mark the files as already cut (`asIs`: each file is one clip, in order, never re-cut). Several different files keep the order you gave them; best-take picking only runs when the files are takes of the same lines. Or film it now with **Record now** (see [Record now](#record-now)).
-   - **Recreate a video** starts from a reel you like, right here: one row under the footage link. Paste its link or upload the file, and the reference is set to **Recreate** (the same Recreate, Influence, Off control as the Look step). Record or add your footage while it is read; Look and Finish already have it.
-2. **Reference.** Paste one or more links (Enter adds them, Shift+Enter starts another line) or upload a file. Links can be YouTube (and Shorts), TikTok, X, Vimeo, a direct video file (.mp4, .mov, .m4v, .webm), or one public Instagram post. Studio downloads each into your download folder, breaks it down, and shows what it found: length, cut times and pace, music BPM, beats and energy, caption style, titles, transitions, finishes, graphics and effects, plus suggestions mapped to the effects menu that you can click to pick. The chat gets the same teardown. See [Reference links](#reference-links). Then choose:
-   - **Influence:** the reference becomes soft defaults on top of the pack you picked (the pack's locks stay). Saved as a local pack, `ref-<job>`.
-   - **Recreate:** the draft uses the reference's Reel.md as the recipe (`--recipe --recut`). Your kept pieces (or your one take) are re-cut to the reference's shot plan, scaled to your length, every cut on a word boundary in the quiet between words, and each shot gets the reference's framing as a punch in or out. Its sound effects play at its times (scaled), a quiet music stem means no bed, the boxes and stickers it drew become graphics slots, and your titles take the style of the reference title doing the same job (hook, number, timer, brand).
-3. **Look.** One Look sets every layer; change any layer and a badge says where each choice came from. See [Look and its 9 layers](#look-and-its-9-layers).
+1. **Start.** Drag clips onto the page or pick files (mp4, mov, m4v, webm, mkv), or paste a public Dropbox or Google Drive share link or a plain video URL (see [Footage from a link](#footage-from-a-link)). They go to `inbox/studio/<job>/`. An assistant can also point the session at a clips folder (`clips` in `studio_set_selections`, refused when it has no clips.json), reorder or drop files (`footage`: the paths from the session in the order to use; an unknown or repeated file is refused), and mark the files as already cut (`asIs`: each file is one clip, in order, never re-cut). Several different files keep the order you gave them; best-take picking only runs when the files are takes of the same lines. Or film it now with **Record now** (see [Record now](#record-now)).
+   - **What should guide the edit?** One row of three choices under the footage: **Just my footage**, **Recreate a video** and **Copy the look**. See [Start: what guides the edit](#start-what-guides-the-edit-1280).
+   - **Scripts** are folded on Start until the job has a script. Click **Scripts** to open them (see [Scripts](#scripts)).
+2. **Reference.** Pick **Recreate a video** or **Copy the look** on Start and paste a link or upload a file. To add more, open Picture and switch to **How the reference was made**: paste one or more links (Enter adds them, Shift+Enter starts another line) or upload a file. Links can be YouTube (and Shorts), TikTok, X, Vimeo, a direct video file (.mp4, .mov, .m4v, .webm), or one public Instagram post. Studio downloads each into your download folder, breaks it down, and shows what it found: length, cut times and pace, music BPM, beats and energy, caption style, titles, transitions, finishes, graphics and effects, plus suggestions mapped to the effects menu that you can click to pick. The chat gets the same teardown. See [Reference links](#reference-links). One control says how the reference is used, with the same four words everywhere:
+   - **Recreate:** same edit, your take. The draft uses the reference's Reel.md as the recipe (`--recipe --recut`). Your kept pieces (or your one take) are re-cut to the reference's shot plan, scaled to your length, every cut on a word boundary in the quiet between words, and each shot gets the reference's framing as a punch in or out. Its sound effects play at its times (scaled), a quiet music stem means no bed, the boxes and stickers it drew become graphics slots, and your titles take the style of the reference title doing the same job (hook, number, timer, brand).
+   - **Copy the look (1.28.0):** same style, your script. The reference gives its look and sound, and the timing comes from your own words.
+   - **Influence:** only the parts you switch on, as soft defaults on top of the pack you picked (the pack's locks stay). Saved as a local pack, `ref-<job>`.
+   - **Off:** the reference is kept and nothing from it is used.
+3. **Picture.** One Look sets every layer; change any layer and a badge says where each choice came from. Picture holds the Looks row and four of the 9 layers: Color and finish, Motion, Transitions and Layout. See [The 9 layers and the steps that show them](#the-9-layers-and-the-steps-that-show-them-1280).
    - **Looks.** One row: the built-in packs and the Looks you saved. **Save as a new Look** writes `packs/local/<name>/pack.json` (validated, gitignored) so you can reuse it with `--pack <name>`; with a reference in use, its look is saved too.
-   - **The reference card**, when a reference is broken down: its name, length and shots, one control (**Recreate**, **Influence**, **Off**, the same words as in the Breakdown) with one line on what it does, and **More** (Save as a Look, Clear reference, Breakdown). On Recreate the card sits above the Looks row, which dims with "Set by your reference", and one row of chips says what it brings: shots, framing, cutaways, sounds, no music, and **N made for you**, which opens the layer with those scenes.
+   - **The reference card**, when a reference is broken down: its name, length and shots, one control (**Recreate**, **Copy the look**, **Influence**, **Off**, the same words as in the Breakdown) with one line on what it does, and **More** (Save as a Look, Clear reference, Breakdown). On Recreate and Copy the look the card sits above the Looks row, which dims with "Set by your reference", and one row of chips says what it brings: shots, framing, cutaways, sounds, no music, and **N made for you**, which opens the layer with those scenes. On Copy the look the card reads "Your look from <name>".
    - **The reference sets your Look.** Pick **Recreate** and we set every layer from the reference: its Look, captions, titles, transitions, grade, effects, music, beat sync and pace. **Influence** sets the same picks as soft defaults and keeps your Look and sound. A short line says so, each built-in choice it set is badged **From reference**, a scene it made says **Made for you**, and its layers get an amber dot. The layer says why in one line ("From the reference: glitch, seen 3 times between shots"), and a tile shows its reason when you hover or focus it. Change anything you like; your change is yours. **Back to my look** (the same as Off) takes out only what the reference set and gives back your own caption style, Look and music. A reference that is still being read says so and sets the Look when it is ready.
    - **Influence takes the parts you switch on.** On **Influence** the reference card shows one switch per part: captions, titles, transitions, grade, effects, graphics, pace, music and sound, fonts and theme. Pace and sound start off, so they stay yours. Turn one off and its picks come out of your Look; turn it on and they come back (`reference.parts`).
-   - **What we read.** The Breakdown is short: the same mode control, a row only when part of the reference was not read, the part switches, and **Details** (length, shots, pace, the shot timeline, the contact sheet) and **Pick parts by hand** closed until you open them. It lists which parts of the reference were read (the full read, speech, layers and grade, the contact sheet, sound effects, music). For any that did not run it names what reads it, with Install and Copy for my agent buttons, then Read it again.
+   - **What we read.** The Breakdown (the **How the reference was made** view) is short: the same mode control, a row only when part of the reference was not read, the part switches, and **Details** (length, shots, pace, the shot timeline, the contact sheet) and **Pick parts by hand** closed until you open them. It lists which parts of the reference were read (the full read, speech, layers and grade, the contact sheet, sound effects, music). For any that did not run it names what reads it, with Install and Copy for my agent buttons, then Read it again.
    - **B-roll at its cutaways.** A Recreate draft puts B-roll spots where the reference cuts away from the speaker, on your edit's own clock. Suggest tries your library first (the best match on a clip's name and tags), and on a tip about a tool or a screen it suggests a screen recording before stock.
-   - **Layers.** Every effect the engine has, as looping previews, in 9 layers. Click a tile to pick it; press F, right-click it, or use its forbid button to forbid it. Hover or focus a tile for its description. Search looks across every layer. Music, sound effects and pace sit in the Music and SFX layer.
-4. **B-roll.** One slot per beat of the draft: fill it from your library, an upload, stock, a card, a screen recording or a generate, and pick full cutaway, split top panel, picture in picture or framed cards. See [B-roll](#b-roll).
-5. **Chat.** Type "calm and cinematic, no glitch, typewriter titles". See [Chat](#chat).
-6. **Render.** Draft runs `npm run reel ... --draft` and shows the choices table: every transition, finish, title and graphic per beat, with why it was picked. Change any cell and apply; the change is pinned. Render builds the reel (and the export size you picked) with progress, then plays it with a download link.
+   - **Layers.** The effects the engine has for the picture, as looping previews. Click a tile to pick it; press F, right-click it, or use its forbid button to forbid it. Hover or focus a tile for its description. The **Zoom punch** switch sits on the Motion layer. Search looks across every layer in every step, and a result from another step offers **Open in <Step>**.
+4. **Text and graphics.** Three layers: Text (captions, titles and kinetic words), Fonts and Graphics. **Your words and logos** sits in a fold at the bottom (see [Words and brands](#words-and-brands)).
+5. **B-roll.** One slot per beat of the draft: fill it from your library, an upload, stock, a card, a screen recording or a generate, and pick full cutaway, split top panel, picture in picture or framed cards. See [B-roll](#b-roll).
+6. **Music and sounds.** Three groups: **Music** (the bed, its energy, and a switch to land the cuts and sounds on the beat), **Sounds** (on or off, and fewer sounds) and **Pace** (how much of a pause inside a line we cut). Every bed and sound is in the fold **Every music bed and sound**. With a reference in use, one line says what it brought ("From your reference: no music, 4 sounds, fast tempo").
+7. **Chat.** Type "calm and cinematic, no glitch, typewriter titles". See [Chat](#chat).
+8. **Review and Render.** Draft on Review runs `npm run reel ... --draft` and shows the choices table: every transition, finish, title and graphic per beat, with why it was picked. Change any cell and apply; the change is pinned. Render builds the reel (and the export size you picked) with progress, then plays it with a download link. See [Review and Render](#review-and-render-1280).
 
 ![The Look step: the built-in Looks as previews of your face, Save as a new Look, and the Layers panel on Text with caption previews](studio/look-layers.png)
 
 ![The same Look step in the light theme](studio/look-layers-light.png)
 
-## Look and its 9 layers
+## Start: what guides the edit (1.28.0)
+
+Under your footage, Start asks one question: **What should guide the edit?** There are three answers.
+
+| Choice | In short | What it means |
+| --- | --- | --- |
+| **Just my footage** (the default) | We edit it from your picks | No other video is involved. You pick a Look and anything else you want on the next steps. |
+| **Recreate a video** | Same edit, your take | You show us a video you like. We follow its cuts and timing on your take, with its look, titles, sounds and music. |
+| **Copy the look** | Same style, your script | You show us a video you like. We copy its style, and your own words set the timing. |
+
+Which one to pick:
+
+- Pick **Recreate a video** when you filmed your own version of a video and want the same edit: the same number of shots, cut at the same moments.
+- Pick **Copy the look** when you like how a video looks and sounds, and you are saying something different. Your reel keeps its own length and its own cuts.
+- Pick **Just my footage** when no video should guide the edit.
+
+**Recreate a video** and **Copy the look** open a box under the row. Paste the video's link and click **Add**, or click **Upload** and pick a file. While we read it, the box says so and you can record or add your footage. When it is ready the box shows the name, the length and the number of shots, and **See how it was made** opens the breakdown on Picture.
+
+**Use a saved look.** On Copy the look, when you have saved a look before, the box also lists your saved looks under **Or use a saved look**. Click one and it is used with no reference at all ("Using your saved look <name>. No reference needed."). Click it again to stop using it. You save a look on Picture: with a reference on Copy the look, its card has **Save as a look**. Saved looks are kept by the engine, and the page shows the list and the button when the engine provides them.
+
+You can change your mind at any time. **Just my footage** turns a reference off (it is kept, and nothing from it is used) and stops using a saved look. The reference card on Picture has the same choice with one more, **Influence**, which takes only the parts you switch on. When a reference is on Influence, Start says so and offers **Change it on Picture**.
+
+<a id="look-and-its-9-layers"></a>
+## The 9 layers and the steps that show them (1.28.0)
+
 
 ![The Look step: a row of Looks, the Hormozi hook reference card with Recreate, Influence and Off, and the Graphics layer with a From reference badge on lower-third](studio/look-layers.png)
 

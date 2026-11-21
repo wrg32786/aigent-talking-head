@@ -1,9 +1,11 @@
-// The 1.13.0 Studio flow in a real Chrome, on synthetic media only (tests/fixtures): six steps (Footage, Cut, Look,
-// B-roll, Finish, Post), the old step links still land (Style and Reference open Look, Render opens Finish), Your edit
-// on every step, and the one render path on Finish:
-// - Draft is made from your pieces (the kept cuts, in your order, already cut, --as-is) or the whole take
-// - Render stays off until the current pieces are drafted, and says so when they changed since
-// - one Render makes the reel and, in the same run, each piece as its own reel (clips) or a plain clip (plain)
+// The Studio flow in a real Chrome, on synthetic media only (tests/fixtures): eight steps (Start, Cut, Picture,
+// Text and graphics, B-roll, Music and sounds, Review, Render), the old step links still land (Footage opens Start,
+// Style and Reference open Picture, Finish opens Review, Render opens Render), Your edit on every step, and the one
+// draft and render path on Review and Render:
+// - Draft (Review) is made from your pieces (the kept cuts, in your order, already cut, --as-is) or the whole take
+// - Render (Render) stays off until the current pieces are drafted, and says so when they changed since
+// - one Render makes the reel and, in the same run, each piece as its own reel (clips) or a plain clip (plain);
+//   those choices are in the What to make fold on Render
 // - the MCP tools get_edit and studio_run (from, exports)
 // Needs Chrome and ffmpeg. Run: node tests/studio-finish.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
 import assert from 'assert';
@@ -41,6 +43,11 @@ const upload = async (kind, f, name) => (await fetch(`${url}/api/upload?kind=${k
 const until = async (fn, ms = 20000) => { const end = Date.now() + ms; for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) throw new Error('timed out'); await wait(150); } };
 const waitTask = async (ms = 3 * 60e3) => { await wait(400); return until(async () => { const v = await api('/api/state'); return v.task && v.task.status !== 'running' ? v : null; }, ms); };
 const log = job => { try { return readFileSync(join(ROOT, 'jobs', job, 'fake-reel.log'), 'utf8'); } catch { return ''; } };
+// a fresh load of a link: via about:blank, because a new hash alone does not reload the page
+const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); };
+const onStep = (pg, st) => pg.waitForFunction(x => document.querySelector('main').dataset.step === x, st);
+const toStep = async (pg, st) => { await pg.click(`#stepper button[data-step="${st}"]`); await onStep(pg, st); };
+const openMake = async pg => { if (!(await pg.isVisible('#exp-reel'))) await pg.click('#make-fold > button'); await pg.waitForSelector('#exp-reel', { state: 'visible' }); };
 const cleanJobs = () => { for (const d of [JOB, `${JOB}-c1`, `${JOB}-c2`]) rmSync(join(ROOT, 'jobs', d), { recursive: true, force: true }); rmSync(join(ROOT, 'inbox', 'studio', JOB), { recursive: true, force: true }); };
 
 const browser = patient(await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox'] }));
@@ -56,24 +63,28 @@ try {
   const pg = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
 
-  await t('six steps: Footage, Cut, Look, B-roll, Finish, Post; old links land in Look and Finish', async () => {
-    await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' });
-    assert.deepStrictEqual(await pg.$$eval('#stepper button', x => x.map(b => b.dataset.step)), ['footage', 'cut', 'look', 'broll', 'finish', 'post']);
-    assert.deepStrictEqual(await pg.$$eval('#stepper .sl', x => x.map(b => b.textContent)), ['Footage', 'Cut', 'Look', 'B-roll', 'Finish', 'Post']);
-    await pg.goto(url + '/#step=render', { waitUntil: 'networkidle' }); await pg.reload({ waitUntil: 'networkidle' });
-    await pg.waitForFunction(() => document.querySelector('main').dataset.step === 'finish'); assert.ok(await pg.isVisible('#s-render h2:has-text("Finish")'));
-    await pg.goto(url + '/#step=style', { waitUntil: 'networkidle' }); await pg.reload({ waitUntil: 'networkidle' });
-    await pg.waitForFunction(() => document.querySelector('main').dataset.step === 'look' && document.querySelector('main').dataset.look === 'style');
+  await t('eight steps: Start, Cut, Picture, Text and graphics, B-roll, Music and sounds, Review, Render; old links land on the step that holds them now', async () => {
+    await open(pg, '#step=footage');
+    assert.deepStrictEqual(await pg.$$eval('#stepper button', x => x.map(b => b.dataset.step)), ['start', 'cut', 'picture', 'text', 'broll', 'music', 'review', 'render']);
+    assert.deepStrictEqual(await pg.$$eval('#stepper .sl', x => x.map(b => b.textContent)), ['Start', 'Cut', 'Picture', 'Text and graphics', 'B-roll', 'Music and sounds', 'Review', 'Render']);
+    await onStep(pg, 'start'); assert.ok(await pg.isVisible('#s-footage h2:has-text("Start")'));
+    await open(pg, '#step=render');
+    await onStep(pg, 'render'); assert.ok(await pg.isVisible('#s-render h2:has-text("Render")'));
+    await open(pg, '#step=finish');
+    await onStep(pg, 'review'); assert.ok(await pg.isVisible('#s-review h2:has-text("Review")')); assert.ok(!(await pg.isVisible('#s-render')), 'Render is not on screen on Review');
+    await open(pg, '#step=style');
+    await pg.waitForFunction(() => document.querySelector('main').dataset.step === 'picture' && document.querySelector('main').dataset.view === 'main');
     assert.ok(await pg.isVisible('#s-menu')); assert.ok(!(await pg.$('#s-ref')), 'the reference view is not on screen');
-    await pg.click('#look-sub-reference'); await pg.waitForSelector('#s-ref'); assert.ok(!(await pg.isVisible('#s-menu')));
-    await pg.goto(url + '/#step=reference', { waitUntil: 'networkidle' }); await pg.reload({ waitUntil: 'networkidle' });
-    await pg.waitForSelector('#s-ref'); assert.strictEqual(await pg.$eval('#look-sub-reference', b => b.getAttribute('aria-checked')), 'true');
-    await pg.click('#look-sub-style'); await pg.waitForSelector('#s-menu', { state: 'visible' });
+    assert.strictEqual(await pg.$('#look-switch'), null, 'no view switch on Picture without a reference');
+    await open(pg, '#step=reference');
+    await pg.waitForSelector('#s-ref'); assert.strictEqual(await pg.$eval('main', m => m.dataset.step + ' ' + m.dataset.view), 'picture reference');
+    assert.strictEqual(await pg.$eval('#look-sub-reference', b => b.getAttribute('aria-checked')), 'true'); assert.ok(!(await pg.isVisible('#s-menu')));
+    await pg.click('#look-sub-style'); await pg.waitForSelector('#s-menu', { state: 'visible' }); assert.ok(!(await pg.$('#s-ref')));
   });
 
   await t('Your edit: on every step, says what you make and from what, and follows your cuts', async () => {
     await api('/api/cut/set', { source: take, by: 'test', candidates: [{ kind: 'clip', label: 'First', ranges: [[0.95, 2.45]] }, { kind: 'clip', label: 'Last', ranges: [[5.9, 7.6]] }, { kind: 'clip', label: 'Middle', ranges: [[3.2, 4.9]], keep: false }] });
-    for (const st of ['footage', 'cut', 'look', 'broll', 'finish']) {
+    for (const st of ['start', 'cut', 'picture', 'text', 'broll', 'music', 'review', 'render']) {
       await pg.click(`#stepper button[data-step="${st}"]`); await pg.waitForFunction(x => document.querySelector('main').dataset.step === x, st);
       assert.ok(await pg.isVisible('#your-edit'), 'Your edit on ' + st);
     }
@@ -83,13 +94,18 @@ try {
     if (shots) { await pg.click('#stepper button[data-step="cut"]'); await pg.waitForTimeout(500); await pg.screenshot({ path: join(shots, 'redesign-cut-your-edit-dark.png') }); }
   });
 
-  await t('Finish: Draft from your pieces cuts once and hands them over as they are; Render waits for it', async () => {
-    await pg.click('#stepper button[data-step="finish"]');
-    await pg.waitForSelector('#fin-from button[data-from="pieces"][aria-checked="true"]');
-    assert.ok(/^Your 2 pieces, \d+ s$/.test(await pg.textContent('#fin-from button[data-from="pieces"]')));
-    assert.ok(await pg.isDisabled('#render'), 'no Render before a draft'); assert.strictEqual(await pg.textContent('#elapsed'), 'Draft first, then Render.');
+  await t('Review: Draft from your pieces cuts once and hands them over as they are; Render waits for it', async () => {
+    // Render, before a draft: off, and it sends you to Review
+    await toStep(pg, 'render');
+    assert.ok(await pg.isDisabled('#render'), 'no Render before a draft'); assert.strictEqual(await pg.textContent('#render-status'), 'Draft it on Review first');
     assert.strictEqual(await pg.$$eval('#s-render button', x => x.filter(b => /^Render/.test(b.textContent.trim())).length), 1, 'one Render button');
     assert.strictEqual(await pg.$('#kept-cuts'), null, 'no second render card');
+    if (shots) { await pg.screenshot({ path: join(shots, 'redesign-render-dark.png') }); }
+    await pg.click('#render-to-review'); await onStep(pg, 'review'); await pg.waitForSelector('#s-review:not([hidden])');
+    await pg.waitForSelector('#fin-from button[data-from="pieces"][aria-checked="true"]');
+    assert.ok(/^Your 2 pieces, \d+ s$/.test(await pg.textContent('#fin-from button[data-from="pieces"]')));
+    assert.strictEqual(await pg.textContent('#elapsed'), 'A draft is a quick plan of the reel, with no video yet.');
+    assert.strictEqual(await pg.$$eval('#s-review button', x => x.filter(b => /^Render/.test(b.textContent.trim())).length), 0, 'no Render button on Review');
     if (shots) { await pg.screenshot({ path: join(shots, 'redesign-finish-dark.png') }); }
     await pg.click('#draft'); const v = await waitTask(); assert.strictEqual(v.task.status, 'done', JSON.stringify(v.task).slice(0, 800));
     const L = log(JOB); assert.ok(/--as-is/.test(L) && /--draft/.test(L), L);
@@ -102,6 +118,8 @@ try {
   });
 
   await t('one Render makes the reel and each piece as its own reel in the same run', async () => {
+    await toStep(pg, 'render'); await pg.waitForSelector('#s-render:not([hidden])');
+    assert.strictEqual(await pg.isVisible('#exp-clips'), false, 'What to make starts closed'); await openMake(pg);
     await pg.click('#exp-clips'); await pg.waitForSelector('#exp-clips[aria-pressed="true"]');
     await pg.click('#render'); const v = await waitTask(); assert.strictEqual(v.task.status, 'done', JSON.stringify(v.task).slice(0, 800)); assert.strictEqual(v.task.kind, 'render');
     assert.ok(existsSync(join(ROOT, 'jobs', JOB, 'reel-v1.mp4')), 'the reel');
@@ -112,19 +130,22 @@ try {
     if (shots) { await pg.evaluate(() => scrollTo(0, 0)); await pg.waitForTimeout(400); await pg.screenshot({ path: join(shots, 'redesign-finish-rendered-dark.png') }); }
   });
 
-  await t('pieces changed since the draft: Your edit and Finish say so, and Render waits for a new draft', async () => {
+  await t('pieces changed since the draft: Your edit, Review and Render say so, and Render waits for a new draft', async () => {
     await api('/api/cut/edit', { id: 'c3', keep: true });
     await pg.waitForSelector('#ye-stale'); await pg.waitForFunction(() => document.querySelector('#render').getAttribute('aria-disabled') === 'true');
     assert.strictEqual(await pg.textContent('#elapsed'), 'Your pieces changed since the draft. Draft again first.');
+    assert.strictEqual(await pg.textContent('#render-status'), 'Your pieces changed since the draft. Draft it on Review first');
     const r = await fetch(url + '/api/render', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); assert.strictEqual(r.status, 202, 'the API still renders the last draft for an agent that asks');
     await waitTask();
     await api('/api/cut/edit', { id: 'c3', keep: false }); await pg.waitForSelector('#ye-stale', { state: 'detached' });
   });
 
   await t('the whole take instead, and plain clips with no reel need no draft', async () => {
+    await toStep(pg, 'review');
     await pg.click('#fin-from button[data-from="take"]'); await pg.waitForSelector('#fin-from button[data-from="take"][aria-checked="true"]');
     assert.strictEqual((await api('/api/edit')).edit.from.mode, 'take');
     await pg.click('#fin-from button[data-from="pieces"]'); await pg.waitForSelector('#fin-from button[data-from="pieces"][aria-checked="true"]');
+    await toStep(pg, 'render'); await openMake(pg);
     await pg.click('#exp-plain'); await pg.waitForSelector('#exp-plain[aria-pressed="true"]');
     await pg.click('#exp-clips'); await pg.waitForSelector('#exp-clips[aria-pressed="false"]');
     await pg.click('#exp-reel'); await pg.waitForSelector('#exp-reel[aria-pressed="false"]');
@@ -151,19 +172,19 @@ try {
   });
 
   if (shots) await t('screenshots: dark and light', async () => {
-    await pg.goto(url + '/#step=finish', { waitUntil: 'networkidle' }); await pg.waitForTimeout(600);
+    await open(pg, '#step=review'); await pg.waitForTimeout(600);
     await pg.screenshot({ path: join(shots, 'redesign-finish-drafted-dark.png') });
-    await pg.click('#stepper button[data-step="look"]'); await pg.waitForTimeout(600); await pg.screenshot({ path: join(shots, 'redesign-look-dark.png') });
-    const theme = async m => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), m); await pg.reload({ waitUntil: 'networkidle' }); await pg.waitForTimeout(700); };
+    await pg.click('#stepper button[data-step="picture"]'); await pg.waitForTimeout(600); await pg.screenshot({ path: join(shots, 'redesign-look-dark.png') });
+    const theme = async m => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), m); await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); await pg.waitForTimeout(700); };
     await theme('light'); await pg.screenshot({ path: join(shots, 'redesign-look-light.png') });
-    await pg.click('#stepper button[data-step="finish"]'); await pg.waitForTimeout(600); await pg.screenshot({ path: join(shots, 'redesign-finish-light.png') });
+    await pg.click('#stepper button[data-step="review"]'); await pg.waitForTimeout(600); await pg.screenshot({ path: join(shots, 'redesign-finish-light.png') });
     await pg.click('#stepper button[data-step="cut"]'); await pg.waitForTimeout(600); await pg.screenshot({ path: join(shots, 'redesign-cut-your-edit-light.png') });
-    await pg.setViewportSize({ width: 390, height: 844 }); await pg.evaluate(() => { location.hash = '#step=finish'; }); await pg.waitForTimeout(600); await pg.screenshot({ path: join(shots, 'redesign-finish-phone-light.png'), fullPage: false });
+    await pg.setViewportSize({ width: 390, height: 844 }); await pg.evaluate(() => { location.hash = '#step=review'; }); await pg.waitForTimeout(600); await pg.screenshot({ path: join(shots, 'redesign-finish-phone-light.png'), fullPage: false });
     await theme('dark'); await pg.screenshot({ path: join(shots, 'redesign-finish-phone-dark.png') });
     await pg.setViewportSize({ width: 1440, height: 900 });
   });
   assert.deepStrictEqual(errs, [], 'no page errors');
-  console.log(`\nStudio Finish e2e: ${n} passed`);
+  console.log(`\nStudio Review and Render e2e: ${n} passed`);
 } finally {
   if (client) await client.close().catch(() => {});
   await browser.close(); srv.kill(); cleanJobs(); rmSync(STATE, { recursive: true, force: true });

@@ -1305,3 +1305,14 @@ button.rp-made { cursor: pointer; } button.rp-made:hover { background: color-mix
 .fold > .review.glass-card { border: 0; background: none; box-shadow: none; padding: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }
 .run-foot .fold2:first-child { margin-top: 0; }
 @media (max-width: 640px) { .draft-from { margin-left: 0; width: 100%; } }
+/* the top bar with 8 dots: shorter links between them, and the bar's words step back sooner */
+.stepper li + li::before { width: 12px; }
+.jobrow { flex: none; }
+@media (max-width: 1700px) { .out-btn .ob-l, .connect-btn .cb-l, .setup-pill .sp-l { display: none; } .out-btn, .connect-btn { padding: 0 10px; } .setup-pill { padding: 0 9px; } }
+@media (max-width: 1500px) { .stepper li + li::before { width: 8px; margin-right: 2px; } .stepper ol { gap: 2px; } }
+@media (max-width: 1280px) { .job input { width: 140px; } }
+@media (max-width: 640px) { .out-btn { display: none; } .jobrow { flex: 1; } .stepper li + li::before { width: auto; } }
+.sound-cards > .block { margin-top: 0; }
+.sound-cards { margin-top: 14px; } .sound-cards > .block.sound-card { margin-top: 0; }
+@media (max-width: 640px) { .picks .none { display: none; } .stepnav #next { max-width: 62vw; } }
+.sources.compact .drop.big { min-height: 132px; padding-block: 18px; }

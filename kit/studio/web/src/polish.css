@@ -20,7 +20,7 @@
 .stepper { flex: 1 1 auto; min-width: 0; display: flex; justify-content: center; }
 .stepper ol { flex-wrap: nowrap; }
 .stepper button { white-space: nowrap; }
-.stepper li + li::before { width: 18px; }
+.stepper li + li::before { width: 12px; }
 .topr { flex: none; gap: 2px; }
 .setup-pill, .connect-btn, #taskpill { white-space: nowrap; flex: none; }
 #taskpill.idle { display: none; }

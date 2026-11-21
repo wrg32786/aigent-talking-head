@@ -1,15 +1,15 @@
 // The Studio Cut step in a real Chrome, on synthetic media only (the presenter still with a tone, tests/fixtures):
-// - the footage player: click a clip to play, J K L and the arrow keys, the transcript (a stand-in transcriber,
+// - the footage player on Start: click a clip to play, J K L and the arrow keys, the transcript (a stand-in transcriber,
 //   tests/fixtures/fake-tx.mjs) highlights along and a word click seeks; an .mkv plays from a 540p preview copy
 // - the Cut step: smart defaults and the summary, the picker cards, Find cuts, candidates on the timeline, trim by
 //   dragging an edge, drop one, add one by dragging on a lane
-// - batch render on Finish: kept cuts become their own videos (a stand-in for the engine, tests/fixtures/fake-reel.mjs, with the
+// - batch render on Render: kept cuts become their own videos (a stand-in for the engine, tests/fixtures/fake-reel.mjs, with the
 //   real extract), a long form one through the real 16:9 pass (1920x1080), an ad one with the CTA end card
-// - Reference: Pull script puts the reference's words in Scripts with [hook], [body] and [cta]
+// - Picture, the reference view: Pull script puts the reference's words in Scripts with [hook], [body] and [cta]
 // - cut points on the audio: a synthetic clip with tone "words" at known times, a breath and room tone, and a transcript
 //   that is off on purpose; every cut lands in the real gap, and the timeline shows where and why
 // - lines and bites: keep or retake, a bite in your order (arrows and drag), play it, save it as one file, the clean take,
-//   the agent's bites labelled; footage order by drag and arrows, remove in place
+//   the agent's bites labelled; footage order on Start by drag and arrows, remove in place
 // Needs Chrome and ffmpeg. Run: node tests/studio-cut.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
 import assert from 'assert';
 import { spawn, execFileSync } from 'child_process';
@@ -48,6 +48,11 @@ const env = { ...process.env, FAKE_TX_WORDS: TXW, CI: '1', STUDIO_DIR: STATE, ST
 const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), '--port', '0', '--no-open'], { cwd: ROOT, env });
 const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out))); });
 const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json();
+// Studio keeps a live connection, so the page never goes network idle: wait for the stepper, and for the step a link names
+const STEP_OF = { reference: 'picture', post: 'render' };
+const ready = async (pg, hash = '') => { await pg.waitForSelector('#stepper'); const st = (hash.match(/step=([a-z]+)/) || [])[1]; if (st) await pg.waitForSelector(`#stepper [aria-current="step"][data-step="${STEP_OF[st] || st}"]`); };
+const openFold = async (pg, sel) => { if (await pg.getAttribute(sel + ' > button', 'aria-expanded') !== 'true') await pg.click(sel + ' > button'); };
+const open = async (pg, hash) => { await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await ready(pg, hash); };
 const upload = async (kind, f, name) => (await fetch(`${url}/api/upload?kind=${kind}&name=${encodeURIComponent(name)}`, { method: 'POST', body: readFileSync(f) })).json();
 const until = async (fn, ms = 20000) => { const end = Date.now() + ms; for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) throw new Error('timed out'); await wait(150); } };
 const waitTask = async (ms = 5 * 60e3) => { await wait(400); return until(async () => { const v = await api('/api/state'); return v.task && v.task.status !== 'running' ? v : null; }, ms); };
@@ -71,7 +76,7 @@ try {
   pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
 
   await t('footage player: click a clip to play; J K L and arrows; the transcript follows and a word click seeks', async () => {
-    await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' });
+    await open(pg, '#step=start');
     await pg.click(`.clip-play[aria-label="Play long-take.mp4"]`);
     await pg.waitForSelector('#player #player-video');
     await pg.waitForFunction(() => document.querySelector('#player-time').textContent.endsWith('1:52'), null, { timeout: 10000 });
@@ -102,7 +107,7 @@ try {
     await pg.click(`.clip-play[aria-label="Play screen.mkv"]`); await pg.waitForFunction(() => !document.querySelector('#player'));
   });
   await t('Cut step: smart defaults and the summary; the cards change it; Find cuts fills the list and the timeline', async () => {
-    await pg.goto(url + '/#step=cut', { waitUntil: 'networkidle' });
+    await open(pg, '#step=cut');
     await pg.waitForSelector('#cut-summary');
     assert.strictEqual(await pg.textContent('#cut-summary'), 'Full edit: 1 short video (~75 s), for organic');
     assert.strictEqual(await pg.$eval('#fmt-short', e => e.getAttribute('aria-checked')), 'true');
@@ -141,13 +146,14 @@ try {
     await until(async () => !(await api('/api/cut')).candidates.some(x => x.id === 'm1'));
     if (shots) await shot(pg, '#cut-timeline', 'cut-timeline.png');
   });
-  await t('one place renders: the Cut step has no Render; Finish renders every kept cut as its own video in its one Render', async () => {
+  await t('one place renders: the Cut step has no Render; the Render step renders every kept cut as its own video in its one Render', async () => {
     assert.strictEqual(await pg.$('#s-cut #cut-render'), null, 'no Render button on the Cut step');
     assert.strictEqual(await pg.$$eval('#s-cut button', x => x.filter(b => /^(Render|Save as)/.test(b.textContent.trim())).length), 0, 'nothing on the Cut step renders or saves a file');
     // the page catches up with the drop above, then says where the 3 kept ones render
-    await pg.waitForFunction(() => /^3 kept\. They render at the end, on the Finish step, as one reel\.$/.test((document.querySelector('#cut-hint') || {}).textContent || ''), null, { timeout: 10000 })
+    await pg.waitForFunction(() => /^3 kept\. They render at the end, on the Render step, as one reel\.$/.test((document.querySelector('#cut-hint') || {}).textContent || ''), null, { timeout: 10000 })
       .catch(async () => { throw new Error('the Cut step says where they render: ' + await pg.textContent('#cut-hint')); });
-    await pg.goto(url + '/#step=finish', { waitUntil: 'networkidle' });
+    await open(pg, '#step=render');
+    await openFold(pg, '#make-fold'); // What to make is a closed fold on Render
     await pg.waitForSelector('#fin-exports #exp-clips');
     assert.strictEqual(await pg.$('#kept-cuts'), null, 'one render path: no second render card');
     assert.strictEqual(await pg.textContent('#exp-clips'), '3 clips from your pieces');
@@ -195,9 +201,9 @@ try {
     const sub = ra.plan[0].job, caps = readFileSync(join(ROOT, 'jobs', sub, 'build', 'captions.js'), 'utf8'), log = readFileSync(join(ROOT, 'jobs', sub, 'fake-reel.log'), 'utf8');
     const cj = {}; new Function('window', caps)(cj); assert.ok(cj.CAPTIONS.flips.some(f => f.mode === 22 && f.text === 'Get the free guide' && f.end - f.start > 2.5), caps); assert.ok(/--draft/.test(log) && /--tighten 0.25/.test(log) && /--rebuild/.test(log) && /--export shorts/.test(log), log);
   });
-  await t('Reference: Pull script transcribes the reference and puts its words in Scripts', async () => {
+  await t('Picture, reference view: Pull script transcribes the reference and puts its words in Scripts', async () => {
     await upload('reference', REF, 'ref.mp4');
-    await pg.goto(url + '/#step=reference', { waitUntil: 'networkidle' });
+    await open(pg, '#step=reference');
     await pg.click('#pull-script-btn');
     await pg.waitForFunction(() => /In Scripts:/.test(document.querySelector('#pull-script').textContent), null, { timeout: 20000 });
     const sc = (await api('/api/state')).scripts.find(x => x.by === 'reference transcript');
@@ -228,7 +234,7 @@ try {
     const ex = await api('/api/cut/edit', { id: a.id, ranges: [[0.95, 2.25]], snap: false }); assert.deepStrictEqual(ex.cut.candidates[0].ranges, [[0.95, 2.25]]); assert.ok(!ex.cut.candidates[0].cuts);
     await api('/api/cut/edit', { id: a.id, ranges: [[0.95, 2.25]] });
     // the timeline: Show cut points draws the transcript times and lists each cut with why
-    await pg.goto(url + '/#step=cut', { waitUntil: 'networkidle' });
+    await open(pg, '#step=cut');
     await pg.waitForSelector('#cut-timeline .region');
     await pg.check('#cut-debug');
     await pg.waitForSelector('#cut-points tbody tr');
@@ -258,10 +264,11 @@ try {
     await pg.click('#bites li.bite .bite-a button:has-text("Stop")');
     // nothing on the Cut step renders: the bite says where it does
     assert.strictEqual(await pg.$$eval('#s-cut button', x => x.filter(b => /^(Render|Save as)/.test(b.textContent.trim())).length), 0, 'no Render or Save as on the Cut step');
-    assert.ok(/renders at the end, on the Finish step/.test(await pg.textContent('#bites-hint')));
-    // on Finish the bite is one of your pieces: Plain clips saves it as one file, the two lines joined, nothing else
+    assert.ok(/renders at the end, on the Render step/.test(await pg.textContent('#bites-hint')));
+    // on Render the bite is one of your pieces: Plain clips saves it as one file, the two lines joined, nothing else
     const bid = (await api('/api/lines')).bites[0].id;
-    await pg.goto(url + '/#step=finish', { waitUntil: 'networkidle' });
+    await open(pg, '#step=render');
+    await openFold(pg, '#make-fold');
     await until(async () => (await api('/api/edit')).combo.pieces.some(x => x.kind === 'bite' && x.id === bid));
     await pg.waitForSelector('#exp-plain:not([disabled])');
     await pg.click('#exp-plain'); await pg.waitForSelector('#exp-plain[aria-pressed="true"]'); await pg.click('#exp-reel'); await pg.waitForSelector('#exp-reel[aria-pressed="false"]');
@@ -270,7 +277,7 @@ try {
     const L = (await api('/api/lines')).bites[0]; assert.ok(L.file, 'the joined file'); assert.ok(Math.abs(+probe(join(ROOT, L.file)).format.duration - L.seconds) < 0.25, `${L.seconds}`);
     assert.ok(!existsSync(join(ROOT, 'jobs', `${JOB}-${L.id}`, 'fake-reel.log')), 'one file is not a reel edit');
     await api('/api/state', { finish: { reel: true, clips: false, plain: false } });
-    await pg.goto(url + '/#step=cut', { waitUntil: 'networkidle' });
+    await open(pg, '#step=cut');
     await pg.click('#lines-toggle'); await pg.waitForSelector('#bites li.bite');
     await pg.waitForSelector(`#bites li.bite a[href*="${L.id}.mp4"]`);
     // the clean take leaves out line 2 (marked a retake)
@@ -281,7 +288,7 @@ try {
     await pg.waitForSelector('#bites li.bite:has-text("By Claude")'); await pg.waitForSelector('#lines-by');
   });
   await t('footage order: drag a clip onto another or use the arrows; the draft follows that order', async () => {
-    await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' });
+    await open(pg, '#step=start');
     const names = () => pg.$$eval('#footage li[data-path]', x => x.map(e => e.dataset.path.split('/').pop()));
     const n0 = await names(); assert.deepStrictEqual(n0, ['long-take.mp4', 'screen.mkv', 'synthetic-speech.mp4']);
     await pg.dragAndDrop('#footage li[data-path$="synthetic-speech.mp4"]', '#footage li[data-path$="long-take.mp4"]');
@@ -293,7 +300,7 @@ try {
     if (shots) {
       // a screenshot of the lines on the long take, with two bites picked by the agent
       await api('/api/cut/output', { source: take }); await api('/api/lines', { path: take, action: 'set', by: 'claude-code', clean: true, bites: [{ name: 'The morning setup', lines: [4, 5, 6, 7], reason: 'One clear how-to with a strong first line' }, { name: 'Hook: ten minutes', lines: [1, 9, 10, 11] }] });
-      await pg.goto(url + '/#step=cut', { waitUntil: 'networkidle' }); await pg.click('#lines-toggle'); await pg.waitForSelector('#bites li.bite');
+      await open(pg, '#step=cut'); await pg.click('#lines-toggle'); await pg.waitForSelector('#bites li.bite');
       await pg.check('#lines-list li[data-line="l13"] input'); await pg.check('#lines-list li[data-line="l14"] input'); await pg.$eval('#lines-list', e => { e.scrollTop = 0; });
       await shot(pg, '#lines', 'lines-bites.png');
     }

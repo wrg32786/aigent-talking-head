@@ -63,10 +63,13 @@ export function Footage({ V, s, apply, patch, go, hidden, onLive, looks }) {
   const [rec, setRec] = useState(() => localStorage.getItem('studio.rec.open') === '1' || /record/.test(location.hash));
   const open = v => { localStorage.setItem('studio.rec.open', v ? '1' : '0'); setRec(v); };
   const needJob = () => { if (s.job) return false; toast('Name the reel first (top left)'); document.getElementById('job')?.focus(); return true; };
+  // Scripts stay folded until you have one or ask for them, so Start is footage first
+  const [scriptsOn, setScriptsOn] = useState(() => localStorage.getItem('studio.scripts.show') === '1');
+  const showScripts = scriptsOn || (V.scripts || []).length > 0;
   return <section className="step" id="s-footage" data-step="start" aria-labelledby="h-footage" hidden={hidden}>
     <header className="sh"><h2 id="h-footage">Start</h2><p className="sub">Add your footage or film it now. Then say if a video you like should guide the edit.</p></header>
     {rec ? <Recorder V={V} s={s} apply={apply} onClose={() => open(false)} onLive={onLive} visible={!hidden} scriptId={readId} />
-      : <div className="sources">
+      : <div className={'sources' + (s.footage.length || s.clips ? ' compact' : '')}>
         <Dropzone id="drop-footage" inputId="file-footage" kind="footage" s={s} apply={apply} big multiple accept="video/*,.mov,.mp4,.m4v,.webm,.mkv" label="Add footage: drop video files or press Enter to choose">
           <Icon n="upload" className="di" /><strong>Drop video here</strong><span>or click to choose</span>
         </Dropzone>
@@ -98,6 +101,8 @@ export function Footage({ V, s, apply, patch, go, hidden, onLive, looks }) {
     </ul>
     {s.footage.length > 0 && !s.clips && <div className="as-is"><Toggle id="as-is" label="Already cut: use each file as it is" description="One clip per file, in this order, no second cut." checked={!!s.asIs} onChange={v => api('/api/state', { asIs: v }).then(apply).catch(() => {})} /></div>}
     {!rec && <StartMode s={s} apply={apply} patch={patch} go={go} looks={looks} />}
-    <Scripts V={V} s={s} apply={apply} onRead={id => { if (needJob()) return; setReadId(id); open(true); requestAnimationFrame(() => document.getElementById('recorder')?.scrollIntoView({ block: 'start', behavior: 'smooth' })); }} />
+    {!showScripts ? <button type="button" className="rs-open glass-card" id="scripts-open" onClick={() => { localStorage.setItem('studio.scripts.show', '1'); setScriptsOn(true); }}>
+      <Icon n="script" /><span className="rs-t"><b>Scripts</b><span className="fine">Write what you will say, or ask your agent to</span></span><Icon n="right" className="rs-go" /></button>
+    : <Scripts V={V} s={s} apply={apply} onRead={id => { if (needJob()) return; setReadId(id); open(true); requestAnimationFrame(() => document.getElementById('recorder')?.scrollIntoView({ block: 'start', behavior: 'smooth' })); }} />}
   </section>;
 }

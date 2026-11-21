@@ -176,6 +176,8 @@ export function App() {
             { id: 'more-open-video', label: 'Past videos', icon: 'film', onClick: () => setVideoMode('open') },
             { id: 'more-setup', label: 'Setup check', icon: 'check', onClick: openSetup },
             { id: 'more-keys', label: 'API keys', icon: 'link', onClick: openKeys },
+            narrow && { id: 'more-wizards', label: 'Wizards', icon: 'spark', onClick: () => setWizOpen(true) },
+            narrow && { id: 'more-outputs', label: 'Outputs', icon: 'film', onClick: () => setOutputsOpen(true) },
             narrow && { id: 'more-theme', label: theme === 'dark' ? 'Light theme' : 'Dark theme', icon: theme === 'dark' ? 'sun' : 'moon', onClick: () => setTheme(theme === 'dark' ? 'light' : 'dark') },
           ]} />
         </div>
