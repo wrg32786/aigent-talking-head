@@ -142,6 +142,13 @@ console.log('theme', await p.evaluate(() => window.__theme));
     writeFileSync(join(ROOT, 'boxes.json'), JSON.stringify(out, null, 1) + '\n');
     console.log('boxes', ts.length, 'moments -> boxes.json'); await b.close(); process.exit(0);
   }
+  // TITLECHECK=1: the frames round every title's start and end, with the title's box and the caption bar on each
+  // (titleframes.json, read by kit/titlecheck.mjs for npm run verify), and stop
+  if (process.env.TITLECHECK) {
+    const tf = await p.evaluate(([f, d]) => (window.__titleFrames ? window.__titleFrames(f, d) : null), [FPS, DUR]);
+    writeFileSync(join(ROOT, 'titleframes.json'), JSON.stringify(tf) + '\n');
+    console.log('title frames', tf ? tf.titles.reduce((n, t) => n + t.frames.length, 0) : 0, '-> titleframes.json'); await b.close(); process.exit(0);
+  }
 }
 // text check (overlay.html __textCheck): on every frame, every text element on screen (a caption's current word, a title,
 // a sticker word) is measured alone where it is drawn, and any two that share area are listed. textcheck.json; npm run
@@ -187,6 +194,12 @@ if (gfx.length) { writeFileSync(join(ROOT, 'graphics.json'), JSON.stringify(gfx,
 const capLayer = await p.evaluate(() => window.__captionLayer || 'front');
 if (capLayer === 'behind') console.log('captions: behind the person (on the title layer, under the mask)');
 const words = await p.evaluate(() => window.__words || []);
+// a label that only repeats the caption is left out (overlay.html, Studio report 4 item 13)
+for (const d of await p.evaluate(() => window.__dropped || [])) console.log(`label '${d.text}' at ${(+d.start).toFixed(2)} s not drawn: ${d.why}`);
+// one-word captions under a title: nothing in the bar while a title is up (words-held.json lists what was left out)
+{ const held = await p.evaluate(() => window.__wordsHeld || []); if (held.length) { writeFileSync(join(ROOT, 'words-held.json'), JSON.stringify(held) + '\n'); console.log(`one-word captions: ${held.length} word${held.length === 1 ? '' : 's'} left out of the bar while a title is up (${held.filter(h => h.why === 'title word').length} said by the title itself)`); } else rmSync(join(ROOT, 'words-held.json'), { force: true }); }
+const gl = await p.evaluate(() => (window.__glow ? window.__glow() : null));
+if (gl && (gl.glow || gl.dim)) console.log(`titles: ${gl.glow ? 'glow ' + gl.glow : 'no glow'}, ${gl.dim ? 'picture dimmed by ' + Math.round(gl.dim * 100) + '% behind a title' : 'no dim'}`);
 if (words.length) { writeFileSync(join(ROOT, 'words.json'), JSON.stringify(words) + '\n'); const short = Math.min(...words.map(w => w.end - w.start)); console.log(`one-word captions: ${words.length} words, each up ${short.toFixed(2)} s or more`); }
 if (titles.length) console.log('titles', titles.map(t => `${t.start}s ${t.entrance}${t.flicker ? '+flicker' : ''}${t.layer && t.layer !== 'front' ? ' ' + t.layer : ''}`).join(', '));
 // Font lockups (titles and kinetic lines, two faces per phrase): written out so they can be checked without pixels

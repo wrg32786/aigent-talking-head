@@ -12,6 +12,8 @@
 //   caption or title that sits on another one fails (the layout pass in overlay.html moves or hides captions and titles).
 //   ffprobe: 1080x1920, the frame rate, H.264 + AAC at 48 kHz, duration = the cut's length.
 //   Loudness: integrated LUFS and true peak (target -14 LUFS, peak <= -1 dBTP).
+//   Titles: every frame from two before a title's start to five after, and the same at its end, read from the drawn text
+//   layer (build/ovl): no caption word in the bar while a title is up, none of its own words in the bar outside it.
 //   Mask (when cut.json has one): alpha measured from the mask file at each title, never judged by eye.
 //   Copy lint: the same check as `npm run check`.
 // Exit 1 on any failure. Then READ every still: titles readable and behind the head only, pills legible, punch frames
@@ -23,6 +25,7 @@ import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 const R = createRequire(import.meta.url)('./rules.cjs');
 const X = createRequire(import.meta.url)('./exports.cjs');
+import { titleCheck } from './titlecheck.mjs';
 const KIT = dirname(fileURLToPath(import.meta.url)), ROOT = dirname(KIT);
 const argv = process.argv.slice(2);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
@@ -178,6 +181,11 @@ if (stills.length) {
     ok(!tc.clashFrames, `no two words on the same spot on ${tc.frames} frames${tc.clashFrames ? `: ${tc.clashFrames} frames` : ''}${mv ? ` (layout stacked or held back ${mv} to keep them apart)` : ''}`);
     for (const e of tc.pairs || []) lines.push(`      "${e.a}" and "${e.b}" overlap from ${e.from}s for ${e.frames} frame${e.frames === 1 ? '' : 's'}, up to ${e.maxPx} px`);
   } }
+// 3e. round every title, on the drawn frames (kit/titlecheck.mjs): from two frames before a title's start to five after,
+// and the same at its end, no caption word in the bar while the title is up and none of its own words in the bar outside it
+if (!EXN || XBUILD) { const tc = titleCheck(build, { dur: TL.total, fps: FPS });
+  tc.notes.forEach(n => notes.push(n));
+  if (tc.ran) { ok(!tc.fails.length, `no caption word under or beside a title on ${tc.frames} frames round ${tc.titles} title${tc.titles === 1 ? '' : 's'} (${tc.pixelFrames} read from the drawn text layer)${tc.fails.length ? ':' : ''}`); tc.fails.forEach(c => lines.push('      ' + c)); } }
 // 4. mask, measured
 const mask = R.maskSpec(C);
 if (C.titles && mask.file) {

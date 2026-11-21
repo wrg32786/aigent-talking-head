@@ -22,7 +22,8 @@ const CASES = [
     { start: 2.3, end: 3.2, text: 'Terms', hero: [0], mode: 7 },
     { start: 3.3, end: 4.2, text: 'and more', mode: 0, words: [[3.3, 3.6, 'and'], [3.6, 4.1, 'more']] }] },
     also: d => { const w = JSON.parse(readFileSync(join(d, 'words.json'), 'utf8')).find(x => x.word === 'on'); ok(w && w.end <= 2.3 + 1e-6, `"on" leaves when "Terms" enters (it ends at ${w && w.end}, the title starts at 2.3)`); } },
-  { name: 'a title that enters while a word is still being said', dur: 5, rawClash: true, caps: { ...top, fonts: 'pirata', flips: [
+  // since 1.28.0 the word ends at the title's start (the caption bar shows nothing while a title is up), so there is no clash even with the layout pass off
+  { name: 'a title that enters while a word is still being said', dur: 5, rawClash: false, caps: { ...top, fonts: 'pirata', flips: [
     { start: 1.0, end: 2.7, text: 'we agree on', mode: 0, words: [[1.0, 1.3, 'we'], [1.3, 1.8, 'agree'], [1.9, 2.6, 'on']] },
     { start: 2.2, end: 3.4, text: 'Terms', hero: [0], mode: 7, y: 230 },
     { start: 3.0, end: 4.2, text: 'and more', mode: 0, words: [[3.0, 3.5, 'and'], [3.6, 4.1, 'more']] }] } },
