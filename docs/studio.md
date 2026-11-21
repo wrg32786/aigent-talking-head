@@ -430,6 +430,8 @@ The B-roll step sits between Look and Finish. Its **spots** come from the draft:
 - Studio puts on what it can place for free: a library clip, Pexels or Pixabay when you set a key, a card when Chrome is here. A spot with only a search waits for you. Generating never runs on its own.
 - Each idea starts on the word it is about and says **why** ("You say "doubled". Show it as a number."). Placed spots say **picked**; the chat says how many were placed.
 
+**Clear all B-roll** (when any spot is filled) takes every clip off the timeline. It asks first, then **Undo** puts them back. Library clips are unchanged.
+
 **Suggest b-roll again** runs the same rules on the empty spots. Click a spot to see **How it sits**, **Timing** and **Why this**, **Use it** or **Keep empty** for an idea, and **Remove** for what is there. **Use it** never needs a key: the idea's clip, its card, a library match, stock with a key, else a card made from the spot's words. With no Chrome it says so and shows the Chrome fix button.
 
 **Options for this spot:**
@@ -574,6 +576,8 @@ A double-click app with no installer at all is planned: [docs/desktop-app-plan.m
 When a reel is done, **New video** clears the board for the next one. Open it with the **+** next to the reel name, or **More**, New video. Give the new reel a name (it is cleaned the same way as the name field: lowercase letters, numbers and dashes; leave it empty for `video-<date>`) and press **Start fresh**. You land on Footage with an empty board: no footage, cuts, reference, b-roll, review notes, draft or chat.
 
 **Keep my look** is on by default and keeps the pack, style picks, music, sound, pace, export size and brand logos for the new reel. Turn it off to go back to the defaults too. Your words (the glossary), API keys, settings and your agent's connection never change.
+
+**Uploading a new talking-head file** on a board that already has an edit also starts a fresh edit for this video: cuts, pieces, B-roll spots and the timeline, the reference, and the draft are cleared. The look resets too, unless you chose **Keep my look** when you started this video with New video. The first file you add to a clean board does not wipe a look you just picked. Files are never deleted. The last reel stays in Outputs, and **Open a past video** still opens your other jobs. A leftover draft on disk is ignored until you draft again, so the B-roll step no longer shows the last video's spots.
 
 Nothing is deleted. The old reel's files stay where they were (`inbox/studio/<job>/`, `jobs/<job>/` with its renders and `reel-vN.build/` saves), and its whole session is saved to `jobs/.studio/videos/<job>.json`.
 

@@ -2,6 +2,16 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.18.1 (unreleased)
+
+Release notes: [docs/releases/v1.18.1.md](docs/releases/v1.18.1.md). Uploading new footage starts a fresh edit, and you can clear all B-roll from the timeline.
+
+- **A new upload starts a fresh edit.** Dropping or choosing a new talking-head file on a board that already has an edit (or adding one from a link, a kept take, or your agent) clears cuts, pieces, B-roll spots and the timeline, the reference, and the draft and render state. The look resets too, unless you turned **Keep my look** on in **New video** (then only the look carries). The first file on a clean board does not wipe a look you just picked. Files are never deleted: the last reel stays in Outputs, and **Open a past video** still opens other jobs.
+- **The leftover B-roll bug.** The B-roll timeline was rebuilt from `jobs/<job>/build/cut.json` even after the footage changed, so spots from the last video stayed on screen with no way to clear them. The leftover build is now ignored until you draft again (`draftStale` / `draftIsCurrent` in `kit/studio/core.mjs`).
+- **Clear all B-roll.** On the B-roll step, when any spot is filled: **Clear all B-roll**, a confirm, then **Undo**. Library clips are unchanged (`POST /api/broll/clear`, `undo: true`).
+- **MCP.** New `clear_broll` (`undo` puts the last clear back). `fill_slot` with `clear` and `all` does the same.
+- **Tests and docs.** `tests/studio-reset.test.mjs` (in `npm run check`); docs/studio.md, docs/mcp.md, AGENTS.md and the Studio skill.
+
 ## 1.17.0 (unreleased)
 
 Release notes: [docs/releases/v1.17.0.md](docs/releases/v1.17.0.md). The redesign, part 5: point and note, drag to select, wizards, Ask my agent.

@@ -72,8 +72,10 @@ export function finish(id, { seconds } = {}, save) {
       save(s => {
         const x = (s.takes || []).find(y => y.id === id); if (!x) return;
         Object.assign(x, { status: 'ready', file: relOf(mp4), thumb: existsSync(join(ROOT, jpg)) ? relOf(jpg) : null, seconds: Math.round(dur * 10) / 10, bytes: statSync(join(ROOT, mp4)).size });
-        if (x.kept) { if (!s.footage.includes(x.file)) s.footage.push(x.file); s.clips = null; }
-        C.applyPatch(s, { reply: `New take recorded: ${fmt(dur)} (take ${id}).`, from: 'Studio', kind: 'action' });
+        if (x.kept) {
+          const radd = C.addFootage(s, x.file);
+          C.applyPatch(s, { reply: radd.reset ? radd.note : `New take recorded: ${fmt(dur)} (take ${id}).`, from: 'Studio', kind: 'action' });
+        } else C.applyPatch(s, { reply: `New take recorded: ${fmt(dur)} (take ${id}).`, from: 'Studio', kind: 'action' });
       });
     } catch (e) {
       save(s => { const x = (s.takes || []).find(y => y.id === id); if (x) Object.assign(x, { status: 'failed', error: e.message.slice(0, 400) }); });
@@ -84,11 +86,13 @@ export function finish(id, { seconds } = {}, save) {
 export function act(s, id, action) {
   const x = (s.takes || []).find(y => y.id === id);
   if (!x) throw Object.assign(new Error(`no take ${id}`), { code: 404 });
-  if (action === 'keep') { x.kept = true; if (x.status === 'ready' && !s.footage.includes(x.file)) { s.footage.push(x.file); s.clips = null; } return; }
-  if (action === 'unkeep') { x.kept = false; s.footage = s.footage.filter(f => f !== x.file); return; }
+  if (action === 'keep') { x.kept = true; if (x.status === 'ready' && x.file) C.addFootage(s, x.file); return; }
+  if (action === 'unkeep') { x.kept = false; const n = (s.footage || []).length; s.footage = s.footage.filter(f => f !== x.file); if (s.footage.length !== n) C.onFootageListChanged(s); return; }
   if (action === 'discard') {
     if (x.status === 'recording' || x.status === 'converting') throw Object.assign(new Error('wait until the take is saved'), { code: 409 });
+    const n = (s.footage || []).length;
     s.footage = s.footage.filter(f => f !== x.file);
+    if (s.footage.length !== n) C.onFootageListChanged(s);
     for (const f of [x.file, x.thumb, x.status === 'failed' ? x.raw : null]) if (f) rmSync(join(ROOT, f), { force: true });
     s.takes = s.takes.filter(y => y.id !== id); return;
   }

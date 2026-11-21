@@ -985,6 +985,10 @@ dialog.nv { width: min(440px, calc(100vw - 24px)); }
 .slot-set .lbl, .beat-panel .opt-h { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-foreground); }
 .sp-refnote { display: flex; align-items: center; gap: 6px; } .sp-refnote svg { width: 14px; height: 14px; color: var(--warning); }
 .broll-bar .tick { font-size: 13px; }
+.broll-clear-row { margin: 4px 0 12px; color: var(--muted-foreground); }
+.broll-clear-confirm, .broll-undo { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: 6px; color: var(--foreground); vertical-align: middle; }
+.broll-clear-row #broll-clear-all, .broll-clear-row #broll-undo-btn { font-weight: 600; }
+
 .add-spot { padding: 8px 10px; border-radius: var(--radius); border: 1px solid var(--border); }
 .up-opts { align-items: center; gap: 10px 14px; }
 .raws { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }

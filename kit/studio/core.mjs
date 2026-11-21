@@ -194,7 +194,13 @@ export function applyPatch(s, p, cat = catalog()) {
       const bad = want.filter(f => !s.footage.includes(f) && !(inbox && f.startsWith(inbox) && !f.includes('..') && existsSync(join(ROOT, f))));
       if (bad.length) errs.push(`footage: not in this job: ${bad.join(', ')} (use the paths in state.footage, or upload the file first)`);
       else if (new Set(want).size !== want.length) errs.push('footage: a file is listed twice');
-      else if (JSON.stringify(want) !== JSON.stringify(s.footage)) { s.footage = want; s.clips = null; log.push(`footage ${want.length ? want.map(f => basename(f)).join(', ') : 'none'}`); }
+      else if (JSON.stringify(want) !== JSON.stringify(s.footage)) {
+        const adding = want.some(f => !s.footage.includes(f)), had = hasEdit(s), sameSet = want.length === s.footage.length && want.every(f => s.footage.includes(f));
+        s.footage = want; s.clips = null;
+        if (adding && had) { onFootageAdded(s, { hadEdit: true }); log.push(footageResetNote(s)); }
+        else if (!sameSet) onFootageListChanged(s, { added: adding, hadEdit: had });
+        log.push(`footage ${want.length ? want.map(f => basename(f)).join(', ') : 'none'}`);
+      }
     }
   }
   // finish: what the one Render makes. from: auto (your pieces when you kept any, else the whole take), pieces or
@@ -521,10 +527,100 @@ export function freshSession(s, { job = null, keepLook = true } = {}) {
   for (const k of KEEP_KEYS) if (s[k] !== undefined) keep[k] = s[k];
   const look = {}; if (keepLook) for (const k of LOOK_KEYS) if (s[k] !== undefined) look[k] = clone(s[k]);
   for (const k of Object.keys(s)) delete s[k];
-  Object.assign(s, d, keep, look, { job: job || null });
+  Object.assign(s, d, keep, look, { job: job || null, keepLook: !!keepLook });
   // Clip-specific pause exceptions are edit decisions, not a reusable pace setting.
   if (s.pace.keepPauses) delete s.pace.keepPauses;
   return s;
+}
+// the footage identity a draft is tied to (order matters). Used to hide a leftover jobs/<job>/build
+// when the user has started a new edit on the same job.
+export const footageKey = s => JSON.stringify([s.footage || [], s.clips || null]);
+// false when the session says the on-disk draft is leftover (a new upload, or footage that no longer
+// matches). When drafted was never set, a build folder still counts, so older tests and jobs stay valid.
+export function draftIsCurrent(s) {
+  if (!s || s.draftStale) return false;
+  if (!s.drafted || !s.drafted.key) return true;
+  const k = s.drafted.key;
+  if (k.startsWith('take:') && k !== 'take:' + footageKey(s)) return false;
+  return true;
+}
+// true when this board already has an edit, or leftover b-roll, so adding footage should start fresh.
+export function hasEdit(s) {
+  if ((s.footage || []).length) return true;
+  if (s.cut || s.drafted || s.cleanup || s.lockedAtDraft || s.output) return true;
+  if (s.asIs || (s.pieces && Object.keys(s.pieces).length) || (s.lines && Object.keys(s.lines).length)) return true;
+  const b = s.job && (s.broll || {})[s.job];
+  if (b && (Object.keys(b.slots || {}).length || Object.keys(b.ideas || {}).length || (b.marks || []).length || (b.cutins || []).length)) return true;
+  const r = s.reference || {};
+  if (r.file || r.url || r.extracted || r.status && r.status !== 'none') return true;
+  return false;
+}
+// hide leftover spots and the on-disk draft without deleting any file
+export function clearBrollTimeline(s) {
+  if (s.job && s.broll && s.broll[s.job]) {
+    const b = s.broll[s.job];
+    b.slots = {}; b.ideas = {}; b.marks = []; b.cutins = [];
+    delete b.undo;
+  }
+  s.drafted = null;
+  s.draftStale = true;
+  delete s.lockedAtDraft;
+  return s;
+}
+// start a fresh edit on this job: cuts, pieces, b-roll spots, notes (reference), draft and render
+// state go; the look stays only when Keep my look was chosen on New video (s.keepLook). Footage,
+// the job name, your words, chat, takes, transcripts and files on disk stay.
+export function resetEdit(s, { keepLook = s.keepLook === true } = {}) {
+  const d = defaultState();
+  s.cut = null;
+  s.lines = {};
+  delete s.pieces;
+  clearBrollTimeline(s);
+  delete s.cleanup;
+  s.output = null;
+  s.reference = clone(d.reference);
+  delete s.undoRef;
+  s.finish = clone(d.finish);
+  delete s.asIs;
+  if (s.pace && s.pace.keepPauses) delete s.pace.keepPauses;
+  if (!keepLook) {
+    s.pack = d.pack;
+    s.picks = {};
+    s.music = clone(d.music);
+    s.sound = clone(d.sound);
+    s.pace = clone(d.pace);
+    s.export = d.export;
+    delete s.brands;
+  }
+  return s;
+}
+export function footageResetNote(s) {
+  return s.keepLook === true
+    ? 'Started a fresh edit for this footage and kept your look. Cuts, b-roll and the draft are cleared. Files stay on disk, and the last reel stays in Outputs.'
+    : 'Started a fresh edit for this footage. Cuts, b-roll, the look and the draft are cleared. Files stay on disk, and the last reel stays in Outputs.';
+}
+// call before the new path is pushed when you already know hadEdit; or after, by passing { hadEdit }
+export function onFootageAdded(s, { hadEdit } = {}) {
+  const had = hadEdit === undefined ? hasEdit(s) : hadEdit;
+  if (had) { resetEdit(s, { keepLook: s.keepLook === true }); return true; }
+  clearBrollTimeline(s);
+  return false;
+}
+// add a talking-head file to the current job. If the board already had an edit, starts a fresh one.
+// Never deletes a file. Returns { added, reset, note }.
+export function addFootage(s, relp) {
+  const path = slash(relp);
+  if ((s.footage || []).includes(path)) return { added: false, reset: false, note: null };
+  const had = hasEdit(s);
+  s.footage = [...(s.footage || []), path];
+  s.clips = null;
+  const reset = onFootageAdded(s, { hadEdit: had });
+  return { added: true, reset, note: reset ? footageResetNote(s) : null };
+}
+export function onFootageListChanged(s, { added = false, hadEdit = false } = {}) {
+  if (added && hadEdit) return onFootageAdded(s, { hadEdit: true });
+  clearBrollTimeline(s);
+  return false;
 }
 // what a past job has on disk when Studio never saved its session (an older install, or a job made with npm run reel)
 export function videoFromDisk(job) {

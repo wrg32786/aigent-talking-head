@@ -110,7 +110,7 @@ function addFootageLink(raw) {
     setImport(id, x => { x.received = received; x.size = size; });
   } }).then(r => {
     const relp = `${dir}/${r.name}`.split(sep).join('/');
-    setImport(id, (x, st) => { Object.assign(x, { status: 'ready', file: relp, name: r.name, received: r.size, size: r.size }); if (!st.footage.includes(relp)) st.footage.push(relp); st.clips = null; });
+    setImport(id, (x, st) => { Object.assign(x, { status: 'ready', file: relp, name: r.name, received: r.size, size: r.size }); const radd = C.addFootage(st, relp); if (radd.reset) C.applyPatch(st, { reply: radd.note, from: 'studio', kind: 'action' }); });
   }).catch(e => setImport(id, x => { x.status = e.name === 'AbortError' ? 'cancelled' : 'failed'; x.error = e.name === 'AbortError' ? null : e.message; }))
     .finally(() => imports.delete(id));
   return id;
@@ -252,7 +252,7 @@ function draftSteps(s) {
       wordsArg = ['--words', wf];
     }
   }
-  return { steps: [[process.env.STUDIO_REEL || 'kit/reel.cjs', [...src, ...wordsArg, '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])], stepEnv]], lockString: comp.lockString, txPrompt: stepEnv.TX_PROMPT || null, key: 'take:' + footageKey(s), from: 'take' };
+  return { steps: [[process.env.STUDIO_REEL || 'kit/reel.cjs', [...src, ...wordsArg, '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])], stepEnv]], lockString: comp.lockString, txPrompt: stepEnv.TX_PROMPT || null, key: 'take:' + C.footageKey(s), from: 'take' };
 }
 function renderSteps(s) {
   if (!s.job || !existsSync(join(ROOT, 'jobs', s.job, 'build', 'cut.json'))) throw Object.assign(new Error('make a draft first'), { code: 400 });
@@ -285,11 +285,10 @@ function swapOf(s) {
 const clipsDirOf = s => s.clips ? resolve(ROOT, s.clips) : join(ROOT, 'jobs', s.job || '-', 'clips');
 const clipsJsonPath = s => join(clipsDirOf(s), 'clips.json');
 const cleanupFile = s => join('jobs', s.job, 'cleanup.json');
-const footageKey = s => JSON.stringify([s.footage, s.clips]);
 // the clean-up plan the next draft uses: only while it is on and the footage is the footage it was made from
 function cleanupFor(s) {
   const c = s.cleanup;
-  if (!s.job || !c || !c.on || c.footage !== footageKey(s) || !existsSync(clipsJsonPath(s)) || !existsSync(join(ROOT, cleanupFile(s)))) return null;
+  if (!s.job || !c || !c.on || c.footage !== C.footageKey(s) || !existsSync(clipsJsonPath(s)) || !existsSync(join(ROOT, cleanupFile(s)))) return null;
   return cleanupFile(s);
 }
 function cleanupView(s, silence) {
@@ -299,7 +298,7 @@ function cleanupView(s, silence) {
   for (const it of items) if (dec[it.id] !== undefined) it.remove = !!dec[it.id];
   const rel = relOf(join(clipsDirOf(s), 'x')).replace(/\/x$/, ''), served = rel.startsWith('jobs/') || rel.startsWith('inbox/studio/');
   const clips = Object.fromEntries((cj.clips || []).map(x => [x.id, { file: served ? `${rel}/${basename(x.file)}` : null, dur: +x.dur, status: x.status, text: x.text }]));
-  return { ready: true, silence: sil, items, clips, on: !!cleanupFor(s), stale: !!(c.on && c.footage !== footageKey(s)), plan: RV.plan(items, {}, cj) };
+  return { ready: true, silence: sil, items, clips, on: !!cleanupFor(s), stale: !!(c.on && c.footage !== C.footageKey(s)), plan: RV.plan(items, {}, cj) };
 }
 const readChoices = s => { try { return JSON.parse(readFileSync(choicesPath(s), 'utf8')); } catch { return null; } };
 function receiptOf(s, ch) {
@@ -540,7 +539,7 @@ function draftFrom(s, combo = comboOf(s)) {
   const f = (s.finish && s.finish.from) || 'auto', own = combo.pieces.some(x => x.kind !== 'testimonial');
   return f === 'take' || !own ? 'take' : 'pieces';
 }
-const draftKey = (s, combo = comboOf(s)) => draftFrom(s, combo) === 'pieces' ? 'pieces:' + combo.key : 'take:' + footageKey(s);
+const draftKey = (s, combo = comboOf(s)) => draftFrom(s, combo) === 'pieces' ? 'pieces:' + combo.key : 'take:' + C.footageKey(s);
 // the pieces as already cut files, with a clips.json beside them that carries each one's words (one transcript)
 function comboFiles(s, combo) {
   const W = {}, wordsFor = rel => (W[rel] = W[rel] || wordsOf(rel) || []), words = wordsFor(combo.source), cutsDir = join(ROOT, `inbox/studio/${s.job}/cuts`), cj = join(cutsDir, 'clips.json');
@@ -813,12 +812,14 @@ async function api(req, res, u) {
     mkdirSync(join(ROOT, dir), { recursive: true });
     const relp = join(dir, name).split(sep).join('/'), dest = join(ROOT, relp);
     await new Promise((ok, bad) => { const w = createWriteStream(dest); req.pipe(w); w.on('finish', ok); w.on('error', bad); req.on('error', bad); });
+    let radd = null;
     const s = update(st => {
-      if (kind === 'footage') { if (!st.footage.includes(relp)) st.footage.push(relp); st.clips = null; }
+      if (kind === 'footage') radd = C.addFootage(st, relp);
       if (kind === 'reference') { st.reference = { ...st.reference, file: relp, url: null, status: 'uploaded', extracted: null, out: null, applied: false }; }
       if (kind === 'music') { st.music.upload = relp; st.music.bed = 'upload'; }
     });
-    return json(res, 200, { ok: true, path: relp, ...view(s) });
+    if (radd && radd.reset) { C.applyPatch(s, { reply: radd.note, from: 'studio', kind: 'action' }); C.save(s); pushState(); }
+    return json(res, 200, { ok: true, path: relp, ...(radd && radd.reset ? { reset: true, note: radd.note } : {}), ...view(s) });
   }
   // Record now (kit/studio/record.mjs): start, numbered chunks while filming, finish converts to mp4
   if (p === '/api/record/start' && M === 'POST') { const b = await readBody(req); const id = update(st => REC.start(st, b)); return json(res, 200, { id, ...view(C.load()) }); }
@@ -964,7 +965,7 @@ async function api(req, res, u) {
     // the page shows the short ask (attach.kind fix); the agent reads the whole instruction
     return json(res, 200, await chatTurn(text, false, { kind: 'fix', fix: String(b.id), label: FX.describe(String(b.id)).label }));
   }
-  if (p === '/api/footage/remove' && M === 'POST') { const b = await readBody(req); const s = update(st => { st.footage = st.footage.filter(f => f !== b.path); }); return json(res, 200, view(s)); }
+  if (p === '/api/footage/remove' && M === 'POST') { const b = await readBody(req); const s = update(st => { const n = (st.footage || []).length; st.footage = st.footage.filter(f => f !== b.path); if (st.footage.length !== n) C.onFootageListChanged(st); }); return json(res, 200, view(s)); }
   if (p === '/api/reference' && M === 'POST') {
     const b = await readBody(req), s = C.load();
     if (b.url || b.urls) { const added = addLinks([].concat(b.urls || [], b.url || [])); return json(res, 202, { added, ...view(C.load()) }); }
@@ -1030,7 +1031,7 @@ async function api(req, res, u) {
     const s = C.load(); const d = draftSteps(s); // checks the footage first, so an empty job says that before a missing tool
     const miss = needFor('draft'); if (miss) return json(res, 400, miss);
     update(st => { st.lockedAtDraft = d.lockString || ''; st.drafted = null; });
-    runTask('draft', () => d.steps, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; }); BRL.autoPick(s.job); return { choices: !!readChoices(C.load()), note: DRAFT_DONE, from: d.from }; });
+    runTask('draft', () => d.steps, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; delete st.draftStale; }); BRL.autoPick(s.job); return { choices: !!readChoices(C.load()), note: DRAFT_DONE, from: d.from }; });
     return json(res, 202, { ...view(C.load()), from: d.from });
   }
   // ---------- pieces and the Combo (kit/studio/pieces.mjs) ----------
@@ -1094,7 +1095,7 @@ async function api(req, res, u) {
     if (task && task.status === 'running') return json(res, 409, { error: 'wait for the running task to finish' });
     let r; try { r = SNAP.reopen(join(ROOT, 'jobs', s.job), String(b.reel || '').split('/').pop()); } catch (e) { return json(res, 400, { error: e.message }); }
     // the reopened build is what Render uses now, whatever the pieces say: it counts as drafted
-    update(st => { st.drafted = { key: draftKey(st), from: 'reopen', reel: r.reel, at: Date.now() }; if (S.load().actionNotes !== false) C.applyPatch(st, { reply: `${r.reel} is back in the editor. Change the picks, then Render makes the next version.${r.backup ? ' The draft it replaced is saved as ' + r.backup + '.' : ''}`, from: 'Studio', kind: 'action' }); });
+    update(st => { st.drafted = { key: draftKey(st), from: 'reopen', reel: r.reel, at: Date.now() }; delete st.draftStale; if (S.load().actionNotes !== false) C.applyPatch(st, { reply: `${r.reel} is back in the editor. Change the picks, then Render makes the next version.${r.backup ? ' The draft it replaced is saved as ' + r.backup + '.' : ''}`, from: 'Studio', kind: 'action' }); });
     return json(res, 200, { reopened: r, ...view(C.load()) });
   }
   if (p === '/api/task/cancel' && M === 'POST') { if (task && task.status === 'running') { task.cancel = true; task.proc && task.proc.kill('SIGTERM'); } return json(res, 200, view(C.load())); }
@@ -1135,9 +1136,9 @@ async function api(req, res, u) {
     writeFileSync(join(ROOT, cleanupFile(s0)), JSON.stringify(pl, null, 1) + '\n');
     const removed = items.filter(it => dec[it.id] !== undefined ? dec[it.id] : it.remove);
     const note = `Clean-up: ${removed.filter(x => x.type === 'silence').length} pauses, ${removed.filter(x => x.type === 'filler').length} filler words and ${items.filter(x => x.type === 'take').length - pl.keep.length} retakes left out, ${pl.saved} s shorter. ${b.redraft === false ? 'Used on the next draft.' : 'Redrafting.'}`;
-    update(st => { st.cleanup = { on: true, silence: sil || (st.cleanup && st.cleanup.silence) || 0.7, decisions: dec, footage: footageKey(st), at: new Date().toISOString(), saved: pl.saved };
+    update(st => { st.cleanup = { on: true, silence: sil || (st.cleanup && st.cleanup.silence) || 0.7, decisions: dec, footage: C.footageKey(st), at: new Date().toISOString(), saved: pl.saved };
       if (S.load().actionNotes !== false) C.applyPatch(st, { reply: note, from: 'Studio', kind: 'action' }); });
-    if (b.redraft !== false) { const s = C.load(), d = draftSteps(s); update(st => { st.lockedAtDraft = d.lockString || ''; st.drafted = null; }); runTask('draft', () => d.steps, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; }); return { choices: !!readChoices(C.load()), cleanup: pl, note: DRAFT_DONE }; }); }
+    if (b.redraft !== false) { const s = C.load(), d = draftSteps(s); update(st => { st.lockedAtDraft = d.lockString || ''; st.drafted = null; }); runTask('draft', () => d.steps, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; delete st.draftStale; }); return { choices: !!readChoices(C.load()), cleanup: pl, note: DRAFT_DONE }; }); }
     return json(res, 202, { ...cleanupView(C.load()), plan: pl, ...view(C.load()) });
   }
   // comment on the preview: a click or a box on a frame, sent to whoever answers the chat, with the frame saved in the job

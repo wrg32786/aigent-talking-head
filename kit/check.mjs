@@ -252,6 +252,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-videos.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { nverrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio video tests (tests/studio-videos.test.mjs: New video keeps or resets the look, nothing deleted, per-job sessions, open a past video, refused while busy, MCP list_videos, new_video, open_video)', errs: nverrs, warns: [] });
+    const rterrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-reset.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { rterrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio reset tests (tests/studio-reset.test.mjs: uploading new footage starts a fresh edit, leftover B-roll leaves the timeline, files stay, Clear all B-roll with undo, MCP clear_broll and fill_slot clear+all, Keep my look)', errs: rterrs, warns: [] });
     const fierrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-finish.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { fierrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
