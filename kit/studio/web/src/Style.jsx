@@ -36,7 +36,7 @@ export function Music({ CAT, V, s, apply, patch, tab, setTab }) {
   const brought = refBrought(s);
   return <>
     <section className="step" id="s-sound" data-step="music" aria-labelledby="h-sound">
-      <header className="sh"><h2 id="h-sound">Music and sounds</h2><p className="sub">The music under your voice, the sounds on the cuts, and how tight the pauses are.</p></header>
+      <header className="sh"><h2 id="h-sound">Music and sounds</h2><p className="sub">The music under your voice and the sounds on the cuts.</p></header>
       {brought && <p className="ref-brought glass-card" id="music-ref"><Icon n="spark" /><span><b>From your reference:</b> {brought}.</span></p>}
       <ChangeNote s={s} patch={patch} />
       <Sound CAT={CAT} s={s} apply={apply} patch={patch} ctx={ctx} />
@@ -253,13 +253,15 @@ function Seg({ id, label, value, onChange, options, off }) {
   return <div id={id}><SegmentedControl label={label} value={value} onChange={onChange} size="sm" isDisabled={!!off} disabledMessage={off || undefined}>{options.map(([v, l]) => <SegmentedControlItem key={v} value={v} label={l} />)}</SegmentedControl></div>;
 }
 
-// The sound controls, three calm groups: Music (the bed, its energy, beat sync), Sounds (on or off, fewer) and Pace
+// The sound controls, two calm groups: Music (the bed, its energy, beat sync) and Sounds (on or off, fewer), and one
+// line that says the Pacing and points to the Cut step, where it is set
 function Sound({ CAT, s, apply, patch, ctx }) {
   const en = controlOf('energy', ctx), cp = controlOf('cap', ctx);
   const audio = useRef(null), musicIn = useRef(null), [playing, setPlaying] = useState(false);
   const b = CAT.beds.find(x => x.id === s.music.bed), src = b ? file(b.file) : s.music.bed === 'upload' && s.music.upload ? file(s.music.upload) : '';
   useEffect(() => { const a = audio.current; if (!a) return; a.pause(); if (src) a.src = src; else a.removeAttribute('src'); }, [src]);
-  const tight = s.pace.tighten == null ? 'pack' : String(s.pace.tighten);
+  // Pacing is one control, on the Cut step (kit/studio/pacing.mjs). Here we only say what it is set to
+  const tg = s.pace.tighten, paceName = tg == null ? 'set by your Look' : tg === 'off' ? 'Natural' : +tg <= 0.3 ? 'Very tight' : 'Tight';
   const noBed = s.music.bed === 'none', sync = !((s.picks.beatSync || { allow: [] }).allow || []).includes('no-beat-sync');
   return <div id="s-music" className="sound-cards">
     <div className="block glass-card sound-card" role="group" aria-labelledby="h-music">
@@ -285,11 +287,7 @@ function Sound({ CAT, s, apply, patch, ctx }) {
       <Seg id="sfx" label="Sound effects" value={s.sound.sfx} onChange={v => patch({ sound: { sfx: v } })} options={[['on', 'On'], ['off', 'Off']]} />
       <Switch id="cap" size="sm" label="Fewer sounds, only the strong moments" value={s.sound.cap !== 'off'} onChange={on => patch({ sound: { cap: on ? 'on' : 'off' } })} isDisabled={!!cp} disabledMessage={cp ? cp.reason : undefined} />
     </div>
-    <div className="block glass-card sound-card" role="group" aria-labelledby="h-pace">
-      <h3 className="lbl" id="h-pace">Pace</h3>
-      <Seg id="tighten" label="Pace" value={tight} onChange={v => patch({ pace: { tighten: v === 'pack' ? null : v === 'off' ? 'off' : +v } })} options={[['pack', 'From the Look'], ['off', 'Keep pauses'], ['0.5', 'Tight'], ['0.3', 'Tighter'], ['0.2', 'Tightest']]} />
-      <p className="fine">How much of a pause inside a line we cut. Your words are never cut.</p>
-    </div>
+    <p className="fine sound-pace" id="tighten">Pacing: <b>{paceName}</b>. How much quiet comes out between your words is one choice, on the Cut step. <a className="linkish" href="#step=cut" onClick={() => localStorage.setItem('studio.cutLayer', 'clips')}>Change it on Cut</a></p>
   </div>;
 }
 

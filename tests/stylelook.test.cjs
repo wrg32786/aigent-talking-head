@@ -216,7 +216,7 @@ t('match.json: each part scored, null where nothing could be measured, honest ab
   const m = FID.measure({ mode: 'look', plan, cut, caps, grade, target: FID.targetOfLook(look, { len: 15, skipped: 1, planned: 4 }) });
   assert.deepStrictEqual([m.version, m.mode, m.against, m.estimate], [1, 'look', 'list-reel', true]);
   assert.deepStrictEqual(Object.keys(m.parts), ['framing', 'grade', 'captions', 'stickers', 'sfx', 'pace']);
-  assert.strictEqual(m.parts.framing.shots.length, 2); assert.ok(m.parts.framing.score > 50 && m.parts.framing.score < 80, 'framing ' + m.parts.framing.score); assert.ok(/1 held at the zoom limit/.test(m.parts.framing.note));
+  assert.strictEqual(m.parts.framing.shots.length, 2); assert.ok(m.parts.framing.score > 50 && m.parts.framing.score < 80, 'framing ' + m.parts.framing.score); assert.ok(/1 held back so the head stays in frame/.test(m.parts.framing.note));
   assert.deepStrictEqual([m.parts.grade.before, m.parts.grade.after, m.parts.grade.score], [15, 5, 80]);
   assert.deepStrictEqual(m.parts.captions.fields.case, { ours: 'upper', target: 'lower', equal: false }); assert.strictEqual(m.parts.captions.score, 50); // 3 of the 6 fields the look sets (outline and shadow "none" count)
   assert.deepStrictEqual(m.parts.stickers.count, { ours: 1, target: 1 }); assert.strictEqual(m.parts.stickers.score, 100);

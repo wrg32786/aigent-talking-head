@@ -489,12 +489,12 @@ async function editLines(b) {
     x.lines = x.lines || {}; const ls = x.lines[rel] = linesState(x, rel);
     if (b.keep && typeof b.keep === 'object') for (const [k, v] of Object.entries(b.keep)) { const id = idOf(k); if (!ids.has(id)) throw bad(`no line ${k}`); ls.keep[id] = !!v; }
     const name = (v, d) => String(v || d).replace(/\u2014/g, ', ').slice(0, 60);
-    if (b.action === 'add') { ls.seq++; ls.bites.push({ id: 'b' + ls.seq, name: name(b.name, `Bite ${ls.seq}`), lines: lineList(b.lines), by: by || 'you', kind: 'clip' }); }
+    if (b.action === 'add') { ls.seq++; ls.bites.push({ id: 'b' + ls.seq, name: name(b.name, `Clip ${ls.seq}`), lines: lineList(b.lines), by: by || 'you', kind: 'clip' }); }
     else if (b.action === 'clean') { const take = CUT.cleanTake(L, ls.keep); if (!take.length) throw bad('keep at least one line');
       const it = { id: 'take', name: 'Clean take', lines: take, by: by || 'you', kind: 'full' }, k = ls.bites.findIndex(y => y.id === 'take'); if (k >= 0) ls.bites[k] = it; else ls.bites.unshift(it); }
     else if (b.action === 'set') { if (!Array.isArray(b.bites)) throw bad('bites: [{ name, lines: [line numbers in order] }]');
       const keepTake = ls.bites.filter(y => y.id === 'take' && b.replace === false);
-      const fresh = b.bites.slice(0, 30).map(y => { ls.seq++; return { id: 'b' + ls.seq, name: name(y.name, `Bite ${ls.seq}`), lines: lineList(y.lines), by: by || 'your agent', kind: 'clip', reason: y.reason ? String(y.reason).replace(/\u2014/g, ', ').slice(0, 160) : null }; });
+      const fresh = b.bites.slice(0, 30).map(y => { ls.seq++; return { id: 'b' + ls.seq, name: name(y.name, `Clip ${ls.seq}`), lines: lineList(y.lines), by: by || 'your agent', kind: 'clip', reason: y.reason ? String(y.reason).replace(/\u2014/g, ', ').slice(0, 160) : null }; });
       ls.bites = b.replace === false ? ls.bites.concat(fresh) : keepTake.concat(fresh); ls.by = by;
       if (b.clean) { const take = CUT.cleanTake(L, ls.keep); if (take.length) { ls.bites = ls.bites.filter(y => y.id !== 'take'); ls.bites.unshift({ id: 'take', name: 'Clean take', lines: take, by: by || 'your agent', kind: 'full' }); } }
       note = `${by || 'Your agent'} made ${fresh.length} clip${fresh.length === 1 ? '' : 's'} from your lines on the Cut step${b.clean ? ', plus the clean take' : ''}.`; }

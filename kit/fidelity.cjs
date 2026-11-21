@@ -23,7 +23,7 @@ function framingPart(shots) {
   if (!rows.length) return { score: null, note: 'not measured (no face found on one side)', shots: [] };
   const each = rows.map(r => (1 - Math.min(1, Math.abs(r.faceH.diff) / r.faceH.target)) * (1 - Math.min(1, Math.abs(r.eyeY.diff) / 0.25)));
   const mean = k => r3(rows.reduce((a, r) => a + Math.abs(r[k].diff), 0) / rows.length), held = rows.filter(r => r.clamped).length;
-  return { score: Math.round(each.reduce((a, x) => a + x, 0) / each.length * 100), note: `${rows.length} shots; face height off by ${r1(mean('faceH') * 100)}% of the frame, eye line by ${r1(mean('eyeY') * 100)}%${held ? `; ${held} held at the zoom limit` : ''}`,
+  return { score: Math.round(each.reduce((a, x) => a + x, 0) / each.length * 100), note: `${rows.length} shots; face height off by ${r1(mean('faceH') * 100)}% of the frame, eye line by ${r1(mean('eyeY') * 100)}%${held ? `; ${held} held back so the head stays in frame` : ''}`,
     faceHDiff: mean('faceH'), eyeYDiff: mean('eyeY'), shots: rows };
 }
 

@@ -129,11 +129,11 @@ Every option lives in exactly one of 9 layers (`layers` in `kit/studio/categorie
 
 **Text and graphics.** Captions and titles, the type they use, and the graphics that sit over you. Scenes made from a reference show here in Graphics, or in Color and finish on Picture.
 
-**Music and sounds.** The music under your voice, the sounds on the cuts, and how tight the pauses are:
+**Music and sounds.** The music under your voice and the sounds on the cuts:
 
 - **Music.** The bed (**Picked for you**, **No music**, your upload or a named bed, with a play button and **Your own** to upload one), **Energy** (Auto, Low, Mid, High) and the switch **Land the cuts and sounds on the beat**, which is off when there is no music to follow.
 - **Sounds.** Sound effects **On** or **Off**, and the switch **Fewer sounds, only the strong moments**.
-- **Pace.** **From the Look**, **Keep pauses**, **Tight**, **Tighter** or **Tightest**: how much of a pause inside a line we cut. Your words are never cut.
+- **Pacing** is one line here that says what it is set to (Natural, Tight, Very tight, or set by your Look) with **Change it on Cut**. The control itself is on the Clips layer of the [Cut](#cut) step, so there is one place to set how much quiet comes out.
 - **Every music bed and sound** is a fold with every bed and sound as tiles. A link with `#menu=music` or `#menu=audio` opens it.
 - With a reference in use, one line at the top says what it brought, in plain words: "From your reference: no music, 4 sounds, fast tempo."
 
