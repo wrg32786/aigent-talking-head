@@ -629,21 +629,41 @@ function cardCursor(c,t,toS,col){const P=lst(c[4].cursor).filter(Boolean).map(k=
  P.forEach((p,i)=>{const d=Math.min(.7,i?Math.max(.25,at[i]-at[i-1]-.12):.7),e=EMPH(cl((t-(at[i]-d))/d));pos=[pos[0]+(p[0]-pos[0])*e,pos[1]+(p[1]-pos[1])*e];const tc=t-at[i];if(tc>=0&&tc<.2)press=Math.max(press,Math.sin(tc/.2*Math.PI))});
  P.forEach((p,i)=>{const [rx,ry]=toS(p[0],p[1]);ripple(rx,ry,t-at[i],col,56)});
  const [x,y]=toS(pos[0],pos[1]),a=cl((dt-.35)/.25)*(1-ex);if(a<=0)return;ctx.save();ctx.globalAlpha*=a;pointer(x,y,1.25,press);ctx.restore()}
-function screenCard(c,t){const o=c[4],dt=t-c[0],ex=gOut(c,t,.35),a=gxa(c),W=(o.w??.66)*1080,pad=14,bar=50;let im=null;
+// A B-roll slot (kit/broll-slots.cjs flipOf, "slot": n) is a screen card with no window bar. It arrives and leaves the
+// way the reference's did ("enter", "exit": pop, fade, slide-up, slide-down, slide-left, slide-right, flash, glitch, cut),
+// with "shake", a "glitch" on the way in and a "tone" (bw, muted, vivid, warm, cool) over your clip. With no clip yet it
+// is a calm card that says what goes there ("need").
+const SLOT_TONE={bw:'grayscale(1)',muted:'saturate(.55)',vivid:'saturate(1.45) contrast(1.06)',warm:'sepia(.28) saturate(1.1)',cool:'hue-rotate(-14deg) saturate(.9)'};
+function slotNeed(X,Y,w,h,o){ctx.fillStyle='#12151b';ctx.fillRect(X,Y,w,h);const g=ctx.createLinearGradient(X,Y,X+w,Y+h);g.addColorStop(0,'rgba(255,255,255,.07)');g.addColorStop(1,'rgba(255,255,255,.015)');ctx.fillStyle=g;ctx.fillRect(X,Y,w,h);
+ const fs=Math.max(28,Math.min(46,h*.16));ctx.textAlign='center';ctx.textBaseline='middle';ctx.letterSpacing='0px';ctx.font=FG(fs*.62);ctx.fillStyle='rgba(255,255,255,.42)';ctx.fillText('B-ROLL '+o.slot,X+w/2,Y+h/2-fs*.8);
+ ctx.font=FG(fs);ctx.fillStyle='rgba(255,255,255,.82)';let tx=String(o.need||'');while(tx.length>4&&ctx.measureText(tx).width>w*.84)tx=tx.slice(0,-2);if(tx!==String(o.need||''))tx=tx.trim()+'...';ctx.fillText(tx,X+w/2,Y+h/2+fs*.35)}
+function slotMove(o,dt,ex,t){const E=o.enter||'pop',X=o.exit||'fade',e=EMPH(cl(dt/.38)),eo=ACC(ex),m={a:1,dx:0,dy:0,s:1};
+ if(E==='cut'){}else if(E==='fade'||E==='flash')m.a*=cl(dt/.3);else if(E==='slide-up')m.dy+=(1-e)*420,m.a*=cl(dt/.1);else if(E==='slide-down')m.dy-=(1-e)*420,m.a*=cl(dt/.1);else if(E==='slide-left')m.dx+=(1-e)*700,m.a*=cl(dt/.1);else if(E==='slide-right')m.dx-=(1-e)*700,m.a*=cl(dt/.1);
+ else m.s*=.55+.45*Math.min(1.06,spring(dt,2.2,.55)),m.a*=cl(dt/.1);
+ if(X==='cut'){if(ex>0)m.a=ex>=1?0:m.a}else if(X==='slide-up')m.dy-=eo*420,m.a*=1-cl((ex-.6)/.4);else if(X==='slide-down')m.dy+=eo*420,m.a*=1-cl((ex-.6)/.4);else if(X==='slide-left')m.dx-=eo*700,m.a*=1-cl((ex-.6)/.4);else if(X==='slide-right')m.dx+=eo*700,m.a*=1-cl((ex-.6)/.4);
+ else if(X==='pop')m.s*=1-.4*eo,m.a*=1-eo;else m.a*=1-eo;
+ if(o.shake){const q=Math.floor(t*24);m.dx+=Math.sin(q*12.9898)*5;m.dy+=Math.cos(q*78.233)*5}
+ if((o.glitch||E==='glitch')&&dt<.28){const q=Math.floor(t*24);m.dx+=(Math.sin(q*91.7)>0?1:-1)*26*(1-dt/.28);m.a*=Math.sin(q*37.1)>.6?.35:1}
+ return m}
+function screenCard(c,t){const o=c[4],SL=o.slot!=null,dt=t-c[0],ex=gOut(c,t,.35),a=gxa(c),W=(o.w??.66)*1080,pad=SL?8:14,bar=SL?0:50;let im=null;
  if(a.frames&&a.frames.length)im=GIMG[a.frames[Math.min(a.frames.length-1,Math.max(0,Math.floor(dt*(a.fps||12))))]];else if(a.src)im=GIMG[a.src];
- const ok=im&&im.naturalWidth,ar=ok?im.naturalHeight/im.naturalWidth:.6,H=Math.min((W-pad*2)*ar+pad*2+bar,(o.maxH??.42)*1920),cy=(o.y??.68)*1920,e=EMPH(cl(dt/.55)),s=.93+.07*Math.min(1.04,spring(dt,1.8,.6)),eo=ACC(ex),bd=o.border||CY,R=RAD(30);
- ctx.save();ctx.globalAlpha*=cl(dt/.12)*(1-eo);ctx.translate(540,cy+(1-e)*150+eo*110);ctx.rotate((1-e)*.05);ctx.scale(s*(1-.05*eo),s*(1-.05*eo));
+ const ok=im&&im.naturalWidth,ar=ok&&!SL?im.naturalHeight/im.naturalWidth:.6,H=Math.min((W-pad*2)*ar+pad*2+bar,(o.maxH??.42)*1920),cy=(o.y??.68)*1920,e=EMPH(cl(dt/.55)),s=.93+.07*Math.min(1.04,spring(dt,1.8,.6)),eo=ACC(ex),bd=o.border||CY,R=RAD(30);
+ ctx.save();
+ if(SL){const m=slotMove(o,dt,ex,t);ctx.globalAlpha*=Math.max(0,m.a);ctx.translate(540+m.dx,cy+m.dy);ctx.scale(m.s,m.s)}
+ else{ctx.globalAlpha*=cl(dt/.12)*(1-eo);ctx.translate(540,cy+(1-e)*150+eo*110);ctx.rotate((1-e)*.05);ctx.scale(s*(1-.05*eo),s*(1-.05*eo))}
  panel(-W/2,-H/2,W,H,R,{fill:o.bg||'#0e1116',alpha:1,elev:1.5});
- const X=-W/2+pad,Y=-H/2+bar,iw=W-pad*2,ih=H-bar-pad;
- ['#ff5f57','#febc2e','#28c840'].forEach((k,i)=>{ctx.beginPath();ctx.arc(-W/2+30+i*24,-H/2+bar/2,7,0,7);ctx.fillStyle=k;ctx.fill();ctx.lineWidth=1;ctx.strokeStyle='rgba(0,0,0,.25)';ctx.stroke()});
- const aw=Math.min(W*.46,420);rr(ctx,-aw/2,-H/2+bar/2-14,aw,28,RAD(14));ctx.fillStyle='rgba(255,255,255,.06)';ctx.fill();icon('lock',-aw/2+20,-H/2+bar/2,15,'rgba(255,255,255,.45)',{width:2.2});rr(ctx,-aw/2+38,-H/2+bar/2-4,aw*.5,8,RAD(4));ctx.fillStyle='rgba(255,255,255,.18)';ctx.fill();
- ctx.save();rr(ctx,X,Y,iw,ih,RAD(18));ctx.clip();const cam=camAt(c,t),toS=(u,v)=>[X+iw/2+(u-cam.x)*iw*cam.z,Y+ih/2+(v-cam.y)*ih*cam.z];
+ const X=-W/2+pad,Y=-H/2+bar+(SL?pad:0),iw=W-pad*2,ih=H-bar-pad-(SL?pad:0);
+ if(!SL){['#ff5f57','#febc2e','#28c840'].forEach((k,i)=>{ctx.beginPath();ctx.arc(-W/2+30+i*24,-H/2+bar/2,7,0,7);ctx.fillStyle=k;ctx.fill();ctx.lineWidth=1;ctx.strokeStyle='rgba(0,0,0,.25)';ctx.stroke()});
+ const aw=Math.min(W*.46,420);rr(ctx,-aw/2,-H/2+bar/2-14,aw,28,RAD(14));ctx.fillStyle='rgba(255,255,255,.06)';ctx.fill();icon('lock',-aw/2+20,-H/2+bar/2,15,'rgba(255,255,255,.45)',{width:2.2});rr(ctx,-aw/2+38,-H/2+bar/2-4,aw*.5,8,RAD(4));ctx.fillStyle='rgba(255,255,255,.18)';ctx.fill()}
+ ctx.save();rr(ctx,X,Y,iw,ih,RAD(SL?22:18));ctx.clip();const cam=camAt(c,t),toS=(u,v)=>[X+iw/2+(u-cam.x)*iw*cam.z,Y+ih/2+(v-cam.y)*ih*cam.z];
  ctx.save();ctx.translate(X+iw/2,Y+ih/2);ctx.scale(cam.z,cam.z);ctx.translate(-X-cam.x*iw,-Y-cam.y*ih);
- if(ok){const k=Math.max(iw/im.naturalWidth,ih/im.naturalHeight);ctx.drawImage(im,X+iw/2-im.naturalWidth*k/2,Y+ih/2-im.naturalHeight*k/2,im.naturalWidth*k,im.naturalHeight*k)}
+ if(ok){const k=Math.max(iw/im.naturalWidth,ih/im.naturalHeight);if(SL&&SLOT_TONE[o.tone])ctx.filter=SLOT_TONE[o.tone];ctx.drawImage(im,X+iw/2-im.naturalWidth*k/2,Y+ih/2-im.naturalHeight*k/2,im.naturalWidth*k,im.naturalHeight*k);ctx.filter='none'}
+ else if(SL)slotNeed(X,Y,iw,ih,o);
  else placeholderUI(X,Y,iw,ih,dt,Math.round(c[0]*10));
  ctx.restore();cardCursor(c,t,toS,bd);
+ if(SL&&(o.enter==='flash')&&dt<.22){ctx.fillStyle='rgba(255,255,255,'+(.85*(1-dt/.22))+')';ctx.fillRect(X,Y,iw,ih)}
  ctx.restore();
- ctx.save();rr(ctx,-W/2+1.5,-H/2+1.5,W-3,H-3,Math.max(0,R-1.5));ctx.shadowColor=rgba(bd,.55);ctx.shadowBlur=28;ctx.lineWidth=3;ctx.strokeStyle=bd;ctx.stroke();ctx.restore();ctx.restore()}
+ ctx.save();rr(ctx,-W/2+1.5,-H/2+1.5,W-3,H-3,Math.max(0,R-1.5));ctx.shadowColor=rgba(bd,.55);ctx.shadowBlur=28;ctx.lineWidth=SL?5:3;ctx.strokeStyle=bd;ctx.stroke();ctx.restore();ctx.restore()}
 // Graphics 12 to 23 (kit/graphics.json): lower third, stat callout, checklist, quote card, highlight, step counter,
 // versus, icon badge, sticker pop, price tag, CTA card, code card. Original designs drawn in code, with Tabler icons (MIT),
 // the theme's accent, text, ink, muted and card colours and the pairing's display and caption faces. Shared look: the

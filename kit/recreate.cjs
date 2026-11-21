@@ -161,7 +161,7 @@ function writeAccent(build, accent) {
 
 // build/plan.json: what a recipe draft took from the recipe, on your edit's clock. shots is the re-cut plan (the same
 // list as cut.json refShots; empty without --recut), scale is 1 when nothing was scaled.
-function planOf({ recipe, scale = null, rc = null, cut, shakes = [], sounds = [], flips = [], theme = null, accent = null, mode = null, look = null }) {
+function planOf({ recipe, scale = null, rc = null, cut, shakes = [], sounds = [], flips = [], theme = null, accent = null, mode = null, look = null, broll = [] }) {
   const segs = (cut && cut.segs) || [], moveName = v => Object.keys(SPL.MOVES).find(m => SPL.MOVES[m] === v) || null;
   const at = segs.map((s, i) => r3(startOf(segs, i)));
   return {
@@ -175,6 +175,8 @@ function planOf({ recipe, scale = null, rc = null, cut, shakes = [], sounds = []
     shakes: shakes.map(h => ({ t: h[0], strength: h[1] })),
     sounds: sounds.map(h => ({ id: h.id, t: h.t })),
     scenes: flips.filter(f => f.mode === 39).map(f => ({ start: f.start, end: f.end, scene: f.scene, ...(f.sceneName ? { name: f.sceneName } : {}) })),
+    // where B-roll goes, what each slot should show and how it is treated; a slot with no clip is "needs" (kit/broll-slots.cjs)
+    broll,
     theme, accent,
   };
 }
