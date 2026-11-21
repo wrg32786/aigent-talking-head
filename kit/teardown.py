@@ -317,8 +317,77 @@ def _hex(bgr):
     return "#%02x%02x%02x" % (int(bgr[2]), int(bgr[1]), int(bgr[0]))
 
 
+YUNET = os.path.join(ROOT, "effects", "vendor", "claude-video-effects", "models", "yunet.onnx")
+_YN = {}
+
+
+def _face_box(img):
+    """The biggest face YuNet finds (x, y, w, h in pixels), or None. OpenCV only, no person mask needed."""
+    import cv2
+    h, w = img.shape[:2]
+    try:
+        if (w, h) not in _YN:
+            _YN[(w, h)] = cv2.FaceDetectorYN.create(YUNET, "", (w, h), 0.6, 0.3, 20) if os.path.exists(YUNET) else None
+        det = _YN[(w, h)]
+        faces = det.detect(img)[1] if det is not None else None
+    except Exception:
+        return None
+    if faces is None or not len(faces):
+        return None
+    f = max(faces, key=lambda r: r[2] * r[3])
+    return [int(v) for v in f[:4]]
+
+
+def _spikes(y, pts):
+    """Shape and spike count of a yellow region that the person may cover in part. The outline's radius is read
+    around the centre of the circle that encloses it: a starburst has clear peaks (its points), a seal is round.
+    The count comes from the usual gap between neighbouring points, so a covered arc does not lower it."""
+    import cv2, numpy as np
+    (cx, cy), R = cv2.minEnclosingCircle(pts)
+    if R < 8:
+        return "seal", None
+    ys, xs = np.nonzero(y)
+    dx, dy = xs - cx, ys - cy
+    rad = np.hypot(dx, dy)
+    ok = rad <= R * 1.03  # other yellow things in the frame (a caption box, a shirt) are left out
+    dx, dy, rad = dx[ok], dy[ok], rad[ok]
+    N = 180  # 2 degree bins
+    ang = (np.floor(np.degrees(np.arctan2(dy, dx)) / (360 / N)).astype(int)) % N
+    prof = np.zeros(N)
+    np.maximum.at(prof, ang, rad)
+    seen = prof > 0.3 * R
+    if seen.sum() < N // 6:
+        return "seal", None
+    sm = np.where(seen, (np.roll(prof, 1) + prof + np.roll(prof, -1)) / 3, 0)
+    peaks = []
+    for i in np.nonzero(seen)[0]:
+        if sm[i] < 0.6 * R:
+            continue
+        near = [sm[(i + k) % N] for k in range(-3, 4)]
+        if sm[i] < max(near) or (sm[i] == sm[(i - 1) % N] and seen[(i - 1) % N]):
+            continue
+        # a point dips on each side within 30 degrees, or runs into the part the person covers
+        sides = []
+        for sgn in (-1, 1):
+            got = False
+            for k in range(1, 16):
+                j = (i + sgn * k) % N
+                if not seen[j] or sm[i] - sm[j] > 0.1 * R:
+                    got = True
+                    break
+            sides.append(got)
+        if all(sides):
+            peaks.append(i)
+    if len(peaks) < 3:
+        return "seal", None
+    gaps = sorted(((b - a) % N) * (360 / N) for a, b in zip(peaks, peaks[1:] + peaks[:1]))[:len(peaks) - 1]
+    med = float(np.median(gaps))
+    gap = float(np.mean([g for g in gaps if 0.6 * med <= g <= 1.5 * med] or [med]))
+    return "starburst", int(min(24, max(6, round(360 / max(gap, 1)))))
+
+
 def _bursts(img, hsv, mask):
-    """Spiky warm-yellow shapes (a starburst), split or whole. Returns bbox, colour, layer hint."""
+    """Spiky warm-yellow shapes (a starburst), split or whole. Returns bbox, colour, shape, spike count, layer hint."""
     import cv2, numpy as np
     h, w = hsv.shape[:2]
     y = ((hsv[..., 0] >= 15) & (hsv[..., 0] <= 38) & (hsv[..., 1] >= 60) & (hsv[..., 2] >= 185)).astype(np.uint8)
@@ -334,6 +403,11 @@ def _bursts(img, hsv, mask):
             keep.append(c); area += a
     if area < 0.012 * h * w:
         return None
+    # pieces of one burst sit side by side around the head: a yellow patch far above or below the biggest piece is not part of it
+    _, by, _, bh0 = cv2.boundingRect(max(keep, key=cv2.contourArea))
+    near = [c for c in keep if cv2.boundingRect(c)[1] < by + bh0 * 1.5 and cv2.boundingRect(c)[1] + cv2.boundingRect(c)[3] > by - bh0 * 0.5]
+    if sum(cv2.contourArea(c) for c in near) >= 0.012 * h * w:
+        keep = near
     pts = np.concatenate(keep)
     x, yy, bw, bh = cv2.boundingRect(pts)
     hull = np.zeros((h, w), np.uint8); cv2.fillPoly(hull, [cv2.convexHull(pts)], 1); hull = hull.astype(bool)
@@ -345,7 +419,17 @@ def _bursts(img, hsv, mask):
         on_p = float(yb[hull & mask].mean()) if (hull & mask).any() else 0.0
         on_bg = float(yb[hull & ~mask].mean()) if (hull & ~mask).any() else 0.0
         layer = "behind" if over > 0.12 and on_bg > 0.2 and on_p < 0.25 * on_bg else "front"
-    return {"bbox": [round(x / w, 3), round(yy / h, 3), round(bw / w, 3), round(bh / h, 3)], "color": col, "layer": layer}
+    else:
+        # no person mask: a face found inside the burst's outline that is not yellow means the burst is behind the head
+        fb = _face_box(img)
+        if fb:
+            fx, fy, fw, fh = fb
+            mx, my = min(w - 1, max(0, fx + fw // 2)), min(h - 1, max(0, fy + fh // 2))
+            face = y[max(0, fy):fy + fh, max(0, fx):fx + fw]
+            if hull[my, mx] and face.size and float(face.mean()) < 0.15:
+                layer = "behind"
+    shape, spikes = _spikes(y, pts)
+    return {"bbox": [round(x / w, 3), round(yy / h, 3), round(bw / w, 3), round(bh / h, 3)], "color": col, "layer": layer, "shape": shape, "spikes": spikes}
 
 
 def _rects(g):
@@ -603,7 +687,14 @@ def detect_graphics(video, cues, seg=None, step=0.25):
         face_w = round(float(np.median(fw)), 3) if fw else None
         hc = [d["head_cy"] for d in e["d"] if d.get("head_cy")]
         head_cy = round(float(np.median(hc)), 3) if hc else None
+        # shape and spikes from the fully grown samples: the majority shape, the median spike count
+        grown = [d for d in e["d"] if d["bbox"][2] >= 0.85 * full_w] or e["d"]
+        shapes = [d.get("shape") for d in grown if d.get("shape")]
+        shape = max(set(shapes), key=shapes.count) if shapes else "seal"
+        sp = [d["spikes"] for d in grown if d.get("shape") == "starburst" and d.get("spikes")]
+        spikes = int(round(float(np.median(sp)))) if shape == "starburst" and sp else None
         out.append({"type": "ordinal-sticker", "start": a, "end": round(z, 2), "text": words[0][0] if words else None, "cue": words[0][1]["text"] if words else None,
+                    "shape": shape, "spikes": spikes,
                     "bbox": bb, "width": full_w, "face_w": face_w, "head_cy": head_cy, "head_ratio": round(full_w / face_w, 2) if face_w else None,
                     "color": e["d"][len(e["d"]) // 2]["color"], "layer": max(set(layers), key=layers.count) if layers else None, "samples": len(e["d"])})
     # screen cards: a dark rectangle for 1 s or more with small UI text read inside it
@@ -665,6 +756,29 @@ def detect_graphics(video, cues, seg=None, step=0.25):
     return out
 
 
+def shot_looks(video, shots, rows, graphics):
+    """Per shot, for a remake to match: where the face sits (kit/framing.py: height, eye line, centre) when the
+    speaker is on screen, and the shot's colour in Lab (kit/grade_match.py), its own graphics left out."""
+    spans = [(float(s["start"]), float(s["end"])) for s in shots]
+    try:
+        import framing
+        for row, f in zip(rows, framing.measure_spans(video, spans)):
+            if f:
+                row["face"] = f
+        print(f"framing: a face in {sum(1 for r in rows if r.get('face'))} of {len(rows)} shots (height, eye line, centre)")
+    except Exception as e:  # a bonus: the remake falls back to the framing words
+        print(f"note: face framing not measured: {e}")
+    try:
+        import grade_match
+        boxes = [{"t0": g["start"], "t1": g["end"], "box": g["bbox"]} for g in graphics or [] if g.get("bbox")]
+        for row, st in zip(rows, grade_match.span_stats(video, spans, boxes=boxes)):
+            if st:
+                row["lab"] = st
+        print(f"grade: colour read on {sum(1 for r in rows if r.get('lab'))} of {len(rows)} shots (black and short shots skipped)")
+    except Exception as e:
+        print(f"note: shot colour not measured: {e}")
+
+
 def cmd_extras(a):
     import cv2, numpy as np
     b = json.load(open(a.breakdown))
@@ -704,6 +818,7 @@ def cmd_extras(a):
         print(f"note: graphics detection failed: {e}")
         out["graphics"] = []
     gx = out["graphics"]
+    shot_looks(a.video, shots, out["shots"], gx)
     try:
         out["caption_look"] = caption_look(a.video, cues)
         out["caption_look"]["layer_samples"] = caption_layer(a.video, cues, seg)

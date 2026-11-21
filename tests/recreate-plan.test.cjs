@@ -74,7 +74,7 @@ t('plan.json: written, read back, shots first and cut.json refShots as the fallb
   assert.deepStrictEqual(RC.shotsOf(build, {}), []);
   const plan = RC.writePlan(build, RC.planOf({ recipe, scale: { len: 6, ref: 12, k: 0.5 }, rc: { plan: shots }, cut: { segs }, shakes: [[3.08, 18]], sounds: [{ id: '11-pop-sticker', t: 1.5, ref: true }],
     flips: [{ mode: 0, start: 0, end: 1 }, { mode: 39, start: 2, end: 3, scene: 'ref-spin', sceneName: 'Spin' }], theme: 'neutral', accent: '#ff5a1f' }));
-  assert.deepStrictEqual(Object.keys(plan), ['version', 'recipe', 'scale', 'shots', 'transitions', 'moves', 'shakes', 'sounds', 'scenes', 'theme', 'accent']);
+  assert.deepStrictEqual(Object.keys(plan), ['version', 'mode', 'recipe', 'scale', 'shots', 'transitions', 'moves', 'shakes', 'sounds', 'scenes', 'theme', 'accent']);
   const back = RC.readPlan(build);
   assert.deepStrictEqual(back, plan);
   assert.ok(back.version === 1 && back.recipe === rp && back.scale === 0.5);

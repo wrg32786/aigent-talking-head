@@ -2,6 +2,8 @@
 'use strict';
 const RM = require('../reelmd.cjs');
 const SPL = require('../shotplan.cjs');
+const RF = require('../reframe.cjs');
+const GM = require('../grade-match.cjs');
 const { r2, pad2, clean, hexOK } = require('./util.cjs');
 const { themeFor, jobTransition } = require('./palette.cjs');
 
@@ -33,6 +35,9 @@ function recipeMd(c) {
     if (s.framing) f.push(`framing ${s.framing}`);
     if (s.cutaway) f.push('cutaway on');
     if (s.cutaway && s.broll) f.push(`broll ${s.broll}`);
+    // where the speaker's face sits (height@eye line, kit/reframe.cjs) and the shot's colour in Lab (kit/grade-match.cjs)
+    if (s.face) f.push(`face ${RF.fmtFace(s.face)}`);
+    if (s.lab) f.push(`lab ${GM.fmtLab(s.lab)}`);
     const mv = (s.moves || []).find(x => SPL.MOVES[x]); if (mv) f.push(`move ${mv}`);
     if (s.n > 1 && ((s.moves || []).includes('shake') || (s.tx && s.tx.shake))) f.push('shake on');
     L.push(f.join(' | '));
@@ -54,6 +59,7 @@ function recipeMd(c) {
       const f = [`#${pad2(i + 1)} ${g.start}-${g.end}`, `type ${g.type}`];
       if (g.text) f.push(`${g.guess ? 'text~' : 'text'} ${g.text}`);
       if (g.layer) f.push(`layer ${g.layer}`);
+      if (g.type === 'ordinal-sticker' && g.shape === 'starburst') f.push('shape starburst', `spikes ${g.spikes || 12}`);
       for (const k of ['color', 'tile', 'border']) if (hexOK(g[k])) f.push(`${k} ${g[k].toLowerCase()}`);
       for (const k of ['x', 'y', 'w', 'size']) if (g[k] != null) f.push(`${k} ${g[k]}`);
       if (g.head != null) f.push(`head ${g.head}`, `head-y ${g.headY}`);
