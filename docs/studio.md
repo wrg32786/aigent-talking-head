@@ -120,7 +120,7 @@ Every option lives in exactly one of 9 layers (`layers` in `kit/studio/categorie
 | Transitions | Picture | all the seams, the glitch, blur, pixelate, warp, zoom blur and light leak ones too |
 | Layout | Picture | frames, split screens and grids around you |
 | Text | Text and graphics | captions (styles, entrances, caption looks), titles and kinetic words (split-flap, keyword caption, LED sign, backdrop word...), the title layer behind your head |
-| Fonts | Text and graphics | the font pairs |
+| Fonts | Text and graphics | the font pairs. With Recreate or Copy the look the font comes from your reference, and one line here says so; pick a font and yours is used instead |
 | Graphics | Text and graphics | lower thirds and name tags, stickers and callouts, data and info cards, intros, chapters and CTAs |
 | B-roll | B-roll | how b-roll sits: split, match cut, phone fan, carousel, screen card |
 | Music and sounds (Music and SFX in the catalog) | Music and sounds | beds, sound effects and beat sync as tiles |
@@ -635,7 +635,7 @@ Draft first, check what we picked, then render once.
 - **Draft** (it reads **Redraft** once there is a draft) plans the reel; it makes no video. When it ends the step says "Plan ready, no video yet. Check it below, then Render." **Cancel** shows only while a draft runs.
 - **Draft from.** When you kept clips on the Cut step: **Your N clips** (the default) or **The whole take**. Your clips are cut once, on their audio-checked edges, and handed to the reel as they are (`--as-is`, with a `clips.json` beside them carrying each one's words), so nothing is transcribed or cut a second time.
 - **The draft preview.** A fast preview of the draft's cuts only, with no captions and no look. It is never a render from another draft or take.
-- **Next to your reference.** One row of chips that says how close the draft is to the reference, one word per part: **Matched**, **Close** or **Off** for Framing, Color, Captions, Graphics, Sounds and Pace. It shows only when the engine measured the draft against a reference, and only for the parts it measured.
+- **Next to your reference.** One row of chips that says how close the draft is to the reference, one word per part: **Matched**, **Close** or **Off** for Framing, Color, Captions, Graphics, Sounds and Pace, and **Matched**, **Close** or **Guess** for Font (how sure we are of the font we read from the reference; Off when you picked your own). It shows only when the engine measured the draft against a reference, and only for the parts it measured.
 - **The edit receipt** and **the clean-up pass**, described under [Review your edit](#review-your-edit).
 - **Every pick and why.** A fold, closed until you open it, with each pick per beat and the reason. Change a cell and click **Apply my edits**; the change is pinned and shows in the next render. When the draft tightened pauses, **Pauses cut** lists each one with **Keep this pause** (`pace.keepPauses`, `--keep-pauses clip@seconds`).
 
