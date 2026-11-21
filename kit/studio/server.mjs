@@ -711,7 +711,8 @@ const relOf = p => (p.startsWith(ROOT + sep) ? p.slice(ROOT.length + 1) : p).spl
 function refDir(s) { const st = S.load(); return st.downloads ? join(st.downloads, s.job) : join(ROOT, 'teardown-in', 'studio', s.job); }
 const setItem = (id, fn) => update(st => { const it = (st.reference.queue || []).find(x => x.id === id); if (it) fn(it, st); });
 function useItem(st, it) {
-  st.reference = { ...st.reference, active: it.id, file: it.file, url: it.url, status: 'ready', out: it.out, extracted: it.extracted, contact: it.contact || null, applied: false };
+  st.reference = { ...st.reference, active: it.id, file: it.file, url: it.url, status: 'ready', out: it.out, extracted: it.extracted, contact: it.contact || null, applied: false, auto: null };
+  C.setReferenceLook(st); // Recreate or Influence: the Look is set from it now, so nobody has to pick it again
 }
 function addLinks(urls) {
   const s0 = C.load(); if (!s0.job) throw Object.assign(new Error('name the job first'), { code: 400 });
@@ -1025,7 +1026,7 @@ async function api(req, res, u) {
       const recipe = join(ROOT, t.out, 'Reel.md');
       if (!existsSync(recipe)) throw new Error('teardown wrote no Reel.md');
       const ex = C.extract(recipe);
-      update(st => { st.reference.status = 'ready'; st.reference.extracted = ex; st.reference.out = t.out; st.reference.contact = existsSync(join(ROOT, t.out, 'contact.jpg')) ? `${t.out}/contact.jpg`.split(sep).join('/') : null; });
+      update(st => { st.reference.status = 'ready'; st.reference.extracted = ex; st.reference.out = t.out; st.reference.contact = existsSync(join(ROOT, t.out, 'contact.jpg')) ? `${t.out}/contact.jpg`.split(sep).join('/') : null; st.reference.auto = null; C.setReferenceLook(st); });
       return { extracted: ex };
     });
     return json(res, 202, view(C.load()));
@@ -1044,7 +1045,7 @@ async function api(req, res, u) {
     else if (b.action === 'remove') {
       if (['downloading', 'tearing'].includes(it.status) && task && task.status === 'running' && task.kind === 'reference') { task.cancel = true; task.proc && task.proc.kill('SIGTERM'); }
       if (it.file && b.deleteFile !== false) rmSync(it.file, { force: true });
-      update(st => { st.reference.queue = st.reference.queue.filter(x => x.id !== id); if (st.reference.active === id) st.reference = { ...st.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null }; });
+      update(st => { st.reference.queue = st.reference.queue.filter(x => x.id !== id); if (st.reference.active === id) { C.undoReferenceLook(st); } if (st.reference.active === id) st.reference = { ...st.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null }; });
     } else return json(res, 400, { error: 'action: use, retry or remove' });
     return json(res, 200, view(C.load()));
   }
@@ -1056,10 +1057,8 @@ async function api(req, res, u) {
     const s0 = C.load(); if (!s0.reference.extracted && !s0.reference.file && !s0.reference.url) return json(res, 400, { error: 'no reference to clear' });
     let n = 0;
     const st = update(x => { x.undoRef = JSON.parse(JSON.stringify({ reference: x.reference, picks: x.picks, pack: x.pack || null, music: x.music }));
-      const added = x.reference.added || [], prev = x.reference.prev || {};
-      for (const r of added) { const [k, id] = [r.slice(0, r.indexOf(':')), r.slice(r.indexOf(':') + 1)]; const pk = x.picks[k]; if (pk && pk.allow.includes(id)) { pk.allow = pk.allow.filter(y => y !== id); n++; } }
-      if ('pack' in prev) x.pack = prev.pack; if ('bed' in prev) x.music = { ...x.music, bed: prev.bed };
-      x.reference = { ...x.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null, added: [], prev: null }; });
+      n = C.undoReferenceLook(x);
+      x.reference = { ...x.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null, added: [], prev: null, auto: null }; });
     return json(res, 200, { ...view(st), note: `Cleared the reference${n ? ` and the ${n} pick${n === 1 ? '' : 's'} it added` : ''}. Undo puts it back.` });
   }
   if (p === '/api/reference/apply' && M === 'POST') {
@@ -1248,7 +1247,7 @@ async function api(req, res, u) {
     if (w.wizard === 'clips') { setOut(WIZ.clipsOutput(w.clips, w.ads)); done.push(`clips: ${w.clips}${w.ads ? ' with ad cuts' : ''}`); next = 'cut';
       if (!MEDIA.transcript(rel)) { update(x => { x.cut = { source: rel, candidates: [], scoredBy: null, pending: 'transcript' }; }); startTranscribe(rel, () => findCuts(rel, 'auto').catch(e => console.error(e.message))); pending = 'transcript'; note = `Transcribing, then finding ${w.clips} clips on whole words.`; }
       else { await findCuts(rel, 'auto'); note = `Found the clips on whole words. Check them on Cut.`; } }
-    if (w.wizard === 'reference') { update(st => { C.applyPatch(st, { reference: { mode: 'all' } }); }); const added = addLinks([w.url]); done.push('reference: reading it, Use all'); next = 'reference'; note = 'Reading the reference. Use all is on.'; if (!added.length) note = 'That link is already in.'; }
+    if (w.wizard === 'reference') { update(st => { C.applyPatch(st, { reference: { mode: 'recreate' } }); }); const added = addLinks([w.url]); done.push('reference: reading it, Use all'); next = 'reference'; note = 'Reading the reference. We will set your look from it when it is ready.'; if (!added.length) note = 'That link is already in.'; }
     return json(res, 200, { ...view(C.load()), wizard: { done, next, pending, note } });
   }
   if (p === '/api/chat/apply' && M === 'POST') {

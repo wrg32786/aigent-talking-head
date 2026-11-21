@@ -171,6 +171,8 @@ export function applyPatch(s, p, cat = catalog()) {
     if (how === 'allow') { if (it.mode === 'one') slot.allow = []; slot.allow.push(it.id); }
     if (how === 'deny') { if (it.mode === 'one') { errs.push(`${ref}: pick another one instead of forbidding this`); continue; } slot.deny.push(it.id); }
     log.push(`${how === 'clear' ? 'cleared' : how === 'allow' ? 'picked' : 'forbade'} ${it.kind} ${it.id}`);
+    // you took back or forbade a pick the reference set: it is yours now, and Back to my look leaves it alone
+    if (how !== 'allow' && s.reference && s.reference.added) s.reference.added = s.reference.added.filter(x => x !== ref);
   }
   if (p.music) {
     const m = p.music;
@@ -184,7 +186,9 @@ export function applyPatch(s, p, cat = catalog()) {
     if (p.pace.keepPauses !== undefined) { const k = [].concat(p.pace.keepPauses || []).map(String); if (k.some(x => !/^[\w-]+@\d+(\.\d+)?$/.test(x))) errs.push('pace.keepPauses: clip-id@seconds, from choices.json "pauses"'); else { s.pace.keepPauses = k; log.push(k.length ? `keep pauses ${k.join(', ')}` : 'cut every long pause'); } }
   }
   if (p.export !== undefined) { if (p.export && !cat.exports.includes(p.export)) errs.push(`export: ${cat.exports.join(', ')}`); else { s.export = p.export || null; log.push(`export ${s.export}`); } }
-  if (p.reference && p.reference.mode !== undefined) { if (!['influence', 'recreate', 'off'].includes(p.reference.mode)) errs.push('reference.mode: influence, recreate or off'); else { s.reference.mode = p.reference.mode; log.push(`reference mode ${p.reference.mode}`); } }
+  if (p.reference && p.reference.mode !== undefined) { if (!['influence', 'recreate', 'off'].includes(p.reference.mode)) errs.push('reference.mode: influence, recreate or off'); else { const was = s.reference.mode; s.reference.mode = p.reference.mode; log.push(`reference mode ${p.reference.mode}`);
+    // Recreate or Influence sets the Look from the reference; Off takes it back out (your own picks stay)
+    if (was !== s.reference.mode || (s.reference.mode !== 'off' && s.reference.extracted && !s.reference.auto)) { const a = setReferenceLook(s, cat); if (a) log.push(`set the look from the reference (${a.n} change${a.n === 1 ? '' : 's'})`); else if (was !== 'off' && s.reference.mode === 'off') log.push('back to your own look'); } } }
   if (p.clips !== undefined) { const c = p.clips ? slash(p.clips) : null; if (c && (c.includes('..') || !existsSync(join(resolve(ROOT, c), 'clips.json')))) errs.push(`clips: no clips.json in ${c}`); else if (c !== s.clips) { s.clips = c; log.push(c ? `clips folder ${c}` : 'clips folder cleared'); } }
   // footage: reorder or drop files the job already has (state.footage), or add a file already in the job's inbox
   if (p.footage !== undefined) {
@@ -383,6 +387,52 @@ export function referencePicks(ex, kinds = null, cat = catalog()) {
   if (want('bed') && ex.music && ex.music.bed && cat.items[`bed:${ex.music.bed}`]) picks[`bed:${ex.music.bed}`] = 'allow';
   if (want('beatSync') && ex.music && ex.music.beatSync === 'on' && cat.items['beatSync:beat-sync']) picks['beatSync:beat-sync'] = 'allow';
   return picks;
+}
+
+// ---------- the Look a reference sets ----------
+// Choosing Recreate or Influence sets the Look for you, and Off (Back to my look) takes it back out.
+//   recreate: every layer the reference read: its Look when it is a built-in one, captions, titles, transitions,
+//             finishes, graphics, effects, the music bed, beat sync and pace.
+//   influence: the same picks as soft defaults, but your Look, music and pace stay yours.
+const SOUND_REF = /^(bed|beatSync|editing):/;
+export function referenceLook(ex, mode, cat = catalog()) {
+  if (!ex || !['recreate', 'influence'].includes(mode)) return null;
+  const picks = referencePicks(ex, null, cat);
+  for (const x of (ex.summary && ex.summary.suggestions) || []) { const it = cat.items[x.ref]; if (it && it.mode !== 'info') picks[x.ref] = 'allow'; }
+  if (mode === 'influence') for (const r of Object.keys(picks)) if (SOUND_REF.test(r)) delete picks[r];
+  for (const r of Object.keys(picks)) if (!cat.items[r] || cat.items[r].mode === 'info') delete picks[r];
+  const out = { picks };
+  if (mode === 'recreate' && ex.preset && cat.packs.some(x => x.name === ex.preset)) out.pack = ex.preset;
+  return out;
+}
+const allowedRefs = s => new Set([...Object.entries(s.picks || {}).flatMap(([k, v]) => ((v && v.allow) || []).map(id => `${k}:${id}`)), ...(s.music && s.music.bed ? [`bed:${s.music.bed}`] : [])]);
+// takes out what the reference set (reference.added, reference.prev), keeping anything you changed since. Returns how many picks went.
+export function undoReferenceLook(s) {
+  const r = s.reference || {}, added = r.added || [], prev = r.prev || {}, auto = r.auto || null; let n = 0;
+  for (const ref of added) { const i = ref.indexOf(':'), k = ref.slice(0, i), id = ref.slice(i + 1); if (k === 'bed') continue;
+    const pk = s.picks[k]; if (pk && pk.allow.includes(id)) { pk.allow = pk.allow.filter(y => y !== id); n++; } }
+  for (const [k, ids] of Object.entries(prev.one || {})) { const pk = s.picks[k] || (s.picks[k] = { allow: [], deny: [] }); if (!pk.allow.length) pk.allow = ids.filter(id => !pk.deny.includes(id)); }
+  if ('pack' in prev && (!auto || s.pack === auto.pack)) s.pack = prev.pack;
+  if ('bed' in prev && (!auto || s.music.bed === auto.bed)) s.music = { ...s.music, bed: prev.bed };
+  r.added = []; r.prev = null; r.auto = null;
+  return n;
+}
+// sets the Look from the reference for its mode, after taking out what an earlier mode or reference set.
+// Returns { mode, n, pack, bed, at } (reference.auto, what the page's notice reads) or null when nothing was set.
+export function setReferenceLook(s, cat = catalog()) {
+  const r = s.reference; if (!r) return null;
+  if ((r.added && r.added.length) || r.prev || r.auto) undoReferenceLook(s);
+  const p = referenceLook(r.extracted, r.mode, cat); if (!p) return null;
+  const had = allowedRefs(s), prev = { one: {} };
+  for (const ref of Object.keys(p.picks)) { const it = cat.items[ref]; if (it.kind !== 'bed' && it.mode === 'one') { const k = it.kind === 'editing' ? 'editing' : it.kind; prev.one[k] = ((s.picks[k] && s.picks[k].allow) || []).slice(); } }
+  if (p.pack !== undefined) prev.pack = s.pack || null;
+  if (Object.keys(p.picks).some(x => x.startsWith('bed:'))) prev.bed = s.music.bed;
+  applyPatch(s, p, cat);
+  const now = allowedRefs(s);
+  r.added = Object.keys(p.picks).filter(x => !had.has(x) && now.has(x));
+  r.prev = prev; r.applied = true;
+  r.auto = { mode: r.mode, n: r.added.length + (p.pack && p.pack !== prev.pack ? 1 : 0), pack: s.pack || null, bed: s.music.bed, at: Date.now() };
+  return r.auto;
 }
 
 export function influencePack(ex, job, basePack) {

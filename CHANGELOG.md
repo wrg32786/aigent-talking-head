@@ -13,6 +13,20 @@ Release notes: [docs/releases/v1.18.1.md](docs/releases/v1.18.1.md). Uploading n
 - **MCP.** New `clear_broll` (`undo` puts the last clear back). `fill_slot` with `clear` and `all` does the same.
 - **Tests and docs.** `tests/studio-reset.test.mjs` (in `npm run check`); docs/studio.md, docs/mcp.md, AGENTS.md and the Studio skill.
 
+## 1.17.1 (unreleased)
+
+Release notes: [docs/releases/v1.17.1.md](docs/releases/v1.17.1.md). A reference sets your Look for you.
+
+- **Recreate and Influence set the Look.** Before, choosing Use all (Recreate) or Use parts (Influence) only changed `reference.mode`: the reference's picks stayed suggestions with a REF badge until you clicked Pick all or Use on each part, and the mode only mattered at Draft. Now choosing a mode sets the layers (`setReferenceLook`, `referenceLook` and `undoReferenceLook` in `kit/studio/core.mjs`, run from `applyPatch` on a mode change and when a reference is ready). Recreate sets every layer the reference read: its Look when it is a built-in one, captions, titles, transitions, the grade, effects, the music bed, beat sync and pace. Influence sets the same picks as soft defaults and keeps your Look and sound.
+- **It says so, once.** A short notice on Look and on the Reference view: "We set your look from the reference. Change anything you like." (Influence: "We set your picks from the reference. Your Look and sound stay yours."), with **Back to my look**. `reference.auto` in the state says what was set.
+- **From reference, per layer.** What the reference set is badged REF (From reference); its layer tabs get an amber dot and the layer hint says how many. A suggestion it did not set no longer carries a badge.
+- **Your change wins.** Clear or forbid anything it set and that choice is yours; Back to my look (the same as Off) takes out only what the reference set and gives back your own caption style, Look and music. A Look you pick after Recreate stays.
+- **Still being read.** A reference that is downloading or being broken down shows "Reading the reference. We will set your look from it when it is ready." and sets it when it is.
+- **Fixes.** The Copy a reference wizard asked for a mode named `all`, which was refused, so it never switched to Use all; it now sets Recreate. Finish's Make button counts lines like Your edit (it said 3 pieces where Your edit said 7).
+- **For your agent.** `studio_set_selections` with `reference.mode` does the same (its description says what each mode sets); the Studio skill says to tell the user in one line.
+- **Smoke.** A Studio Chrome test that hangs is stopped after 6 minutes with its log (`SMOKE_E2E_TIMEOUT`), instead of holding every result until the CI step times out.
+- **Tests and docs.** `tests/studio-refstyle.test.mjs` (in `npm run check`) and new cases in `tests/studio-look.e2e.mjs` (in `npm run smoke`); docs/studio.md.
+
 ## 1.17.0 (unreleased)
 
 Release notes: [docs/releases/v1.17.0.md](docs/releases/v1.17.0.md). The redesign, part 5: point and note, drag to select, wizards, Ask my agent.

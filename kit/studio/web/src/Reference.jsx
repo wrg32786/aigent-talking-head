@@ -7,6 +7,7 @@ import { api, file, toast, grow, pickState, Icon, IconBtn, SITE, STATUS, KIND_NA
 import { upload } from './upload.js';
 import { canWrite, NO_WRITER } from './Scripts.jsx';
 import { FixActions } from './Fix.jsx';
+import { RefNotice } from './Style.jsx';
 
 export function Reference({ CAT, V, s, apply, patch }) {
   const r = s.reference, env = V.env, q = r.queue || [], t = env.tools || {};
@@ -88,7 +89,8 @@ function Breakdown({ CAT, V, s, apply, patch }) {
       </div>
     </div>
     {/fallback/.test(engine || '') && <p className="fine ref-engine" id="ref-engine" role="note"><Badge label="Read by the built-in analyzer" variant="warning" /> It is rougher and can miss shots, titles and the grade. Get rea-video for the full read, then add this reference again. <FixActions V={V} id="rea" apply={apply} /></p>}
-    {r.mode === 'influence' && <p className="fine" id="ref-mode-note">Influence borrows its picks. It does not copy the look. Recreate does.</p>}
+    <RefNotice s={s} patch={patch} id="ref-notice-td" />
+    {r.mode === 'influence' && !r.auto && <p className="fine" id="ref-mode-note">Influence sets its picks and keeps your Look and sound. Recreate uses all of it.</p>}
     <div className="td-body">
       {r.contact ? <img src={file(r.contact)} alt="Contact sheet of the reference, one frame per shot" /> : <div className="empty-art"><Icon n="film" /></div>}
       <div>
@@ -103,7 +105,7 @@ function Breakdown({ CAT, V, s, apply, patch }) {
         </div>}
         {found.length > 0 && <div className="found" aria-label="Found in the reference">{found.map(([k, v], i) => <span key={i} className="tag"><em>{k}</em>{v}</span>)}</div>}
         {sugg.length > 0 && <div>
-          <div className="sugg-h"><span className="lbl">Suggested picks</span><Button variant="secondary" size="sm" label="Pick all" onClick={() => api('/api/reference/apply', {}).then(v => { apply(v); toast('Reference picks added', true); })} /></div>
+          <div className="sugg-h"><span className="lbl">Its picks</span><span className="fine">{r.mode === 'off' ? 'Click one to use it.' : 'Set on your Look. Click one to take it out.'}</span></div>
           <div className="chips">{sugg.map(x => {
             const it = CAT.items[x.ref], st = pickState(s, it);
             return <button key={x.ref} className={'chip' + (st === 'allow' ? ' on' : '')} type="button" title={x.why} aria-pressed={String(st === 'allow')} onClick={() => patch({ picks: { [x.ref]: st === 'allow' ? 'clear' : 'allow' } })}>

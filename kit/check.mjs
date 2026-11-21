@@ -268,6 +268,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-look.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { lkerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio Look tests (tests/studio-look.test.mjs: 9 layers with every option in exactly one, no duplicates, the badges, Clear reference as one undo, Save as a Look with the reference, MCP clear_reference and save_look)', errs: lkerrs, warns: [] });
+    const rserrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-refstyle.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { rserrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio reference sets the Look (tests/studio-refstyle.test.mjs: Recreate sets every layer, Influence keeps your Look and sound, your changes stay, Back to my look gives your own picks back, a reference still being read sets it when ready, MCP studio_set_selections)', errs: rserrs, warns: [] });
     const auerrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-agent-ux.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { auerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
