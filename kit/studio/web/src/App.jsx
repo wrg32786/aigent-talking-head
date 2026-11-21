@@ -212,7 +212,7 @@ export function App() {
             <span style={{ visibility: i ? 'visible' : 'hidden' }}><Button id="prev" variant="ghost" label="Back" icon={<Icon n="left" />} onClick={() => go(STEPS[Math.max(0, i - 1)], true)} /></span>
             <PicksTray s={s} patch={patch} cat={CAT} added={(V.look && V.look.added) || []} openLayer={pickTab} />
             <AskAgent step={post ? 'post' : step} apply={apply} openChat={openChat} />
-            {i < STEPS.length - 1 ? <Button id="next" variant="primary" label={stepName(STEPS[i + 1])} endContent={<Icon n="right" />} onClick={() => go(STEPS[i + 1], true)} /> : <span className="nextpad" />}
+            {i < STEPS.length - 1 ? <Button id="next" variant={step === 'review' && !drafted ? 'secondary' : 'primary'} label={stepName(STEPS[i + 1])} endContent={<Icon n="right" />} onClick={() => go(STEPS[i + 1], true)} /> : <span className="nextpad" />}
           </footer>
         </main>
         <Chat key={s.videoSeq || 0} {...ctx} open={chatOpen} setOpen={setChatOpen} agentState={agentState} />

@@ -59,7 +59,7 @@ export function StartMode({ s, apply, patch, go, looks }) {
     </div>
     {has && !choice && <p className="fine" id="start-mode-note">Your reference is on Influence: we take only the parts you switched on. <button type="button" className="linkish" onClick={() => go('picture', true)}>Change it on Picture</button></p>}
     {open && <div className="rs glass-card" id="recreate-card" ref={box} data-state={ex ? 'ready' : has ? 'reading' : 'empty'} data-mode={choice}>
-      <b className="rs-h" id="recreate-h">{has ? 'Your reference' : isLook ? 'The video whose look you want' : 'The video to recreate'}</b>
+      <b className="rs-h" id="recreate-h">{has ? 'Your reference' : using ? 'Your look' : isLook ? 'The video whose look you want' : 'The video to recreate'}</b>
       {ex ? <p className="rs-line" id="recreate-ready"><Icon n="check" /><span><b>{refName(s)}</b>{meta ? `, ${meta}` : ''}. {isLook ? 'We copy its style. Your own words set the timing.' : 'We follow its cuts and timing on your take.'}</span>
           <button type="button" className="linkish" id="recreate-details" onClick={() => go('reference', true)}>See how it was made</button></p>
         : r.status === 'uploaded' ? <p className="rs-line" id="recreate-uploaded"><span>Your file is here.</span><Button id="recreate-go" size="sm" variant="secondary" label="Break down the file" onClick={breakDown} /></p>

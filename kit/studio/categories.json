@@ -7,7 +7,7 @@
     {"id": "transitions", "label": "Transitions", "hint": "The seam between two shots.", "groups": [{"cat": "transitions"}]},
     {"id": "color", "label": "Color and finish", "hint": "Grades, themes, grain, vignette, scan lines and glitches.", "groups": [{"cat": "color", "notKinds": ["look"]}, {"cat": "overlays"}, {"cat": "glitch"}]},
     {"id": "motion", "label": "Motion", "hint": "Camera moves, zoom punch, you and the room, speed and time.", "groups": [{"cat": "camera"}, {"cat": "speed-time"}, {"cat": "person"}]},
-    {"id": "audio", "label": "Music and SFX", "hint": "Music beds, energy, sound effects and pace. Ducking under your voice is always on.", "groups": [{"cat": "audio"}]},
+    {"id": "audio", "label": "Music and sounds", "hint": "Music beds, energy, sound effects and pace. Ducking under your voice is always on.", "groups": [{"cat": "audio"}]},
     {"id": "broll", "label": "B-roll", "hint": "How b-roll sits: splits, match cuts, phone fans, carousels, screen cards.", "groups": [{"cat": "broll"}]},
     {"id": "layout", "label": "Layout", "hint": "Frames, split screens and grids around you.", "groups": [{"cat": "frames"}]}
   ],

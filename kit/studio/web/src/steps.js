@@ -23,11 +23,14 @@ export function layerOf(name, layers) {
 }
 // the step a #menu= name opens; a name nothing owns opens Picture, as the old Look step did
 export const menuStep = (name, layers) => LAYER_STEP[layerOf(name, layers)] || 'picture';
-// the layer names the page shows (the catalog still calls the audio layer Music and SFX)
+// the layer names the page shows (the catalog said Music and SFX before 1.28.0; an older server may still send it)
 export const LAYER_LABEL = { audio: 'Music and sounds' };
 // where the Your edit line's next action goes: the server still says finish for both Draft it and Render
 export const nextStep = next => (!next || !next.step ? null : next.step === 'finish' ? (/^render/i.test(next.label || '') ? 'render' : 'review') : stepOf(next.step));
-// how close the draft is to the reference, one word per part (build/match.json, values 0 to 1; null is not measured)
+// how close the draft is to the reference, one word per part. The engine writes build/match.json as
+// { overall, parts: { framing: { score: 0 to 100, note }, ... } } (kit/fidelity.cjs); a flat { framing: 0 to 1 } reads too.
+// A part with no score (n/a) is left out
 export const MATCH_PARTS = [['framing', 'Framing'], ['grade', 'Color'], ['captions', 'Captions'], ['stickers', 'Graphics'], ['sfx', 'Sounds'], ['pace', 'Pace']];
 export const matchWord = v => (v >= 0.9 ? 'Matched' : v >= 0.7 ? 'Close' : 'Off');
-export const matchChips = m => (m && typeof m === 'object' ? MATCH_PARTS.filter(([k]) => typeof m[k] === 'number' && isFinite(m[k])).map(([k, label]) => ({ id: k, label, word: matchWord(m[k]) })) : []);
+const matchPart = (m, k) => { const p = m.parts && typeof m.parts[k] === 'object' ? m.parts[k] : null, raw = p ? p.score : m[k]; if (typeof raw !== 'number' || !isFinite(raw)) return null; return { v: p ? raw / 100 : raw, note: (p && p.note) || null }; };
+export const matchChips = m => (m && typeof m === 'object' ? MATCH_PARTS.map(([k, label]) => { const x = matchPart(m, k); return x ? { id: k, label, word: matchWord(x.v), note: x.note } : null; }).filter(Boolean) : []);

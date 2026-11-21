@@ -64,6 +64,9 @@ t('match chips: Matched from 0.9, Close from 0.7, else Off, only for what was me
   assert.deepStrictEqual(S.matchChips({ framing: null, grade: undefined }), []);
   assert.deepStrictEqual(S.matchChips(null), []); assert.deepStrictEqual(S.matchChips(undefined), []); assert.deepStrictEqual(S.matchChips({}), []);
   assert.deepStrictEqual(S.matchChips({ pace: 'fast', sfx: NaN }), [], 'only numbers count');
+  // the engine's own shape (kit/fidelity.cjs build/match.json): scores out of 100 under parts, a part with no score left out
+  assert.deepStrictEqual(S.matchChips({ overall: 85, parts: { framing: { score: 39, note: 'the take is closer' }, grade: { score: 83 }, captions: { score: 100 }, stickers: { score: null, note: 'n/a' }, sfx: { score: 93 }, pace: { score: 1 } } }).map(c => [c.id, c.word, c.note]),
+    [['framing', 'Off', 'the take is closer'], ['grade', 'Close', null], ['captions', 'Matched', null], ['sfx', 'Matched', null], ['pace', 'Off', null]]);
 });
 
 t('no em dashes in the step map', () => { assert.ok(!/\u2014/.test(readFileSync(join(ROOT, 'kit', 'studio', 'web', 'src', 'steps.js'), 'utf8'))); });

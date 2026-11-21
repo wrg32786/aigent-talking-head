@@ -65,7 +65,7 @@ export function ReviewStep({ CAT, V, s, apply, patch, hidden, run }) {
     {mine && <div id="progress"><ProgressBar label={`${cap1(t.kind)} running`} isLabelHidden isIndeterminate /></div>}
     {notes.length > 0 && <div id="notes" className="notes">{notes.map((x, i) => <p key={i}>{x}</p>)}</div>}
     {good && match.length > 0 && <div className="match glass-card" id="match"><span className="lbl" id="match-h">How close to your reference</span>
-      <ul className="match-chips" id="match-chips" aria-labelledby="match-h">{match.map(m => <li key={m.id} className={'match-chip ' + m.word.toLowerCase()} data-part={m.id} data-match={m.word.toLowerCase()}><span>{m.label}</span><b>{m.word}</b></li>)}</ul></div>}
+      <ul className="match-chips" id="match-chips" aria-labelledby="match-h">{match.map(m => <li key={m.id} className={'match-chip ' + m.word.toLowerCase()} data-part={m.id} data-match={m.word.toLowerCase()} title={m.note || undefined}><span>{m.label}</span><b>{m.word}</b></li>)}</ul></div>}
     <div id="draft-view" className="outputs">
       {good && V.draftPreview ? <DraftPreview preview={V.draftPreview} s={s} />
         : !good && <div className="empty-art" id="fin-plan"><Icon n="film" /><p>{!s.job ? 'Name the reel at the top to start.' : stale ? 'Your clips changed. Draft again to see the new plan.' : 'Your draft shows up here. Earlier reels stay in Outputs.'}</p></div>}

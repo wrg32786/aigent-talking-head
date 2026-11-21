@@ -39,7 +39,9 @@ export function refBrought(s) {
 }
 // a saved look in a few words (GET /api/style-looks summary): only the parts it has, never an empty row
 const LOOK_PARTS = [['framing', 'Framing'], ['grade', 'Color'], ['captions', 'Captions'], ['pace', 'Pace'], ['music', 'Music'], ['sfx', 'Sounds']];
-const say = v => (v == null || v === '' ? null : v === true ? 'yes' : v === false ? 'none' : Array.isArray(v) ? v.slice(0, 3).join(', ') : typeof v === 'object' ? (v.label || v.name || v.style || null) : String(v));
+const calm = t => t.split(';')[0].replace(/\s*\([^)]*\)/g, '').replace(/,?\s*#[0-9a-f]{3,8}\b/gi, '').replace(/\s+/g, ' ').trim();
+const say0 = v => (v == null || v === '' ? null : v === true ? 'yes' : v === false ? 'none' : Array.isArray(v) ? v.slice(0, 3).join(', ') : typeof v === 'object' ? (v.label || v.name || v.style || null) : String(v));
+const say = v => { const t = say0(v); return t ? calm(t) || null : null; };
 export function LookChips({ summary, id }) {
   const bits = summary ? LOOK_PARTS.map(([k, l]) => [k, l, say(summary[k])]).filter(x => x[2]) : [];
   if (!bits.length) return null;
