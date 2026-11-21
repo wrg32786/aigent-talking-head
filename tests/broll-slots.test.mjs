@@ -182,5 +182,20 @@ try {
       const cl = await req('/api/broll/slot', { beat: b.n, clear: true }); assert.ok(cl.j.broll.beats.find(x => x.n === b.n).need, 'the slot needs a clip again');
     });
   } finally { srv.kill(); }
+  await t('the render step keeps a clip the recipe put on a full slot, and Studio placing its own clip there replaces it', async () => {
+    const J2 = JOB + '-own', b2 = join(ROOT, 'jobs', J2, 'build'); mkdirSync(b2, { recursive: true });
+    try {
+      const mine = join(ROOT, 'jobs', J2, 'mine.mp4'), other = join(ROOT, 'jobs', J2, 'other.mp4'); writeFileSync(mine, 'x'); writeFileSync(other, 'x');
+      const cut0 = { segs: [{ file: '../clips/a.mp4', in: 0, out: 12 }], inserts: [{ file: '../mine.mp4', at: 5, dur: 3, place: 'full', slot: 1 }, { file: '../mine.mp4', at: 9, dur: 1, place: 'full' }] };
+      const plan0 = { broll: [{ n: 1, kind: 'full', start: 5, end: 8, state: 'filled', file: mine, by: 'recipe', fx: {} }] };
+      const run = lane => { writeFileSync(join(b2, 'cut.json'), JSON.stringify(cut0)); writeFileSync(join(b2, 'plan.json'), JSON.stringify(plan0)); const pf = join(b2, 'lane.json'); writeFileSync(pf, JSON.stringify(lane));
+        execFileSync(process.execPath, [join(ROOT, 'kit', 'studio', 'broll-run.mjs'), 'apply', '--name', J2, '--plan', pf], { cwd: ROOT, encoding: 'utf8' }); return JSON.parse(readFileSync(join(b2, 'cut.json'), 'utf8')).inserts || []; };
+      const kept = run({ inserts: [] });
+      assert.deepStrictEqual(kept.map(x => [x.at, x.slot ?? null]), [[5, 1], [9, null]], 'the recipe clip on slot 1 is still in the cut: ' + JSON.stringify(kept));
+      assert.strictEqual(JSON.parse(readFileSync(join(b2, 'plan.json'), 'utf8')).broll[0].state, 'filled');
+      const swapped = run({ inserts: [{ file: other, at: 5, dur: 3, in: 0, place: 'full', beat: 1, slot: 1 }] });
+      assert.deepStrictEqual(swapped.filter(x => x.slot === 1).map(x => [x.file, !!x.studio]), [['../other.mp4', true]], 'one clip on the slot, the one placed in Studio: ' + JSON.stringify(swapped));
+    } finally { rmSync(join(ROOT, 'jobs', J2), { recursive: true, force: true }); }
+  });
   console.log(`\nB-ROLL SLOTS PASS (${n} tests)`);
 } finally { rmSync(STATE, { recursive: true, force: true }); rmSync(join(ROOT, 'jobs', JOB), { recursive: true, force: true }); }

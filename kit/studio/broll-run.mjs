@@ -1,7 +1,8 @@
 // Puts Studio's b-roll lane into a drafted job before the rebuild:
 //   node kit/studio/broll-run.mjs apply --name <job> --plan <broll.json>
 // broll.json is { inserts: [{ file (absolute), at, dur, in, place, image, beat, clip, studio: true }], credits: "..." }.
-// Inserts Studio wrote before (studio: true) are replaced; inserts from a recipe or --broll stay. Missing files are
+// Inserts Studio wrote before (studio: true) are replaced; inserts from a recipe (a slot it filled with its own file
+// too) or --broll stay. Missing files are
 // skipped with a note. credits.txt lands next to the reel, or goes when the lane is empty.
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { dirname, join, relative, resolve, isAbsolute, sep } from 'path';
@@ -25,7 +26,7 @@ const capF = join(build, 'captions.js'), planJ = join(build, 'plan.json');
 let caps = null; try { caps = R.readCaptions(capF); } catch {}
 let rplan = null; try { rplan = JSON.parse(readFileSync(planJ, 'utf8')); } catch {}
 const slots = (rplan && Array.isArray(rplan.broll) ? rplan.broll : []), skipped = new Set((plan.skipped || []).map(Number)), cards = [], state = {};
-const keep = (cut.inserts || []).filter(x => !x.studio && x.slot == null), add = [];
+const add = [];
 for (const x of plan.inserts || []) {
   if (!x.file || !existsSync(x.file)) { console.log(`b-roll: beat ${x.beat}: no file ${x.file}, skipped`); continue; }
   const sl = x.slot != null ? slots.find(q => q.n === +x.slot) : null;
@@ -39,6 +40,10 @@ for (const x of plan.inserts || []) {
   }
   add.push({ ...x, file: relative(build, x.file).split(sep).join('/'), studio: true });
 }
+// a slot the recipe filled with its own file keeps its clip (a full, split or pip slot is a cut.json insert the draft
+// wrote with "slot": n), unless Studio placed another clip on that slot
+const ownSlot = n => slots.some(x => x.n === +n && x.by === 'recipe' && x.file && !state[x.n]);
+const keep = (cut.inserts || []).filter(x => !x.studio && (x.slot == null || ownSlot(x.slot)));
 if (caps) {
   const before = (caps.flips || []).length;
   const own = new Set(slots.filter(x => x.by === 'recipe' && x.file && !state[x.n]).map(x => x.n)); // a slot the recipe filled keeps its card
