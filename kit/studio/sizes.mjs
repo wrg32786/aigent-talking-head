@@ -12,7 +12,7 @@ const X = createRequire(import.meta.url)('../exports.cjs');
 
 export const SIZES = [
   { id: 'reels', size: '9:16', label: 'Reels and Stories 9:16', use: 'For Reels and Stories', always: true },
-  { id: 'feed45', size: '4:5', label: 'Instagram Feed 4:5 (1080x1350)', use: X.get('feed45').use },
+  { id: 'feed45', size: '4:5', label: 'Instagram Feed 4:5', use: X.get('feed45').use },
   { id: 'square', size: '1:1', label: 'Square 1:1', use: X.get('square').use },
 ];
 export const EXTRA = SIZES.filter(z => !z.always).map(z => z.id);

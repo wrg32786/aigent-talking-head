@@ -82,7 +82,7 @@ try {
     await pg.click('#mode-look');
     await pg.waitForSelector('#recreate-card[data-mode="look"] #recreate-link');
     assert.strictEqual(await pg.$eval('#mode-look', b => b.getAttribute('aria-checked')), 'true');
-    assert.match(await pg.$eval('#recreate-h', e => e.textContent), /look you want/);
+    assert.match(await pg.$eval('#recreate-h', e => e.textContent), /The video you like/);
     // the server takes the mode when it knows it (1.28.0 engine); an older one keeps its own and the page stays calm
     const mode = (await api('/api/state')).state.reference.mode;
     assert.ok(['look', 'influence'].includes(mode), 'mode ' + mode);

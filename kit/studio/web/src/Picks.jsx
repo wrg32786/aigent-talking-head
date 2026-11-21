@@ -7,7 +7,7 @@ import { REF_LABEL, MADE_LABEL } from './RefCard.jsx';
 const MAX = 3;
 export const pickName = (cat, ref) => { const it = cat && cat.items[ref], id = ref.slice(ref.indexOf(':') + 1); return it && it.made ? it.made.name : /^ref-/.test(id) ? 'Made scene' : id; };
 
-export function PicksTray({ s, patch, cat, added = [], openLayer }) {
+export function PicksTray({ step, s, patch, cat, added = [], openLayer }) {
   const layers = (cat && cat.layers) || [], from = new Set(added), groups = new Map();
   for (const [kind, p] of Object.entries(s.picks)) for (const [how, ids] of [['allow', p.allow], ['deny', p.deny]]) for (const id of ids) {
     const ref = `${kind}:${id}`, L = layers.find(l => l.items.includes(ref)) || { id: 'other', label: 'Other' };
@@ -17,7 +17,8 @@ export function PicksTray({ s, patch, cat, added = [], openLayer }) {
   const list = [...layers.map(l => groups.get(l.id)), groups.get('other')].filter(Boolean), n = list.reduce((a, g) => a + g.picks.length, 0);
   const r = s.reference, byRef = !!(r && r.extracted && r.mode !== 'off' && from.size);
   const undoRef = () => patch({ reference: { mode: 'off' } }).then(() => toast('Back to your own look. The reference is off.', true)).catch(() => {});
-  if (!n) return <div className="picks" id="picksbar"><span className="none">No picks yet. Click a tile to pick it.</span><b id="pickcount" hidden>0</b></div>;
+  // with no picks, the hint shows only where there are tiles on the page to click (Picture, Text and graphics)
+  if (!n) return <div className="picks" id="picksbar">{(step === 'picture' || step === 'text') && <span className="none">No picks yet. Click a tile to pick it.</span>}<b id="pickcount" hidden>0</b></div>;
   return <Popover className="picks" id="picksbar">{({ close }) => <>
     <PopoverButton className="btn sm ghost picks-btn" id="picks-open">Picks <b id="pickcount">{n}</b><Icon n="up" /></PopoverButton>
     <PopoverPanel anchor={{ to: 'top start', gap: 10, padding: 8 }} className="menu-panel glass picks-panel" id="picks-panel" transition>

@@ -90,7 +90,7 @@ try {
     assert.ok(/picked/.test(await pg.textContent('#broll-lane .spot[data-beat="3"] .sp-by')));
     await pg.click('#broll-lane .spot[data-beat="1"]'); await pg.waitForSelector('#beat-idea');
     assert.ok(/Picked from your words/.test(await pg.textContent('#beat-idea'))); assert.ok((await pg.textContent('#idea-why')).length > 10);
-    assert.strictEqual(await pg.textContent('#ye-next') !== null, true);
+    assert.strictEqual(await pg.$('#ye-next'), null, 'no second Next button on B-roll');
     assert.ok(/1 spot/.test(await pg.textContent('#your-edit [data-part="broll"]')));
   });
   await t('Use it with no key and nothing in the library: a card made from the spot words goes on', async () => {

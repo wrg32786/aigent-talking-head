@@ -192,7 +192,7 @@ The categories come from `kit/studio/categories.json`, which maps the engine's o
 | Camera effects | 11 | the effects marked camera in `effects/catalog.json` (slow push, lean in, locked on, over-the-shoulder zoom and more) plus punch-ins |
 | Speed and time | 3 | tighten, pause point, wave trim |
 | Person and background | 16 | title layers (front, behind the head, auto) and effects that use the person mask |
-| Color and looks | 16 | looks, film finishes, themes |
+| Color grades | 16 | looks, film finishes, themes |
 | Overlays and textures | 7 | grain, vignette, scan lines, glass widgets, shortcut rain, noise, light leak |
 | Glitch and distortion | 10 | glitch seams and effects |
 | Shapes, frames and split screens | 10 | reel frame, split headline, B-roll split, grid, versus, screen card, colour and chapter cards |
@@ -648,7 +648,7 @@ When your clips changed after the draft, Review says "Your clips changed since t
 Full quality, once.
 
 - **Render vN** is the one Render button, with progress and **Cancel** while it runs. It stays off until the reel is drafted, and then offers **Draft it on Review first**. A cancel that lands after the render wrote its video keeps the video; the task ends done.
-- **Sizes** is one small row under the Render button: **Reels and Stories 9:16** (always made, so its box stays ticked), **Instagram Feed 4:5 (1080x1350)** and **Square 1:1**. Tick more than one and the same render makes them all. The Instagram Feed does not take a 9:16 video, so the 4:5 and the square are their own versions of the reel: the frame follows your face, and the captions, titles, graphics and b-roll are laid out again to fit, with all text kept off your face. No words are cut and the timing is the same. See [rendering.md](rendering.md#sizes-916-45-for-the-instagram-feed-11) for how the frame is found.
+- **Sizes** is one small row under the Render button: **Reels and Stories 9:16** (always made, so its box stays ticked), **Instagram Feed 4:5** (1080x1350) and **Square 1:1**. Tick more than one and the same render makes them all. The Instagram Feed does not take a 9:16 video, so the 4:5 and the square are their own versions of the reel: the frame follows your face, and the captions, titles, graphics and b-roll are laid out again to fit, with all text kept off your face. No words are cut and the timing is the same. See [rendering.md](rendering.md#sizes-916-45-for-the-instagram-feed-11) for how the frame is found.
 - **The finished reel.** Render builds the reel, applies your choices edits, and lists every file of this draft with a plain label and its name: **For Reels and Stories** (`reel-v1.mp4`), **For the Instagram Feed** (`reel-v1-feed-4x5.mp4`), **Square, for feeds** (`reel-v1-square-1x1.mp4`). Each has a player, **Edit this reel** and a download link. **Post it** opens the Post view. A note counts the earlier reels and links to Outputs and New video.
 - **What to make** is a fold, with a one-line summary beside its name. Inside: **The reel**, **N clips on their own** (each clip as its own reel with the same look) and **Plain clips, no edit** (the words you kept, joined, no look, in seconds), plus **Keep text clear of the buttons on**, the app whose buttons and caption area the 9:16 reel leaves room for (Reels by default). Any mix; Render makes them all in one run. With only clips or plain clips ticked there is nothing to draft.
 - **Compare with the original, or comment on a frame** is a fold that shows once this draft has a rendered reel. See [Review your edit](#review-your-edit).

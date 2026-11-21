@@ -84,7 +84,7 @@ try {
     await pg.click('#pieces-retakes'); await pg.waitForSelector('#pieces-grid .pz-cat[data-cat="aside"] .pz'); await pg.click('#pieces-retakes');
     assert.strictEqual(await pg.textContent('#combo-h'), 'Your clip');
     assert.strictEqual(await pg.textContent('#combo-sum'), 'Click lines above to stitch your own clip, or use our best lines.');
-    assert.strictEqual(await pg.$('#pieces-own'), null, 'Start over shows only when your clip has lines');
+    assert.strictEqual(await pg.$('#pieces-own'), null, 'Clear my clip shows only when your clip has lines');
     // the lines we would pick carry a Best mark, and the button says how many
     assert.deepStrictEqual((await pg.$$eval('#pieces-grid .pz:has(.pz-best)', x => x.map(e => e.dataset.piece))).sort(), [...P.best.ids].sort());
     assert.strictEqual(await pg.textContent('#pieces-choose'), `Use our ${P.best.ids.length} best lines`);
@@ -95,9 +95,9 @@ try {
     assert.strictEqual(by[c[0]].category, 'hook'); assert.strictEqual(by[c[c.length - 1]].category, 'cta'); assert.ok(!c.some(id => by[id].category === 'aside'));
     assert.strictEqual(await pg.$$eval('#combo-strip .cb-why', x => x.filter(e => e.textContent.length > 5).length), c.length);
     assert.deepStrictEqual(c, P.best.ids, 'what the Best marks said');
-    assert.ok(/Our pick/.test(await pg.textContent('#combo'))); await pg.waitForFunction(n => new RegExp(`${n} lines, \\d+ s, in your order, our pick`).test(document.querySelector('#your-edit [data-part="from"]').textContent), c.length, { timeout: 5000 }).catch(async () => assert.fail('Your edit: ' + await pg.textContent('#your-edit [data-part="from"]')));
+    assert.ok(/Our pick/.test(await pg.textContent('#combo'))); await pg.waitForFunction(n => new RegExp(`our ${n} best lines, \\d+ s`).test(document.querySelector('#your-edit [data-part="from"]').textContent), c.length, { timeout: 5000 }).catch(async () => assert.fail('Your edit: ' + await pg.textContent('#your-edit [data-part="from"]')));
     assert.ok(new RegExp(`^${c.length} lines, \\d+ s, stitched in this order\\.$`).test(await pg.textContent('#combo-sum')), await pg.textContent('#combo-sum'));
-    assert.strictEqual(await pg.textContent('#pieces-own'), 'Start over');
+    assert.strictEqual(await pg.textContent('#pieces-own'), 'Clear my clip');
     // the server's note says lines and your clip (choosing again picks the same)
     const again = await api('/api/pieces', { choose: true }); assert.ok(new RegExp(`^Picked ${c.length} lines, \\d+ s, for your clip\\.`).test(again.note), again.note); assert.deepStrictEqual(again.pieces.combo.ids, c);
     assert.strictEqual(await pg.$$eval('#pieces-grid .pz.in .pz-n', x => x.length), c.length, 'numbered in the grid');
@@ -129,15 +129,15 @@ try {
     const st = JSON.parse(readFileSync(join(ROOT, 'jobs', JOB, 'reel-v1.settings.json'), 'utf8'));
     assert.strictEqual(st.version, 1); assert.ok(st.look && st.pieces.length >= 2 && st.files.includes(`jobs/${JOB}/reel-v1.mp4`), JSON.stringify(st));
     await api('/api/pieces', { remove: (await ids())[1] }); await api('/api/draft', {}); await waitTask(); await api('/api/render', {}); await waitTask();
-    await pg.click('#outputs-open'); await pg.waitForSelector('#out-list .ov[data-version="2"]');
+    await pg.click('#more-open'); await pg.click('#more-outputs'); await pg.waitForSelector('#out-list .ov[data-version="2"]');
     assert.deepStrictEqual(await pg.$$eval('#out-list .ov', x => x.map(e => e.dataset.version)), ['2', '1']);
     assert.ok(/Latest/.test(await pg.textContent('#out-list .ov[data-version="2"]')));
     assert.ok(/piece/.test(await pg.textContent('#out-list .ov[data-version="1"] dl')));
     await pg.click('#out-list .ov[data-version="2"] .ov-compare'); await pg.waitForSelector('#out-cmp-hint');
     await pg.click('#out-list .ov[data-version="1"] .ov-compare'); await pg.waitForSelector('#out-compare');
     assert.ok(await pg.$$eval('#out-compare tr.diff', x => x.length) >= 1, 'length changed between the two');
-    await theme(pg, 'dark'); await pg.click('#outputs-open'); await pg.waitForSelector('#out-list .ov'); if (shots) await pg.screenshot({ path: join(shots, 'redesign-outputs-dark.png') });
-    await theme(pg, 'light'); await pg.click('#outputs-open'); await pg.waitForSelector('#out-list .ov'); if (shots) await pg.screenshot({ path: join(shots, 'redesign-outputs-light.png') });
+    await theme(pg, 'dark'); await pg.click('#more-open'); await pg.click('#more-outputs'); await pg.waitForSelector('#out-list .ov'); if (shots) await pg.screenshot({ path: join(shots, 'redesign-outputs-dark.png') });
+    await theme(pg, 'light'); await pg.click('#more-open'); await pg.click('#more-outputs'); await pg.waitForSelector('#out-list .ov'); if (shots) await pg.screenshot({ path: join(shots, 'redesign-outputs-light.png') });
     await pg.keyboard.press('Escape'); await theme(pg, 'dark');
   });
   await t('MCP: get_pieces, choose_combo, set_combo and list_outputs', async () => {
@@ -159,7 +159,7 @@ try {
     await pg.waitForSelector(own + '[data-keep="1"]'); assert.strictEqual(await pg.$eval('#cut-candidates li.clip-row', e => e.dataset.id), 'own');
     assert.ok(/^2 lines stitched, /.test(await pg.textContent(own + ' .clip-m')), await pg.textContent(own + ' .clip-m'));
     await pg.waitForSelector('#cut-candidates li.clip-row:not([data-id="own"])', { timeout: 20000 });
-    assert.strictEqual(await pg.textContent('#cut-own-wins'), 'Your own clip is what moves on. Untick it to use the clips below instead.');
+    assert.strictEqual(await pg.textContent('#cut-own-wins'), 'Only Your clip moves on. Untick it to use the clips below.');
     assert.ok(/^1 clip kept, \d+ s\. It moves on to the next steps as one reel\.$/.test(await pg.textContent('#cut-kept')), await pg.textContent('#cut-kept'));
     await pg.click('#cut-layer-lines'); await pg.waitForSelector('#pieces-grid');
     await pg.setViewportSize({ width: 390, height: 844 }); await open(pg, '#step=cut'); await pg.waitForSelector('#pieces-grid');

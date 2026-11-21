@@ -13,6 +13,8 @@ import { clock } from './Player.jsx';
 const HIDDEN = ['aside', 'retake'];
 const byLabel = b => !b ? null : b === 'ai' ? 'Our pick' : b === 'you' ? 'Built by you' : b === 'ai, changed by you' ? 'Our pick, changed by you' : `Set by ${b}`;
 export const FITS = 'Fits your point';
+// an empty group says what the take is missing, in plain words
+const NONE = { hook: 'No clear opening line in this take.', cta: 'No ask at the end.' };
 
 function LineCard({ p, n, best, onToggle, onPlay, cats, onMove }) {
   const [menu, setMenu] = useState(false);
@@ -21,7 +23,7 @@ function LineCard({ p, n, best, onToggle, onPlay, cats, onMove }) {
     <button type="button" className="pz-play" aria-label={`Play: ${p.text}`} onClick={() => onPlay(p)}><Icon n="play" /></button>
     <button type="button" className="pz-body" aria-pressed={n ? 'true' : 'false'} onClick={() => onToggle(p)} title={n ? 'Take it out of your clip' : 'Add it to your clip'}>
       <span className="pz-t">{p.text}</span>
-      <span className="pz-m"><span>{clock(p.start)}</span><span>{p.seconds.toFixed(1)} s</span>
+      <span className="pz-m"><span title={`At ${clock(p.start)} in the take`}>{p.seconds.toFixed(1)} s</span>
         {best && <span className="pz-best" title={best}>Best</span>}{p.fits && <span className="pz-fits">{FITS}</span>}
         {p.hint && <span className="pz-hint">{p.hint === 'retake' ? 'said again later' : p.hint}</span>}{p.category !== p.rule && <span className="pz-you">moved by you</span>}</span>
     </button>
@@ -46,8 +48,8 @@ export function Pieces({ V, apply, player, src, stitch, spans, onClips }) {
   return <div className="pieces" id="pieces">
     <div className="pz-bar">
       <Button id="pieces-choose" variant={ids.length ? 'secondary' : 'primary'} label={bestN ? `Use our ${bestN} best lines` : 'Use our best lines'} icon={<Icon n="spark" />} isLoading={busy} onClick={() => send({ choose: true })} />
-      {ids.length > 0 && <Button id="pieces-own" variant="ghost" label="Start over" onClick={() => send({ clear: true }, 'Your clip is empty. Click a line to add it.')} />}
-      {hiddenN > 0 && <button type="button" className="linkish" id="pieces-retakes" aria-pressed={showAll ? 'true' : 'false'} onClick={() => setShowAll(!showAll)}>{showAll ? 'Hide asides and retakes' : `Show asides and retakes (${hiddenN})`}</button>}
+      {ids.length > 0 && <Button id="pieces-own" variant="secondary" label="Clear my clip" onClick={() => send({ clear: true }, 'Your clip is empty. Click a line to add it.')} />}
+      {hiddenN > 0 && <button type="button" className={'chip sm grow-r' + (showAll ? ' on' : '')} id="pieces-retakes" aria-pressed={showAll ? 'true' : 'false'} onClick={() => setShowAll(!showAll)}>{showAll ? 'Hide asides and retakes' : `Show asides and retakes (${hiddenN})`}</button>}
     </div>
     {P.topics.length > 0 && <div className="pz-topics" role="group" aria-label="Topics" id="pieces-topics">
       <span className="fine">Topics</span>
@@ -56,8 +58,8 @@ export function Pieces({ V, apply, player, src, stitch, spans, onClips }) {
     <div className="pz-grid" id="pieces-grid">
       {cats.map(c => { const list = P.pieces.filter(p => p.category === c.id && shown(p)); if (tp && !list.length) return null;
         return <section key={c.id} className="pz-cat glass-card" data-cat={c.id} aria-label={c.label}>
-          <header><i className="pz-dot" aria-hidden="true" /><h3>{c.label}</h3><span className="fine">{list.length}</span></header>
-          {list.length ? <ul>{list.map(p => <LineCard key={p.id} p={p} n={pos[p.id] || 0} best={best[p.id]} onToggle={toggle} onPlay={play} cats={P.cats} onMove={move} />)}</ul> : <p className="fine pz-none">{c.use}</p>}
+          <header><i className="pz-dot" aria-hidden="true" /><h3>{c.label}</h3></header>
+          {list.length ? <ul>{list.map(p => <LineCard key={p.id} p={p} n={pos[p.id] || 0} best={best[p.id]} onToggle={toggle} onPlay={play} cats={P.cats} onMove={move} />)}</ul> : <p className="fine pz-none">{NONE[c.id] || c.use}</p>}
         </section>; })}
     </div>
     <section className="combo glass-card" id="combo" aria-labelledby="combo-h">

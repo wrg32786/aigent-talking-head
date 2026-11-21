@@ -83,8 +83,10 @@ export function summary(o, sourceSeconds) {
   const len = o.seconds ? `~${fmtLen(o.seconds)}` : (() => { const r = f.lengths[o.length]; return r[1] == null ? `${fmtLen(r[0])}+` : `~${fmtLen(mid(r))}`; })();
   const what = f.label.toLowerCase(), clipName = o.format === 'square' ? 'square clips' : 'short clips';
   const parts = sourceSeconds ? Math.max(1, Math.round(sourceSeconds / mid(range(o), sourceSeconds))) : null;
+  // a take shorter than the target length: the target says nothing useful, so it is left out
+  const under = !o.seconds && !!sourceSeconds && f.lengths[o.length][1] != null && sourceSeconds < mid(f.lengths[o.length]);
   const ad = o.goal === 'ad' && o.adCuts ? ' + 15 s and 30 s ad cuts' : '';
-  if (o.kind === 'full') return o.split ? `Full edit in parts: ${parts ? parts + ' ' : ''}${what} videos (${len} each), ${goal}${ad}` : `Full edit: 1 ${what} video (${len}), ${goal}${ad}`;
+  if (o.kind === 'full') return o.split ? `Full edit in parts: ${parts ? parts + ' ' : ''}${what} videos (${len} each), ${goal}${ad}` : `Full edit: 1 ${what} video${under ? '' : ` (${len})`}, ${goal}${ad}`;
   if (o.kind === 'clips') return `Clips: ${o.clips} ${o.format === 'long' ? 'long form clips' : clipName} (${o.clipSeconds || o.seconds ? '~' + fmtLen(o.clipSeconds || o.seconds) : lengthLabel(o.format === 'long' ? 'short' : o.format, o.length)}), ${goal}${ad}`;
   return `Both: 1 full edit (${len}) + ${o.clips} ${clipName}, ${goal}${ad}`;
 }
@@ -196,7 +198,7 @@ function bestVersion(S, r, dur, goal, pt) {
   for (const s of keep) { const a = +Math.max(0, s.start - pad).toFixed(2), b = +Math.min(dur || Infinity, s.end + pad).toFixed(2), l = ranges[ranges.length - 1]; if (l && a - l[1] < 0.6) l[1] = b; else ranges.push([a, b]); }
   const avg = keep.length ? Math.round(keep.reduce((a, s) => a + sc(s), 0) / keep.length) : 0;
   const cut = S.length - keep.length, fits = !!pt && keep.some(s => pt.fits(s.text));
-  return { ranges, score: avg, reason: cap(`${keep.length} of ${S.length} sentences kept in order${cut ? `, ${cut} weaker or filler ones cut` : ''}, opens on its strongest early line`), ...(fits ? { fits: true } : {}), text: snippet(keep.length ? keep : S, 0, Math.min(2, (keep.length || S.length) - 1)), label: 'Best version' };
+  return { ranges, score: avg, reason: cap(cut ? `${keep.length} of ${S.length} lines kept in order, ${cut} weaker or filler ones cut, opens on its strongest early line` : 'Every line, in order, with the pauses trimmed'), ...(fits ? { fits: true } : {}), text: snippet(keep.length ? keep : S, 0, Math.min(2, (keep.length || S.length) - 1)), label: 'Best version' };
 }
 
 // ad cuts: the best hook, then the strongest lines, then the call to action, inside 15 or 30 s

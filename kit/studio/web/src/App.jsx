@@ -3,7 +3,7 @@ import { Theme } from '@astryxdesign/core/theme';
 import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';
 import { aigentTheme } from './theme.js';
-import { api, quiet, toast, onToast, onOffline, setOffline, isOffline, STEPS, stepName, stepOf, viewOf, menuStep, layerOf, STEP_LAYERS, LAYER_STEP, pickState, Icon, IconBtn, cap1 } from './lib.jsx';
+import { api, quiet, toast, onToast, onOffline, setOffline, isOffline, STEPS, stepName, stepShort, stepOf, viewOf, menuStep, layerOf, STEP_LAYERS, LAYER_STEP, pickState, Icon, IconBtn, cap1 } from './lib.jsx';
 import { YourEdit } from './Edit.jsx';
 import { BRoll } from './BRoll.jsx';
 import { Keys } from './Keys.jsx';
@@ -165,14 +165,12 @@ export function App() {
         <nav className="stepper" aria-label="Steps"><ol id="stepper">
           {STEPS.map((st, k) => <li key={st} className={done[st] ? 'done' : ''}>
             <button type="button" data-step={st} aria-current={st === step ? 'step' : 'false'} title={stepName(st)} aria-label={`${k + 1}. ${stepName(st)}${done[st] && st !== step ? ', done' : ''}`} onClick={() => go(st, true)}>
-              <span className="sn">{done[st] && st !== step ? <Icon n="check" /> : k + 1}</span><span className="sl">{stepName(st)}</span>
+              <span className="sn">{done[st] && st !== step ? <Icon n="check" /> : k + 1}</span><span className="sl">{stepShort(st)}</span>
             </button></li>)}
         </ol></nav>
         <div className="topr">
           {recLive && step !== 'start' && <button type="button" className="rec-pill" id="rec-pill" onClick={() => go('start', true)} aria-label="Recording, go back to the recorder"><i aria-hidden="true" />{recLive.phase === 'paused' ? 'Paused' : recLive.phase === 'saving' ? 'Saving take' : 'Recording'}</button>}
-          {env.setup && !env.setup.ready && (() => { const nm = Object.values(env.setup.missing).filter(x => x.need === 'core').length; return <button type="button" className="setup-pill" id="setup-pill" onClick={openSetup} aria-label={`${nm} missing, open Setup check`} title="Setup check"><Icon n="ban" /><span className="sp-n">{nm}</span><span className="sp-l"> missing</span></button>; })()}
-          <button type="button" className="out-btn" id="wizards-open" aria-haspopup="dialog" onClick={() => setWizOpen(true)} title="A guided start"><Icon n="spark" /><span className="ob-l">Wizards</span></button>
-          <button type="button" className="out-btn" id="outputs-open" aria-haspopup="dialog" onClick={() => setOutputsOpen(true)} title="Every render, with its settings"><Icon n="film" /><span className="ob-l">Outputs</span></button>
+          {env.setup && !env.setup.ready && (() => { const nm = Object.values(env.setup.missing).filter(x => x.need === 'core').length; return <button type="button" className="setup-pill" id="setup-pill" onClick={openSetup} aria-label={`${nm} to fix, open Setup check`} title="Setup check"><Icon n="ban" /><span className="sp-n">{nm}</span><span className="sp-l"> to fix</span></button>; })()}
           <button type="button" className={'connect-btn ' + agentState} id="connect-open" aria-haspopup="dialog" onClick={openConnect} title={agentState === 'on' ? `${a.name} connected` : 'Connect your terminal agent'}><Icon n="plug" /><span className="cb-l">{agentState === 'on' || agentState === 'busy' ? (a.name || 'Agent') : 'Connect agent'}</span></button>
           <span id="taskpill" role="status" aria-live="polite" className={t ? '' : 'idle'}>{t ? <Badge label={pill} variant={running ? 'cyan' : t.status === 'failed' ? 'error' : 'neutral'} /> : <span className="sr">{pill}</span>}</span>
           <button type="button" className="icon-btn theme-btn" id="theme" data-mode={theme} aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} title={theme === 'dark' ? 'Light theme' : 'Dark theme'} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}><Icon n="moon" className="tm-moon" /><Icon n="sun" className="tm-sun" /></button>
@@ -182,15 +180,15 @@ export function App() {
             { id: 'more-open-video', label: 'Past videos', icon: 'film', onClick: () => setVideoMode('open') },
             { id: 'more-setup', label: 'Setup check', icon: 'check', onClick: openSetup },
             { id: 'more-keys', label: 'API keys', icon: 'link', onClick: openKeys },
-            narrow && { id: 'more-wizards', label: 'Wizards', icon: 'spark', onClick: () => setWizOpen(true) },
-            narrow && { id: 'more-outputs', label: 'Outputs', icon: 'film', onClick: () => setOutputsOpen(true) },
+            { id: 'more-wizards', label: 'Wizards', hint: 'A guided start', icon: 'spark', onClick: () => setWizOpen(true) },
+            { id: 'more-outputs', label: 'Outputs', hint: 'Every render', icon: 'film', onClick: () => setOutputsOpen(true) },
             narrow && { id: 'more-theme', label: theme === 'dark' ? 'Light theme' : 'Dark theme', icon: theme === 'dark' ? 'sun' : 'moon', onClick: () => setTheme(theme === 'dark' ? 'light' : 'dark') },
           ]} />
         </div>
       </header>
       <div className="layout">
         <main id="main" data-step={step} data-view={step === 'picture' ? picView : step === 'render' ? outView : 'main'} ref={mainRef}>
-          {!post && <YourEdit V={V} s={s} go={go} step={step} />}
+          {!post && step !== 'start' && <YourEdit V={V} s={s} go={go} step={step} />}
           {step === 'picture' && (refAny || breakdown) && <ViewSwitch id="look-switch" label="Picture" value={picView} set={v => { setPicView(v); history.replaceState(null, '', '#step=' + (v === 'reference' ? 'reference' : 'picture')); }} views={[['main', 'Your picture', 'look-sub-style'], ['reference', 'How the reference was made', 'look-sub-reference', refOn]]} />}
           {step === 'render' && <ViewSwitch id="render-switch" label="Render" value={outView} set={v => { setOutView(v); history.replaceState(null, '', '#step=' + (v === 'post' ? 'post' : 'render')); }} views={[['main', 'Render', 'render-sub-main'], ['post', 'Post', 'render-sub-post']]} />}
           {/* a new or opened video remounts the steps, so no step keeps the last board's local picks */}
@@ -210,7 +208,7 @@ export function App() {
           </Fragment>
           <footer className="stepnav glass" id="stepnav">
             <span style={{ visibility: i ? 'visible' : 'hidden' }}><Button id="prev" variant="ghost" label="Back" icon={<Icon n="left" />} onClick={() => go(STEPS[Math.max(0, i - 1)], true)} /></span>
-            <PicksTray s={s} patch={patch} cat={CAT} added={(V.look && V.look.added) || []} openLayer={pickTab} />
+            <PicksTray step={step} s={s} patch={patch} cat={CAT} added={(V.look && V.look.added) || []} openLayer={pickTab} />
             <AskAgent step={post ? 'post' : step} apply={apply} openChat={openChat} />
             {i < STEPS.length - 1 ? <Button id="next" variant={step === 'review' && !drafted ? 'secondary' : 'primary'} label={stepName(STEPS[i + 1])} endContent={<Icon n="right" />} onClick={() => go(STEPS[i + 1], true)} /> : <span className="nextpad" />}
           </footer>

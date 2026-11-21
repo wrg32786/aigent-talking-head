@@ -108,6 +108,10 @@ function Compose({ hidden, part, setPart, st, s, reload, V }) {
   useEffect(() => { if (making && !taskRunning) { setMaking(false); reload().catch(() => {}); } }, [taskRunning]);
   const makeFeed = () => api('/api/sizes/make', { size: 'feed45', file: reel }).then(() => setMaking(true)).catch(() => {});
   const name = f => String(f || '').split('/').pop();
+  // a reel by its version, not its file name (the file name stays in the tooltip and on Download)
+  const verName = f => { const m = name(f).match(/^reel-v(\d+)/); return m ? `Version ${m[1]}` : name(f); };
+  // a channel set to the Feed while the 4:5 is not made yet: the one fixable reason, said once on its row with the fix
+  const needsFeed = c => feedMissing && c.service === 'instagram' && place[c.id] === 'feed';
   const toggle = id => setPick(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
   const canSend = picked.length > blocked.length && (mode !== 'schedule' || due) && (mode !== 'now' || confirm) && (host !== 'url' || /^https:\/\//.test(url.trim())) && !(job && job.status === 'running') && !making;
   const send = async () => {
@@ -118,10 +122,9 @@ function Compose({ hidden, part, setPart, st, s, reload, V }) {
   return <div className="post-compose">
     {part === 'channels' && <>
       <div className="glass-card post-card" id="post-reel">
-        <label className="col"><span className="lbl">Reel</span><select id="post-reel-pick" value={reel} onChange={e => setReel(e.target.value)}>{st.reels.map(r => <option key={r} value={r}>{r.split('/').pop()}{st.files && st.files[r] ? ` (${st.files[r].use})` : ''}</option>)}</select></label>
-        <div className="post-reel-row"><video src={file(reel) + '#t=1.2'} preload="metadata" muted aria-label={'Preview of ' + reel.split('/').pop()} /><p className="fine" id="post-reel-info">{info ? [secs(info.seconds), info.width && `${info.width}x${info.height}`, info.vcodec && (info.vcodec === 'h264' ? 'H.264' : `${info.vcodec}, re-encoded to H.264 when sent`), info.size && `${Math.round(info.size / 1e6 * 10) / 10} MB`].filter(Boolean).join(', ') : ''}</p></div>
-        <div className="post-where" id="post-where"><Icon n="info" /><p className="fine">{st.where || 'Reels and Stories get the 9:16 file. The Instagram Feed gets the 4:5 file.'}{toFeed.length > 0 && feedFile && !feedFile.missing && <> <b id="post-feed-file">{name(feedFile.file)}</b> goes to the Feed.</>}</p>
-          {feedMissing && <Button id="post-make-feed" size="sm" variant="primary" label={st.makeFeed || 'Make the 4:5 version for the Feed'} isLoading={making || taskRunning} isDisabled={taskRunning} onClick={makeFeed} />}</div>
+        <label className="col"><span className="lbl">Reel</span><select id="post-reel-pick" value={reel} onChange={e => setReel(e.target.value)}>{st.reels.map(r => <option key={r} value={r}>{verName(r)}{st.files && st.files[r] ? ` (${st.files[r].use})` : ''}</option>)}</select></label>
+        <div className="post-reel-row"><video src={file(reel) + '#t=1.2'} preload="metadata" muted aria-label={'Preview of ' + reel.split('/').pop()} /><p className="fine" id="post-reel-info" title={info ? [name(reel), info.width && `${info.width}x${info.height}`, info.size && `${Math.round(info.size / 1e6 * 10) / 10} MB`].filter(Boolean).join(', ') : undefined}>{info ? secs(info.seconds) : ''}</p></div>
+        <div className="post-where" id="post-where"><Icon n="info" /><p className="fine">{st.where || 'Reels and Stories get the 9:16 file. The Instagram Feed gets the 4:5 file.'}</p></div>
       </div>
       <div className="glass-card post-card" id="post-channels">
         <div className="row"><h3 className="lbl">Channels</h3><Button id="post-reload-channels" size="sm" variant="ghost" label="Reload" onClick={() => loadChs(true)} /></div>
@@ -130,11 +133,12 @@ function Compose({ hidden, part, setPart, st, s, reload, V }) {
         {chs && !chs.length && <p className="fine">No channels in your Buffer account yet. Connect Instagram, TikTok, YouTube and others in Buffer, then Reload.</p>}
         {chs && <ul className="post-ch-list">{chs.map(c => { const on = pick.includes(c.id), ck = checks[c.id]; return <li key={c.id} data-id={c.id} data-service={c.service} className={on ? 'on' : ''}>
           <label><input type="checkbox" checked={on} onChange={() => toggle(c.id)} /><span className="pc-n"><b>{c.name}</b><small className="fine">{SERVICE[c.service] || c.service}{c.rules && c.rules.max ? `, up to ${secs(c.rules.max)}` : ''}</small></span>
-            {on && ck && !ck.ok && <Badge label="Will be skipped" variant="error" />}{on && ck && ck.ok && ck.warn.length > 0 && <Badge label="Check" variant="warning" />}</label>
+            {on && ck && !ck.ok && <Badge label={needsFeed(c) ? "Can't post yet" : "Can't post this one"} variant={needsFeed(c) ? 'warning' : 'error'} />}{on && ck && ck.ok && ck.warn.length > 0 && <Badge label="Check" variant="warning" />}</label>
           {on && c.service === 'instagram' && <div className="pc-place"><span className="fine" id={'post-place-l-' + c.id}>Post to</span><div className="seg" role="radiogroup" aria-labelledby={'post-place-l-' + c.id} id={'post-place-' + c.id}>
             {[['reel', 'Reels'], ['feed', 'Feed']].map(([v, l]) => <button key={v} type="button" role="radio" data-place={v} aria-checked={(place[c.id] || 'reel') === v} onClick={() => setPlace(p => ({ ...p, [c.id]: v }))}>{l}</button>)}</div>
-            <span className="fine pc-file">{place[c.id] === 'feed' ? (feedFile && !feedFile.missing ? `Gets ${name(feedFile.file)} (4:5)` : 'Needs the 4:5 version') : `Gets ${name(reel)}`}</span></div>}
-          {on && ck && (ck.block.length > 0 || ck.warn.length > 0) && <p className="fine pc-why">{[...ck.block, ...ck.warn].join(' ')}</p>}
+            <span className="fine pc-file" title={place[c.id] === 'feed' ? (feedFile && !feedFile.missing ? name(feedFile.file) : undefined) : name(reel)}>{place[c.id] === 'feed' ? (feedFile && !feedFile.missing ? 'Gets the 4:5 version' : 'Needs the 4:5 version.') : 'Gets the 9:16 version'}</span>
+            {needsFeed(c) && <Button id={c.id === (toFeed[0] || {}).id ? 'post-make-feed' : undefined} size="sm" variant="primary" label="Make it" aria-label={st.makeFeed || 'Make the 4:5 version for the Feed'} isLoading={making || taskRunning} isDisabled={taskRunning} onClick={makeFeed} />}</div>}
+          {on && ck && !needsFeed(c) && (ck.block.length > 0 || ck.warn.length > 0) && <p className="fine pc-why">{[...ck.block, ...ck.warn].join(' ')}</p>}
         </li>; })}</ul>}
       </div>
       <div className="glass-card post-card" id="post-caption">
