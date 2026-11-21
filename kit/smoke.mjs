@@ -1022,6 +1022,7 @@ try {
       ['Studio Finish in Chrome: six steps, Your edit, Draft from your pieces, one Render with clips and plain clips, MCP get_edit and studio_run (tests/studio-finish.e2e.mjs)', 'studio-finish.e2e.mjs'],
       ['Studio New video in Chrome: start fresh keeps the look, nothing deleted, open a past video restores it, More menu (tests/studio-videos.e2e.mjs)', 'studio-videos.e2e.mjs'],
       ['Studio fix buttons in Chrome: no terminal command on the page, Install, Send and Copy for my agent, the toast and Setup check (tests/studio-fixes.e2e.mjs)', 'studio-fixes.e2e.mjs'],
+      ['Studio Recreate drafts from your pieces: --as-is with the reference recipe, the cut line stays out, drafted and not stale after, Render next (tests/studio-recreate-pieces.test.mjs)', 'studio-recreate-pieces.test.mjs'],
       ['Studio review tools in Chrome: what to swap, show original, comments, clean-up pass, edit receipt (tests/studio-review.e2e.mjs)', 'studio-review.e2e.mjs'],
     ];
     const jobs = Math.max(1, +process.env.SMOKE_E2E_JOBS || 2), out = new Array(E2E.length);

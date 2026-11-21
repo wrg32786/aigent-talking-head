@@ -232,8 +232,10 @@ function draftSteps(s) {
   if (comp.errs.length) throw Object.assign(new Error(comp.errs.join('; ')), { code: 400 });
   let args = comp.args.slice();
   if (recreate) { const i = args.indexOf('--pack'); if (i >= 0) args.splice(i, 2); args.push('--recipe', join(s.reference.out, 'Reel.md')); }
-  // your pieces (the Combo) when you kept any: cut once, here, and handed to the reel as they are (--as-is)
-  const combo = comboOf(s), fromPieces = draftFrom(s, combo) === 'pieces' && !recreate;
+  // your pieces (the Combo) when you kept any: cut once, here, and handed to the reel as they are (--as-is). Recreate
+  // runs on them too, with the reference's Reel.md as the recipe, so the draft is what Your edit says it is (it used
+  // to switch to the whole take, so the draft's key never matched and Render could not come on)
+  const combo = comboOf(s), fromPieces = draftFrom(s, combo) === 'pieces';
   if (fromPieces) {
     const cf = comboFiles(s, combo);
     return { steps: [...cf.steps, [process.env.STUDIO_REEL || 'kit/reel.cjs', [...cf.files, '--as-is', '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])]]], lockString: comp.lockString, txPrompt: null, key: draftKey(s, combo), from: 'pieces', pieces: combo.pieces.length };
