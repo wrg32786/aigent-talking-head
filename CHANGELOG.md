@@ -2,6 +2,19 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.23.1 (unreleased)
+
+Release notes: [docs/releases/v1.23.1.md](docs/releases/v1.23.1.md). Recreate tells the truth about the reference (from Fable's end to end review).
+
+- **Music is not dropped by mistake.** A teardown wrote `bed: none` whenever no library bed matched the tempo, which Studio read as "the reference has no music". Now it writes `bed: auto` (the kit picks one) when music is heard, and `none` only when the music stem is quiet or absent.
+- **No invented Look or glitch.** The recipe no longer names the `aigent` preset (`preset: auto`) and its job transition is `none` (hard cuts) unless the reference dissolves, so a glitch is no longer picked "seen 1 time between shots".
+- **Re-cut seams stay hard cuts.** A transitions lock skips Recreate's re-cut seams (`s.recut`) like jump cuts, so a transition never lands mid sentence.
+- **Forbid reaches the recipe's scenes.** A REF scene forbidden on the Look step is left out of a Recreate draft too (`--scenes-off` on `npm run reel`).
+- **Effects on the cut.** A recipe effect scene moves to the nearest seam of your edit when one is within a second.
+- **One scene per look.** The scene library dedupes by look, not by where it sat, so one label style no longer fills the menu.
+- **Sounds.** A reference sound named with an underscore (`cha_ching`) maps to its kit sound instead of a pop.
+- **Tests.** `tests/ref-scenes.test.mjs` covers each.
+
 ## 1.23.0 (unreleased)
 
 Release notes: [docs/releases/v1.23.0.md](docs/releases/v1.23.0.md). A calmer reference: one control, one path, details when you want them.

@@ -329,6 +329,8 @@ export function compose(s, { refPack = null } = {}) {
   if (g && (g.allow.length || g.deny.length)) locks.graphics = { ...(g.allow.length ? { allow: g.allow.slice() } : {}), ...(g.deny.length ? { deny: g.deny.slice() } : {}) };
   const scn = g0 ? g0.allow.filter(id => isScene(id) && !g0.deny.includes(id) && SCN.get(id)) : [];
   if (scn.length) args.push('--scenes', scn.join(','));
+  const scOff = g0 ? g0.deny.filter(isScene) : []; // a forbidden scene stays out, the recipe's own too (Recreate)
+  if (scOff.length) args.push('--scenes-off', scOff.join(','));
   const fi = allowed(s, 'finish'); if (fi) locks.finishes = fi.length ? fi : ['none'];
   const one = k => s.picks[k] && s.picks[k].allow[0];
   if (one('captionEntrance')) { locks.captionEntrance = one('captionEntrance'); args.push('--caption-entrance', one('captionEntrance')); }

@@ -92,6 +92,23 @@ await t('Recreate takes the reference with no music bed as no bed', () => {
   assert.strictEqual((C.referenceLook(ex, 'recreate', cat).music || {}).bed, 'none');
   assert.notStrictEqual((C.referenceLook(ex, 'influence', cat).music || {}).bed, 'none');
 });
+await t('Recreate tells the truth: music with no bed match is not "no music", no invented Look or glitch, forbidden scenes stay out', () => {
+  const withMusic = { ...B, audio: { music: { present: true } }, stems: { level_db: { mix: -14, vocals: -16, music: -24 } }, audio_plan: { sfx_merged: [{ t: 2, dur: 0.3, level_db: -20, type: 'cha_ching' }] } };
+  const r = V.convert(withMusic, {}, { dir: pkg });
+  assert.match(r.md, /- bed: auto/, 'music heard, no library bed matched: the kit picks one');
+  assert.match(r.md, /- preset: auto/); assert.match(r.md, /- transition: none/);
+  assert.match(r.md, /type cha-ching/);
+  writeFileSync(join(pkg, 'Music.md'), r.md);
+  const ex = C.extract(join(pkg, 'Music.md'));
+  assert.ok(!ex.music.noBed && ex.music.bed === null, JSON.stringify(ex.music));
+  assert.ok(!Object.keys(ex.transitions).includes('glitch'), 'no glitch from nowhere');
+  const L = require('../kit/locks.cjs'), cut = { segs: [{ in: 0, out: 1 }, { in: 1, out: 2, recut: true }, { in: 2, out: 3 }] };
+  L.applyCut({ transitions: ['whip'] }, cut);
+  assert.deepStrictEqual(cut.segs.map(x => x.transition || null), [null, null, 'whip'], 'a re-cut seam stays a hard cut');
+  const s = C.load(), id = res.scenes[1].id; s.picks.graphic = { allow: [], deny: [id] };
+  const { args } = C.compose(s), i = args.indexOf('--scenes-off');
+  assert.ok(i >= 0 && args[i + 1] === id, args.join(' '));
+});
 await t('a timer or number slot nobody took gets your own words, whole words, near its time', () => {
   const w = s => s.split(' ').map((x, i) => ({ start: i * 0.4, end: i * 0.4 + 0.3, word: x }));
   const W = w('so you only need five minutes a day to learn three easy tricks okay');

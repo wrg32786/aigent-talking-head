@@ -391,7 +391,7 @@ function convert(b, extras = {}, opts = {}) {
 
   // the reference's sound effects (rea-video audio_plan.sfx_merged), the loud enough ones
   const sfx = (((b.audio_plan || {}).sfx_merged) || []).filter(x => x && Number.isFinite(+x.t) && x.type && !(x.level_db < -60)).slice(0, 24)
-    .map(x => ({ t: r2(x.t), dur: +x.dur || 0.2, type: String(x.type).toLowerCase().replace(/[^a-z-]/g, ''), on: x.on && x.on.type ? String(x.on.type).replace(/[^a-z_]/g, '') : null }));
+    .map(x => ({ t: r2(x.t), dur: +x.dur || 0.2, type: String(x.type).toLowerCase().replace(/[_\s]+/g, '-').replace(/[^a-z-]/g, ''), on: x.on && x.on.type ? String(x.on.type).replace(/[^a-z_]/g, '') : null }));
   // boxes the reference drew over a shot (rea-video overlay.boxes) and its stickers: graphics slots, placeholders until you fill them
   const busy = (a, z) => graphics.some(g => g.start < z && a < g.end);
   const extraG = [];
@@ -428,10 +428,10 @@ function convert(b, extras = {}, opts = {}) {
   const L = ['---', RM.dumpYaml(card).trimEnd(), '---', '', `# Teardown: ${src.file || name}`, '',
     'Detected from the reference. Read the teardown report next to this file, change anything that looks wrong, then remake:',
     `\`npm run reel -- --recipe ${opts.recipePath || 'teardown/' + name + '/Reel.md'} --clip inbox/your-clip.mp4\``, '',
-    '## Brand kit', '- preset: aigent', '- theme: aigent', `- colors: ${colours.join(', ') || 'none'}`, '- fonts: theme', '- logo: none', '',
-    '## Music', `- bed: ${hasMusic && bed ? bed.name : 'none'}`, ...(hasMusic && bed && level && level.vol ? [`- bed-volume: ${level.vol}`] : []), `- bpm: ${bpm ? Math.round(bpm) : ''}`, `- beat-sync: ${hasMusic ? 'on' : 'off'}`, '',
+    '## Brand kit', '- preset: auto', '- theme: aigent', `- colors: ${colours.join(', ') || 'none'}`, '- fonts: theme', '- logo: none', '',
+    '## Music', `- bed: ${!hasMusic ? 'none' : bed ? bed.name : 'auto'}`, ...(hasMusic && bed && level && level.vol ? [`- bed-volume: ${level.vol}`] : []), `- bpm: ${bpm ? Math.round(bpm) : ''}`, `- beat-sync: ${hasMusic ? 'on' : 'off'}`, '',
     '## Style', `- look: ${look}`, `- captions: ${cs.style}`, ...(cs.position ? [`- caption-position: ${cs.position}`] : []), ...(cs.color ? [`- caption-color: ${cs.color}`] : []), ...(cs.outline ? [`- caption-outline: ${cs.outline}`] : []), ...(cs.shadow ? [`- caption-shadow: ${cs.shadow}`] : []), ...(cs.textCase && cs.style === 'one-word' ? [`- caption-case: ${cs.textCase}`] : []), ...(cs.layer ? [`- caption-layer: ${cs.layer}`] : []), `- titles: ${titles.length ? 'on' : 'off'}`, `- title-layer: ${layerDefault}`,
-    `- finish: ${jobFinish ? jobFinish.split(',').join(', ') : 'none'}`, `- transition: ${shots.some(s => /dissolve|fade|cross/.test(s.transitionIn || '')) ? 'crossfade' : 'glitch'}`,
+    `- finish: ${jobFinish ? jobFinish.split(',').join(', ') : 'none'}`, `- transition: ${shots.some(s => /dissolve|fade|cross/.test(s.transitionIn || '')) ? 'crossfade' : 'none'}`,
     `- punch: ${zoomShots || jumpCuts || avgShot < 3 ? 'on' : 'off'}`, '- effects: none', '',
     '## Shots', '', '```videomd-timeline'];
   for (const s of shots) {

@@ -47,7 +47,7 @@ export function extract(recipePath) {
     name: (r.card && r.card.name) || basename(dirname(recipePath)), shots: (r.shots || []).length, titles: (r.titles || []).length,
     preset: br.preset && br.preset !== 'none' ? br.preset : null, look: st.look || null, captionStyle: st.captions || null,
     transitions: tcount, entrances: real('entrance', entrances), finishes: real('finish', finishes), graphics: real('graphic', graphics), effects: real('effect', effects),
-    music: { bed: mu.bed && mu.bed !== 'none' ? mu.bed : null, ...(mu.bed === 'none' ? { noBed: true } : {}), energy: mu.energy || null, beatSync: mu['beat-sync'] || null }, punch: st.punch || null,
+    music: { bed: mu.bed && !/^(none|auto)$/i.test(mu.bed) ? mu.bed : null, ...(mu.bed === 'none' ? { noBed: true } : {}), energy: mu.energy || null, beatSync: mu['beat-sync'] || null }, punch: st.punch || null,
     ran: ranOf(dirname(recipePath), r),
     // what was made for the menu from it (kit/scenes.cjs), and what Recreate re-cuts and brings: its shot plan, framing, cutaways and sounds
     scenes: scenesOf(r, dirname(recipePath)),
