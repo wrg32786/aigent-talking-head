@@ -7,6 +7,7 @@ Each version below is one GitHub release. `npm run release:notes -- --version X.
 Release notes: [docs/releases/v1.18.2.md](docs/releases/v1.18.2.md). Recreate drafts from your pieces.
 
 - **Recreate keeps your pieces.** With a reference on Recreate, Draft used the whole take even when you kept pieces on Cut (`fromPieces = ... && !recreate` in `draftSteps`), so a line you cut out came back. The draft was saved under the take's key while Your edit and Finish asked for the pieces' key, so after every draft Studio still said "Your pieces changed since the draft" (`drafted: false, stale: true`) and Render never came on. Recreate now drafts from your pieces, already cut (`--as-is`), with the reference's Reel.md as the recipe, and the draft counts as done.
+- **A reference, then your take.** A reference on its own no longer counts as an edit, so adding your first take after picking a reference keeps it (1.18.1 started a fresh edit and cleared the reference).
 - **Tests.** `tests/studio-recreate-pieces.test.mjs` (in `npm run smoke`, it needs ffmpeg).
 
 ## 1.18.1 (unreleased)

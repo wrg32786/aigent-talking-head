@@ -649,8 +649,7 @@ export function hasEdit(s) {
   if (s.asIs || (s.pieces && Object.keys(s.pieces).length) || (s.lines && Object.keys(s.lines).length)) return true;
   const b = s.job && (s.broll || {})[s.job];
   if (b && (Object.keys(b.slots || {}).length || Object.keys(b.ideas || {}).length || (b.marks || []).length || (b.cutins || []).length)) return true;
-  const r = s.reference || {};
-  if (r.file || r.url || r.extracted || r.status && r.status !== 'none') return true;
+  // a reference on its own is not an edit: picking a reference, then adding your take, keeps the reference
   return false;
 }
 // hide leftover spots and the on-disk draft without deleting any file
