@@ -197,6 +197,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'recreate-shotplan.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
     catch (e) { shperrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Recreate shot plan tests (tests/recreate-shotplan.test.cjs: a multi-shot reference to a recipe, one take re-cut on word boundaries with framing per shot, sounds, boxes, titles by role, transcript offset, an end in a pause)', errs: shperrs, warns: [] });
+    const rperrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'recreate-plan.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
+    catch (e) { rperrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Recreate module and plan.json tests (tests/recreate-plan.test.cjs: one scale, per-shot settings, sounds, shakes, graphics, accent, a recipe draft writes build/plan.json, read first with cut.json refShots as the fallback)', errs: rperrs, warns: [] });
     const scerrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'ref-scenes.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { scerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }

@@ -1,7 +1,7 @@
 {
   "contract": 1,
   "name": "aigent-talking-head",
-  "version": "1.26.0",
+  "version": "1.27.0",
   "summary": "Turn a phone clip into a captioned, styled 9:16 talking-head reel, locally.",
   "skill": "skills/aigent-talking-head/SKILL.md",
   "invoke": "npm run <command> -- <args>  (from the repo root; or node <script> <args>)",
@@ -145,6 +145,7 @@
       "outputs": [
         "jobs/<name>/clips/clips.json and clips.md (best take per sentence, retakes flagged)",
         "jobs/<name>/build/cut.json, captions.js, theme.js and overlay frames",
+        "jobs/<name>/build/plan.json with --recipe: what the draft took from the recipe (shots, transitions, moves, shakes, sounds, scenes, theme, accent; docs/reel-md.md)",
         "jobs/<name>/reel-vN.mp4 (a new number each run; earlier versions are kept)",
         "jobs/<name>/reel-vN-<export>.mp4 with --export",
         "jobs/<name>/build/layout.json: what the layout pass moved clear of a graphic, hid while one was up, or placed inside the export's safe area",

@@ -2,6 +2,15 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.27.0 (unreleased)
+
+Release notes: [docs/releases/v1.27.0.md](docs/releases/v1.27.0.md). Recreate code split into small modules, and one plan file per draft (built with Fable).
+
+- **Converter split.** `kit/videomd2reel.cjs` (594 lines) is now a 112-line orchestrator over `kit/teardown/`: `captions`, `titles`, `graphics`, `grade`, `music`, `palette`, `scenes-out`, `recipe`, `report` and `util`. Every old export is kept. Output is byte for byte the same on five breakdowns.
+- **One Recreate module.** `kit/recreate.cjs` holds the scale, recut, shot plan, reference sounds, shakes, graphics scale, title slots and accent that were spread through `kit/reel.cjs`. The three copies of the length and scale sum are one (`scaleOf`).
+- **`build/plan.json`.** Every draft from a recipe writes one plan: version, recipe, scale, shots, transitions, moves, shakes, sounds, scenes, theme and accent. Studio's B-roll spots read it first and fall back to `cut.refShots`. A draft with no recipe removes it. Documented in `docs/reel-md.md` and the contract.
+- **Tests.** `tests/recreate-plan.test.cjs` (7 tests), wired into `npm run check`.
+
 ## 1.26.0 (unreleased)
 
 Release notes: [docs/releases/v1.26.0.md](docs/releases/v1.26.0.md). B-roll like the reference, and a remake that keeps the eyes clear.

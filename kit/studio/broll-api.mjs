@@ -37,7 +37,7 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     try { cut = JSON.parse(readFileSync(join(b, 'cut.json'), 'utf8')); } catch { return null; }
     try { const g = {}; new Function('window', readFileSync(join(b, 'captions.js'), 'utf8'))(g); caps = g.CAPTIONS; } catch {}
     const base = LANE.beats(cut, caps), len = base.length ? base[base.length - 1].end : 0;
-    let refs = []; try { refs = (refParts(s, cut) || []).map(r => ({ ...r, at: r.frac != null ? +r.frac * len : +r.at, ...(r.fracLen != null ? { seconds: +(r.fracLen * len).toFixed(2) } : {}) })).filter(r => r.at >= 0 && r.at < len); } catch {}
+    let refs = []; try { refs = (refParts(s, cut, job) || []).map(r => ({ ...r, at: r.frac != null ? +r.frac * len : +r.at, ...(r.fracLen != null ? { seconds: +(r.fracLen * len).toFixed(2) } : {}) })).filter(r => r.at >= 0 && r.at < len); } catch {}
     const j = peek(s, job);
     return { cut, caps, beats: LANE.spots(cut, caps, { marks: j.marks, refs }), len };
   }

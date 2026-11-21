@@ -94,6 +94,7 @@ const RM = require('./reelmd.cjs');
 const S = require('./spoken.cjs');
 const CARDS = require('./cards.cjs');
 const SFXMAP = require('./sfx-map.cjs');
+const RC = require('./recreate.cjs');
 
 const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
@@ -113,7 +114,6 @@ const PY = process.env.PYTHON || [path.join(ROOT, '.venv', 'Scripts', 'python.ex
 const GL = require('./glossary.cjs');
 const BR = require('./brands.cjs');
 const CP = require('./cutpoints.cjs');
-const SFXPLAN = require('./sfx-plan.cjs');
 const many = k => argv.flatMap((a, i) => (a === '--' + k && argv[i + 1] && !argv[i + 1].startsWith('--') ? [argv[i + 1]] : []));
 
 let srcs = positional.slice();
@@ -304,16 +304,10 @@ if (!flag('rebuild')) {
   if (wantPunch && keep.length >= 3) { segs[clipStart[1]].bigPunch = true; segs[clipStart[keep.length - 1]].bigPunch = true; }
   // --recut (Studio's Recreate): your edit re-cut to the recipe's shot plan, on word boundaries, with the reference's
   // framing per shot (kit/shotplan.cjs). The recipe's per-shot settings then go to these shots, not to your clips.
-  let RECUT = null, REFSHAKES = [];
+  let RECUT = null, SCALE = null, REFSHAKES = [], REFSOUNDS = [];
   if (flag('recut') && recipe && recipe.shots.length >= 2) {
-    const SPL = require('./shotplan.cjs'), envs = new Map();
-    const envOf = i => { const f = path.join(clipsDir, path.basename(segClip[i].file)); if (!envs.has(f)) envs.set(f, CP.envelopeSync(f)); return envs.get(f); };
-    const quiet = (i, a, b) => { const e = envOf(i); return e ? SPL.quietFrom(CP, e)(a, b) : null; };
-    const plan0 = RM.shotSettings(recipe);
-    if (keep.length >= 3) segs.forEach(x => { delete x.bigPunch; });
-    RECUT = SPL.recut(segs, i => segClip[i].words || [], plan0, quiet);
-    segs.splice(0, segs.length, ...RECUT.segs);
-    console.log(`recut: ${RECUT.plan.length} shots from the recipe's ${plan0.length} (scaled to ${segs.reduce((a, x) => a + x.out - x.in, 0).toFixed(1)} s), cuts at ${RECUT.cuts.map(c => c.t + ' s (' + c.on + ')').join(', ') || 'none'}${RECUT.skipped.length ? `; no quiet near ${RECUT.skipped.map(x => x.at + ' s').join(', ')}, those shots play as one` : ''}`);
+    RECUT = RC.recut({ recipe, segs, segClip, clipsDir, manyClips: keep.length >= 3 });
+    SCALE = RC.scaleOf(recipe, segs); // the edit's length against the reference's: every scaled time below uses it
   }
   let t = 0; const seams = [], jumpSeams = new Set();
   segs.forEach((s, i) => { if (i) { seams.push(+t.toFixed(3)); if (s.jump || s.recut) jumpSeams.add(+t.toFixed(3)); } t += s.out - s.in; });
@@ -357,19 +351,16 @@ if (!flag('rebuild')) {
   if (flag('no-beat-sync')) cut.beatSync = false;
   else if (flag('beat-sync') || bed) cut.beatSync = true;
   if (recipe) {
-    const plan = RM.shotSettings(recipe), SPLM = require('./shotplan.cjs'), shakeAt = [];
-    // per-shot settings go to each clip (its first segment, or every segment for a finish, when pauses were tightened)
+    // per-shot settings go to the re-cut shots (Recreate), else to each clip (kit/recreate.cjs)
+    const { plan, shakeAt } = RC.applyShotPlan({ recipe, segs, rc: RECUT, clipStart, wantPunch });
     if (RECUT) {
-      RECUT.shotStart.forEach((k, j) => { const p = plan[RECUT.shotOf[j]] || {}, sg = segs[k], subs = segs.slice(k, RECUT.shotStart[j + 1] ?? segs.length); if (p.finish) subs.forEach(x => { x.finish = p.finish; }); if (p.bigPunch && wantPunch) sg.bigPunch = true; if (p.transition && j) sg.transition = p.transition; if (p.move && !sg.bigPunch) sg.push = SPLM.MOVES[p.move]; if (p.shake && j) shakeAt.push(k); });
       cut.refShots = RECUT.plan;
       // the reference's sound effects, scaled to your edit, as the kit's sounds (the cap still thins them)
-      const len = segs.reduce((a, x) => a + x.out - x.in, 0), R0 = +(recipe.card.source && recipe.card.source.duration) || recipe.shots[recipe.shots.length - 1].end || len, k = len / R0;
-      const hits = (recipe.sfx || []).map(x => ({ id: x.sound || require('./shotplan.cjs').sfxId(x.type), t: +(x.start * k).toFixed(3), ref: true })).filter(h => h.t < len - 0.1 && SFXPLAN.lookup(h.id));
+      const hits = REFSOUNDS = RC.refSounds(recipe, SCALE);
       if (hits.length) { cut.sfx = {}; cut.sfxHits = (cut.sfxHits || []).concat(hits); console.log(`recut: ${hits.length} sound effects from the reference at its times, scaled (${hits.map(h => h.id + '@' + h.t).join(', ')})`); }
-    } else plan.forEach((p, i) => { const k = clipStart[i]; if (k == null) return; const sg = segs[k], subs = segs.slice(k, clipStart[i + 1] ?? segs.length); if (p.finish) subs.forEach(x => { x.finish = p.finish; }); if (p.bigPunch && wantPunch) sg.bigPunch = true; if (p.transition && i) sg.transition = p.transition; if (p.move && !sg.bigPunch) sg.push = SPLM.MOVES[p.move]; if (p.shake && i) shakeAt.push(k); });
+    }
     // the reference's handheld or shaking shots: a shake on the cut in, just after the seam (the voice runs on across it)
-    if (shakeAt.length) { const at = k => segs.slice(0, k).reduce((a, x) => a + x.out - x.in, 0);
-      REFSHAKES = shakeAt.map(k => [+(at(k) + 0.08).toFixed(3), 18]); }
+    REFSHAKES = RC.refShakes(segs, shakeAt);
     if (!RECUT && plan.length !== keep.length) console.log(`recipe: ${plan.length} shots in the recipe, ${keep.length} clips from your takes; per-shot settings applied to the first ${Math.min(plan.length, keep.length)}`);
     if (preset.bedStart != null && opt('bed-start') == null && cut.bed) cut.bedStart = preset.bedStart;
     if (preset.bedVol != null && cut.bed) cut.bedVol = preset.bedVol;
@@ -390,9 +381,8 @@ if (!flag('rebuild')) {
   if (preset && preset.glitch === false) { cut.hits = []; cut.glitch = false; }
   // the reference's handheld or shaking shots: a shake on the cut in, just after the seam (kept with glitch off: the
   // reference shook there)
-  if (REFSHAKES.length) { const hits = cut.hits || (cut.hits = []), added = [];
-    for (const h of REFSHAKES) if (!hits.some(([x]) => Math.abs(x - h[0]) < 0.2)) { hits.push(h); added.push(h[0]); }
-    hits.sort((a, z) => a[0] - z[0]); if (added.length) console.log(`recipe: a shake at ${added.join(', ')} s (the reference's handheld shots)`); }
+  const SHAKES = RC.addShakes(cut, REFSHAKES);
+  if (SHAKES.length) console.log(`recipe: a shake at ${SHAKES.join(', ')} s (the reference's handheld shots)`);
   if (opt('title-layer')) {
     const layer = String(opt('title-layer')).toLowerCase();
     if (!R.TITLE_LAYERS.includes(layer)) die('--title-layer must be front, behind or auto');
@@ -441,8 +431,7 @@ if (!flag('rebuild')) {
       mine.forEach((f, i) => { const r = byRole ? byRole.get(f) : rt[i]; if (!r) return; if (r.entrance && !used.has(r.entrance)) { f.entrance = r.entrance; used.add(r.entrance); set.add(f); } if (r.layer) f.layer = r.layer; if (r.place) f.place = r.place; if (r.lockup) f.lockup = r.lockup; });
       mine.forEach(f => { if (!set.has(f) && f.entrance && used.has(f.entrance)) delete f.entrance; }); // each entrance once; the engine fills the rest
       if (RECUT) { // a timer or number slot in the reference none of your titles took: a title from your matching words there
-        const len = segs.reduce((a, x) => a + x.out - x.in, 0), R0 = +(recipe.card.source && recipe.card.source.duration) || recipe.shots[recipe.shots.length - 1].end || len;
-        const made = require('./shotplan.cjs').fillSlots(rt, [...byRole.values()], S.timeline(segs, build), { k: len / R0, len, taken: mine });
+        const made = RC.titleSlots(rt, [...byRole.values()], S.timeline(segs, build), SCALE, mine);
         if (made.length) { caps.flips = caps.flips.concat(made).sort((a, b) => a.start - b.start); console.log(`recipe title slots: ${made.map(f => `"${f.text}" (${f.role}) at ${f.start}s`).join(', ')} from your words`); }
       }
       console.log(`recipe titles: entrance, layer and place pattern applied to ${Math.min(mine.length, rt.length)} of your ${mine.length} titles (pass --recipe-titles to use the recipe's text)`);
@@ -469,10 +458,7 @@ if (!flag('rebuild')) {
     if (recipe && flag('capture-sources')) { try { sh(process.execPath, [path.join(KIT, 'capture.mjs'), '--recipe', recipe.file], ROOT); } catch { console.warn('note: some sources were not captured (listed above); their cards use the placeholder'); } }
     const gfx = recipe ? RM.graphicFlips(recipe) : [];
     // Recreate: the reference's graphics at its times scaled to your edit, like its shots and sounds
-    if (RECUT && gfx.length) {
-      const len = segs.reduce((a, x) => a + x.out - x.in, 0), R0 = +(recipe.card.source && recipe.card.source.duration) || recipe.shots[recipe.shots.length - 1].end || len, k = len / R0;
-      if (Math.abs(k - 1) > 0.01) { for (const g of gfx) { const d = g.end - g.start; g.start = +(g.start * k).toFixed(3); g.end = +(g.start + Math.max(0.6, Math.min(d, d * k + 0.4))).toFixed(3); } console.log(`recut: ${gfx.length} graphics from the reference at its times, scaled by ${k.toFixed(2)}`); }
-    }
+    if (RECUT && gfx.length && RC.scaleGraphics(gfx, SCALE)) console.log(`recut: ${gfx.length} graphics from the reference at its times, scaled by ${SCALE.k.toFixed(2)}`);
     // scenes (kit/scenes.cjs): what the menu had no item for, made from the reference (its scenes.json, else the
     // library) or picked from the menu (--scenes). {{text}} shows a word you say then, never the reference's words.
     {
@@ -670,12 +656,11 @@ if (!flag('rebuild')) {
   fs.copyFileSync(th, path.join(build, 'theme.js'));
   // a recipe's colours (Reel.md brand kit "colors", read from the reference's titles and captions): its accent goes on the
   // theme's hero words, stickers, number tiles and cards, unless you named a theme yourself
-  if (recipe && !opt('theme') && preset && Array.isArray(preset.colors) && preset.colors.length) {
-    const hex = preset.colors.filter(c => /^#[0-9a-f]{6}$/i.test(c)), rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
-    const lum = h => { const [r, g, b] = rgb(h); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }, sat = h => { const c = rgb(h), mx = Math.max(...c); return mx ? (mx - Math.min(...c)) / mx : 0; };
-    const accent = hex.find(h => sat(h) > 0.3 && lum(h) > 0.25) || hex.find(h => lum(h) > 0.5);
-    if (accent) { fs.appendFileSync(path.join(build, 'theme.js'), `\n// the reference's accent (Reel.md brand kit colors), set by kit/reel.cjs\nwindow.THEME.colors.accent = '${accent.toLowerCase()}';\n`); console.log(`theme: ${path.basename(th, '.js')}, accent ${accent.toLowerCase()} from the reference`); }
-  }
+  const accent = recipe && !opt('theme') ? RC.accentFor(preset) : null;
+  if (accent) { RC.writeAccent(build, accent); console.log(`theme: ${path.basename(th, '.js')}, accent ${accent} from the reference`); }
+  // build/plan.json: what this draft took from the recipe, for other tools (kit/recreate.cjs; docs/reel-md.md)
+  if (recipe) RC.writePlan(build, RC.planOf({ recipe, scale: SCALE, rc: RECUT, cut: JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8')), shakes: REFSHAKES, sounds: REFSOUNDS, flips: R.readCaptions(path.join(build, 'captions.js')).flips || [], theme: path.basename(th, '.js'), accent }));
+  else RC.dropPlan(build);
   // what was picked, per beat, and why: jobs/<name>/choices.json to edit (kit/choices.cjs)
   try {
     const x = CH.explain(build);
