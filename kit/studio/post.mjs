@@ -338,7 +338,9 @@ export async function send(o, { env = process.env, fetchImpl = fetch, onPhase = 
   if (picked.some(c => plOf(c) === 'feed')) {
     const u = host === 'url' && o.feedUrl ? checkUrl(o.feedUrl) : null; if (u && !u.ok) throw bad(u.error);
     if (!rel) feed = { missing: !u, url: u ? u.url : null, info: u ? { width: 1080, height: 1350 } : null, file: null };
-    else { const f = SZ.fileFor(rel, 'feed', ROOT); feed = { ...f, abs: f.file && !f.missing ? resolve(ROOT, f.file) : null, url: u ? u.url : null }; feed.info = feed.abs ? probe(feed.abs) : null; if (host === 'url' && !u) feed.missing = true; }
+    else { const f = SZ.fileFor(rel, 'feed', ROOT); feed = { ...f, abs: f.file && !f.missing ? resolve(ROOT, f.file) : null, url: u ? u.url : null }; feed.info = feed.abs ? probe(feed.abs) : null;
+      // your own link: the link you pasted for the Feed is what is sent, whether or not the 4:5 file is on this computer
+      if (host === 'url') { feed.missing = !u; if (u && !feed.info) feed.info = { width: 1080, height: 1350 }; } }
   }
   const checks = picked.map(c => { const pl = plOf(c); return { c, pl, ...checkChannel(c, pl === 'feed' ? feed.info : info, { text: textOf(c), title: o.youtubeTitle, placement: pl, feed }) }; });
   const go = checks.filter(x => x.ok);
