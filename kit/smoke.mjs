@@ -38,6 +38,11 @@ const node = process.execPath;
 let ok = false;
 try {
   step('ffmpeg and ffprobe on PATH', () => { run('ffmpeg', ['-version']); run('ffprobe', ['-version']); });
+  // the synthetic clips below, npm run verify and the pack previews draw text with ffmpeg's drawtext filter, which a build without
+  // libfreetype lacks (Homebrew's plain ffmpeg formula is one). Say so here instead of failing later inside a test clip.
+  step('ffmpeg has the drawtext filter', () => {
+    if (!/\bdrawtext\b/.test(run('ffmpeg', ['-hide_banner', '-filters']))) throw new Error("this ffmpeg has no drawtext filter (it was built without libfreetype). Install a full build and put it first on PATH, then run this again. macOS with Homebrew: brew install ffmpeg-full && export PATH=\"$(brew --prefix ffmpeg-full)/bin:$PATH\"");
+  });
   step(`Chrome found (${findChrome()})`, () => {});
   step('menu and showcase cover every catalog entry', () => {
     const cov = coverage();

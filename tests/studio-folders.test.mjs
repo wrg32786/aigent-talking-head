@@ -14,7 +14,8 @@ import { fileURLToPath } from 'url';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const TMP = mkdtempSync(join(tmpdir(), 'studio-folders-test-')), HOME = join(TMP, 'home'), OUT = join(TMP, 'outside');
-for (const d of ['Desktop', 'Downloads', 'Videos', 'Documents', 'Projects/reels/2026', '.ssh', 'AppData/Roaming', 'node_modules/x']) mkdirSync(join(HOME, d), { recursive: true });
+const VID = process.platform === 'darwin' ? 'Movies' : 'Videos'; // the home video folder is Movies on a Mac (kit/studio/folders.mjs places())
+for (const d of ['Desktop', 'Downloads', VID, 'Documents', 'Projects/reels/2026', '.ssh', 'AppData/Roaming', 'node_modules/x']) mkdirSync(join(HOME, d), { recursive: true });
 mkdirSync(OUT, { recursive: true }); writeFileSync(join(OUT, 'private.txt'), 'outside'); mkdirSync(join(OUT, 'inner'));
 writeFileSync(join(HOME, 'notes.txt'), 'a file, never listed'); writeFileSync(join(HOME, '.ssh', 'id_test'), 'secret');
 try { symlinkSync(OUT, join(HOME, 'link-out'), 'dir'); } catch {}
@@ -22,7 +23,7 @@ process.env.STUDIO_HOME = HOME; process.env.STUDIO_FOLDERS_NO_OPEN = '1';
 const F = await import('../kit/studio/folders.mjs');
 let n = 0; const t = async (name, fn) => { await fn(); n++; console.log('ok ' + name); };
 
-const env = { ...process.env, CI: '1', STUDIO_DIR: join(TMP, 'studio'), STUDIO_HOME: HOME, STUDIO_FOLDERS_NO_OPEN: '1', STUDIO_CHAT: '', STUDIO_AGENT_CLIENT: '', DISPLAY: '', WAYLAND_DISPLAY: '' };
+const env = { ...process.env, CI: '1', STUDIO_DIR: join(TMP, 'studio'), STUDIO_HOME: HOME, STUDIO_FOLDERS_NO_OPEN: '1', STUDIO_CHAT: '', STUDIO_AGENT_CLIENT: '', DISPLAY: '', WAYLAND_DISPLAY: '', STUDIO_FOLDER_DIALOG: 'none' };
 // the native dialog stand-ins are small node scripts, so they run on Windows as well as macOS and Linux
 const PICKED = join(HOME, 'Projects', 'reels'), fake = join(TMP, 'fake-dialog.mjs'), cancel = join(TMP, 'cancel-dialog.mjs');
 writeFileSync(fake, `import { writeFileSync } from 'fs';\nwriteFileSync(${JSON.stringify(join(TMP, 'dialog-args'))}, process.env.STUDIO_PICK_START + '|' + process.env.STUDIO_PICK_TITLE);\nprocess.stdout.write(${JSON.stringify(PICKED)} + '\\n');\n`);
@@ -41,7 +42,7 @@ const servers = [];
 try {
   await t('list: folder names only, sorted, hidden and secret folders left out, quick places, the way up', async () => {
     const v = F.list(HOME, ROOT);
-    assert.deepStrictEqual(v.folders.map(f => f.name), ['Desktop', 'Documents', 'Downloads', 'Projects', 'Videos'], JSON.stringify(v.folders));
+    assert.deepStrictEqual(v.folders.map(f => f.name), ['Desktop', 'Documents', 'Downloads', 'Projects', VID].sort(), JSON.stringify(v.folders));
     assert.ok(!JSON.stringify(v).includes('notes.txt') && !JSON.stringify(v).includes('id_test'), 'files are never listed');
     assert.strictEqual(v.parent, null, 'home is the top of what Studio shows here');
     assert.deepStrictEqual(v.places.map(p => p.id).slice(0, 5), ['home', 'desktop', 'downloads', 'videos', 'documents']);
@@ -56,13 +57,13 @@ try {
       assert.throws(() => F.list(p, ROOT), e => e.status === 403 || e.status === 404, p);
     assert.ok(!F.list(HOME, ROOT).folders.some(f => f.name === 'link-out'), 'a link out of home is not listed');
     assert.ok(F.allowed(join(ROOT, 'jobs'), ROOT) || !existsSync(join(ROOT, 'jobs')), 'the kit folder is allowed');
-    assert.ok(F.blocked('.config') && F.blocked('AppData') && F.blocked('$RECYCLE.BIN') && !F.blocked('Videos'));
+    assert.ok(F.blocked('.config') && F.blocked('AppData') && F.blocked('$RECYCLE.BIN') && !F.blocked(VID));
     assert.ok(F.blocked('Windows', true) && !F.blocked('Windows', false), 'Windows and ProgramData are blocked only at a drive root');
   });
   await t('New folder: plain names only, inside what Studio shows', async () => {
-    const made = F.makeFolder(join(HOME, 'Videos'), 'Finished reels', ROOT); assert.ok(existsSync(made));
-    for (const bad of ['', '../x', 'a/b', '.hidden', 'con:', 'x'.repeat(130), 'trailing.']) assert.throws(() => F.makeFolder(join(HOME, 'Videos'), bad, ROOT), e => e.status === 400, bad);
-    assert.throws(() => F.makeFolder(join(HOME, 'Videos'), 'Finished reels', ROOT), e => e.status === 409);
+    const made = F.makeFolder(join(HOME, VID), 'Finished reels', ROOT); assert.ok(existsSync(made));
+    for (const bad of ['', '../x', 'a/b', '.hidden', 'con:', 'x'.repeat(130), 'trailing.']) assert.throws(() => F.makeFolder(join(HOME, VID), bad, ROOT), e => e.status === 400, bad);
+    assert.throws(() => F.makeFolder(join(HOME, VID), 'Finished reels', ROOT), e => e.status === 409);
     assert.throws(() => F.makeFolder(OUT, 'nope', ROOT), e => e.status === 403);
   });
 
@@ -77,7 +78,7 @@ try {
   });
   await t('routes: list, outside refused, New folder, Open folder (dry run), settings show the default paths', async () => {
     const r = await call(a.url, '/api/folders'); assert.strictEqual(r.status, 200); assert.strictEqual(r.j.path, HOME); assert.strictEqual(r.j.sep, sep);
-    assert.ok(r.j.folders.some(f => f.name === 'Videos') && !r.j.folders.some(f => f.name.startsWith('.')));
+    assert.ok(r.j.folders.some(f => f.name === VID) && !r.j.folders.some(f => f.name.startsWith('.')));
     assert.strictEqual((await call(a.url, '/api/folders?path=' + encodeURIComponent('/etc'))).status, 403);
     assert.strictEqual((await call(a.url, '/api/folders?path=' + encodeURIComponent(join(HOME, '.ssh')))).status, 403);
     const mk = await call(a.url, '/api/folders/new', { path: join(HOME, 'Desktop'), name: 'Reels out' }); assert.strictEqual(mk.status, 200); assert.strictEqual(mk.j.path, join(HOME, 'Desktop', 'Reels out'));
@@ -102,8 +103,8 @@ try {
   });
   const b = await start({ STUDIO_FOLDER_DIALOG: fake }); servers.push(b.srv);
   await t('native dialog: returns the full path picked; the start folder and title go in by environment, not the script', async () => {
-    const r = await call(b.url, '/api/folders/pick', { start: join(HOME, 'Videos'), title: 'Copy finished reels to' }); assert.strictEqual(r.j.path, PICKED);
-    const { readFileSync } = await import('fs'); assert.strictEqual(readFileSync(join(TMP, 'dialog-args'), 'utf8'), join(HOME, 'Videos') + '|Copy finished reels to');
+    const r = await call(b.url, '/api/folders/pick', { start: join(HOME, VID), title: 'Copy finished reels to' }); assert.strictEqual(r.j.path, PICKED);
+    const { readFileSync } = await import('fs'); assert.strictEqual(readFileSync(join(TMP, 'dialog-args'), 'utf8'), join(HOME, VID) + '|Copy finished reels to');
     assert.strictEqual((await call(b.url, '/api/folders/pick', { start: HOME }, {})).status, 403, 'the agent or another site cannot open a dialog');
   });
   const c = await start({ STUDIO_FOLDER_DIALOG: cancel }); servers.push(c.srv);

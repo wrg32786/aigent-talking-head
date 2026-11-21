@@ -125,6 +125,7 @@ on error number -128
 end try`;
 export function dialogCommand() {
   const hook = process.env.STUDIO_FOLDER_DIALOG; // tests: a command that prints a path (a .mjs runs with this node, so it works on Windows too)
+  if (hook === 'none') return null; // tests: no folder dialog on any system, so the page's own folder list is what opens
   if (hook) return /\.m?js$/i.test(hook) ? [process.execPath, [hook]] : [hook, []];
   if (IS_WIN()) return ['powershell.exe', ['-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-Command', PS]];
   if (IS_MAC()) return ['osascript', ['-e', OSA]];
