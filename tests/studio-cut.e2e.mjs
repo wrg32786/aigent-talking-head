@@ -1,15 +1,17 @@
 // The Studio Cut step in a real Chrome, on synthetic media only (the presenter still with a tone, tests/fixtures):
 // - the footage player on Start: click a clip to play, J K L and the arrow keys, the transcript (a stand-in transcriber,
 //   tests/fixtures/fake-tx.mjs) highlights along and a word click seeks; an .mkv plays from a 540p preview copy
-// - the Cut step: smart defaults and the summary, the picker cards, Find cuts, candidates on the timeline, trim by
-//   dragging an edge, drop one, add one by dragging on a lane
+// - the Cut step, on its Clips layer: smart defaults and the summary, the picker cards behind Change, the clips find
+//   themselves, Find clips again, the timeline behind Trim on the timeline: trim by dragging an edge, untick one, add
+//   one by dragging on a lane (tests/studio-cut-layers.e2e.mjs covers the three layers, the point and Pacing)
 // - batch render on Render: kept cuts become their own videos (a stand-in for the engine, tests/fixtures/fake-reel.mjs, with the
 //   real extract), a long form one through the real 16:9 pass (1920x1080), an ad one with the CTA end card
 // - Picture, the reference view: Pull script puts the reference's words in Scripts with [hook], [body] and [cta]
 // - cut points on the audio: a synthetic clip with tone "words" at known times, a breath and room tone, and a transcript
 //   that is off on purpose; every cut lands in the real gap, and the timeline shows where and why
-// - lines and bites: keep or retake, a bite in your order (arrows and drag), play it, save it as one file, the clean take,
-//   the agent's bites labelled; footage order on Start by drag and arrows, remove in place
+// - clips made from lines (the server still calls them bites): each one is a row on Clips, Play runs its lines in its
+//   order, Render saves it as one file, the clean take leaves out a retake, the agent's ones are labelled;
+//   footage order on Start by drag and arrows, remove in place
 // Needs Chrome and ffmpeg. Run: node tests/studio-cut.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
 import assert from 'assert';
 import { spawn, execFileSync } from 'child_process';
@@ -72,7 +74,10 @@ try {
   assert.ok(take && mkv, 'uploaded');
   const errs = [];
   const pg = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-  await pg.addInitScript(() => { if (!localStorage.getItem('studio.cutView')) localStorage.setItem('studio.cutView', 'cuts'); }); // this test is about Cuts and lines (tests/studio-pieces.e2e.mjs covers Pieces)
+  await pg.addInitScript(() => { if (!localStorage.getItem('studio.cutLayer')) localStorage.setItem('studio.cutLayer', 'clips'); }); // this test is about the Clips layer (tests/studio-pieces.e2e.mjs covers Best lines)
+  // the timeline sits in a closed fold on Clips, and it closes again on every load
+  const openTrim = async () => { await pg.waitForSelector('#cut-trim'); if (!(await pg.$eval('#cut-trim', d => d.open))) await pg.click('#cut-trim > summary'); await pg.waitForSelector('#cut-timeline'); };
+  const row = id => `#cut-candidates li.clip-row[data-id="${id}"]`;
   pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
 
   await t('footage player: click a clip to play; J K L and arrows; the transcript follows and a word click seeks', async () => {
@@ -106,24 +111,36 @@ try {
     await pg.waitForFunction(u => document.querySelector('#player-video').currentSrc.includes(u), i.proxy.url, { timeout: 8000 });
     await pg.click(`.clip-play[aria-label="Play screen.mkv"]`); await pg.waitForFunction(() => !document.querySelector('#player'));
   });
-  await t('Cut step: smart defaults and the summary; the cards change it; Find cuts fills the list and the timeline', async () => {
+  await t('Cut step: smart defaults and the summary; the cards behind Change change it; the clips find themselves, Find clips again fills the list and the timeline', async () => {
     await open(pg, '#step=cut');
     await pg.waitForSelector('#cut-summary');
     assert.strictEqual(await pg.textContent('#cut-summary'), 'Full edit: 1 short video (~75 s), for organic');
+    assert.strictEqual(await pg.getAttribute('#cut-layer-clips', 'aria-selected'), 'true', 'this test works on Clips');
+    // the words are read (the test above), so Clips finds our suggestions by itself, by the rules
+    await pg.waitForSelector(row('full'), { timeout: 20000 });
+    assert.strictEqual((await api('/api/cut')).scoredBy, 'rules');
+    assert.strictEqual(await pg.textContent('#cut-find'), 'Find clips again');
+    assert.strictEqual(await pg.$('#fmt-short'), null, 'What to make is folded until you ask');
+    await pg.click('#cut-change'); await pg.waitForSelector('#fmt-short');
     assert.strictEqual(await pg.$eval('#fmt-short', e => e.getAttribute('aria-checked')), 'true');
     await pg.click('#out-both'); await pg.waitForFunction(() => /^Both: 1 full edit \(~75 s\) \+ 5 short clips, for organic$/.test(document.querySelector('#cut-summary').textContent));
     await pg.click('#clip-count + button'); await pg.click('#len-short'); await pg.click('#len-medium');
     await pg.waitForFunction(() => /\+ 3 short clips/.test(document.querySelector('#cut-summary').textContent) || /\+ 6 short clips/.test(document.querySelector('#cut-summary').textContent));
     await api('/api/cut/output', { clips: 3, clipLength: 'short' });
+    await pg.click('#cut-change'); await pg.waitForSelector('#fmt-short', { state: 'detached' });
     await pg.click('#cut-find');
-    await pg.waitForSelector('#cut-candidates li', { timeout: 20000 });
-    const ids = await pg.$$eval('#cut-candidates li', x => x.map(e => e.dataset.id)); assert.deepStrictEqual(ids.slice(0, 1), ['full']); assert.strictEqual(ids.length, 4, ids.join());
-    assert.ok(/Scored by the rules/.test(await pg.textContent('#cut-scored')));
+    await pg.waitForSelector(row('c3'), { timeout: 20000 });
+    const ids = await pg.$$eval('#cut-candidates li.clip-row', x => x.map(e => e.dataset.id)); assert.deepStrictEqual(ids.slice(0, 1), ['full']); assert.strictEqual(ids.length, 4, ids.join());
+    // the rules found them: no "Picked by" line, that one is for a model or your agent
+    assert.strictEqual((await api('/api/cut')).scoredBy, 'rules'); assert.strictEqual(await pg.$('#cut-scored'), null);
+    assert.strictEqual(await pg.$('#cut-timeline'), null, 'the timeline stays folded until you open it');
+    await openTrim();
     assert.strictEqual(await pg.$$eval('#cut-timeline .lane.k-clip .region', x => x.length), 3);
     assert.ok(await pg.$$eval('#cut-timeline .mk.filler', x => x.length) > 0, 'filler marks');
     if (shots) { await pg.evaluate(() => scrollTo(0, 0)); await pg.waitForTimeout(300); await pg.screenshot({ path: join(shots, 'cut-desktop.png') }); }
   });
-  await t('timeline: drag an edge to trim, drop one, drag on a lane to add your own, preview plays the region', async () => {
+  await t('timeline: drag an edge to trim, untick one, drag on a lane to add your own, Play plays it', async () => {
+    await openTrim();
     const before = (await api('/api/cut')).candidates.find(x => x.id === 'c1');
     await pg.evaluate(() => document.querySelector('#cut-timeline').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(300);
     const edge = await pg.locator('#cut-timeline .region[data-region="c1"] .edge.b').boundingBox();
@@ -131,8 +148,10 @@ try {
     await pg.mouse.move(edge.x - 30, edge.y + edge.height / 2, { steps: 6 }); await pg.mouse.up();
     const after = await until(async () => { const c = (await api('/api/cut')).candidates.find(x => x.id === 'c1'); return c.trimmed ? c : null; });
     assert.ok(after.ranges[0][1] < before.ranges[0][1] - 1, `${before.ranges[0][1]} -> ${after.ranges[0][1]}`);
-    await pg.click('#cut-candidates li[data-id="c3"] .keep');
+    await pg.click('#keep-c3'); // the tick follows the server, so a plain click
     await until(async () => (await api('/api/cut')).candidates.find(x => x.id === 'c3').keep === false);
+    await pg.waitForSelector(row('c3') + '[data-keep="0"]');
+    await pg.evaluate(() => document.querySelector('#cut-timeline').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(300);
     // drag across an empty part of the clip lane (the last 15 s of the take)
     const lane = await pg.locator('#cut-timeline .lane.k-clip .lane-track').boundingBox(), cs = (await api('/api/cut')).candidates.filter(x => x.kind === 'clip');
     let from = 95, to = 108; for (const c of cs) if (c.ranges.some(([a, b]) => b > from && a < to)) { from = 2; to = 14; }
@@ -140,23 +159,27 @@ try {
     await pg.mouse.move(X(from), lane.y + lane.height / 2); await pg.mouse.down(); await pg.mouse.move(X(to), lane.y + lane.height / 2, { steps: 8 }); await pg.mouse.up();
     const mine = await until(async () => (await api('/api/cut')).candidates.find(x => x.id === 'm1'));
     assert.ok(Math.abs(mine.ranges[0][0] - from) < 1.5 && Math.abs(mine.ranges[0][1] - to) < 1.5, JSON.stringify(mine.ranges));
-    await pg.click('#cut-candidates li[data-id="m1"] button[aria-label^="Preview"]');
-    await pg.waitForFunction(f => { const v = document.querySelector('#player-video'); return !v.paused && v.currentTime >= f - 0.2; }, mine.ranges[0][0], { timeout: 8000 });
-    await pg.click('#cut-candidates li[data-id="m1"] button[aria-label^="Remove"]');
+    // only a clip you added has a trash; ours can only be unticked
+    assert.strictEqual(await pg.$(row('c1') + ' button[aria-label^="Remove"]'), null);
+    await pg.click(row('m1') + ' .cc-play');
+    await pg.waitForFunction(([a, b]) => { const v = document.querySelector('#player-video'); return !v.paused && v.currentTime >= a - 0.2 && v.currentTime <= b + 0.2; }, mine.ranges[0], { timeout: 8000 });
+    await pg.click(row('m1') + ' .cc-play'); await pg.waitForFunction(() => document.querySelector('#player-video').paused, null, { timeout: 8000 });
+    await pg.click(row('m1') + ' button[aria-label^="Remove"]');
     await until(async () => !(await api('/api/cut')).candidates.some(x => x.id === 'm1'));
     if (shots) await shot(pg, '#cut-timeline', 'cut-timeline.png');
   });
   await t('one place renders: the Cut step has no Render; the Render step renders every kept cut as its own video in its one Render', async () => {
     assert.strictEqual(await pg.$('#s-cut #cut-render'), null, 'no Render button on the Cut step');
     assert.strictEqual(await pg.$$eval('#s-cut button', x => x.filter(b => /^(Render|Save as)/.test(b.textContent.trim())).length), 0, 'nothing on the Cut step renders or saves a file');
-    // the page catches up with the drop above, then says where the 3 kept ones render
-    await pg.waitForFunction(() => /^3 kept\. They render at the end, on the Render step, as one reel\.$/.test((document.querySelector('#cut-hint') || {}).textContent || ''), null, { timeout: 10000 })
-      .catch(async () => { throw new Error('the Cut step says where they render: ' + await pg.textContent('#cut-hint')); });
+    // the page catches up with the untick above, then says what moves on: the 3 kept ones, as one reel
+    await pg.waitForFunction(() => /^3 clips kept, [\d:]+( s)?\. They move on to the next steps as one reel\.$/.test((document.querySelector('#cut-kept') || {}).textContent || ''), null, { timeout: 10000 })
+      .catch(async () => { throw new Error('the Cut step says what moves on: ' + await pg.textContent('#cut-hint')); });
+    assert.strictEqual(await pg.getAttribute('#cut-hint', 'data-kept'), '3');
     await open(pg, '#step=render');
     await openFold(pg, '#make-fold'); // What to make is a closed fold on Render
     await pg.waitForSelector('#fin-exports #exp-clips');
     assert.strictEqual(await pg.$('#kept-cuts'), null, 'one render path: no second render card');
-    assert.strictEqual(await pg.textContent('#exp-clips'), '3 clips from your pieces');
+    assert.strictEqual(await pg.textContent('#exp-clips'), '3 clips on their own');
     // each kept cut as its own reel, and no reel of them all this time
     await pg.click('#exp-clips'); await pg.waitForSelector('#exp-clips[aria-pressed="true"]');
     await pg.click('#exp-reel'); await pg.waitForSelector('#exp-reel[aria-pressed="false"]');
@@ -235,38 +258,34 @@ try {
     await api('/api/cut/edit', { id: a.id, ranges: [[0.95, 2.25]] });
     // the timeline: Show cut points draws the transcript times and lists each cut with why
     await open(pg, '#step=cut');
-    await pg.waitForSelector('#cut-timeline .region');
+    await openTrim(); await pg.waitForSelector('#cut-timeline .region');
     await pg.check('#cut-debug');
     await pg.waitForSelector('#cut-points tbody tr');
     assert.ok((await pg.$$('#cut-timeline .cp-tx')).length >= 8, 'transcript ticks on the lanes');
     const rows = await pg.$$eval('#cut-points tbody tr', r => r.map(x => x.textContent)); assert.ok(rows.length === 2 && /two\./.test(rows[1]) && /ran past/.test(rows[1]), rows.join(' | '));
-    await pg.locator('#cut-candidates li[data-id="' + b.id + '"]').click({ position: { x: 6, y: 6 } });
+    await pg.click(row(b.id) + ' .clip-m'); // a click on the row picks it (its name is the label of its tick)
     await pg.waitForFunction(() => /Late end/.test(document.querySelector('#cut-points').textContent));
     if (shots) await shot(pg, '#cut-timeline', 'cut-points.png');
   });
-  await t('lines and bites: keep or retake a line, group lines into a bite in your order, play it, save it as one file, the clean take', async () => {
-    await pg.click('#lines-toggle'); await pg.waitForSelector('#lines-list li[data-line]');
-    assert.strictEqual((await pg.$$('#lines-list li[data-line]')).length, 3, 'three lines: "One two." "Three four." "Five six."');
-    await pg.click('#keep-l2'); await pg.waitForFunction(() => document.querySelector('#keep-l2').getAttribute('aria-checked') === 'false');
-    await pg.check('#lines-list li[data-line="l3"] input'); await pg.check('#lines-list li[data-line="l1"] input');
-    await pg.fill('#bite-name', 'Five then one'); await pg.click('#bite-add');
-    await pg.waitForSelector('#bites li.bite');
-    const order = () => pg.$$eval('#bites li.bite .bite-lines li', x => x.map(e => e.dataset.line));
-    assert.deepStrictEqual(await order(), ['l3', 'l1'], 'in the order you ticked them');
-    await pg.click('#bites li.bite .bite-lines li[data-line="l3"] [aria-label="Move line 3 down"]');
-    await pg.waitForFunction(() => document.querySelector('#bites li.bite .bite-lines li').dataset.line === 'l1'); assert.deepStrictEqual(await order(), ['l1', 'l3']);
-    await pg.dragAndDrop('#bites li.bite .bite-lines li[data-line="l3"]', '#bites li.bite .bite-lines li[data-line="l1"]');
-    await pg.waitForFunction(() => document.querySelector('#bites li.bite .bite-lines li').dataset.line === 'l3'); 
-    // play: the first line, then the second
-    await pg.click('#bites li.bite .bite-a button:has-text("Play")');
+  await t('clips made from lines: a row each on Clips, Play runs the lines in their order, one file on Render, the clean take, the agent\'s labelled', async () => {
+    // the page no longer has the Lines panel; an agent (or the API) still groups whole lines into a clip, in any order
+    const L0 = await api('/api/lines'); assert.strictEqual(L0.lines.length, 3, 'three lines: "One two." "Three four." "Five six."');
+    assert.strictEqual((await api('/api/lines', { keep: { l2: false } })).lines.lines[1].keep, false, 'line 2 is a retake');
+    const made = await api('/api/lines', { action: 'add', name: 'Five then one', lines: [3, 1] }), bid = made.lines.bites[0].id;
+    assert.deepStrictEqual(made.lines.bites[0].lines, ['l3', 'l1'], 'in the order you gave them');
+    assert.deepStrictEqual((await api('/api/lines', { action: 'update', id: bid, lines: [1, 3] })).lines.bites[0].lines, ['l1', 'l3']);
+    assert.deepStrictEqual((await api('/api/lines', { action: 'update', id: bid, lines: [3, 1] })).lines.bites[0].lines, ['l3', 'l1']);
+    await pg.waitForSelector(row(bid));
+    assert.ok(/Five then one/.test(await pg.textContent(row(bid) + ' .clip-h b'))); assert.ok(/^2 lines stitched, /.test(await pg.textContent(row(bid) + ' .clip-m')), await pg.textContent(row(bid) + ' .clip-m'));
+    // play: the first line (five six), then the second (one two)
+    await pg.click(row(bid) + ' .cc-play');
     await pg.waitForFunction(() => { const v = document.querySelector('#player-video'); return v.currentTime > 6.1 && v.currentTime < 7.6; }, null, { timeout: 8000 });
     await pg.waitForFunction(() => { const v = document.querySelector('#player-video'); return v.currentTime > 1.0 && v.currentTime < 2.5; }, null, { timeout: 8000 });
-    await pg.click('#bites li.bite .bite-a button:has-text("Stop")');
-    // nothing on the Cut step renders: the bite says where it does
+    if (await pg.textContent(row(bid) + ' .cc-play') === 'Stop') await pg.click(row(bid) + ' .cc-play');
+    // nothing on the Cut step renders: it says what moves on
     assert.strictEqual(await pg.$$eval('#s-cut button', x => x.filter(b => /^(Render|Save as)/.test(b.textContent.trim())).length), 0, 'no Render or Save as on the Cut step');
-    assert.ok(/renders at the end, on the Render step/.test(await pg.textContent('#bites-hint')));
-    // on Render the bite is one of your pieces: Plain clips saves it as one file, the two lines joined, nothing else
-    const bid = (await api('/api/lines')).bites[0].id;
+    assert.ok(/move on to the next steps as one reel/.test(await pg.textContent('#cut-kept')), await pg.textContent('#cut-kept'));
+    // on Render it is one of your clips: Plain clips saves it as one file, the two lines joined, nothing else
     await open(pg, '#step=render');
     await openFold(pg, '#make-fold');
     await until(async () => (await api('/api/edit')).combo.pieces.some(x => x.kind === 'bite' && x.id === bid));
@@ -278,14 +297,15 @@ try {
     assert.ok(!existsSync(join(ROOT, 'jobs', `${JOB}-${L.id}`, 'fake-reel.log')), 'one file is not a reel edit');
     await api('/api/state', { finish: { reel: true, clips: false, plain: false } });
     await open(pg, '#step=cut');
-    await pg.click('#lines-toggle'); await pg.waitForSelector('#bites li.bite');
-    await pg.waitForSelector(`#bites li.bite a[href*="${L.id}.mp4"]`);
+    await pg.waitForSelector(row(bid));
     // the clean take leaves out line 2 (marked a retake)
-    await pg.click('#lines-clean'); await pg.waitForSelector('#bites li.bite.clean');
-    assert.deepStrictEqual(await pg.$$eval('#bites li.bite.clean .bite-lines li', x => x.map(e => e.dataset.line)), ['l1', 'l3']);
+    const clean = (await api('/api/lines', { action: 'clean' })).lines.bites.find(x => x.id === 'take'); assert.deepStrictEqual(clean.lines, ['l1', 'l3']);
+    await pg.waitForSelector(row('take')); assert.ok(/Clean take/.test(await pg.textContent(row('take') + ' .clip-h b'))); assert.ok(/^2 lines stitched, /.test(await pg.textContent(row('take') + ' .clip-m')));
     // the agent's picks show as its own
     await api('/api/lines', { action: 'set', by: 'claude-code', bites: [{ name: 'Middle', lines: [2, 3], reason: 'The how-to' }], replace: false });
-    await pg.waitForSelector('#bites li.bite:has-text("By Claude")'); await pg.waitForSelector('#lines-by');
+    await pg.waitForSelector('#cut-candidates li.clip-row:has-text("Middle"):has-text("By Claude")');
+    assert.ok(/The how-to/.test(await pg.textContent('#cut-candidates li.clip-row:has-text("Middle") .clip-why')));
+    assert.ok(!/\bbites?\b/i.test(await pg.innerText('#s-cut')), 'the page says clips, never bites');
   });
   await t('footage order: drag a clip onto another or use the arrows; the draft follows that order', async () => {
     await open(pg, '#step=start');
@@ -298,11 +318,10 @@ try {
     assert.deepStrictEqual((await api('/api/state')).state.footage.map(f => f.split('/').pop()), ['synthetic-speech.mp4', 'screen.mkv', 'long-take.mp4']);
     await pg.click('[aria-label="Remove screen.mkv"]'); await until(async () => (await names()).join() === 'synthetic-speech.mp4,long-take.mp4');
     if (shots) {
-      // a screenshot of the lines on the long take, with two bites picked by the agent
+      // a screenshot of Clips on the long take, with two clips picked by the agent
       await api('/api/cut/output', { source: take }); await api('/api/lines', { path: take, action: 'set', by: 'claude-code', clean: true, bites: [{ name: 'The morning setup', lines: [4, 5, 6, 7], reason: 'One clear how-to with a strong first line' }, { name: 'Hook: ten minutes', lines: [1, 9, 10, 11] }] });
-      await open(pg, '#step=cut'); await pg.click('#lines-toggle'); await pg.waitForSelector('#bites li.bite');
-      await pg.check('#lines-list li[data-line="l13"] input'); await pg.check('#lines-list li[data-line="l14"] input'); await pg.$eval('#lines-list', e => { e.scrollTop = 0; });
-      await shot(pg, '#lines', 'lines-bites.png');
+      await open(pg, '#step=cut'); await pg.waitForSelector('#cut-candidates li.clip-row');
+      await shot(pg, '#cut-clips', 'lines-bites.png');
     }
   });
   assert.deepStrictEqual(errs.filter(e => !/favicon/.test(e)), []);

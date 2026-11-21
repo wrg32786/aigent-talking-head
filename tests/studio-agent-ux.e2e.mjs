@@ -82,7 +82,7 @@ try {
   const errs = [];
   const pg = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
-  await pg.addInitScript(() => { try { localStorage.setItem('studio.cutView', 'cuts'); } catch {} }); // about:blank has no storage
+  await pg.addInitScript(() => { try { localStorage.setItem('studio.cutLayer', 'raw'); } catch {} }); // the waveform and the words are on Raw take; about:blank has no storage
 
   await t('waveform: a drag selects on whole words; Note for my agent sends from and to', async () => {
     await open(pg, '#step=cut'); await pg.waitForSelector('#player-scrub'); await pg.waitForSelector('#player-transcript .w');
@@ -165,7 +165,7 @@ try {
     await theme(pg, 'dark');
     const ph = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1.5, isMobile: true, hasTouch: true });
     ph.on('pageerror', e => errs.push(e.message));
-    await ph.addInitScript(() => { try { localStorage.setItem('studio.cutView', 'cuts'); } catch {} });
+    await ph.addInitScript(() => { try { localStorage.setItem('studio.cutLayer', 'raw'); } catch {} });
     await open(ph, '#step=cut'); await ph.waitForSelector('#ask-agent'); await ph.click('#ask-agent'); await ph.waitForSelector('#ask-pop');
     const over = await ph.evaluate(() => Math.max(...[...document.querySelectorAll('body *')].filter(e => e.offsetParent).map(e => e.getBoundingClientRect().right)) - innerWidth); assert.ok(over <= 1, 'no sideways scroll: ' + over);
     if (shots) await ph.screenshot({ path: join(shots, 'redesign-ask-agent-phone-dark.png') });

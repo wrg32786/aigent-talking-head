@@ -127,3 +127,7 @@ Always show the user the teardown report and contact sheet, and let them change 
 - `contact.jpg`: sampled frames with the detected titles boxed and labelled.
 - `videomd/`: rea-video's VIDEO.md package, `breakdown.json` and `report.html` (or `fallback.json` from the built-in analyzer).
 - `titles.json`, `extras.json`, `speech.json`: intermediate data. `extras.json` `shots[]` holds each shot's grade stats, and since 1.28.0 `face` (`h`, `eye_y`, `cx`, the box `x0 y0 x1 y1`, and `n` of `of` samples with a face) and `lab` (`mean`, `std`); `graphics[]` holds each ordinal sticker's `shape`, `spikes`, `color` and `layer`.
+
+## Stage lines
+
+While it runs, the teardown prints one line as each stage starts, such as `stage cuts: finding cuts` or `stage graphics: reading graphics`. Studio reads these for the status line under a reference's progress bar (`kit/studio/stages.mjs`). The stages, in order: cuts, captions, camera, transcribe, sound, graphics, framing, colours, recipe. rea-video prints nothing while it works, so for its part we watch the files it writes.

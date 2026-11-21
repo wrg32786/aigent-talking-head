@@ -33,7 +33,7 @@ ok('the stemmer makes build, builds, building and built meet', () => {
 
 // ---------- the point ----------
 ok('the point is cleaned: one line, no em dash, capped', () => {
-  assert.strictEqual(cleanPoint('  Show  beginners\n they can — build  '), 'Show beginners they can , build');
+  assert.strictEqual(cleanPoint('  Show  beginners\n they can \u2014 build  '), 'Show beginners they can , build');
   assert.strictEqual(cleanPoint(null), ''); assert.strictEqual(cleanPoint('x'.repeat(500)).length, POINT_MAX);
   assert.strictEqual(pointLine(''), ''); assert.ok(pointLine(POINT).includes(POINT));
 });
@@ -75,7 +75,7 @@ ok('cuts: the suggested clips lean to the point and the model prompt carries it'
 ok('topics: 3 to 5 themes of two or more words, and none of the old weak chips', () => {
   const themes = themesOf(LINES), labels = themes.map(t => t.label);
   assert.ok(themes.length >= 3 && themes.length <= 5, labels.join(' | '));
-  for (const l of labels) { assert.ok(l.split(' ').length >= 2 && l.split(' ').length <= 4, l); assert.ok(!/—/.test(l)); }
+  for (const l of labels) { assert.ok(l.split(' ').length >= 2 && l.split(' ').length <= 4, l); assert.ok(!/\u2014/.test(l)); }
   const BAD = ['help', 'youre', "you're", 'back', 'build', 'different', 'friends', 'able', 'business'];
   for (const l of labels) assert.ok(!BAD.includes(l.toLowerCase()), 'old chip: ' + l);
   for (const l of labels) for (const w of [l.split(' ')[0], l.split(' ').pop()]) assert.ok(!STOP.has(w.toLowerCase()), `${l} starts or ends on a weak word`);
@@ -103,7 +103,7 @@ ok('topics from a model or an agent are checked before we show them', () => {
   assert.deepStrictEqual(good.map(t => t.label), ['starting with ChatGPT', 'building with AI']);
   assert.deepStrictEqual(good[0].lines, ['l1', 'l6', 'l24']);
   assert.strictEqual(readTopics('not json', LINES), null); assert.strictEqual(readTopics({ topics: [{ label: 'one theme only', lines: [1] }] }, LINES), null);
-  const p = topicsPrompt(LINES, POINT); assert.ok(p.includes(POINT) && !/—/.test(p));
+  const p = topicsPrompt(LINES, POINT); assert.ok(p.includes(POINT) && !/\u2014/.test(p));
 });
 
 // ---------- pacing ----------

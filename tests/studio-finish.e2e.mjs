@@ -88,7 +88,7 @@ try {
       await pg.click(`#stepper button[data-step="${st}"]`); await pg.waitForFunction(x => document.querySelector('main').dataset.step === x, st);
       assert.ok(await pg.isVisible('#your-edit'), 'Your edit on ' + st);
     }
-    await pg.waitForFunction(() => /2 pieces, \d+ s, in your order/.test(document.querySelector('#your-edit [data-part="from"]').textContent));
+    await pg.waitForFunction(() => /2 clips, \d+ s, in your order/.test(document.querySelector('#your-edit [data-part="from"]').textContent));
     const e = await api('/api/edit'); assert.strictEqual(e.combo.pieces.length, 2); assert.deepStrictEqual(e.combo.pieces.map(x => x.id), ['c1', 'c2']); assert.strictEqual(e.edit.from.mode, 'pieces');
     assert.ok(/^1 reel/.test(e.edit.making.text), e.edit.making.text); assert.strictEqual(e.edit.next.label, 'Draft it');
     if (shots) { await pg.click('#stepper button[data-step="cut"]'); await pg.waitForTimeout(500); await pg.screenshot({ path: join(shots, 'redesign-cut-your-edit-dark.png') }); }
@@ -103,7 +103,7 @@ try {
     if (shots) { await pg.screenshot({ path: join(shots, 'redesign-render-dark.png') }); }
     await pg.click('#render-to-review'); await onStep(pg, 'review'); await pg.waitForSelector('#s-review:not([hidden])');
     await pg.waitForSelector('#fin-from button[data-from="pieces"][aria-checked="true"]');
-    assert.ok(/^Your 2 pieces, \d+ s$/.test(await pg.textContent('#fin-from button[data-from="pieces"]')));
+    assert.ok(/^Your 2 clips, \d+ s$/.test(await pg.textContent('#fin-from button[data-from="pieces"]')));
     assert.strictEqual(await pg.textContent('#elapsed'), 'A draft is a quick plan of the reel, with no video yet.');
     assert.strictEqual(await pg.$$eval('#s-review button', x => x.filter(b => /^Render/.test(b.textContent.trim())).length), 0, 'no Render button on Review');
     if (shots) { await pg.screenshot({ path: join(shots, 'redesign-finish-dark.png') }); }
@@ -126,15 +126,15 @@ try {
     for (const id of ['c1', 'c2']) { assert.ok(existsSync(join(ROOT, 'jobs', `${JOB}-${id}`, 'reel-v1.mp4')), id + ' as its own reel'); assert.ok(/--as-is/.test(log(`${JOB}-${id}`))); }
     assert.ok(!existsSync(join(ROOT, 'jobs', `${JOB}-c3`)), 'the dropped piece is not rendered');
     await pg.waitForSelector('#cut-outputs figure'); assert.strictEqual(await pg.$$eval('#cut-outputs figure', x => x.length), 2);
-    assert.ok(/Clips from your pieces/.test(await pg.textContent('#h-cut-outs')));
+    assert.ok(/^Your clips on their own$/.test(await pg.textContent('#h-cut-outs')));
     if (shots) { await pg.evaluate(() => scrollTo(0, 0)); await pg.waitForTimeout(400); await pg.screenshot({ path: join(shots, 'redesign-finish-rendered-dark.png') }); }
   });
 
   await t('pieces changed since the draft: Your edit, Review and Render say so, and Render waits for a new draft', async () => {
     await api('/api/cut/edit', { id: 'c3', keep: true });
     await pg.waitForSelector('#ye-stale'); await pg.waitForFunction(() => document.querySelector('#render').getAttribute('aria-disabled') === 'true');
-    assert.strictEqual(await pg.textContent('#elapsed'), 'Your pieces changed since the draft. Draft again first.');
-    assert.strictEqual(await pg.textContent('#render-status'), 'Your pieces changed since the draft. Draft it on Review first');
+    assert.strictEqual(await pg.textContent('#elapsed'), 'Your clips changed since the draft. Draft again first.');
+    assert.strictEqual(await pg.textContent('#render-status'), 'Your clips changed since the draft. Draft it on Review first');
     const r = await fetch(url + '/api/render', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); assert.strictEqual(r.status, 202, 'the API still renders the last draft for an agent that asks');
     await waitTask();
     await api('/api/cut/edit', { id: 'c3', keep: false }); await pg.waitForSelector('#ye-stale', { state: 'detached' });

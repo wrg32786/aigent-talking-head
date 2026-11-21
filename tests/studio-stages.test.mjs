@@ -62,7 +62,7 @@ ok('a run that stops names the stage in plain words, and a retry starts clean', 
   const v = S.view(run);
   assert.strictEqual(v.failed, 'transcribe'); assert.strictEqual(v.stage, null); assert.strictEqual(v.message, 'We stopped while transcribing.');
   assert.strictEqual(v.list.find(x => x.id === 'transcribe').state, 'failed');
-  assert.ok(!/[—]/.test(v.message));
+  assert.ok(!/[\u2014]/.test(v.message));
   S.feed(run, 'stage colours'); assert.strictEqual(run.failed, null);
 });
 

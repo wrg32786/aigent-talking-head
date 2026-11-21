@@ -242,7 +242,7 @@ The page uses three words, one per layer. Each layer is a numbered tab, and the 
 
 ### Raw take
 
-The full take in the player, with its words under it once we have read them. Beside it: how long the take is, how many lines it has, how many long pauses (and their seconds) and how many filler words. **See the best lines** opens the next layer.
+The full take in the player, with its words under it once we have read them. Above it: how long the take is, how many lines it has, how many long pauses (and their seconds) and how many filler words. **See the best lines** opens the next layer.
 
 ### Best lines
 
@@ -418,6 +418,7 @@ The page uses `POST /api/footage/url { url }` and `POST /api/footage/import { id
 The breakdown is visual: four numbers (length, shots, BPM and energy, average shot), a timeline of the shots with a beat grid at the measured BPM, tags for what was found, and suggested picks you click to add (or Pick all). It also says which teardown engine ran; the built-in fallback is rougher, so treat its finds as guesses.
 
 - **Queue.** Paste several links at once; they download and tear down one at a time, in their own lane (a Draft or a Render can run meanwhile; a Draft on Recreate that needs a reference still being read says so), each with its status (waiting, downloading with a progress bar, breaking it down, ready, failed with the reason) and Stop, Try again, Remove and "Use this one" buttons. The newest ready one is used unless you pick another.
+- **Where it is (1.28.0).** While a reference is read, one line under its progress bar names the stage in plain words: Downloading, Finding cuts, Reading captions, Reading camera moves, Transcribing, Reading music and sounds, Reading graphics, Reading framing, Reading colours, Building the recipe. The bar follows the real stages, and a folded list under the line ("6 of 10 steps done") shows every stage with a check as each finishes. It shows on Start and in the reference view of Picture, and a reload shows the same line. When a stage stops, the line says which one ("We stopped while reading graphics. Nothing was changed.") with **Try again**. Agents see the same on each queue item as `stages` (`stage`, `label`, `percent`, `list`) in `studio_get_reference_teardown` and the state.
 - **Downloaders.** YouTube, TikTok, X, Vimeo and most video pages go through [yt-dlp](https://github.com/yt-dlp/yt-dlp), an optional free program. The one-line installers add it to the kit's venv; without it, the reference view shows **Install** and the agent buttons (or put its standalone program on your PATH, or set `YTDLP=/path/to/yt-dlp`). It runs as a separate program; none of its code is in the kit. A direct video link is downloaded by Studio itself. Instagram uses the kit's [instaloader](https://github.com/instaloader/instaloader) helper (MIT): one public post, anonymous, never a login. Without yt-dlp, the link fails with the reason in plain words and the fix buttons.
 - **Where it goes.** By default `teardown-in/studio/<job>/` in the kit, which git ignores. Pick any folder in [Settings](#settings). Downloads never go into the repo's tracked files, and the teardown (`teardown/studio-<job>-r<id>/`: Reel.md, teardown.md, contact sheet) is gitignored too.
 - **Long videos.** Studio keeps the first 90 seconds for the teardown (`STUDIO_REF_MAX_SECONDS` changes it); with ffmpeg present yt-dlp downloads only that part.
@@ -632,13 +633,13 @@ Finish, the old last step before Post, is now two steps. **Review** drafts the r
 Draft first, check what we picked, then render once.
 
 - **Draft** (it reads **Redraft** once there is a draft) plans the reel; it makes no video. When it ends the step says "Plan ready, no video yet. Check it below, then Render." **Cancel** shows only while a draft runs.
-- **Draft from.** When you kept pieces on the Cut step: **Your N pieces** (the default) or **The whole take**. Your pieces are cut once, on their audio-checked edges, and handed to the reel as they are (`--as-is`, with a `clips.json` beside them carrying each one's words), so nothing is transcribed or cut a second time.
+- **Draft from.** When you kept clips on the Cut step: **Your N clips** (the default) or **The whole take**. Your clips are cut once, on their audio-checked edges, and handed to the reel as they are (`--as-is`, with a `clips.json` beside them carrying each one's words), so nothing is transcribed or cut a second time.
 - **The draft preview.** A fast preview of the draft's cuts only, with no captions and no look. It is never a render from another draft or take.
 - **Next to your reference.** One row of chips that says how close the draft is to the reference, one word per part: **Matched**, **Close** or **Off** for Framing, Color, Captions, Graphics, Sounds and Pace. It shows only when the engine measured the draft against a reference, and only for the parts it measured.
 - **The edit receipt** and **the clean-up pass**, described under [Review your edit](#review-your-edit).
 - **Every pick and why.** A fold, closed until you open it, with each pick per beat and the reason. Change a cell and click **Apply my edits**; the change is pinned and shows in the next render. When the draft tightened pauses, **Pauses cut** lists each one with **Keep this pause** (`pace.keepPauses`, `--keep-pauses clip@seconds`).
 
-When your pieces changed after the draft, Review says "Your pieces changed since the draft. Draft again first." (Your edit says so too.) If this job already has earlier reels, they stay in Outputs, and New video starts a new job if you want this take kept apart.
+When your clips changed after the draft, Review says "Your clips changed since the draft. Draft again first." (Your edit says so too.) If this job already has earlier reels, they stay in Outputs, and New video starts a new job if you want this take kept apart.
 
 ### Render
 
@@ -648,7 +649,7 @@ Full quality, once.
 
 - **Render vN** is the one Render button, with progress and **Cancel** while it runs. It stays off until the reel is drafted, and then offers **Draft it on Review first**. A cancel that lands after the render wrote its video keeps the video; the task ends done.
 - **The finished reel.** Render builds the reel, applies your choices edits, and lists this draft's output (`reel-vN.mp4` and the export) with a player, **Edit this reel** and a download link. **Post it** opens the Post view. A note counts the earlier reels and links to Outputs and New video.
-- **What to make** is a fold, with a one-line summary beside its name. Inside: **The reel**, **N clips from your pieces** (each piece as its own reel with the same look) and **Plain clips, no edit** (the words you kept, joined, no look, in seconds), plus **Also sized for**, the platform size. Any mix; Render makes them all in one run. With only clips or plain clips ticked there is nothing to draft.
+- **What to make** is a fold, with a one-line summary beside its name. Inside: **The reel**, **N clips on their own** (each clip as its own reel with the same look) and **Plain clips, no edit** (the words you kept, joined, no look, in seconds), plus **Also sized for**, the platform size. Any mix; Render makes them all in one run. With only clips or plain clips ticked there is nothing to draft.
 - **Compare with the original, or comment on a frame** is a fold that shows once this draft has a rendered reel. See [Review your edit](#review-your-edit).
 - **Post** is the second view of Render (the switch above the step, or `#step=post`). It sends the reel to Buffer as a draft; see [posting.md](posting.md).
 
@@ -656,7 +657,7 @@ Under both Review and Render, the log is folded, and **For your agent** copies t
 
 The effects pass (camera moves, person-mask effects) runs when the effects venv is set up; without it, Studio says the picked effects need it, with **Install** and the agent buttons, and the reel renders without them.
 
-![Finish after a render: the reel and each piece as its own reel under Clips from your pieces](studio/finish-rendered.png)
+![After a render: the reel and each clip as its own reel](studio/finish-rendered.png)
 
 Every export saves the build behind it beside the video (`reel-vN.build/`). A later Draft replaces `build/`, so a finished reel shows **Edit this reel**: it brings that reel's build back (the draft it replaces is kept as `draft-<time>.build/`), then edit and Render. Agents use `reopen_reel` or `npm run reopen -- <job> v3`.
 

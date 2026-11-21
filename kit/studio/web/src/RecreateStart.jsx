@@ -25,7 +25,7 @@ export function StartMode({ s, apply, patch, go, looks }) {
   const has = !!(ex || reading || r.status === 'running' || r.status === 'uploaded');
   const live = reading ? reading.stages : r.status === 'running' ? r.stages : null; // the stage view, when the server sends one
   // what is in use decides the choice; before any reference is in, the card you clicked does
-  const choice = has ? (r.mode === 'recreate' ? 'recreate' : r.mode === 'look' ? 'look' : r.mode === 'off' ? (s.styleLook ? 'look' : 'own') : null) : s.styleLook ? 'look' : local || 'own';
+  const choice = has ? (r.mode === 'recreate' ? 'recreate' : r.mode === 'look' ? 'look' : r.mode === 'off' ? (s.styleLook ? 'look' : 'own') : null) : s.styleLook ? 'look' : local || (failed && (r.mode === 'recreate' || r.mode === 'look') ? r.mode : 'own'); // a link that stopped keeps its box open after a reload
   const needJob = () => { if (s.job) return false; toast('Name the reel first (top left)'); document.getElementById('job')?.focus(); return true; };
   const setMode = m => (m === 'look' ? quiet('/api/state', { reference: { mode: m } }).then(j => { if (j) apply(j); }) : patch({ reference: { mode: m } }).catch(() => {}));
   const pick = m => {

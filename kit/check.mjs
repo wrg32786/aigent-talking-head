@@ -287,6 +287,7 @@ if (target) {
     catch (e) { sterrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio step map tests (tests/studio-steps.test.mjs: the 8 steps, old step names land, one step per layer, menu links, match chips)', errs: sterrs, warns: [] });
     for (const [f, what] of [['studio-point.test.mjs', 'Studio Cut step tests (tests/studio-point.test.mjs: the point of the video steers lines and clips, topics are real themes, Pacing never cuts a word)'],
+      ['studio-cut-server.test.mjs', 'Studio Cut server tests (tests/studio-cut-server.test.mjs: the Cut routes, the point, topics, Pacing and the stitched previews over HTTP)'],
       ['studio-stages.test.mjs', 'Studio stage status tests (tests/studio-stages.test.mjs: teardown log lines to the stage line, the list and the bar)']]) {
       const e2 = [];
       try { execFileSync(process.execPath, [join(ROOT, 'tests', f)], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
