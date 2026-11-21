@@ -143,6 +143,20 @@ console.log('theme', await p.evaluate(() => window.__theme));
     console.log('boxes', ts.length, 'moments -> boxes.json'); await b.close(); process.exit(0);
   }
 }
+// text check (overlay.html __textCheck): on every frame, every text element on screen (a caption's current word, a title,
+// a sticker word) is measured alone where it is drawn, and any two that share area are listed. textcheck.json; npm run
+// verify fails on any clash, reel.cjs prints the count. TEXTCHECK=0 skips it; TEXTCHECK=only writes it and stops.
+if ((!only || process.env.TEXTCHECK === 'only') && process.env.TEXTCHECK !== '0' && (await p.evaluate(() => !!window.__textCheck))) {
+  const r = await p.evaluate(([d, f]) => window.__textCheck(d, f), [DUR, FPS]), pairs = new Map();
+  for (const c of r.clashes) { const k = c.a + '|' + c.b, e = pairs.get(k) || { a: c.a, b: c.b, kinds: c.kinds, from: c.t, frames: 0, maxPx: 0 }; e.frames++; e.to = c.t; e.maxPx = Math.max(e.maxPx, c.px); pairs.set(k, e); }
+  const lay = await p.evaluate(() => (window.__layout ? window.__layout() : { elements: [] }));
+  const moved = lay.elements.filter(e => e.texts).flatMap(e => e.texts.map(x => ({ kind: e.kind, text: x.word || e.text, ...x })));
+  const tc = { frames: r.frames, together: r.together, clashFrames: new Set(r.clashes.map(c => c.t)).size, pairs: [...pairs.values()], moved, clashes: r.clashes.slice(0, 200) };
+  writeFileSync(join(ROOT, 'textcheck.json'), JSON.stringify(tc, null, 1) + '\n');
+  console.log(`text check: ${tc.clashFrames} of ${r.frames} frames with two words on the same spot; layout stacked ${moved.filter(m => m.move).length} and held back ${moved.filter(m => m.hide).length} to keep words apart (textcheck.json)`);
+  for (const e of tc.pairs) console.warn(`WARNING: "${e.a}" and "${e.b}" overlap from ${e.from}s for ${e.frames} frame${e.frames === 1 ? '' : 's'} (up to ${e.maxPx} px)`);
+  if (process.env.TEXTCHECK === 'only') { writeFileSync(join(ROOT, 'words.json'), JSON.stringify(await p.evaluate(() => window.__words || [])) + '\n'); await b.close(); process.exit(0); }
+}
 // face check (kit/facezone.py -> captions.js faceTrack): at 8 moments a second, every caption, title and kinetic word is
 // drawn alone with its layout and the letter pixels inside the face zone are counted. facecheck.json; npm run verify fails
 // on any hit, reel.cjs prints the count. FACECHECK=0 skips it.

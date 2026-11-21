@@ -967,7 +967,7 @@ if (EXN && EXN.names.length) {
     for (const n of EXN.reframed) {
       try {
         const r = require('./export-frame.cjs').make({ jobDir: job, src: build, name: n, reel: out, base: path.join(build, 'base.mp4'), masks: build, python: PY, env: (flag('no-sfx') || opt('sfx') === 'off') ? { NOSFX: '1' } : {} });
-        exportsMade.push({ name: n, file: r.file, size: r.size, label: r.label, window: r.window, layout: r.layout, faceHits: r.faceHits });
+        exportsMade.push({ name: n, file: r.file, size: r.size, label: r.label, window: r.window, layout: r.layout, faceHits: r.faceHits, textClashes: r.textClashes });
       } catch (e) { die(`The reel is done (${out}), but the ${X.get(n).label} version failed: ${String(e.message || e).split('\n')[0]}`); }
     }
   }

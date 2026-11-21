@@ -342,6 +342,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'face-matte.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { ferrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'face and mask tests (tests/face-matte.test.mjs: BiRefNet tiers, memory check, Studio 409 when memory is short)', errs: ferrs, warns: [] });
+    const toerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'text-overlap.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { toerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'words never overlap (tests/text-overlap.test.mjs: every text box on every frame for 9:16, 4:5 and 1:1; a said word leaves when a title enters, a title over a word, two titles, caption lines, an ordinal word)', errs: toerrs, warns: [] });
     const sberrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'starburst.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { sberrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }

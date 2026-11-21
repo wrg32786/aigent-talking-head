@@ -170,6 +170,14 @@ if (stills.length) {
     ok(!fc.overlapMoments, `no text on the face zone at ${fc.withFace} moments with a face${fc.overlapMoments ? `: ${fc.overlapMoments} moments` : ''}${fc.moved && fc.moved.length ? ` (layout moved ${fc.moved.length} off the face)` : ''}`);
     for (const e of fc.elements || []) lines.push(`      ${e.kind} "${e.text}" at ${e.start}s: ${e.moments} moment${e.moments === 1 ? '' : 's'}, up to ${e.maxPx} px on the face`);
   } }
+// 3d. text clear of text (render.mjs -> textcheck.json): no two words on the same spot on any frame
+{ let tc = null; try { tc = JSON.parse(readFileSync(join(build, 'textcheck.json'), 'utf8')); } catch {}
+  if (!tc) notes.push('no textcheck.json: the text overlap check did not run (rebuild with the current kit)');
+  else {
+    const mv = (tc.moved || []).length;
+    ok(!tc.clashFrames, `no two words on the same spot on ${tc.frames} frames${tc.clashFrames ? `: ${tc.clashFrames} frames` : ''}${mv ? ` (layout stacked or held back ${mv} to keep them apart)` : ''}`);
+    for (const e of tc.pairs || []) lines.push(`      "${e.a}" and "${e.b}" overlap from ${e.from}s for ${e.frames} frame${e.frames === 1 ? '' : 's'}, up to ${e.maxPx} px`);
+  } }
 // 4. mask, measured
 const mask = R.maskSpec(C);
 if (C.titles && mask.file) {

@@ -484,7 +484,11 @@ function oneWord(c,t,yo){const ws=wordsOf(c);let cur=null;for(const w of ws){if(
 // words the same start) until the next word starts. A pause longer than 1.5 s clears the screen.
 const OWSEQ=(()=>{const ws=[];for(const c of flips)if(c[3]===0&&(c[4].style||CSTYLE)==='one-word')for(const w of wordsOf(c))if(String(w[2]).replace(/[^\p{L}\p{N}]/gu,''))ws.push({a:+w[0],z:+w[1],w:w[2],c});
  if(!ws.length)return null;ws.sort((p,q)=>p.a-q.a);const MIN=CAP.wordMin||.12;let prev=-1e9;for(const x of ws){x.s=Math.max(x.a,prev+MIN);prev=x.s}
- ws.forEach((x,i)=>{const nx=ws[i+1],tail=Math.max(x.z,x.s+MIN)+.25;x.e=nx?(nx.a-x.z>1.5?Math.min(nx.s,tail):nx.s):tail});return ws})();
+ ws.forEach((x,i)=>{const nx=ws[i+1],tail=Math.max(x.z,x.s+MIN)+.25;x.e=nx?(nx.a-x.z>1.5?Math.min(nx.s,tail):nx.s):tail});
+ // One word leaves before the next enters: a word that has been said does not hold on under a title or an ordinal word that
+ // comes in before the next spoken word (Will, 2026-11-21: "on" stayed up under the title "Terms").
+ const ent=flips.filter(c=>c[3]===7||c[3]===9).map(c=>+c[0]);for(const x of ws)for(const a of ent)if(a>x.s&&a<x.e&&a>=x.z-.05)x.e=Math.max(x.s+MIN,a);
+ return ws})();
 window.__words=OWSEQ?OWSEQ.map(x=>({start:+x.s.toFixed(3),end:+x.e.toFixed(3),word:String(x.w)})):[];
 const wnorm=w=>String(w).toLowerCase().replace(/[^a-z0-9]/g,'');
 // the word on screen now. While a title or an ordinal word is up, the spoken word that it shows is skipped (it is
@@ -494,7 +498,10 @@ function oneWordSeq(t,only){if(!OWSEQ)return;const x=OWSEQ.find(x=>t>=x.s&&t<x.e
  const shows=c=>{let ws=String(c[2]).replace(/\|/g,' ').split(/\s+/).filter(Boolean);if(c[3]===7&&ONEW&&ws.length&&c[4].lockup!==false)ws=[ws[heroOf(ws.map(w=>[0,0,w]),c[4])[0]]];return ws.map(wnorm)}; // a one-word title shows only its hero word
  if(over.some(c=>shows(c).includes(wnorm(x.w))))return;
  const yo=zoneAt(t)==='move'?ALTY:0,y=yo||x.c[4].y||KY;
- ctx.save();{const k=LXF(x.c,t);if(k===0){ctx.restore();return}if(k)xfApply(k)}oneWordDraw(x.c,x.w,x.s,t,over.length&&y<760?150:y);ctx.restore()}
+ ctx.save();
+ // the layout pass can move or hide one word on its own (step 4, text clear of text): x.adj and x.hid
+ if(!RAW){let a=1;for(const [h0,h1] of x.hid||[]){const f=.08;if(t>=h0-f&&t<=h1+f)a=Math.min(a,t<h0?(h0-t)/f:t>h1?(t-h1)/f:0)}if(a<=.001){ctx.restore();return}if(a<1)ctx.globalAlpha*=a;if(x.adj)xfApply(x.adj)}
+ {const k=LXF(x.c,t);if(k===0){ctx.restore();return}if(k)xfApply(k)}oneWordDraw(x.c,x.w,x.s,t,over.length&&y<760?150:y);ctx.restore()}
 // one-word (the simple style): while a title is up it is the one word on screen, so the caption waits
 const titleUp=t=>(zoneAt(t)!=='hide'&&TITLES.some(c=>t>=c[0]&&t<c[1]))||(CPOS==='top'&&flips.some(c=>c[3]===9&&t>=c[0]+.1&&t<c[1])); // a top caption also waits for an ordinal word
 function caption(c,t){if(splitLight(t)&&ctx.canvas!==INKC)return inked(()=>caption(c,t));const st=c[4].style||CSTYLE;if(st==='one-word'&&OWSEQ)return;if(st==='one-word'&&titleUp(t))return;const yo=splitY(t)||(zoneAt(t)==='move'?ALTY:0);if(st==='kinetic')return kinetic(c,t);if(st==='oneword')return oneword(c,t);if(st==='pill')return pill(c,t,yo);if(st==='hormozi')return boldCap(c,t,false,yo);if(st==='karaoke')return boldCap(c,t,true,yo);if(st==='one-word')return oneWord(c,t,yo);glyphs(c[2],fit([c[2]],S,CSZ,980),540,yo||CYB,t-c[0],CCOL||IV,true)}
@@ -1220,6 +1227,9 @@ const REPORT=[];
 function layoutPass(){LAYOUT.clear();REPORT.length=0;const R=safeRect(),M=18;
  const els=flips.map(c=>({c,kind:kindOf(c),s:c[0],e:endOf(c),raw:rawBox(c)})).filter(x=>x.raw);
  for(const x of els){x.takeover=area(x.raw)>1080*1920*.55;x.xf=null;x.box=x.raw;x.hide=[];x.action='none'}
+ // a one-word caption is on screen for as long as its words are, which can run past the phrase's own end (a word holds
+ // until the next one starts), so every step below works with that span
+ if(OWSEQ)for(const w of OWSEQ){w.adj=null;w.hid=[];const x=els.find(q=>q.c===w.c);if(x){x.s=Math.min(x.s,w.s);x.e=Math.max(x.e,w.e)}}
  const live=(a,b)=>a.s<b.e-.04&&b.s<a.e-.04;
  // 1. export frame and safe areas, every element but a full-frame takeover
  if(EXPF)for(const x of els){if(x.takeover)continue;const k=fitInto(x.raw,R);if(k){x.xf=k;x.box=xfBox(x.raw,k);x.action='safe-area'}}
@@ -1274,8 +1284,42 @@ function layoutPass(){LAYOUT.clear();REPORT.length=0;const R=safeRect(),M=18;
    const k=best?best.k:k0;if(best){x.xf=k;x.box=best.B}
    const hs=[];for(const q of bad(k)){const a=q.t-.5/f,b=q.t+.5/f,l=hs[hs.length-1];if(l&&a<=l[1]+.01)l[1]=b;else hs.push([a,b])}
    x.hide=x.hide.concat(hs);x.action=(x.action==='none'?'':x.action+'+')+(best?'face+face-hide':'face-hide');placed.push(x)}}
- for(const x of els){if(x.xf||x.hide.length)LAYOUT.set(x.c,{xf:x.xf,hide:x.hide});
-  REPORT.push({kind:x.kind,mode:x.c[3],start:x.s,end:x.c[1],text:String(x.c[2]||'').slice(0,40),action:x.action,takeover:x.takeover,box:x.raw,final:x.box,hide:x.hide,...(x.xf?{move:{dx:x.xf.dx,dy:x.xf.dy,s:x.xf.s}}:{})})}}
+ // 4. text clear of text: no two words share a spot at any moment. Every frame (24 a second) that two text elements are
+ // both up, each is measured alone where it will really be drawn. On a clash the title stays, then stickers, then captions,
+ // and the earlier one before the later one. The other one (for one-word captions: just that word) stacks above or below
+ // with a gap, shrinking to no less than 60%, only where it stays inside the safe area, off the face at every moment and
+ // clear of graphics. When nothing fits it waits: it is hidden for the frames that would clash, so one leaves before the
+ // other enters.
+ for(const x of els)LAYOUT.set(x.c,x); // from here on LXF reads each element's place live
+ {const GAP=8,st=1/24,rank=x=>x.kind==='title'?0:x.kind==='caption'?2:1,done=[],bx=(x,t)=>boxNow([x.c],t,false,true);
+  const TX=els.filter(x=>isText(x.c)&&!x.takeover).sort((a,b)=>rank(a)-rank(b)||a.s-b.s);
+  const wordAt=(x,t)=>OWSEQ&&x.kind==='caption'?OWSEQ.find(w=>w.c===x.c&&t>=w.s&&t<w.e)||null:null;
+  const ftol=b=>Math.max(300,area(b)*.01),hit=(q,k)=>{const b=k?xfBox(q.b,k):q.b;return q.ob.some(o=>inter(o,b,GAP))};
+  for(const x of TX){const obs=done.filter(o=>live(o,x));done.push(x);if(!obs.length)continue;
+   const end=Math.min(x.e,x.s+60),A=[];for(let f=Math.ceil(x.s/st);f*st<end;f++){const t=f*st,b=bx(x,t);if(!b)continue;A.push({t,b,w:wordAt(x,t),ob:obs.filter(o=>t>=o.s&&t<o.e).map(o=>bx(o,t)).filter(Boolean)})}
+   if(!A.some(q=>hit(q)))continue;
+   const groups=new Map();for(const q of A){const u=q.w||x;if(!groups.has(u))groups.set(u,[]);groups.get(u).push(q)}
+   for(const [u,Q] of groups){const bad=Q.filter(q=>hit(q));if(!bad.length)continue;
+    const W=Q.reduce((b,q)=>uni(b,q.b),null),O=bad.reduce((b,q)=>q.ob.reduce((p,o)=>uni(p,o),b),null),H=W.y1-W.y0,cx=(W.x0+W.x1)/2,cy=(W.y0+W.y1)/2,cand=[];
+    for(let sc=1;sc>=.6-1e-6;sc-=.1){const h=H*sc;cand.push({s:sc,dy:O.y0-M-h/2-cy},{s:sc,dy:O.y1+M+h/2-cy})}
+    let best=null;
+    for(const c of cand){const k={cx,cy,dx:0,dy:Math.round(c.dy),s:+c.s.toFixed(2)},B=xfBox(W,k);
+     if(B.y0<R.y0-1||B.y1>R.y1+1||B.x0<R.x0-1||B.x1>R.x1+1)continue;
+     if(Q.some(q=>{if(hit(q,k))return true;const b=xfBox(q.b,k),z=FACESAFE&&!cardAt(q.t)?faceAt(q.t):null;if(z&&interA(b,z)>ftol(b))return true;
+      return G.some(o=>!STARBEH(o.c)&&q.t>=o.s&&q.t<o.e&&inter(o.box,b,M-2))}))continue;
+     const cost=Math.abs(k.dy)+(1-k.s)*600;if(!best||cost<best.cost)best={k,cost}}
+    const note=a=>{if(!new RegExp('(^|\\+)'+a+'$').test(x.action))x.action=x.action==='none'?a:x.action+'+'+a};
+    if(best){const k=best.k;
+     if(u!==x)u.adj=k;
+     else{const k0=x.xf||{cx:(x.raw.x0+x.raw.x1)/2,cy:(x.raw.y0+x.raw.y1)/2,dx:0,dy:0,s:1},s0=k0.s||1;
+      x.xf={cx:k0.cx,cy:k0.cy,s:+(s0*k.s).toFixed(3),dx:Math.round((k0.cx+(k0.dx||0)-k.cx)*k.s+k.cx-k0.cx),dy:Math.round((k0.cy+(k0.dy||0)-k.cy)*k.s+k.cy+k.dy-k0.cy)};x.box=xfBox(x.raw,x.xf)}
+     note('text');(x.texts=x.texts||[]).push({at:+Q[0].t.toFixed(2),...(u!==x?{word:String(u.w)}:{}),move:{dy:k.dy,s:k.s}});continue}
+    const hs=[];for(const q of bad){const a=q.t-st/2,b=q.t+st/2,l=hs[hs.length-1];if(l&&a<=l[1]+.01)l[1]=b;else hs.push([a,b])}
+    if(u!==x)u.hid=hs;else x.hide=x.hide.concat(hs);
+    note('text-hide');(x.texts=x.texts||[]).push({at:+Q[0].t.toFixed(2),...(u!==x?{word:String(u.w)}:{}),hide:hs.map(h=>[+h[0].toFixed(2),+h[1].toFixed(2)])})}}}
+ LAYOUT.clear();
+ for(const x of els){if(x.xf||x.hide.length)LAYOUT.set(x.c,{xf:x.xf,hide:x.hide});if(x.texts)x.rep={texts:x.texts};
+  REPORT.push({kind:x.kind,mode:x.c[3],start:x.s,end:x.c[1],text:String(x.c[2]||'').slice(0,40),action:x.action,takeover:x.takeover,box:x.raw,final:x.box,hide:x.hide,...(x.xf?{move:{dx:x.xf.dx,dy:x.xf.dy,s:x.xf.s}}:{}),...(x.rep||{})})}}
 window.__layout=()=>({export:EXPF?EXPF.name||'custom':null,safe:safeRect(),face:FACEZ,faceTrack:!!FTRK,faceSafe:FACESAFE,elements:REPORT});
 // the face check: every caption, title and kinetic word on screen at t, drawn alone with its layout, and how many of its
 // letter pixels land inside the face zone at t (full-frame pixels; 0 is clean). render.mjs samples it into facecheck.json.
@@ -1288,6 +1332,15 @@ window.__faceInk=t=>{const z=faceAt(t);if(!z)return null;const q={x0:Math.floor(
  return{zone:z,hits:out}};
 // every element on screen at t, each measured alone with its layout applied (hidden ones report no box)
 window.__boxesAt=t=>flips.filter(c=>t>=c[0]&&t<c[1]).map(c=>({kind:kindOf(c),mode:c[3],start:c[0],end:c[1],text:String(c[2]||'').slice(0,40),box:boxNow([c],t,false,STARBEH(c)),takeover:(REPORT.find(r=>r.start===c[0]&&r.mode===c[3])||{}).takeover||false})).filter(x=>x.box);
+// Text clear of text, checked: every text element on screen at t (a caption's current word, a title, a sticker word),
+// each measured alone where it is really drawn, and every pair whose boxes share any area. render.mjs runs it on every
+// frame into textcheck.json; npm run verify and tests/text-overlap.test.mjs fail on any.
+const textUp=(c,t)=>isText(c)&&((t>=c[0]&&t<c[1])||(!!OWSEQ&&c[3]===0&&OWSEQ.some(x=>x.c===c&&t>=x.s&&t<x.e)));
+window.__textBoxesAt=t=>{const out=[];for(const c of flips){if(!textUp(c,t))continue;if((REPORT.find(r=>r.start===c[0]&&r.mode===c[3])||{}).takeover)continue;
+  const w=OWSEQ&&c[3]===0?OWSEQ.find(x=>x.c===c&&t>=x.s&&t<x.e):null,b=boxNow([c],t,false,true);if(b)out.push({kind:kindOf(c),mode:c[3],start:c[0],text:w?String(w.w):String(c[2]||'').slice(0,40),box:b})}return out};
+window.__textCheck=(dur,fps=24)=>{const clashes=[];let n=0,busy=0;for(let f=0;f<Math.round(dur*fps);f++){const t=f/fps;n++;if(flips.filter(c=>textUp(c,t)).length<2)continue;busy++;
+  const bs=window.__textBoxesAt(t);for(let i=0;i<bs.length;i++)for(let j=i+1;j<bs.length;j++){const a=interA(bs[i].box,bs[j].box);if(a>0)clashes.push({t:+t.toFixed(3),a:bs[i].text,b:bs[j].text,kinds:[bs[i].kind,bs[j].kind],px:Math.round(a),boxes:[bs[i].box,bs[j].box]})}}
+ return{frames:n,together:busy,clashes}};
 function flip(t,only){for(const c of (only||flips)){if(t<c[0]||t>=c[1])continue;if(LAYER==='panels'&&!(PANM(c[3])&&PANB(c)))continue;use(c.ps);const dt=t-c[0],m=c[3],out=c[1]>90?1:cl((c[1]-t)/.05);ctx.save();ctx.globalAlpha=out;{const k=LXF(c,t);if(k===0){ctx.restore();continue}if(k)xfApply(k)}
 if(m===9){const beh=c[4].layer==='behind';if(LAYER==='titles'){if(beh)ordBurst(c,t)}else{if(!(beh&&LAYER==='front')&&!(WORDONLY&&STARBEH(c)))ordBurst(c,t);ordWord(c,t)}}
 else if(m===7){if(zoneAt(t)!=='hide'){const lay=cardAt(t)?'front':(c.layer||'front'); // on a colour card there is no head to sit behind
