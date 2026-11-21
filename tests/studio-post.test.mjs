@@ -228,6 +228,47 @@ try {
     const r = await sendAndWait({ reel: `jobs/${JOB}/reel-v3.mp4`, channels: ['ch-ig'], caption: 'hevc' }); assert.strictEqual(r.j.status, 'done', JSON.stringify(r.j));
     assert.ok(r.j.result.encoded && r.j.result.encoded.why.some(w => /hevc/.test(w)), JSON.stringify(r.j.result.encoded)); assert.strictEqual(P.probe(join(jobDir, 'post', 'reel-v3-h264.mp4')).vcodec, 'h264');
   });
+  await t('Instagram Feed: the note says which file goes where; a Feed placement is checked against the 4:5 and never gets the 9:16', async () => {
+    await req('/api/post/host', { host: 'r2' });
+    const st = (await req('/api/post')).j; assert.match(st.where, /Feed gets the 4:5/); assert.strictEqual(st.makeFeed, 'Make the 4:5 version for the Feed');
+    assert.deepStrictEqual([st.files[`jobs/${JOB}/reel-v2.mp4`].use, st.files[`jobs/${JOB}/reel-v2.mp4`].feed.missing], ['For Reels and Stories', true]);
+    // rules, no network
+    const feed45 = { seconds: 20, width: 1080, height: 1350 }, ig = { id: 'ch-ig', service: 'instagram' };
+    assert.strictEqual(P.placementOf(ig, { 'ch-ig': 'feed' }), 'feed'); assert.strictEqual(P.placementOf(ig, { instagram: 'feed' }), 'feed'); assert.strictEqual(P.placementOf(ig, {}), 'reel');
+    assert.strictEqual(P.placementOf({ id: 'ch-fb', service: 'facebook' }, { 'ch-fb': 'feed' }), 'reel', 'only Instagram has a Feed placement here');
+    assert.ok(P.checkChannel(ig, feed45, { placement: 'feed', feed: { missing: false } }).ok);
+    assert.match(P.checkChannel(ig, null, { placement: 'feed', feed: { missing: true } }).block.join(), /Make the 4:5 version for the Feed first/);
+    assert.match(P.checkChannel(ig, { seconds: 20, width: 1080, height: 1920 }, { placement: 'feed', feed: { missing: false } }).block.join(), /4:5 to 1.91:1/);
+    assert.deepStrictEqual(P.postInput(ig, { url: 'https://cdn.example.com/f.mp4', placement: 'feed' }).metadata.instagram, { type: 'post', shouldShareToFeed: true });
+    assert.strictEqual(P.postInput(ig, { url: 'https://cdn.example.com/f.mp4', placement: 'feed' }).saveToDraft, true, 'still a draft by default');
+    // the page's check: no 4:5 yet, so the channel is blocked with the plain line
+    let c = (await req('/api/post/check', { reel: `jobs/${JOB}/reel-v2.mp4`, channels: ['ch-ig', 'ch-yt'], caption: 'x', placements: { 'ch-ig': 'feed' } })).j;
+    assert.strictEqual(c.feed.missing, true); assert.deepStrictEqual([c.channels[0].placement, c.channels[0].ok, c.channels[0].file], ['feed', false, null]); assert.match(c.channels[0].block.join(), /Make the 4:5 version for the Feed/);
+    assert.deepStrictEqual([c.channels[1].placement, c.channels[1].file], ['reel', `jobs/${JOB}/reel-v2.mp4`]);
+    // a send with no 4:5: the Feed channel is skipped (needs feed45), nothing goes to Buffer for it, YouTube still gets the 9:16
+    const n0 = posts.length, r = await sendAndWait({ reel: `jobs/${JOB}/reel-v2.mp4`, channels: ['ch-ig', 'ch-yt'], caption: 'Feed test', placements: { 'ch-ig': 'feed' } });
+    assert.strictEqual(r.j.status, 'done', JSON.stringify(r.j)); const by = Object.fromEntries(r.j.result.results.map(z => [z.channelId, z]));
+    assert.deepStrictEqual([by['ch-ig'].ok, by['ch-ig'].skipped, by['ch-ig'].needs, by['ch-ig'].placement], [false, true, 'feed45', 'feed']); assert.ok(by['ch-yt'].ok);
+    assert.strictEqual(posts.length, n0 + 1); assert.ok(!posts.slice(n0).some(p => p.channelId === 'ch-ig'), 'no 9:16 went to the Feed');
+  });
+  if (FF) await t('Instagram Feed: with the 4:5 made, the Feed gets that file on its own link and the other channels get the 9:16, all as drafts', async () => {
+    mk(join(jobDir, 'reel-v2-feed-4x5.mp4'), 5, ['-vf', 'scale=432:540', '-c:v', 'libx264', '-preset', 'ultrafast', '-c:a', 'aac']);
+    const st = (await req('/api/post')).j; assert.strictEqual(st.reels[0], `jobs/${JOB}/reel-v3.mp4`.replace('v3', existsSync(join(jobDir, 'reel-v3.mp4')) ? 'v3' : 'v2'), 'the reel still comes before its sizes');
+    assert.deepStrictEqual([st.files[`jobs/${JOB}/reel-v2-feed-4x5.mp4`].use, st.files[`jobs/${JOB}/reel-v2.mp4`].feed.missing], ['For the Instagram Feed', false]);
+    const c = (await req('/api/post/check', { reel: `jobs/${JOB}/reel-v2.mp4`, channels: ['ch-ig'], caption: 'x', placements: { 'ch-ig': 'feed' } })).j;
+    assert.deepStrictEqual([c.channels[0].ok, c.channels[0].file, c.feed.info.width, c.feed.info.height], [true, `jobs/${JOB}/reel-v2-feed-4x5.mp4`, 432, 540]);
+    const n0 = posts.length, o0 = objects.size, r = await sendAndWait({ reel: `jobs/${JOB}/reel-v2.mp4`, channels: ['ch-ig', 'ch-yt'], caption: 'Feed and Shorts', placements: { 'ch-ig': 'feed' } });
+    assert.strictEqual(r.j.status, 'done', JSON.stringify(r.j)); const x = r.j.result, by = Object.fromEntries(x.results.map(z => [z.channelId, z]));
+    assert.deepStrictEqual([by['ch-ig'].ok, by['ch-ig'].placement, by['ch-ig'].file, by['ch-ig'].status], [true, 'feed', `jobs/${JOB}/reel-v2-feed-4x5.mp4`, 'draft']);
+    assert.strictEqual(by['ch-yt'].file, `jobs/${JOB}/reel-v2.mp4`); assert.strictEqual(x.feed.reel, `jobs/${JOB}/reel-v2-feed-4x5.mp4`); assert.notStrictEqual(x.feed.url, x.url);
+    const ig = posts.slice(n0).find(p => p.channelId === 'ch-ig'), yt = posts.slice(n0).find(p => p.channelId === 'ch-yt');
+    assert.deepStrictEqual([ig.metadata.instagram.type, ig.assets[0].video.url, ig.saveToDraft, yt.assets[0].video.url, yt.saveToDraft], ['post', x.feed.url, true, x.url, true]);
+    assert.ok(objects.size >= o0 + 1, 'the 4:5 was uploaded as its own file');
+    // only the Feed: the 9:16 is not uploaded again and nothing 9:16 is posted
+    const n1 = posts.length, r2 = await sendAndWait({ reel: `jobs/${JOB}/reel-v2.mp4`, channels: ['instagram'], caption: 'Feed only', placements: { instagram: 'feed' } });
+    assert.strictEqual(r2.j.status, 'done', JSON.stringify(r2.j)); assert.strictEqual(posts.length, n1 + 1); assert.strictEqual(posts.at(-1).assets[0].video.url, x.feed.url, 'the same 4:5 file keeps its link');
+    assert.strictEqual(r2.j.result.feed.uploaded, false);
+  });
   await t('MCP: buffer_channels, buffer_post_reel (drafts by default, now needs confirmNow), setup_status says posting', async () => {
     client = new Client({ name: 'post-test', version: '1' });
     await client.connect(new StdioClientTransport({ command: process.execPath, args: [join(ROOT, 'kit', 'mcp.mjs')], cwd: ROOT, env: { ...env }, stderr: 'ignore' }));
@@ -238,6 +279,11 @@ try {
     r = await client.callTool({ name: 'buffer_post_reel', arguments: { channels: ['instagram'], caption: 'from the agent', reel: `jobs/${JOB}/reel-v2.mp4` } }); assert.ok(!r.isError, JSON.stringify(r)); noKeys(JSON.stringify(r));
     assert.strictEqual(r.structuredContent.mode, 'draft'); assert.strictEqual(posts.length, n0 + 1); assert.strictEqual(posts.at(-1).saveToDraft, true);
     r = await client.callTool({ name: 'buffer_post_reel', arguments: { channels: ['instagram'], mode: 'now', reel: `jobs/${JOB}/reel-v2.mp4` } }); assert.ok(r.isError); assert.match(r.content[0].text, /confirmNow/);
+    { const tool = (await client.listTools()).tools.find(x => x.name === 'buffer_post_reel'); assert.ok(tool.inputSchema.properties.placements && /4:5/.test(tool.description), 'buffer_post_reel knows the Feed placement');
+      if (FF) { const n1 = posts.length; r = await client.callTool({ name: 'buffer_post_reel', arguments: { channels: ['instagram'], caption: 'feed from the agent', reel: `jobs/${JOB}/reel-v2.mp4`, placements: { instagram: 'feed' } } }); assert.ok(!r.isError, JSON.stringify(r));
+        assert.strictEqual(r.structuredContent.feed.file, `jobs/${JOB}/reel-v2-feed-4x5.mp4`); assert.strictEqual(posts.length, n1 + 1); assert.deepStrictEqual([posts.at(-1).metadata.instagram.type, posts.at(-1).saveToDraft], ['post', true]); }
+      r = await client.callTool({ name: 'buffer_post_reel', arguments: { channels: ['instagram'], caption: 'no 4:5 for v1', reel: `jobs/${JOB}/reel-v1.mp4`, placements: { instagram: 'feed' } } }); assert.ok(!r.isError, JSON.stringify(r));
+      assert.deepStrictEqual([r.structuredContent.sent, r.structuredContent.results[0].needs], [0, 'feed45']); }
     r = await client.callTool({ name: 'setup_status', arguments: {} }); assert.deepStrictEqual([r.structuredContent.posting.tool, r.structuredContent.posting.buffer, r.structuredContent.posting.host], ['buffer_post_reel', true, 'r2']);
   });
   await t('no key ever reached the page, the agent or a log; every call went to the mock', async () => {
