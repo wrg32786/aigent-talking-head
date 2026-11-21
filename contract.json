@@ -1,7 +1,7 @@
 {
   "contract": 1,
   "name": "aigent-talking-head",
-  "version": "1.18.2",
+  "version": "1.20.1",
   "summary": "Turn a phone clip into a captioned, styled 9:16 talking-head reel, locally.",
   "skill": "skills/aigent-talking-head/SKILL.md",
   "invoke": "npm run <command> -- <args>  (from the repo root; or node <script> <args>)",
@@ -131,6 +131,8 @@
         { "name": "sfx", "type": "enum", "values": ["off"], "default": null, "description": "off skips the locked-set sounds" },
         { "name": "no-sfx", "type": "boolean", "default": false, "description": "same as --sfx off" },
         { "name": "no-sfx-cap", "type": "boolean", "default": false, "description": "turn off the sound density cap (at least 0.25 s apart, at most 6 in any 10 s, by default)" },
+        { "name": "sfx-map", "type": "boolean", "default": false, "description": "sounds mapped to the moves (kit/sfx-map.cjs: whoosh on transitions, pop on titles, typing under a typewriter title), whatever the preset says" },
+        { "name": "no-sfx-map", "type": "boolean", "default": false, "description": "no sounds mapped to the moves, even when the preset maps them" },
         { "name": "draft", "type": "boolean", "default": false, "description": "stop after captions.js so it can be edited" },
         { "name": "rebuild", "type": "boolean", "default": false, "description": "re-render and re-assemble an edited job (use with --name)" },
         { "name": "force", "type": "boolean", "default": false, "description": "re-clip and redraft over an existing job" },

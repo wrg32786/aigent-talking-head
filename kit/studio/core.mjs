@@ -7,6 +7,7 @@ import { dirname, join, resolve, relative, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { loadMenu } from '../menu.mjs';
+import * as CF from './conflicts.mjs';
 
 const require = createRequire(import.meta.url);
 export const STUDIO = dirname(fileURLToPath(import.meta.url));
@@ -88,7 +89,9 @@ export function catalog({ fresh = false } = {}) {
     return { id: c.id, label: c.label, hint: c.hint, items: refs, count: refs.length };
   });
   const layers = layersOf(map, categories, items, errs);
-  const packs = K.list().map(p => ({ name: p.name, label: p.label, description: p.description, version: p.version, shipped: !!p.shipped, locks: L.describe(p.locks || {}),
+  // sets: what the pack's base preset decides that other options depend on (kit/studio/conflicts.mjs)
+  const setsOf = p => { try { const st = K.toPreset(p); return Object.fromEntries(['look', 'captionStyle', 'titles'].filter(k => st[k] !== undefined).map(k => [k, st[k]])); } catch { return {}; } };
+  const packs = K.list().map(p => ({ name: p.name, label: p.label, description: p.description, version: p.version, shipped: !!p.shipped, locks: L.describe(p.locks || {}), sets: setsOf(p),
     preview: p.dir && existsSync(join(p.dir, 'preview.webp')) ? rel(join(p.dir, 'preview.webp')) : null }));
   const beds = JSON.parse(readFileSync(join(KIT, 'music', 'beds.json'), 'utf8'));
   cached = { categories, layers, items, packs, candidates: map.candidates || [], beds: Object.entries(beds).map(([id, b]) => ({ id, title: b.title, seconds: b.seconds, energy: b.energy, file: rel(join(KIT, 'music', b.file)) })),
@@ -140,11 +143,33 @@ const CHAT_KEYS = ['say', 'reply', 'from', 'toAgent', 'replyTo', 'kind', 'attach
 const slash = x => String(x).replace(/\\/g, '/').replace(/^\.\//, '');
 export const brandsDir = () => join(stateDir(), 'brands');
 export const KIT_BRANDS = ['kit/example/skool-logo.svg'];
-export function applyPatch(s, p, cat = catalog()) {
+// Settings that rule out others (kit/studio/conflicts.mjs): after the change, a pick it ruled out is turned off and
+// s.lastChange says so ("Single word captions turned off the Typewriter caption entrance.") with { undoChange: true }
+// to put it back; a ruled out pick the same patch asked for is refused with the reason. switchFor: "kind:id" picks it
+// and makes the one change it needs (the page's one click switch on a greyed option).
+const SETTLE_KEYS = ['pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'reference', 'switchFor'];
+const lookSnap = s => JSON.parse(JSON.stringify({ pack: s.pack || null, picks: s.picks || {}, music: s.music, sound: s.sound, pace: s.pace,
+  reference: s.reference ? { mode: s.reference.mode, added: s.reference.added, prev: s.reference.prev, auto: s.reference.auto, applied: s.reference.applied } : null }));
+export const effectsReady = () => existsSync(join(ROOT, 'effects', '.venv'));
+export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
   const errs = [], log = [];
   if (!p || typeof p !== 'object') return { errs: ['patch must be an object'], log, noop: false };
-  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands', 'finish'];
+  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands', 'finish', 'switchFor', 'undoChange'];
   for (const k of Object.keys(p)) if (!known.includes(k)) errs.push(`unknown field "${k}" (${known.join(', ')})`);
+  if (p.undoChange) {
+    const u = s.lastChange && s.lastChange.undo; if (!u) { errs.push('undoChange: nothing to undo'); return { errs, log, noop: false }; }
+    Object.assign(s, { pack: u.pack, picks: u.picks, music: u.music, sound: u.sound, pace: u.pace }); if (u.reference && s.reference) Object.assign(s.reference, u.reference);
+    delete s.lastChange; log.push('undid the last change'); return { errs, log, noop: false };
+  }
+  const touches = !nested && SETTLE_KEYS.some(k => p[k] !== undefined), before = touches ? lookSnap(s) : null;
+  let switched = '';
+  if (p.switchFor !== undefined) {
+    const it = cat.items[p.switchFor];
+    if (!it || it.mode === 'info') errs.push(`switchFor: no option "${p.switchFor}" to pick`);
+    else { const ctx = CF.contextOf(s, cat), sp = CF.switchPatch(it, ctx) || { picks: { [it.ref]: 'allow' } }; switched = CF.switchText(it, ctx);
+      p = { ...p, ...sp, picks: { ...(p.picks || {}), ...sp.picks }, ...(sp.music ? { music: { ...(p.music || {}), ...sp.music } } : {}), ...(sp.sound ? { sound: { ...(p.sound || {}), ...sp.sound } } : {}), ...(sp.pace ? { pace: { ...(p.pace || {}), ...sp.pace } } : {}) };
+      if (switched) log.push(switched); }
+  }
   if (p.job !== undefined) { if (p.job && !JOB_RE.test(p.job)) errs.push('job: lowercase letters, numbers and dashes'); else { s.job = p.job || null; log.push(`job ${s.job}`); } }
   if (p.pack !== undefined) {
     if (p.pack && !cat.packs.some(x => x.name === p.pack)) errs.push(`pack: no pack named "${p.pack}" (${cat.packs.map(x => x.name).join(', ')})`);
@@ -246,8 +271,16 @@ export function applyPatch(s, p, cat = catalog()) {
   const line = m => { m.id = s.chatSeq = (s.chatSeq || 0) + 1; m.channel = 'studio'; s.chat.push(m); return m; };
   if (p.say) line({ role: 'user', text: String(p.say).slice(0, 2000), at, from: p.from || 'ui', ...(p.toAgent ? { to: 'agent', status: 'queued' } : {}), ...(p.attach && typeof p.attach === 'object' ? { attach: p.attach } : {}) });
   if (p.reply) line({ role: 'assistant', text: String(p.reply).slice(0, 4000), at, from: p.from || 'assistant', ...(p.replyTo ? { replyTo: p.replyTo } : {}), ...(p.kind ? { kind: p.kind } : {}) });
+  let off = [];
+  if (touches) {
+    const st = CF.settle(s, p, cat, { before, effectsReady: effectsReady() });
+    errs.push(...st.errs); off = st.off;
+    for (const o of st.off) log.push(`turned off ${o.ref} (${o.by})`);
+    const text = [switched, st.text].filter(Boolean).join(' ');
+    if (text) s.lastChange = { text, off: st.off, undo: before, at: Date.now() }; else delete s.lastChange;
+  }
   const asked = Object.keys(p).some(k => !CHAT_KEYS.includes(k));
-  return { errs, log, noop: asked && !errs.length && !log.length };
+  return { errs, log, off, noop: asked && !errs.length && !log.length };
 }
 
 // ---------- session -> reel arguments ----------
@@ -256,6 +289,13 @@ const allowed = (s, kind) => { const p = s.picks[kind]; if (!p) return null; if 
 
 export function compose(s, { refPack = null } = {}) {
   const args = [], notes = [], locks = {};
+  // a pick another setting rules out is never sent to the reel (kit/studio/conflicts.mjs); the notes say which and why
+  const conflicts = CF.conflictsOf(s, catalog());
+  if (conflicts.length) {
+    const out = new Set(conflicts.map(c => c.ref));
+    s = { ...s, picks: Object.fromEntries(Object.entries(s.picks || {}).map(([k, v]) => [k, { ...v, allow: ((v && v.allow) || []).filter(id => !out.has(`${k}:${id}`)) }])) };
+    for (const c of conflicts) notes.push(`not used: ${c.label} (${c.reason})`);
+  }
   const pack = refPack || s.pack;
   if (pack) args.push('--pack', pack);
   const tr = allowed(s, 'transition'); if (tr && tr.length) locks.transitions = tr;
@@ -279,6 +319,7 @@ export function compose(s, { refPack = null } = {}) {
   else if (on('tighten')) args.push('--tighten', '0.3');
   if (s.sound.sfx === 'off') { args.push('--no-sfx'); locks.sfx = false; }
   if (s.sound.cap === 'off' || off('sfx-cap')) args.push('--no-sfx-cap');
+  if (s.sound.sfx !== 'off' && on('sfx-map')) args.push('--sfx-map'); else if (off('sfx-map')) args.push('--no-sfx-map');
   // the bed: music.bed only (the music panel shows the one the draft uses). none = no bed, even when the pack has one.
   const bed = s.music.bed !== 'auto' && s.music.bed !== 'none' && s.music.bed !== 'upload' ? s.music.bed : null;
   if (s.music.bed === 'upload' && s.music.upload) args.push('--bed', s.music.upload);
@@ -297,7 +338,7 @@ export function compose(s, { refPack = null } = {}) {
   const errs = L.validate(locks);
   const lockString = lockStringOf(locks);
   if (lockString) args.push('--lock', lockString);
-  return { args, locks, lockString, notes, effects: fx, errs, bed: s.music.bed === 'upload' ? (s.music.upload ? basename(s.music.upload) : null) : s.music.bed };
+  return { args, locks, lockString, notes, conflicts, effects: fx, errs, bed: s.music.bed === 'upload' ? (s.music.upload ? basename(s.music.upload) : null) : s.music.bed };
 }
 const KEBAB = { maxTitles: 'max-titles', titleWords: 'title-words', captionEntrance: 'caption-entrance' };
 export function lockStringOf(l) {
@@ -427,7 +468,7 @@ export function setReferenceLook(s, cat = catalog()) {
   for (const ref of Object.keys(p.picks)) { const it = cat.items[ref]; if (it.kind !== 'bed' && it.mode === 'one') { const k = it.kind === 'editing' ? 'editing' : it.kind; prev.one[k] = ((s.picks[k] && s.picks[k].allow) || []).slice(); } }
   if (p.pack !== undefined) prev.pack = s.pack || null;
   if (Object.keys(p.picks).some(x => x.startsWith('bed:'))) prev.bed = s.music.bed;
-  applyPatch(s, p, cat);
+  applyPatch(s, p, cat, { nested: true });
   const now = allowedRefs(s);
   r.added = Object.keys(p.picks).filter(x => !had.has(x) && now.has(x));
   r.prev = prev; r.applied = true;
@@ -677,6 +718,7 @@ export function resetEdit(s, { keepLook = s.keepLook === true } = {}) {
   s.output = null;
   s.reference = clone(d.reference);
   delete s.undoRef;
+  delete s.lastChange; // its Undo belongs to the old video
   s.finish = clone(d.finish);
   delete s.asIs;
   if (s.pace && s.pace.keepPauses) delete s.pace.keepPauses;

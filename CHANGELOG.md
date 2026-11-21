@@ -2,14 +2,25 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
-## 1.18.2 (unreleased)
+## 1.20.1 (unreleased)
 
-Release notes: [docs/releases/v1.18.2.md](docs/releases/v1.18.2.md). Recreate drafts from your pieces.
+Release notes: [docs/releases/v1.20.1.md](docs/releases/v1.20.1.md). Recreate drafts from your pieces.
 
 - **Recreate keeps your pieces.** With a reference on Recreate, Draft used the whole take even when you kept pieces on Cut (`fromPieces = ... && !recreate` in `draftSteps`), so a line you cut out came back. The draft was saved under the take's key while Your edit and Finish asked for the pieces' key, so after every draft Studio still said "Your pieces changed since the draft" (`drafted: false, stale: true`) and Render never came on. Recreate now drafts from your pieces, already cut (`--as-is`), with the reference's Reel.md as the recipe, and the draft counts as done.
 - **A reference, then your take.** A reference on its own no longer counts as an edit, so adding your first take after picking a reference keeps it (1.18.1 started a fresh edit and cleared the reference).
 - **Tests.** `tests/studio-recreate-pieces.test.mjs` (in `npm run smoke`, it needs ffmpeg).
 
+## 1.20.0 (unreleased)
+
+Release notes: [docs/releases/v1.20.0.md](docs/releases/v1.20.0.md). Settings that rule out other settings now say so.
+
+- **One rules file.** `kit/studio/conflicts.mjs` says which options rule out which, why in a few plain words, and the one change that makes them work. Studio's server (`applyPatch`, `compose`), the agent tools and the page all read it, so the page, your agent and the render agree. The rules follow the engine: caption entrances only move Kinetic captions (`kit/overlay.html`); title entrances and the title layer need titles, which the Classic look and the minimal-clean Look turn off (`kit/reel.cjs`); Beat sync needs music; Sound map and Sparse sounds need sound effects on; Tighten pauses does nothing with Keep pauses; Punch-in does nothing with Zoom punch off. A caption style set by your Look, pack or reference counts too ("Not with Hormozi captions, set by the hormozi-bold Look").
+- **Greyed, with the reason.** An option another setting rules out is greyed on its tile with a short reason ("Not with Single word captions"); the hover card adds why and what one click does. Energy says "Set by the music you picked" or "Not with No music" with Use Auto music; Sparse is off with sound effects off.
+- **One click to switch.** Clicking a greyed option picks it and makes the one change it needs (Kinetic captions for a caption entrance, titles back on for a title entrance, music back on for Beat sync), and says so: "Switched to Kinetic captions for the Cascade caption entrance." with Undo.
+- **What a pick turned off.** A pick that rules out an earlier one turns it off and says so in one line above the layer: "Single word captions turned off the Typewriter caption entrance." with Undo, which puts it all back. A Look you pick brings its own captions ("The Classic look replaced your Pill captions.").
+- **Nothing silently ignored.** The draft and render never send a ruled out pick to the reel; `compose` notes "not used: ... (reason)". Sound map was a tile that did nothing: it now reaches the reel (`--sfx-map`, `--no-sfx-map` on `npm run reel`). Effects and the Behind or Auto title layer say "needs setup" until the effects pass is set up, and the split and framed b-roll say your head stays under the panel until the person mask is.
+- **For your agent.** `studio_set_selections` refuses a ruled out pick with the reason and how to switch, takes `switchFor` (the one click switch) and `undoChange`, and returns `turnedOff` with the line the page shows. Its description lists the rules.
+- **Tests and docs.** `tests/studio-conflicts.test.mjs` (in `npm run check`: every rule against the engine, turn off and Undo, refuse, switch, compose, the page bundles the same file, MCP) and `tests/studio-conflicts.e2e.mjs` (in `npm run smoke`, Chrome, dark, light and phone); docs/studio.md.
 ## 1.18.1 (unreleased)
 
 Release notes: [docs/releases/v1.18.1.md](docs/releases/v1.18.1.md). Uploading new footage starts a fresh edit, Finish shows only the current draft, and you can clear all B-roll from the timeline.

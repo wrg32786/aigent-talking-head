@@ -52,6 +52,7 @@
 //          --cards auto|off  colour cards on short lines to land and numbered chapter cards on a list (kit/cards.cjs),
 //            plus the number-pop intro on a list. Auto in the magazine preset.
 //          --no-sfx-cap  turn off the sound density cap (on by default: kit/sfx-map.cjs)
+//          --sfx-map / --no-sfx-map  sounds mapped to the moves (kit/sfx-map.cjs), on or off whatever the preset says
 //          --aliases "Gwyn: Guinn, Gwin; aigent: agent"  names Whisper mishears, written your way in captions and titles
 //            (adds to a recipe's ## Aliases)
 //          --glossary <words.json | "chat GBT = ChatGPT; school = Skool after on, in">  brand words fixed in clips.json,
@@ -332,7 +333,8 @@ if (!flag('rebuild')) {
   } else if (bed === 'auto') bed = undefined;
   if (bed) Object.assign(cut, { bed: require('./rules.cjs').isBed(bed) ? bed : path.resolve(bed), bedVol: 0.16, ...(opt('bed-start') != null ? { bedStart: +opt('bed-start') } : {}) });
   // sound mapped to the moves and the density cap (kit/sfx-map.cjs)
-  if (preset && preset.sfxMap) cut.sfxMap = true;
+  if ((preset && preset.sfxMap) || flag('sfx-map')) cut.sfxMap = true;
+  if (flag('no-sfx-map')) cut.sfxMap = false;
   if (preset && preset.sfxCap !== undefined) cut.sfxCap = preset.sfxCap;
   if (flag('no-sfx-cap')) cut.sfxCap = false;
   if (flag('no-beat-sync')) cut.beatSync = false;
