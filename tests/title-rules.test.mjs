@@ -120,6 +120,18 @@ const report = { ...base, flips: [
   const lay = JSON.parse(readFileSync(join(r.d, 'layout.json'), 'utf8')).elements.filter(e => e.mode === 10).map(e => e.text);
   ok(lay.length === 1 && lay[0] === 'FIGMA', `only the label with its own word is laid out (${lay.join(', ')})`);
 }
+{ // a real app with its own icon is not a misread caption word: it stays when the caption says its name
+  const flips = [{ start: 1, end: 2.4, text: 'I use Figma daily', mode: 0, words: [[1, 1.2, 'I'], [1.2, 1.5, 'use'], [1.5, 2.1, 'Figma'], [2.1, 2.4, 'daily']] }, { start: 1.4, end: 2.9, text: 'Figma', mode: 10, icon: 'figma.png' }];
+  const r = draw({ ...base, flips }, 4);
+  ok(!/label 'Figma'.*not drawn/.test(r.log), 'a label with its own icon stays when the caption says its name');
+}
+{ // a word said before a title that is also one of the title's words leaves ahead of it, so the check passes on a plain draft
+  const flips = [{ start: 3, end: 4.6, text: 'that is the plan', mode: 0, words: [[3, 3.3, 'that'], [3.3, 3.5, 'is'], [3.5, 3.7, 'the'], [3.7, 4.4, 'plan']] },
+    { start: 4.9, end: 5.5, text: 'plan today', mode: 7, hero: [0] }, { start: 5.6, end: 7, text: 'ok then', mode: 0, words: [[5.6, 6.0, 'ok'], [6.0, 6.9, 'then']] }];
+  const r = draw({ ...base, flips }, 7.5), plan = r.words.find(w => w.word === 'plan'), tc = titleCheck(r.d, { dur: 7.5 });
+  ok(plan && plan.start === 3.7 && plan.end <= 4.9 - 2 / 24 && plan.end > 4.4, `"plan", said a second before the title "plan today", is shown and leaves before the frames just ahead of the title (${plan && plan.start} to ${plan && plan.end})`);
+  ok(tc.ran && !tc.fails.length, 'the title check passes on it: ' + tc.fails.join(' | '));
+}
 { const flips = [{ start: 1, end: 3, text: 'hold on', mode: 0, words: [[1, 1.9, 'hold'], [1.9, 2.9, 'on']] }];
   const dark = b => { let n = 0; for (let i = 0; i < b.length; i += 4) if (b[i + 3] > 60 && b[i] < 60 && b[i + 1] < 60 && b[i + 2] < 60) n++; return n; };
   const r = draw({ ...base, boost: [[1.8, 2.9]], flips }, 4, { stills: [1.5, 2.4] });
