@@ -4,7 +4,8 @@
 // kit/assemble.cjs terms: zoom, punchX and punchY (the zoom centre).
 //   - the zoom is the reference's face height over yours, never under 1 (we cannot zoom out of your take) and never
 //     over what your source holds without obvious blur (maxZoom)
-//   - a little more zoom (up to EYE_EXTRA) is allowed when that is what it takes to reach the eye line
+//   - a little more zoom (up to EYE_EXTRA past the face height target) is allowed when that is what it takes to reach
+//     the eye line, never when your face is already bigger than the target
 //   - the face box stays inside the frame with a margin
 // The face keep-out zone (kit/facezone.py) is measured after the crop, so captions follow the new framing.
 'use strict';
@@ -60,8 +61,10 @@ function cropFor(ours, target, opts = {}) {
   // the zoom the eye line alone would need (from the top or the bottom edge)
   const v = ours.eyeY, vt = target.eyeY;
   const zEye = vt < v ? (1 - vt) / Math.max(0.05, 1 - v) : vt / Math.max(0.05, v);
+  // the eye line may ask for more zoom than the face height does: allowed up to EYE_EXTRA past the face height target,
+  // and not at all when your face is already bigger than the target (more zoom would only make that miss worse)
   let z = Math.max(1, want);
-  if (zEye > z) z = Math.min(zEye, z * EYE_EXTRA);
+  if (zEye > z) z = Math.min(zEye, Math.max(z, want * EYE_EXTRA));
   const clamped = z > zMax + 1e-6;
   z = clamp(z, 1, zMax);
   // the face box must fit the frame at this zoom

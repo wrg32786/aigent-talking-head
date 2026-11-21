@@ -43,9 +43,12 @@ t('cropFor: the zoom is held at the source limit and says so; never under 1', ()
 });
 
 t('cropFor: a little extra zoom to reach the eye line, and the face box stays inside the frame', () => {
-  const c = RF.cropFor({ faceH: 0.2, eyeY: 0.46, cx: 0.5, y0: 0.38, y1: 0.6, x0: 0.36, x1: 0.64 }, { faceH: 0.17, eyeY: 0.32, cx: 0.5 }, { maxZoom: 3 });
-  assert.ok(c.zoom > 1 && c.zoom <= RF.EYE_EXTRA + 1e-9, 'zoom ' + c.zoom);
+  const c = RF.cropFor({ faceH: 0.16, eyeY: 0.46, cx: 0.5, y0: 0.39, y1: 0.56, x0: 0.39, x1: 0.61 }, { faceH: 0.17, eyeY: 0.32, cx: 0.5 }, { maxZoom: 3 });
+  assert.ok(c.zoom > 1.0625 && c.zoom <= 1.0625 * RF.EYE_EXTRA + 0.001, 'zoom ' + c.zoom);
   assert.ok(c.got.eyeY < 0.46, 'the eye line moved up: ' + c.got.eyeY);
+  // a face already bigger than the target gets no more zoom for the eye line: that would only make it bigger still
+  const close = RF.cropFor({ faceH: 0.24, eyeY: 0.46, cx: 0.55, y0: 0.37, y1: 0.61, x0: 0.4, x1: 0.7 }, { faceH: 0.17, eyeY: 0.32, cx: 0.5 }, { maxZoom: 3 });
+  assert.strictEqual(close.zoom, 1); assert.strictEqual(close.got.faceH, 0.24); assert.strictEqual(close.got.eyeY, 0.46);
   const big = RF.cropFor({ faceH: 0.3, eyeY: 0.5, cx: 0.5, y0: 0.35, y1: 0.68, x0: 0.25, x1: 0.75 }, { faceH: 0.8, eyeY: 0.1, cx: 0.5 }, { maxZoom: 3 });
   const y0 = 0.35 * big.zoom - (big.zoom - 1) * big.punchY, y1 = 0.68 * big.zoom - (big.zoom - 1) * big.punchY, x0 = 0.25 * big.zoom - (big.zoom - 1) * big.punchX, x1 = 0.75 * big.zoom - (big.zoom - 1) * big.punchX;
   assert.ok(y0 >= RF.MARGIN - 0.002 && y1 <= 1 - RF.MARGIN + 0.002 && x0 >= RF.MARGIN - 0.002 && x1 <= 1 - RF.MARGIN + 0.002, `face box inside: ${[x0, y0, x1, y1].map(v => v.toFixed(3))}`);
