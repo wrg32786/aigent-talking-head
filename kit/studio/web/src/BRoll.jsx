@@ -188,11 +188,11 @@ function Testimonials({ B, V, after }) {
   const set = async (clip, o) => { try { after(await api('/api/broll/cutin', { clip, ...o })); } catch {} };
   if (!(B.testimonials || []).length) return null;
   return <div className="testis glass" id="broll-testimonials">
-    <div className="bp-h"><b>Testimonials</b><span className="fine">They play in your reel with their own sound, between your pieces. Draft again to hear them.</span></div>
+    <div className="bp-h"><b>Testimonials</b><span className="fine">They play in your reel with their own sound, between your clips. Draft again to hear them.</span></div>
     <ul>{B.testimonials.map(c => { const x = on[c.id]; return <li key={c.id} data-id={c.id} className={x ? 'on' : ''}>
       <span className="ts-t"><b>{c.name}</b><span className="fine">{c.raw && c.raw.seconds ? `${t1(c.raw.seconds)} s` : ''}{c.raw && c.raw.text && !c.raw.text.startsWith(c.name) ? ` · "${c.raw.text.slice(0, 80)}"` : ''}</span></span>
-      {!pieces.length ? <span className="fine">Keep pieces on the Cut step first.</span>
-        : x ? <><label className="inl"><span className="fine">After</span><select className="ts-after" value={x.after || ''} onChange={e => set(c.id, { after: e.target.value || null })}><option value="">Before my last piece</option>{pieces.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select></label>
+      {!pieces.length ? <span className="fine">Keep a clip on the Cut step first.</span>
+        : x ? <><label className="inl"><span className="fine">After</span><select className="ts-after" value={x.after || ''} onChange={e => set(c.id, { after: e.target.value || null })}><option value="">Before my last clip</option>{pieces.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select></label>
           <Button size="sm" variant="ghost" label="Take out" onClick={() => set(c.id, { remove: true })} /></>
         : <Button className="ts-add" size="sm" variant="secondary" label="Play in my reel" icon={<Icon n="plus" />} onClick={() => set(c.id, {})} />}
     </li>; })}</ul>

@@ -63,7 +63,7 @@ export function Wizards({ CAT, V, s, apply, patch, go, open, setOpen, openChat }
   // one wizard step on the server; the last one closes the wizard and opens the step it says comes next
   const step = (body, last) => run(async () => { const j = await api('/api/wizard', body); apply(j); const z = j.wizard || {};
     if (last || z.pending) { close(); if (z.next && z.next !== 'choose' && z.next !== 'look' && z.next !== 'picture') go(z.next, true); if (z.note) toast(z.note, true); } return j; });
-  const deciders = { reel: ['Pick the goal for this take and set the output.', 'Pick a Look that fits this take.', 'Choose the pieces for the Combo.'], reference: ['Find a reference reel that fits what I am making.'], clips: ['Pick the best clips from this take, and say if ad cuts make sense.'] };
+  const deciders = { reel: ['Pick the goal for this take and set the output.', 'Pick a Look that fits this take.', 'Choose the lines for my clip.'], reference: ['Find a reference reel that fits what I am making.'], clips: ['Pick the best clips from this take, and say if ad cuts make sense.'] };
   const Decide = ({ k }) => <Button className="wz-agent" variant="ghost" size="sm" label="Let my agent decide" icon={<Icon n="spark" />} isDisabled={busy} onClick={() => agent(deciders[w][k] || deciders[w][0])} />;
   const body = () => {
     if (!W) return err ? <div className="row"><Button id="wz-retry" variant="ghost" size="sm" label="Try again" onClick={() => { setErr(''); setTries(k => k + 1); }} /></div> : <p className="fine">Loading</p>;

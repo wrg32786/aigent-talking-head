@@ -31,6 +31,9 @@ import { capture as capturePage } from '../capture.mjs';
 import { findChrome } from '../chrome.mjs';
 import { mount as mountBroll } from './broll-api.mjs';
 import * as PIECES from './pieces.mjs';
+import * as TOPICS from './topics.mjs';
+import * as PACING from './pacing.mjs';
+import { pointLine } from './point.mjs';
 import * as WIZ from './wizards.mjs';
 import * as SLK from './stylelooks.mjs';
 import { mount as mountFolders } from './folders.mjs';
@@ -134,6 +137,8 @@ function view(s) {
   let comp; try { comp = C.compose(s, { refPack: refPackName(s) }); } catch (e) { comp = { args: [], errs: [e.message], notes: [] }; }
   let scripts = []; try { scripts = SC.list(s.job); } catch {}
   let cut = null; try { cut = cutView(s); } catch (e) { cut = { error: e.message, candidates: [] }; }
+  // the Pacing choice on the Cut step (kit/studio/pacing.mjs), read from the flags the next draft gets
+  if (cut && !cut.error) { const ad = cut.output && cut.output.goal === 'ad' && !comp.args.includes('--tighten') && !comp.args.includes('--no-tighten'); cut.pacing = PACING.pacingOf(ad ? [...comp.args, '--tighten', '0.25'] : comp.args).id; cut.pacings = PACING.PACING.map(({ id, label, says }) => ({ id, label, says })); cut.point = s.point || ''; }
   let broll = null; try { broll = BRL.view(s); } catch (e) { broll = { error: e.message, beats: [] }; }
   let reopenable = []; try { reopenable = s.job ? SNAP.list(join(ROOT, 'jobs', s.job)).filter(x => x.snapshot).map(x => `jobs/${s.job}/${x.reel}`) : []; } catch {}
   let combo = { pieces: [], seconds: 0, key: '' }; try { combo = comboOf(s); } catch {}
@@ -378,21 +383,40 @@ const wordsOf = rel => { const t = MEDIA.transcript(rel); return t ? t.words : n
 const energyOf = rel => MEDIA.energy(rel).catch(() => null);
 const snapOne = (c, words, env, dur) => (env ? CUT.snapCandidate(c, words || [], env, dur) : c);
 const CTA_LINE = 'Pick the cuts';
-async function findCuts(rel, scorer = 'auto') {
+async function findCuts(rel, scorer = 'auto', { keepPicks = false } = {}) {
   const s = C.load(), o = outputOf(s), words = wordsOf(rel); if (!words) throw Object.assign(new Error('transcribe the footage first'), { code: 400 });
-  const env = await energyOf(rel), cands = CUT.candidates(words, o, { duration: durOf(rel) }).map(c => snapOne(c, words, env, durOf(rel)));
+  const env = await energyOf(rel), cands = CUT.candidates(words, o, { duration: durOf(rel), point: s.point }).map(c => snapOne(c, words, env, durOf(rel)));
+  // finding again after the point changed (keepPicks): what you kept or dropped stays, and so do the clips you added
+  if (keepPicks && s.cut && s.cut.source === rel) { const was = Object.fromEntries((s.cut.candidates || []).map(c => [c.id, c]));
+    for (const c of cands) if (was[c.id]) c.keep = was[c.id].keep;
+    for (const c of (s.cut.candidates || []).filter(c => c.by === 'you')) cands.push({ ...c, order: cands.length }); }
   const summary = CUT.summary(o, durOf(rel)), st = S.load(), a = CH.presence();
   const who = scorer !== 'auto' ? scorer : st.chat.backend === 'agent' && a.connected ? 'agent' : LLM.provider(KEYS.envWithKeys(), st.chat) ? 'model' : 'rules';
   update(x => { x.cut = { source: rel, summary, candidates: cands, scoredBy: 'rules', pending: who === 'rules' ? null : who, at: Date.now() }; });
   if (who === 'agent') {
-    const line = `${CTA_LINE} for "${summary}": ${cands.length} candidates from the rules are on the Cut step. Read them and the transcript with get_cuts, then send your picks with set_cuts (time ranges in seconds, a 0 to 100 score and a short reason each). ${o.goal === 'ad' ? 'It is an ad: hook in the first 1 to 2 s, tight pacing, a clear call to action at the end, no long intro.' : 'It is organic: story pacing, a strong first line, short clips that loop back to the start.'}`;
+    const line = `${CTA_LINE} for "${summary}": ${cands.length} candidates from the rules are on the Cut step. Read them and the transcript with get_cuts, then send your picks with set_cuts (time ranges in seconds, a 0 to 100 score and a short reason each). ${o.goal === 'ad' ? 'It is an ad: hook in the first 1 to 2 s, tight pacing, a clear call to action at the end, no long intro.' : 'It is organic: story pacing, a strong first line, short clips that loop back to the start.'}${s.point ? ' ' + pointLine(s.point) : ''}`;
     update(x => { C.applyPatch(x, { say: line, from: 'ui', toAgent: true, attach: { kind: 'cut', source: rel } }); });
   } else if (who === 'model') {
-    LLM.complete('You score cuts of a talking-head video. Reply with JSON only.', CUT.scorePrompt(cands, o), KEYS.envWithKeys(), st.chat, { maxTokens: 1500 })
+    LLM.complete('You score cuts of a talking-head video. Reply with JSON only.', CUT.scorePrompt(cands, o, s.point), KEYS.envWithKeys(), st.chat, { maxTokens: 1500 })
       .then(r => { const re = CUT.applyScores(cands, r.text); update(x => { if (!x.cut || x.cut.source !== rel) return; if (re) { x.cut.candidates = re.map(c => ({ ...c, keep: (x.cut.candidates.find(y => y.id === c.id) || c).keep })); x.cut.scoredBy = r.model || r.provider; } x.cut.pending = null; if (!re) x.cut.note = 'The model reply had no scores, so the rules scores stay.'; }); })
       .catch(e => update(x => { if (x.cut && x.cut.source === rel) { x.cut.pending = null; x.cut.note = `The model failed (${e.message}), so the rules scores stay.`; } }));
   }
   return who;
+}
+async function previewOf(s, rel) {
+  let comp = { args: [] }; try { comp = C.compose(s, { refPack: refPackName(s) }); } catch {}
+  const o = outputOf(s), pace = PACING.pacingOf(o.goal === 'ad' && !comp.args.includes('--tighten') && !comp.args.includes('--no-tighten') ? [...comp.args, '--tighten', '0.25'] : comp.args);
+  const words = wordsOf(rel) || [], dur = durOf(rel), env = words.length ? await energyOf(rel) : null, clips = {};
+  const put = (id, ranges) => { const R = CUT.renderRanges({ ranges }); if (R.length) clips[id] = PACING.playSpans(R, words, env, pace.maxPause, dur); };
+  const c = s.cut && s.cut.source === rel ? s.cut : null;
+  for (const x of (c && c.candidates) || []) put(x.id, x.ranges);
+  const L = words.length ? await linesOf(rel) : null;
+  if (L) {
+    const ps = piecesState(s, rel), P = ps.ids && ps.ids.length ? piecesOf(s, rel) : null;
+    if (P && P.combo.ids.length) put('own', PIECES.comboRanges(P.combo.ids, P.pieces).flatMap(x => x.ranges));
+    for (const b of linesState(s, rel).bites) put(b.id, CUT.biteRanges(b.lines, L));
+  }
+  return { source: rel, pacing: pace.id, maxPause: pace.maxPause, options: PACING.PACING.map(({ id, label, says }) => ({ id, label, says })), audio: !!env, clips };
 }
 async function editCut(b) {
   const c0 = C.load().cut, env = c0 && b.snap !== false && (b.add || b.ranges) ? await energyOf(c0.source) : null;
@@ -543,16 +567,37 @@ function linesCached(rel) {
 const piecesState = (s, rel) => ((s.pieces || {})[rel]) || { ids: [], reasons: {}, by: null, cats: {} };
 function piecesOf(s, rel = cutSource(s)) {
   const L = rel ? linesCached(rel) : null; if (!L) return null;
-  const st = piecesState(s, rel), b = PIECES.build(L, { goal: outputOf(s).goal, cats: st.cats || {} }), by = Object.fromEntries(b.pieces.map(p => [p.id, p]));
+  const st = piecesState(s, rel), named = topicsFor(s, rel, L);
+  const b = PIECES.build(L, { goal: outputOf(s).goal, cats: st.cats || {}, point: s.point, topics: named && named.list }), by = Object.fromEntries(b.pieces.map(p => [p.id, p]));
   const ids = (st.ids || []).filter(id => by[id]);
-  return { source: rel, cats: PIECES.CATS, topics: b.topics, pieces: b.pieces, combo: { ids, reasons: st.reasons || {}, by: st.by, seconds: +ids.reduce((a, id) => a + by[id].seconds, 0).toFixed(2) } };
+  // best: the lines we would pick for the length you asked for (what Let AI choose takes), each with its reason
+  const r = CUT.range(outputOf(s)), ch = PIECES.choose(b.pieces, { min: r[0], max: r[1] == null ? r[0] * 1.33 : r[1] });
+  return { source: rel, cats: PIECES.CATS, topics: b.topics, topicsBy: b.topics.length ? (named ? named.by : 'rules') : null, point: s.point || '', pieces: b.pieces, best: { ids: ch.ids, reasons: ch.reasons, seconds: ch.seconds },
+    combo: { ids, reasons: st.reasons || {}, by: st.by, off: !!st.off, seconds: +ids.reduce((a, id) => a + by[id].seconds, 0).toFixed(2) } };
+}
+// the themes of a take, named by a model or your agent when there is one (kept with the session, per transcript);
+// null means the local rules name them (kit/studio/topics.mjs). The model is asked once per transcript, in the
+// background, through the same local key path as every other model call (kit/studio/llm.mjs)
+const txKey = L => `${L.length}:${L.length ? L[L.length - 1].end : 0}`;
+const TOPICS_ASKED = new Set();
+function topicsFor(s, rel, L) {
+  const key = txKey(L), saved = (s.topics || {})[rel];
+  if (saved && saved.key === key && Array.isArray(saved.list) && saved.list.length) return saved;
+  if (L.length >= 6 && !TOPICS_ASKED.has(rel + key) && !process.env.STUDIO_NO_TOPIC_MODEL) {
+    const st = S.load(), prov = st.chat.backend === 'agent' || st.chat.backend === 'keywords' ? null : LLM.provider(KEYS.envWithKeys(), st.chat);
+    if (prov) { TOPICS_ASKED.add(rel + key);
+      LLM.complete('You name the themes of a talking-head take. Reply with JSON only.', TOPICS.topicsPrompt(L, s.point), KEYS.envWithKeys(), st.chat, { maxTokens: 600 })
+        .then(r => { const list = TOPICS.readTopics(r.text, L); if (list) update(x => { x.topics = x.topics || {}; x.topics[rel] = { key, by: r.model || r.provider || 'a model', list }; }); })
+        .catch(e => console.error('topics: ' + e.message)); }
+  }
+  return null;
 }
 function comboOf(s) {
   const src = cutSource(s); if (!src) return { source: null, pieces: [], seconds: 0, key: '' };
   const pieces = [], c = s.cut && s.cut.source === src ? s.cut : null, ps = piecesState(s, src);
   // your Combo, when you made one (Let AI choose or Build my own on the Cut step), wins: its pieces in your order,
   // neighbours in the take joined into one range. Otherwise the kept cuts in order, then your bites.
-  const P = ps.ids && ps.ids.length ? piecesOf(s, src) : null;
+  const P = ps.ids && ps.ids.length && !ps.off ? piecesOf(s, src) : null;
   if (P && P.combo.ids.length) for (const x of PIECES.comboRanges(P.combo.ids, P.pieces)) pieces.push({ kind: 'piece', id: 'pc-' + x.ids.join('-').slice(0, 40), label: x.text.length > 48 ? x.text.slice(0, 46) + '...' : x.text, ranges: x.ranges, cutKind: 'clip', category: x.category, lines: x.ids });
   else if (c) for (const x of (c.candidates || []).filter(y => y.keep).sort((a, b) => a.order - b.order)) {
     const ranges = CUT.renderRanges(x); if (ranges.length) pieces.push({ kind: 'cut', id: x.id, label: x.label || x.id, ranges, cutKind: x.kind || 'clip' });
@@ -614,7 +659,7 @@ function editOf(s, v) {
   const next = !takes && !s.clips ? { step: 'footage', label: 'Add footage' } : !s.job ? { step: 'footage', label: 'Name the reel' } : !drafted && fin.reel ? { step: 'finish', label: 'Draft it' } : { step: 'finish', label: 'Render' };
   return {
     making: { text: making, format: fmt, aspect, goal: o.goal, length: (cut.summary && cut.summary.length) || null },
-    from: { takes, source: src, seconds: from === 'pieces' ? combo.seconds : (cut.seconds || null), mode: from, pieces: combo.pieces.length, text: from === 'pieces' ? `${pieceN(combo)} piece${pieceN(combo) === 1 ? '' : 's'}, ${Math.round(combo.seconds)} s, in your order${(() => { const by = piecesState(s, combo.source).by; return by && combo.pieces.some(x => x.kind === 'piece') ? (by === 'ai' ? ', picked by AI' : by === 'you' ? ', built by you' : `, ${by === 'ai, changed by you' ? 'picked by AI, changed by you' : 'set by ' + by}`) : ''; })()}` : takes ? `the whole take${takes > 1 ? ` (${takes} files)` : ''}` : 'no footage yet' },
+    from: { takes, source: src, seconds: from === 'pieces' ? combo.seconds : (cut.seconds || null), mode: from, pieces: combo.pieces.length, text: from === 'pieces' ? `${(() => { const own = combo.pieces.some(x => x.kind === 'piece'), n = own ? pieceN(combo) : combo.pieces.length, w = own ? 'line' : 'clip'; return `${n} ${w}${n === 1 ? '' : 's'}`; })()}, ${Math.round(combo.seconds)} s, in your order${(() => { const by = piecesState(s, combo.source).by; return by && combo.pieces.some(x => x.kind === 'piece') ? (by === 'ai' ? ', our pick' : by === 'you' ? ', built by you' : `, ${by === 'ai, changed by you' ? 'our pick, changed by you' : 'set by ' + by}`) : ''; })()}` : takes ? `the whole take${takes > 1 ? ` (${takes} files)` : ''}` : 'no footage yet' },
     look: { pack: s.pack || null, reference: ref, styleLook, picks, text: [styleLook ? `style look ${styleLook}` : s.pack || 'Studio picks', ref ? `reference (${ref === 'look' ? 'copy the look' : ref})` : null, picks ? `${picks} change${picks === 1 ? '' : 's'} by you` : null].filter(Boolean).join(', ') },
     broll: { spots, ideas: ((v.broll && v.broll.beats) || []).filter(b => b.idea && !b.slot).length, cutins: combo.pieces.filter(x => x.kind === 'testimonial').length, text: [spots ? `${spots} spot${spots === 1 ? '' : 's'}` : 'none yet', combo.pieces.some(x => x.kind === 'testimonial') ? `${combo.pieces.filter(x => x.kind === 'testimonial').length} testimonial` : null].filter(Boolean).join(', ') },
     sound: { bed: s.music.bed, sfx: s.sound.sfx, text: `${s.music.bed === 'auto' ? 'Music picked for you' : s.music.bed === 'none' ? 'No music' : s.music.bed}, sounds ${s.sound.sfx}` },
@@ -892,7 +937,13 @@ async function api(req, res, u) {
     const patch = await readBody(req);
     const s = C.load(), r = C.applyPatch(s, { ...patch, from: patch.from || 'ui' });
     if (r.errs.length) return json(res, 400, { error: r.errs.join('; '), errs: r.errs });
-    C.save(s); pushState(); return json(res, 200, { ...view(s), log: r.log });
+    C.save(s); pushState();
+    // a new point changes what we recommend: the lines rescore by themselves, the suggested clips are found again
+    if (patch.point !== undefined && r.log.some(l => /^(point:|no point set)/.test(l)) && s.cut && s.cut.source && (s.cut.candidates || []).length && MEDIA.transcript(s.cut.source)) {
+      try { await findCuts(s.cut.source, 'rules', { keepPicks: true }); } catch (e) { console.error(e.message); }
+      return json(res, 200, { ...view(C.load()), log: r.log });
+    }
+    return json(res, 200, { ...view(s), log: r.log });
   }
   if (p === '/api/upload' && M === 'POST') {
     const kind = u.searchParams.get('kind'), name = safeName(u.searchParams.get('name')), ext = extname(name).toLowerCase();
@@ -989,7 +1040,14 @@ async function api(req, res, u) {
   }
   if (p === '/api/cut' && M === 'GET') {
     const s = C.load(), v = cutView(s), t = v.source && MEDIA.transcript(v.source);
+    v.point = s.point || '';
     return json(res, 200, { ...v, lengthSeconds: Object.fromEntries(Object.entries(CUT.FORMATS).map(([k, f]) => [k, f.lengths])), sentences: t ? CUT.sentences(t.words).map(x => ({ i: x.i, start: x.start, end: x.end, text: x.text })) : null });
+  }
+  // the stitched previews of the Cut step: for every clip, the stretches of the take it plays, in order, with the
+  // quiet the Pacing choice takes out (kit/studio/pacing.mjs). The page plays them back to back on the take itself
+  if (p === '/api/cut/preview' && M === 'GET') {
+    const s = C.load(), rel = cutSource(s, u.searchParams.get('path')); if (!rel) return json(res, 400, { error: 'add footage first' });
+    return json(res, 200, await previewOf(s, rel));
   }
   if (p === '/api/cut/output' && M === 'POST') {
     const b = await readBody(req), s = C.load();
@@ -1148,19 +1206,25 @@ async function api(req, res, u) {
     update(st => { st.pieces = st.pieces || {}; const x = st.pieces[rel] = { ...piecesState(st, rel) }; x.ids = [...(x.ids || [])]; x.reasons = { ...(x.reasons || {}) }; x.cats = { ...(x.cats || {}) };
       if (b.cats) for (const [id, c] of Object.entries(b.cats)) { if (c === null) delete x.cats[id]; else x.cats[id] = c; }
       if (b.choose) { const r = CUT.range(outputOf(st)), mn = r[0], mx = r[1] == null ? r[0] * 1.33 : r[1];
-        const ch = PIECES.choose(piecesOf(st, rel).pieces, { min: mn, max: mx }); x.ids = ch.ids; x.reasons = ch.reasons; x.by = 'ai'; note = `Picked ${ch.ids.length} pieces, ${Math.round(ch.seconds)} s, for your Combo. Drag to reorder, click x to drop.`; }
+        const ch = PIECES.choose(piecesOf(st, rel).pieces, { min: mn, max: mx }); x.ids = ch.ids; x.reasons = ch.reasons; x.by = 'ai'; note = `Picked ${ch.ids.length} lines, ${Math.round(ch.seconds)} s, for your clip. Drag to reorder, click x to drop.`; }
       if (Array.isArray(b.ids)) { x.ids = [...new Set(b.ids.map(String))]; x.reasons = b.reasons && typeof b.reasons === 'object' ? Object.fromEntries(Object.entries(b.reasons).filter(([k]) => x.ids.includes(k)).map(([k, v]) => [k, String(v).replace(/\u2014/g, ', ').slice(0, 160)])) : {}; x.by = who === 'you' ? 'you' : who;
-        if (who !== 'you') C.applyPatch(st, { reply: `${who} set your Combo: ${x.ids.length} piece${x.ids.length === 1 ? '' : 's'}.`, from: 'assistant', kind: 'action' }); }
+        if (who !== 'you') C.applyPatch(st, { reply: `${who} picked the lines for your clip: ${x.ids.length} line${x.ids.length === 1 ? '' : 's'}.`, from: 'assistant', kind: 'action' }); }
       if (b.add != null && !x.ids.includes(b.add)) { x.ids.push(String(b.add)); x.by = x.by === 'ai' ? 'ai, changed by you' : x.by || 'you'; }
       if (b.remove != null) { x.ids = x.ids.filter(i => i !== b.remove); delete x.reasons[b.remove]; }
       if (b.move) { const k = x.ids.indexOf(b.move.id); if (k >= 0) { x.ids.splice(k, 1); x.ids.splice(Math.max(0, Math.min(x.ids.length, +b.move.to || 0)), 0, b.move.id); } }
       if (b.clear) { x.ids = []; x.reasons = {}; x.by = null; }
+      // your own clip moves on unless you untick it on the Cut step (off: true); picking lines again turns it back on
+      if (b.off !== undefined) x.off = !!b.off; else if (b.choose || Array.isArray(b.ids) || b.add != null) delete x.off;
+      if (!x.off) delete x.off;
+      // themes your agent named for this take ([{ label, lines: [line numbers or ids] }]); [] goes back to the local rules
+      if (Array.isArray(b.topics)) { const L = LINES.get(rel).lines, list = b.topics.length ? TOPICS.readTopics(b.topics, L) : null; st.topics = st.topics || {};
+        if (list) st.topics[rel] = { key: txKey(L), by: who === 'you' ? 'you' : who, list }; else { delete st.topics[rel]; if (b.topics.length) throw Object.assign(new Error('topics: 2 to 5 themes, each { label: 2 to 5 words, lines: [line numbers] }'), { code: 400 }); } }
       if ((b.add != null || b.remove != null || b.move) && x.by === 'ai') x.by = 'ai, changed by you';
     });
     const s1 = C.load(); return json(res, 200, { ...view(s1), pieces: piecesOf(s1, rel), note });
   }
   if (p === '/api/outputs' && M === 'GET') return json(res, 200, outputsLib(C.load(), u.searchParams.get('all') === '1'));
-  if (p === '/api/edit' && M === 'GET') { const v = view(C.load()); return json(res, 200, { edit: v.edit, combo: v.combo, finish: v.state.finish, referenceMode: v.state.reference.mode, styleLook: v.state.styleLook || null, styleLooks: v.styleLooks, match: v.match }); }
+  if (p === '/api/edit' && M === 'GET') { const v = view(C.load()); return json(res, 200, { edit: v.edit, combo: v.combo, point: v.state.point || '', finish: v.state.finish, referenceMode: v.state.reference.mode, styleLook: v.state.styleLook || null, styleLooks: v.styleLooks, match: v.match }); }
   if (p === '/api/render' && M === 'POST') {
     // the one Render: the reel (from the draft), and in the same run the exports you ticked in Finish: each piece as its
     // own reel (clips) or as a plain clip (plain). Body { exports: { reel, clips, plain } } overrides finish for this run.
@@ -1297,7 +1361,7 @@ async function api(req, res, u) {
     if (w.choose) {
       if (!(await linesOf(rel))) { if (!MEDIA.transcript(rel)) startTranscribe(rel, () => findCuts(rel, 'auto').catch(e => console.error(e.message))); pending = 'transcript'; next = 'cut'; note = 'Transcribing the take first. Let AI choose on Cut when it is ready.'; }
       else { update(st => { const r = CUT.range(outputOf(st)), mn = r[0], mx = r[1] == null ? r[0] * 1.33 : r[1], ch = PIECES.choose(piecesOf(st, rel).pieces, { min: mn, max: mx });
-        st.pieces = st.pieces || {}; st.pieces[rel] = { ...piecesState(st, rel), ids: ch.ids, reasons: ch.reasons, by: 'ai' }; note = `Picked ${ch.ids.length} pieces, ${Math.round(ch.seconds)} s, for your Combo. Draft it in Finish.`; });
+        st.pieces = st.pieces || {}; st.pieces[rel] = { ...piecesState(st, rel), ids: ch.ids, reasons: ch.reasons, by: 'ai' }; note = `Picked ${ch.ids.length} lines, ${Math.round(ch.seconds)} s, for your clip. Draft it on Review.`; });
         done.push('combo: AI chose'); next = 'finish'; }
     }
     if (w.wizard === 'clips') { setOut(WIZ.clipsOutput(w.clips, w.ads)); done.push(`clips: ${w.clips}${w.ads ? ' with ad cuts' : ''}`); next = 'cut';

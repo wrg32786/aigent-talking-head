@@ -9,6 +9,7 @@ import { createRequire } from 'module';
 import { loadMenu } from '../menu.mjs';
 import * as CF from './conflicts.mjs';
 import * as SLK from './stylelooks.mjs';
+import { cleanPoint } from './point.mjs';
 
 const require = createRequire(import.meta.url);
 export const STUDIO = dirname(fileURLToPath(import.meta.url));
@@ -126,7 +127,7 @@ export function defaultState() {
     reference: { file: null, url: null, mode: 'influence', status: 'none', out: null, extracted: null, applied: false, queue: [], active: null },
     pack: null, picks: {}, music: { bed: 'auto', energy: 'auto', upload: null }, sound: { sfx: 'on', cap: 'on' }, pace: { tighten: null, punch: 'on' },
     export: 'reels', chat: [], task: null, outputs: [], takes: [], output: null, cut: null, tx: {}, lines: {}, broll: {},
-    finish: { from: 'auto', reel: true, clips: false, plain: false }, drafted: null, styleLook: null };
+    finish: { from: 'auto', reel: true, clips: false, plain: false }, drafted: null, styleLook: null, point: '' };
 }
 export function load() {
   try { const s = JSON.parse(readFileSync(statePath(), 'utf8')); return oneBed({ ...defaultState(), ...s, reference: { ...defaultState().reference, ...(s.reference || {}) } }); }
@@ -152,6 +153,7 @@ const ENERGY = ['auto', 'low', 'mid', 'high'];
 // a change from the page, the chat or an assistant. Refuses names the engine does not have.
 //   { job, pack, picks: { "transition:whip": "allow" | "deny" | "clear" }, clearPicks: true, music: { bed, energy },
 //     styleLook: "<a saved style look>" | null (Copy the look, kit/studio/stylelooks.mjs),
+//     point: "what the video is for, one line" | "" (kit/studio/point.mjs),
 //     sound: { sfx: on|off, cap: on|off }, pace: { tighten: null|number, punch: on|off }, export, reference: { mode },
 //     say: "user chat line", reply: "assistant chat line", from: "ui" | "assistant" | "chat",
 //     footage: [paths from state.footage, in the order to use; leave one out to drop it], clips: "<clip.py folder>" | null,
@@ -174,7 +176,7 @@ export const effectsReady = () => existsSync(join(ROOT, 'effects', '.venv'));
 export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
   const errs = [], log = [];
   if (!p || typeof p !== 'object') return { errs: ['patch must be an object'], log, noop: false };
-  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands', 'finish', 'switchFor', 'undoChange', 'styleLook'];
+  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands', 'finish', 'switchFor', 'undoChange', 'styleLook', 'point'];
   for (const k of Object.keys(p)) if (!known.includes(k)) errs.push(`unknown field "${k}" (${known.join(', ')})`);
   if (p.undoChange) {
     const u = s.lastChange && s.lastChange.undo; if (!u) { errs.push('undoChange: nothing to undo'); return { errs, log, noop: false }; }
@@ -241,6 +243,8 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
       if (s.reference.mode === 'influence' && s.reference.extracted) { const a = setReferenceLook(s, cat); if (a) log.push(`set the look from the reference (${a.n} change${a.n === 1 ? '' : 's'})`); } }
   }
   // a saved style look for drafts with no reference in use; null clears it
+  // the point of the video, one optional line (kit/studio/point.mjs): it steers what we pick on the Cut step
+  if (p.point !== undefined) { const v = cleanPoint(p.point); if (v !== (s.point || '')) { s.point = v; log.push(v ? `point: ${v}` : 'no point set'); } }
   if (p.styleLook !== undefined) {
     const n = p.styleLook === null || p.styleLook === '' ? null : p.styleLook;
     if (n !== null && !SLK.exists(n)) errs.push(`styleLook: no saved look named "${n}"${SLK.list().length ? ` (${SLK.list().map(x => x.name).join(', ')})` : ''}`);
@@ -609,6 +613,8 @@ export function resetEdit(s, { keepLook = s.keepLook === true } = {}) {
   s.cut = null;
   s.lines = {};
   delete s.pieces;
+  delete s.topics;
+  s.point = ''; // the point belongs to the video that was on the board
   clearBrollTimeline(s);
   delete s.cleanup;
   s.output = null;

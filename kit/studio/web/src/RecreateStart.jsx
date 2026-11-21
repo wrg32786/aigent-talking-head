@@ -7,6 +7,7 @@ import { Button } from '@astryxdesign/core/Button';
 import { api, quiet, toast, Icon, STATUS } from './lib.jsx';
 import { upload } from './upload.js';
 import { READING, refName, LookChips } from './RefCard.jsx';
+import { PointField } from './Cut.jsx';
 
 export const START_MODES = [
   ['own', 'Just my footage', 'We edit it from your picks', 'film'],
@@ -77,5 +78,7 @@ export function StartMode({ s, apply, patch, go, looks }) {
           {s.styleLook === x.name && <Icon n="check" />}{x.name}</button></li>)}</ul>
         {using && <LookChips summary={(saved.find(x => x.name === using) || {}).summary} id="saved-look-chips" />}</div>}
     </div>}
+    {/* Copy the look puts a style on your own words, so we ask what the video is for (the same line as on Cut) */}
+    {isLook && <PointField s={s} apply={apply} id="point-start" compact />}
   </div>;
 }

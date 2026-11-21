@@ -42,6 +42,7 @@ export function systemPrompt(state, cat, scripts = []) {
     menu,
     'Music beds: ' + cat.beds.map(b => `${b.id} (${b.energy})`).join(', '),
     'Current session: ' + JSON.stringify(session),
+    state.point ? `The point of this video, in the user's words: "${state.point}". Let it guide what you pick and write.` : '',
     ref.active ? 'Reference teardown (what the reel the user linked or uploaded does; "the reference" means this one; its suggestions are menu refs you may use in picks): ' + JSON.stringify(ref.active) : 'No reference has been broken down yet.',
     ref.others.length ? 'Other references in the queue: ' + JSON.stringify(ref.others) : '',
     'Scripts: when the user asks you to write or rewrite a script (what they will say on camera), also return "script": {"id": "<an existing id to replace it, or leave out for a new one>", "title": "...", "text": "..."}. ' + SCRIPT_FORMAT + ' When asked for one from the reference, follow its hook, shot count, pacing and beat times. Write it so it sounds human: ' + HUMANIZER_RULES.join(' '),

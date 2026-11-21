@@ -3,10 +3,12 @@
 // the pieces you want, in your order; it is what Draft, B-roll and Render use (kit/studio/server.mjs comboOf).
 //   categories: a fixed 8 (Hook, Story, Tip, Proof or quote, List, CTA, Aside, Retake or fragment), sorted by rules
 //     here; you or your agent can move a piece to another one
-//   topics: words this footage keeps coming back to (pricing, Claude Code...), to filter by subject
+//   topics: the themes this footage keeps coming back to ("starting with ChatGPT"), to filter by subject
 //   choose: Let AI choose. The best hook, then the strongest story, tip, proof and list pieces up to the length you
 //     picked, in the take's order, then the call to action, each with one reason
 import { sentenceScore, signals } from './cut.mjs';
+import { themesOf } from './topics.mjs';
+import { pointScorer, FITS } from './point.mjs';
 
 export const CATS = [
   { id: 'hook', label: 'Hook', use: 'The open: a claim, a question or "you"' },
@@ -44,19 +46,18 @@ export function categoryOf(line, i, n) {
   if (TIP.test(t)) return 'tip';
   return g.hook || g.question ? 'hook' : 'story';
 }
-// topic tags: content words said in at least two lines, the most often first (up to 8)
-export function topicsOf(lines, max = 8) {
-  const n = new Map();
-  for (const l of lines) for (const w of new Set(contentWords(l.text))) n.set(w, (n.get(w) || 0) + 1);
-  return [...n.entries()].filter(([, c]) => c >= 2).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, max).map(([w]) => w);
-}
-// the pieces of a take: one a line, with its category (yours wins over the rules), score and topics
-export function build(lines, { goal = 'organic', cats = {} } = {}) {
-  const L = lines || [], topics = topicsOf(L);
-  const pieces = L.map((l, i) => { const ws = new Set(contentWords(l.text)), rule = categoryOf(l, i, L.length);
+// topics: 3 to 5 themes the take keeps coming back to, each a short phrase (kit/studio/topics.mjs). Before 1.28.0
+// these were single words said in two lines, which gave chips like "help", "youre" and "back"
+export const topicsOf = (lines, max = 5) => themesOf(lines, { max }).map(t => t.label);
+// the pieces of a take: one a line, with its category (yours wins over the rules), score and topics.
+//   point: the point of the video (kit/studio/point.mjs). A line that serves it scores higher and carries fits: true
+//   topics: themes a model or your agent named ([{ label, lines: [ids] }]); without them the local rules find them
+export function build(lines, { goal = 'organic', cats = {}, point = '', topics: given = null } = {}) {
+  const L = lines || [], themes = given && given.length ? given : themesOf(L), pt = pointScorer(point);
+  const pieces = L.map((l, i) => { const rule = categoryOf(l, i, L.length), fits = !!(pt && pt.fits(l.text));
     return { id: l.id, n: l.n, start: l.start, end: l.end, seconds: l.seconds, text: l.text, hint: l.hint || null, why: l.why || null,
-      category: CAT_IDS.includes(cats[l.id]) ? cats[l.id] : rule, rule, score: Math.round(sentenceScore({ text: l.text, start: l.start, end: l.end }, goal)), topics: topics.filter(w => ws.has(w)) }; });
-  return { pieces, topics };
+      category: CAT_IDS.includes(cats[l.id]) ? cats[l.id] : rule, rule, score: Math.round(sentenceScore({ text: l.text, start: l.start, end: l.end }, goal, pt)), ...(fits ? { fits: true } : {}), topics: themes.filter(t => t.lines.includes(l.id)).map(t => t.label) }; });
+  return { pieces, topics: themes.map(t => t.label) };
 }
 const REASON = {
   hook: p => `Strongest open${signals({ text: p.text, start: p.start, end: p.end }).question ? ': a question' : ''}. Score ${p.score}.`,
@@ -76,7 +77,7 @@ export function choose(pieces, { min = 30, max = 60 } = {}) {
   }
   mid.sort((a, b) => a.start - b.start);
   const out = [hook, ...mid, cta].filter(Boolean);
-  const reasons = Object.fromEntries(out.map(p => [p.id, p === hook ? REASON.hook(p) : p === cta ? REASON.cta(p) : p.category === 'hook' ? 'Keeps the open going.' : (REASON[p.category] || REASON.story)(p)]));
+  const reasons = Object.fromEntries(out.map(p => [p.id, (p === hook ? REASON.hook(p) : p === cta ? REASON.cta(p) : p.category === 'hook' ? 'Keeps the open going.' : (REASON[p.category] || REASON.story)(p)) + (p.fits ? ` ${FITS}.` : '')]));
   return { ids: out.map(p => p.id), reasons, seconds: +secs.toFixed(2) };
 }
 // the Combo's pieces as ranges: neighbours in the take that sit next to each other in the Combo join into one range,

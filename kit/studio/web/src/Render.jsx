@@ -44,7 +44,7 @@ export function ReviewStep({ CAT, V, s, apply, patch, hidden, run }) {
   if (s.reference.mode === 'recreate' && s.reference.out && s.reference.extracted) notes.unshift('Recreate: we follow the reference, and it sets the look.');
   // a draft is a plan, not a video: say so when it ends, so it never reads like a finished render
   const planReady = t && !running && t.kind === 'draft' && t.status === 'done';
-  const status = stale && !running ? 'Your pieces changed since the draft. Draft again first.' : !fin.reel ? 'The reel is switched off under What to make, on Render.' : mine ? ticking : running ? '' : planReady || (isDrafted && !stale) ? 'Plan ready, no video yet. Check it below, then Render.' : t && t.kind === 'draft' ? took : 'A draft is a quick plan of the reel, with no video yet.';
+  const status = stale && !running ? 'Your clips changed since the draft. Draft again first.' : !fin.reel ? 'The reel is switched off under What to make, on Render.' : mine ? ticking : running ? '' : planReady || (isDrafted && !stale) ? 'Plan ready, no video yet. Check it below, then Render.' : t && t.kind === 'draft' ? took : 'A draft is a quick plan of the reel, with no video yet.';
   // only when a reference or a saved look is in use: there is nothing to be close to otherwise
   const guided = !!(s.reference.extracted && s.reference.mode !== 'off') || !!s.styleLook;
   const match = guided ? matchChips(V.match || (V.edit && V.edit.match) || s.match) : [];
@@ -58,9 +58,9 @@ export function ReviewStep({ CAT, V, s, apply, patch, hidden, run }) {
       {mine && <Button id="cancel" variant="ghost" label="Cancel" onClick={() => api('/api/task/cancel', {}).then(apply)} />}
       <span id="elapsed" className="fine" role="status">{!s.job ? 'Name the reel at the top to start.' : status}</span>
       {n > 0 && <div className="draft-from"><span className="lbl" id="fin-from-l">Draft from</span><div className="seg" role="radiogroup" aria-labelledby="fin-from-l" aria-describedby="fin-from-note" id="fin-from">
-        <button type="button" role="radio" aria-checked={fromPieces} data-from="pieces" onClick={() => patch({ finish: { from: 'pieces' } }).catch(() => {})}>Your {lineN} piece{lineN > 1 ? 's' : ''}, {Math.round(combo.seconds)} s</button>
+        <button type="button" role="radio" aria-checked={fromPieces} data-from="pieces" onClick={() => patch({ finish: { from: 'pieces' } }).catch(() => {})}>{combo.pieces.some(x => x.kind === 'piece') ? `Your ${lineN} line${lineN > 1 ? 's' : ''}` : `Your ${combo.pieces.length} clip${combo.pieces.length > 1 ? 's' : ''}`}, {Math.round(combo.seconds)} s</button>
         <button type="button" role="radio" aria-checked={!fromPieces} data-from="take" onClick={() => patch({ finish: { from: 'take' } }).catch(() => {})}>The whole take</button>
-      </div><span className="sr" id="fin-from-note">{fromPieces ? 'The reel is your pieces from the Cut step, in your order, already cut. Nothing is cut twice.' : 'The reel is cut from the whole take. Your pieces are left out.'}</span></div>}
+      </div><span className="sr" id="fin-from-note">{fromPieces ? 'The reel is the clips you kept on the Cut step, in your order, already cut. Nothing is cut twice.' : 'The reel is cut from the whole take. Your clips are left out.'}</span></div>}
     </div>
     {mine && <div id="progress"><ProgressBar label={`${cap1(t.kind)} running`} isLabelHidden isIndeterminate /></div>}
     {notes.length > 0 && <div id="notes" className="notes">{notes.map((x, i) => <p key={i}>{x}</p>)}</div>}
@@ -68,7 +68,7 @@ export function ReviewStep({ CAT, V, s, apply, patch, hidden, run }) {
       <ul className="match-chips" id="match-chips" aria-labelledby="match-h">{match.map(m => <li key={m.id} className={'match-chip ' + m.word.toLowerCase()} data-part={m.id} data-match={m.word.toLowerCase()}><span>{m.label}</span><b>{m.word}</b></li>)}</ul></div>}
     <div id="draft-view" className="outputs">
       {good && V.draftPreview ? <DraftPreview preview={V.draftPreview} s={s} />
-        : !good && <div className="empty-art" id="fin-plan"><Icon n="film" /><p>{!s.job ? 'Name the reel at the top to start.' : stale ? 'Your pieces changed. Draft again to see the new plan.' : 'Your draft shows up here. Earlier reels stay in Outputs.'}</p></div>}
+        : !good && <div className="empty-art" id="fin-plan"><Icon n="film" /><p>{!s.job ? 'Name the reel at the top to start.' : stale ? 'Your clips changed. Draft again to see the new plan.' : 'Your draft shows up here. Earlier reels stay in Outputs.'}</p></div>}
     </div>
     {(isDrafted || drafted) && <>
       <Receipt r={run.receipt} />
@@ -106,7 +106,7 @@ export function Render({ CAT, V, s, apply, patch, hidden, go, run, openOutputs, 
     <div className="runbar glass-card" id="render-bar">
       <Button id="render" size="lg" variant={canRender ? 'primary' : 'secondary'} label={renderLabel} isDisabled={!canRender} onClick={() => doRender()} />
       {mine && <Button id="cancel" variant="ghost" label="Cancel" onClick={() => api('/api/task/cancel', {}).then(apply)} />}
-      <span id="render-status" className="fine" role="status">{!s.job ? 'Name the reel at the top to start.' : needDraft && !running ? <>{stale ? 'Your pieces changed since the draft. ' : ''}<button type="button" className="linkish" id="render-to-review" onClick={() => go('review', true)}>Draft it on Review first</button></> : mine ? ticking : running ? `${cap1(t.kind)} running` : t && t.kind === 'render' ? took : outputs.length ? '' : 'Ready when you are.'}</span>
+      <span id="render-status" className="fine" role="status">{!s.job ? 'Name the reel at the top to start.' : needDraft && !running ? <>{stale ? 'Your clips changed since the draft. ' : ''}<button type="button" className="linkish" id="render-to-review" onClick={() => go('review', true)}>Draft it on Review first</button></> : mine ? ticking : running ? `${cap1(t.kind)} running` : t && t.kind === 'render' ? took : outputs.length ? '' : 'Ready when you are.'}</span>
     </div>
     {mem && !running && <div id="mem-short" className="notes glass-card" role="alert"><p>{mem.message}</p>
       <div className="row">{(mem.options || []).map(o => <Button key={o.id} id={'mem-' + o.id} size="sm" variant={o.id === 'front' ? 'primary' : o.id === 'light' ? 'secondary' : 'ghost'} label={o.label} onClick={() => doRender(o.id)} />)}</div>
@@ -124,11 +124,11 @@ export function Render({ CAT, V, s, apply, patch, hidden, go, run, openOutputs, 
       <div className="fin-make" id="fin-make" role="group" aria-label="What Render makes">
         <div className="chips" id="fin-exports">
           <Chip id="exp-reel" on={fin.reel} label="The reel" onClick={() => setFin({ reel: !fin.reel })} />
-          <Chip id="exp-clips" on={fin.clips} disabled={!n} label={n ? `${n} clip${n > 1 ? 's' : ''} from your pieces` : 'Clips from your pieces'} onClick={() => setFin({ clips: !fin.clips })} />
+          <Chip id="exp-clips" on={fin.clips} disabled={!n} label={n ? `${n} clip${n > 1 ? 's' : ''} on their own` : 'Each clip on its own'} onClick={() => setFin({ clips: !fin.clips })} />
           <Chip id="exp-plain" on={fin.plain} disabled={!n} label="Plain clips, no edit" onClick={() => setFin({ plain: !fin.plain })} />
           <label className="exp"><span className="lbl">Also sized for</span><select id="export" value={s.export || ''} onChange={e => patch({ export: e.target.value || null })}><option value="">Just the reel</option>{CAT.exports.map(x => <option key={x} value={x}>{x}</option>)}</select></label>
         </div>
-        <p className="fine">{n ? 'Clips render each piece as its own reel with the same look, in the same run. Plain clips are just the words you kept, joined.' : 'Clips and plain clips come from the pieces you keep on the Cut step.'}</p>
+        <p className="fine">{n ? 'Each kept clip also renders as its own reel with the same look, in the same run. Plain clips are just the words you kept, joined.' : 'These come from the clips you keep on the Cut step.'}</p>
       </div>
     </Fold>
     {outputs.length > 0 && <details className="fold glass-card" id="compare-fold"><summary>Compare with the original, or comment on a frame</summary>
@@ -221,7 +221,7 @@ function useBites(V, s) {
 function CutOutputs({ V, s, bites = [] }) {
   const done = [...((V.cut && V.cut.candidates) || []).map(c => ({ key: 'c-' + c.id, id: c.id, label: c.label, outputs: c.outputs })), ...bites.map(b => ({ key: 'b-' + b.id, id: b.id, label: b.name, outputs: b.outputs }))].filter(c => c.outputs && c.outputs.length);
   if (!done.length) return null;
-  return <section className="cut-outs" id="cut-outputs" aria-labelledby="h-cut-outs"><h3 id="h-cut-outs" className="lbl">Clips from your pieces</h3>
+  return <section className="cut-outs" id="cut-outputs" aria-labelledby="h-cut-outs"><h3 id="h-cut-outs" className="lbl">Your clips on their own</h3>
     <div className="outputs">{done.map(c => { const o = c.outputs[0]; return <figure key={c.key} className="glass-card" data-id={c.id}><video src={file(o) + '?v=' + s.rev + '#t=1.2'} controls preload="metadata" aria-label={c.label} />
       <figcaption><span>{c.label}</span><a className="btn ghost sm" href={file(o) + '?download'} download={o.split('/').pop()}><Icon n="download" />Download</a></figcaption></figure>; })}</div></section>;
 }

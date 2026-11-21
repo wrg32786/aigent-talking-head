@@ -1,0 +1,30 @@
+{
+  "note": "A made-up take in the voice of a real one, for tests/studio-topics.test.mjs. The old topic chips on a take like this were single weak words: help, youre, back, build, different, friends, able, business.",
+  "lines": [
+    "If you're just starting with ChatGPT, this is going to help you a lot.",
+    "A year back I wasn't able to write a single line of code.",
+    "Now I build apps for my friends and for my own business.",
+    "Most people think building with AI is only for developers, and that's not true.",
+    "You're able to build a working app in a weekend if you pick one small problem.",
+    "When I was starting with ChatGPT I asked it really basic questions.",
+    "Things like, what is a database, and how do I put a website online.",
+    "It didn't judge me, and that's what helped me keep going.",
+    "My friends thought I was wasting my time.",
+    "Then I showed them the first app, and they wanted one for their business too.",
+    "So here's the different way I'd do it if I went back and started over.",
+    "First, pick one small problem you have every single week.",
+    "For me it was sending invoices for my business.",
+    "Second, describe that one small problem to the AI like you're talking to a friend.",
+    "Don't try to sound smart, just say what you'd want it to do.",
+    "Third, ask it to build the smallest version that could help.",
+    "Building with AI is different because you're not typing code, you're giving directions.",
+    "You'll get it wrong a few times, and that's fine.",
+    "I had to go back and explain the same thing three different ways.",
+    "But by Sunday night I had a working app that sent my invoices.",
+    "My friends were able to use it on their phones the same day.",
+    "That's the part nobody tells you about building with AI.",
+    "You don't need to know how to build everything, you need to know what would help.",
+    "So if you're starting with ChatGPT this week, pick one small problem and build that.",
+    "Follow me if you want to see the exact prompts I used for my first working app."
+  ]
+}

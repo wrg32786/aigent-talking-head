@@ -9,7 +9,7 @@ import { Spinner } from './ui.jsx';
 
 const when = iso => { if (!iso) return ''; const d = new Date(iso), today = new Date().toDateString() === d.toDateString();
   return (today ? 'Today ' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ', ') + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); };
-const ROWS = [['Rendered', v => when(v.at)], ['Take', v => v.take || 'Not recorded'], ['Draft', v => v.draft || 'Not recorded'], ['Look', v => v.settings ? v.settings.look : 'Not recorded'], ['Length', v => [v.seconds ? `${Math.round(v.seconds)} s` : null, v.settings && v.settings.pieces ? (k => `${k} piece${k === 1 ? '' : 's'}`)(v.settings.count != null ? v.settings.count : v.settings.pieces.length) : null].filter(Boolean).join(', ') || 'Not recorded'],
+const ROWS = [['Rendered', v => when(v.at)], ['Take', v => v.take || 'Not recorded'], ['Draft', v => v.draft || 'Not recorded'], ['Look', v => v.settings ? v.settings.look : 'Not recorded'], ['Length', v => [v.seconds ? `${Math.round(v.seconds)} s` : null, v.settings && v.settings.pieces ? (k => `${k} clip${k === 1 ? '' : 's'}`)(v.settings.count != null ? v.settings.count : v.settings.pieces.length) : null].filter(Boolean).join(', ') || 'Not recorded'],
   ['B-roll', v => v.settings ? v.settings.broll : 'Not recorded']];
 
 function Version({ v, latest, running, onReopen, cmp, onCompare }) {

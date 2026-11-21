@@ -56,6 +56,19 @@ export function useScrub(dur, seek) {
 
 export const DRAG_MIN = 0.25;
 
+// play stretches of the take back to back on the Cut step's player, skipping what lies between them: how a clip
+// sounds once its lines are stitched and the quiet is out. spans: [[from, to]] in take seconds, in play order.
+// Nothing is rendered: the take's own media element jumps from the end of one stretch to the start of the next
+export function useStitch(player) {
+  const seq = useRef(null), [playing, setPlaying] = useState(null);
+  useEffect(() => { const id = setInterval(() => { const q = seq.current, p = player.current; if (!q || !p) return;
+    if (p.now() >= q.spans[q.k][1] - 0.04) { q.k++; if (q.k >= q.spans.length) { seq.current = null; setPlaying(null); p.pause(); } else p.play(q.spans[q.k][0], q.spans[q.k][1]); } }, 30); return () => clearInterval(id); }, [player]);
+  const stop = () => { seq.current = null; setPlaying(null); if (player.current) player.current.pause(); };
+  const play = (id, spans) => { const p = player.current, S = (spans || []).filter(x => x && x[1] > x[0]); if (!p || !S.length) return; if (playing === id) { stop(); return; }
+    seq.current = { spans: S, k: 0 }; setPlaying(id); p.play(S[0][0], S[0][1]); };
+  return { playing, play, stop };
+}
+
 export function Player({ path, tx, onClose, playerRef, onAddRange, apply, children }) {
   const { info, peaks, src, proxy } = useMedia(path);
   const t = useTranscript(path, tx);
@@ -120,7 +133,7 @@ export function Player({ path, tx, onClose, playerRef, onAddRange, apply, childr
     <div className="pl-tr" ref={trRef} onMouseUp={onSelect} onKeyUp={onSelect} id="player-transcript">
       {t ? <p>{words.map((w, i) => <span key={i} className={'w' + (i === curWord ? ' now' : '')} data-a={w[0]} data-b={w[1]} onClick={() => { if (getSelection().isCollapsed) seek(w[0]); }}>{w[2]} </span>)}</p>
         : txRun ? <div className="tx-run"><ProgressBar label="Transcribing" value={tx.total ? Math.round(100 * tx.done / tx.total) : undefined} isIndeterminate={!tx.total} /><span className="fine">Transcribing{tx.total ? `, part ${Math.min(tx.done + 1, tx.total)} of ${tx.total}` : ''}. Long takes go a chunk at a time and pick up where they stopped.</span></div>
-        : <div className="row"><Button id="player-tx" size="sm" variant="secondary" label="Show transcript" onClick={() => api('/api/cut/transcribe', { path }).catch(() => {})} /><span className="fine">{tx && tx.status === 'failed' ? tx.error : 'Whisper on this computer. Click a word to jump there.'}</span></div>}
+        : <div className="row"><Button id="player-tx" size="sm" variant="secondary" label="Show transcript" onClick={() => api('/api/cut/transcribe', { path }).catch(() => {})} /><span className="fine">{tx && tx.status === 'failed' ? tx.error : 'We read the words on this computer. Click a word to jump there.'}</span></div>}
     </div>
     {sel && <div className="pl-sel" id="pl-sel"><span className="fine" id="pl-sel-at">{clock(sel[0])} to {clock(sel[1])}{words.length ? ', on whole words' : ''}</span>
       <Button id="play-selection" size="sm" variant="ghost" label="Play it" onClick={() => play(sel[0], sel[1])} />

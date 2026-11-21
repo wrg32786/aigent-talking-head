@@ -1049,6 +1049,67 @@ dialog.nv { width: min(440px, calc(100vw - 24px)); }
 .cb-why { font-size: 11px; color: var(--muted-foreground); }
 .cb-ctl { display: flex; gap: 2px; margin-top: auto; } .cb-ctl .icon-btn { width: 26px; height: 26px; } .cb-ctl .cb-x { margin-left: auto; }
 
+/* ---------- 1.28.0: the Cut step in three layers (Raw take, Best lines, Clips), the point of the video, Pacing ---------- */
+.point { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 14px; padding: 10px 16px; border-radius: var(--radius-lg); margin-bottom: 10px; }
+.point-l { font-weight: 650; font-size: 15px; white-space: nowrap; }
+.point-i { min-height: 38px; width: 100%; border-radius: 10px; border: 1px solid var(--input); background: var(--background); color: var(--foreground); font: inherit; padding: 6px 12px; }
+.point-i::placeholder { color: var(--muted-foreground); opacity: .85; }
+.point-i:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.point-h { grid-column: 2; margin: 0; }
+.point.compact { margin: 10px 0 0; padding: 10px 14px; }
+@media (max-width: 760px) { .point { grid-template-columns: 1fr; } .point-h { grid-column: 1; } .point-l { white-space: normal; } }
+.cut-sum { padding: 10px 16px; margin-bottom: 0; } .cut-sum .cs-l { margin: 0; flex: none; }
+.cut-sum .cs-t { font-size: 15px; }
+.cut-layers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 14px 0 8px; }
+.cut-layer { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--card); color: var(--foreground); font: inherit; cursor: pointer; text-align: left; min-width: 0; }
+.cut-layer:hover { border-color: color-mix(in srgb, var(--primary) 55%, transparent); }
+.cut-layer:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.cut-layer .cl-n { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; border: 1.5px solid var(--input); color: var(--muted-foreground); flex: none; }
+.cut-layer .cl-t { font-weight: 650; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cut-layer .cl-c { font-size: 12px; color: var(--muted-foreground); }
+.cut-layer[aria-selected="true"] { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary) inset; }
+.cut-layer[aria-selected="true"] .cl-n { background: var(--primary); border-color: transparent; color: var(--primary-foreground); }
+.cut-explain { margin: 0 0 14px; color: var(--muted-foreground); font-size: 14px; }
+.cut-body { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.cut-body .cut-play { position: sticky; top: 8px; min-width: 0; } .cut-body .cut-side { min-width: 0; }
+.cut-body.v-lines .pl-tr, .cut-body.v-clips .pl-tr { display: none; }
+.cut-body.v-lines .keys, .cut-body.v-clips .keys { display: none; }
+/* Raw take: the player takes the row, the video on the left and its words beside it */
+.cut-body.v-raw { grid-template-columns: minmax(0, 1fr); }
+.cut-body.v-raw .cut-play { position: static; }
+.cut-body.v-raw .player { display: grid; grid-template-columns: minmax(220px, 320px) minmax(0, 1fr); grid-template-areas: "top top" "stage words" "bar words" "sel sel"; gap: 10px 18px; align-items: start; }
+.cut-body.v-raw .player .pl-top { grid-area: top; } .cut-body.v-raw .player .pl-stage { grid-area: stage; } .cut-body.v-raw .player .pl-bar { grid-area: bar; }
+.cut-body.v-raw .player .pl-tr { grid-area: words; max-height: min(64vh, 620px); overflow: auto; font-size: 15px; line-height: 1.7; } .cut-body.v-raw .player .pl-sel { grid-area: sel; }
+.raw-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; padding: 12px 16px; border-radius: 14px; font-size: 14px; color: var(--muted-foreground); }
+.raw-facts b { color: var(--foreground); font-weight: 650; } .raw-facts > :last-child { margin-left: auto; }
+@media (max-width: 900px) { .cut-body, .cut-body.v-raw .player { grid-template-columns: 1fr; } .cut-body.v-raw .player { grid-template-areas: "top" "stage" "bar" "words" "sel"; } .cut-body .cut-play { position: static; max-width: 340px; } .cut-layer { padding: 8px 10px; gap: 8px; } .cut-layer .cl-c { display: none; } }
+/* Best lines */
+.pz.best { border-color: color-mix(in srgb, var(--primary) 45%, var(--border)); }
+.pz-best, .pz-fits { display: inline-flex; align-items: center; padding: 0 7px; border-radius: 999px; font-size: 11px; font-weight: 650; line-height: 18px; white-space: nowrap; }
+.pz-best { color: var(--primary); background: color-mix(in srgb, var(--primary) 14%, transparent); }
+.pz-fits { color: var(--foreground); background: color-mix(in srgb, var(--warning, #f5b748) 24%, transparent); }
+.combo-a { display: inline-flex; gap: 6px; margin-left: auto; }
+/* Clips */
+.cut-clips { display: flex; flex-direction: column; gap: 12px; }
+.cut-clips-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 12px 16px; border-radius: 14px; }
+.pacing { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; flex: 1 1 420px; min-width: 0; } .pacing .lbl, .pacing .fine { margin: 0; }
+.clip-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.clip-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 14px; align-items: start; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--border); background: var(--card); }
+.clip-row.sel { border-color: color-mix(in srgb, var(--primary) 60%, var(--border)); }
+.clip-row.off .clip-main, .clip-row.muted .clip-main { opacity: .55; }
+.clip-row.k-own { border-color: color-mix(in srgb, var(--primary) 50%, var(--border)); }
+.clip-keep { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--primary); cursor: pointer; }
+.clip-keep.fixed { display: grid; place-items: center; color: var(--primary); cursor: default; } .clip-keep.fixed .ic { width: 16px; height: 16px; stroke-width: 3; }
+.clip-h { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; } .clip-h label { cursor: pointer; font-size: 15px; } .clip-m { margin: 0; }
+.clip-why { margin: 4px 0 0; font-size: 13.5px; } .clip-tx { margin: 4px 0 0; font-size: 13px; color: var(--muted-foreground); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.clip-a { display: flex; align-items: center; gap: 6px; }
+.clip-note { padding: 0 4px; margin: 0; }
+.clips-kept { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; font-weight: 600; } .clips-kept .ic { width: 16px; height: 16px; color: var(--primary); flex: none; }
+.clips-kept[data-kept="0"] .ic { color: var(--muted-foreground); }
+.clips-tl > summary { cursor: pointer; font-size: 13px; color: var(--muted-foreground); padding: 4px 0; } .clips-tl > summary:hover { color: var(--foreground); }
+.clips-tl .timeline { margin-top: 8px; }
+@media (max-width: 640px) { .clip-row { grid-template-columns: 22px minmax(0, 1fr); } .clip-a { grid-column: 2; } }
+
 /* ---------- Outputs library (1.15.0) ---------- */
 .out-btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px 0 10px; margin-right: 4px; border-radius: 999px; border: 1px solid var(--border); background: var(--btn-secondary-bg, var(--card)); color: var(--foreground); font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; flex: none; }
 .out-btn .ic { width: 16px; height: 16px; color: var(--primary); } .out-btn:hover { border-color: var(--primary); }

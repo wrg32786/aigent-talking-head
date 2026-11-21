@@ -7,6 +7,7 @@
 //   score them instead; scoredBy says which one did.
 // Pure functions: the server (kit/studio/server.mjs), the MCP tools and the tests share them.
 import CP from '../cutpoints.cjs';
+import { pointScorer, pointLine } from './point.mjs';
 
 export const FORMATS = {
   short: { label: 'Short', sub: 'Reels, Shorts, TikTok', aspect: '9:16', export: 'shorts', lengths: { short: [15, 30], medium: [30, 60], long: [60, 90] } },
@@ -114,8 +115,9 @@ export function signals(s) {
   return { hook: HOOK.test(s.text.trim()), question: /\?\s*$/.test(s.text), number: /\b\d|\b(one|two|three|five|ten|hundred|thousand|million)\b/i.test(s.text), cta: CTA.test(s.text),
     weakStart: WEAK_START.test(s.text.trim()), filler: ws.filter(w => FILLER.test(w.replace(/[^a-z]/gi, ''))).length / Math.max(1, ws.length), rate: ws.length / dur, short: ws.length < 4 };
 }
-export function sentenceScore(s, goal) {
-  const g = signals(s); let v = 50;
+// pt: the scorer for the point of the video (kit/studio/point.mjs pointScorer), or nothing
+export function sentenceScore(s, goal, pt) {
+  const g = signals(s); let v = 50 + (pt ? pt.boost(s.text) : 0);
   if (g.hook) v += 14; if (g.question) v += 8; if (g.number) v += 8; if (g.cta) v += goal === 'ad' ? 10 : 2;
   if (g.weakStart) v -= 6; if (g.short) v -= 8; v -= g.filler * 60;
   if (g.rate > 2 && g.rate < 4.2) v += 6; else if (g.rate < 1.4) v -= 8;
@@ -123,10 +125,10 @@ export function sentenceScore(s, goal) {
 }
 
 // a window of sentences [i..j] as a candidate: its score and the reason in plain words
-function windowOf(S, i, j, goal, kind) {
+function windowOf(S, i, j, goal, kind, pt) {
   const w = S.slice(i, j + 1), first = signals(w[0]), last = signals(w[w.length - 1]);
-  let score = w.reduce((a, s) => a + sentenceScore(s, goal), 0) / w.length;
-  const why = [];
+  let score = w.reduce((a, s) => a + sentenceScore(s, goal, pt), 0) / w.length;
+  const why = [], fits = !!pt && w.filter(s => pt.fits(s.text)).length >= Math.max(1, Math.ceil(w.length / 4));
   if (first.hook || first.question) { score += goal === 'ad' ? 16 : 10; why.push(first.question ? 'opens on a question' : 'opens on a strong line'); }
   else if (goal === 'ad') score -= 10;
   if (first.weakStart) { score -= 10; why.push('starts mid-thought'); }
@@ -136,7 +138,7 @@ function windowOf(S, i, j, goal, kind) {
   const filler = w.reduce((a, s) => a + signals(s).filler, 0) / w.length; if (filler > 0.08) why.push('some filler words');
   if (!END.test(w[w.length - 1].text)) score -= 4; else if (!why.length) why.push('a complete thought');
   if (last.cta && goal !== 'ad') why.push('ends on a call to action');
-  return { score: Math.round(Math.max(0, Math.min(100, score))), reason: cap(why.join(', ') || 'steady delivery') };
+  return { score: Math.round(Math.max(0, Math.min(100, score))), reason: cap(why.join(', ') || 'steady delivery'), ...(fits ? { fits: true } : {}) };
 }
 const cap = t => t ? t[0].toUpperCase() + t.slice(1) : t;
 const snippet = (S, i, j) => { const t = S.slice(i, j + 1).map(s => s.text).join(' '); return t.length > 160 ? t.slice(0, 157).replace(/\s+\S*$/, '') + '...' : t; };
@@ -145,20 +147,20 @@ const rng = (S, i, j, dur) => [+Math.max(0, S[i].start - pad).toFixed(2), +Math.
 export const lengthOf = c => +c.ranges.reduce((a, [x, y]) => a + (y - x), 0).toFixed(2);
 
 // the best non-overlapping windows between min and max seconds
-function bestWindows(S, [min, max], n, goal, kind, dur, taken = []) {
+function bestWindows(S, [min, max], n, goal, kind, dur, pt, taken = []) {
   const all = [];
   for (let i = 0; i < S.length; i++) for (let j = i; j < S.length; j++) {
     const d = S[j].end - S[i].start; if (d > (max || Infinity) * 1.05) break;
-    if (d >= min * 0.95) all.push({ i, j, ...windowOf(S, i, j, goal, kind) });
+    if (d >= min * 0.95) all.push({ i, j, ...windowOf(S, i, j, goal, kind, pt) });
   }
   all.sort((a, b) => b.score - a.score || (a.i - b.i));
   const out = [], used = taken.slice();
   for (const c of all) { if (out.length >= n) break; if (used.some(([a, b]) => c.i <= b && c.j >= a)) continue; used.push([c.i, c.j]); out.push(c); }
-  return out.map(c => ({ ranges: [rng(S, c.i, c.j, dur)], score: c.score, reason: c.reason, text: snippet(S, c.i, c.j), from: c.i, to: c.j }));
+  return out.map(c => ({ ranges: [rng(S, c.i, c.j, dur)], score: c.score, reason: c.reason, ...(c.fits ? { fits: true } : {}), text: snippet(S, c.i, c.j), from: c.i, to: c.j }));
 }
 
 // parts of about the target length that cover the take, broken at the longest pause near each target (a topic change)
-function parts(S, [min, max], dur, goal) {
+function parts(S, [min, max], dur, goal, pt) {
   const target = mid([min, max], dur), out = []; let i = 0;
   while (i < S.length) {
     let best = null;
@@ -172,17 +174,18 @@ function parts(S, [min, max], dur, goal) {
     const rest = S.length - 1 - j; if (rest > 0 && S[S.length - 1].end - S[j + 1].start < min * 0.5) { out.push([i, S.length - 1]); break; } // a short tail joins the last part
     out.push([i, j]); i = j + 1;
   }
-  return out.map(([a, b], k) => ({ ranges: [rng(S, a, b, dur)], ...windowOf(S, a, b, goal, 'part'), text: snippet(S, a, b), label: `Part ${k + 1} of ${out.length}`, from: a, to: b }));
+  return out.map(([a, b], k) => ({ ranges: [rng(S, a, b, dur)], ...windowOf(S, a, b, goal, 'part', pt), text: snippet(S, a, b), label: `Part ${k + 1} of ${out.length}`, from: a, to: b }));
 }
 
 // the best version: the strongest sentences, in order, up to the target; the opening hook always stays
-function bestVersion(S, r, dur, goal) {
+function bestVersion(S, r, dur, goal, pt) {
+  const sc = s => sentenceScore(s, goal, pt);
   const total = S.length ? S[S.length - 1].end - S[0].start : 0, target = Math.min(mid(r, total), total);
-  const scored = S.map(s => ({ s, v: sentenceScore(s, goal) }));
+  const scored = S.map(s => ({ s, v: sc(s) }));
   let keep;
   if (total <= target * 1.08) keep = scored.filter(x => x.v >= 25 || x.s.words >= 4).map(x => x.s);
   else {
-    const firstHook = S.slice(0, Math.max(1, Math.ceil(S.length * 0.2))).reduce((b, s) => (sentenceScore(s, goal) > sentenceScore(b, goal) ? s : b), S[0]);
+    const firstHook = S.slice(0, Math.max(1, Math.ceil(S.length * 0.2))).reduce((b, s) => (sc(s) > sc(b) ? s : b), S[0]);
     const order = scored.filter(x => x.s !== firstHook).sort((a, b) => b.v - a.v), chosen = new Set([firstHook]); let t = firstHook.end - firstHook.start;
     for (const x of order) { const d = x.s.end - x.s.start; if (t + d > target * 1.04) continue; chosen.add(x.s); t += d; }
     if (goal === 'ad') { const c = [...S].reverse().find(s => signals(s).cta); if (c && !chosen.has(c)) chosen.add(c); }
@@ -191,41 +194,42 @@ function bestVersion(S, r, dur, goal) {
   // neighbouring sentences join into one range
   const ranges = [];
   for (const s of keep) { const a = +Math.max(0, s.start - pad).toFixed(2), b = +Math.min(dur || Infinity, s.end + pad).toFixed(2), l = ranges[ranges.length - 1]; if (l && a - l[1] < 0.6) l[1] = b; else ranges.push([a, b]); }
-  const avg = keep.length ? Math.round(keep.reduce((a, s) => a + sentenceScore(s, goal), 0) / keep.length) : 0;
-  const cut = S.length - keep.length;
-  return { ranges, score: avg, reason: cap(`${keep.length} of ${S.length} sentences kept in order${cut ? `, ${cut} weaker or filler ones cut` : ''}, opens on its strongest early line`), text: snippet(keep.length ? keep : S, 0, Math.min(2, (keep.length || S.length) - 1)), label: 'Best version' };
+  const avg = keep.length ? Math.round(keep.reduce((a, s) => a + sc(s), 0) / keep.length) : 0;
+  const cut = S.length - keep.length, fits = !!pt && keep.some(s => pt.fits(s.text));
+  return { ranges, score: avg, reason: cap(`${keep.length} of ${S.length} sentences kept in order${cut ? `, ${cut} weaker or filler ones cut` : ''}, opens on its strongest early line`), ...(fits ? { fits: true } : {}), text: snippet(keep.length ? keep : S, 0, Math.min(2, (keep.length || S.length) - 1)), label: 'Best version' };
 }
 
 // ad cuts: the best hook, then the strongest lines, then the call to action, inside 15 or 30 s
-function adCut(S, secs, dur) {
-  const hooks = S.map(s => ({ s, v: sentenceScore(s, 'ad') + (signals(s).hook || signals(s).question ? 20 : 0) })).sort((a, b) => b.v - a.v);
+function adCut(S, secs, dur, pt) {
+  const hooks = S.map(s => ({ s, v: sentenceScore(s, 'ad', pt) + (signals(s).hook || signals(s).question ? 20 : 0) })).sort((a, b) => b.v - a.v);
   const hook = hooks[0] && hooks[0].s; if (!hook) return null;
   const cta = [...S].reverse().find(s => signals(s).cta && s !== hook);
   const L = s => s.end - s.start + 2 * pad, chosen = new Set([hook]); let t = L(hook) + (cta ? L(cta) : 0);
   if (t > secs * 1.1) return null;
   if (cta) chosen.add(cta);
-  for (const x of S.filter(s => !chosen.has(s)).map(s => ({ s, v: sentenceScore(s, 'ad') })).sort((a, b) => b.v - a.v)) { const d = L(x.s); if (t + d > secs) continue; chosen.add(x.s); t += d; }
+  for (const x of S.filter(s => !chosen.has(s)).map(s => ({ s, v: sentenceScore(s, 'ad', pt) })).sort((a, b) => b.v - a.v)) { const d = L(x.s); if (t + d > secs) continue; chosen.add(x.s); t += d; }
   const ord = [hook, ...S.filter(s => chosen.has(s) && s !== hook && s !== cta), ...(cta ? [cta] : [])];
+  const fits = !!pt && ord.some(s => pt.fits(s.text));
   const ranges = ord.map(s => [+Math.max(0, s.start - pad).toFixed(2), +Math.min(dur || Infinity, s.end + pad).toFixed(2)]);
-  return { ranges, score: Math.round(ord.reduce((a, s) => a + sentenceScore(s, 'ad'), 0) / ord.length), reason: `Hook first, then the strongest lines${cta ? ', ends on your call to action' : ', an end card adds the call to action'}`, text: snippet(ord, 0, Math.min(1, ord.length - 1)), label: `${secs} s ad` };
+  return { ranges, score: Math.round(ord.reduce((a, s) => a + sentenceScore(s, 'ad', pt), 0) / ord.length), reason: `Hook first, then the strongest lines${cta ? ', ends on your call to action' : ', an end card adds the call to action'}`, ...(fits ? { fits: true } : {}), text: snippet(ord, 0, Math.min(1, ord.length - 1)), label: `${secs} s ad` };
 }
 
 // every candidate for the output, ranked; ids are stable per kind and order (full, p1.., c1.., ad15, ad30)
-export function candidates(words, o, { duration } = {}) {
-  const S = sentences(words), dur = duration || (words && words.length ? words[words.length - 1][1] : 0), out = [];
+export function candidates(words, o, { duration, point } = {}) {
+  const pt = pointScorer(point), S = sentences(words), dur = duration || (words && words.length ? words[words.length - 1][1] : 0), out = [];
   if (!S.length) return [];
   if (o.kind === 'full' || o.kind === 'both') {
-    if (o.split && o.kind === 'full') parts(S, range(o), dur, o.goal).forEach((c, k) => out.push({ id: 'p' + (k + 1), kind: 'part', ...c }));
-    else out.push({ id: 'full', kind: 'full', ...bestVersion(S, range(o), dur, o.goal) });
+    if (o.split && o.kind === 'full') parts(S, range(o), dur, o.goal, pt).forEach((c, k) => out.push({ id: 'p' + (k + 1), kind: 'part', ...c }));
+    else out.push({ id: 'full', kind: 'full', ...bestVersion(S, range(o), dur, o.goal, pt) });
   }
   if (o.kind === 'clips' || o.kind === 'both') {
     const r = o.kind === 'both' || o.format !== 'long' ? range(o, 'clip') : range(o);
-    let w = bestWindows(S, r, o.clips, o.goal, 'clip', dur);
+    let w = bestWindows(S, r, o.clips, o.goal, 'clip', dur, pt);
     // a take shorter than the clip length: clips scaled to the take, a quarter to a half of it
-    if (!w.length && dur) w = bestWindows(S, [Math.min(r[0], dur * 0.25), Math.min(r[1] || dur, dur * 0.5)], o.clips, o.goal, 'clip', dur).map(c => ({ ...c, reason: c.reason + ' (shorter than the length you picked, the take is short)' }));
+    if (!w.length && dur) w = bestWindows(S, [Math.min(r[0], dur * 0.25), Math.min(r[1] || dur, dur * 0.5)], o.clips, o.goal, 'clip', dur, pt).map(c => ({ ...c, reason: c.reason + ' (shorter than the length you picked, the take is short)' }));
     w.forEach((c, k) => out.push({ id: 'c' + (k + 1), kind: 'clip', label: `Clip ${k + 1}`, ...c }));
   }
-  if (o.goal === 'ad' && o.adCuts) for (const secs of AD_CUTS) { const c = adCut(S, secs, dur); if (c) out.push({ id: 'ad' + secs, kind: 'ad', ...c }); }
+  if (o.goal === 'ad' && o.adCuts) for (const secs of AD_CUTS) { const c = adCut(S, secs, dur, pt); if (c) out.push({ id: 'ad' + secs, kind: 'ad', ...c }); }
   return out.map((c, k) => ({ ...c, label: c.label || KIND_LABEL[c.kind], seconds: lengthOf(c), keep: true, order: k }));
 }
 
@@ -255,11 +259,12 @@ export function textIn(words, ranges) {
 }
 
 // ask a model to score the rule-based candidates; returns them re-ranked with its reasons
-export function scorePrompt(cands, o) {
+export function scorePrompt(cands, o, point) {
   return ['You pick the best parts of a talking-head video for ' + summary(o) + '.',
     o.goal === 'ad' ? 'This is an ad: the hook must land in the first 1 to 2 seconds, pacing tight, a clear call to action at the end, no long intro.' : 'This is organic content: story pacing, a strong first line, and for short clips an ending that loops back to the start.',
+    pointLine(point),
     'Score each candidate 0 to 100 and give a short plain reason (no em dashes). Reply with JSON only: {"scores":[{"id":"c1","score":80,"reason":"..."}]}.',
-    'Candidates: ' + JSON.stringify(cands.map(c => ({ id: c.id, kind: c.kind, seconds: c.seconds, text: c.text })))].join('\n');
+    'Candidates: ' + JSON.stringify(cands.map(c => ({ id: c.id, kind: c.kind, seconds: c.seconds, text: c.text })))].filter(Boolean).join('\n');
 }
 export function applyScores(cands, reply) {
   let j; try { j = JSON.parse(String(reply).match(/\{[\s\S]*\}/)[0]); } catch { return null; }
