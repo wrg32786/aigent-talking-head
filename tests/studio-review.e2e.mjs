@@ -1,9 +1,13 @@
 // The Studio review tools in a real Chrome, on synthetic media only (tests/fixtures/studio-media.mjs):
-// - what to swap: the reference's parts with times; a time button seeks the reference, Use picks its look
-// - show original: the reference beside and over your reel on one clock, the opacity slider
-// - comment on the preview: drag a box on a frame, send it, and the chat line carries the frame and the box
-// - clean-up pass: a real draft from a clips folder with a filler word, a long pause and a retake, reviewed and
-//   applied; the redraft's cut.json has the cuts as jump cuts and is shorter; the edit receipt lists the clean-up
+// - what to swap (Picture, the reference view): the reference's parts with times; a time button seeks the
+//   reference, Use picks its look
+// - clean-up pass (Review): a real draft from a clips folder with a filler word, a long pause and a retake, reviewed
+//   and applied; the redraft's cut.json has the cuts as jump cuts and is shorter; the edit receipt (Review) lists
+//   the clean-up
+// - show original (Render, in the closed Compare fold): the reference beside and over your reel on one clock, the
+//   opacity slider
+// - comment on the preview (Render, same fold): drag a box on a frame, send it, and the chat line carries the frame
+//   and the box
 // The "reel" Studio compares against is the synthetic clips joined by ffmpeg, tagged as this draft (the test does not wait for a render).
 // Needs Chrome and ffmpeg. Run: node tests/studio-review.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
 import assert from 'assert';
@@ -59,6 +63,8 @@ const asCurrentDraft = async (job, version = 1) => {
     writeFileSync(join(STATE, 'state.json'), JSON.stringify(st, null, 2));
   }
 };
+// a fresh load of a link: via about:blank, because a new hash alone does not reload the page
+const open = async (page, hash) => { await page.goto('about:blank'); await page.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await page.waitForSelector('#stepper'); };
 const c3 = c => c.segs.filter(s => /clip-003/.test(s.file));
 // a screenshot of one panel, scrolled below the sticky header
 const shot = async (page, sel, name) => {
@@ -79,7 +85,8 @@ try {
   pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
 
   await t('what to swap: parts with times; a time seeks the reference; Use picks the look', async () => {
-    await pg.goto(url + '/#step=reference', { waitUntil: 'networkidle' });
+    await open(pg, '#step=reference'); await pg.waitForSelector('#s-ref');
+    assert.strictEqual(await pg.$eval('main', m => m.dataset.step + ' ' + m.dataset.view), 'picture reference');
     await pg.waitForSelector('#ref-byhand > summary'); assert.strictEqual(await pg.$eval('#ref-byhand', e => e.open), false, 'Pick parts by hand starts closed'); await pg.click('#ref-byhand > summary');
     await pg.waitForSelector('#swap .sw-list li');
     const rows = await pg.$$eval('#swap .sw-list li .sw-k', x => x.map(e => e.textContent));
@@ -95,7 +102,7 @@ try {
   });
 
   await t('clean-up pass: a real draft, the review list, apply and redraft: jump cuts, shorter, retake left out', async () => {
-    await api('/api/draft', {});
+    const d = await api('/api/draft', {}); assert.ok(!d.error, 'draft refused: ' + d.error);
     const v = await waitTask(); assert.strictEqual(v.task.status, 'done', JSON.stringify(v.task).slice(0, 600));
     const before = JSON.parse(readFileSync(join(JOBDIR, 'build', 'cut.json'), 'utf8'));
     assert.ok(!before.segs.some(s => /clip-005/.test(s.file)), 'the retake is left out by default');
@@ -103,7 +110,7 @@ try {
     writeFileSync(join(STATE, 'list.txt'), ['001', '002', '003', '004', '006'].map(k => `file '${join(CL, `clip-${k}.mp4`)}'`).join('\n'));
     execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', join(STATE, 'list.txt'), '-vf', 'scale=540:960', '-c:v', 'libx264', '-preset', 'ultrafast', '-c:a', 'aac', join(JOBDIR, 'reel-v1.mp4')]);
     await asCurrentDraft(JOB);
-    await pg.goto(url + '/#step=render', { waitUntil: 'networkidle' });
+    await open(pg, '#step=review'); await pg.waitForSelector('#s-review:not([hidden])');
     await pg.waitForSelector('#cl-list li');
     const kinds = await pg.$$eval('#cl-list li', x => x.map(e => e.querySelector('.badge, [class*="badge"], span').textContent));
     const txt = await pg.textContent('#cl-list');
@@ -124,7 +131,7 @@ try {
   });
 
   await t('edit receipt: the draft in plain lines, with the clean-up', async () => {
-    await pg.goto(url + '/#step=render', { waitUntil: 'networkidle' });
+    await open(pg, '#step=review'); await pg.waitForSelector('#s-review:not([hidden])');
     await pg.waitForSelector('#receipt .rc-sec');
     const r = await pg.textContent('#receipt');
     assert.ok(/Beat 1: opening shot/.test(r) && /Clean-up/.test(r) && /Why:|pack|locked|kit/.test(r), r.slice(0, 500));
@@ -132,6 +139,8 @@ try {
   });
 
   await t('show original: side by side on one clock, overlay with opacity', async () => {
+    await pg.click('#stepper button[data-step="render"]'); await pg.waitForSelector('#s-render:not([hidden])');
+    await pg.waitForSelector('#compare-fold'); assert.strictEqual(await pg.$eval('#compare-fold', e => e.open), false, 'Compare starts closed'); await pg.click('#compare-fold > summary');
     await pg.waitForSelector('#compare .cmp-pane.ref video');
     await pg.waitForFunction(() => [...document.querySelectorAll('#compare video')].every(v => v.readyState >= 2), null, { timeout: 15000 });
     await pg.click('#cmp-play'); await pg.waitForTimeout(1500); await pg.click('#cmp-play');
@@ -167,14 +176,14 @@ try {
     await pg.waitForSelector('#msgs li.comment img');
   });
 
-  await t('phone layout: no sideways scroll in Reference and Render', async () => {
+  await t('phone layout: no sideways scroll in the reference view, Review and Render', async () => {
     const ph = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1.5, isMobile: true, hasTouch: true });
     ph.on('pageerror', e => errs.push(e.message));
-    for (const step of ['reference', 'render']) {
-      await ph.goto(url + '/#step=' + step, { waitUntil: 'networkidle' }); await ph.waitForTimeout(500);
+    for (const step of ['reference', 'review', 'render']) {
+      await open(ph, '#step=' + step); await ph.waitForSelector('main .step:not([hidden]) h2'); await ph.waitForTimeout(500);
       const over = await ph.evaluate(() => document.documentElement.scrollWidth - innerWidth); assert.ok(over <= 1, `${step} scrolls sideways by ${over}px`);
     }
-    if (shots) { await ph.locator('#compare').scrollIntoViewIfNeeded(); await ph.waitForTimeout(300); await ph.screenshot({ path: join(shots, 'review-phone.png') }); }
+    if (shots) { await ph.click('#compare-fold > summary'); await ph.locator('#compare').scrollIntoViewIfNeeded(); await ph.waitForTimeout(300); await ph.screenshot({ path: join(shots, 'review-phone.png') }); }
     await ph.close();
     assert.deepStrictEqual(errs, []);
   });

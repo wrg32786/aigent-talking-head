@@ -3,8 +3,8 @@
 // - drag on the waveform: the stretch snaps to whole words, Play it, Note for my agent sends it with from and to
 // - Ask my agent on a step: prompts for that step, sent to the chat with the step, the chat opens
 // - an agent answer with a suggested change shows Apply; nothing changes until it is clicked, then it says Applied
-// - a note on a stretch of the reel in Finish: Mark the end here
-// - the wizards: Make a reel (goal, Look, Let AI choose, then Finish) and Clips and ads
+// - a note on a stretch of the reel on Render (in the closed Compare fold): Mark the end here
+// - the wizards: Make a reel (goal, Look, Let AI choose, then Review) and Clips and ads; on a phone they open from More
 // - screenshots, dark and light, and the phone
 // Needs Chrome and ffmpeg. Run: node tests/studio-agent-ux.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
 import assert from 'assert';
@@ -42,7 +42,9 @@ const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { metho
 const upload = async (kind, f, name) => (await fetch(`${url}/api/upload?kind=${kind}&name=${encodeURIComponent(name)}`, { method: 'POST', body: readFileSync(f) })).json();
 const until = async (fn, ms = 20000) => { const end = Date.now() + ms; for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) throw new Error('timed out'); await wait(150); } };
 const cleanJobs = () => { rmSync(join(ROOT, 'jobs', JOB), { recursive: true, force: true }); rmSync(join(ROOT, 'inbox', 'studio', JOB), { recursive: true, force: true }); };
-const theme = async (pg, th) => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); await pg.reload({ waitUntil: 'networkidle' }); await pg.waitForSelector('#main .step:not([hidden])'); };
+// a fresh load of a link: via about:blank, because a new hash alone does not reload the page
+const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); };
+const theme = async (pg, th) => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#main .step:not([hidden])'); };
 const shot = async (pg, sel, name) => {
   if (!shots) return; await pg.waitForTimeout(350);
   const b = await pg.locator(sel).first().boundingBox(), vp = pg.viewportSize();
@@ -80,10 +82,10 @@ try {
   const errs = [];
   const pg = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
-  await pg.addInitScript(() => localStorage.setItem('studio.cutView', 'cuts'));
+  await pg.addInitScript(() => { try { localStorage.setItem('studio.cutView', 'cuts'); } catch {} }); // about:blank has no storage
 
   await t('waveform: a drag selects on whole words; Note for my agent sends from and to', async () => {
-    await pg.goto(url + '/#step=cut', { waitUntil: 'networkidle' }); await pg.waitForSelector('#player-scrub'); await pg.waitForSelector('#player-transcript .w');
+    await open(pg, '#step=cut'); await pg.waitForSelector('#player-scrub'); await pg.waitForSelector('#player-transcript .w');
     const dur = await until(() => pg.evaluate(() => { const v = document.getElementById('player-video'); return v && v.duration > 0 ? v.duration : 0; }));
     await pg.locator('#player-scrub').scrollIntoViewIfNeeded(); await pg.evaluate(() => scrollBy(0, 150));
     const b = await pg.locator('#player-scrub').boundingBox(), x = s => b.x + (s / dur) * b.width;
@@ -121,13 +123,15 @@ try {
     await shot(pg, '#chat', 'redesign-apply-dark.png');
     await pg.click('#msgs .sg-apply'); await pg.waitForSelector('#msgs .sg-done');
     assert.strictEqual((await api('/api/state')).state.pack, 'magazine'); await pg.waitForSelector('#s-look:not([hidden])');
+    assert.strictEqual(await pg.$eval('#stepper [aria-current="step"]', b => b.dataset.step), 'picture', 'a suggestion for the old Look step opens Picture');
     await pg.keyboard.press('Escape');
   });
 
-  await t('a note on a stretch of the reel in Finish: Mark the end here', async () => {
+  await t('a note on a stretch of the reel on Render: Mark the end here', async () => {
     mkdirSync(join(ROOT, 'jobs', JOB), { recursive: true }); copyFileSync(TAKE, join(ROOT, 'jobs', JOB, 'reel-v1.mp4'));
     await asCurrentDraft(JOB);
-    await pg.goto(url + '/#step=finish', { waitUntil: 'networkidle' }); await pg.reload({ waitUntil: 'networkidle' }); await pg.waitForSelector('#comment-start');
+    await open(pg, '#step=render'); await pg.waitForSelector('#s-render:not([hidden])');
+    await pg.click('#compare-fold > summary'); await pg.waitForSelector('#comment-start');
     await pg.click('#comment-start'); await pg.fill('#cmp-seek', '4'); await wait(300); await pg.click('#comment-end');
     assert.ok(/From 0:00\.0 to 0:04\.0/.test(await pg.textContent('#cm-hint')), await pg.textContent('#cm-hint'));
     await pg.fill('#comment-text', 'This stretch drags');
@@ -136,8 +140,8 @@ try {
     const m = await lastUser(); assert.strictEqual(m.attach.t, 0); assert.ok(Math.abs(m.attach.end - 4) < 0.1, JSON.stringify(m.attach)); assert.match(m.text, /reel-v1\.mp4 from 0:00\.0 to 0:04\.0/);
   });
 
-  await t('wizards: Make a reel (goal, Look, Let AI choose, Finish) and Clips and ads', async () => {
-    await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' }); await pg.reload({ waitUntil: 'networkidle' }); await pg.click('#wizards-open'); await pg.waitForSelector('#wz-list');
+  await t('wizards: Make a reel (goal, Look, Let AI choose, Review) and Clips and ads', async () => {
+    await open(pg, '#step=start'); await pg.waitForSelector('#s-footage:not([hidden])'); await pg.click('#wizards-open'); await pg.waitForSelector('#wz-list');
     assert.deepStrictEqual(await pg.$$eval('#wz-list .wz-pick b', x => x.map(e => e.textContent)), ['Make a reel from a long take', 'Copy a reference', 'Clips and ads from one take']);
     await shot(pg, '#wizards', 'redesign-wizards-dark.png');
     await pg.click('.wz-pick[data-wizard="reel"]'); await pg.waitForSelector('.wz-opt[data-goal="sell"]');
@@ -145,7 +149,7 @@ try {
     await pg.click('.wz-opt[data-goal="sell"]'); await pg.waitForSelector('.wz-look');
     const out = (await api('/api/cut')).output; assert.strictEqual(out.goal, 'ad'); assert.strictEqual(out.adCuts, true);
     await pg.click('.wz-look[data-look="magazine"]'); await pg.waitForSelector('#wz-choose');
-    await pg.click('#wz-choose'); await pg.waitForSelector('#s-render:not([hidden]), [data-step="finish"][aria-current="step"]');
+    await pg.click('#wz-choose'); await pg.waitForSelector('#s-review:not([hidden])'); await pg.waitForSelector('#stepper [data-step="review"][aria-current="step"]');
     const P = await api('/api/pieces'); assert.ok(P.combo.ids.length >= 2, JSON.stringify(P.combo)); assert.strictEqual(P.combo.by, 'ai');
     await pg.click('#wizards-open'); await pg.click('.wz-pick[data-wizard="clips"]'); await pg.click('#wizards .seg [role="radio"] >> text=3'); await pg.check('#wz-ads');
     await pg.click('#wz-clips-go'); await pg.waitForSelector('[data-step="cut"][aria-current="step"]');
@@ -161,14 +165,17 @@ try {
     await theme(pg, 'dark');
     const ph = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1.5, isMobile: true, hasTouch: true });
     ph.on('pageerror', e => errs.push(e.message));
-    await ph.addInitScript(() => { localStorage.setItem('studio.cutView', 'cuts'); });
-    await ph.goto(url + '/#step=cut', { waitUntil: 'networkidle' }); await ph.waitForSelector('#ask-agent'); await ph.click('#ask-agent'); await ph.waitForSelector('#ask-pop');
+    await ph.addInitScript(() => { try { localStorage.setItem('studio.cutView', 'cuts'); } catch {} });
+    await open(ph, '#step=cut'); await ph.waitForSelector('#ask-agent'); await ph.click('#ask-agent'); await ph.waitForSelector('#ask-pop');
     const over = await ph.evaluate(() => Math.max(...[...document.querySelectorAll('body *')].filter(e => e.offsetParent).map(e => e.getBoundingClientRect().right)) - innerWidth); assert.ok(over <= 1, 'no sideways scroll: ' + over);
     if (shots) await ph.screenshot({ path: join(shots, 'redesign-ask-agent-phone-dark.png') });
-    await ph.keyboard.press('Escape'); await ph.goto(url + '/#step=footage', { waitUntil: 'networkidle' }); await ph.click('#wizards-open'); await ph.waitForSelector('#wz-list');
+    await ph.keyboard.press('Escape'); await open(ph, '#step=start'); await ph.waitForSelector('#s-footage:not([hidden])');
+    // on a phone the Wizards button is in the More menu
+    assert.strictEqual(await ph.isVisible('#wizards-open'), false, 'no Wizards button in the top bar on a phone');
+    await ph.click('#more-open'); await ph.click('#more-wizards'); await ph.waitForSelector('#wz-list');
     const ow = await ph.evaluate(() => document.getElementById('wizards').getBoundingClientRect().right - innerWidth); assert.ok(ow <= 1, 'the wizard fits: ' + ow);
     if (shots) await ph.screenshot({ path: join(shots, 'redesign-wizards-phone-dark.png') });
-    await ph.evaluate(() => localStorage.setItem('studio.theme', 'light')); await ph.reload({ waitUntil: 'networkidle' }); await ph.click('#wizards-open'); await ph.waitForSelector('#wz-list');
+    await ph.evaluate(() => localStorage.setItem('studio.theme', 'light')); await ph.reload({ waitUntil: 'domcontentloaded' }); await ph.waitForSelector('#s-footage:not([hidden])'); await ph.click('#more-open'); await ph.click('#more-wizards'); await ph.waitForSelector('#wz-list');
     if (shots) await ph.screenshot({ path: join(shots, 'redesign-wizards-phone-light.png') });
     await ph.close();
     assert.deepStrictEqual(errs, []);

@@ -1,4 +1,4 @@
-// The Post step in a real Chrome, against a local mock of Buffer, R2 and the public link check (no network, no real keys):
+// Post (the second view of the Render step) in a real Chrome, against a local mock of Buffer, R2 and the public link check (no network, no real keys):
 // - Connect: Next stays off until the Buffer key is saved and a host is saved; R2 fields and the key pair; Check host
 // - Channels: the reel, your Buffer channels, Facebook Reels marked "Will be skipped" for a 100 s reel, the caption count
 // - Send: Drafts is the default and names the button; Post now needs the tick; a send lands as Buffer drafts and the
@@ -50,15 +50,22 @@ const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), 
 const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out.slice(-400)))); });
 const post = (p, b) => fetch(url + p, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) });
 await post('/api/settings', { chat: { backend: 'keywords' } }); await post('/api/state', { job: JOB });
+// a fresh load of a link: via about:blank, because a new hash alone does not reload the page
+const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); };
 const browser = patient(await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox'] }));
 const snap = async (pg, name, sel) => { if (!shots) return; await pg.waitForTimeout(500); if (sel) await pg.locator(sel).screenshot({ path: join(shots, name) }); else await pg.screenshot({ path: join(shots, name) }); };
 try {
   const errs = [], ctx = await browser.newContext({ viewport: { width: 1280, height: 1100 } }), pg = await ctx.newPage();
   pg.on('pageerror', e => errs.push(e.message));
-  await pg.goto(url + '/#step=post', { waitUntil: 'networkidle' }); await pg.waitForSelector('#s-post');
+  await open(pg, '#step=post'); await pg.waitForSelector('#s-post');
 
-  await t('Post is the last step; Connect shows first; Next stays off until the key and a host are saved', async () => {
-    assert.strictEqual(await pg.textContent('#stepper li:last-child button .sl'), 'Post');
+  await t('Post is the second view of Render, the last step; Connect shows first; Next stays off until the key and a host are saved', async () => {
+    assert.strictEqual(await pg.textContent('#stepper li:last-child button .sl'), 'Render');
+    assert.strictEqual(await pg.getAttribute('#stepper li:last-child button', 'aria-current'), 'step');
+    assert.strictEqual(await pg.$eval('main', m => m.dataset.step + ' ' + m.dataset.view), 'render post');
+    assert.deepStrictEqual(await pg.$$eval('#render-switch [role="radio"]', x => x.map(b => [b.id, b.textContent, b.getAttribute('aria-checked')])), [['render-sub-main', 'Render', 'false'], ['render-sub-post', 'Post', 'true']]);
+    assert.strictEqual(await pg.textContent('#s-post h2'), 'Post'); assert.ok(!(await pg.isVisible('#s-render')), 'the Render view is not on screen');
+    assert.strictEqual(await pg.$('#your-edit'), null, 'the Your edit line is hidden on Post');
     await pg.waitForSelector('#post-buffer'); assert.ok(await pg.isDisabled('#post-next-channels'));
     assert.ok(await pg.isDisabled('#post-part-channels'));
     await snap(pg, 'post-connect-dark.png');
@@ -98,8 +105,8 @@ try {
     assert.match(await pg.textContent('#post-result li[data-id="ch-fb"]'), /1 min 30 s/);
     await snap(pg, 'post-send-dark.png');
   });
-  await t('light theme: the step reads in brand cream', async () => {
-    await pg.evaluate(() => localStorage.setItem('studio.theme', 'light')); await pg.reload({ waitUntil: 'networkidle' });
+  await t('light theme: the view reads in brand cream', async () => {
+    await pg.evaluate(() => localStorage.setItem('studio.theme', 'light')); await pg.reload({ waitUntil: 'domcontentloaded' });
     await pg.waitForSelector('.post-ch-list li[data-id="ch-ig"]');
     assert.strictEqual(await pg.evaluate(() => document.documentElement.dataset.theme), 'light');
     await snap(pg, 'post-channels-light.png');
@@ -109,11 +116,11 @@ try {
   });
   await t('no sideways scroll on a 375 px phone', async () => {
     const p2 = await (await browser.newContext({ viewport: { width: 375, height: 800 } })).newPage(); p2.on('pageerror', e => errs.push(e.message));
-    await p2.goto(url + '/#step=post', { waitUntil: 'networkidle' }); await p2.waitForSelector('.post-ch-list li');
+    await open(p2, '#step=post'); await p2.waitForSelector('.post-ch-list li');
     assert.ok(await p2.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'sideways scroll on a phone');
     if (shots) await p2.screenshot({ path: join(shots, 'post-phone.png'), fullPage: true });
     await p2.context().close();
   });
   assert.deepStrictEqual(errs, []);
 } finally { await browser.close(); srv.kill(); mock.close(); rmSync(TMP, { recursive: true, force: true }); rmSync(jobDir, { recursive: true, force: true }); }
-console.log(`\n${n} studio post step tests passed`);
+console.log(`\n${n} studio post tests passed`);

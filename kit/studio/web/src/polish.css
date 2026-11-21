@@ -20,7 +20,7 @@
 .stepper { flex: 1 1 auto; min-width: 0; display: flex; justify-content: center; }
 .stepper ol { flex-wrap: nowrap; }
 .stepper button { white-space: nowrap; }
-.stepper li + li::before { width: 18px; }
+.stepper li + li::before { width: 12px; }
 .topr { flex: none; gap: 2px; }
 .setup-pill, .connect-btn, #taskpill { white-space: nowrap; flex: none; }
 #taskpill.idle { display: none; }
@@ -104,13 +104,19 @@ main[data-step] .step[data-step] { animation: none; }
 @keyframes step-in-5 { from { opacity: 0; transform: translateY(10px); } }
 @keyframes step-in-6 { from { opacity: 0; transform: translateY(10px); } }
 @keyframes step-in-7 { from { opacity: 0; transform: translateY(10px); } }
-main[data-step="footage"] { animation: step-in-1 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+@keyframes step-in-8 { from { opacity: 0; transform: translateY(10px); } }
+@keyframes step-in-9 { from { opacity: 0; transform: translateY(10px); } }
+@keyframes step-in-10 { from { opacity: 0; transform: translateY(10px); } }
+main[data-step="start"] { animation: step-in-1 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
 main[data-step="cut"] { animation: step-in-2 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
-main[data-step="look"][data-look="reference"] { animation: step-in-3 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
-main[data-step="look"][data-look="style"] { animation: step-in-4 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+main[data-step="picture"][data-view="reference"] { animation: step-in-3 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+main[data-step="picture"][data-view="main"] { animation: step-in-4 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
 main[data-step="broll"] { animation: step-in-5 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
-main[data-step="finish"] { animation: step-in-6 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
-main[data-step="post"] { animation: step-in-7 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+main[data-step="review"] { animation: step-in-6 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+main[data-step="render"][data-view="post"] { animation: step-in-7 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+main[data-step="text"] { animation: step-in-8 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+main[data-step="music"] { animation: step-in-9 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+main[data-step="render"][data-view="main"] { animation: step-in-10 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
 .glass-card { transition: box-shadow var(--motion) var(--ease-ui), border-color var(--motion) var(--ease-ui), transform var(--motion) var(--ease-ui); }
 .pack, .tile, .agent-grid > * { transition: box-shadow var(--motion) var(--ease-ui), border-color var(--motion) var(--ease-ui); }
 /* brand: nothing moves on hover, only light and colour change */

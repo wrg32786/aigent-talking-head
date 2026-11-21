@@ -1,6 +1,6 @@
 // The Cut step: what to make from the take (format, length, output, goal, with smart defaults), then the candidates
 // on the take's timeline to keep, drop, trim, reorder or add to. Nothing renders here: the kept cuts and bites render
-// on the Finish step, the one place that makes videos.
+// on the Render step, the one place that makes videos.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';
@@ -160,7 +160,7 @@ export function Cut({ V, s, apply, go }) {
   const renderedFor = c => (c.outputs || [])[0];
   if (!s.footage.length) return <section className="step" id="s-cut" data-step="cut" aria-labelledby="h-cut">
     <header className="sh"><h2 id="h-cut">Cut</h2><p className="sub">What to make from your take.</p></header>
-    <div className="empty-art"><Icon n="film" /><p>Add footage first.</p><Button variant="secondary" label="Go to Footage" onClick={() => go('footage', true)} /></div></section>;
+    <div className="empty-art"><Icon n="film" /><p>Add footage first.</p><Button variant="secondary" label="Go to Start" onClick={() => go('start', true)} /></div></section>;
   return <section className="step" id="s-cut" data-step="cut" aria-labelledby="h-cut">
     <header className="sh"><h2 id="h-cut">Cut</h2><p className="sub">What to make from your take. The picks below are a smart start, so you can just hit Next.</p></header>
     <div className="cut-sum glass-card" id="cut-summary-box">
@@ -183,7 +183,7 @@ export function Cut({ V, s, apply, go }) {
       <Button id="cut-find" size="lg" variant={cut.candidates.length ? 'secondary' : 'primary'} label={cut.candidates.length ? 'Find again' : 'Find cuts'} isLoading={tx && tx.status === 'running'} onClick={find} />
       <span className="fine" id="cut-scored">{scored}</span>
       {comboN > 0 && <span className="fine" id="cut-combo-wins">{`Your combo of ${comboN} piece${comboN === 1 ? '' : 's'} renders, not the kept cuts. Clear it on Pieces to render these.`}</span>}
-      {!comboN && kept.length > 0 && <span className="fine" id="cut-hint">{`${kept.length} kept. ${kept.length > 1 ? 'They render' : 'It renders'} at the end, on the Finish step, as one reel.`}</span>}
+      {!comboN && kept.length > 0 && <span className="fine" id="cut-hint">{`${kept.length} kept. ${kept.length > 1 ? 'They render' : 'It renders'} at the end, on the Render step, as one reel.`}</span>}
     </div>
     {tx && tx.status === 'running' && <div className="tx-run" id="cut-tx"><ProgressBar label="Transcribing the take" value={tx.total ? Math.round(100 * tx.done / tx.total) : undefined} isIndeterminate={!tx.total} />
       <span className="fine">Transcribing{tx.total ? ` part ${Math.min(tx.done + 1, tx.total)} of ${tx.total}` : ''}, then finding cuts. Safe to leave this page.</span></div>}

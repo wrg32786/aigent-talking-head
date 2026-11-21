@@ -1,5 +1,5 @@
 // Studio 1.13.0, without a browser or ffmpeg: the finish choice (what the one Render makes) is checked and saved, a new
-// video starts with the defaults, the page has six steps with the old names as aliases, one render path (no second
+// video starts with the defaults, the page has eight steps with the old names as aliases, one render path (no second
 // render card), Your edit, and the MCP tools get_edit and studio_run (from, exports) are listed.
 // Run: node tests/studio-finish.test.mjs   (npm run check runs it too)
 import assert from 'assert';
@@ -31,18 +31,19 @@ try {
     const s = C.defaultState(); s.job = 'one'; C.applyPatch(s, { finish: { from: 'take', plain: true } }); s.drafted = { key: 'take:x', from: 'take' };
     C.freshSession(s, { job: 'two', keepLook: true }); assert.deepStrictEqual(s.finish, C.defaultState().finish); assert.strictEqual(s.drafted, null);
   });
-  await t('the page: six steps, old step names land, one render path, Your edit on every step', async () => {
-    const lib = src('lib.jsx');
-    assert.ok(lib.includes("export const STEPS = ['footage', 'cut', 'look', 'broll', 'finish', 'post'];"));
-    assert.ok(lib.includes("STEP_ALIAS = { style: 'look', reference: 'look', render: 'finish' }"));
+  await t('the page: eight steps, old step names land, one render path, Your edit on every step', async () => {
+    const steps = src('steps.js');
+    assert.ok(steps.includes("export const STEPS = ['start', 'cut', 'picture', 'text', 'broll', 'music', 'review', 'render'];"));
+    assert.ok(steps.includes("STEP_ALIAS = { footage: 'start', look: 'picture', style: 'picture', reference: 'picture', finish: 'review', post: 'render' }"));
     const render = src('Render.jsx'), app = src('App.jsx');
-    assert.ok(!/Render my|kept-cuts|More ways to save|Draft whole take/.test(render), 'no second render card on Finish');
+    assert.ok(!/Render my|kept-cuts|More ways to save|Draft whole take/.test(render), 'no second render card');
     assert.strictEqual((render.match(/<Button id="render"/g) || []).length, 1, 'one Render button');
-    for (const id of ['fin-from', 'exp-reel', 'exp-clips', 'exp-plain', 'fin-stages']) assert.ok(render.includes(`id="${id}"`) || render.includes(`id={'${id}'}`), id);
-    assert.ok(/<YourEdit /.test(app) && /<LookSwitch /.test(app));
-    assert.ok(!/\u2014/.test(render + app + src('Edit.jsx')), 'no em dashes in the page copy');
+    assert.strictEqual((render.match(/<Button id="draft"/g) || []).length, 1, 'one Draft button');
+    for (const id of ['fin-from', 'exp-reel', 'exp-clips', 'exp-plain', 'match-chips']) assert.ok(render.includes(`id="${id}"`) || render.includes(`id={'${id}'}`), id);
+    assert.ok(/<YourEdit /.test(app) && /<ViewSwitch /.test(app) && /<ReviewStep /.test(app) && /<Music /.test(app));
+    assert.ok(!/\u2014/.test(render + app + steps + src('Edit.jsx') + src('Style.jsx') + src('RecreateStart.jsx') + src('RefCard.jsx')), 'no em dashes in the page copy');
     const built = readFileSync(join(ROOT, 'kit', 'studio', 'public', 'assets', 'app.js'), 'utf8');
-    assert.ok(built.includes('your-edit') && built.includes('fin-exports'), 'the built page has the new Finish and Your edit (npm run studio:build)');
+    assert.ok(built.includes('your-edit') && built.includes('fin-exports'), 'the built page has Review, Render and Your edit (npm run studio:build)');
   });
   await t('MCP: get_edit, studio_run with from and exports, finish in studio_set_selections', async () => {
     client = new Client({ name: 'finish-test', version: '1' });

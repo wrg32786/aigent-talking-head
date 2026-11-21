@@ -1,4 +1,4 @@
-// Review tools in the Finish step: show the original next to or over your build on one clock, comment on a frame for
+// Review tools on the Review and Render steps: show the original next to or over your build on one clock, comment on a frame for
 // your agent, the clean-up pass (pauses, filler words, retakes) and the edit receipt (choices.json in plain words).
 import { Hint } from './ui.jsx';
 import { useEffect, useRef, useState } from 'react';
@@ -66,7 +66,7 @@ export function Compare({ V, s, apply, outputs }) {
       </SegmentedControl>
       {outs.length > 1 && <label className="lbl-in"><span className="lbl">Reel</span><select id="cmp-pick" value={pick} onChange={e => { setPick(e.target.value); setPlaying(false); }}>{outs.map(o => <option key={o} value={o}>{o.split('/').pop()}</option>)}</select></label>}
     </div>
-    {!hasRef && <p className="fine">Add a reference in Look, Reference, to see it here.</p>}
+    {!hasRef && <p className="fine">Add a reference on Start to see it next to yours here.</p>}
     <div className={'cmp-stage ' + (hasRef ? mode : 'build')}>{refPane}{buildPane}</div>
     <div className="cmp-bar">
       <IconBtn id="cmp-play" n={playing ? 'pause' : 'play'} label={playing ? 'Pause both' : 'Play both'} onClick={play} />
@@ -99,7 +99,7 @@ export function Cleanup({ V, s, apply, drafted }) {
   const running = V.task && V.task.status === 'running';
   const load = async (silence) => { const j = await api('/api/cleanup' + (silence ? `?silence=${silence}` : '')).catch(() => null); if (j) { setD(j); setSil(j.silence || 0.7); setDec({}); } };
   useEffect(() => { if (V.cleanupReady && drafted) load(); else setD(null); }, [V.cleanupReady, drafted, s.job]);
-  if (!V.cleanupReady || !drafted) return <div className="review glass-card" id="cleanup"><h3>Clean-up pass</h3><p className="fine">Draft first. Studio then lists long pauses, filler words and retakes from the word timings for you to keep or remove.</p></div>;
+  if (!V.cleanupReady || !drafted) return <div className="review glass-card" id="cleanup"><h3>Clean-up pass</h3><p className="fine">Draft first. We then list long pauses, filler words and retakes for you to keep or remove.</p></div>;
   if (!d) return <div className="review glass-card" id="cleanup"><h3>Clean-up pass</h3><p className="fine">Reading the word timings.</p></div>;
   const items = d.items.map(it => ({ ...it, remove: dec[it.id] !== undefined ? dec[it.id] : it.remove }));
   const shown = items.filter(it => only === 'all' || it.type === only);
@@ -109,7 +109,7 @@ export function Cleanup({ V, s, apply, drafted }) {
   const applyIt = async redraft => { setBusy(true); try { const j = await api('/api/cleanup', { decisions: Object.fromEntries(items.map(it => [it.id, it.remove])), silence: sil, redraft }); apply(j); setD(j); setDec({}); toast(redraft ? 'Clean-up applied. Redrafting.' : 'Saved for the next draft.', true); } catch {} finally { setBusy(false); } };
   const off = async () => { const j = await api('/api/cleanup', { on: false }); apply(j); setD(j); toast('Clean-up off for the next draft', true); };
   return <div className="review glass-card" id="cleanup">
-    <div className="rv-head"><h3>Clean-up pass</h3><Hint id="cleanup-hint" label="How clean-up works">From the Whisper word timings of your draft. Retakes are already left out; switch one to Keep to bring it back. Nothing is deleted.</Hint>{d.on && <Badge label="On" variant="success" />}{d.stale && <Badge label="Footage changed" variant="warning" />}
+    <div className="rv-head"><h3>Clean-up pass</h3><Hint id="cleanup-hint" label="How clean-up works">From the word timings of your draft. Retakes are already left out; switch one to Keep to bring it back. Nothing is deleted.</Hint>{d.on && <Badge label="On" variant="success" />}{d.stale && <Badge label="Footage changed" variant="warning" />}
       <span className="fine grow">{items.length ? `${items.filter(x => x.remove).length} of ${items.length} marked to remove, about ${out.toFixed(1)} s` : 'Nothing to clean up.'}</span></div>
     <div className="cl-opts">
       <div className="chips" role="group" aria-label="Show">{['all', 'silence', 'filler', 'take'].map(k => <button key={k} type="button" className={'chip' + (only === k ? ' on' : '')} aria-pressed={String(only === k)} onClick={() => setOnly(k)}>{k === 'all' ? `All ${items.length}` : `${TYPE[k]}s ${count(k)}`}</button>)}</div>
@@ -137,7 +137,7 @@ export function Cleanup({ V, s, apply, drafted }) {
 
 // ---------- edit receipt ----------
 export function Receipt({ r }) {
-  if (!r) return <div className="review glass-card" id="receipt"><h3>Edit receipt</h3><p className="fine">Draft first. The receipt then says what Studio picked for each beat, title and graphic, and why.</p></div>;
+  if (!r) return <div className="review glass-card" id="receipt"><h3>Edit receipt</h3><p className="fine">Draft first. The receipt then says what we picked for each beat, title and graphic, and why.</p></div>;
   return <div className="review glass-card" id="receipt">
     <div className="rv-head"><h3>Edit receipt</h3><span className="fine grow">{r.summary}</span>
       <Button variant="ghost" size="sm" label="Copy" icon={<Icon n="copy" />} onClick={() => navigator.clipboard && navigator.clipboard.writeText(r.text).then(() => toast('Receipt copied', true))} /></div>

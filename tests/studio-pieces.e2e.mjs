@@ -2,7 +2,7 @@
 // - Cut opens on Pieces: every line sorted by what it does, asides and retakes hidden until you ask
 // - Let AI choose (hook first, CTA last, a reason each), Build my own: drop, add, reorder
 // - the Combo drafts on whole words: every word of every piece, in your order, none clipped
-// - Render writes reel-vN.settings.json; the Outputs library lists versions with their settings; Compare marks changes
+// - Render (the Render step) writes reel-vN.settings.json; the Outputs library lists versions with their settings; Compare marks changes
 // - MCP: get_pieces, choose_combo, set_combo and list_outputs
 // - screenshots, dark and light, phone
 // Needs Chrome and ffmpeg. Run: node tests/studio-pieces.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
@@ -46,7 +46,9 @@ const until = async (fn, ms = 20000) => { const end = Date.now() + ms; for (;;) 
 const waitTask = async (ms = 3 * 60e3) => { await wait(400); return until(async () => { const v = await api('/api/state'); return v.task && v.task.status !== 'running' ? v : null; }, ms); };
 const log = job => { try { return readFileSync(join(ROOT, 'jobs', job, 'fake-reel.log'), 'utf8'); } catch { return ''; } };
 const cleanJobs = () => { rmSync(join(ROOT, 'jobs', JOB), { recursive: true, force: true }); rmSync(join(ROOT, 'inbox', 'studio', JOB), { recursive: true, force: true }); };
-const theme = async (pg, th) => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); await pg.reload({ waitUntil: 'networkidle' }); await pg.waitForSelector('#main .step:not([hidden])'); };
+// a fresh load of a link: via about:blank, because a new hash alone does not reload the page
+const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); };
+const theme = async (pg, th) => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#main .step:not([hidden])'); };
 const shot = async (pg, sel, name) => {
   if (!shots) return;
   await pg.evaluate(q => { const e = document.querySelector(q); e.scrollIntoView({ block: 'start' }); const h = document.querySelector('header.top'); scrollBy(0, -((h ? h.offsetHeight : 0) + 12)); }, sel);
@@ -72,7 +74,7 @@ try {
   const ids = async () => (await api('/api/pieces')).combo.ids;
 
   await t('Cut opens on Pieces: every line sorted by what it does, the aside hidden until you ask', async () => {
-    await pg.goto(url + '/#step=cut', { waitUntil: 'networkidle' }); await pg.waitForSelector('#pieces-grid');
+    await open(pg, '#step=cut'); await pg.waitForSelector('#pieces-grid');
     assert.strictEqual(await pg.getAttribute('#cut-mode-pieces', 'aria-selected'), 'true');
     const cat = Object.fromEntries(P.pieces.map(p => [p.text, p.category]));
     assert.strictEqual(cat[SENT[0]], 'hook'); assert.strictEqual(cat[SENT[2]], 'aside'); assert.strictEqual(cat[SENT[3]], 'proof'); assert.strictEqual(cat[SENT[5]], 'cta');
@@ -110,7 +112,7 @@ try {
     const files = cj.clips.map(x => x.file); let k = -1; for (const f of files) { const i = L.indexOf(f); assert.ok(i > k, 'in your order: ' + L); k = i; }
   });
   await t('Render writes the settings beside the reel; Outputs lists each version with them; Compare marks what changed', async () => {
-    await pg.click('#stepper button[data-step="finish"]'); await pg.waitForFunction(() => document.querySelector('#render') && document.querySelector('#render').getAttribute('aria-disabled') !== 'true');
+    await pg.click('#stepper button[data-step="render"]'); await pg.waitForSelector('#s-render:not([hidden])'); await pg.waitForFunction(() => document.querySelector('#render') && document.querySelector('#render').getAttribute('aria-disabled') !== 'true');
     await pg.click('#render'); assert.strictEqual((await waitTask()).task.status, 'done');
     const st = JSON.parse(readFileSync(join(ROOT, 'jobs', JOB, 'reel-v1.settings.json'), 'utf8'));
     assert.strictEqual(st.version, 1); assert.ok(st.look && st.pieces.length >= 2 && st.files.includes(`jobs/${JOB}/reel-v1.mp4`), JSON.stringify(st));
@@ -140,7 +142,7 @@ try {
   await t('Cuts and lines is one click away, and the phone layout fits', async () => {
     await pg.click('#stepper button[data-step="cut"]'); await pg.click('#cut-mode-cuts'); await pg.waitForSelector('#cut-find');
     assert.ok(/Your combo of 2 pieces renders/.test(await pg.textContent('#cut-combo-wins'))); await pg.click('#cut-mode-pieces'); await pg.waitForSelector('#pieces-grid');
-    await pg.setViewportSize({ width: 390, height: 844 }); await pg.goto(url + '/#step=cut', { waitUntil: 'networkidle' }); await pg.waitForSelector('#pieces-grid');
+    await pg.setViewportSize({ width: 390, height: 844 }); await open(pg, '#step=cut'); await pg.waitForSelector('#pieces-grid');
     const over = await pg.evaluate(() => [...document.querySelectorAll('#s-cut *')].map(e => e.getBoundingClientRect().right).reduce((a, b) => Math.max(a, b), 0) - innerWidth); assert.ok(over <= 1, 'no sideways scroll: ' + over);
     await shot(pg, '#pieces', 'redesign-cut-pieces-phone-dark.png');
     await theme(pg, 'light'); await shot(pg, '#pieces', 'redesign-cut-pieces-phone-light.png'); await theme(pg, 'dark');

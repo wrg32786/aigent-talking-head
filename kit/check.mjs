@@ -281,7 +281,11 @@ if (target) {
     const fierrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-finish.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { fierrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
-    results.push({ label: 'Studio finish tests (tests/studio-finish.test.mjs: what the one Render makes, six steps and their old names, one render path, Your edit, MCP get_edit and studio_run from and exports)', errs: fierrs, warns: [] });
+    results.push({ label: 'Studio finish tests (tests/studio-finish.test.mjs: what the one Render makes, eight steps and their old names, one render path, Your edit, MCP get_edit and studio_run from and exports)', errs: fierrs, warns: [] });
+    const sterrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-steps.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { sterrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio step map tests (tests/studio-steps.test.mjs: the 8 steps, old step names land, one step per layer, menu links, match chips)', errs: sterrs, warns: [] });
     const sperrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-spots.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { sperrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }

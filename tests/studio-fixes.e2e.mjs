@@ -1,10 +1,12 @@
 // Fix buttons in a real Chrome (v1.10.2): Studio never shows a terminal command for something missing.
 // - Render: the "needs ffmpeg and Chrome" note has a link, Send to my agent and Copy for my agent; Copy puts a plain
-//   instruction with the command on the clipboard; Draft refused for a missing tool shows the same buttons in the toast
+//   instruction with the command on the clipboard; Review has its own note for Drafting; Draft (on Review) refused for a
+//   missing tool shows the same buttons in the toast
 // - Setup check: missing first, Install where Studio can do it (it runs setup --only <step> and says when it did not
 //   finish), Send to my agent queues the ask in the Studio chat, which shows the short ask, not the command
-// - the For your agent fold copies the reel as an instruction
-// - no step, drawer or toast shows a command as text
+// - the For your agent fold (under Review and Render) copies the reel as an instruction
+// - no step (Start, Cut, Picture and its reference view, Text and graphics, B-roll, Music and sounds, Review, Render and
+//   its Post view), drawer or toast shows a command as text
 // Needs Chrome. Run: node tests/studio-fixes.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
 import assert from 'assert';
 import { spawn } from 'child_process';
@@ -29,6 +31,9 @@ const listen = () => writeFileSync(join(STATE, 'agent.json'), JSON.stringify({ n
 const browser = await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox'] });
 const errsOf = pg => { const e = []; pg.on('pageerror', x => e.push(x.message)); pg.on('console', m => { if (m.type() === 'error' && !/favicon|Failed to load resource/.test(m.text())) e.push(m.text()); }); return e; };
 const noCmd = async (pg, sel, what) => { const txt = await pg.evaluate(s => [...document.querySelectorAll(s)].map(e => e.innerText).join('\n'), sel); const m = txt.match(CMD); assert.ok(!m, `${what} shows a command: ...${m && txt.slice(Math.max(0, m.index - 60), m.index + 40)}...`); };
+// Studio keeps a live connection, so wait for the page, not for a quiet network; about:blank first, so a link that only
+// changes the hash still loads the page
+const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); };
 const shot = async (pg, name) => { if (shots) { await pg.waitForTimeout(800); await pg.screenshot({ path: join(shots, `noterm-${name}.png`) }); } };
 
 try {
@@ -38,13 +43,13 @@ try {
   for (const theme of ['dark', 'light']) {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 }, deviceScaleFactor: 1 }), pg = await ctx.newPage(), errs = errsOf(pg);
     await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: url });
-    await pg.addInitScript(th => { localStorage.setItem('studio.theme', th); localStorage.setItem('studio.paused', '1'); }, theme);
+    await pg.addInitScript(th => { try { localStorage.setItem('studio.theme', th); localStorage.setItem('studio.paused', '1'); } catch {} }, theme);
     const clip = () => pg.evaluate(() => navigator.clipboard.readText());
-    await pg.goto(url + '/#step=render', { waitUntil: 'networkidle' });
+    await open(pg, '#step=render');
     await t(`${theme}: Render says what is missing with a link and the agent buttons; Copy gives the agent a plain instruction`, async () => {
       listen(); await pg.waitForSelector('#s-render .needfix [data-fix="ffmpeg"]');
       const row = pg.locator('#s-render .needfix').first();
-      assert.match(await row.innerText(), /Drafting and rendering needs ffmpeg and Chrome, and they are not installed yet\./);
+      assert.match(await row.innerText(), /Rendering needs ffmpeg and Chrome, and they are not installed yet\./);
       assert.strictEqual(await row.locator('[data-fix="ffmpeg"] a.fix-link').getAttribute('href'), 'https://ffmpeg.org/download.html');
       await row.locator('[data-fix="ffmpeg"] button', { hasText: 'Send to my agent' }).waitFor();
       await row.locator('[data-fix="chrome"] button', { hasText: 'Copy for my agent' }).click();
@@ -54,6 +59,11 @@ try {
       await shot(pg, `render-${theme}`);
     });
     await t(`${theme}: a refused Draft shows the fix buttons in the toast, not a command`, async () => {
+      // Draft is on Review, with its own note: drafting needs ffmpeg, not Chrome
+      await pg.click('#stepper [data-step="review"]'); await pg.waitForSelector('#s-review:not([hidden]) .needfix [data-fix="ffmpeg"]');
+      assert.match(await pg.locator('#s-review .needfix').first().innerText(), /Drafting needs ffmpeg, and it is not installed yet\./);
+      assert.strictEqual(await pg.$('#s-review .needfix [data-fix="chrome"]'), null);
+      await noCmd(pg, '#s-review', 'Review');
       await pg.click('#draft');
       await pg.waitForSelector('#toast.has-fix [data-fix="ffmpeg"]');
       assert.match(await pg.textContent('#toast'), /ffmpeg is missing, so Studio cannot draft yet\./);
@@ -92,10 +102,13 @@ try {
       await shot(pg, 'chat-sent');
     });
     await t(`${theme}: For your agent copies this reel as an instruction; no step shows a command`, async () => {
-      await pg.goto(url + '/#step=render', { waitUntil: 'networkidle' });
+      await open(pg, '#step=render'); await pg.waitForSelector('#s-render:not([hidden])');
       await pg.click('#cmd-fold .fold2-h'); await pg.click('#cmd-copy');
       assert.match(await clip(), /^In my aigent-talking-head folder, make this reel by running npm run reel -- /);
-      for (const st of ['footage', 'cut', 'look', 'reference', 'style', 'broll', 'finish', 'post']) { await pg.goto(url + '/#step=' + st, { waitUntil: 'networkidle' }); await noCmd(pg, 'body', 'step ' + st); }
+      await open(pg, '#step=review'); await pg.waitForSelector('#s-review:not([hidden])'); assert.ok(await pg.$('#run-foot #cmd-fold'), 'the same fold under Review');
+      // every step and both second views (the reference view of Picture, the Post view of Render): [link, step, view]
+      for (const [st, step, view] of [['start', 'start', 'main'], ['cut', 'cut', 'main'], ['picture', 'picture', 'main'], ['reference', 'picture', 'reference'], ['text', 'text', 'main'], ['broll', 'broll', 'main'], ['music', 'music', 'main'], ['review', 'review', 'main'], ['render', 'render', 'main'], ['post', 'render', 'post']]) {
+        await open(pg, '#step=' + st); await pg.waitForSelector(`main[data-step="${step}"][data-view="${view}"] .step:not([hidden]) h2`); await noCmd(pg, 'body', 'step ' + st); }
       assert.deepStrictEqual(errs, []);
     });
     await ctx.close();
