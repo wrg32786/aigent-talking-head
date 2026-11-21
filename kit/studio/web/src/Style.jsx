@@ -20,13 +20,24 @@ export function Style({ CAT, V, s, apply, patch, reloadCat, hidden, tab, setTab,
 const MODE = [['recreate', 'Use all'], ['influence', 'Use parts'], ['off', 'Off']];
 const READING = ['queued', 'downloading', 'tearing'];
 // One short line when the reference set the Look (or is about to), with the way back to your own picks
+// Influence: which parts of the reference to take, one switch each (reference.parts)
+export function RefParts({ V, s, patch }) {
+  const parts = (V.env && V.env.refParts) || [], on = { ...((V.env && V.env.influenceParts) || {}), ...(s.reference.parts || {}) };
+  if (!parts.length) return null;
+  return <div className="ref-parts" id="ref-parts">
+    <span className="lbl">Take</span>
+    <div className="chips" role="group" aria-label="Parts of the reference to take">{parts.map(p => <button key={p.id} type="button" id={'ref-part-' + p.id} className={'chip' + (on[p.id] ? ' on' : '')} aria-pressed={String(!!on[p.id])}
+      onClick={() => patch({ reference: { parts: { [p.id]: !on[p.id] } } })}><Icon n={on[p.id] ? 'check' : 'plus'} />{p.label}</button>)}</div>
+  </div>;
+}
+
 export function RefNotice({ s, patch, id = 'ref-notice' }) {
   const r = s.reference, a = r.auto, reading = !r.extracted && r.mode !== 'off' && (r.status === 'running' || (r.queue || []).some(x => READING.includes(x.status)));
   if (reading) return <div className="ref-notice glass-card" id={id} role="status"><span className="rn-spin" aria-hidden="true" /><p><b>Reading the reference.</b> We will set your look from it when it is ready.</p></div>;
   if (!r.extracted || !a || r.mode === 'off') return null;
   const back = () => patch({ reference: { mode: 'off' } }).then(() => toast('Back to your own look. The reference is off.', true)).catch(() => {});
   return <div className="ref-notice glass-card" id={id} role="status" data-mode={a.mode}><Icon n="spark" />
-    <p><b>{a.mode === 'recreate' ? 'We set your look from the reference.' : 'We set your picks from the reference.'}</b> {a.mode === 'recreate' ? 'Change anything you like.' : 'Your Look and sound stay yours. Change anything you like.'}</p>
+    <p><b>{a.mode === 'recreate' ? 'We set your look from the reference.' : 'We set your picks from the reference.'}</b> {a.mode === 'recreate' ? 'Change anything you like.' : (a.sound ? 'Your Look stays yours. Change anything you like.' : 'Your Look and sound stay yours. Change anything you like.')}</p>
     <Button id={id + '-back'} size="sm" variant="secondary" label="Back to my look" onClick={back} /></div>;
 }
 function SaveLook({ id, label, fromReference, reloadCat, apply, variant = 'ghost' }) {
@@ -60,11 +71,12 @@ function Looks({ CAT, V, s, apply, patch, reloadCat, hidden, go }) {
       <span className="src src-ref">Reference</span>
       <div className="rc-t"><b>{ex.name || (item && item.url) || 'Your reference'}</b>
         <span className="fine">{[item && item.url ? item.url.replace(/^https?:\/\//, '').slice(0, 40) : null, sm.seconds ? `${Math.round(sm.seconds)} s` : null, ex.shots ? `${ex.shots} shots` : null, mu.bpm ? `${mu.bpm} BPM` : null].filter(Boolean).join(', ')}</span>
-        <span className="fine" id="ref-card-note">{r.mode === 'recreate' ? 'Using all of it: its Look, captions, titles, transitions, music and pace.' : r.mode === 'influence' ? 'Using its parts as soft defaults, with your Look and sound.' : 'Off: kept here, not used.'}</span></div>
+        <span className="fine" id="ref-card-note">{r.mode === 'recreate' ? 'Using all of it: its Look, captions, titles, transitions, music and pace, with your take re-cut to its shots and framing.' : r.mode === 'influence' ? 'Using the parts you switch on, as soft defaults. Your Look stays yours.' : 'Off: kept here, not used.'}</span></div>
       <div className="seg" role="radiogroup" aria-label="Use the reference" id="ref-card-mode">{MODE.map(([m, l]) => <button key={m} type="button" role="radio" aria-checked={r.mode === m ? 'true' : 'false'} data-mode={m} onClick={() => patch({ reference: { mode: m } })}>{l}</button>)}</div>
       <SaveLook id="save-ref-look" label="Save as a Look" fromReference reloadCat={reloadCat} apply={apply} />
       <Button id="ref-clear" size="sm" variant="ghost" label="Clear reference" onClick={clear} />
       <button type="button" className="linkish" id="ref-open" onClick={() => go && go('reference', true)}>Breakdown</button>
+      {r.mode === 'influence' && <RefParts V={V} s={s} patch={patch} />}
     </div> : s.undoRef ? <p className="fine ref-undo" id="ref-undo">Reference cleared. <button type="button" className="linkish" id="ref-undo-btn" onClick={undo}>Undo</button></p> : null}
   </section>;
 }

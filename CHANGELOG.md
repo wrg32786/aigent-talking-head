@@ -2,6 +2,21 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.21.0 (unreleased)
+
+Release notes: [docs/releases/v1.21.0.md](docs/releases/v1.21.0.md). Recreate re-cuts your take to the reference's shot plan.
+
+- **Shot plan re-cut.** `reel.cjs --recut` (every Studio Recreate draft): the recipe's shot lengths are scaled to your edit and each cut goes on a word boundary, a seam you already have or the middle of the quiet between two words from the audio (at least 0.14 s, so the segment fades never touch a word). No quiet near a reference cut: that cut is left out. The audio runs on across new cuts and they get no glitch hit. `kit/shotplan.cjs`; `cut.json` `refShots`.
+- **Framing per shot.** A shot line's `framing` (from the breakdown's shot size) sets that shot's zoom: close-up 1.16, extreme close-up 1.3, medium close-up 1.06, medium or wider 1, never the same twice in a row.
+- **More of the breakdown in the recipe.** `kit/videomd2reel.cjs` writes `framing` and `cutaway on` (talk_share under 0.35, else no face) on shot lines; the reference's sound effects as a `reel-sfx` block mapped to kit sounds (placed at scaled times on `--recut`, instead of the default whoosh and boom); boxes drawn over a shot and stickers as placeholder graphics; a title `role` (hook, number, timer, brand, line); `bed: none` when the music stem is -37 dB or quieter, else a `bed-volume` from the music and voice levels.
+- **Titles by role.** On `--recut` your titles take the style of the recipe title with the same role, then the rest in order.
+- **Cut points.** An end set inside a clean pause stays in it: the next line is no longer pulled back in when Whisper times its first word early (`/api/cut/set` moved 6.75 s to 8.04 s past a pause at 6.63 to 7.20 s). A transcript that runs early or late as a whole is moved onto the sound (`kit/cutpoints.cjs` `offsetOf`, `align`), once the audio is read; the cached transcript records `aligned`. The pause guard acts only on a clean pause, one with no whole word inside it.
+- **Influence per part.** `reference.parts` (captions, titles, transitions, grade, effects, graphics, pace, sound, fonts): Influence takes only the parts switched on, one switch each on the reference card (Use parts) and in the Breakdown. Pace and sound start off, as before. `C.REF_PARTS`, the MCP `studio_set_selections` description.
+- **What the breakdown read.** `C.ranOf`: the full read, speech, layers and grade, contact sheet, sound effects and music, from what the teardown left. The Breakdown shows them in one row, and each missing one names what reads it with the Install and Copy for my agent fix buttons, then Read it again.
+- **B-roll at the reference's cutaways.** A recut draft's `refShots` cutaways become reference spots on the draft clock (before: the reference's b-roll parts as a fraction of its length). Shot lines with `cutaway on` count as b-roll parts in What to swap.
+- **Library first, better matching.** `broll.mjs` `rank`: the best library clip on a spot's nouns, counting stems and partial matches, then on its words, before stock. A tip about a tool or a screen suggests a screen recording first.
+- **Tests and docs.** `tests/studio-recreate-parts.test.mjs` (in `npm run check`), `tests/studio-recreate.e2e.mjs` (in `npm run smoke`), `tests/recreate-shotplan.test.cjs` (in `npm run check`), a `--recut` smoke step on one continuous take with a 6-shot reference, `--recut` asserted in `tests/studio-recreate-pieces.test.mjs`; `docs/reel-md.md`, `docs/studio.md`, the MCP `studio_add_reference_url` description.
+
 ## 1.20.1 (unreleased)
 
 Release notes: [docs/releases/v1.20.1.md](docs/releases/v1.20.1.md). Recreate drafts from your pieces.

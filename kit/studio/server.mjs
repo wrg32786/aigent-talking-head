@@ -122,7 +122,7 @@ function env() {
   return { llm: p ? `${p.name}${p.model ? ' (' + p.model + ')' : ''}` : null, backend, agent: CH.presence(), effectsReady: existsSync(join(ROOT, 'effects', '.venv')), port: PORT,
     settings: { downloads: st.downloads, renders: st.renders, actionNotes: st.actionNotes, agent: st.agent, chat: st.chat, from: st.from, defaultDownloads: 'teardown-in/studio/<job>/ (in the kit, not shared)', defaultRenders: 'jobs/<job>/ (in the kit)', defaultDownloadsPath: join(ROOT, 'teardown-in', 'studio'), defaultRendersPath: join(ROOT, 'jobs') },
     keys: { anthropic: KEYS.isSet('anthropic'), openai: KEYS.isSet('openai') }, broll: st.broll, localPresets: S.LOCAL_PRESETS,
-    tools: { ytdlp: t.ytdlp ? t.ytdlp.version : null, instaloader: t.instaloader, ffmpeg: t.ffmpeg }, install: F.INSTALL, setup: setupBrief(), fixes: FX.all() };
+    tools: { ytdlp: t.ytdlp ? t.ytdlp.version : null, instaloader: t.instaloader, ffmpeg: t.ffmpeg }, install: F.INSTALL, setup: setupBrief(), fixes: FX.all(), refParts: C.REF_PARTS.map(({ id, label }) => ({ id, label })), influenceParts: C.INFLUENCE_PARTS };
 }
 // every view carries a rising seq (and this run's boot id) so the page can drop a reply that is older than an event it
 // already applied, e.g. a POST answer that lands after the SSE state for a download that failed right away
@@ -231,7 +231,7 @@ function draftSteps(s) {
   const comp = C.compose(s, { refPack: ref });
   if (comp.errs.length) throw Object.assign(new Error(comp.errs.join('; ')), { code: 400 });
   let args = comp.args.slice();
-  if (recreate) { const i = args.indexOf('--pack'); if (i >= 0) args.splice(i, 2); args.push('--recipe', join(s.reference.out, 'Reel.md')); }
+  if (recreate) { const i = args.indexOf('--pack'); if (i >= 0) args.splice(i, 2); args.push('--recipe', join(s.reference.out, 'Reel.md'), '--recut'); }
   // your pieces (the Combo) when you kept any: cut once, here, and handed to the reel as they are (--as-is). Recreate
   // runs on them too, with the reference's Reel.md as the recipe, so the draft is what Your edit says it is (it used
   // to switch to the whole take, so the draft's key never matched and Render could not come on)
@@ -813,7 +813,11 @@ const FOLDERS = mountFolders({ ROOT, json, readBody, extraFolders: () => { const
   ensure: [join(ROOT, 'teardown-in', 'studio'), join(ROOT, 'jobs')] });
 const POSTR = mountPost({ ROOT, C, json, readBody });
 // the reference's b-roll parts, on its own clock as a fraction of its length, become spots (kit/studio/lane.mjs spots)
-const refBroll = s => { if (!s.reference || s.reference.mode === 'off') return []; const sw = swapOf(s); if (!sw || !sw.seconds) return [];
+// A Recreate draft re-cut to the reference's shots (cut.json refShots) gives its cutaways on the draft's own clock.
+const refBroll = (s, cut) => { if (!s.reference || s.reference.mode === 'off') return [];
+  const rs = cut && Array.isArray(cut.refShots) ? cut.refShots.filter(x => x.cutaway) : [];
+  if (rs.length) return rs.map(x => ({ at: +x.start + 0.05, label: 'B-roll', detail: 'the reference cuts away here' }));
+  const sw = swapOf(s); if (!sw || !sw.seconds) return [];
   return (sw.parts || []).filter(p => p.kind === 'broll').map(p => ({ frac: p.at / sw.seconds, label: p.label, detail: p.detail })); };
 const BRL = mountBroll({ ROOT, C, update, json, readBody, serveFile: (...a) => serveFile(...a), CH, capturePage, chromeOk, refParts: refBroll,
   transcribe: (rel, done) => { startTranscribe(rel, () => done(null)); if (MEDIA.transcribing(rel)) watchTx(rel, done); }, wordsOf, energyOf });

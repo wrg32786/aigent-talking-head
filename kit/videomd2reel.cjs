@@ -12,6 +12,9 @@
 // Reads breakdown.json (rea-video's full data, or kit/teardown.py's fallback with the same field names). Everything
 // it writes is a guess you should check: see "How sure is this" in docs/teardown.md.
 'use strict';
+const SPL = require('./shotplan.cjs');
+// brand names the breakdown read (rea-video packaging.brands or video_context.brands), for a title's role
+const colourless = b => [].concat((b.packaging && b.packaging.brands) || [], (b.video_context && b.video_context.brands) || []).map(x => typeof x === 'string' ? x : x && (x.name || x.text)).filter(Boolean);
 const fs = require('fs');
 const path = require('path');
 const RM = require('./reelmd.cjs');
@@ -336,7 +339,7 @@ function convert(b, extras = {}, opts = {}) {
     const fin = finishOf(m, (+s.end || 0) - (+s.start || 0));
     const cam = (s.aspects && s.aspects.camera && (s.aspects.camera.result || s.aspects.camera.measured)) || {};
     const move = cam.move || cam.motion;
-    return { n: i + 1, m, start: r2(s.start), end: r2(s.end), finish: fin.finish, finishWhy: fin.why, ...(fin.unread ? { unread: true } : {}), transitionIn: s.transition_in, move: typeof move === 'string' ? move : null, shake: (s.aspects && s.aspects.camera && s.aspects.camera.measured && s.aspects.camera.measured.shake) };
+    return { n: i + 1, m, start: r2(s.start), end: r2(s.end), finish: fin.finish, finishWhy: fin.why, ...(fin.unread ? { unread: true } : {}), transitionIn: s.transition_in, framing: ((s.aspects && s.aspects.framing && (s.aspects.framing.result || s.aspects.framing.measured)) || {}).shot_size || null, cutaway: SPL.isCutaway(s), boxes: ((s.overlay && s.overlay.boxes) || []).filter(x => Array.isArray(x.bbox) && x.bbox[2] * x.bbox[3] >= 0.04), move: typeof move === 'string' ? move : null, shake: (s.aspects && s.aspects.camera && s.aspects.camera.measured && s.aspects.camera.measured.shake) };
   });
   const read = shots.filter(s => !s.unread);
   const ambient = gradeChoice(read);
@@ -347,7 +350,9 @@ function convert(b, extras = {}, opts = {}) {
   const jobFinish = top && top[0] !== 'none' && top[1] / read.length >= 0.6 ? top[0] : null;
   const audio = b.audio || {}, music = audio.music || {};
   const bpm = music.tempo_bpm || audio.tempo_bpm || null;
-  const hasMusic = !!(music.present || bpm);
+  // the music stem's level: about -37 dB or lower is no music bed, whatever the beat tracker found
+  const level = SPL.musicLevel(b.stems && b.stems.level_db);
+  const hasMusic = !!(music.present || bpm) && !(level && level.bed === false);
   const bed = suggestBed(bpm, opts);
   const beatEdit = audio.beat_synced_edit === true || (audio.cuts_on_beat_ratio != null && audio.cuts_on_beat_chance != null && audio.cuts_on_beat_ratio > audio.cuts_on_beat_chance + 0.15);
   const zoomShots = shots.filter(s => s.move && /zoom|push|punch/i.test(s.move)).length;
@@ -361,6 +366,17 @@ function convert(b, extras = {}, opts = {}) {
   const name = (opts.name || (src.file || 'reference').replace(/\.[^.]+$/, '')).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'reference';
   const layerDefault = titles.some(t => t.layer === 'behind') ? 'auto' : 'front';
 
+  // the reference's sound effects (rea-video audio_plan.sfx_merged), the loud enough ones
+  const sfx = (((b.audio_plan || {}).sfx_merged) || []).filter(x => x && Number.isFinite(+x.t) && x.type && !(x.level_db < -60)).slice(0, 24)
+    .map(x => ({ t: r2(x.t), dur: +x.dur || 0.2, type: String(x.type).toLowerCase().replace(/[^a-z-]/g, ''), on: x.on && x.on.type ? String(x.on.type).replace(/[^a-z_]/g, '') : null }));
+  // boxes the reference drew over a shot (rea-video overlay.boxes) and its stickers: graphics slots, placeholders until you fill them
+  const busy = (a, z) => graphics.some(g => g.start < z && a < g.end);
+  const extraG = [];
+  shots.forEach(s => s.boxes.slice(0, 1).forEach(x => { if (busy(s.start, s.end)) return; const [bx, by, bw] = x.bbox; extraG.push({ start: s.start, end: r2(Math.min(s.end, s.start + 4)), type: 'screen-card', keys: { y: r2(Math.min(0.8, Math.max(0.3, by + x.bbox[3] / 2))), w: r2(Math.min(0.92, Math.max(0.4, bw + 0.04))), 'subject~': `a box the reference drew (${x.band || 'frame'})` } }); }));
+  for (const st of ((b.packaging || {}).stickers || []).slice(0, 4)) {
+    const t0 = +(st.t ?? st.start ?? (st.span && st.span[0])); if (!Number.isFinite(t0) || busy(t0, t0 + 1)) continue;
+    extraG.push({ start: r2(t0), end: r2(+(st.end ?? (st.span && st.span[1])) || t0 + 1.5), type: 'sticker-pop', keys: { ...(st.glyph ? { glyph: st.glyph } : {}), 'subject~': clean(String(st.what || st.text || st.kind || 'a sticker')).slice(0, 40) || 'a sticker' } });
+  }
   const card = {
     videomd: 1, name,
     description: `Recipe torn down from ${src.file || 'a reference reel'}: ${shots.length} shots in ${dur}s, ${titles.length} big titles, ${cs.style} captions${bpm ? `, music near ${Math.round(bpm)} BPM` : ''}. Measured by ${engine}; finishes, entrances and layers are best guesses.`,
@@ -371,7 +387,7 @@ function convert(b, extras = {}, opts = {}) {
     'Detected from the reference. Read the teardown report next to this file, change anything that looks wrong, then remake:',
     `\`npm run reel -- --recipe ${opts.recipePath || 'teardown/' + name + '/Reel.md'} --clip inbox/your-clip.mp4\``, '',
     '## Brand kit', '- preset: aigent', '- theme: aigent', `- colors: ${colours.join(', ') || 'none'}`, '- fonts: theme', '- logo: none', '',
-    '## Music', `- bed: ${hasMusic && bed ? bed.name : 'none'}`, `- bpm: ${bpm ? Math.round(bpm) : ''}`, `- beat-sync: ${hasMusic ? 'on' : 'off'}`, '',
+    '## Music', `- bed: ${hasMusic && bed ? bed.name : 'none'}`, ...(hasMusic && bed && level && level.vol ? [`- bed-volume: ${level.vol}`] : []), `- bpm: ${bpm ? Math.round(bpm) : ''}`, `- beat-sync: ${hasMusic ? 'on' : 'off'}`, '',
     '## Style', `- look: ${look}`, `- captions: ${cs.style}`, ...(cs.position ? [`- caption-position: ${cs.position}`] : []), ...(cs.color ? [`- caption-color: ${cs.color}`] : []), ...(cs.outline ? [`- caption-outline: ${cs.outline}`] : []), ...(cs.shadow ? [`- caption-shadow: ${cs.shadow}`] : []), ...(cs.textCase && cs.style === 'one-word' ? [`- caption-case: ${cs.textCase}`] : []), ...(cs.layer ? [`- caption-layer: ${cs.layer}`] : []), `- titles: ${titles.length ? 'on' : 'off'}`, `- title-layer: ${layerDefault}`,
     `- finish: ${jobFinish ? jobFinish.split(',').join(', ') : 'none'}`, `- transition: ${shots.some(s => /dissolve|fade|cross/.test(s.transitionIn || '')) ? 'crossfade' : 'glitch'}`,
     `- punch: ${zoomShots || jumpCuts || avgShot < 3 ? 'on' : 'off'}`, '- effects: none', '',
@@ -381,6 +397,8 @@ function convert(b, extras = {}, opts = {}) {
     if (s.finish && s.finish !== jobFinish) f.push(`finish ${s.finish}`);
     if (big.includes(s.n)) f.push('punch big');
     if (/dissolve|fade|cross/.test(s.transitionIn || '')) f.push('transition crossfade');
+    if (s.framing) f.push(`framing ${s.framing}`);
+    if (s.cutaway) f.push('cutaway on');
     if (s.move) f.push(`camera~ ${s.move}`);
     L.push(f.join(' | '));
   }
@@ -390,7 +408,7 @@ function convert(b, extras = {}, opts = {}) {
     titles.forEach(t => {
       const f = [`#${pad2(t.n)} ${t.start}-${t.end}`];
       if (t.entrance) f.push(`entrance ${t.entrance}`);
-      f.push(`layer ${t.layer || 'front'}`, `text ${t.text}`);
+      f.push(`layer ${t.layer || 'front'}`, `role ${SPL.roleOf(t.text, t.start, t.n - 1, colourless(b))}`, `text ${t.text}`);
       L.push(f.join(' | '));
     });
     L.push('```', '');
@@ -408,6 +426,18 @@ function convert(b, extras = {}, opts = {}) {
       if (g.sourceGuess) f.push(`source~ ${g.sourceGuess}`);
       L.push(f.join(' | '));
     });
+    L.push('```', '');
+  }
+  if (extraG.length) {
+    if (!graphics.length) L.push('## Graphics', '', '```reel-graphics');
+    const at = graphics.length ? L.lastIndexOf('```') : L.length;
+    const gl = extraG.map((g, i) => [`#${pad2(graphics.length + i + 1)} ${g.start}-${g.end}`, `type ${g.type}`, ...Object.entries(g.keys).map(([k, v]) => `${k} ${v}`)].join(' | '));
+    L.splice(at, 0, ...gl);
+    if (!graphics.length) L.push('```', '');
+  }
+  if (sfx.length) {
+    L.push('## Sound effects', '', 'The reference\'s sound effects and when they play, as the kit\'s sounds. Recreate scales the times to your take.', '', '```reel-sfx');
+    sfx.forEach((x, i) => L.push(`#${pad2(i + 1)} ${x.t}-${r2(x.t + Math.max(0.05, Math.min(1, x.dur || 0.2)))} | type ${x.type} | sound ${SPL.sfxId(x.type)}${x.on ? ` | on~ ${x.on}` : ''}`));
     L.push('```', '');
   }
   if (lines.length) {

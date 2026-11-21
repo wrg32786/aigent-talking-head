@@ -16,7 +16,7 @@ const fs = require('fs');
 const path = require('path');
 
 const KIT = __dirname, ROOT = path.dirname(KIT);
-const SHOTS_BLOCK = 'videomd-timeline', TITLES_BLOCK = 'reel-titles', SCRIPT_BLOCK = 'reel-script', GRAPHICS_BLOCK = 'reel-graphics', CARDS_BLOCK = 'reel-cards';
+const SHOTS_BLOCK = 'videomd-timeline', TITLES_BLOCK = 'reel-titles', SCRIPT_BLOCK = 'reel-script', GRAPHICS_BLOCK = 'reel-graphics', CARDS_BLOCK = 'reel-cards', SFX_BLOCK = 'reel-sfx';
 const CARDS = require('./cards.cjs');
 // where a title or caption can sit around the head (kit/overlay.html placeSpec); center is the default band
 const PLACES = ['left', 'right', 'above', 'chest', 'face', 'center'];
@@ -134,13 +134,15 @@ function parse(text, file = 'Reel.md') {
   const scriptLines = fenced(body, SCRIPT_BLOCK) || [];
   const graphicLines = fenced(body, GRAPHICS_BLOCK) || [];
   const cardLines = fenced(body, CARDS_BLOCK) || [];
+  const sfxLines = fenced(body, SFX_BLOCK) || [];
   const shots = shotLines.map(l => parseLine(l, file + ' shots'));
   const titles = titleLines.map(l => parseLine(l, file + ' titles'));
   const script = scriptLines.map(l => parseLine(l, file + ' script'));
   const graphics = graphicLines.map(l => parseLine(l, file + ' graphics'));
   const cards = cardLines.map(l => parseLine(l, file + ' cards'));
+  const sfx = sfxLines.map(l => parseLine(l, file + ' sfx'));
   const title = (body.match(/^#\s+(.+)$/m) || [])[1];
-  return { file, card, title, brand, music, style, aliases, shots, titles, script, graphics, cards, notes: (S._intro || '').replace(/^#\s+.+$/m, '').trim() };
+  return { file, card, title, brand, music, style, aliases, shots, titles, script, graphics, cards, sfx, notes: (S._intro || '').replace(/^#\s+.+$/m, '').trim() };
 }
 
 function validate(r) {
@@ -250,6 +252,9 @@ function shotSettings(r) {
     const o = {};
     if (s.finish && !none(s.finish)) o.finish = s.finish;
     if (s.punch === 'big') o.bigPunch = true;
+    if (s.framing && !none(s.framing)) o.framing = String(s.framing).replace(/-/g, ' ');
+    if (onOff(s.cutaway)) o.cutaway = true;
+    o.dur = +(s.end - s.start).toFixed(3);
     if (s.transition && !none(s.transition)) o.transition = s.transition;
     if (s.src) { o.file = s.src; o.in = +(s.in ?? 0); o.out = s.out != null ? +s.out : +(s.in ?? 0) + (s.end - s.start); }
     return o;
@@ -267,6 +272,7 @@ function titleFlips(r) {
     if (t.accent != null && f.accent === undefined) { delete f.accent; f.lockup = { accent: 'script' }; }
     if (t.hero != null) f.hero = String(t.hero).split(',').map(Number);
     if (t.flicker != null) f.flicker = onOff(t.flicker);
+    if (t.role) f.role = String(t.role);
     return f;
   });
 }

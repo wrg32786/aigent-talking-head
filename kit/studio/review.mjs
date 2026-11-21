@@ -34,9 +34,9 @@ export function swapList(recipePath, cat) {
   // every cut between shots and how it moves
   for (const sh of shots.slice(1)) {
     const tr = sh.transition || st.transition;
-    const isBroll = BROLL_STORY.test(sh.story || '') || sh.broll;
+    const isBroll = BROLL_STORY.test(sh.story || '') || sh.broll || /^(on|yes|true)$/i.test(String(sh.cutaway || ''));
     add({ kind: isBroll ? 'broll' : 'cut', at: sh.start, end: sh.end, label: isBroll ? 'B-roll' : `Cut to shot ${sh.n}`,
-      detail: [tr && tr !== 'none' ? `${tr} transition` : 'hard cut', sh.story && `story ${sh.story}`, sh.punch && `punch ${sh.punch === true ? 'in' : sh.punch}`].filter(Boolean).join(', '),
+      detail: [sh.cutaway && 'the reference cuts away here', tr && tr !== 'none' ? `${tr} transition` : 'hard cut', sh.framing && sh.framing, sh.story && `story ${sh.story}`, sh.punch && `punch ${sh.punch === true ? 'in' : sh.punch}`].filter(Boolean).join(', '),
       refs: [tr && tr !== 'none' && 'transition:' + tr, ...fin(sh.finish), sh.punch && 'editing:punch'] });
   }
   for (const t of titles) if (t !== hookTitle) add({ kind: 'title', at: t.start, end: t.end, label: 'Title', detail: `"${t.text || ''}"${t.entrance ? `, ${t.entrance} entrance` : ''}`, refs: [t.entrance && 'entrance:' + t.entrance, t.layer && t.layer !== 'auto' && 'titleLayer:' + t.layer] });

@@ -74,7 +74,16 @@ export function peaks(rel, n = 1200) {
 
 // the cached transcript: { file, duration, total, done: [chunks], words: [[start, end, word]] }
 export const txFile = rel => cacheFile(rel, '.tx.json');
-export function transcript(rel) { const t = readJson(txFile(rel)); return t && t.total && t.done && t.done.length >= t.total ? t : null; }
+// once the audio envelope is cached, a transcript that runs early or late as a whole is moved onto the sound
+// (kit/cutpoints.cjs offsetOf), once; "aligned" says by how much
+export function transcript(rel) {
+  const t = readJson(txFile(rel)); if (!(t && t.total && t.done && t.done.length >= t.total)) return null;
+  if (t.aligned == null && Array.isArray(t.words)) {
+    const env = CP.fromJSON(readJson(cacheFile(rel, '.cut.json')));
+    if (env) { const o = CP.offsetOf(t.words, env); if (o.shift) t.words = CP.align(t.words, env); t.aligned = { shift: o.shift, n: o.n }; try { writeFileSync(txFile(rel), JSON.stringify(t)); } catch {} }
+  }
+  return t;
+}
 export function partial(rel) { return readJson(txFile(rel)); }
 const txJobs = new Map();
 export function transcribing(rel) { return txJobs.has(rel); }

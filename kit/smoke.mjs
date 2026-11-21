@@ -717,6 +717,29 @@ try {
     const fg = SP.fitGraphics([{ start: 2.5, end: 3.25, mode: 9, text: 'FIRST', layer: 'behind' }], [{ start: 2.97, end: 3.29, word: 'second,' }], 10).gfx;
     if (fg.length !== 1 || fg[0].text !== 'SECOND' || Math.abs(fg[0].start - 2.82) > 0.01) fail('ordinal from your words: ' + JSON.stringify(fg));
   });
+  step('reel.cjs --recut (Recreate): one continuous take re-cut to a 6-shot reference on word boundaries, framing per shot, the reference sounds scaled', () => {
+    const clips = join(work, 'clips-take'); mkdirSync(clips, { recursive: true });
+    const W = []; { let x = 0.4; for (let k = 0; x < 9.4; k++) { W.push([+x.toFixed(2), +(x + 0.24).toFixed(2), 'word' + k]); x += 0.42 + (k % 5 === 4 ? 0.3 : 0); } }
+    const tone = W.map(w => `between(t,${w[0]},${w[1]})`).join('+');
+    run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1080x1920:rate=24:duration=10', '-f', 'lavfi', '-i', `aevalsrc='0.4*sin(2*PI*220*t)*(${tone})':s=48000:d=10`,
+      '-shortest', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', 'clip-001.mp4'], clips);
+    writeFileSync(join(clips, 'clips.json'), JSON.stringify({ src: 'synthetic', clips: [{ id: 'clip-001', file: 'clips/clip-001.mp4', dur: 10, status: 'keep', text: W.map(w => w[2]).join(' '), words: W }] }));
+    const rp = join(work, 'ref6.Reel.md');
+    writeFileSync(rp, ['---', 'videomd: 1', 'name: ref6', 'description: a 6-shot reference', 'source:', '  file: ref.mp4', '  duration: 12', 'shots: 6', 'lang: en', 'x-reel: 1', '---', '', '# ref6', '',
+      '## Shots', '', '```videomd-timeline', '#01 0-2 | framing close-up', '#02 2-3.5 | framing close-up | punch big', '#03 3.5-6 | framing medium close-up', '#04 6-8 | framing medium shot | cutaway on', '#05 8-10 | framing extreme close-up', '#06 10-12 | framing close-up', '```', '',
+      '## Sound effects', '', '```reel-sfx', '#01 2-2.2 | type pop | sound 11-pop-sticker', '#02 6-6.6 | type ding | sound 14-ui-notification', '```', ''].join('\n'));
+    const log = run(node, [join(KIT, 'reel.cjs'), '--clips', clips, '--jobs', join(work, 'jobs'), '--name', 'recut', '--recipe', rp, '--recut', '--no-mask', '--draft', '--tighten', '1.5'], work);
+    if (!/recut: \d+ shots/.test(log || '')) console.log('(reel.cjs log not captured)');
+    const cut = JSON.parse(readFileSync(join(work, 'jobs', 'recut', 'build', 'cut.json'), 'utf8'));
+    if (!(cut.segs.length >= 5)) fail('expected the take re-cut into 5 or 6 shots: ' + JSON.stringify(cut.segs));
+    for (const sg of cut.segs.slice(1)) if (W.some(w => sg.in > w[0] - 0.06 && sg.in < w[1] + 0.06)) fail(`a cut at ${sg.in} s is inside a word or its margin`);
+    cut.segs.forEach((sg, i) => { if (i && sg.recut && sg.in !== cut.segs[i - 1].out) fail('a recut piece is not back to back: ' + JSON.stringify(cut.segs)); });
+    const z = (cut.refShots || []).map(p => p.zoom); if (z.length < 5 || z.some((x, i) => i && Math.abs(x - z[i - 1]) < 0.04)) fail('framing should change on every cut: ' + JSON.stringify(cut.refShots));
+    if (!(cut.refShots || []).some(p => p.cutaway)) fail('the cutaway shot is missing from refShots');
+    const hits = (cut.sfxHits || []).filter(h => h.ref).map(h => h.id + '@' + h.t).join(' ');
+    if (hits !== '11-pop-sticker@1.667 14-ui-notification@5') fail('reference sounds scaled to the take: ' + hits);
+    if (cut.hits.some(h => cut.segs.some((sg, i) => sg.recut && Math.abs(h[0] - cut.segs.slice(0, i).reduce((a, x) => a + x.out - x.in, 0)) < 0.01))) fail('a recut seam got a glitch hit');
+  });
   step('style pack + locks: --pack magazine with --lock keeps every seam and title inside the lock; choices.json explains and applies edits', () => {
     run(node, [join(KIT, 'reel.cjs'), '--clips', join(work, 'clips-muse'), '--jobs', join(work, 'jobs'), '--name', 'pack-lock', '--pack', 'magazine', '--lock', 'transitions=whip,zoom; titles=typewriter', '--no-mask', '--draft'], work);
     const b = join(work, 'jobs', 'pack-lock', 'build'), cut = JSON.parse(readFileSync(join(b, 'cut.json'), 'utf8'));
@@ -1023,6 +1046,7 @@ try {
       ['Studio New video in Chrome: start fresh keeps the look, nothing deleted, open a past video restores it, More menu (tests/studio-videos.e2e.mjs)', 'studio-videos.e2e.mjs'],
       ['Studio fix buttons in Chrome: no terminal command on the page, Install, Send and Copy for my agent, the toast and Setup check (tests/studio-fixes.e2e.mjs)', 'studio-fixes.e2e.mjs'],
       ['Studio Recreate drafts from your pieces: --as-is with the reference recipe, the cut line stays out, drafted and not stale after, Render next (tests/studio-recreate-pieces.test.mjs)', 'studio-recreate-pieces.test.mjs'],
+      ['Studio Recreate and Influence in Chrome: a switch per part on Use parts, a part off takes its picks out, what the breakdown read with fix buttons (tests/studio-recreate.e2e.mjs)', 'studio-recreate.e2e.mjs'],
       ['Studio review tools in Chrome: what to swap, show original, comments, clean-up pass, edit receipt (tests/studio-review.e2e.mjs)', 'studio-review.e2e.mjs'],
     ];
     const jobs = Math.max(1, +process.env.SMOKE_E2E_JOBS || 2), out = new Array(E2E.length);
