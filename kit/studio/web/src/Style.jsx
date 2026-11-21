@@ -287,7 +287,7 @@ function Sound({ CAT, s, apply, patch, ctx }) {
       <Seg id="sfx" label="Sound effects" value={s.sound.sfx} onChange={v => patch({ sound: { sfx: v } })} options={[['on', 'On'], ['off', 'Off']]} />
       <Switch id="cap" size="sm" label="Fewer sounds, only the strong moments" value={s.sound.cap !== 'off'} onChange={on => patch({ sound: { cap: on ? 'on' : 'off' } })} isDisabled={!!cp} disabledMessage={cp ? cp.reason : undefined} />
     </div>
-    <p className="fine sound-pace" id="tighten">Pacing: <b>{paceName}</b>. How much quiet comes out between your words is one choice, on the Cut step. <a className="linkish" href="#step=cut" onClick={() => localStorage.setItem('studio.cutLayer', 'clips')}>Change it on Cut</a></p>
+    <p className="fine sound-pace" id="pacing-line">Pacing: <b>{paceName}</b>. How much quiet comes out between your words is one choice, on the Cut step. <a className="linkish" href="#step=cut" onClick={() => localStorage.setItem('studio.cutLayer', 'clips')}>Change it on Cut</a></p>
   </div>;
 }
 

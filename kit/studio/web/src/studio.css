@@ -1403,5 +1403,5 @@ button.rp-made { cursor: pointer; } button.rp-made:hover { background: color-mix
 
 /* Music and sounds: the cards sit under the heading, and the Pacing line under both cards */
 #s-music.sound-cards { margin-top: 12px; }
-.sound-cards .sound-pace { grid-column: 1 / -1; margin: 2px 4px 0; }
+.sound-cards .sound-pace { grid-column: 1 / -1; margin: 2px 4px 0; display: block; }
 .sound-card:first-child { grid-row: auto; }

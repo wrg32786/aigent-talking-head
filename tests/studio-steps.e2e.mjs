@@ -113,7 +113,7 @@ try {
   await t('#step=music: sound on its own step', async () => {
     await open(pg, '#step=music');
     assert.strictEqual(await h2(pg), 'Music and sounds');
-    for (const id of ['#bed', '#energy', '#beat-sync', '#sfx', '#cap', '#tighten']) assert.ok(await pg.$(id), id);
+    for (const id of ['#bed', '#energy', '#beat-sync', '#sfx', '#cap', '#pacing-line']) assert.ok(await pg.$(id), id);
     assert.strictEqual(await pg.$('#punch'), null, 'zoom punch is a picture control');
     assert.strictEqual(await pg.$('#music-ref'), null, 'no reference line without a reference');
     assert.ok(!/\bBPM\b/.test(await pg.$eval('#s-sound', e => e.innerText)));

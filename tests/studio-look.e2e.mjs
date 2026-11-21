@@ -110,7 +110,7 @@ try {
   });
   await t('Music and sounds is one step: the bed, energy, sound effects and pace sit with the beds and sounds', async () => {
     await step(pg, 'music'); await pg.waitForSelector('#s-music #bed'); assert.strictEqual(await pg.$$eval('#s-music', x => x.length), 1, 'one sound panel');
-    for (const id of ['#energy', '#sfx', '#tighten']) assert.ok(await pg.$('#s-music ' + id), id);
+    for (const id of ['#energy', '#sfx', '#pacing-line']) assert.ok(await pg.$('#s-music ' + id), id);
     assert.ok(await pg.$('#sounds-fold #grid[data-layer="audio"]'), 'the beds and sounds are in the fold under it'); assert.strictEqual(await pg.$('#tab-audio'), null, 'no tab for it');
     await step(pg, 'text'); await pg.waitForSelector('#tab-text'); assert.strictEqual(await pg.$('#s-music'), null, 'not on the other steps');
   });
