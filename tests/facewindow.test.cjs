@@ -103,7 +103,7 @@ t('file names and plain labels', () => {
   assert.deepStrictEqual([L.main, L.reframed, L.bad], ['reels', ['feed45', 'square'], ['nope']]);
   assert.deepStrictEqual(X.frameOf('feed45'), { name: 'feed45', w: 1080, h: 1350, y0: 285, safe: X.get('feed45').safe, reframed: true });
   assert.strictEqual(X.frameOf('square').y0, 420); assert.strictEqual(X.frameOf('reels').reframed, undefined);
-  for (const p of Object.values(X.EX)) for (const v of [p.label, p.use || '']) assert.ok(!/—/.test(v), 'no em dash in a label');
+  for (const p of Object.values(X.EX)) for (const v of [p.label, p.use || '']) assert.ok(!/\u2014/.test(v), 'no em dash in a label');
 });
 t('split and framed b-roll fit the 4:5 and 1:1 frame; the 9:16 layouts are unchanged', () => {
   const f = { crown: 500, cx: 540 }, top = SPL.layout({ place: 'top' }, f), fr = SPL.layout({ place: 'frame' }, f);
