@@ -6,6 +6,7 @@ import { useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { api, quiet, toast, Icon, STATUS } from './lib.jsx';
 import { upload } from './upload.js';
+import { Stages } from './Stages.jsx';
 import { READING, refName, LookChips } from './RefCard.jsx';
 import { PointField } from './Cut.jsx';
 
@@ -22,6 +23,7 @@ export function StartMode({ s, apply, patch, go, looks }) {
   const reading = q.find(x => READING.includes(x.status)), last = q[q.length - 1];
   const failed = !ex && !reading && last && last.status === 'failed' ? last : null;
   const has = !!(ex || reading || r.status === 'running' || r.status === 'uploaded');
+  const live = reading ? reading.stages : r.status === 'running' ? r.stages : null; // the stage view, when the server sends one
   // what is in use decides the choice; before any reference is in, the card you clicked does
   const choice = has ? (r.mode === 'recreate' ? 'recreate' : r.mode === 'look' ? 'look' : r.mode === 'off' ? (s.styleLook ? 'look' : 'own') : null) : s.styleLook ? 'look' : local || 'own';
   const needJob = () => { if (s.job) return false; toast('Name the reel first (top left)'); document.getElementById('job')?.focus(); return true; };
@@ -63,6 +65,7 @@ export function StartMode({ s, apply, patch, go, looks }) {
       {ex ? <p className="rs-line" id="recreate-ready"><Icon n="check" /><span><b>{refName(s)}</b>{meta ? `, ${meta}` : ''}. {isLook ? 'We copy its style. Your own words set the timing.' : 'We follow its cuts and timing on your take.'}</span>
           <button type="button" className="linkish" id="recreate-details" onClick={() => go('reference', true)}>See how it was made</button></p>
         : r.status === 'uploaded' ? <p className="rs-line" id="recreate-uploaded"><span>Your file is here.</span><Button id="recreate-go" size="sm" variant="secondary" label="Break down the file" onClick={breakDown} /></p>
+        : has && live ? <p className="rs-line fine" id="recreate-reading">Record or add your footage while we read it.</p>
         : has ? <p className="rs-line" id="recreate-reading" role="status"><span className="rn-spin" aria-hidden="true" /><span>{reading ? `${STATUS[reading.status]}${reading.status === 'downloading' && reading.progress ? ` ${reading.progress}%` : ''}` : 'Breaking down'}. Record or add your footage while we read it.</span></p>
         : using ? <p className="rs-line" id="recreate-using"><Icon n="check" /><span>Using your saved look <b>{using}</b>. No reference needed.</span></p>
         : <form className="row rs-form" onSubmit={addLink}>
@@ -72,7 +75,9 @@ export function StartMode({ s, apply, patch, go, looks }) {
           <Button id="recreate-upload" type="button" variant="secondary" label="Upload" icon={<Icon n="upload" />} onClick={() => fileIn.current.click()} />
           <input type="file" id="recreate-file" ref={fileIn} accept="video/*,.mov,.mp4,.m4v,.webm,.mkv" hidden onChange={e => { addFile([...e.target.files]); e.target.value = ''; }} />
         </form>}
-      {failed && <p className="err" id="recreate-err" role="alert">{failed.error}</p>}
+      {!ex && has && <Stages v={live} id="recreate-stages" />}
+      {failed && failed.stages && failed.stages.failed ? <Stages v={failed.stages} id="recreate-stages" onRetry={() => api('/api/reference/item', { id: failed.id, action: 'retry' }).then(apply).catch(() => {})} />
+        : failed && <p className="err" id="recreate-err" role="alert">{failed.error}</p>}
       {saved && !has && <div className="saved-looks" id="saved-looks"><span className="lbl" id="saved-looks-h">{using ? 'Your saved looks' : 'Or use a saved look'}</span>
         <ul className="sl-list" aria-labelledby="saved-looks-h">{saved.map(x => <li key={x.name}><button type="button" className={'chip' + (s.styleLook === x.name ? ' on' : '')} data-look={x.name} aria-pressed={String(s.styleLook === x.name)} title={x.from ? `Saved from ${x.from}` : undefined} onClick={() => looks.pick(s.styleLook === x.name ? null : x.name)}>
           {s.styleLook === x.name && <Icon n="check" />}{x.name}</button></li>)}</ul>

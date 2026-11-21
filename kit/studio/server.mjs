@@ -35,6 +35,7 @@ import * as TOPICS from './topics.mjs';
 import * as PACING from './pacing.mjs';
 import { pointLine } from './point.mjs';
 import * as WIZ from './wizards.mjs';
+import * as STG from './stages.mjs';
 import * as SLK from './stylelooks.mjs';
 import { mount as mountFolders } from './folders.mjs';
 import { mountScenes } from './scene-routes.mjs';
@@ -825,24 +826,28 @@ function pump() {
   const dir = refDir(s), file = join(dir, `ref-${it.id}.mp4`), out = join('teardown', `studio-${s.job}-r${it.id}`);
   const max = String(+(process.env.STUDIO_REF_MAX_SECONDS || F.DEFAULT_MAX_SECONDS));
   let lastP = -1, title = null;
-  setItem(it.id, x => { x.status = 'downloading'; x.progress = 0; x.error = null; x.file = file; x.out = out.split(sep).join('/'); });
+  // where the breakdown is (kit/studio/stages.mjs): kept on the item in the saved state, so a reload shows the same line
+  const run = STG.newRun(), stages = part => STG.view(run, { part });
+  setItem(it.id, x => { x.status = 'downloading'; x.progress = 0; x.error = null; x.file = file; x.out = out.split(sep).join('/'); x.stages = stages(0); });
   try {
     runTask('reference', () => [['kit/studio/fetch.mjs', [it.url, '--out', file, '--max-seconds', max, '--json']],
       (v => [TEARDOWN, [file, '--out', out, '--name', `studio-${s.job}-r${it.id}`, ...(process.env.STUDIO_TEARDOWN_ARGS ? process.env.STUDIO_TEARDOWN_ARGS.split(' ') : []), ...(v ? v.args : [])], v && v.env])(vlmOf())], () => {
       const recipe = join(ROOT, out, 'Reel.md');
       if (!existsSync(recipe)) throw new Error('teardown wrote no Reel.md');
       const ex = C.extract(recipe);
-      setItem(it.id, (x, st) => { x.status = 'ready'; x.progress = 100; x.extracted = ex; x.contact = existsSync(join(ROOT, out, 'contact.jpg')) ? `${out}/contact.jpg`.split(sep).join('/') : null; if (title) x.title = title;
+      STG.finish(run);
+      setItem(it.id, (x, st) => { x.status = 'ready'; x.progress = 100; x.stages = stages(); x.extracted = ex; x.contact = existsSync(join(ROOT, out, 'contact.jpg')) ? `${out}/contact.jpg`.split(sep).join('/') : null; if (title) x.title = title;
         if (!st.reference.active || st.reference.active === x.id || !(st.reference.queue || []).some(q => q.id === st.reference.active && q.status === 'ready')) useItem(st, x); });
       return { extracted: ex };
     }, {
-      step: i => { if (i === 1) setItem(it.id, x => { x.status = 'tearing'; x.progress = 100; }); },
+      step: i => { if (i === 1) { STG.feed(run, 'stage cuts'); setItem(it.id, x => { x.status = 'tearing'; x.progress = 100; x.stages = stages(); }); } },
       line: l => {
-        const m = /^progress (\d+)%/.exec(l); if (m && +m[1] !== lastP && (+m[1] - lastP >= 5 || +m[1] === 100)) { lastP = +m[1]; setItem(it.id, x => { if (x.status === 'downloading') x.progress = lastP; }); }
+        const m = /^progress (\d+)%/.exec(l); if (m && +m[1] !== lastP && (+m[1] - lastP >= 5 || +m[1] === 100)) { lastP = +m[1]; STG.feed(run, l); setItem(it.id, x => { if (x.status === 'downloading') { x.progress = lastP; x.stages = stages(lastP / 100); } }); }
+        else if (!m && STG.feed(run, l)) setItem(it.id, x => { x.stages = stages(run.stage === 'download' ? Math.max(0, lastP) / 100 : undefined); });
         if (l.startsWith('{"file"')) { try { const j = JSON.parse(l); title = j.title; setItem(it.id, x => { x.title = j.title; x.seconds = j.seconds; x.trimmed = j.trimmed; }); } catch {} }
       },
       lane: 'reference',
-      end: (status, lines) => { if (status !== 'done') setItem(it.id, x => { if (x.status !== 'ready') { x.status = status === 'cancelled' ? 'cancelled' : 'failed'; const e = lines.filter(l => /download failed|error|Error|failed|not found/i.test(l) && !l.startsWith('$')).pop(); x.fix = F.fixOf(e); x.error = (e || lines[lines.length - 1] || 'failed').replace(/^download failed: /, '').slice(0, 300); } }); },
+      end: (status, lines) => { if (status !== 'done') setItem(it.id, x => { if (x.status !== 'ready') { x.status = status === 'cancelled' ? 'cancelled' : 'failed'; if (status === 'cancelled') delete x.stages; else { STG.fail(run); x.stages = stages(); } const e = lines.filter(l => /download failed|error|Error|failed|not found/i.test(l) && !l.startsWith('$')).pop(); x.fix = F.fixOf(e); x.error = (e || lines[lines.length - 1] || 'failed').replace(/^download failed: /, '').slice(0, 300); } }); },
     });
   } catch (e) { setItem(it.id, x => { x.status = 'failed'; x.error = e.message; }); }
 }
@@ -1129,14 +1134,18 @@ async function api(req, res, u) {
     const b = await readBody(req), s = C.load();
     if (b.url || b.urls) { const added = addLinks([].concat(b.urls || [], b.url || [])); return json(res, 202, { added, ...view(C.load()) }); }
     const t = teardownSteps(s, null);
-    update(st => { st.reference.status = 'running'; st.reference.url = b.url || null; st.reference.out = t.out; });
+    const run = STG.newRun(), stages = () => STG.view(run, { skip: ['download'] });
+    STG.feed(run, 'stage cuts');
+    update(st => { st.reference.status = 'running'; st.reference.url = b.url || null; st.reference.out = t.out; st.reference.stages = stages(); });
     runTask('teardown', () => t.steps, () => {
       const recipe = join(ROOT, t.out, 'Reel.md');
       if (!existsSync(recipe)) throw new Error('teardown wrote no Reel.md');
       const ex = C.extract(recipe);
-      update(st => { st.reference.status = 'ready'; st.reference.extracted = ex; st.reference.out = t.out; st.reference.contact = existsSync(join(ROOT, t.out, 'contact.jpg')) ? `${t.out}/contact.jpg`.split(sep).join('/') : null; st.reference.auto = null; C.setReferenceLook(st); });
+      STG.finish(run);
+      update(st => { st.reference.status = 'ready'; st.reference.stages = stages(); st.reference.extracted = ex; st.reference.out = t.out; st.reference.contact = existsSync(join(ROOT, t.out, 'contact.jpg')) ? `${t.out}/contact.jpg`.split(sep).join('/') : null; st.reference.auto = null; C.setReferenceLook(st); });
       return { extracted: ex };
-    }, { end: status => { if (status !== 'done') update(st => { C.settleReference(st); }); } }); // failed or cancelled: not "running" forever
+    }, { line: l => { if (STG.feed(run, l)) update(st => { st.reference.stages = stages(); }); },
+      end: status => { if (status !== 'done') update(st => { C.settleReference(st); if (status === 'cancelled') delete st.reference.stages; else { STG.fail(run); st.reference.stages = stages(); } }); } }); // failed or cancelled: not "running" forever
     return json(res, 202, view(C.load()));
   }
   if (p === '/api/reference/url' && M === 'POST') {
@@ -1149,7 +1158,7 @@ async function api(req, res, u) {
     const b = await readBody(req), id = +b.id, s = C.load(), it = (s.reference.queue || []).find(x => x.id === id);
     if (!it) return json(res, 404, { error: `no reference ${id}` });
     if (b.action === 'use') { if (it.status !== 'ready') return json(res, 400, { error: 'that reference is not broken down yet' }); update(st => useItem(st, st.reference.queue.find(x => x.id === id))); }
-    else if (b.action === 'retry') { if (['downloading', 'tearing'].includes(it.status)) return json(res, 409, { error: 'it is running' }); setItem(id, x => { x.status = 'queued'; x.error = null; x.progress = 0; const c = F.classify(x.url); const miss = c.ok ? F.missingFor(c, F.tools({ fresh: true })) : c.error; if (miss) { x.status = 'failed'; x.error = miss; } }); setImmediate(pump); }
+    else if (b.action === 'retry') { if (['downloading', 'tearing'].includes(it.status)) return json(res, 409, { error: 'it is running' }); setItem(id, x => { x.status = 'queued'; x.error = null; x.progress = 0; delete x.stages; const c = F.classify(x.url); const miss = c.ok ? F.missingFor(c, F.tools({ fresh: true })) : c.error; if (miss) { x.status = 'failed'; x.error = miss; } }); setImmediate(pump); }
     else if (b.action === 'remove') {
       if (['downloading', 'tearing'].includes(it.status) && refTask && refTask.status === 'running') { refTask.cancel = true; refTask.proc && refTask.proc.kill('SIGTERM'); }
       if (it.file && b.deleteFile !== false) rmSync(it.file, { force: true });

@@ -17,7 +17,7 @@ Eight steps across the top (1.28.0): **Start**, **Cut**, **Picture**, **Text and
 | Step | What you do there |
 | --- | --- |
 | Start | Add or film your footage, and say what should guide the edit: just your footage, a video to recreate, or a look to copy |
-| Cut | Say what to make from the take and choose the pieces |
+| Cut | Say what the video is for and what to make, then go from the raw take to the best lines to the clips you keep |
 | Picture | Pick one Look, then color and finish, motion, transitions and layout |
 | Text and graphics | Captions and titles, fonts, graphics, and your own words and logos |
 | B-roll | Fill the spots of the draft with clips, cards and screen recordings |
@@ -217,17 +217,40 @@ No category is empty today, so none is hidden. These are thin, or are things peo
 
 ## Cut
 
-The Cut step comes right after Start. It asks what to make from the take, finds the best parts, and lets you trim them by hand. Code: `kit/studio/cut.mjs` (the choice and the candidates), `kit/studio/media.mjs` (preview copies, waveform, transcripts), `kit/studio/cut-run.mjs` (cutting and the 16:9 pass).
+The Cut step comes right after Start. It takes you from your raw take, to the best lines, to the clips that move on. Our picks are a smart start, so you can just hit Next. Nothing renders here.
 
-![The Cut step: the summary line, the Format, Length, Output and Goal cards, and Find cuts](studio/cut-desktop.png)
+![The Cut step: the summary line and the Format, Length, Output and Goal cards](studio/cut-desktop.png)
 
-### Pieces and your combo (1.15.0)
+The page uses three words, one per layer. Each layer is a numbered tab, and the player with your take stays next to all three.
 
-![The Cut step on Pieces: the take's lines sorted into Hook, Story, Tip, Proof or quote, List and CTA, five numbered in Your combo, each with its reason](studio/cut-pieces.png)
+| Layer | What it is |
+|---|---|
+| 1 **Raw take** | Your take in full, just as you filmed it. Play it, or click a word to jump there |
+| 2 **Best lines** | Every line of the take, sorted by what it does. The ones marked **Best** are the lines we recommend. Play any of them |
+| 3 **Clips** | Our best lines stitched into clips (the full edit and the short clips), with the quiet trimmed. Play each one as it will sound, and tick the ones to keep |
 
-Once the take has a transcript, the Cut step opens on **Pieces** (the switch at the top; **Cuts and lines** is the view below). Every line of the take is a piece, sorted by what it does (`kit/studio/pieces.mjs`):
+**What's the point of this video?** One optional line at the top of Cut, up to 200 characters, for example "Show beginners they can build an app with AI in a weekend". It is saved with the video and it steers what we pick: the score of every line, the Best marks, the full edit and the clips. A line or a clip that serves it says **Fits your point**. When you change it, the lines are scored again and the suggested clips are found again; what you kept or dropped and the clips you added stay. Your agent and a model get the same line with every ask. The same field is on Start when you pick Copy the look.
 
-| Category | What lands there |
+**What to make.** One line under the point sums up the choice, for example "Both: 1 full edit (~10 min) + 5 short clips, for organic". We set it from the take's length (up to 2 min: one full short; up to 10 min: clips; longer: a long form edit plus 5 clips). **Change** opens four rows of cards, and **Smart pick** puts our defaults back. With more than one take, **Take** picks the one to cut.
+
+| Row | Cards | Notes |
+|---|---|---|
+| Format | Short (Reels, Shorts, TikTok, 9:16), Long form (YouTube, 16:9), Square post (1:1) | A custom aspect (9:16, 16:9, 1:1, 4:5) is under More |
+| Length | Short, Medium, Long | Relative to the format: 15-30 s, 30-60 s, 60-90 s for shorts; 3-5 min, 8-12 min, 15+ min for long form; 15-30 s, 30-60 s, 60-120 s for square. Exact seconds are under More |
+| Output | Full edit, Clips, Both | Both is one best-version full edit plus N clips (the + and - buttons). "Split into parts of ~length" is a box under Full edit |
+| Goal | Organic, Ad | Ad: a hook in the first 1 to 2 s, Very tight pacing unless you set another, a CTA end card with your text, captions kept inside the platform safe area, and an optional pair of 15 s and 30 s ad cuts. Organic: story pacing, and short clips that loop back to their first line score higher |
+
+### Raw take
+
+The full take in the player, with its words under it once we have read them. Beside it: how long the take is, how many lines it has, how many long pauses (and their seconds) and how many filler words. **See the best lines** opens the next layer.
+
+### Best lines
+
+![The Cut step with the take's lines sorted into Hook, Story, Tip, Proof or quote, List and CTA](studio/cut-pieces.png)
+
+Every line of the take is sorted by what it does (`kit/studio/pieces.mjs`):
+
+| Group | What lands there |
 |---|---|
 | Hook | the open: a claim, a question or "you", near the start |
 | Story | sets up the payoff: "my first client", "I remember", "last year" |
@@ -238,57 +261,70 @@ Once the take has a transcript, the Cut step opens on **Pieces** (the switch at 
 | Aside | off topic, apologies, filler talk. Hidden until **Show asides and retakes** |
 | Retake or fragment | said again later, or cut off. Hidden too |
 
-Each piece shows its time, length and score; the play button plays just that line. The **...** on a piece moves it to another category (yours wins over the rules). **Topics** are the words that come back in two or more lines; click one to show only the pieces about it.
+Each line shows its start time and length, and its play button plays just that line. The lines we would pick carry **Best** (hover for the reason), and a line that serves your point says **Fits your point**. The **...** on a line moves it to another group, and your choice wins over ours.
 
-**Your combo** is the pieces in the order the reel plays them. **Let AI choose** fills it: the strongest hook, then the best middle pieces in the take's order up to the length you picked, then the CTA, never an aside or a retake, each with one reason ("Strongest open", "A number backs it"). **Build my own** empties it, and clicking a piece adds it at the end. Drag to reorder, or use the arrows; x drops one. Your edit says who built it (picked by AI, changed by you, or your agent).
+**Topics.** A row of up to 5 chips names the themes the take keeps coming back to, each a short phrase such as "starting with ChatGPT" or "building with AI". Click one to show only the lines about it; click it again to show them all. Your agent or a model names them when one is connected. With neither, we look for phrases of 2 to 4 words said in two or more lines (`kit/studio/topics.mjs`). When we find nothing good, the row is hidden.
 
-A piece is a whole transcript line with its edges snapped to the quiet next to its words, so a combo never cuts a word or starts mid-word. Pieces next to each other in the take that sit next to each other in your combo play as one range, with no second cut. When there is a combo it is what drafts and renders, ahead of the kept cuts (the Cuts and lines view says so). The what-to-make cards fold behind **Change** on Pieces so the pieces fit on one screen.
+**Your clip.** **Use our N best lines** stitches our picks: the strongest hook, then the best middle lines in the take's order up to the length you picked, then the CTA, never an aside or a retake. Or click lines to add them yourself. They land in **Your clip**, the strip at the bottom, in the order they play. Drag to reorder, or use the arrows; x takes a line out, and **Start over** empties it. **Play it stitched** plays the lines back to back, and **See it in Clips** opens the next layer. A badge says who built it: Our pick, Built by you, Our pick, changed by you, or Set by your agent.
 
-**What to make.** Four rows of big cards, with smart defaults from the take's length (up to 2 min: one full short; up to 10 min: clips; longer: a long form edit plus 5 clips), so you can just hit Next. A line at the top sums it up, for example "Both: 1 full edit (~10 min) + 5 short clips, for organic", and **Smart pick** puts the defaults back.
+A line is a whole transcript line with its edges in the quiet next to its words, so a clip never cuts a word or starts mid-word. Lines next to each other in the take that sit next to each other in your clip play as one stretch, with no second cut.
 
-| Row | Cards | Notes |
-|---|---|---|
-| Format | Short (Reels, Shorts, TikTok, 9:16), Long form (YouTube, 16:9), Square post (1:1) | A custom aspect (9:16, 16:9, 1:1, 4:5) is under More |
-| Length | Short, Medium, Long | Relative to the format: 15-30 s, 30-60 s, 60-90 s for shorts; 3-5 min, 8-12 min, 15+ min for long form; 15-30 s, 30-60 s, 60-120 s for square. Exact seconds are under More |
-| Output | Full edit, Clips, Both | Both is one best-version full edit plus N clips (the + and - buttons). "Split into parts of ~length" is a box under Full edit |
-| Goal | Organic, Ad | Ad: a hook in the first 1 to 2 s, tighter cuts (`--tighten 0.25`), a CTA end card with your text, captions kept inside the platform safe area, no long intro, and an optional pair of 15 s and 30 s ad cuts. Organic: story pacing, and short clips that loop back to their first line score higher |
+### Clips
 
-**Find cuts.** Transcribes the take (once, cached) and lists candidates: the full edit (the best version near your length, or its parts), clips, and ad cuts. Each shows the words, the times, the length, a score from 0 to 100 and why. Who scored them is shown under the buttons:
+Clips opens with our suggestions already there: the full edit (or its parts), the short clips, and ad cuts when the goal is an ad. Each clip shows how many lines are stitched, its length, how much quiet came out, why we picked it and its words. **Play** plays the stitched result on the take itself, so what you hear is what the draft does. Tick a clip to keep it. **Find clips again** looks again.
 
-- **Your terminal agent**, when it is the chat backend and connected: it gets a Studio message ("Pick the cuts for ...") and answers with `get_cuts` and `set_cuts`. The rules' picks show until it does.
-- **An API or local model** (Settings): it rescores the rules' picks and its name shows.
-- **The rules**, when there is neither: hooks (a question, a number, "here is", "the secret"), a clean start and end on a sentence, few fillers and pauses, a call to action for ads, a loop for organic shorts.
+When you built your own on Best lines, **Your clip** is first in the list and it is what moves on. Untick it to use the clips below.
 
-![Cut candidates on the take's timeline: the full edit and clips as colored blocks, filler words and pauses marked on the waveform](studio/cut-timeline.png)
+Under the list, one line says what moves on, for example "3 clips kept, 1:12. They move on to the next steps as one reel." With no clip kept, the whole take moves on.
 
-**The timeline.** Under the list, the take's waveform with filler words (red ticks) and long pauses (grey bands), and a lane per kind with each candidate as a colored block. Drag a block's edge to trim it; drag on an empty part of a lane, or select words in the transcript and press **Add as a clip**, to add your own. Click a block or its play button to preview just that part. In the list: **Keep** or **Dropped**, move up and down, and remove the ones you added.
+A line under Pacing says who picked when it was not our rules:
 
-**Cut points on the audio.** Transcript word times are often a little off, so every cut also looks at the audio. Studio reads the take's loudness every 10 ms (cached next to the waveform) and works out what quiet means for this take from its room tone and its speech. An end moves to the first quiet stretch of 70 ms or more after the last word, plus 40 ms; a start moves to the quiet just before the first word, minus 40 ms. If the transcript says the word ended but the audio is still loud, the audio wins (within 0.35 s, or up to 1 s when the word clearly runs on); if the audio went quiet before the transcript says, the cut moves back to it. A cut never goes into the next word, a short stop inside a word (a "t" or "p") does not count as the end, the breath after a line stays out, and with no clear dip it takes the quietest spot nearby. This applies to every cut: the rules', your agent's, a model's, and the ones you add or trim (an edit with `snap: false` keeps your exact times). Without ffmpeg the cuts stay on the transcript times.
+- **Your terminal agent**, when it is the chat backend and connected: it gets a Studio message ("Pick the cuts for ...") and answers with `get_cuts` and `set_cuts`. Our picks show until it does.
+- **An API or local model** (Settings): it scores our picks again and its name shows.
+- **Our rules**, when there is neither: hooks (a question, a number, "here is", "the secret"), a clean start and end on a sentence, few fillers and pauses, a call to action for ads, a loop for organic shorts.
 
-![Show cut points: the transcript times as dashed ticks on each region and a table of every cut with the word, the transcript and audio times, the shift and why](studio/cut-points.png)
+**Pacing.** One control on Clips says how much quiet comes out (`kit/studio/pacing.mjs`). It changes the stitched previews at once, and the draft uses the same choice.
 
-Tick **Show cut points** under the timeline to see them: a dashed tick where the transcript put each edge, and for the selected candidate a table with the edge, the word, the transcript time, the audio time, the cut (click to hear it), the shift and why, for example "audio: the word ran past the transcript".
+| Pacing | What it does |
+|---|---|
+| **Natural** | Your pauses stay as you said them |
+| **Tight** | Long pauses come out. A breath stays between lines (no pause longer than 0.45 s) |
+| **Very tight** | Almost no quiet between words. Fast, for ads and short clips (no pause longer than 0.25 s) |
 
-**Nothing renders on the Cut step.** Cut is for choosing: keep, drop, trim and order. Under **Find cuts** it says how many you kept and that they render at the end, on the [Render step](#render), as one reel. The kept cuts (in your order) and your bites are **your pieces**: Draft on [Review](#review) makes the reel from them, already cut. Tick **N clips from your pieces** under **What to make** on Render to also render every piece as its own video in the same run, in `jobs/<job>-<id>/` (the cut itself is in `inbox/studio/<job>/cuts/`). Shorts and square posts go through the full reel edit with the session's style and the platform export; ads also get the end card. They show on Render under "Clips from your pieces".
+We only trim quiet between words, never a word. Pauses are read from the audio: a cut goes after the last sound and the clip comes back before the next one.
+
+![Clips on the take's timeline as colored blocks, with filler words and pauses marked on the waveform](studio/cut-timeline.png)
+
+**Trim on the timeline.** A fold under the list. It shows the take's waveform with filler words (red ticks) and long pauses (grey bands), and a row per kind with each clip as a colored block. Drag a block's edge to trim it. Drag on an empty part of a row, or select words under the player and press **Add as a clip**, to add your own. You can remove the ones you added.
+
+**Cut points on the audio.** Transcript word times are often a little off, so every edge also looks at the audio. An end moves to the first quiet stretch after the last word, and a start moves to the quiet just before the first word. A cut never goes into the next word, and the breath after a line stays out. This holds for every clip: ours, your agent's, a model's, and the ones you add or trim (an edit with `snap: false` keeps your exact times). Without ffmpeg the edges stay on the transcript times.
+
+![Show cut points: the transcript times as dashed ticks on each block and a table of every cut with the word, the transcript and audio times, the shift and why](studio/cut-points.png)
+
+Tick **Show cut points** under the timeline to see where each edge landed: the word, the transcript time, the audio time, the cut (click to hear it), the shift and why.
+
+**After Cut.** The kept clips move on. Draft on [Review](#review) makes the reel from them, already cut. On [Render](#render), **What to make** can also make every kept clip its own video in the same run, or a plain clip with no edit.
 
 **Long form.** The engine renders 9:16, so a Long form output is a plain edit for now: the cut joined with short fades, centered over a blurred copy of itself at 1920x1080, loudness-normalized to -14 LUFS. No captions or graphics yet.
 
-**Long takes.** Transcription runs 2 minutes at a time (`kit/studio/tx_chunks.py`, faster-whisper `small.en`, `TX_MODEL` picks another) with progress on the page, saves after each chunk and picks up where it stopped. Transcripts, waveforms and preview copies are cached by file (path, size and time) in `jobs/.studio/media/`. Uploaded, recorded and linked footage all work the same.
+**Long takes.** We read the words 2 minutes at a time (`kit/studio/tx_chunks.py`, faster-whisper `small.en`, `TX_MODEL` picks another) with progress on the page, save after each part and pick up where we stopped. Transcripts, waveforms and preview copies are cached by file in `jobs/.studio/media/`.
 
-### Lines and bites
+### For agents
 
-For a long recording, under the player. It opens by itself for takes over 3 minutes; click **Lines and bites** to open it for a shorter one.
+The page changed its words; the tools, the API and the saved state kept their names. Talk to the user in the page's words.
 
-![Lines and bites: every line with its number, play button, text, length and Keep switch, and bites on the right: the clean take and one picked by the agent, with their lines in order](studio/lines-bites.png)
+| The page says | Tools and API say | Tools |
+|---|---|---|
+| Line | piece (`get_pieces`), line (`get_lines`) | `get_pieces`, `get_lines` |
+| Your clip | the Combo | `set_combo`, `choose_combo` |
+| Clips (our suggestions) | candidates, cuts | `get_cuts`, `set_cuts`, `render_cuts` |
+| A clip your agent stitched from lines | a bite | `set_bites`, `render_bites` |
+| The point | `point` | read in `get_edit`, `get_cuts`, `get_pieces` and `studio_get_state`; set with `studio_set_selections` |
+| Pacing | `pace.tighten` (`off`, 0.45, 0.25) | `get_cuts` returns `pacing`; set with `studio_set_selections` |
 
-- **Lines.** Every line of the take, one per sentence, with its number, a play button, the text, the length and a **Keep** or **Retake** switch. Times sit on the quiet in the audio, like the cuts. A line is marked a likely retake only when a later line within 2 minutes says most of it again (70% of its words, not counting openers like "so" or "we know how to") and is not much shorter. Lines under 0.6 s, or two words that stop mid-thought, are marked fragments. Both start as Retake, and one click brings them back. **Show** filters to kept lines or to retakes and fragments.
-- **Bites.** Tick lines (from anywhere in the take, in the order you want them), name the bite and press **Make a bite**. In a bite, drag a line or use the arrows to reorder it, and the x takes it out. **Play** plays the lines back to back. Bites render on the Render step: **Render my N bites** sends each one through the reel edit as a short clip (in `jobs/<job>-<bite>/`), and under **More ways to save**, **Save each bite as one file** (or **Plain clip** on one bite) only joins the lines into `inbox/studio/<job>/cuts/<bite>.mp4`, with no edit.
-- **One clean take.** Makes a bite of every kept line in the take's order: the whole thing without the retakes and fragments. It renders with the Output choice (a plain 16:9 edit for Long form), or its **Plain clip** on the Render step gives you the joined take as it is.
-- **Your agent.** **Ask my agent to pick** sends it a Studio message. It reads the lines with `get_lines`, marks retakes with `keep`, and sends named bites with `set_bites` (line numbers in play order, plus `clean: true` for the clean take). Its bites show as **By** its name, and the chat says what it picked. You can still rename, reorder and play them, and render them on the Render step. `render_bites` renders from the agent.
+`set_output` sets What to make. `get_cuts` reads the take, the point, the pacing, the transcript as numbered sentences and the candidates (`find: true` runs our rules first), and `set_cuts` sends your picks (time ranges, a score and a reason each). `get_pieces` returns every line with its group, score and topics, `fits: true` on lines that serve the point, `best` (the lines we would pick) and the Combo. `get_lines` lists every line with keep and a retake hint, and `set_bites` sends named clips as line numbers in play order (`clean: true` adds one clean take of every kept line); they show on Clips with **By** and your agent's name.
 
-API: `GET /api/lines?path=`, `POST /api/lines` (`keep`, or `action`: add, update, remove, move, clean, set), `POST /api/lines/render` (`ids`, `only: "file"`).
-
-**Agents.** `set_output` sets the choice, `get_cuts` reads the take, the transcript as numbered sentences and the candidates (`find: true` runs the rules first), `set_cuts` sends your picks (time ranges, a score and a reason each), `render_cuts` renders them (`file: true` saves plain clips). API: `GET /api/cut`, `POST /api/cut/output`, `/api/cut/find`, `/api/cut/edit`, `/api/cut/set`, `/api/cut/render` (`ids`, `only: "file"`), `POST /api/cut/transcribe`, `GET /api/cut/transcript?path=`.
+API: `GET /api/cut`, `GET /api/cut/preview?path=` (the stretches each clip plays with the Pacing choice), `POST /api/cut/output`, `/api/cut/find`, `/api/cut/edit`, `/api/cut/set`, `/api/cut/render` (`ids`, `only: "file"`), `POST /api/cut/transcribe`, `GET /api/cut/transcript?path=`, `GET` and `POST /api/pieces`, `GET /api/lines?path=`, `POST /api/lines` (`keep`, or `action`: add, update, remove, move, clean, set), `POST /api/lines/render` (`ids`, `only: "file"`). The point is `POST /api/state { point }`.
 
 ## Footage player
 

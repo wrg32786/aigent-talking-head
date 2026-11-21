@@ -202,9 +202,16 @@ def beat_grid(path, dur):
         return json.load(open(out))
 
 
+def stage(name, words):
+    # where the breakdown is, for Studio's status line (kit/studio/stages.mjs). Flushed so it shows up as it happens
+    sys.stdout.flush()
+    print(f"stage {name}: {words}", flush=True)
+
+
 def cmd_analyze(a):
     src = probe(a.video)
     dur = src["duration"]
+    stage("cuts", "finding cuts")
     cuts = scene_cuts(a.video)
     bounds = [0.0] + cuts + [dur]
     shots = []
@@ -217,20 +224,23 @@ def cmd_analyze(a):
     out = {"x_engine": "talking-head fallback (frame-difference cuts + pixel stats)", "source": src, "shots": shots,
            "packaging": {"text_cues": []}, "audio": {}, "speech": {"ok": False, "reason": "skipped"}}
     if not a.no_ocr:
+        stage("captions", "reading captions")
         cues = ocr_frames(a.video, dur)
         if cues is None:
             out["packaging"]["note"] = "OCR not installed (pip install rapidocr-onnxruntime); no on-screen text read"
         else:
             out["packaging"]["text_cues"] = cues
     if has_audio(a.video):
+        if not a.no_asr:
+            stage("transcribe", "transcribing")
+            sp = speech_words(a.video, a.model)
+            if sp:
+                out["speech"] = sp
+        stage("sound", "reading music and sounds")
         grid = beat_grid(a.video, dur)
         if grid:
             out["audio"]["music"] = {"present": True, "tempo_bpm": grid.get("tempo_bpm"), "beats": grid.get("beats", []), "drops": grid.get("drops", [])}
             out["audio"]["tempo_bpm"] = grid.get("tempo_bpm")
-        if not a.no_asr:
-            sp = speech_words(a.video, a.model)
-            if sp:
-                out["speech"] = sp
     imgs = [x for x in (frame_at(a.video, (s["start"] + s["end"]) / 2, 160) for s in shots[:12]) if x is not None]
     if imgs:
         out["x_palette"] = dominant_colours(imgs)
@@ -760,6 +770,7 @@ def shot_looks(video, shots, rows, graphics):
     """Per shot, for a remake to match: where the face sits (kit/framing.py: height, eye line, centre) when the
     speaker is on screen, and the shot's colour in Lab (kit/grade_match.py), its own graphics left out."""
     spans = [(float(s["start"]), float(s["end"])) for s in shots]
+    stage("framing", "reading framing")
     try:
         import framing
         for row, f in zip(rows, framing.measure_spans(video, spans)):
@@ -768,6 +779,7 @@ def shot_looks(video, shots, rows, graphics):
         print(f"framing: a face in {sum(1 for r in rows if r.get('face'))} of {len(rows)} shots (height, eye line, centre)")
     except Exception as e:  # a bonus: the remake falls back to the framing words
         print(f"note: face framing not measured: {e}")
+    stage("colours", "reading colours")
     try:
         import grade_match
         boxes = [{"t0": g["start"], "t1": g["end"], "box": g["bbox"]} for g in graphics or [] if g.get("bbox")]

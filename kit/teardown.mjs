@@ -18,8 +18,8 @@
 // Only use it on content you have the rights to, and follow Instagram's terms.
 // Writes teardown/<name>/: Reel.md, teardown.md (what was detected and how sure), contact.jpg, videomd/ (rea-video's
 // package and report.html) or fallback.json.
-import { execFileSync, spawnSync } from 'child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'fs';
+import { execFileSync, spawnSync, spawn } from 'child_process';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
 import { basename, dirname, join, resolve, relative, delimiter } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
@@ -69,6 +69,29 @@ const out = resolve(opt('out', join(ROOT, 'teardown', name)));
 mkdirSync(out, { recursive: true });
 const run = (cmd, args, o = {}) => { console.log('>', basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { stdio: 'inherit', ...o }); };
 
+// "stage <id>" lines say where the breakdown is. Studio reads them (kit/studio/stages.mjs) for its status line.
+const STAGE = { cuts: 'finding cuts', captions: 'reading captions', camera: 'reading camera moves', transcribe: 'transcribing', sound: 'reading music and sounds', graphics: 'reading graphics', recipe: 'building the recipe' };
+const stage = id => console.log(`stage ${id}: ${STAGE[id]}`);
+// rea-video prints nothing while it works, so we watch what it writes: the sound picture and the first stills land
+// once the cuts are found, then the text pass, then one sheet per shot as it reads the camera.
+async function runRea(cmd, args, pkg) {
+  console.log('>', basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' '));
+  const t0 = Date.now() - 1000, shots = join(pkg, 'shots');
+  const fresh = f => { try { return statSync(f).mtimeMs >= t0; } catch { return false; } };
+  const names = () => { try { return readdirSync(shots).filter(n => fresh(join(shots, n))); } catch { return []; } };
+  let at = 0;
+  stage('cuts');
+  const look = () => {
+    const n = names();
+    if (at < 2 && (fresh(join(pkg, 'packaging')) || n.some(x => /^shot_\d+\.jpg$/.test(x)))) { at = 2; stage('camera'); }
+    else if (at < 1 && (fresh(join(pkg, 'audio.png')) || n.some(x => /_first\.jpg$/.test(x)))) { at = 1; stage('captions'); }
+  };
+  const timer = setInterval(look, 700);
+  try {
+    await new Promise((ok, no) => { const p = spawn(cmd, args, { stdio: 'inherit' }); p.on('error', no); p.on('close', c => (c === 0 ? ok() : no(new Error(`${basename(cmd)} exited with ${c}`)))); });
+  } finally { clearInterval(timer); }
+}
+
 function findRea() {
   if (process.env.REA_VIDEO && existsSync(process.env.REA_VIDEO)) return process.env.REA_VIDEO;
   const bin = process.platform === 'win32' ? 'rea-video.exe' : 'rea-video';
@@ -100,8 +123,8 @@ if (engine === 'rea') {
     const base = ['decompose', video, '-o', pkg, '--lang', 'en', ...(flag('no-ocr') ? ['--no-ocr'] : []), ...(flag('no-asr') ? ['--no-asr'] : [])];
     // --vlm: a vision model describes each shot (the effects and transitions measurements miss). When that call fails
     // (no key, a bad key, the service is down) the breakdown runs again without it, so a teardown never fails for it
-    if (flag('vlm')) { try { run(rea, [...base, '--vlm', ...(opt('max-vlm-shots') ? ['--max-vlm-shots', String(opt('max-vlm-shots'))] : [])]); } catch (e) { console.warn('note: the descriptions (--vlm) failed; reading the reference without them'); run(rea, [...base, '--no-vlm']); } }
-    else run(rea, base);
+    if (flag('vlm')) { try { await runRea(rea, [...base, '--vlm', ...(opt('max-vlm-shots') ? ['--max-vlm-shots', String(opt('max-vlm-shots'))] : [])], pkg); } catch (e) { console.warn('note: the descriptions (--vlm) failed; reading the reference without them'); await runRea(rea, [...base, '--no-vlm'], pkg); } }
+    else await runRea(rea, base, pkg);
   }
   b = V.loadBreakdown(pkg);
 } else {
@@ -113,6 +136,7 @@ if (engine === 'rea') {
 // speech: rea-video's optional ASR is SenseVoice; when it is off, use faster-whisper (already a kit dependency)
 if (!(b.speech && b.speech.ok && (b.speech.lines || []).length) && !flag('no-asr') && engine === 'rea' && pyHas('faster_whisper')) {
   const f = join(out, 'speech.json');
+  stage('transcribe');
   if (flag('reuse') && existsSync(f)) { const sp = JSON.parse(readFileSync(f, 'utf8')); if (sp.ok) b.speech = sp; }
   else {
   const r = spawnSync(PY, ['-c', `import sys,json;sys.path.insert(0,${JSON.stringify(KIT)});import teardown as T;json.dump(T.speech_words(${JSON.stringify(video)},${JSON.stringify(opt('model', 'base.en'))}) or {},open(${JSON.stringify(f)},'w'))`], { stdio: 'inherit' });
@@ -124,6 +148,7 @@ if (!(b.speech && b.speech.ok && (b.speech.lines || []).length) && !flag('no-asr
 const cacheF = join(ROOT, 'teardown', '.bed-bpm.json');
 let bpms = {}; try { bpms = JSON.parse(readFileSync(cacheF, 'utf8')); } catch {}
 const audio = b.audio || {};
+stage('sound');
 if ((audio.tempo_bpm || (audio.music || {}).tempo_bpm) && pyHas('librosa')) {
   for (const bed of Object.keys(R.BEDS || {})) {
     if (bpms[bed]) continue;
@@ -144,10 +169,12 @@ const fxPy = join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scri
 const exPy = existsSync(fxPy) ? fxPy : PY; // the effects venv has MediaPipe for the person mask
 const bf = engine === 'rea' ? join(out, 'videomd', 'breakdown.json') : join(out, 'fallback.json');
 let extras = {};
+stage('graphics');
 const ex = spawnSync(exPy, [join(KIT, 'teardown.py'), 'extras', video, '--breakdown', bf, '--titles', join(out, 'titles.json'), '--out', join(out, 'extras.json'), '--sheet', join(out, 'contact.jpg')], { stdio: 'inherit' });
 if (!ex.status) extras = JSON.parse(readFileSync(join(out, 'extras.json'), 'utf8'));
 else console.warn('note: extras failed (no layer hints, vignette or contact sheet)');
 
+stage('recipe');
 const res = V.convert(b, extras, { name, bpms, recipePath: relative(ROOT, join(out, 'Reel.md')) });
 writeFileSync(join(out, 'Reel.md'), res.md);
 writeFileSync(join(out, 'teardown.md'), res.report);

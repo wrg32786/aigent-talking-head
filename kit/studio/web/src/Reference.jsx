@@ -6,6 +6,7 @@ import { api, file, toast, grow, pickState, Icon, IconBtn, SITE, STATUS, KIND_NA
 import { upload } from './upload.js';
 import { canWrite, NO_WRITER } from './Scripts.jsx';
 import { FixActions } from './Fix.jsx';
+import { Stages } from './Stages.jsx';
 import { RefMode, RefNotice, RefParts, RefPlan } from './RefCard.jsx';
 
 export function Reference({ CAT, V, s, apply, patch }) {
@@ -48,7 +49,7 @@ export function Reference({ CAT, V, s, apply, patch }) {
             {['failed', 'cancelled'].includes(it.status) && <IconBtn n="retry" label="Try again" onClick={() => item(it.id, 'retry')} />}
             <IconBtn n="x" label={(busy ? 'Stop ' : 'Remove ') + (it.title || it.url)} onClick={() => item(it.id, 'remove')} />
           </span>
-          {busy && <div className="qbar"><ProgressBar label={STATUS[it.status]} isLabelHidden value={it.status === 'downloading' && it.progress ? it.progress : undefined} isIndeterminate={it.status === 'tearing' || !it.progress} /></div>}
+          {it.stages && (busy || it.status === 'failed') ? <div className="qbar"><Stages v={it.stages} id={`ref-stages-${it.id}`} onRetry={() => item(it.id, 'retry')} /></div> : busy && <div className="qbar"><ProgressBar label={STATUS[it.status]} isLabelHidden value={it.status === 'downloading' && it.progress ? it.progress : undefined} isIndeterminate={it.status === 'tearing' || !it.progress} /></div>}
           {it.error && <p className="err">{it.error}</p>}
           {it.fix && it.status === 'failed' && <FixActions V={V} id={it.fix} apply={apply} />}
           {it.trimmed && <p className="fine">Kept the first part of a longer video.</p>}
@@ -56,6 +57,7 @@ export function Reference({ CAT, V, s, apply, patch }) {
       })}
     </ol>
     {r.status === 'uploaded' && <Button id="ref-go" variant="secondary" label="Break down the file" isDisabled={running} onClick={() => api('/api/reference', {}).then(apply).catch(() => {})} />}
+    {r.stages && (r.status === 'running' || r.stages.failed) && !r.extracted && <Stages v={r.stages} id="ref-stages-file" onRetry={running ? null : () => api('/api/reference', {}).then(apply).catch(() => {})} />}
     <span id="ref-status" className="sr" role="status">{r.status === 'running' ? 'Breaking it down' : r.status === 'ready' ? 'Reference ready' : ''}</span>
     {(r.file || r.out) && <PullScript V={V} s={s} apply={apply} />}
     {r.extracted ? <Breakdown CAT={CAT} V={V} s={s} apply={apply} patch={patch} /> : !q.length && <div id="ref-empty" className="empty-art"><Icon n="film" /><p>Add a link to see its shots, beats and effects.</p></div>}

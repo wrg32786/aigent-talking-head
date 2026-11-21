@@ -10,6 +10,7 @@ import { loadMenu } from '../menu.mjs';
 import * as CF from './conflicts.mjs';
 import * as SLK from './stylelooks.mjs';
 import { cleanPoint } from './point.mjs';
+import { failView } from './stages.mjs';
 
 const require = createRequire(import.meta.url);
 export const STUDIO = dirname(fileURLToPath(import.meta.url));
@@ -727,14 +728,14 @@ export function videoBusy(s) {
 // "running" it would refuse every Recreate draft (kit/studio/server.mjs refWait). True when it changed something.
 export function settleReference(s) {
   const r = s.reference; if (!r || r.status !== 'running') return false;
-  r.status = r.extracted ? 'ready' : r.file ? 'uploaded' : 'none'; return true;
+  r.status = r.extracted ? 'ready' : r.file ? 'uploaded' : 'none'; if (r.stages) r.stages = failView(r.stages); return true;
 }
 export function settleStale(s) {
   let n = 0; const stop = (x, status, error) => { Object.assign(x, { status, ...(error ? { error } : {}) }); n++; };
   if (settleReference(s)) n++;
   if (s.task && s.task.status === 'running') stop(s.task, 'cancelled');
   for (const x of s.imports || []) if (x.status === 'downloading') stop(x, 'failed', 'Studio stopped during this download');
-  for (const x of refRunning(s)) stop(x, 'failed', 'Studio stopped while reading this reference');
+  for (const x of refRunning(s)) { stop(x, 'failed', 'Studio stopped while reading this reference'); if (x.stages) x.stages = failView(x.stages); }
   for (const x of Object.values(s.tx || {})) if (x && x.status === 'running') stop(x, 'failed', 'Studio stopped during this transcript');
   for (const b of Object.values(s.broll || {})) for (const g of (b && b.gens) || []) if (g.status === 'running') stop(g, 'failed', 'Studio stopped while this was generating');
   return n;
