@@ -31,7 +31,7 @@ function gradePart(grade) {
   const rows = ((grade && grade.shots) || []).map((s, i) => (s ? { shot: i + 1, before: s.before, after: s.after, strength: s.strength } : null)).filter(Boolean);
   if (!grade || !grade.ok || !rows.length) return { score: null, note: 'not matched (off, or no colour to read)', shots: [] };
   const avg = k => r1(rows.reduce((a, r) => a + r[k], 0) / rows.length);
-  return { score: Math.round((1 - Math.min(1, avg('after') / 25)) * 100), note: `mean Lab distance ${avg('before')} before, ${avg('after')} after the LUT (${grade.single ? 'one LUT' : 'per shot'}, skin kept at ${Math.round(grade.skin * 100)}%)`, before: avg('before'), after: avg('after'), single: !!grade.single, shots: rows };
+  return { score: Math.round((1 - Math.min(1, avg('after') / 25)) * 100), note: `mean Lab distance ${avg('before')} before, ${avg('after')} after the LUT (${grade.single ? 'one LUT' : grade.luts && grade.luts < rows.length ? grade.luts + ' LUTs' : 'per shot'}, skin kept at ${Math.round(grade.skin * 100)}%)`, before: avg('before'), after: avg('after'), single: !!grade.single, shots: rows };
 }
 
 const CAPTION_FIELDS = [['style', 'captionStyle', 'captions'], ['position', 'captionPosition', 'caption-position'], ['color', 'captionColor', 'caption-color'], ['outline', 'captionOutline', 'caption-outline'], ['shadow', 'captionShadow', 'caption-shadow'], ['case', 'captionCase', 'caption-case'], ['layer', 'captionLayer', 'caption-layer']];

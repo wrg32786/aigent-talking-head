@@ -577,6 +577,8 @@ if (!flag('rebuild')) {
         const len = segs.reduce((a, sg) => a + (sg.out - sg.in), 0), sp = LOOK ? { gfx, dropped: [] } : S.fitGraphics(gfx, S.timeline(segs, build), len);
         for (const d of sp.dropped) console.log('recipe graphic dropped: ' + d.why);
         const fit = sp.gfx.filter(g => g.start < len - 0.3).map(g => ({ ...g, end: +Math.min(g.end, len).toFixed(3) }));
+        // a sticker moved to the word you say can run into one of your titles: it leaves just before the title comes in
+        { const tt = (caps.flips || []).filter(f => f.mode === 7); for (const g of fit.filter(x => x.mode === 9)) { const t = tt.find(x => x.start > g.start + 0.6 && x.start < g.end + 0.05); if (t) g.end = +(t.start - 0.05).toFixed(3); } }
         // a sticker placed for the reference's face follows yours where the reframe could not match it (kit/lookplan.cjs)
         if (MATCH && MATCH.framing && RECUT) { const n = LK.placeOnFace(fit, RECUT.plan); if (n) console.log(`stickers: ${n} moved and sized to where your face is in that shot`); }
         caps.flips = (caps.flips || []).filter(f => !Object.values(RM.GRAPHICS).includes(f.mode)).concat(fit);
