@@ -134,6 +134,7 @@ Every section is optional except the card. Anything left out falls back to the p
 | src, in, out | a file and its in and out points | full segments (see below) |
 | framing | the reference's shot size: `close-up`, `extreme close-up`, `medium close-up`, `medium shot`, `wide` | with `--recut` (Studio's Recreate), that shot's punch: close-up 1.16, extreme close-up 1.3, medium close-up 1.06, medium or wider 1, never the same two shots in a row |
 | cutaway | `on`: the reference cut away from the speaker here (B-roll, a screen) | `cut.json` `refShots` marks the shot, for B-roll |
+| broll | with `cutaway on`: what the reference shows there, in a few words (`a screen recording of OmniRoute`) | the B-roll spot's idea and search, and its length is the shot's (`refShots` `broll`) |
 | move | the camera inside the shot: `push` (a slow push-in), `pull` (a slow pull-out), `drift` (a gentle push, for a pan or a track) | that segment's `push` (zoom gained over the segment: 0.07, -0.07, 0.035) |
 | shake | `on`: a handheld or shaking camera, or a shake cut | a shake hit on the cut into that segment (`cut.json` `hits`) |
 | any `key~` | a guess, written by a teardown (VIDEO.md marks inferred keys with `~`) | not used by the render |

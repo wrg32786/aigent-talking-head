@@ -383,7 +383,7 @@ function convert(b, extras = {}, opts = {}) {
     const fin = finishOf(m, (+s.end || 0) - (+s.start || 0));
     const cam = (s.aspects && s.aspects.camera && (s.aspects.camera.result || s.aspects.camera.measured)) || {};
     const move = cam.move || cam.motion;
-    return { n: i + 1, m, start: r2(s.start), end: r2(s.end), finish: fin.finish, finishWhy: fin.why, ...(fin.unread ? { unread: true } : {}), transitionIn: s.transition_in, tx: SPL.transitionFor(s.transition_in, s.transition), moves: SPL.moveFor(cam), vlmText: SC.textOf(s && s.vlm), framing: ((s.aspects && s.aspects.framing && (s.aspects.framing.result || s.aspects.framing.measured)) || {}).shot_size || null, cutaway: SPL.isCutaway(s), boxes: ((s.overlay && s.overlay.boxes) || []).filter(x => Array.isArray(x.bbox) && x.bbox[2] * x.bbox[3] >= 0.04), move: typeof move === 'string' ? move : null, shake: (s.aspects && s.aspects.camera && s.aspects.camera.measured && s.aspects.camera.measured.shake) };
+    return { n: i + 1, m, start: r2(s.start), end: r2(s.end), finish: fin.finish, finishWhy: fin.why, ...(fin.unread ? { unread: true } : {}), transitionIn: s.transition_in, tx: SPL.transitionFor(s.transition_in, s.transition), moves: SPL.moveFor(cam), vlmText: SC.textOf(s && s.vlm), framing: ((s.aspects && s.aspects.framing && (s.aspects.framing.result || s.aspects.framing.measured)) || {}).shot_size || null, cutaway: SPL.isCutaway(s), broll: SPL.isCutaway(s) ? SPL.brollOf(s, SC.textOf) : null, boxes: ((s.overlay && s.overlay.boxes) || []).filter(x => Array.isArray(x.bbox) && x.bbox[2] * x.bbox[3] >= 0.04), move: typeof move === 'string' ? move : null, shake: (s.aspects && s.aspects.camera && s.aspects.camera.measured && s.aspects.camera.measured.shake) };
   });
   const read = shots.filter(s => !s.unread);
   const ambient = gradeChoice(read);
@@ -470,6 +470,7 @@ function convert(b, extras = {}, opts = {}) {
     if (s.tx && s.tx.name && s.n > 1) f.push(`transition ${s.tx.name}`);
     if (s.framing) f.push(`framing ${s.framing}`);
     if (s.cutaway) f.push('cutaway on');
+    if (s.cutaway && s.broll) f.push(`broll ${s.broll}`);
     const mv = (s.moves || []).find(x => SPL.MOVES[x]); if (mv) f.push(`move ${mv}`);
     if (s.n > 1 && ((s.moves || []).includes('shake') || (s.tx && s.tx.shake))) f.push('shake on');
     L.push(f.join(' | '));

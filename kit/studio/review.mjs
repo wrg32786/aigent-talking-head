@@ -36,7 +36,8 @@ export function swapList(recipePath, cat) {
     const tr = sh.transition || st.transition;
     const isBroll = BROLL_STORY.test(sh.story || '') || sh.broll || /^(on|yes|true)$/i.test(String(sh.cutaway || ''));
     add({ kind: isBroll ? 'broll' : 'cut', at: sh.start, end: sh.end, label: isBroll ? 'B-roll' : `Cut to shot ${sh.n}`,
-      detail: [sh.cutaway && 'the reference cuts away here', tr && tr !== 'none' ? `${tr} transition` : 'hard cut', sh.framing && sh.framing, sh.story && `story ${sh.story}`, sh.punch && `punch ${sh.punch === true ? 'in' : sh.punch}`].filter(Boolean).join(', '),
+      ...(isBroll && sh.broll && sh.broll !== true && !/^(on|yes|true)$/i.test(String(sh.broll)) ? { what: String(sh.broll) } : {}),
+      detail: [sh.cutaway && (sh.broll && typeof sh.broll === 'string' && !/^(on|yes|true)$/i.test(sh.broll) ? `it shows ${sh.broll}` : 'the reference cuts away here'), tr && tr !== 'none' ? `${tr} transition` : 'hard cut', sh.framing && sh.framing, sh.story && `story ${sh.story}`, sh.punch && `punch ${sh.punch === true ? 'in' : sh.punch}`].filter(Boolean).join(', '),
       refs: [tr && tr !== 'none' && 'transition:' + tr, ...fin(sh.finish), sh.punch && 'editing:punch'] });
   }
   for (const t of titles) if (t !== hookTitle) add({ kind: 'title', at: t.start, end: t.end, label: 'Title', detail: `"${t.text || ''}"${t.entrance ? `, ${t.entrance} entrance` : ''}`, refs: [t.entrance && 'entrance:' + t.entrance, t.layer && t.layer !== 'auto' && 'titleLayer:' + t.layer] });

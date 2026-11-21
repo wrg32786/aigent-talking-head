@@ -73,6 +73,10 @@ t('a single take re-cut to the reference: scaled, cuts in the quiet between word
   r.segs.forEach((s, i) => { if (i) assert.strictEqual(s.in, r.segs[i - 1].out); });
   assert.ok(Math.abs(r.segs.reduce((a, s) => a + s.out - s.in, 0) - 10) < 1e-6, 'nothing dropped');
   assert.ok(r.segs.slice(1).every(s => s.recut && !s.fadeIn), 'new cuts are marked recut');
+  { // a cutaway's content rides on its plan entry (cut.json refShots), for the B-roll spot
+    const pl = RM.shotSettings(recipe).map((x, i) => (i === 3 ? { ...x, cutaway: true, broll: 'a screen recording of OmniRoute' } : x));
+    const r2 = SPL.recut(segs, () => WORDS, pl, (i, a, b) => SPL.quietFrom(CP, ENV)(a, b)), c = r2.plan.find(x => x.cutaway);
+    assert.ok(c && c.broll === 'a screen recording of OmniRoute', JSON.stringify(r2.plan)); }
   r.zoom.forEach((z, i) => { if (i) assert.ok(Math.abs(z - r.zoom[i - 1]) >= 0.04, 'framing changes on every cut: ' + r.zoom); });
   const cu = r.plan.find(p => p.framing === 'extreme close-up'); assert.ok(!cu || cu.zoom === 1.3);
   assert.ok(r.plan.some(p => p.cutaway), 'the cutaway shot is in the plan');
