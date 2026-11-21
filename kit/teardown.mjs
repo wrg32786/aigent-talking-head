@@ -178,6 +178,10 @@ stage('recipe');
 const res = V.convert(b, extras, { name, bpms, recipePath: relative(ROOT, join(out, 'Reel.md')) });
 writeFileSync(join(out, 'Reel.md'), res.md);
 writeFileSync(join(out, 'teardown.md'), res.report);
+// titles.json again, as the recipe has them: which titles' text we are not sure of (lowConfidence, why), and the look read
+writeFileSync(join(out, 'titles.json'), JSON.stringify(res.titles, null, 1));
+if (res.titleLook) writeFileSync(join(out, 'title-look.json'), JSON.stringify(res.titleLook, null, 1));
+{ const un = res.titles.filter(t => t.lowConfidence); if (un.length) console.log(`check ${un.length} title${un.length === 1 ? '' : 's'} before a draft, the text may be misread: ${un.map(t => `#${t.n} "${t.text}" (${t.why})`).join('; ')}`); }
 { const added = V.saveScenes(res, out, { library: !flag('no-scenes') }); if (res.scenes.length) console.log(`scenes: ${res.scenes.length} made from the reference (${res.scenes.map(x => x.name).join(', ')}), ${added.length} new in the menu with a REF badge`); }
 const r = RM.load(join(out, 'Reel.md'));
 const { errs } = RM.validate(r);

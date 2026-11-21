@@ -56,10 +56,29 @@ function pickTitles(b, max = 10) {
     let ent = kind ? ENTRANCE_MAP[kind] : undefined;
     if (ent && used.has(ent)) ent = undefined; // each entrance once per reel; the engine fills a free one
     if (ent) used.add(ent);
-    return { n: i + 1, start: r2(x.c.t0), end: r2(Math.max(x.c.t1, x.c.t0 + 0.8)), text: clean(x.c.text), entrance: ent, seenAs: kind || 'unknown', bbox: x.c.bbox, fill: x.c.style && x.c.style.fill, band: x.c.band };
+    return { n: i + 1, start: r2(x.c.t0), end: r2(Math.max(x.c.t1, x.c.t0 + 0.8)), text: clean(x.c.text), entrance: ent, seenAs: kind || 'unknown', conf: x.c.conf ?? null, lines: x.c.n_lines || (String(x.c.text).includes('/') ? 2 : 1), bbox: x.c.bbox, fill: x.c.style && x.c.style.fill, band: x.c.band };
   });
   out.dropped = dropped;
   return out;
 }
 
-module.exports = { ENTRANCE_MAP, pickTitles };
+// Is a title's text, as the teardown read it off the screen, safe to draw? (Studio report 4, item 13: "Kng",
+// "Inthe age of At,/be the signal,", "360 Days" for 347 Days.) Returns a short reason when it is not, else null:
+//   the read itself was unsure (OCR confidence under 0.85);
+//   a word with no vowel in it, or letters and punctuation run together, which is how a misread looks;
+//   the speaker says something else at that moment (under two thirds of the title's words are in the speech near it).
+function textDoubt(t, speechWords) {
+  const txt = String(t.text || ''), toks = txt.split(/[\s/|]+/).filter(Boolean);
+  if (t.conf != null && t.conf < 0.85) return `read with low confidence (${Math.round(t.conf * 100)}%)`;
+  for (const w of toks) {
+    const a = w.replace(/[^A-Za-z]/g, '');
+    if (a.length >= 3 && !/[aeiouy]/i.test(a) && !(a === a.toUpperCase() && a.length <= 5)) return `"${w}" does not read as a word`;
+    if (/[a-z][A-Z][a-z]/.test(w) || /[A-Za-z][,.;:][A-Za-z]/.test(w.replace(/\.(com|io|ai|md|html)$/i, '')) || /^[A-Za-z]+[.,][0-9]/.test(w)) return `"${w}" looks misread (letters and marks run together)`;
+  }
+  if (/[,;:]\s*\/|,\s*$/.test(txt)) return 'stray punctuation in it';
+  const ws = toks.map(norm).filter(w => w.length >= 2), near = (speechWords || []).filter(w => w[0] <= t.end + 0.6 && w[1] >= t.start - 1.2).map(w => norm(w[2])).filter(Boolean);
+  if (ws.length >= 2 && near.length >= 2) { const hit = ws.filter(w => near.some(n => sameWord(n, w))).length; if (hit / ws.length < 0.67) return 'not what is said at that moment'; }
+  return null;
+}
+
+module.exports = { ENTRANCE_MAP, pickTitles, textDoubt };

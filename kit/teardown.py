@@ -848,6 +848,19 @@ def cmd_extras(a):
             print("font: no big words on screen to read a font from")
     except Exception as e:
         print(f"note: font match failed: {e}")
+    # the look of the big titles (kit/titlelook.py): one line or two, serif or sans, italic, case, colours, glow, dim
+    try:
+        import titlelook
+        tl = titlelook.read_video(a.video, titles, shots, frame_at)
+        out["title_look"] = tl
+        lk = tl.get("look")
+        if lk:
+            k, p = lk["key"], lk.get("partner")
+            print(f"titles: {lk['lockup']} ({lk['two_line']} of {lk['titles']} read as two lines); key word {'italic ' if k['italic'] else ''}{k['category'] or 'kind not read'}, {k['color']}"
+                  + (f"; partner line {p['category'] or 'kind not read'}, {p['case'] or 'case not read'}, {p['color']}, {p['place']}" if p else "")
+                  + f"; glow {lk['glow'] or 'none'}, picture dim {lk['dim'] or 'none'}")
+    except Exception as e:
+        print(f"note: title look not read: {e}")
     json.dump(out, open(a.out, "w", encoding="utf-8"), indent=1)
     sys.stdout.flush()
     print(f"graphics: {sum(g['type'] == 'ordinal-sticker' for g in gx)} ordinal stickers, {sum(g['type'] == 'app-label' for g in gx)} app labels, {sum(g['type'] == 'screen-card' for g in gx)} screen cards")

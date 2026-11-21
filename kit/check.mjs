@@ -31,12 +31,12 @@ function checkJob(captionsFile, cutFile, label) {
   }
   for (const k of ['card', 'cta']) if (CAP[k]) for (const v of Object.values(CAP[k])) if (typeof v === 'string') R.lintCopy(v).errs.forEach(x => errs.push(`${k}: ${x}`));
   const raw = flips.filter(f => f.mode === R.TITLE_MODE);
-  if (raw.length > R.ENTRANCES.length && !CAP.entranceRepeat) errs.push(`${raw.length} titles; there are ${R.ENTRANCES.length} entrances and none repeats in one video`);
+  if (raw.length > R.ENTRANCES.length && !CAP.entranceRepeat && !CAP.titleEntrance) errs.push(`${raw.length} titles; there are ${R.ENTRANCES.length} entrances and none repeats in one video`);
   const seen = {};
   for (const t of raw) if (t.entrance) {
     if (!R.ENTRANCES.includes(t.entrance)) errs.push(`title ${t.start}s: unknown entrance "${t.entrance}" (${R.ENTRANCES.join(', ')})`);
     // a repeat is allowed when you chose it (a titles lock with fewer entrances than titles, or npm run choices --apply)
-    if (seen[t.entrance] && !CAP.entranceRepeat) errs.push(`title ${t.start}s: entrance "${t.entrance}" already used at ${seen[t.entrance]}s`);
+    if (seen[t.entrance] && !CAP.entranceRepeat && !CAP.titleEntrance) errs.push(`title ${t.start}s: entrance "${t.entrance}" already used at ${seen[t.entrance]}s`);
     seen[t.entrance] = t.start;
   }
   const sorted = raw.slice().sort((a, b) => a.start - b.start);

@@ -72,7 +72,8 @@ const flips=(()=>{const all=CAP.flips.map(f=>[f.start,f.end,f.text,f.mode,f]),nw
 // Same rules as kit/rules.cjs resolveTitles().
 const ENTR=['stagger-rise','slam','blur-rise','slide-left','elastic','flip','pop-zoom','drop','typewriter'];
 const TITLES=flips.filter(c=>c[3]===7).sort((a,b)=>a[0]-b[0]);
-{const used=new Set(TITLES.map(c=>c[4].entrance).filter(Boolean)),free=ENTR.filter(e=>!used.has(e));TITLES.forEach((c,i)=>{c.entr=c[4].entrance||free.shift()||ENTR[i%ENTR.length];c.flick=(i===0||i===TITLES.length-1)&&c[4].flicker!==false&&c.entr!=='typewriter'})} // a typewriter title has its caret instead of the flicker
+{const used=new Set(TITLES.map(c=>c[4].entrance).filter(Boolean)),free=ENTR.filter(e=>!used.has(e));const dflt=ENTR.includes(CAP.titleEntrance)?CAP.titleEntrance:null; // "titleEntrance": the entrance of every title that names none (it may repeat)
+ TITLES.forEach((c,i)=>{c.entr=c[4].entrance||dflt||free.shift()||ENTR[i%ENTR.length];c.flick=(i===0||i===TITLES.length-1)&&c[4].flicker!==false&&c.entr!=='typewriter'})} // a typewriter title has its caret instead of the flicker
 // Title layer: front (default, whole title in front of the person), behind (hero word behind the head), or auto
 // (at most two punch titles behind, never consecutive). Same as kit/rules.cjs resolveTitles(). cut.json titleLayer
 // can arrive via LOCKOVER.titleLayer. Partner words of a behind title still draw in front of the person.
@@ -490,11 +491,12 @@ window.__oneword=()=>flips.filter(c=>c[3]===0&&(c[4].style||CSTYLE)==='oneword')
 // (default upper): the one-word caption's look, from a Reel.md's Style (a teardown measures them) or captions.js.
 const COUT=CAP.captionOutline||'thick',CSHD=CAP.captionShadow||'soft',CCASE=CAP.captionCase||'upper';
 function oneWordDraw(c,raw,a,t,y){let txt=String(raw).replace(/^[\s.,;:!?"“”]+|[\s.,;:!?"“”]+$/g,'');if(!txt)return;txt=CCASE==='lower'?txt.toLowerCase():CCASE==='upper'?txt.toUpperCase():txt;
- const fs=fit([txt],G,Math.round(CSZ*2.4),1000),dt=t-a,pop=.86+.14*backOut(cl(dt/.12));
+ // "captionFace": "secondary" sets the one-word captions in the pairing's partner face (a sans under an italic serif title)
+ const CF=CAP.captionFace==='secondary'?S:G,fs=fit([txt],CF,Math.round(CSZ*(CF===S?2:2.4)),1000),dt=t-a,pop=.86+.14*backOut(cl(dt/.12));
  // behind the head at the top (headTop, measured by reel.cjs): the word's middle sits a little above the highest the head goes,
  // so the hair hides at most the bottom of the letters (and the tails), as in the reels that do this
  if(CAPBEH&&CPOS==='top'&&CAP.headTop>0)y=Math.max(170,Math.min(y,CAP.headTop-.12*fs));
- ctx.save();ctx.font=fnt(G,fs);ctx.textAlign='center';ctx.textBaseline='middle';ctx.letterSpacing=(TRK*fs)+'px';ctx.globalAlpha*=cl(dt/.05);ctx.translate(540,y);ctx.scale(pop,pop);
+ ctx.save();ctx.font=fnt(CF,fs);ctx.textAlign='center';ctx.textBaseline='middle';ctx.letterSpacing=CF===S?'0px':(TRK*fs)+'px';ctx.globalAlpha*=cl(dt/.05);ctx.translate(540,y);ctx.scale(pop,pop);
  const sh=CSHD!=='none'||BOOST;ctx.fillStyle=c[4].highlight||CCOL||CY;if(sh)shadow(ctx,fs);ctx.lineJoin='round'; // BOOST: this moment read under 3:1, so the word gets the shadow whatever the style says
  if(COUT!=='none'){ctx.lineWidth=COUT==='thin'?Math.max(3,fs*.045):Math.max(8,fs*.1);ctx.strokeStyle=c[4].outline||'#000';ctx.strokeText(txt,0,0);if(sh)ctx.shadowColor='transparent'}
  ctx.fillStyle=c[4].highlight||CCOL||CY;ctx.fillText(txt,0,0);ctx.restore()}

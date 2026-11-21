@@ -28,6 +28,31 @@ const CAPTION_POSITIONS = ['top', 'middle', 'bottom'];
 const SRC = require('./sources.cjs');
 // the one-word caption's look: Reel.md key -> captions.js key and its values
 const CAPTION_LOOK = { 'caption-outline': ['captionOutline', ['none', 'thin', 'thick']], 'caption-shadow': ['captionShadow', ['none', 'soft']], 'caption-case': ['captionCase', ['upper', 'lower', 'as-said']], 'caption-layer': ['captionLayer', ['front', 'behind', 'auto']], 'panel-layer': ['panelLayer', ['front', 'behind', 'auto']], 'caption-entrance': ['captionEntrance', ['pop', 'unfurl', 'cascade', 'orbit', 'warp', 'crystallize', 'compute', 'levitate', 'undulate', 'typewriter']] };
+// The look of the titles (Reel.md Style; a teardown reads them from the reference, kit/titlelook.py):
+//   title-lockup two-line | one-line      two-line draws the rest of the phrase small with the key word, in every caption style
+//   title-key-case, title-partner-case    upper | lower | as-said
+//   title-key-color, title-partner-color  #rrggbb, or accent | text
+//   title-glow off | soft | strong        a glow in the key word's colour on titles and kinetic key words
+//   title-dim off | 0.1 to 0.8            the picture darker while a title is up
+//   title-entrance <entrance>             the entrance of every title that names none (it may repeat)
+//   caption-face display | partner        one-word captions in the pairing's key face (default) or its partner face
+// titleLookOf(style) -> the captions.js keys they set ({} when the Style has none), errors pushed to errs.
+const TITLE_KEYS = ['title-lockup', 'title-key-case', 'title-partner-case', 'title-key-color', 'title-partner-color', 'title-glow', 'title-dim', 'title-entrance', 'caption-face'];
+function titleLookOf(st, errs = []) {
+  const out = {}, lk = {}, low = k => (st && st[k] != null && !none(st[k]) ? String(st[k]).trim().toLowerCase() : null);
+  const col = (k, into) => { const v = low(k); if (!v) return; if (/^#[0-9a-f]{6}$/.test(v) || v === 'accent' || v === 'text') lk[into] = v; else errs.push(`style: ${k} must be a #rrggbb colour, accent or text`); };
+  const cas = k => { const v = low(k); if (!v) return null; if (!['upper', 'lower', 'as-said'].includes(v)) { errs.push(`style: ${k} must be upper, lower or as-said`); return null; } return v; };
+  const tl = low('title-lockup'); if (tl) { if (['two-line', 'one-line'].includes(tl)) { if (tl === 'two-line') { out.titleLockup = 'full'; lk.arrange = 'stack'; lk.partner = 'secondary'; } } else errs.push('style: title-lockup must be two-line or one-line'); }
+  const kc = cas('title-key-case'); if (kc) lk.heroUpper = kc === 'upper';
+  const pc = cas('title-partner-case'); if (pc) { lk.partnerUpper = pc === 'upper'; if (pc === 'upper') { lk.partnerTracking = 0.08; } }
+  col('title-key-color', 'heroColor'); col('title-partner-color', 'partnerColor');
+  const g = st && st['title-glow'] != null ? String(st['title-glow']).trim().toLowerCase() : null; if (g) { if (['soft', 'strong'].includes(g)) out.titleGlow = g; else if (!['off', 'none', 'no'].includes(g)) errs.push('style: title-glow must be off, soft or strong'); }
+  const d = st && st['title-dim'] != null ? String(st['title-dim']).trim().toLowerCase() : null; if (d) { if (/^0?\.\d+$/.test(d) && +d >= 0.05 && +d <= 0.8) out.titleDim = +d; else if (!['off', 'none', 'no', '0'].includes(d)) errs.push('style: title-dim must be off or a number from 0.05 to 0.8'); }
+  const e = low('title-entrance'); if (e) { if (ENTRANCES.includes(e)) out.titleEntrance = e; else errs.push(`style: title-entrance must be one of ${ENTRANCES.join(', ')}`); }
+  const cf = low('caption-face'); if (cf) { if (['display', 'partner'].includes(cf)) { if (cf === 'partner') out.captionFace = 'secondary'; } else errs.push('style: caption-face must be display or partner'); }
+  if (Object.keys(lk).length) out.lockup = lk;
+  return out;
+}
 const ENTRANCES = ['stagger-rise', 'slam', 'blur-rise', 'slide-left', 'elastic', 'flip', 'pop-zoom', 'drop', 'typewriter'];
 const LAYERS = ['front', 'behind', 'auto'];
 // built-in glyphs for icon-badge, sticker-pop and cta-card (Tabler icons, drawn in kit/overlay.html)
@@ -195,6 +220,7 @@ function validate(r) {
   if (st['caption-position'] && !none(st['caption-position']) && !CAPTION_POSITIONS.includes(st['caption-position'])) errs.push(`style: caption-position must be ${CAPTION_POSITIONS.join(', ')}`);
   for (const [k, [, vals]] of Object.entries(CAPTION_LOOK)) if (st[k] && !vals.includes(String(st[k]).toLowerCase())) errs.push(`style: ${k} must be ${vals.join(', ')}`);
   if (st['caption-color'] && !none(st['caption-color']) && !/^#[0-9a-f]{6}$/i.test(st['caption-color'])) errs.push('style: caption-color must be a #rrggbb colour');
+  titleLookOf(st, errs);
   if (st['sfx-cap'] && onOff(st['sfx-cap']) !== false && !/^\d+(\.\d+)?\s*\/\s*\d+$/.test(st['sfx-cap'])) errs.push('style: sfx-cap must be off or "min gap / per 10 s", for example 0.4/4');
   if (st['title-places']) for (const pl of list(st['title-places'])) if (!PLACES.includes(pl)) errs.push(`style: title-places "${pl}" must be ${PLACES.join(', ')}`);
   const mu = r.music || {};
@@ -226,6 +252,7 @@ function toPreset(r) {
   if (!none(s['caption-position'])) out.captionPosition = String(s['caption-position']).toLowerCase();
   if (!none(s['caption-color'])) out.captionColor = String(s['caption-color']).toLowerCase();
   for (const [k, [key, vals]] of Object.entries(CAPTION_LOOK)) if (s[k] && vals.includes(String(s[k]).toLowerCase())) out[key] = String(s[k]).toLowerCase(); // none is a value here
+  { const tl = titleLookOf(s); if (Object.keys(tl).length) out.titleLook = tl; else delete out.titleLook; }
   if (onOff(s.titles) !== undefined) out.titles = onOff(s.titles);
   if (!none(s['title-layer'])) out.titleLayer = s['title-layer'].toLowerCase();
   if (s.finish !== undefined) { const f = list(s.finish); out.finish = f.length ? f.join(',') : null; delete out.finishPool; }
@@ -343,6 +370,7 @@ function compile(r) {
   if (pre.captionPosition) captions.captionPosition = pre.captionPosition;
   for (const [, [key]] of Object.entries(CAPTION_LOOK)) if (pre[key]) captions[key] = pre[key];
   if (pre.captionColor) captions.captionColor = pre.captionColor;
+  if (pre.titleLook) Object.assign(captions, pre.titleLook);
   if (pre.fonts) captions.fonts = pre.fonts;
   if (pre.titleLayer) captions.titleLayer = pre.titleLayer;
   if (r.titles.length) captions.titles = titleFlips(r);
@@ -388,6 +416,7 @@ function exportJob(cut, caps, opts = {}) {
   L.push('## Style', `- look: ${opts.look || pre.look || 'kinetic'}`, `- captions: ${(caps && caps.captionStyle) || pre.captionStyle || 'kinetic'}`, `- titles: ${flips.length ? 'on' : 'off'}`,
     ...(caps && caps.captionPosition ? [`- caption-position: ${caps.captionPosition}`] : []), ...(caps && caps.captionColor ? [`- caption-color: ${caps.captionColor}`] : []),
     ...Object.entries(CAPTION_LOOK).filter(([, [key]]) => caps && caps[key]).map(([k, [key]]) => `- ${k}: ${caps[key]}`),
+    ...titleLookLines(caps),
     `- title-layer: ${(caps && caps.titleLayer) || cut.titleLayer || 'front'}`, `- finish: ${fin}`, `- transition: ${jobTrans}`, `- punch: ${cut.punch === false ? 'off' : 'on'}`, `- effects: ${(pre.effectsFavourites || []).join(', ') || 'none'}`, '');
   L.push('## Shots', '', '```' + SHOTS_BLOCK);
   for (const sh of shots) {
@@ -474,7 +503,23 @@ function summary(r) {
     ...(Object.keys(r.aliases || {}).length ? [`aliases: ${Object.entries(r.aliases).map(([w, h]) => w + ' = ' + h.join(' / ')).join('; ')}`] : [])].join('\n');
 }
 
-module.exports = { parse, load, validate, compile, toPreset, shotSettings, titleFlips, graphicFlips, cardFlips, PLACES, CARDS_BLOCK, GRAPHICS, CAPTION_POSITIONS, CAPTION_LOOK, exportJob, toPackage, summary, parseYaml, dumpYaml, parseLine, ENTRANCES, LAYERS, GLYPHS };
+// the Style lines for a job's title look (the reverse of titleLookOf)
+function titleLookLines(caps) {
+  if (!caps) return [];
+  const L = [], lk = caps.lockup && typeof caps.lockup === 'object' ? caps.lockup : {}, cs = v => (v === true ? 'upper' : 'as-said');
+  if (caps.titleLockup === 'full') L.push('- title-lockup: two-line');
+  if (typeof lk.heroUpper === 'boolean') L.push(`- title-key-case: ${cs(lk.heroUpper)}`);
+  if (typeof lk.partnerUpper === 'boolean') L.push(`- title-partner-case: ${cs(lk.partnerUpper)}`);
+  if (lk.heroColor) L.push(`- title-key-color: ${lk.heroColor}`);
+  if (lk.partnerColor) L.push(`- title-partner-color: ${lk.partnerColor}`);
+  if (caps.titleGlow) L.push(`- title-glow: ${caps.titleGlow === 'strong' || +caps.titleGlow > 0.7 ? 'strong' : 'soft'}`);
+  if (+caps.titleDim > 0) L.push(`- title-dim: ${+(+caps.titleDim).toFixed(2)}`);
+  if (caps.titleEntrance) L.push(`- title-entrance: ${caps.titleEntrance}`);
+  if (caps.captionFace === 'secondary') L.push('- caption-face: partner');
+  return L;
+}
+
+module.exports = { titleLookOf, titleLookLines, TITLE_KEYS, parse, load, validate, compile, toPreset, shotSettings, titleFlips, graphicFlips, cardFlips, PLACES, CARDS_BLOCK, GRAPHICS, CAPTION_POSITIONS, CAPTION_LOOK, exportJob, toPackage, summary, parseYaml, dumpYaml, parseLine, ENTRANCES, LAYERS, GLYPHS };
 
 if (require.main === module) {
   const argv = process.argv.slice(2), cmd = argv[0];

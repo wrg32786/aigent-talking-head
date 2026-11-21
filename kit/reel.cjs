@@ -579,8 +579,13 @@ if (!flag('rebuild')) {
         console.log(`burst sized to your head: head ${(hw.head_w * 100).toFixed(0)}% of the frame wide, centre ${(hw.head_cy * 100).toFixed(0)}% down`);
       } else console.log('note: no person mask to measure your head (npm run effects:setup); bursts keep the recipe size');
     }
-    if (pos || col || gfx.length || Object.keys(look).length) {
+    // the look of the reference's titles (Reel.md Style title-lockup, title-key-*, title-partner-*, title-glow, title-dim,
+    // title-entrance; kit/titlelook.py reads them in a teardown): the two-line lockup, its cases and colours, glow and dim
+    const TLOOK = preset && preset.titleLook && Object.keys(preset.titleLook).length ? preset.titleLook : null;
+    if (TLOOK) console.log(`titles: ${TLOOK.titleLockup === 'full' ? 'the key word with its partner line, as the reference' : 'the key word'}${TLOOK.titleGlow ? ', glow ' + TLOOK.titleGlow : ''}${TLOOK.titleDim ? ', picture dimmed by ' + Math.round(TLOOK.titleDim * 100) + '%' : ''}${TLOOK.titleEntrance ? ', entrance ' + TLOOK.titleEntrance + ' where the reference\'s was not read' : ''}`);
+    if (pos || col || gfx.length || Object.keys(look).length || TLOOK) {
       const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF);
+      if (TLOOK) { const { lockup: lkp, ...rest } = TLOOK; Object.assign(caps, rest); if (lkp) caps.lockup = { ...(caps.lockup || {}), ...lkp }; }
       if (pos) caps.captionPosition = String(pos);
       if (col) caps.captionColor = String(col).toLowerCase();
       Object.assign(caps, look);
