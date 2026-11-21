@@ -71,7 +71,7 @@ try {
   });
   await t('the step face is calm: keys and Add a spot in More, sources behind Choose something else, no engine words', async () => {
     const face = await pg.locator('#s-broll').innerText();
-    assert.ok(!/API keys and providers/.test(face) && !/Stock: /.test(face) && !/\(full cutaway\)/i.test(face) && !/—/.test(face), face.slice(0, 400));
+    assert.ok(!/API keys and providers/.test(face) && !/Stock: /.test(face) && !/\(full cutaway\)/i.test(face) && !/\u2014/.test(face), face.slice(0, 400));
     assert.strictEqual(await pg.isVisible('#open-keys'), false); assert.strictEqual(await pg.isVisible('#broll-add-spot'), false);
     assert.strictEqual(await pg.locator('#btab-library').count(), 0, 'the source tabs are folded away');
     await pg.click('#broll-more'); await pg.waitForSelector('#btab-library');
@@ -84,7 +84,7 @@ try {
     await pg.click('#broll-needs .need[data-slot="1"] .need-copy');
     const tx = await until(async () => { const c = await pg.evaluate(() => navigator.clipboard.readText().catch(() => '')); return /slot 1/.test(c) ? c : null; });
     assert.ok(/Capture a screen recording/.test(tx) && /Open the dashboard/.test(tx) && /wide 16:9/.test(tx) && /The reference showed Dashboard/.test(tx), tx);
-    assert.ok(!/npm |node |—/.test(tx));
+    assert.ok(!/npm |node |\u2014/.test(tx));
   });
   await t('Skip keeps the slot and says so; Put it back restores the card', async () => {
     await pg.click('#broll-needs .need[data-slot="3"] .need-skip');
