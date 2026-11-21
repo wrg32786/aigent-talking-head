@@ -1,11 +1,12 @@
 // Connect agent, the teleprompter controls and pop-out, the setup check and footage from a link, in a real Chrome.
+// The recorder and the link box are on the Start step (#step=start).
 // - Connect agent: opens from the header and the chat, shows each agent's commands with this install's paths, the
 //   "Let my agent set it up" prompt, waits, then shows "Connected: Claude Code, listening" when a scripted MCP client
 //   (the official SDK client over stdio, as Claude Code) starts listening; the picked agent is remembered
 // - teleprompter: plus, minus and the arrow keys change the WPM while it scrolls, slow/normal/fast, remembered after a
 //   reload; Rehearse scrolls with no take; the pop-out window (the plain popup; Picture-in-Picture is not driven here)
 //   stays in sync both ways: speed, mirror, rehearse, record with the countdown, stop; closing it brings it back
-// - footage from a link: a Drive link through the confirm page lands in the footage; a private one shows the login line
+// - footage from a link (Start): a Drive link through the confirm page lands in the footage; a private one shows the login line
 // Needs Chrome and ffmpeg. Run: node tests/studio-connect.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
 import assert from 'assert';
 import http from 'http';

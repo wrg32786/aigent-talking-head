@@ -102,7 +102,7 @@ try {
   });
 
   await t('clean-up pass: a real draft, the review list, apply and redraft: jump cuts, shorter, retake left out', async () => {
-    await api('/api/draft', {});
+    const d = await api('/api/draft', {}); assert.ok(!d.error, 'draft refused: ' + d.error);
     const v = await waitTask(); assert.strictEqual(v.task.status, 'done', JSON.stringify(v.task).slice(0, 600));
     const before = JSON.parse(readFileSync(join(JOBDIR, 'build', 'cut.json'), 'utf8'));
     assert.ok(!before.segs.some(s => /clip-005/.test(s.file)), 'the retake is left out by default');

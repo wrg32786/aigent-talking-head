@@ -1,9 +1,11 @@
-// Recreate and Influence on the reference card (1.21.0) in a real Chrome, with no keys and no network:
-// - Influence shows one switch per part of the reference; turning one off takes its picks out of your
+// Recreate and Influence on the reference card (1.21.0, on the eight steps of 1.28.0) in a real Chrome, with no keys and no network:
+// - Picture: Influence shows one switch per part of the reference; turning one off takes its picks out of your
 //   Look, turning it back on puts them back; Recreate and Off hide the switches
-// - the Breakdown shows which parts of the reference were read, and a fix button (no command) for each that was not;
-//   the same Recreate, Influence, Off control as the card; stats, timeline and contact sheet behind Details
-// - Recreate from the first screen: "Recreate a video" on Footage takes a link, sets Recreate and stays on Footage
+// - the Breakdown (the reference view of Picture) shows which parts of the reference were read, and a fix button (no
+//   command) for each that was not; the same Recreate, Copy the look, Influence, Off control as the card; stats,
+//   timeline and contact sheet behind Details
+// - Recreate from the first screen: the "Recreate a video" choice on Start opens the reference box, takes a link, sets
+//   Recreate and stays on Start
 // - screenshots, dark and light
 // Needs Chrome. Run: node tests/studio-recreate.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
 import assert from 'assert';
@@ -47,7 +49,10 @@ const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), 
 const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out))); });
 const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json();
 const until = async (fn, ms = 20000) => { const end = Date.now() + ms; for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) throw new Error('timed out'); await wait(150); } };
-const theme = async (pg, th) => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); await pg.reload({ waitUntil: 'networkidle' }); };
+// the page keeps a live connection, so wait for the stepper, not for a quiet network
+const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); };
+// a reload lands on the step in the address; give a hash to land on a view (the Breakdown is #step=reference)
+const theme = async (pg, th, hash) => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); if (hash) return open(pg, hash); await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); };
 const shot = async (pg, name, h = 1100) => { if (!shots) return; const vp = pg.viewportSize(); await pg.setViewportSize({ width: vp.width, height: h }); await pg.evaluate(() => scrollTo(0, 0)); await pg.waitForTimeout(400); await pg.screenshot({ path: join(shots, name) }); await pg.setViewportSize(vp); };
 const allowed = async kind => (((await api('/api/state')).state.picks[kind] || {}).allow || []);
 
@@ -56,17 +61,17 @@ try {
   const errs = [];
   const pg = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
-  await pg.addInitScript(() => localStorage.setItem('studio.paused', '1'));
+  await pg.addInitScript(() => { try { localStorage.setItem('studio.paused', '1'); } catch {} }); // about:blank has no storage
 
   await t('Influence shows a switch per part; Off and Recreate hide them', async () => {
-    await pg.goto(url + '/#step=style', { waitUntil: 'networkidle' }); await pg.waitForSelector('#ref-card');
+    await open(pg, '#step=picture'); await pg.waitForSelector('#ref-card');
     assert.strictEqual(await pg.$('#ref-parts'), null, 'no switches when Off');
     await pg.click('#ref-card-mode [data-mode="influence"]'); await pg.waitForSelector('#ref-card #ref-parts');
     const labels = await pg.$$eval('#ref-card #ref-parts .chip', x => x.map(e => e.textContent.trim()));
     assert.deepStrictEqual(labels, ['Captions', 'Titles', 'Transitions', 'Grade', 'Effects', 'Graphics', 'Pace', 'Music and sound', 'Fonts and theme']);
     assert.strictEqual(await pg.getAttribute('#ref-card #ref-part-transitions', 'aria-pressed'), 'true');
     assert.strictEqual(await pg.getAttribute('#ref-card #ref-part-sound', 'aria-pressed'), 'false', 'sound stays yours by default');
-    assert.match(await pg.textContent('#ref-card-mode-hint'), /Only the parts you switch on, as soft defaults\./);
+    assert.match(await pg.textContent('#ref-card-mode-hint'), /Only the parts you switch on\. Everything else stays yours\./);
     assert.strictEqual(await pg.$('#ref-card-note'), null);
   });
   await t('a switch off takes that part out of your Look, and on puts it back', async () => {
@@ -80,15 +85,16 @@ try {
   });
   await t('the Breakdown says what was read and offers a fix for the rest, never a command', async () => {
     await pg.click('#ref-more'); await pg.click('#ref-open'); await pg.waitForSelector('#ref-ran');
+    assert.deepStrictEqual(await pg.evaluate(() => [document.querySelector('main').dataset.step, document.querySelector('main').dataset.view]), ['picture', 'reference'], 'the Breakdown is a view of Picture');
     const st = await pg.$$eval('#ref-ran .ran li', x => x.map(e => [e.dataset.part, e.className]));
     assert.deepStrictEqual(Object.fromEntries(st), { reader: 'ok', speech: 'miss', layers: 'miss', sheet: 'miss', sounds: 'ok', music: 'ok' });
     const txt = await pg.textContent('#ref-ran'); assert.match(txt, /did not run/);
     assert.ok(!/npm |pip |python3? |\$ /.test(txt), 'no terminal command: ' + txt);
     assert.ok(await pg.$('#ref-ran .ran-fix button'), 'a fix button');
-    for (const th of ['dark', 'light']) { await theme(pg, th); await pg.waitForSelector('#ref-ran'); await pg.$eval('#ref-ran', e => e.scrollIntoView({ block: 'center' })); if (shots) { await pg.waitForTimeout(300); await (await pg.$('#ref-out')).screenshot({ path: join(shots, `recreate-ran-${th}.png`) }); } }
+    for (const th of ['dark', 'light']) { await theme(pg, th, '#step=reference'); await pg.waitForSelector('#ref-ran'); await pg.$eval('#ref-ran', e => e.scrollIntoView({ block: 'center' })); if (shots) { await pg.waitForTimeout(300); await (await pg.$('#ref-out')).screenshot({ path: join(shots, `recreate-ran-${th}.png`) }); } }
   });
   await t('the Breakdown is calm: the same mode control, parts switches in Influence, the rest behind Details', async () => {
-    assert.deepStrictEqual(await pg.$$eval('#ref-mode [role="radio"]', x => x.map(e => e.textContent.trim())), ['Recreate', 'Influence', 'Off']);
+    assert.deepStrictEqual(await pg.$$eval('#ref-mode [role="radio"]', x => x.map(e => e.textContent.trim())), ['Recreate', 'Copy the look', 'Influence', 'Off']);
     assert.strictEqual(await pg.getAttribute('#ref-mode [data-mode="influence"]', 'aria-checked'), 'true');
     assert.match(await pg.textContent('#ref-mode-hint'), /Only the parts you switch on/);
     assert.ok(await pg.isVisible('#ref-out #ref-parts'), 'the part switches stay in view');
@@ -98,10 +104,10 @@ try {
     await pg.click('#ref-details > summary'); await pg.waitForSelector('#ref-details .stats', { state: 'visible' }); assert.ok(await pg.isVisible('#ref-details .timeline'));
     await pg.click('#ref-details > summary');
   });
-  await t('Recreate: no switches, the hint says it re-cuts to its shots, the card sits above a dimmed Looks row', async () => {
-    await pg.goto(url + '/#step=style', { waitUntil: 'networkidle' }); await pg.waitForSelector('#ref-card');
+  await t('Recreate: no switches, the hint says same edit, your take, the card sits above a dimmed Looks row', async () => {
+    await open(pg, '#step=picture'); await pg.waitForSelector('#ref-card');
     await pg.click('#ref-card-mode [data-mode="recreate"]'); await pg.waitForSelector('#ref-card-mode [data-mode="recreate"][aria-checked="true"]');
-    assert.strictEqual(await pg.$('#ref-card #ref-parts'), null); assert.match(await pg.textContent('#ref-card-mode-hint'), /Your take re-cut to its shots, with its look, titles, sounds and music\./);
+    assert.strictEqual(await pg.$('#ref-card #ref-parts'), null); assert.match(await pg.textContent('#ref-card-mode-hint'), /Same edit, your take: its cuts and timing, with its look, titles, sounds and music\./);
     await pg.waitForSelector('#looks.by-ref'); assert.strictEqual((await pg.textContent('#looks-by-ref')).trim(), 'Set by your reference');
     const pos = await pg.evaluate(() => [document.querySelector('#ref-card').getBoundingClientRect().bottom, document.querySelector('#looks').getBoundingClientRect().top, +getComputedStyle(document.querySelector('#looks')).opacity]);
     assert.ok(pos[0] <= pos[1], 'the card is above the Looks row: ' + pos); assert.ok(pos[2] < 1, 'the Looks row is dimmed');
@@ -109,30 +115,34 @@ try {
     for (const th of ['dark', 'light']) { await theme(pg, th); await pg.waitForSelector('#ref-card'); await shot(pg, `recreate-useall-${th}.png`); }
     assert.deepStrictEqual(errs, []);
   });
-  await t('Recreate from the first screen: one quiet entry on Footage takes a link, sets Recreate, and you stay on Footage', async () => {
+  await t('Recreate from the first screen: the Recreate a video choice on Start takes a link, sets Recreate, and you stay on Start', async () => {
     await api('/api/settings', { downloads: join(STATE, 'dl') });
     await api('/api/reference/clear', {}); await api('/api/state', { reference: { mode: 'influence' } }); await theme(pg, 'dark');
-    await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' }); await pg.waitForSelector('#recreate-open');
-    assert.match(await pg.textContent('#recreate-open'), /Recreate a video/); assert.strictEqual(await pg.$('#recreate-card'), null, 'one row until you ask');
-    assert.ok(await pg.$eval('#recreate-open', e => e.getBoundingClientRect().height < 80), 'a quiet row, not a third big tile');
+    await open(pg, '#step=start'); await pg.waitForSelector('#start-mode #mode-recreate');
+    assert.match(await pg.textContent('#mode-recreate'), /Recreate a video/); assert.strictEqual(await pg.$('#recreate-card'), null, 'one row until you ask');
+    assert.deepStrictEqual(await pg.$$eval('#start-mode [role="radio"]', x => x.map(e => [e.dataset.mode, e.getAttribute('aria-checked')])), [['own', 'true'], ['recreate', 'false'], ['look', 'false']], 'three choices, Just my footage first');
+    assert.ok(await pg.$eval('#mode-recreate', e => e.getBoundingClientRect().height < 80), 'a quiet row, not a third big tile');
     await shot(pg, 'recreate-first-dark.png');
-    await pg.click('#recreate-open'); await pg.waitForSelector('#recreate-card[data-state="empty"] #recreate-link');
-    await pg.waitForSelector('#recreate-mode [data-mode="recreate"][aria-checked="true"]');
-    assert.deepStrictEqual(await pg.$$eval('#recreate-mode [role="radio"]', x => x.map(e => e.textContent.trim())), ['Recreate', 'Influence', 'Off'], 'the same control as the Look step');
-    assert.strictEqual((await api('/api/state')).state.reference.mode, 'recreate');
+    await pg.click('#mode-recreate'); await pg.waitForSelector('#recreate-card[data-state="empty"][data-mode="recreate"] #recreate-link');
+    await pg.waitForSelector('#mode-recreate[aria-checked="true"]');
+    // the mode is the choice above the box now: the box has no Recreate, Influence, Off control of its own and no Close button
+    assert.strictEqual(await pg.$('#recreate-mode'), null); assert.strictEqual(await pg.$('#recreate-open'), null);
+    await until(async () => (await api('/api/state')).state.reference.mode === 'recreate');
     assert.ok(await pg.isVisible('#recreate-upload'), 'a file works too');
     await pg.fill('#recreate-link', `http://127.0.0.1:${media.address().port}/ref.mp4`); await pg.click('#recreate-add');
-    await pg.waitForSelector('#recreate-card[data-state="reading"] #recreate-reading'); assert.match(await pg.textContent('#recreate-reading'), /Record or add your footage while it reads\./);
+    await pg.waitForSelector('#recreate-card[data-state="reading"] #recreate-reading'); assert.match(await pg.textContent('#recreate-reading'), /Record or add your footage while we read it\./);
     assert.ok(await pg.isVisible('#drop-footage') && await pg.isVisible('#record-now'), 'footage and the recorder are right there');
     for (const th of ['dark', 'light']) { await theme(pg, th); await pg.waitForSelector('#recreate-reading'); await shot(pg, `recreate-first-reading-${th}.png`); }
     await theme(pg, 'dark'); release();
     await pg.waitForSelector('#recreate-card[data-state="ready"] #recreate-ready', { timeout: 30000 });
-    assert.strictEqual(await pg.evaluate(() => document.querySelector('main').dataset.step), 'footage', 'still on the first screen');
+    assert.strictEqual(await pg.evaluate(() => document.querySelector('main').dataset.step), 'start', 'still on the first screen');
     const st = (await api('/api/state')).state; assert.strictEqual(st.reference.mode, 'recreate'); assert.strictEqual(st.reference.status, 'ready'); assert.ok(st.reference.extracted);
     await shot(pg, 'recreate-first-ready-dark.png');
     assert.ok(!/\u2014/.test(await pg.textContent('#recreate-card')), 'no em dashes');
-    await pg.click('#next'); await pg.click('#next'); await pg.waitForSelector('#ref-card[data-mode="recreate"]'); // Cut, then Look: the reference is already set
-    await pg.setViewportSize({ width: 390, height: 844 }); await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' }); await pg.waitForSelector('#recreate-card');
+    assert.strictEqual(await pg.getAttribute('#mode-recreate', 'aria-checked'), 'true'); assert.strictEqual((await pg.textContent('#recreate-details')).trim(), 'See how it was made');
+    await pg.click('#next'); await pg.click('#next'); await pg.waitForSelector('#ref-card[data-mode="recreate"]'); // Cut, then Picture: the reference is already set
+    assert.strictEqual(await pg.getAttribute('main', 'data-step'), 'picture');
+    await pg.setViewportSize({ width: 390, height: 844 }); await open(pg, '#step=start'); await pg.waitForSelector('#recreate-card');
     const over = await pg.evaluate(() => Math.max(...[...document.querySelectorAll('#s-footage *')].filter(e => e.offsetParent).map(e => e.getBoundingClientRect().right)) - innerWidth); assert.ok(over <= 1, 'fits a phone: ' + over);
     assert.deepStrictEqual(errs, []);
   });

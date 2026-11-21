@@ -1,4 +1,4 @@
-// The B-roll step and API keys in a real Chrome, on synthetic media only, with mock Pexels and Higgsfield servers
+// The B-roll step (step 5 of 8, #step=broll) and API keys in a real Chrome, on synthetic media only, with mock Pexels and Higgsfield servers
 // (no real keys, no network):
 // - the lane: beats from a draft (tests/fixtures/fake-reel.mjs), upload onto a beat, full cutaway, split top panel and
 //   picture in picture, timing, clear

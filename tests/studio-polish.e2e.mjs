@@ -1,6 +1,8 @@
-// The 1.8.0 polish in a real Chrome:
+// The 1.8.0 polish in a real Chrome, on the eight steps of 1.28.0 (Start, Cut, Picture, Text and graphics, B-roll,
+// Music and sounds, Review, Render, and the Post view of Render):
 // - the top bar fits on one line at desktop, laptop and tablet widths, and on two rows on a phone; Settings stays on screen
-// - the More menu (Headless UI Menu) opens with the keyboard, moves with arrow keys and runs Connect agent and the theme
+// - the More menu (Headless UI Menu) opens with the keyboard, moves with arrow keys and runs Setup check; on a phone it
+//   also carries Wizards, Outputs and the theme
 // - hints (Headless UI Popover) open on click with the longer text and close with Escape
 // - the theme button swaps its icons; reduced motion turns the step entrance off
 // Needs Chrome. Run: node tests/studio-polish.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
@@ -22,36 +24,41 @@ const env = { ...process.env, CI: '1', STUDIO_DIR: join(TMP, 'studio'), STUDIO_C
 const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), '--port', '0', '--no-open'], { cwd: ROOT, env });
 const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out.slice(-400)))); });
 const browser = patient(await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox'] }));
-const STEPS = ['footage', 'cut', 'look', 'broll', 'finish', 'post'];
+const { STEPS } = await import('../kit/studio/web/src/steps.js');
+// every step, and Post (the second view of Render): [link, step, view]
+const PAGES = [...STEPS.map(st => [st, st, 'main']), ['post', 'render', 'post']];
+// a link that only changes the hash does not reload the page, so wait for the step to show
+const to = async (pg, hash, step, view) => { await pg.goto(url + '/#step=' + hash); await pg.waitForFunction(([st, v]) => { const m = document.querySelector('main'); return m && m.dataset.step === st && (!v || m.dataset.view === v); }, [step, view || null]); };
 try {
   await fetch(url + '/api/settings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat: { backend: 'keywords' } }) });
   const errs = [], ctx = await browser.newContext({ viewport: { width: 1280, height: 860 } }), pg = await ctx.newPage();
   pg.on('pageerror', e => errs.push(e.message));
-  await pg.goto(url, { waitUntil: 'networkidle' }); await pg.waitForSelector('#more-open');
+  await pg.goto(url, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#more-open'); // Studio keeps a live connection, so the network is never idle
 
   await t('the top bar fits at 1600, 1280, 1024, 820 and 375 px on every step; Settings and More stay on screen', async () => {
     for (const w of [1600, 1280, 1024, 820, 375]) {
       await pg.setViewportSize({ width: w, height: 820 });
-      for (const st of STEPS) {
-        await pg.goto(url + '/#step=' + st, { waitUntil: 'networkidle' }); await pg.waitForSelector('#more-open');
+      for (const [st, step, view] of PAGES) {
+        await to(pg, st, step, view); await pg.waitForSelector('#more-open');
         const m = await pg.evaluate(() => ({ over: document.documentElement.scrollWidth - innerWidth, top: document.querySelector('.top').getBoundingClientRect(),
           set: document.querySelector('#open-settings').getBoundingClientRect().right, more: document.querySelector('#more-open').getBoundingClientRect().right,
           steps: [...document.querySelectorAll('.stepper button')].map(b => b.getBoundingClientRect()).map(r => [r.left, r.right]) }));
+        assert.strictEqual(m.steps.length, 8, `${w} ${st}: the 8 steps`);
         assert.ok(m.over <= 0, `${w} ${st}: sideways scroll ${m.over}`);
         assert.ok(m.set <= w && m.more <= w, `${w} ${st}: buttons off screen ${m.set} ${m.more}`);
         assert.ok(m.steps.every(([l, r]) => l >= 0 && r <= w), `${w} ${st}: a step is off screen`);
       }
     }
-    if (shots) { await pg.goto(url + '/#step=look', { waitUntil: 'networkidle' }); await pg.waitForTimeout(600); await pg.screenshot({ path: join(shots, 'top-phone.png'), clip: { x: 0, y: 0, width: 375, height: 260 } }); }
+    if (shots) { await to(pg, 'picture', 'picture'); await pg.waitForTimeout(600); await pg.screenshot({ path: join(shots, 'top-phone.png'), clip: { x: 0, y: 0, width: 375, height: 260 } }); }
     await pg.setViewportSize({ width: 1280, height: 860 });
-    if (shots) { await pg.goto(url + '/#step=style', { waitUntil: 'networkidle' }); await pg.waitForTimeout(900); await pg.screenshot({ path: join(shots, 'liquid-glass.png') }); }
+    if (shots) { await to(pg, 'text', 'text'); await to(pg, 'picture', 'picture'); await pg.waitForTimeout(900); await pg.screenshot({ path: join(shots, 'liquid-glass.png') }); }
   });
 
   await t('More menu: only what is nowhere else on the page, short labels; keyboard opens it, arrows move, Enter runs Setup check', async () => {
     // a hash change moves focus to the step heading on the next frame (App go(step, true)); let that land first, or it
     // can take focus off the More button between focus() and Enter on a slow runner
-    await pg.goto(url + '/#step=footage', { waitUntil: 'networkidle' });
-    await pg.waitForFunction(() => document.querySelector('main').dataset.step === 'footage' && document.activeElement && document.activeElement.id === 'h-footage');
+    await pg.goto(url + '/#step=start');
+    await pg.waitForFunction(() => document.querySelector('main').dataset.step === 'start' && document.activeElement && document.activeElement.id === 'h-footage');
     await pg.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     await pg.focus('#more-open'); assert.strictEqual(await pg.evaluate(() => document.activeElement.id), 'more-open');
     await pg.keyboard.press('Enter');
@@ -65,10 +72,14 @@ try {
     await pg.keyboard.press('ArrowUp'); await pg.keyboard.press('Enter');
     await pg.waitForSelector('#h-setup', { state: 'visible' }); await pg.waitForFunction(() => !document.querySelector('#more-setup'));
     await pg.keyboard.press('Escape'); await pg.waitForSelector('#h-setup', { state: 'hidden' });
-    // on a phone the theme button leaves the top bar, so More carries it there (and only there)
+    // on a phone Wizards, Outputs and the theme button leave the top bar, so More carries them there (and only there)
     const vp = pg.viewportSize(); await pg.setViewportSize({ width: 390, height: 844 });
     const before = await pg.evaluate(() => document.documentElement.dataset.theme || 'dark');
-    await pg.click('#more-open'); await pg.click('#more-theme');
+    await pg.click('#more-open'); await pg.waitForSelector('#more-theme');
+    assert.deepStrictEqual(await pg.$$eval('.menu-item span', x => x.map(e => e.textContent)), ['Past videos', 'Setup check', 'API keys', 'Wizards', 'Outputs', before === 'dark' ? 'Light theme' : 'Dark theme']);
+    for (const id of ['#more-wizards', '#more-outputs']) assert.ok(await pg.isVisible(id), id);
+    for (const id of ['#wizards-open', '#outputs-open', '#theme']) assert.ok(!(await pg.isVisible(id)), id + ' is in More on a phone');
+    await pg.click('#more-theme');
     assert.notStrictEqual(await pg.evaluate(() => document.documentElement.dataset.theme), before);
     await pg.setViewportSize(vp);
     await pg.click('#theme'); assert.strictEqual(await pg.evaluate(() => document.documentElement.dataset.theme), before);
@@ -89,7 +100,7 @@ try {
     await pg.goto(url + '/#step=cut'); await pg.waitForFunction(() => document.querySelector('main').dataset.step === 'cut');
     assert.strictEqual(await anim(), 'step-in-2'); // a new name per step is what replays it
     assert.strictEqual(await pg.$eval('#s-cut', e => getComputedStyle(e).animationName), 'none'); // the section itself never replays it
-    await pg.goto(url + '/#step=footage'); await pg.waitForFunction(() => document.querySelector('main').dataset.step === 'footage');
+    await pg.goto(url + '/#step=start'); await pg.waitForFunction(() => document.querySelector('main').dataset.step === 'start');
     await pg.emulateMedia({ reducedMotion: 'reduce' }); assert.strictEqual(await anim(), 'none');
     await pg.emulateMedia({ reducedMotion: null });
   });

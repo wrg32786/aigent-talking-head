@@ -1,7 +1,8 @@
-// Record now in a real Chrome with a fake camera and mic (--use-fake-device-for-media-stream gives a moving test
+// Record now, on the Start step, in a real Chrome with a fake camera and mic (--use-fake-device-for-media-stream gives a moving test
 // pattern and a beep; --use-fake-ui-for-media-stream answers the permission prompt). Turns the camera on, films a
 // take with the 3, 2, 1 countdown, stops, and checks the take was cropped to 9:16, converted to mp4 and added to the
-// footage. Also checks the blocked-camera message and that the phone layout does not scroll sideways.
+// footage. Also checks the Scripts panel on Start (it shows by itself once the job has a script), the blocked-camera message
+// and that the phone layout does not scroll sideways.
 // FAKE_VIDEO=<file.y4m> swaps the test pattern for a calmer clip (used for the docs screenshots).
 // Needs Chrome and ffmpeg. Run: node tests/studio-record.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
 import assert from 'assert';

@@ -58,7 +58,7 @@ try {
   const errs = [];
   const pg = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
-  await pg.addInitScript(() => localStorage.setItem('studio.paused', '1'));
+  await pg.addInitScript(() => { try { localStorage.setItem('studio.paused', '1'); } catch {} }); // about:blank has no storage
 
   await t('Picture: one row of Looks, the reference card, 4 layer tabs; Text and graphics has 3', async () => {
     await open(pg, '#step=picture'); await pg.waitForSelector('#looks .pack[data-look="magazine"][aria-checked="true"]');

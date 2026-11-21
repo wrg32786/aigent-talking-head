@@ -30,6 +30,7 @@ export function StartMode({ s, apply, patch, go, looks }) {
     if (m !== 'own' && needJob()) return;
     setLocal(m);
     if (m === 'own') { if (has && r.mode !== 'off') setMode('off'); if (s.styleLook && looks) looks.pick(null); return; }
+    if (m === 'look' && looks && !looks.on) looks.reload();
     if (r.mode !== m) setMode(m);
     if (m === 'recreate' && s.styleLook && looks) looks.pick(null);
   };

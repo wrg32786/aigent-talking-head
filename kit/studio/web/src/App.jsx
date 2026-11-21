@@ -94,7 +94,7 @@ export function App() {
     if (s === 'picture' && v) setPicView(v); if (s === 'render' && v) setOutView(v);
     setStep(s); localStorage.setItem('studio.step', s);
     // a #menu= link stays while you are on the step that owns its layer
-    const m = hashMenu(); if (!m || menuStep(m, catRef.current && catRef.current.layers) !== s) history.replaceState(null, '', '#step=' + s);
+    const m = hashMenu(); if (!m || menuStep(m, catRef.current && catRef.current.layers) !== s) history.replaceState(null, '', '#step=' + (v === 'reference' || v === 'post' ? v : s));
     if (focus) requestAnimationFrame(() => { window.scrollTo({ top: 0 }); const h = document.querySelector('main .step:not([hidden]) h2'); if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); } });
   }, [setPicView, setOutView]);
   // open a layer: the step that owns it comes up with that layer showing
@@ -110,7 +110,6 @@ export function App() {
         setCat(await api('/api/catalog'));
         apply(await api('/api/state'));
       } catch (e) { toast('Studio could not load: ' + e.message); return; }
-      reloadLooks();
       es = new EventSource('/api/events');
       es.addEventListener('state', e => apply(JSON.parse(e.data)));
       es.addEventListener('log', e => { const d = JSON.parse(e.data); setLog(l => (l ? l + '\n' : '') + d.line); });
@@ -126,6 +125,10 @@ export function App() {
   }, [apply, go, pickTab, reloadLooks]);
   // an old tab name in a link (#menu=captions) is a group inside a layer: once the catalog is in, open the step that holds it
   useEffect(() => { const m = hashMenu(); if (CAT && m) { const st = menuStep(m, CAT.layers); if (st !== step) pickTab(m); } }, [!!CAT]);
+  // the saved looks are asked for only when they can matter: the server knows them (the state has styleLook), the
+  // reference is on Copy the look, or you pick Copy the look on Start. An older server is never asked on a page load
+  const wantLooks = !!V && (V.state.styleLook !== undefined || V.state.reference.mode === 'look');
+  useEffect(() => { if (wantLooks) reloadLooks(); }, [wantLooks, reloadLooks]);
   const run = useRun(V || { compose: {} }, V ? V.state : { footage: [] }, log, setLog);
 
   if (!CAT || !V) return <Theme theme={aigentTheme} mode={theme}><div className="boot" role="status"><span className="spin" aria-hidden="true" />Loading Studio</div><Toast /></Theme>;
@@ -185,8 +188,8 @@ export function App() {
       <div className="layout">
         <main id="main" data-step={step} data-view={step === 'picture' ? picView : step === 'render' ? outView : 'main'} ref={mainRef}>
           {!post && <YourEdit V={V} s={s} go={go} step={step} />}
-          {step === 'picture' && (refAny || breakdown) && <ViewSwitch id="look-switch" label="Picture" value={picView} set={setPicView} views={[['main', 'Your picture', 'look-sub-style'], ['reference', 'How the reference was made', 'look-sub-reference', refOn]]} />}
-          {step === 'render' && <ViewSwitch id="render-switch" label="Render" value={outView} set={setOutView} views={[['main', 'Render', 'render-sub-main'], ['post', 'Post', 'render-sub-post']]} />}
+          {step === 'picture' && (refAny || breakdown) && <ViewSwitch id="look-switch" label="Picture" value={picView} set={v => { setPicView(v); history.replaceState(null, '', '#step=' + (v === 'reference' ? 'reference' : 'picture')); }} views={[['main', 'Your picture', 'look-sub-style'], ['reference', 'How the reference was made', 'look-sub-reference', refOn]]} />}
+          {step === 'render' && <ViewSwitch id="render-switch" label="Render" value={outView} set={v => { setOutView(v); history.replaceState(null, '', '#step=' + (v === 'post' ? 'post' : 'render')); }} views={[['main', 'Render', 'render-sub-main'], ['post', 'Post', 'render-sub-post']]} />}
           {/* a new or opened video remounts the steps, so no step keeps the last board's local picks */}
           <Fragment key={'v' + (s.videoSeq || 0)}>
           <Footage {...ctx} hidden={step !== 'start'} onLive={setRecLive} />
@@ -198,7 +201,7 @@ export function App() {
           {step === 'broll' && <BrollLayer {...ctx} tab={tab} setTab={pickTab} />}
           {step === 'music' && <Music {...ctx} tab={tab} setTab={pickTab} />}
           <ReviewStep {...ctx} run={run} hidden={step !== 'review'} />
-          <Render {...ctx} run={run} hidden={step !== 'render' || post} toPost={() => { setOutView('post'); window.scrollTo({ top: 0 }); }} />
+          <Render {...ctx} run={run} hidden={step !== 'render' || post} toPost={() => go('post', true)} />
           {post && <Post {...ctx} />}
           {(step === 'review' || (step === 'render' && !post)) && <RunFoot V={V} s={s} log={log} />}
           </Fragment>

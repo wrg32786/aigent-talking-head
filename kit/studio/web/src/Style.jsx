@@ -108,7 +108,7 @@ function Looks({ CAT, V, s, apply, patch, reloadCat, go, setTab, looks: saved })
     <div id="looks" className={'packs looks' + (byRef ? ' by-ref' : '')} role="radiogroup" aria-label="Look" aria-describedby={byRef ? 'looks-by-ref' : undefined}>
       {looks.map(p => <button key={p.name || 'none'} className="pack" type="button" role="radio" data-look={p.name || ''} aria-checked={String((s.pack || null) === p.name)} title={p.description || (p.label || '').split(':')[0]} onClick={() => patch({ pack: p.name })}>
         <span className="pv">{p.preview ? <img src={file(p.preview)} alt="" loading="lazy" width={112} height={199} /> : <span className="ph">{p.name ? 'No preview' : 'Your picks only'}</span>}</span>
-        <b>{p.name || 'None'}</b><small className="fine">{!p.name ? 'kit defaults' : p.shipped ? 'built in' : /reference/i.test(p.label || '') ? 'saved from a reference' : 'your saved Look'}</small>
+        <b>{p.name || 'None'}</b><small className="fine">{!p.name ? 'our defaults' : p.shipped ? 'built in' : /reference/i.test(p.label || '') ? 'saved from a reference' : 'your saved Look'}</small>
       </button>)}
     </div>
   </div>;
@@ -188,7 +188,7 @@ function Layers({ step, bare, CAT, V, s, apply, patch, tab, setTab }) {
               {x.label}{refIn(x) > 0 ? <span className="pd pd-ref" title={REF_LABEL} aria-label="has picks from the reference" /> : any && <span className="pd" title="has your picks" aria-label="has your picks" />}</button>; })}
         </div>
         <div className="tools">
-          <label className="search"><Icon n="search" /><span className="sr">Filter effects</span><input id="filter" type="search" placeholder="Search everything" aria-label="Filter effects" value={q} onChange={e => setQ(e.target.value)} /><span className="kbdwrap"><Kbd keys="/" /></span></label>
+          <label className="search"><Icon n="search" /><span className="sr">Filter effects</span><input id="filter" type="search" placeholder="Search all" aria-label="Filter effects" value={q} onChange={e => setQ(e.target.value)} /><span className="kbdwrap"><Kbd keys="/" /></span></label>
           <IconBtn id="pause" n={paused ? 'play' : 'pause'} label={paused ? 'Play previews' : 'Pause previews'} aria-pressed={String(paused)} onClick={togglePause} />
         </div>
       </div>

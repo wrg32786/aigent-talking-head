@@ -48,7 +48,7 @@ const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(u
 const onStep = (pg, st) => pg.waitForFunction(x => document.querySelector('main').dataset.step === x, st);
 const toStep = async (pg, st) => { await pg.click(`#stepper button[data-step="${st}"]`); await onStep(pg, st); };
 const openMake = async pg => { if (!(await pg.isVisible('#exp-reel'))) await pg.click('#make-fold > button'); await pg.waitForSelector('#exp-reel', { state: 'visible' }); };
-const cleanJobs = () => { for (const d of [JOB, `${JOB}-c1`, `${JOB}-c2`]) rmSync(join(ROOT, 'jobs', d), { recursive: true, force: true }); rmSync(join(ROOT, 'inbox', 'studio', JOB), { recursive: true, force: true }); };
+const cleanJobs = () => { for (const d of [JOB, `${JOB}-c1`, `${JOB}-c2`, `${JOB}-c3`]) rmSync(join(ROOT, 'jobs', d), { recursive: true, force: true }); rmSync(join(ROOT, 'inbox', 'studio', JOB), { recursive: true, force: true }); };
 
 const browser = patient(await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox'] }));
 let client;

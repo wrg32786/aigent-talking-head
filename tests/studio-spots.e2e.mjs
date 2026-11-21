@@ -1,4 +1,4 @@
-// B-roll that picks itself (1.13.0) in a real Chrome, on synthetic media only (no keys, no network):
+// B-roll that picks itself (1.13.0), on the B-roll step (#step=broll), in a real Chrome, on synthetic media only (no keys, no network):
 // - after a draft, b-roll picks itself: the first spot too (after the hook), a number said becomes a counter card
 //   placed by Studio, the rest wait with why; the chat says what was placed
 // - Use it with no Pexels key and nothing in the library: a card made from the spot's words goes on

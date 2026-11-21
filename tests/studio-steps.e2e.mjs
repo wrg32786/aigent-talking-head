@@ -102,6 +102,14 @@ try {
     }
   });
 
+  await t('a second view stays after a reload: Post inside Render', async () => {
+    await open(pg, '#step=render'); await pg.click('#render-sub-post'); await pg.waitForSelector('#s-post');
+    assert.match(await pg.evaluate(() => location.hash), /step=post/);
+    await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#s-post');
+    await pg.click('#render-sub-main'); await pg.waitForSelector('#s-render:not([hidden])');
+    assert.match(await pg.evaluate(() => location.hash), /step=render/);
+  });
+
   await t('#step=music: sound on its own step', async () => {
     await open(pg, '#step=music');
     assert.strictEqual(await h2(pg), 'Music and sounds');
