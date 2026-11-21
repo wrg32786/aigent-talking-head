@@ -74,4 +74,6 @@ export function forDraft(s, root, args) {
 }
 
 // how close the current draft is to what it copies (build/match.json), or null
+// the font a saved look carries (the pairing a teardown matched), or null
+export const fontOf = name => { try { const l = name ? SL.load(name) : null; return (l && l.captions && l.captions.font) || null; } catch { return null; } };
 export const matchOf = build => (build ? FID.read(build) : null);
