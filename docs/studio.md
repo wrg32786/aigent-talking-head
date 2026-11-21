@@ -66,6 +66,24 @@ The Look step used to show 17 tabs where 58 options sat in two or three. It now 
 
 **Save as a Look** on the reference card saves the reference's look as a Look of its own, beside the built-in ones (`POST /api/pack/save { fromReference }`; `save_look`). Save as a new Look keeps the reference's look too when one is in use.
 
+### Settings that rule out others (1.20.0)
+
+Some picks only work with others. One file, `kit/studio/conflicts.mjs`, holds the rules for the page, the server, the render and your agent:
+
+| You picked | What it rules out | One click switches to |
+| --- | --- | --- |
+| A caption style other than Kinetic (Single word, Oneword, Pill, Hormozi, Karaoke, Classic), yourself or through a Look, pack or reference | Caption entrances (they only move Kinetic captions) | Kinetic captions |
+| The Classic look, or a Look with no titles (minimal-clean) | Title entrances and the title layer | Titles on, your captions kept |
+| No music | Beat sync, and Energy | Auto music |
+| Sound effects off | Sound map and Sparse sounds | Sound effects on |
+| Keep pauses | Tighten pauses | Pace from the Look |
+| Zoom punch off | Punch-in | Zoom punch on |
+| A Look | Your earlier caption style (the Look brings its own) | |
+
+A ruled out option is greyed with a short reason, and clicking it makes the switch. A pick that turns something off says so in one line with Undo. The draft never sends a ruled out pick to the reel. Effects, and titles behind your head, say "needs setup" until the effects pass is set up. For agents, `studio_set_selections` refuses a ruled out pick with the reason, and takes `switchFor` and `undoChange`.
+
+<img src="studio/look-conflicts.jpg" width="560" alt="Single word captions turned off the Typewriter caption entrance, with Undo; the caption entrances greyed with Not with Single word captions">
+
 ## Words and brands
 
 In Look (Your look), **Words and brands** has two lists:

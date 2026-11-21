@@ -2,29 +2,40 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
-## 1.19.0 (unreleased)
+## 1.21.0 (unreleased)
 
-Release notes: [docs/releases/v1.19.0.md](docs/releases/v1.19.0.md). Recreate re-cuts your take to the reference's shot plan.
+Release notes: [docs/releases/v1.21.0.md](docs/releases/v1.21.0.md). Recreate re-cuts your take to the reference's shot plan.
 
 - **Shot plan re-cut.** `reel.cjs --recut` (every Studio Recreate draft): the recipe's shot lengths are scaled to your edit and each cut goes on a word boundary, a seam you already have or the middle of the quiet between two words from the audio (at least 0.14 s, so the segment fades never touch a word). No quiet near a reference cut: that cut is left out. The audio runs on across new cuts and they get no glitch hit. `kit/shotplan.cjs`; `cut.json` `refShots`.
 - **Framing per shot.** A shot line's `framing` (from the breakdown's shot size) sets that shot's zoom: close-up 1.16, extreme close-up 1.3, medium close-up 1.06, medium or wider 1, never the same twice in a row.
 - **More of the breakdown in the recipe.** `kit/videomd2reel.cjs` writes `framing` and `cutaway on` (talk_share under 0.35, else no face) on shot lines; the reference's sound effects as a `reel-sfx` block mapped to kit sounds (placed at scaled times on `--recut`, instead of the default whoosh and boom); boxes drawn over a shot and stickers as placeholder graphics; a title `role` (hook, number, timer, brand, line); `bed: none` when the music stem is -37 dB or quieter, else a `bed-volume` from the music and voice levels.
 - **Titles by role.** On `--recut` your titles take the style of the recipe title with the same role, then the rest in order.
-- **Cut points.** An end set inside a clean pause stays in it: the next line is no longer pulled back in when Whisper times its first word early (`/api/cut/set` moved 6.75 s to 8.04 s past a pause at 6.63 to 7.20 s). A transcript that runs early or late as a whole is moved onto the sound (`kit/cutpoints.cjs` `offsetOf`, `align`), once the audio is read; the cached transcript records `aligned`.
+- **Cut points.** An end set inside a clean pause stays in it: the next line is no longer pulled back in when Whisper times its first word early (`/api/cut/set` moved 6.75 s to 8.04 s past a pause at 6.63 to 7.20 s). A transcript that runs early or late as a whole is moved onto the sound (`kit/cutpoints.cjs` `offsetOf`, `align`), once the audio is read; the cached transcript records `aligned`. The pause guard acts only on a clean pause, one with no whole word inside it.
 - **Influence per part.** `reference.parts` (captions, titles, transitions, grade, effects, graphics, pace, sound, fonts): Influence takes only the parts switched on, one switch each on the reference card (Use parts) and in the Breakdown. Pace and sound start off, as before. `C.REF_PARTS`, the MCP `studio_set_selections` description.
 - **What the breakdown read.** `C.ranOf`: the full read, speech, layers and grade, contact sheet, sound effects and music, from what the teardown left. The Breakdown shows them in one row, and each missing one names what reads it with the Install and Copy for my agent fix buttons, then Read it again.
 - **B-roll at the reference's cutaways.** A recut draft's `refShots` cutaways become reference spots on the draft clock (before: the reference's b-roll parts as a fraction of its length). Shot lines with `cutaway on` count as b-roll parts in What to swap.
 - **Library first, better matching.** `broll.mjs` `rank`: the best library clip on a spot's nouns, counting stems and partial matches, then on its words, before stock. A tip about a tool or a screen suggests a screen recording first.
 - **Tests and docs.** `tests/studio-recreate-parts.test.mjs` (in `npm run check`), `tests/studio-recreate.e2e.mjs` (in `npm run smoke`), `tests/recreate-shotplan.test.cjs` (in `npm run check`), a `--recut` smoke step on one continuous take with a 6-shot reference, `--recut` asserted in `tests/studio-recreate-pieces.test.mjs`; `docs/reel-md.md`, `docs/studio.md`, the MCP `studio_add_reference_url` description.
 
-## 1.18.2 (unreleased)
+## 1.20.1 (unreleased)
 
-Release notes: [docs/releases/v1.18.2.md](docs/releases/v1.18.2.md). Recreate drafts from your pieces.
+Release notes: [docs/releases/v1.20.1.md](docs/releases/v1.20.1.md). Recreate drafts from your pieces.
 
 - **Recreate keeps your pieces.** With a reference on Recreate, Draft used the whole take even when you kept pieces on Cut (`fromPieces = ... && !recreate` in `draftSteps`), so a line you cut out came back. The draft was saved under the take's key while Your edit and Finish asked for the pieces' key, so after every draft Studio still said "Your pieces changed since the draft" (`drafted: false, stale: true`) and Render never came on. Recreate now drafts from your pieces, already cut (`--as-is`), with the reference's Reel.md as the recipe, and the draft counts as done.
 - **A reference, then your take.** A reference on its own no longer counts as an edit, so adding your first take after picking a reference keeps it (1.18.1 started a fresh edit and cleared the reference).
 - **Tests.** `tests/studio-recreate-pieces.test.mjs` (in `npm run smoke`, it needs ffmpeg).
 
+## 1.20.0 (unreleased)
+
+Release notes: [docs/releases/v1.20.0.md](docs/releases/v1.20.0.md). Settings that rule out other settings now say so.
+
+- **One rules file.** `kit/studio/conflicts.mjs` says which options rule out which, why in a few plain words, and the one change that makes them work. Studio's server (`applyPatch`, `compose`), the agent tools and the page all read it, so the page, your agent and the render agree. The rules follow the engine: caption entrances only move Kinetic captions (`kit/overlay.html`); title entrances and the title layer need titles, which the Classic look and the minimal-clean Look turn off (`kit/reel.cjs`); Beat sync needs music; Sound map and Sparse sounds need sound effects on; Tighten pauses does nothing with Keep pauses; Punch-in does nothing with Zoom punch off. A caption style set by your Look, pack or reference counts too ("Not with Hormozi captions, set by the hormozi-bold Look").
+- **Greyed, with the reason.** An option another setting rules out is greyed on its tile with a short reason ("Not with Single word captions"); the hover card adds why and what one click does. Energy says "Set by the music you picked" or "Not with No music" with Use Auto music; Sparse is off with sound effects off.
+- **One click to switch.** Clicking a greyed option picks it and makes the one change it needs (Kinetic captions for a caption entrance, titles back on for a title entrance, music back on for Beat sync), and says so: "Switched to Kinetic captions for the Cascade caption entrance." with Undo.
+- **What a pick turned off.** A pick that rules out an earlier one turns it off and says so in one line above the layer: "Single word captions turned off the Typewriter caption entrance." with Undo, which puts it all back. A Look you pick brings its own captions ("The Classic look replaced your Pill captions.").
+- **Nothing silently ignored.** The draft and render never send a ruled out pick to the reel; `compose` notes "not used: ... (reason)". Sound map was a tile that did nothing: it now reaches the reel (`--sfx-map`, `--no-sfx-map` on `npm run reel`). Effects and the Behind or Auto title layer say "needs setup" until the effects pass is set up, and the split and framed b-roll say your head stays under the panel until the person mask is.
+- **For your agent.** `studio_set_selections` refuses a ruled out pick with the reason and how to switch, takes `switchFor` (the one click switch) and `undoChange`, and returns `turnedOff` with the line the page shows. Its description lists the rules.
+- **Tests and docs.** `tests/studio-conflicts.test.mjs` (in `npm run check`: every rule against the engine, turn off and Undo, refuse, switch, compose, the page bundles the same file, MCP) and `tests/studio-conflicts.e2e.mjs` (in `npm run smoke`, Chrome, dark, light and phone); docs/studio.md.
 ## 1.18.1 (unreleased)
 
 Release notes: [docs/releases/v1.18.1.md](docs/releases/v1.18.1.md). Uploading new footage starts a fresh edit, Finish shows only the current draft, and you can clear all B-roll from the timeline.

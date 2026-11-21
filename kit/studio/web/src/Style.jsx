@@ -7,6 +7,7 @@ import { api, file, toast, pickState, isPaused, Icon, IconBtn, KIND_NAME } from 
 import { upload } from './upload.js';
 import { WordsBrands } from './Brands.jsx';
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react';
+import { contextOf, blockOf, needsOf, controlOf } from '../../conflicts.mjs';
 
 export function Style({ CAT, V, s, apply, patch, reloadCat, hidden, tab, setTab, go }) {
   return <>
@@ -98,6 +99,8 @@ function Layers({ CAT, V, s, apply, patch, hidden, tab, setTab }) {
   const src = V && V.look ? { pack: new Set(V.look.pack), ref: new Set(V.look.ref), added: new Set(V.look.added) } : { pack: new Set(), ref: new Set(), added: new Set() };
   // a badge only on what is picked (or set by the Look): From reference, Yours or From the Look
   const sourceOf = (it, st) => st === 'allow' ? (src.added.has(it.ref) ? 'ref' : 'you') : st ? null : src.pack.has(it.ref) ? 'look' : null;
+  // what rules out what (kit/studio/conflicts.mjs, the same rules the server and the agent use)
+  const ctx = contextOf(s, CAT, { effectsReady: !V || !V.env || V.env.effectsReady !== false });
   const refOn = s.reference && s.reference.mode !== 'off' && s.reference.extracted;
   const refIn = x => refOn ? x.items.filter(r => src.added.has(r) && pickState(s, CAT.items[r]) === 'allow').length : 0;
   return <section className="step" id="s-menu" data-step="style" aria-labelledby="h-menu" hidden={hidden}>
@@ -115,11 +118,12 @@ function Layers({ CAT, V, s, apply, patch, hidden, tab, setTab }) {
       </div>
       <label className="tabselect"><span className="sr">Layer</span><select id="tabselect" value={cur} onChange={e => setTab(e.target.value)}>{layers.map(x => <option key={x.id} value={x.id}>{x.label} ({x.count})</option>)}</select></label>
       <p id="tabhint" className="fine">{ql ? `Every layer, matching "${q.trim()}".` : L.hint || ''}{!ql && refIn(L) > 0 && <> <span className="src src-ref" id="layer-ref">From reference</span> {refIn(L)} here. Click any to change it.</>}</p>
-      {!ql && cur === 'audio' && <Sound CAT={CAT} s={s} apply={apply} patch={patch} />}
+      <ChangeNote s={s} patch={patch} />
+      {!ql && cur === 'audio' && <Sound CAT={CAT} s={s} apply={apply} patch={patch} ctx={ctx} />}
       <div id="grid" className="layer-groups" role="tabpanel" aria-labelledby={'tab-' + cur} ref={gridRef}>
         {groups.length ? groups.map(g => <section key={g.label} className="lg" data-group={g.id} aria-label={g.label}>
           {(groups.length > 1 || ql) && <h4 className="lg-h">{g.label}<span className="fine"> {g.items.length}</span></h4>}
-          <div className="grid">{g.items.map(r => CAT.items[r]).filter(Boolean).map(it => { const st = pickState(s, it); return <Tile key={it.ref} it={it} st={st} src={sourceOf(it, st)} paused={paused} setPick={setPick} setTip={setTip} />; })}</div>
+          <div className="grid">{g.items.map(r => CAT.items[r]).filter(Boolean).map(it => { const st = pickState(s, it); const block = st === 'deny' ? null : blockOf(it, ctx); return <Tile key={it.ref} it={it} st={st} src={sourceOf(it, st)} paused={paused} setPick={setPick} setTip={setTip} block={block} need={needsOf(it, ctx)} sw={() => { focusKey.current = 'p:' + it.ref; patch({ switchFor: it.ref }); }} />; })}</div>
         </section>) : <p className="fine">Nothing matches that search.</p>}
       </div>
     </div>
@@ -128,21 +132,21 @@ function Layers({ CAT, V, s, apply, patch, hidden, tab, setTab }) {
 }
 
 const SRC = { you: 'YOU', ref: 'REF', look: 'LOOK' }, SRC_TIP = { you: 'Your pick', ref: 'From reference', look: 'From the Look' };
-function Tile({ it, st, src, paused, setPick, setTip }) {
-  const info = it.mode === 'info', kind = KIND_NAME[it.kind] || it.kind, canDeny = !info && it.mode !== 'one', did = 'd-' + it.ref.replace(/[^a-z0-9]/gi, '-');
+function Tile({ it, st, src, paused, setPick, setTip, block, need, sw }) {
+  const info = it.mode === 'info', kind = KIND_NAME[it.kind] || it.kind, canDeny = !info && it.mode !== 'one' && !block, did = 'd-' + it.ref.replace(/[^a-z0-9]/gi, '-');
   const still = paused && it.preview && it.preview.animated ? it.preview.still : null, showAnim = it.preview && (!paused || !it.preview.animated);
   const flag = info ? 'info' : it.needsCopy ? 'your words' : it.preview && (!it.preview.animated || still) ? 'still' : null;
   const deny = () => setPick(it, st === 'deny' ? 'clear' : 'deny', 'p:' + it.ref);
-  return <div className={`tile ${st || ''} ${info ? 'info' : ''}`} onMouseEnter={e => setTip({ el: e.currentTarget, it })} onMouseLeave={() => setTip(null)} onFocus={e => setTip({ el: e.currentTarget, it })} onBlur={() => setTip(null)}>
+  return <div className={`tile ${st || ''} ${info ? 'info' : ''} ${block ? 'blocked' : ''}`} data-blocked={block ? block.id : undefined} onMouseEnter={e => setTip({ el: e.currentTarget, it, block, need })} onMouseLeave={() => setTip(null)} onFocus={e => setTip({ el: e.currentTarget, it, block, need })} onBlur={() => setTip(null)}>
     <button className="pick" type="button" data-focus={'p:' + it.ref} aria-pressed={info ? undefined : String(st === 'allow')} aria-describedby={did}
-      aria-label={info ? `${it.id}, ${kind}, shown for reference` : `Pick ${it.id}, ${kind}`}
-      onClick={() => { if (info) return toast(`${it.id}: set it with ${it.flag}`, true); setPick(it, st === 'allow' ? 'clear' : 'allow', 'p:' + it.ref); }}
+      aria-label={info ? `${it.id}, ${kind}, shown for reference` : block ? `${it.id}, ${kind}. ${block.reason}. ${block.act}` : `Pick ${it.id}, ${kind}`}
+      onClick={() => { if (info) return toast(`${it.id}: set it with ${it.flag}`, true); if (block) return sw(); setPick(it, st === 'allow' ? 'clear' : 'allow', 'p:' + it.ref); }}
       onContextMenu={e => { if (!canDeny) return; e.preventDefault(); deny(); }}
       onKeyDown={e => { if ((e.key === 'f' || e.key === 'F') && canDeny) { e.preventDefault(); deny(); } }}>
       <span className="media">{showAnim ? <img src={file(it.preview.src)} alt="" loading="lazy" decoding="async" width={120} height={160} /> : still ? <img src={file(still)} alt="" loading="lazy" width={120} height={160} /> : <span className="np">{it.preview ? 'Paused' : it.id}</span>}</span>
-      <span className="nm">{it.id}</span><span className="ds" id={did}>{it.label || ''}</span>
+      <span className="nm">{it.id}</span>{block ? <span className="ds why" id={did}>{block.reason}</span> : <span className="ds" id={did}>{it.label || ''}</span>}
     </button>
-    {flag && <span className="flag" aria-hidden="true">{flag}</span>}
+    {!block && (need || flag) && <span className={'flag' + (need ? ' need' : '')} aria-hidden="true">{need ? 'needs setup' : flag}</span>}
     {src && <span className={'src src-' + src} title={SRC_TIP[src]} data-src={src}>{SRC[src]}<span className="sr">, {SRC_TIP[src]}</span></span>}
     <span className="state" aria-hidden="true">{st === 'allow' ? <Icon n="check" /> : st === 'deny' ? <Icon n="x" /> : null}</span>
     {canDeny && <button className="forbid" type="button" data-focus={'f:' + it.ref} aria-pressed={String(st === 'deny')} aria-label={`Forbid ${it.id}`} title={st === 'deny' ? 'Forbidden. Click to allow again.' : 'Forbid'} onClick={() => setPick(it, st === 'deny' ? 'clear' : 'deny', 'f:' + it.ref)}><Icon n="ban" /></button>}
@@ -164,15 +168,17 @@ function HoverCard({ tip }) {
   const it = tip && tip.it;
   return <div id="tip" ref={ref} className="hovercard glass" role="tooltip" hidden={!tip} style={{ left: pos.left, top: pos.top }}>
     {it && <><span className="k">{KIND_NAME[it.kind] || it.kind}</span><b>{it.id}</b>{it.label && <p>{it.label}</p>}
-      {it.mode === 'info' ? <p><code>{it.flag || ''}</code></p> : <p className="k">{it.mode === 'one' ? 'Click to pick. One per reel.' : 'Click to pick. Right-click or F to forbid.'}</p>}</>}
+      {tip.block ? <p className="why" id="tip-why"><b>{tip.block.reason}.</b> {tip.block.why} Click to {tip.block.act[0].toLowerCase() + tip.block.act.slice(1)}.</p> : tip.need ? <p className="why need" id="tip-why">{tip.need}</p> : null}
+      {tip.block ? null : it.mode === 'info' ? <p><code>{it.flag || ''}</code></p> : <p className="k">{it.mode === 'one' ? 'Click to pick. One per reel.' : 'Click to pick. Right-click or F to forbid.'}</p>}</>}
   </div>;
 }
 
-function Seg({ id, label, value, onChange, options }) {
-  return <div id={id}><SegmentedControl label={label} value={value} onChange={onChange} size="sm">{options.map(([v, l]) => <SegmentedControlItem key={v} value={v} label={l} />)}</SegmentedControl></div>;
+function Seg({ id, label, value, onChange, options, off }) {
+  return <div id={id}><SegmentedControl label={label} value={value} onChange={onChange} size="sm" isDisabled={!!off} disabledMessage={off || undefined}>{options.map(([v, l]) => <SegmentedControlItem key={v} value={v} label={l} />)}</SegmentedControl></div>;
 }
 
-function Sound({ CAT, s, apply, patch }) {
+function Sound({ CAT, s, apply, patch, ctx }) {
+  const en = controlOf('energy', ctx), cp = controlOf('cap', ctx);
   const audio = useRef(null), musicIn = useRef(null), [playing, setPlaying] = useState(false);
   const b = CAT.beds.find(x => x.id === s.music.bed), src = b ? file(b.file) : s.music.bed === 'upload' && s.music.upload ? file(s.music.upload) : '';
   useEffect(() => { const a = audio.current; if (!a) return; a.pause(); if (src) a.src = src; else a.removeAttribute('src'); }, [src]);
@@ -193,14 +199,24 @@ function Sound({ CAT, s, apply, patch }) {
             <input type="file" id="file-music" ref={musicIn} accept="audio/*" hidden onChange={e => { upload('music', [...e.target.files], s, apply); e.target.value = ''; }} />
           </div></div>
         <div className="ctl"><span className="lbl">Energy</span>
-          <Seg id="energy" label="Energy" value={s.music.energy} onChange={v => patch({ music: { energy: v } })} options={[['auto', 'Auto'], ['low', 'Low'], ['mid', 'Mid'], ['high', 'High']]} /></div>
+          <Seg id="energy" label="Energy" value={s.music.energy} onChange={v => patch({ music: { energy: v } })} options={[['auto', 'Auto'], ['low', 'Low'], ['mid', 'Mid'], ['high', 'High']]} off={en && en.reason} />
+          {en && <span className="fine ctl-off" id="energy-off">{en.reason}. <button type="button" className="linkish" onClick={() => patch(en.fix)}>{en.act}</button></span>}</div>
         <div className="ctl"><span className="lbl">Sound effects</span>
           <div className="row"><Seg id="sfx" label="Sound effects" value={s.sound.sfx} onChange={v => patch({ sound: { sfx: v } })} options={[['on', 'On'], ['off', 'Off']]} />
-            <Switch id="cap" size="sm" label="Sparse" value={s.sound.cap !== 'off'} onChange={on => patch({ sound: { cap: on ? 'on' : 'off' } })} /></div></div>
+            <Switch id="cap" size="sm" label="Sparse" value={s.sound.cap !== 'off'} onChange={on => patch({ sound: { cap: on ? 'on' : 'off' } })} isDisabled={!!cp} disabledMessage={cp ? cp.reason : undefined} /></div></div>
         <div className="ctl wide"><span className="lbl">Pace</span>
           <div className="row"><Seg id="tighten" label="Pace" value={tight} onChange={v => patch({ pace: { tighten: v === 'pack' ? null : v === 'off' ? 'off' : +v } })} options={[['pack', 'Pack'], ['off', 'Keep pauses'], ['0.5', 'Tight'], ['0.3', 'Tighter'], ['0.2', 'Tightest']]} />
             <Switch id="punch" size="sm" label="Zoom punch" value={s.pace.punch !== 'off'} onChange={on => patch({ pace: { punch: on ? 'on' : 'off' } })} /></div></div>
       </div>
     </div>
   </div>;
+}
+
+// one line when a pick turned something off, or a greyed option switched what it needed: what changed, and Undo
+export function ChangeNote({ s, patch }) {
+  const c = s.lastChange, [gone, setGone] = useState(null);
+  if (!c || !c.text || gone === c.at) return null;
+  return <p className="change-note glass-card" id="change-note" role="status"><Icon n="spark" /><span>{c.text}</span>
+    <button type="button" className="linkish" id="change-undo" onClick={() => patch({ undoChange: true }).catch(() => {})}>Undo</button>
+    <button type="button" className="x" aria-label="Dismiss" onClick={() => setGone(c.at)}><Icon n="x" /></button></p>;
 }

@@ -1,4 +1,4 @@
-// Recreate and Influence on the reference card (1.19.0) in a real Chrome, with no keys and no network:
+// Recreate and Influence on the reference card (1.21.0) in a real Chrome, with no keys and no network:
 // - Influence (Use parts) shows one switch per part of the reference; turning one off takes its picks out of your
 //   Look, turning it back on puts them back; Recreate and Off hide the switches
 // - the Breakdown shows which parts of the reference were read, and a fix button (no command) for each that was not

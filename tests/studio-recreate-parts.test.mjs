@@ -1,4 +1,4 @@
-// Influence per part and what the breakdown read (1.19.0), no Chrome, no ffmpeg:
+// Influence per part and what the breakdown read (1.21.0), no Chrome, no ffmpeg:
 // - Influence takes only the parts switched on (reference.parts): a part off takes its picks out, Recreate takes all
 // - a bad parts patch is refused; the default leaves pace and sound yours
 // - ranOf says which parts of the breakdown ran, each missing one with a fix id (never a command)
