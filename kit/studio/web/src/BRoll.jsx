@@ -10,6 +10,7 @@ import { TabGroup, TabList, Tab, TabPanels, TabPanel } from '@headlessui/react';
 import { api, toast, cap1, Icon, IconBtn } from './lib.jsx';
 import { Hint } from './ui.jsx';
 import { FixActions } from './Fix.jsx';
+import { PLACE_NEEDS } from '../../conflicts.mjs';
 
 const TAB_ICON = { library: 'grid', upload: 'upload', stock: 'search', make: 'spark', record: 'camera', generate: 'film' };
 const TABS = [['library', 'Library'], ['upload', 'Your uploads'], ['stock', 'Stock'], ['make', 'Made card'], ['record', 'Screen'], ['generate', 'AI generate']];
@@ -199,6 +200,7 @@ function Testimonials({ B, V, after }) {
 }
 
 export function BRoll({ V, apply, go, openKeys }) {
+  const noMask = !!(V && V.env && V.env.effectsReady === false);
   const B = V.broll || { beats: [], sources: [], asks: [], gens: [], generate: { providers: [] }, library: {} };
   const [sel, setSel] = useState(null), [tab, setTab] = useState('library'), [busy, setBusy] = useState(''), [addAt, setAddAt] = useState(null);
   const beat = B.beats.find(b => b.n === sel) || null;
@@ -251,7 +253,8 @@ export function BRoll({ V, apply, go, openKeys }) {
             <div className="col">
               <span className="fine">{beat.slot.clip.name} · {beat.slot.clip.source}{beat.slot.by && beat.slot.by !== 'you' ? ` · ${beat.slot.by === 'Studio' ? 'picked from your words' : 'placed by ' + beat.slot.by}` : ''}</span>
               <span className="lbl">How it sits</span>
-              <div className="seg-row" role="radiogroup" aria-label="Placement">{Object.entries(B.places).map(([k, l]) => <button key={k} type="button" role="radio" id={'place-' + k} aria-checked={String(beat.slot.place === k)} className={'chip place plc-' + k + (beat.slot.place === k ? ' on' : '')} title={PLACE_TIP[k]} onClick={() => fill({ clip: beat.slot.clip.id, place: k })}><i aria-hidden="true" />{l}</button>)}</div>
+              <div className="seg-row" role="radiogroup" aria-label="Placement">{Object.entries(B.places).map(([k, l]) => <button key={k} type="button" role="radio" id={'place-' + k} aria-checked={String(beat.slot.place === k)} className={'chip place plc-' + k + (beat.slot.place === k ? ' on' : '')} title={PLACE_TIP[k] + (noMask && PLACE_NEEDS[k] ? '. ' + PLACE_NEEDS[k] : '')} onClick={() => fill({ clip: beat.slot.clip.id, place: k })}><i aria-hidden="true" />{l}</button>)}</div>
+              {noMask && PLACE_NEEDS[beat.slot.place] && <p className="fine ctl-off" id="place-need">{PLACE_NEEDS[beat.slot.place]}</p>}
               <span className="lbl">Timing</span>
               <div className="row">
                 <label className="inl"><span className="fine">Starts</span><input id="slot-offset" type="number" step={0.1} min={0} max={beat.seconds} defaultValue={beat.slot.offset} key={'o' + beat.n + beat.slot.offset} onBlur={e => fill({ clip: beat.slot.clip.id, offset: +e.target.value })} /><span className="fine">s in</span></label>

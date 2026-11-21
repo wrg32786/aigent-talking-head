@@ -265,6 +265,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-look.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { lkerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio Look tests (tests/studio-look.test.mjs: 9 layers with every option in exactly one, no duplicates, the badges, Clear reference as one undo, Save as a Look with the reference, MCP clear_reference and save_look)', errs: lkerrs, warns: [] });
+    const cferrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-conflicts.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { cferrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio settings that rule out others (tests/studio-conflicts.test.mjs: the rules match the engine, a pick that rules something out turns it off with one line and Undo, a ruled out pick refused with the reason, the one click switch, compose drops ruled out picks, the page bundles the same rules, MCP studio_set_selections)', errs: cferrs, warns: [] });
     const rserrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-refstyle.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { rserrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }

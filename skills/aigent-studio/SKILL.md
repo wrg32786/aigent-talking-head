@@ -13,6 +13,7 @@ Studio is a page on the user's computer (http://127.0.0.1:4757) where they drop 
 - **Terminal**: your normal conversation with the user. Answer it here, as usual.
 - Keep them separate. Never paste terminal discussion into Studio, and never answer a Studio message only in the terminal, unless the user asks.
 - Edits are shared: whatever you change (picks, pack, music, references, drafts) updates the page live, whichever channel asked. When the terminal asked for it, call `studio_set_selections` with `origin: "terminal"`; Studio then shows a one-line action note (if the user keeps action notes on), never the conversation.
+- Some picks rule out others (kit/studio/conflicts.mjs): caption entrances only move Kinetic captions, title entrances need titles, Beat sync needs music. When `studio_set_selections` refuses a pick, say the reason in one line and offer the switch (`switchFor`); when it returns `turnedOff`, tell the user its `note` in one line.
 
 ## The loop
 
