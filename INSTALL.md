@@ -8,7 +8,7 @@ Report the OS and these versions. Install what is missing with the system's pack
 
 - Git: `git --version`
 - Node.js 18 or newer: `node -v`
-- ffmpeg and ffprobe: `ffmpeg -version`, `ffprobe -version`. The build needs the `drawtext` filter (`ffmpeg -hide_banner -filters` lists it). Homebrew's plain `ffmpeg` does not have it: on a Mac use `brew install ffmpeg-full`, then `export PATH="$(brew --prefix ffmpeg-full)/bin:$PATH"` for every `npm run` command, and run `ffmpeg -version` afterwards to see that it still starts.
+- ffmpeg and ffprobe: `ffmpeg -version`, `ffprobe -version`. The build needs the `drawtext` filter (`ffmpeg -hide_banner -filters` lists it). Homebrew's plain `ffmpeg` does not have it: on a Mac use `brew install ffmpeg-full`, then `export PATH="$(brew --prefix ffmpeg-full)/bin:$PATH"` for every `npm run` command, and run `ffmpeg -version` afterwards to see that it still starts. If an older Homebrew `ffmpeg` stops starting after that (installing `ffmpeg-full` can upgrade x265, and the old build then cannot find its x265 library), `brew upgrade ffmpeg` fixes it. `npm run setup:all -- --check` names both cases.
 - Python 3.10 or newer: `python3 --version` (Windows: `py -3 --version`)
 - Chrome or Chromium (any install the kit can find, or set `CHROME_PATH`)
 

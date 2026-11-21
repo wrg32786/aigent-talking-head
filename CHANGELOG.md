@@ -22,6 +22,17 @@ Release notes: [docs/releases/v1.28.0.md](docs/releases/v1.28.0.md). Recreate no
 - **plan.json.** New fields only: `mode` (`recreate`, `look` or `recipe`), `look`, and per shot `face`, `faceTarget`, `crop`, `clamped`, `grade` and `cls`.
 - **Tests.** `tests/reframe-grade.test.cjs`, `tests/stylelook.test.cjs`, `tests/starburst.test.mjs`, `tests/studio-stylelook.test.mjs`, `tests/studio-steps.test.mjs`, `tests/studio-point.test.mjs`, `tests/studio-cut-server.test.mjs` and `tests/studio-stages.test.mjs`, all in `npm run check`; `tests/studio-steps.e2e.mjs`, `tests/studio-cut-layers.e2e.mjs` and `tests/studio-stages.e2e.mjs` in `npm run smoke`.
 
+## 1.27.3 (unreleased)
+
+Release notes: [docs/releases/v1.27.3.md](docs/releases/v1.27.3.md). macOS fixes from @mmjohnson84BMP (#70), and the follow-ups it left.
+
+- **Folder tests pass on macOS** (#70, @mmjohnson84BMP). The tests expect `Movies` as the Mac home video folder, and `STUDIO_FOLDER_DIALOG=none` turns off the native folder dialog in tests on any system (`kit/studio/folders.mjs`).
+- **Smoke names a missing drawtext filter** (#70, @mmjohnson84BMP). A step after "ffmpeg and ffprobe on PATH" fails with a plain message when ffmpeg has no `drawtext`, instead of `No such filter` deep in a test clip.
+- **Mac install docs say ffmpeg-full** (#70, @mmjohnson84BMP). Homebrew's plain `ffmpeg` has no `drawtext`; `INSTALL.md` and `README.md` say `brew install ffmpeg-full` and to put its `bin` first on `PATH`.
+- **The setup check knows a weak ffmpeg.** `kit/setup.mjs` (`ffmpegState`, `ffmpegFixFor`) counts ffmpeg as ready only when it starts and has `drawtext`. Without `drawtext` on a Mac the fix is `brew install ffmpeg-full` and its `bin` first on `PATH`; one that no longer starts gets `brew upgrade ffmpeg`. Studio shows this only inside Copy for my agent and Send to my agent (`kit/studio/fixes.mjs`). With `--yes` on a Mac it installs `ffmpeg-full` and says the `PATH` step is still yours.
+- **Docs.** `INSTALL.md`: if an older Homebrew `ffmpeg` stops starting after `ffmpeg-full` upgrades x265, `brew upgrade ffmpeg` fixes it.
+- **Tests.** `tests/studio-connect.test.mjs`: an ffmpeg with no `drawtext` is not ready and gets the right fix. `tests/studio-folders.e2e.mjs` makes `jobs/` when run on its own in a fresh checkout. `tests/studio-finish.e2e.mjs` closes with a time limit and exits when done, like the other Studio e2e tests; on CI it hung after all 7 passed and smoke stopped it.
+
 ## 1.27.2 (unreleased)
 
 Release notes: [docs/releases/v1.27.2.md](docs/releases/v1.27.2.md). "Wizards failed to fetch", from a live test on Windows.
