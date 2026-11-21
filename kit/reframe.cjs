@@ -72,7 +72,7 @@ function cropFor(ours, target, opts = {}) {
   const v = ours.eyeY, vt = target.eyeY, cxT = target.cx != null ? target.cx : 0.5;
   const done = (z, px, py, held) => {
     const got = { faceH: r3(ours.faceH * z), eyeY: r3(move(v, z, py)), cx: r3(move(ours.cx, z, px)) };
-    return { zoom: r3(z), punchX: r3(px), punchY: r3(py), clamped: !!held, ...(held ? { held } : {}), ...(closer ? { closer: true } : {}), want: r3(want), got, head: [r3(top), r3(bot)],
+    return { zoom: r3(z), punchX: r3(px), punchY: r3(py), clamped: !!held, ...(held ? { held } : {}), ...(closer ? { closer: true } : {}), want: r3(want), got, head: [r3(top), r3(bot)], headTop: r3(move(top, z, py)),
       diff: { faceH: r3(got.faceH - target.faceH), eyeY: r3(got.eyeY - target.eyeY), cx: r3(got.cx - cxT) } };
   };
   // the face box, and the head around it: the crown is above the face box (hair, a cap), the chin just under it
@@ -149,7 +149,7 @@ function applyToSegs({ segs, shotStart, targets, faces, takes = [], maxZoom: zMa
     }
     if (!first) { out.push(null); return; }
     out.push({ framing: { faceH: first.got.faceH, eyeY: first.got.eyeY, cx: first.got.cx }, target: { faceH: r3(target.faceH), eyeY: r3(target.eyeY), cx: r3(target.cx != null ? target.cx : 0.5) },
-      crop: { zoom: first.zoom, punchX: first.punchX, punchY: first.punchY }, ...(first.clamped ? { clamped: true, held: first.held } : {}), ...(own ? {} : { borrowed: true }) });
+      crop: { zoom: first.zoom, punchX: first.punchX, punchY: first.punchY }, headTop: first.headTop, ...(first.closer ? { closer: true } : {}), ...(first.clamped ? { clamped: true, held: first.held } : {}), ...(own ? {} : { borrowed: true }) });
     if (first.clamped) lines.push(first.held === 'headroom' ? `reframe: shot ${j + 1} is held at ${first.zoom}x${first.zoom < first.want ? ` (it wants ${first.want}x)` : ''} so the top of your head and your chin stay in the frame` : `reframe: shot ${j + 1} wants ${first.want}x to match the face height, held at ${first.zoom}x (the most your source holds without blur)`);
   });
   return { shots: out, lines };

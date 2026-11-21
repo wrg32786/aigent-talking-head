@@ -103,7 +103,7 @@ function matchShots({ recipe, segs, rc, build, python, sources = [], reframe = t
   const shots = recipe ? RM.shotSettings(recipe) : [], out = { framing: null, grade: null };
   if (reframe) {
     const fr = reframeShots({ segs, shotStart: rc.shotStart, targets: faceTargets || rc.shotOf.map(k => (shots[k] || {}).face || null), build, python, sources, log, what });
-    if (fr) { out.framing = fr; fr.forEach((f, j) => { if (!f || !rc.plan[j]) return; rc.zoom[j] = f.crop.zoom; Object.assign(rc.plan[j], { zoom: f.crop.zoom, face: f.framing, faceTarget: f.target, crop: f.crop, ...(f.clamped ? { clamped: true, ...(f.held ? { held: f.held } : {}) } : {}) }); }); }
+    if (fr) { out.framing = fr; fr.forEach((f, j) => { if (!f || !rc.plan[j]) return; rc.zoom[j] = f.crop.zoom; Object.assign(rc.plan[j], { zoom: f.crop.zoom, face: f.framing, faceTarget: f.target, crop: f.crop, ...(f.headTop != null ? { headTop: f.headTop } : {}), ...(f.closer ? { closer: true } : {}), ...(f.clamped ? { clamped: true, ...(f.held ? { held: f.held } : {}) } : {}) }); }); }
   } else log('reframe: off; framing by shot size');
   if (grade) {
     // a cutaway's colour is not the speaker's grade
