@@ -165,6 +165,10 @@ try {
   assert.deepStrictEqual(errs, [], 'no page errors');
   console.log(`\nStudio Finish e2e: ${n} passed`);
 } finally {
-  if (client) await client.close().catch(() => {});
-  await browser.close(); srv.kill(); cleanJobs(); rmSync(STATE, { recursive: true, force: true });
+  // bounded: on CI a close could hang after every test passed and smoke stopped the run at 360 s (1.27.3)
+  const capped = p => Promise.race([p.catch(() => {}), new Promise(r => setTimeout(r, 5000))]);
+  if (client) await capped(client.close());
+  await capped(browser.close()); srv.kill('SIGKILL'); cleanJobs(); rmSync(STATE, { recursive: true, force: true });
 }
+// like the other Studio e2e tests: a child the server started can hold a pipe open, so leave once the results are in
+process.exit(0);

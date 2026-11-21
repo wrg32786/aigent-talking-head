@@ -11,7 +11,7 @@ Release notes: [docs/releases/v1.27.3.md](docs/releases/v1.27.3.md). macOS fixes
 - **Mac install docs say ffmpeg-full** (#70, @mmjohnson84BMP). Homebrew's plain `ffmpeg` has no `drawtext`; `INSTALL.md` and `README.md` say `brew install ffmpeg-full` and to put its `bin` first on `PATH`.
 - **The setup check knows a weak ffmpeg.** `kit/setup.mjs` (`ffmpegState`, `ffmpegFixFor`) counts ffmpeg as ready only when it starts and has `drawtext`. Without `drawtext` on a Mac the fix is `brew install ffmpeg-full` and its `bin` first on `PATH`; one that no longer starts gets `brew upgrade ffmpeg`. Studio shows this only inside Copy for my agent and Send to my agent (`kit/studio/fixes.mjs`). With `--yes` on a Mac it installs `ffmpeg-full` and says the `PATH` step is still yours.
 - **Docs.** `INSTALL.md`: if an older Homebrew `ffmpeg` stops starting after `ffmpeg-full` upgrades x265, `brew upgrade ffmpeg` fixes it.
-- **Tests.** `tests/studio-connect.test.mjs`: an ffmpeg with no `drawtext` is not ready and gets the right fix. `tests/studio-folders.e2e.mjs` makes `jobs/` when run on its own in a fresh checkout.
+- **Tests.** `tests/studio-connect.test.mjs`: an ffmpeg with no `drawtext` is not ready and gets the right fix. `tests/studio-folders.e2e.mjs` makes `jobs/` when run on its own in a fresh checkout. `tests/studio-finish.e2e.mjs` closes with a time limit and exits when done, like the other Studio e2e tests; on CI it hung after all 7 passed and smoke stopped it.
 
 ## 1.27.2 (unreleased)
 
