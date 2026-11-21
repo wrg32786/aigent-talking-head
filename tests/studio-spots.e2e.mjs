@@ -117,7 +117,9 @@ try {
   });
   let piece;
   await t('a raw testimonial is cut into pieces on whole words, then plays in the reel with its own sound', async () => {
-    if (!(await pg.$('#up-type'))) await tab(pg, '#btab-upload');
+    // the panel redraws once the upload above lands on its spot; wait for that, then open Upload again if it closed
+    await pg.waitForTimeout(1500); if (!(await pg.$('#up-type'))) await tab(pg, '#btab-upload');
+    await pg.waitForSelector('#up-type');
     await pg.selectOption('#up-type', 'testimonial'); assert.ok(await pg.isChecked('#up-raw'), 'a testimonial is raw by default');
     await pg.setInputFiles('#broll-file', TESTI);
     await pg.waitForSelector('#up-raws .raw.done', { timeout: 60000 });

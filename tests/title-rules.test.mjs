@@ -60,7 +60,7 @@ const report = { ...base, flips: [
   ok(r.held.some(h => h.word === 'for' && h.why === 'title word'), 'words-held.json says why "for" was left out');
   ok(/1 word left out of the bar while a title is up/.test(r.log), 'the build log says a word was left out of the bar');
   const tc = titleCheck(r.d, { dur: 14.5 });
-  ok(tc.ran && !tc.fails.length && tc.pixelFrames >= 8, `the check passes with the rule on (${tc.pixelFrames} frames read from the text layer): ${tc.fails.join(' | ')}`);
+  ok(tc.ran && !tc.fails.length && (!hasFf || tc.pixelFrames >= 8), `the check passes with the rule on (${tc.pixelFrames} frames read from the text layer): ${tc.fails.join(' | ')}`);
 }
 // ---- a word that holds on under a title ("SAY" inside "What", report 3 item 18), and a word said under a title
 { const r = draw({ ...base, flips: [
@@ -98,7 +98,7 @@ const report = { ...base, flips: [
   ok(per.lockups[0].partners.length === 1 && !per.lockups[1].partners.length, '"partner": true on one title draws its partner line only');
 }
 // ---- 8 glow and dim, 13 the label, 14 the shadow: read from stills
-{ const flips = [{ start: 1, end: 3, text: 'if we made $30K', mode: 7, hero: '$30K' }, { start: 3.2, end: 4.4, text: 'it adds up', mode: 0, words: [[3.2, 3.5, 'it'], [3.5, 3.9, 'adds'], [3.9, 4.3, 'up']] }];
+if (!hasFf) console.log('skip glow, dim and shadow checks read from stills (needs ffmpeg)'); else { const flips = [{ start: 1, end: 3, text: 'if we made $30K', mode: 7, hero: '$30K' }, { start: 3.2, end: 4.4, text: 'it adds up', mode: 0, words: [[3.2, 3.5, 'it'], [3.5, 3.9, 'adds'], [3.9, 4.3, 'up']] }];
   const px = (r, t) => rgba(join(r.d, 'stills', `t${t.toFixed(2)}.png`));
   const plain = draw({ ...base, fonts: 'instrument', flips }, 5, { stills: [2, 3.7] }), lit = draw({ ...base, fonts: 'instrument', titleGlow: 'strong', titleDim: 0.4, flips }, 5, { stills: [2, 3.7] });
   const A = px(plain, 2), Bf = px(lit, 2), corner = b => b[(1900 * 1080 + 20) * 4 + 3];
@@ -120,7 +120,7 @@ const report = { ...base, flips: [
   const lay = JSON.parse(readFileSync(join(r.d, 'layout.json'), 'utf8')).elements.filter(e => e.mode === 10).map(e => e.text);
   ok(lay.length === 1 && lay[0] === 'FIGMA', `only the label with its own word is laid out (${lay.join(', ')})`);
 }
-{ const flips = [{ start: 1, end: 3, text: 'hold on', mode: 0, words: [[1, 1.9, 'hold'], [1.9, 2.9, 'on']] }];
+if (hasFf) { const flips = [{ start: 1, end: 3, text: 'hold on', mode: 0, words: [[1, 1.9, 'hold'], [1.9, 2.9, 'on']] }];
   const dark = b => { let n = 0; for (let i = 0; i < b.length; i += 4) if (b[i + 3] > 60 && b[i] < 60 && b[i + 1] < 60 && b[i + 2] < 60) n++; return n; };
   const r = draw({ ...base, boost: [[1.8, 2.9]], flips }, 4, { stills: [1.5, 2.4] });
   const before = dark(rgba(join(r.d, 'stills', 't1.50.png'))), boosted = dark(rgba(join(r.d, 'stills', 't2.40.png')));
