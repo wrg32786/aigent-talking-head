@@ -361,6 +361,7 @@ if (target) {
     // Studio report 4 (camera moves, B-roll runs, the last piece, the breakdown's progress)
     for (const [f, what] of [
       ['motion.test.mjs', 'camera moves you can see (tests/motion.test.mjs: the move size measured per shot, carried in the recipe as move-size, sized by Subtle, Medium or Strong with Medium the default, sized again on a rebuild, the Studio control)'],
+      ['piece-edges.test.mjs', 'the two ends of a piece (tests/piece-edges.test.mjs: the last piece ends with its closing sentence and a word said after it is left out, the cut clear of both words; a piece starts on the first frame at the lens inside the quiet before its first word, read with YuNet; a draft does both and --keep-ends does neither)'],
     ]) {
       const e2 = [];
       try { execFileSync(process.execPath, [join(ROOT, 'tests', f)], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
