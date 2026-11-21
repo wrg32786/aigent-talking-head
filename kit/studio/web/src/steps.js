@@ -5,8 +5,11 @@ export const STEP_LABEL = { start: 'Start', cut: 'Cut', picture: 'Picture', text
 // every step name from before 1.28.0, so old links and saved places still land: Footage is Start, Look (and its two
 // older names Style and Reference) is Picture, Finish is Review and Post is a view of Render
 export const STEP_ALIAS = { footage: 'start', look: 'picture', style: 'picture', reference: 'picture', finish: 'review', post: 'render' };
+// the short name the step bar shows, so all eight fit on one line
+export const STEP_SHORT = { text: 'Text', music: 'Music' };
 export const stepOf = st => STEP_ALIAS[st] || st;
 export const stepName = st => STEP_LABEL[stepOf(st)] || String(st || '');
+export const stepShort = st => STEP_SHORT[stepOf(st)] || stepName(st);
 // a step with a second view: Picture has the reference breakdown, Render has Post
 export const viewOf = st => (st === 'reference' ? 'reference' : st === 'post' ? 'post' : st === 'style' || st === 'look' || st === 'picture' ? 'main' : st === 'render' ? 'main' : null);
 // which step shows each of the 9 layers (kit/studio/categories.json layers), in the order the step shows them

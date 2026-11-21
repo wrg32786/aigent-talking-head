@@ -27,7 +27,10 @@ export async function api(path, body, method) {
 }
 
 // the 8 steps, their old names and which step owns each layer live in steps.js (plain JS, the tests read it too)
-export { STEPS, STEP_LABEL, STEP_ALIAS, stepOf, stepName, viewOf, STEP_LAYERS, LAYER_STEP, LAYER_LABEL, layerOf, menuStep, nextStep, matchChips } from './steps.js';
+// The name a tile or a Look shows: its id in plain words. The id stays what agents, presets and saved picks use.
+const SHOW = { oneword: 'One word, serif', 'one-word': 'One word, big', hormozi: 'Bold yellow', 'hormozi-bold': 'Bold yellow', aigent: 'AIgent' };
+export const showName = id => SHOW[id] || String(id || '').replace(/[-_]+/g, ' ').replace(/^./, c => c.toUpperCase());
+export { STEPS, STEP_LABEL, STEP_ALIAS, stepOf, stepName, stepShort, viewOf, STEP_LAYERS, LAYER_STEP, LAYER_LABEL, layerOf, menuStep, nextStep, matchChips } from './steps.js';
 // a request that may not exist on an older server (the saved looks): null instead of a toast when it fails
 export async function quiet(path, body) {
   try { const r = await fetch(path, { method: body === undefined ? 'GET' : 'POST', headers: body !== undefined ? { 'content-type': 'application/json' } : {}, body: body !== undefined ? JSON.stringify(body) : undefined }); if (!r.ok) return null; return await r.json(); } catch { return null; }
