@@ -256,7 +256,7 @@ function shotSettings(r) {
     if (s.finish && !none(s.finish)) o.finish = s.finish;
     if (s.punch === 'big') o.bigPunch = true;
     if (s.framing && !none(s.framing)) o.framing = String(s.framing).replace(/-/g, ' ');
-    if (onOff(s.cutaway)) o.cutaway = true;
+    if (onOff(s.cutaway)) { o.cutaway = true; if (s.broll && onOff(s.broll) === undefined) o.broll = String(s.broll).slice(0, 80); }
     if (s.move && /^(push|pull|drift)$/.test(String(s.move).toLowerCase())) o.move = String(s.move).toLowerCase();
     if (onOff(s.shake)) o.shake = true;
     o.dur = +(s.end - s.start).toFixed(3);

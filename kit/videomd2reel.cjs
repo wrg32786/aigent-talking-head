@@ -280,12 +280,13 @@ function themeFor(colours) {
   }
   return best;
 }
-function brandColours(b, titles) {
+function brandColours(b, titles, graphics = []) {
   const out = [];
   const add = h => { if (hexOK(h) && !out.some(x => dist(x, h) < 60)) out.push(h.toLowerCase()); };
   const dist = (a, c) => { const p = parseInt(a.slice(1), 16), q = parseInt(c.slice(1), 16); return Math.hypot((p >> 16) - (q >> 16), ((p >> 8) & 255) - ((q >> 8) & 255), (p & 255) - (q & 255)); };
   // accent first: saturated title and caption colours
-  const texts = [...titles.map(t => t.fill), ...((b.packaging || {}).text_cues || []).filter(c => c.kind === 'subtitle').flatMap(c => [c.style && c.style.fill, c.style && c.style.box_color])];
+  // the graphics' own colours (sticker fill, app tile) count as text colours: they are the reference's accents
+  const texts = [...titles.map(t => t.fill), ...graphics.flatMap(g => [g.keys && g.keys.color, g.keys && g.keys.tile, g.color, g.tile]), ...((b.packaging || {}).text_cues || []).filter(c => c.kind === 'subtitle').flatMap(c => [c.style && c.style.fill, c.style && c.style.box_color])];
   texts.filter(h => hexOK(h) && satOf(h) > 0.35).forEach(add);
   texts.filter(h => hexOK(h)).forEach(h => { if (out.length < 3) add(h); });
   (b.x_palette || []).map(p => p.hex).sort((a, c) => lum(a) - lum(c)).forEach(h => { if (out.length < 5) add(h); });
@@ -383,7 +384,7 @@ function convert(b, extras = {}, opts = {}) {
     const fin = finishOf(m, (+s.end || 0) - (+s.start || 0));
     const cam = (s.aspects && s.aspects.camera && (s.aspects.camera.result || s.aspects.camera.measured)) || {};
     const move = cam.move || cam.motion;
-    return { n: i + 1, m, start: r2(s.start), end: r2(s.end), finish: fin.finish, finishWhy: fin.why, ...(fin.unread ? { unread: true } : {}), transitionIn: s.transition_in, tx: SPL.transitionFor(s.transition_in, s.transition), moves: SPL.moveFor(cam), vlmText: SC.textOf(s && s.vlm), framing: ((s.aspects && s.aspects.framing && (s.aspects.framing.result || s.aspects.framing.measured)) || {}).shot_size || null, cutaway: SPL.isCutaway(s), boxes: ((s.overlay && s.overlay.boxes) || []).filter(x => Array.isArray(x.bbox) && x.bbox[2] * x.bbox[3] >= 0.04), move: typeof move === 'string' ? move : null, shake: (s.aspects && s.aspects.camera && s.aspects.camera.measured && s.aspects.camera.measured.shake) };
+    return { n: i + 1, m, start: r2(s.start), end: r2(s.end), finish: fin.finish, finishWhy: fin.why, ...(fin.unread ? { unread: true } : {}), transitionIn: s.transition_in, tx: SPL.transitionFor(s.transition_in, s.transition), moves: SPL.moveFor(cam), vlmText: SC.textOf(s && s.vlm), framing: ((s.aspects && s.aspects.framing && (s.aspects.framing.result || s.aspects.framing.measured)) || {}).shot_size || null, cutaway: SPL.isCutaway(s), broll: SPL.isCutaway(s) ? SPL.brollOf(s, SC.textOf) : null, boxes: ((s.overlay && s.overlay.boxes) || []).filter(x => Array.isArray(x.bbox) && x.bbox[2] * x.bbox[3] >= 0.04), move: typeof move === 'string' ? move : null, shake: (s.aspects && s.aspects.camera && s.aspects.camera.measured && s.aspects.camera.measured.shake) };
   });
   const read = shots.filter(s => !s.unread);
   const ambient = gradeChoice(read);
@@ -403,7 +404,7 @@ function convert(b, extras = {}, opts = {}) {
   const jumpCuts = shots.filter(s => /jump/.test(s.transitionIn || '')).length;
   const avgShot = shots.length ? dur / shots.length : dur;
   const big = shots.length >= 3 ? [2, shots.length] : [];
-  const colours = brandColours(b, titles);
+  const colours = brandColours(b, titles, graphics);
   const speech = b.speech || {};
   const words = speech.words || [];
   const lines = speech.lines || [];
@@ -460,7 +461,7 @@ function convert(b, extras = {}, opts = {}) {
     '## Brand kit', '- preset: auto', `- theme: ${themeFor(colours)}`, `- colors: ${colours.join(', ') || 'none'}`, '- fonts: theme', '- logo: none', '',
     '## Music', `- bed: ${!hasMusic ? 'none' : bed ? bed.name : 'auto'}`, ...(hasMusic && bed && level && level.vol ? [`- bed-volume: ${level.vol}`] : []), `- bpm: ${bpm ? Math.round(bpm) : ''}`, `- beat-sync: ${hasMusic ? 'on' : 'off'}`, '',
     '## Style', `- look: ${look}`, `- captions: ${cs.style}`, ...(cs.position ? [`- caption-position: ${cs.position}`] : []), ...(cs.color ? [`- caption-color: ${cs.color}`] : []), ...(cs.outline ? [`- caption-outline: ${cs.outline}`] : []), ...(cs.shadow ? [`- caption-shadow: ${cs.shadow}`] : []), ...(cs.textCase && cs.style === 'one-word' ? [`- caption-case: ${cs.textCase}`] : []), ...(cs.layer ? [`- caption-layer: ${cs.layer}`] : []), `- titles: ${titles.length ? 'on' : 'off'}`, `- title-layer: ${layerDefault}`,
-    `- finish: ${jobFinish ? jobFinish.split(',').join(', ') : 'none'}`, `- transition: ${jobTransition(shots)}`,
+    `- finish: ${jobFinish ? jobFinish.split(',').join(', ') : 'none'}`, `- transition: ${jobTransition(shots)}`, `- glitch: ${shots.some(s => s.tx && s.tx.name === 'glitch') ? 'on' : 'off'}`,
     `- punch: ${zoomShots || jumpCuts || avgShot < 3 ? 'on' : 'off'}`, '- effects: none', '',
     '## Shots', '', '```videomd-timeline'];
   for (const s of shots) {
@@ -470,6 +471,7 @@ function convert(b, extras = {}, opts = {}) {
     if (s.tx && s.tx.name && s.n > 1) f.push(`transition ${s.tx.name}`);
     if (s.framing) f.push(`framing ${s.framing}`);
     if (s.cutaway) f.push('cutaway on');
+    if (s.cutaway && s.broll) f.push(`broll ${s.broll}`);
     const mv = (s.moves || []).find(x => SPL.MOVES[x]); if (mv) f.push(`move ${mv}`);
     if (s.n > 1 && ((s.moves || []).includes('shake') || (s.tx && s.tx.shake))) f.push('shake on');
     L.push(f.join(' | '));

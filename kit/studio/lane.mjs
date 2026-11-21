@@ -66,7 +66,7 @@ export function spots(cut, caps, { marks = [], refs = [] } = {}) {
     for (let k = 0; k + 1 < edges.length; k++) { const a = edges[k], z = edges[k + 1]; out.push({ start: r2(a), end: r2(z), seconds: r2(z - a), text: flips.length ? textIn(flips, a, z) : b.text, seg: b.n }); }
   }
   out.forEach((s, i) => { s.n = i + 1; });
-  for (const r of refs) { const s = out.find(x => +r.at >= x.start - 0.05 && +r.at < x.end) || out[out.length - 1]; if (s && !s.ref) s.ref = { label: r.label || 'B-roll', detail: r.detail || '' }; }
+  for (const r of refs) { const s = out.find(x => +r.at >= x.start - 0.05 && +r.at < x.end) || out[out.length - 1]; if (s && !s.ref) s.ref = { label: r.label || 'B-roll', detail: r.detail || '', ...(r.seconds > 0 ? { seconds: +(+r.seconds).toFixed(2) } : {}), ...(r.what ? { what: String(r.what) } : {}) }; }
   for (const t of marks) { const s = out.find(x => Math.abs(x.start - t) < 1.6); if (s) s.mark = true; }
   return out.map(s => ({ n: s.n, start: s.start, end: s.end, seconds: s.seconds, text: s.text, seg: s.seg, ...(s.ref ? { ref: s.ref } : {}), ...(s.mark ? { mark: true } : {}) }));
 }

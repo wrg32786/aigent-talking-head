@@ -37,7 +37,7 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     try { cut = JSON.parse(readFileSync(join(b, 'cut.json'), 'utf8')); } catch { return null; }
     try { const g = {}; new Function('window', readFileSync(join(b, 'captions.js'), 'utf8'))(g); caps = g.CAPTIONS; } catch {}
     const base = LANE.beats(cut, caps), len = base.length ? base[base.length - 1].end : 0;
-    let refs = []; try { refs = (refParts(s, cut) || []).map(r => ({ ...r, at: r.frac != null ? +r.frac * len : +r.at })).filter(r => r.at >= 0 && r.at < len); } catch {}
+    let refs = []; try { refs = (refParts(s, cut) || []).map(r => ({ ...r, at: r.frac != null ? +r.frac * len : +r.at, ...(r.fracLen != null ? { seconds: +(r.fracLen * len).toFixed(2) } : {}) })).filter(r => r.at >= 0 && r.at < len); } catch {}
     const j = peek(s, job);
     return { cut, caps, beats: LANE.spots(cut, caps, { marks: j.marks, refs }), len };
   }
@@ -99,21 +99,27 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
       if (!all && !bt.ref && [...taken, ...out.map(x => x.at)].some(t => Math.abs(t - at) < gap)) continue;
       const role = p ? p.role : 'other', want = ROLE_TYPES[role] || [];
       // library first: the clip that best matches the spot's nouns (then its words), before any stock
-      let hit = p && p.query ? (BR.rank(p.query, { exclude: used })[0] || null) : null;
+      // a reference cutaway says what it showed (Reel.md shot broll): that is the search, before your words
+      const what = bt.ref && bt.ref.what ? String(bt.ref.what) : null, wq = what ? (LANE.nounQuery(what) || what) : null;
+      let hit = wq ? (BR.rank(wq + ' ' + what, { exclude: used }).find(c => c.matched >= 1) || null) : null;
+      if (!hit) hit = p && p.query ? (BR.rank(p.query, { exclude: used })[0] || null) : null;
       if (!hit && bt.text) { const r = BR.rank(LANE.nounQuery(bt.text) + ' ' + bt.text, { exclude: used }).find(c => c.matched >= 2); if (r) hit = r; }
       if (!hit && want.length) hit = lib.find(c => want.includes(c.type) && !used.has(c.id) && !(c.raw && c.type === 'testimonial' && j.cutins.some(x => x.clip === c.id))) || null;
       if (hit) used.add(hit.id);
       const place = hit && hit.type === 'screen-recording' ? 'top' : hit && hit.type === 'testimonial' ? 'pip' : 'full';
       // a tip about a tool, an app or a screen: a screen recording of it first, then stock
       const screen = !hit && !(p && p.card) && role === 'tip' && p && p.query;
-      const idea = hit ? `${hit.name} from your library` : p && p.card ? p.idea : screen ? `Screen recording: ${p.query}` : p ? `Stock: ${p.query}` : 'B-roll like the reference';
-      const why = bt.ref ? `The reference cuts to b-roll here${bt.ref.detail ? ` (${bt.ref.detail})` : ''}.${p ? ' ' + p.why : ''}` : p.why;
+      const rscreen = !hit && what && /screen recording/i.test(what);
+      const idea = hit ? `${hit.name} from your library` : what ? (rscreen ? `Screen recording: ${what.replace(/^a screen recording( of)?\s*/i, '') || wq}` : `Like the reference: ${what}`) : p && p.card ? p.idea : screen ? `Screen recording: ${p.query}` : p ? `Stock: ${p.query}` : 'B-roll like the reference';
+      // as long as the reference's cutaway, scaled to your reel (within the spot)
+      const dur = bt.ref && bt.ref.seconds ? +Math.max(1, Math.min(+bt.ref.seconds, bt.seconds - offset)).toFixed(2) : null;
+      const why = bt.ref ? `The reference cuts to b-roll here${bt.ref.detail ? ` (${bt.ref.detail})` : ''}.${p && !what ? ' ' + p.why : ''}` : p.why;
       const why2 = screen ? `${why} Record your screen showing it (Screen recording in B-roll), or Approve for stock.` : why;
-      out.push({ beat: bt.n, at: +at.toFixed(2), offset, idea, why: why2, role, query: p && p.query ? p.query : null, card: !hit && p && p.card ? p.card : null, clip: hit ? hit.id : null, place: screen ? 'top' : place, ...(screen ? { screen: true } : {}), source: bt.ref ? 'reference' : 'rules' });
+      out.push({ beat: bt.n, at: +at.toFixed(2), offset, ...(dur ? { dur } : {}), idea, why: why2, role, query: wq || (p && p.query ? p.query : null), card: !hit && !what && p && p.card ? p.card : null, clip: hit ? hit.id : null, place: screen || rscreen ? 'top' : place, ...(screen || rscreen ? { screen: true } : {}), source: bt.ref ? 'reference' : 'rules' });
     }
     return out;
   }
-  function saveIdeas(ideas, by = 'the rules') { return update(st => { const jj = jobState(st); for (const x of ideas) jj.ideas[x.beat] = { idea: x.idea, why: x.why || null, query: x.query || null, clip: x.clip || null, card: x.card || null, place: x.place || null, offset: x.offset != null ? x.offset : null, role: x.role || null, source: x.source || null, by }; }); }
+  function saveIdeas(ideas, by = 'the rules') { return update(st => { const jj = jobState(st); for (const x of ideas) jj.ideas[x.beat] = { idea: x.idea, why: x.why || null, query: x.query || null, clip: x.clip || null, card: x.card || null, place: x.place || null, offset: x.offset != null ? x.offset : null, ...(x.dur != null ? { dur: x.dur } : {}), role: x.role || null, source: x.source || null, by }; }); }
   // after every draft (when B-roll picks itself is on): ideas for the spots, and the ones Studio can fill for free go
   // straight on (a library clip, Pexels or Pixabay when you set a key, a made card when Chrome is here). Generating
   // never runs on its own, and a spot with only a search waits for you rather than getting a card of your own words. The page shows what was placed and why; Remove or swap any of it.
@@ -153,7 +159,7 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     if (!clip && !o.noFallback && chromeOk()) { const bt = (draftOf(s.job, s) || { beats: [] }).beats.find(b => b.n === +n), text = idea.card && idea.card.text || (bt && bt.text) || idea.idea;
       clip = await makeCard(idea.card || { kind: 'quote', text: String(text).split(/\s+/).slice(0, 14).join(' ') }); }
     if (!clip) throw bad(`Nothing in the library${idea.query ? ` for "${idea.query}"` : ''}${tried.length ? ` (${tried.join('; ')})` : ''}. Install Chrome so Studio can make a card here, add a free Pexels key for stock, or fill the spot by hand.`, 400, { fix: chromeOk() ? null : ['chrome'] });
-    return fill(C.load(), n, clip.id, { place: idea.place, offset: idea.offset != null ? idea.offset : undefined, by, quiet: o.quiet, why: idea.why });
+    return fill(C.load(), n, clip.id, { place: idea.place, offset: idea.offset != null ? idea.offset : undefined, dur: idea.dur != null ? idea.dur : undefined, by, quiet: o.quiet, why: idea.why });
   }
   function addAsk(s0, a) {
     const st = S.load(); GEN.check(a, st);
@@ -294,7 +300,7 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
       const t = +b.at; if (!Number.isFinite(t) || t <= 0 || t >= d.len) throw bad(`at: seconds into the reel, between 0 and ${d.len.toFixed(1)}`);
       const v = update(st => { const j = jobState(st), before = draftOf(st.job, st).beats;
         j.marks = b.remove ? j.marks.filter(x => Math.abs(x - t) > 1.6) : [...j.marks.filter(x => Math.abs(x - t) > 0.5), +t.toFixed(2)].sort((x, y) => x - y).slice(0, 60);
-        const after = LANE.spots(d.cut, d.caps, { marks: j.marks, refs: (refParts(st, d.cut) || []).map(r => ({ ...r, at: r.frac != null ? +r.frac * d.len : +r.at })) });
+        const after = LANE.spots(d.cut, d.caps, { marks: j.marks, refs: (refParts(st, d.cut) || []).map(r => ({ ...r, at: r.frac != null ? +r.frac * d.len : +r.at, ...(r.fracLen != null ? { seconds: +(r.fracLen * d.len).toFixed(2) } : {}) })) });
         j.slots = LANE.remap(j.slots, before, after); j.ideas = LANE.remap(j.ideas, before, after); });
       return json(res, 200, { broll: view(v), state: v });
     }

@@ -1159,7 +1159,8 @@ const kindOf=c=>c[3]===0?'caption':c[3]===7?'title':'graphic';
 // "faceTrack" ({fps, zones: [[x0,y0,x1,y1,crownY]|null,...]}, kit/facezone.py, from YuNet landmarks, smoothed) is the zone
 // from the eyebrows to below the chin, per moment. No caption, title or kinetic word may cover it: the layout pass moves
 // it above (onto the hair or cap, which text may cover, in front or behind) or below the face, shrinking to no less than
-// 60%, and hides it only for the moments nothing fits. Graphics and cards keep their place (a card may cover the chin;
+// 60%, and hides it only for the moments nothing fits. Graphics and cards keep their place unless they cover the eyes
+// (then they move down to the chin, step 1b; a card may cover the chin;
 // a panel behind the head only ever goes behind the crown, kit/headmask.py). "faceSafe": false turns the move off;
 // the check below (window.__faceInk, facecheck.json, npm run verify) still counts every overlap.
 const FTRK=CAP.faceTrack&&Array.isArray(CAP.faceTrack.zones)?CAP.faceTrack:null;
@@ -1203,6 +1204,14 @@ function layoutPass(){LAYOUT.clear();REPORT.length=0;const R=safeRect(),M=18;
  const live=(a,b)=>a.s<b.e-.04&&b.s<a.e-.04;
  // 1. export frame and safe areas, every element but a full-frame takeover
  if(EXPF)for(const x of els){if(x.takeover)continue;const k=fitInto(x.raw,R);if(k){x.xf=k;x.box=xfBox(x.raw,k);x.action='safe-area'}}
+ // 1b. a card or graphic never covers the eyes: one that meets the face above its lower 30% (the chin, which a card may
+ // cover) moves down so it starts there, shrinking to fit the frame (no less than 60%). A reference's card placed for
+ // its speaker lands on yours this way when you sit lower or wider in the frame.
+ if(FACESAFE)for(const x of els){if(x.kind!=='graphic'||x.takeover||x.c[3]===8)continue;const Z=faceSpan(x.s,Math.min(x.e,x.s+30));if(!Z)continue;
+  const eyes={x0:Z.x0,x1:Z.x1,y0:Z.y0,y1:Z.y0+(Z.y1-Z.y0)*.7},B0=x.box;if(interA(B0,eyes)<area(B0)*.02)continue;
+  const top=eyes.y1+M,H=B0.y1-B0.y0,s=Math.max(.6,Math.min(1,(R.y1-top)/H)),k0=x.xf||{cx:(x.raw.x0+x.raw.x1)/2,cy:(x.raw.y0+x.raw.y1)/2,dx:0,dy:0,s:1};
+  const s2=+((k0.s||1)*s).toFixed(3),rh=x.raw.y1-x.raw.y0,k={cx:k0.cx,cy:k0.cy,dx:k0.dx||0,s:s2,dy:Math.round(top+rh*s2/2-k0.cy)},B=xfBox(x.raw,k);
+  if(B.y1>R.y1+1)continue;x.xf=k;x.box=B;x.action=x.action==='none'?'face':x.action+'+face'}
  // 2. titles clear of graphics, then captions clear of graphics and titles
  const G=els.filter(x=>x.kind==='graphic'&&x.c[3]!==8); // a colour card carries the words on it, so it is not something to move clear of
  const place=(x,obs)=>{const hit=obs.filter(o=>live(o,x)&&inter(o.box,x.box,M));if(!hit.length)return;

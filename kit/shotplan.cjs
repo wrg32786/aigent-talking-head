@@ -106,7 +106,7 @@ function recut(segs, words, shots, quiet) {
   const shotOf = [0, ...chosen.map(c => c.k + 1)];
   const z = zooms(shotOf.map(k => shots[k]));
   shotStart.forEach((k, j) => { for (let i = k; i < (shotStart[j + 1] ?? out.length); i++) out[i].zoom = z[j]; });
-  const plan = []; { let t = 0; const st = out.map(s => { const x = t; t += s.out - s.in; return x; }); shotStart.forEach((k, j) => plan.push({ start: r3(st[k]), end: r3(shotStart[j + 1] != null ? st[shotStart[j + 1]] : t), ref: shotOf[j] + 1, zoom: z[j], ...(shots[shotOf[j]].framing ? { framing: shots[shotOf[j]].framing } : {}), ...(shots[shotOf[j]].cutaway ? { cutaway: true } : {}) })); }
+  const plan = []; { let t = 0; const st = out.map(s => { const x = t; t += s.out - s.in; return x; }); shotStart.forEach((k, j) => plan.push({ start: r3(st[k]), end: r3(shotStart[j + 1] != null ? st[shotStart[j + 1]] : t), ref: shotOf[j] + 1, zoom: z[j], ...(shots[shotOf[j]].framing ? { framing: shots[shotOf[j]].framing } : {}), ...(shots[shotOf[j]].cutaway ? { cutaway: true } : {}), ...(shots[shotOf[j]].cutaway && shots[shotOf[j]].broll ? { broll: shots[shotOf[j]].broll } : {}) })); }
   return { segs: out, shotStart, shotOf, zoom: z, cuts: chosen.map(c => ({ t: r3(c.t), on: c.edge ? 'seam' : 'pause' })), skipped, plan };
 }
 
@@ -230,4 +230,17 @@ function moveFor(cam = {}) {
 // a move as the cut.json keys: push is the zoom gained over the segment (minus: a pull-out)
 const MOVES = { push: 0.07, pull: -0.07, drift: 0.035 };
 
-module.exports = { transitionFor, moveFor, MOVES, recut, zooms, zoomFor, quietFrom, sfxId, SFX, roleOf, matchRoles, slotPhrase, fillSlots, musicLevel, isCutaway, MIN_SHOT, MIN_QUIET };
+// what a reference cutaway shows, in a few words, for the B-roll spot it becomes: the shot's description (rea-video
+// VLM), else its kind (a screen recording, a still, an animation) and the name on screen (a label OCR read)
+const KIND_WORDS = { screen_capture: 'a screen recording', still_motion: 'a still image', static_hold: 'a still image', anim_2d: 'an animation', code_render: 'a motion graphic', cg_3d: 'a 3D render', film_footage: 'archive footage' };
+function brollOf(s, textOf = v => (typeof v === 'string' ? v : '')) {
+  if (!s) return null;
+  const v = String(textOf(s.vlm && (s.vlm.description || (s.vlm.result && s.vlm.result.description) || s.vlm)) || '').split(/[.\n]/)[0].trim();
+  if (v.length >= 8) return v.slice(0, 70).replace(/\|/g, ' ').trim();
+  const kind = KIND_WORDS[(s.base || {}).label] || null;
+  const name = (((s.text || {}).tracks) || []).filter(t => t && t.kind === 'label').flatMap(t => t.texts || []).map(x => String(x).trim()).find(x => /^[A-Za-z0-9][\w .&'+-]{2,28}$/.test(x) && /[a-z]{2}/i.test(x));
+  const out = kind && name ? `${kind} of ${name}` : kind || (name ? `${name} on screen` : null);
+  return out ? out.replace(/\|/g, ' ') : null;
+}
+
+module.exports = { brollOf, transitionFor, moveFor, MOVES, recut, zooms, zoomFor, quietFrom, sfxId, SFX, roleOf, matchRoles, slotPhrase, fillSlots, musicLevel, isCutaway, MIN_SHOT, MIN_QUIET };

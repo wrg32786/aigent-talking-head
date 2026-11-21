@@ -838,11 +838,12 @@ const FOLDERS = mountFolders({ ROOT, json, readBody, extraFolders: () => { const
 const POSTR = mountPost({ ROOT, C, json, readBody });
 // the reference's b-roll parts, on its own clock as a fraction of its length, become spots (kit/studio/lane.mjs spots)
 // A Recreate draft re-cut to the reference's shots (cut.json refShots) gives its cutaways on the draft's own clock.
+// Each carries the cutaway's length and what it showed (Reel.md shot broll), so the spot matches it.
 const refBroll = (s, cut) => { if (!s.reference || s.reference.mode === 'off') return [];
   const rs = cut && Array.isArray(cut.refShots) ? cut.refShots.filter(x => x.cutaway) : [];
-  if (rs.length) return rs.map(x => ({ at: +x.start + 0.05, label: 'B-roll', detail: 'the reference cuts away here' }));
+  if (rs.length) return rs.map(x => ({ at: +x.start + 0.05, seconds: +(+x.end - +x.start).toFixed(2), label: 'B-roll', detail: x.broll ? `it shows ${x.broll}` : 'the reference cuts away here', ...(x.broll ? { what: x.broll } : {}) }));
   const sw = swapOf(s); if (!sw || !sw.seconds) return [];
-  return (sw.parts || []).filter(p => p.kind === 'broll').map(p => ({ frac: p.at / sw.seconds, label: p.label, detail: p.detail })); };
+  return (sw.parts || []).filter(p => p.kind === 'broll').map(p => ({ frac: p.at / sw.seconds, ...(p.end != null && p.end > p.at ? { fracLen: (p.end - p.at) / sw.seconds } : {}), label: p.label, detail: p.detail, ...(p.what ? { what: p.what } : {}) })); };
 const BRL = mountBroll({ ROOT, C, update, json, readBody, serveFile: (...a) => serveFile(...a), CH, capturePage, chromeOk, refParts: refBroll,
   transcribe: (rel, done) => { startTranscribe(rel, () => done(null)); if (MEDIA.transcribing(rel)) watchTx(rel, done); }, wordsOf, energyOf });
 // startTranscribe calls back only on success; a raw upload also wants to hear a failure

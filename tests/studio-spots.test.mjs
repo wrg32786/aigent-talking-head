@@ -111,6 +111,23 @@ try {
     assert.strictEqual((await req('/api/broll/auto', { on: 'yes' })).status, 400);
     const lib = (await req('/api/broll/library?q=walkthrough')).j.clips; assert.strictEqual((await req('/api/broll/cutin', { clip: lib[0].id })).status, 404);
   });
+  await t('a reference cutaway carries its length and what it showed onto the spot and its idea', async () => {
+    const SPL = (await import('module')).createRequire(import.meta.url)('../kit/shotplan.cjs');
+    assert.strictEqual(SPL.brollOf({ base: { label: 'screen_capture' }, text: { tracks: [{ kind: 'label', texts: ['OmniRoute'] }] } }), 'a screen recording of OmniRoute');
+    assert.strictEqual(SPL.brollOf({ vlm: { description: 'A hand pours coffee into a mug. Steam rises.' } }), 'A hand pours coffee into a mug');
+    assert.strictEqual(SPL.brollOf({ base: { label: 'live_action' } }), null);
+    const sp = LANE.spots(CUT, CAPS, { refs: [{ at: 14.05, seconds: 2.6, label: 'B-roll', detail: 'it shows a screen recording of OmniRoute', what: 'a screen recording of OmniRoute' }] });
+    const hit = sp.find(x => x.ref); assert.ok(hit && hit.ref.seconds === 2.6 && /OmniRoute/.test(hit.ref.what), JSON.stringify(hit));
+    // the server: a Recreate draft's refShots cutaway becomes that spot's idea, as long as the reference's
+    writeFileSync(join(jobDir, 'build', 'cut.json'), JSON.stringify({ ...CUT, refShots: [{ start: 14, end: 16.6, ref: 3, cutaway: true, broll: 'a screen recording of OmniRoute' }] }));
+    try {
+      const sg = await req('/api/broll/suggest', { all: true }); assert.strictEqual(sg.status, 200, sg.text);
+      const b = sg.j.broll.beats.find(x => x.ref && /OmniRoute/.test(x.ref.what || ''));
+      assert.ok(b, 'the spot is tagged: ' + JSON.stringify(sg.j.broll.beats.map(x => x.ref)));
+      if (b.idea) { assert.match(b.idea.idea, /OmniRoute/); assert.ok(b.idea.dur > 0 && b.idea.dur <= 2.6, JSON.stringify(b.idea)); assert.strictEqual(b.idea.place, 'top'); assert.match(b.idea.why, /shows a screen recording/); }
+      else assert.ok(b.slot, 'a filled spot keeps its clip');
+    } finally { writeFileSync(join(jobDir, 'build', 'cut.json'), JSON.stringify(CUT)); }
+  });
   await t('MCP: pick_broll, add_spot and add_testimonial are listed with their inputs; add_broll takes type and raw', async () => {
     client = new Client({ name: 'spots-test', version: '1.0.0' });
     await client.connect(new StdioClientTransport({ command: process.execPath, args: [join(ROOT, 'kit', 'mcp.mjs')], cwd: ROOT, env: { ...process.env, STUDIO_PORT: url.split(':').pop() } }));

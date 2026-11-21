@@ -2,6 +2,16 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.26.0 (unreleased)
+
+Release notes: [docs/releases/v1.26.0.md](docs/releases/v1.26.0.md). B-roll like the reference, and a remake that keeps the eyes clear.
+
+- **B-roll length and content.** A reference cutaway's seconds and what it shows (`shotplan.brollOf`: "a screen recording of X", "X on screen", or the shot's description) ride on the recut plan, the shot (`broll <what>` in Reel.md) and the B-roll spot (`ref.seconds`, `ref.what`). Search and the idea use it ("Screen recording: X"), and the clip is cut to the reference's length.
+- **No invented glitch.** The recipe writes `glitch: on|off`; it is off unless the reference glitches. Reference shakes are kept (`REFSHAKES` in `kit/reel.cjs`).
+- **Graphics colours count.** The colour and tile of the reference's graphics count toward its accents (`brandColours`).
+- **Cards off the eyes.** With the face mask missing or on, a graphic that would cover the face above its lower 30% moves down to start at the chin, scaled to no less than 60% (`layoutPass` step 1b in `kit/overlay.html`).
+- **Tests.** `tests/studio-spots.test.mjs` and `tests/recreate-shotplan.test.cjs` cover the B-roll carry.
+
 ## 1.25.0 (unreleased)
 
 Release notes: [docs/releases/v1.25.0.md](docs/releases/v1.25.0.md). Recreate from the first screen, and a calmer Look (built with Fable).
