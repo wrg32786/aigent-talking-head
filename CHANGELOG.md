@@ -2,6 +2,17 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.23.0 (unreleased)
+
+Release notes: [docs/releases/v1.23.0.md](docs/releases/v1.23.0.md). A calmer reference: one control, one path, details when you want them.
+
+- **One mode control, one vocabulary.** `RefMode` (`kit/studio/web/src/RefCard.jsx`): **Recreate**, **Influence**, **Off** with one line on what the mode does, the same on the Look step card (`#ref-card-mode`) and in the Breakdown (`#ref-mode`). "Use all" and "Use parts" are gone from the page, the docs and the tool descriptions.
+- **A slim reference card.** Name, length and shots, the mode, and **More** (Save as a Look, Clear reference, Breakdown). The long note and the repeated notice are gone from the Look step. On Recreate the card sits above the Looks row, which dims with "Set by your reference".
+- **What Recreate brings, as chips.** Shots, framing, cutaways, sounds, no music, and **N made for you**, which opens the layer holding those REF scenes.
+- **A short Breakdown.** The analyzer warning and what was not read share one row, shown only when something was missed. Stats, the shot timeline and the contact sheet sit under **Details**; the per-part list under **Pick parts by hand**. The tip line, the mode note and the "Its picks" list are gone (the Look layers show them).
+- **Organized code.** `kit/studio/reference.mjs` holds what a reference gives Studio (`extract`, `referenceLook`, `influencePack`, `recreateRecipe`, `recreateArgs` and the rest; `core.mjs` re-exports it). `kit/studio/scene-routes.mjs` holds the `/api/scenes` routes. `RefCard.jsx` holds the shared reference pieces.
+- **Tests.** The Look, Recreate, scenes and review browser tests check one vocabulary in both places, the More menu, the plan chips and the made chip opening its layer.
+
 ## 1.22.1 (unreleased)
 
 Release notes: [docs/releases/v1.22.1.md](docs/releases/v1.22.1.md). Two rough spots from the first live agent test.
