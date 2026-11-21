@@ -21,6 +21,8 @@ const VID = process.platform === 'darwin' ? 'Movies' : 'Videos'; // the home vid
 const shots = process.argv.includes('--shots') ? process.argv[process.argv.indexOf('--shots') + 1] : null;
 for (const d of ['Desktop', 'Downloads', VID + '/2025', 'Documents', 'Projects/reels', '.ssh', 'AppData/Local']) mkdirSync(join(HOME, d), { recursive: true });
 writeFileSync(join(HOME, 'notes.txt'), 'never listed');
+// the default folder is jobs/ in the kit; a fresh checkout has none until the first job, so make it when run on its own
+mkdirSync(join(ROOT, 'jobs'), { recursive: true });
 // the native dialog stand-in is a small node script, so it runs on Windows too
 const PICKED = join(HOME, 'Projects', 'reels'), fake = join(TMP, 'dialog.mjs');
 writeFileSync(fake, `process.stdout.write(${JSON.stringify(PICKED)} + '\\n');\n`);

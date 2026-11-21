@@ -7,7 +7,7 @@
 // (Chrome, ffmpeg, Node, Python on a computer without it) get a link as well. Errors carry a fix id so the page can
 // show these buttons instead of a command.
 import { ROOT } from './core.mjs';
-import { sysFix } from '../setup.mjs';
+import { sysFix, ffmpegFix } from '../setup.mjs';
 
 const WIN = process.platform === 'win32';
 // id: { label, why, step (kit/setup.mjs --only step, so Studio can install it), link, linkLabel, user (only the person
@@ -15,7 +15,7 @@ const WIN = process.platform === 'win32';
 const DEFS = {
   npm: { label: 'Node packages', why: 'Studio, rendering and the agent tools need them.', step: 'npm', how: () => 'npm install' },
   python: { label: 'Python tools', why: 'Studio needs them to transcribe your footage, find beats and read references.', step: 'python', link: 'https://www.python.org/downloads/', linkLabel: 'Get Python', how: () => 'npm run setup:all -- --only python (if Python 3.10 or newer is not installed, install it first)' },
-  ffmpeg: { label: 'ffmpeg', why: 'Studio needs it to draft, render and trim video.', user: true, link: 'https://ffmpeg.org/download.html', linkLabel: 'Get ffmpeg', how: () => `${sysFix('ffmpeg')} (it may ask for my password), so ffmpeg and ffprobe are on the PATH, then restart Studio` },
+  ffmpeg: { label: 'ffmpeg', why: 'Studio needs it to draft, render and trim video.', user: true, link: 'https://ffmpeg.org/download.html', linkLabel: 'Get ffmpeg', how: () => `${ffmpegFix() || sysFix('ffmpeg')} (it may ask for my password), so ffmpeg and ffprobe with the drawtext filter are on the PATH, then restart Studio` },
   chrome: { label: 'Chrome', why: 'Studio draws titles, graphics and B-roll cards with it.', user: true, link: 'https://www.google.com/chrome/', linkLabel: 'Get Chrome', how: () => `${sysFix('chrome')} (it may ask for my password), then restart Studio` },
   node: { label: 'Node.js 18 or newer', why: 'Everything in Studio runs on it.', user: true, link: 'https://nodejs.org', linkLabel: 'Get Node.js', how: () => (WIN ? 'winget install OpenJS.NodeJS.LTS' : 'the installer from https://nodejs.org') + ', then restart Studio' },
   model: { label: 'Whisper model', why: 'Studio downloads it once (about 470 MB) to transcribe your footage.', step: 'model', how: () => 'npm run setup:all -- --only model' },

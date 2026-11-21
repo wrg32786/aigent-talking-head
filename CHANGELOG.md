@@ -2,6 +2,17 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.27.3 (unreleased)
+
+Release notes: [docs/releases/v1.27.3.md](docs/releases/v1.27.3.md). macOS fixes from @mmjohnson84BMP (#70), and the follow-ups it left.
+
+- **Folder tests pass on macOS** (#70, @mmjohnson84BMP). The tests expect `Movies` as the Mac home video folder, and `STUDIO_FOLDER_DIALOG=none` turns off the native folder dialog in tests on any system (`kit/studio/folders.mjs`).
+- **Smoke names a missing drawtext filter** (#70, @mmjohnson84BMP). A step after "ffmpeg and ffprobe on PATH" fails with a plain message when ffmpeg has no `drawtext`, instead of `No such filter` deep in a test clip.
+- **Mac install docs say ffmpeg-full** (#70, @mmjohnson84BMP). Homebrew's plain `ffmpeg` has no `drawtext`; `INSTALL.md` and `README.md` say `brew install ffmpeg-full` and to put its `bin` first on `PATH`.
+- **The setup check knows a weak ffmpeg.** `kit/setup.mjs` (`ffmpegState`, `ffmpegFixFor`) counts ffmpeg as ready only when it starts and has `drawtext`. Without `drawtext` on a Mac the fix is `brew install ffmpeg-full` and its `bin` first on `PATH`; one that no longer starts gets `brew upgrade ffmpeg`. Studio shows this only inside Copy for my agent and Send to my agent (`kit/studio/fixes.mjs`). With `--yes` on a Mac it installs `ffmpeg-full` and says the `PATH` step is still yours.
+- **Docs.** `INSTALL.md`: if an older Homebrew `ffmpeg` stops starting after `ffmpeg-full` upgrades x265, `brew upgrade ffmpeg` fixes it.
+- **Tests.** `tests/studio-connect.test.mjs`: an ffmpeg with no `drawtext` is not ready and gets the right fix. `tests/studio-folders.e2e.mjs` makes `jobs/` when run on its own in a fresh checkout.
+
 ## 1.27.2 (unreleased)
 
 Release notes: [docs/releases/v1.27.2.md](docs/releases/v1.27.2.md). "Wizards failed to fetch", from a live test on Windows.
