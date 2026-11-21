@@ -280,12 +280,13 @@ function themeFor(colours) {
   }
   return best;
 }
-function brandColours(b, titles) {
+function brandColours(b, titles, graphics = []) {
   const out = [];
   const add = h => { if (hexOK(h) && !out.some(x => dist(x, h) < 60)) out.push(h.toLowerCase()); };
   const dist = (a, c) => { const p = parseInt(a.slice(1), 16), q = parseInt(c.slice(1), 16); return Math.hypot((p >> 16) - (q >> 16), ((p >> 8) & 255) - ((q >> 8) & 255), (p & 255) - (q & 255)); };
   // accent first: saturated title and caption colours
-  const texts = [...titles.map(t => t.fill), ...((b.packaging || {}).text_cues || []).filter(c => c.kind === 'subtitle').flatMap(c => [c.style && c.style.fill, c.style && c.style.box_color])];
+  // the graphics' own colours (sticker fill, app tile) count as text colours: they are the reference's accents
+  const texts = [...titles.map(t => t.fill), ...graphics.flatMap(g => [g.keys && g.keys.color, g.keys && g.keys.tile, g.color, g.tile]), ...((b.packaging || {}).text_cues || []).filter(c => c.kind === 'subtitle').flatMap(c => [c.style && c.style.fill, c.style && c.style.box_color])];
   texts.filter(h => hexOK(h) && satOf(h) > 0.35).forEach(add);
   texts.filter(h => hexOK(h)).forEach(h => { if (out.length < 3) add(h); });
   (b.x_palette || []).map(p => p.hex).sort((a, c) => lum(a) - lum(c)).forEach(h => { if (out.length < 5) add(h); });
@@ -403,7 +404,7 @@ function convert(b, extras = {}, opts = {}) {
   const jumpCuts = shots.filter(s => /jump/.test(s.transitionIn || '')).length;
   const avgShot = shots.length ? dur / shots.length : dur;
   const big = shots.length >= 3 ? [2, shots.length] : [];
-  const colours = brandColours(b, titles);
+  const colours = brandColours(b, titles, graphics);
   const speech = b.speech || {};
   const words = speech.words || [];
   const lines = speech.lines || [];
@@ -460,7 +461,7 @@ function convert(b, extras = {}, opts = {}) {
     '## Brand kit', '- preset: auto', `- theme: ${themeFor(colours)}`, `- colors: ${colours.join(', ') || 'none'}`, '- fonts: theme', '- logo: none', '',
     '## Music', `- bed: ${!hasMusic ? 'none' : bed ? bed.name : 'auto'}`, ...(hasMusic && bed && level && level.vol ? [`- bed-volume: ${level.vol}`] : []), `- bpm: ${bpm ? Math.round(bpm) : ''}`, `- beat-sync: ${hasMusic ? 'on' : 'off'}`, '',
     '## Style', `- look: ${look}`, `- captions: ${cs.style}`, ...(cs.position ? [`- caption-position: ${cs.position}`] : []), ...(cs.color ? [`- caption-color: ${cs.color}`] : []), ...(cs.outline ? [`- caption-outline: ${cs.outline}`] : []), ...(cs.shadow ? [`- caption-shadow: ${cs.shadow}`] : []), ...(cs.textCase && cs.style === 'one-word' ? [`- caption-case: ${cs.textCase}`] : []), ...(cs.layer ? [`- caption-layer: ${cs.layer}`] : []), `- titles: ${titles.length ? 'on' : 'off'}`, `- title-layer: ${layerDefault}`,
-    `- finish: ${jobFinish ? jobFinish.split(',').join(', ') : 'none'}`, `- transition: ${jobTransition(shots)}`,
+    `- finish: ${jobFinish ? jobFinish.split(',').join(', ') : 'none'}`, `- transition: ${jobTransition(shots)}`, `- glitch: ${shots.some(s => s.tx && s.tx.name === 'glitch') ? 'on' : 'off'}`,
     `- punch: ${zoomShots || jumpCuts || avgShot < 3 ? 'on' : 'off'}`, '- effects: none', '',
     '## Shots', '', '```videomd-timeline'];
   for (const s of shots) {

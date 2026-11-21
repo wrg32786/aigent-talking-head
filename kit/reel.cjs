@@ -304,7 +304,7 @@ if (!flag('rebuild')) {
   if (wantPunch && keep.length >= 3) { segs[clipStart[1]].bigPunch = true; segs[clipStart[keep.length - 1]].bigPunch = true; }
   // --recut (Studio's Recreate): your edit re-cut to the recipe's shot plan, on word boundaries, with the reference's
   // framing per shot (kit/shotplan.cjs). The recipe's per-shot settings then go to these shots, not to your clips.
-  let RECUT = null;
+  let RECUT = null, REFSHAKES = [];
   if (flag('recut') && recipe && recipe.shots.length >= 2) {
     const SPL = require('./shotplan.cjs'), envs = new Map();
     const envOf = i => { const f = path.join(clipsDir, path.basename(segClip[i].file)); if (!envs.has(f)) envs.set(f, CP.envelopeSync(f)); return envs.get(f); };
@@ -368,9 +368,8 @@ if (!flag('rebuild')) {
       if (hits.length) { cut.sfx = {}; cut.sfxHits = (cut.sfxHits || []).concat(hits); console.log(`recut: ${hits.length} sound effects from the reference at its times, scaled (${hits.map(h => h.id + '@' + h.t).join(', ')})`); }
     } else plan.forEach((p, i) => { const k = clipStart[i]; if (k == null) return; const sg = segs[k], subs = segs.slice(k, clipStart[i + 1] ?? segs.length); if (p.finish) subs.forEach(x => { x.finish = p.finish; }); if (p.bigPunch && wantPunch) sg.bigPunch = true; if (p.transition && i) sg.transition = p.transition; if (p.move && !sg.bigPunch) sg.push = SPLM.MOVES[p.move]; if (p.shake && i) shakeAt.push(k); });
     // the reference's handheld or shaking shots: a shake on the cut in, just after the seam (the voice runs on across it)
-    if (shakeAt.length && cut.hits) { const at = k => segs.slice(0, k).reduce((a, x) => a + x.out - x.in, 0), added = [];
-      for (const k of shakeAt) { const t = +(at(k) + 0.08).toFixed(3); if (!cut.hits.some(([h]) => Math.abs(h - t) < 0.2)) { cut.hits.push([t, 18]); added.push(t); } }
-      cut.hits.sort((a, z) => a[0] - z[0]); if (added.length) console.log(`recipe: a shake at ${added.join(', ')} s (the reference's handheld shots)`); }
+    if (shakeAt.length) { const at = k => segs.slice(0, k).reduce((a, x) => a + x.out - x.in, 0);
+      REFSHAKES = shakeAt.map(k => [+(at(k) + 0.08).toFixed(3), 18]); }
     if (!RECUT && plan.length !== keep.length) console.log(`recipe: ${plan.length} shots in the recipe, ${keep.length} clips from your takes; per-shot settings applied to the first ${Math.min(plan.length, keep.length)}`);
     if (preset.bedStart != null && opt('bed-start') == null && cut.bed) cut.bedStart = preset.bedStart;
     if (preset.bedVol != null && cut.bed) cut.bedVol = preset.bedVol;
@@ -389,6 +388,11 @@ if (!flag('rebuild')) {
   }
   // glitch off (the magazine preset): no glitch seams and no RGB drop shakes from beat-sync, soft transitions only
   if (preset && preset.glitch === false) { cut.hits = []; cut.glitch = false; }
+  // the reference's handheld or shaking shots: a shake on the cut in, just after the seam (kept with glitch off: the
+  // reference shook there)
+  if (REFSHAKES.length) { const hits = cut.hits || (cut.hits = []), added = [];
+    for (const h of REFSHAKES) if (!hits.some(([x]) => Math.abs(x - h[0]) < 0.2)) { hits.push(h); added.push(h[0]); }
+    hits.sort((a, z) => a[0] - z[0]); if (added.length) console.log(`recipe: a shake at ${added.join(', ')} s (the reference's handheld shots)`); }
   if (opt('title-layer')) {
     const layer = String(opt('title-layer')).toLowerCase();
     if (!R.TITLE_LAYERS.includes(layer)) die('--title-layer must be front, behind or auto');
