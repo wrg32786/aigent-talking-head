@@ -7,7 +7,7 @@ import { api, file, toast, grow, pickState, Icon, IconBtn, SITE, STATUS, KIND_NA
 import { upload } from './upload.js';
 import { canWrite, NO_WRITER } from './Scripts.jsx';
 import { FixActions } from './Fix.jsx';
-import { RefNotice, RefParts } from './Style.jsx';
+import { RefNotice, RefParts, RefPlan } from './Style.jsx';
 
 export function Reference({ CAT, V, s, apply, patch }) {
   const r = s.reference, env = V.env, q = r.queue || [], t = env.tools || {};
@@ -92,6 +92,7 @@ function Breakdown({ CAT, V, s, apply, patch }) {
     <RefNotice s={s} patch={patch} id="ref-notice-td" />
     {r.mode === 'influence' && !r.auto && <p className="fine" id="ref-mode-note">Influence takes the parts you switch on. Recreate uses all of it.</p>}
     {r.mode === 'influence' && <RefParts V={V} s={s} patch={patch} />}
+    <RefPlan ex={r.extracted} mode={r.mode} />
     {Array.isArray(ex.ran) && <RefRan V={V} s={s} apply={apply} ran={ex.ran} />}
     <div className="td-body">
       {r.contact ? <img src={file(r.contact)} alt="Contact sheet of the reference, one frame per shot" /> : <div className="empty-art"><Icon n="film" /></div>}

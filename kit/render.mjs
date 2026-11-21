@@ -1,6 +1,7 @@
 import { chromium } from 'playwright-core';
 import { mkdirSync, rmSync, existsSync, copyFileSync, writeFileSync, readFileSync, readdirSync, statSync, renameSync } from 'fs';
 import { execFileSync } from 'child_process';
+import { createHash } from 'crypto';
 import { resolveFonts } from './fonts.mjs';
 import { createRequire } from 'module';
 import { dirname, join, isAbsolute } from 'path';
@@ -51,6 +52,24 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
   // (build/gfx/, 12 fps) so the card can play it frame-accurately. Fonts for the ordinal word, the label, the code
   // card, the split-flap and flash-card face (Anton) and the terminal (JetBrains Mono), and each graphic's default place and layer rule from kit/graphics.json.
   { const assets = {}, VID = /\.(mp4|mov|m4v|webm|mkv)$/i, url = f => pathToFileURL(f).href;
+    // scenes (mode 39, kit/scenes.cjs): drawn once to clear PNG frames at their box's size with the Make card renderer
+    // (kit/broll-make.mjs), cached by what they draw in build/gfx/scene-<hash>/, then played frame by frame
+    { const SC = createRequire(import.meta.url)('./scenes.cjs'), jobs = [], keys = [];
+      for (const f of CAP.flips || []) {
+        if (f.mode !== 39 || !f.html) continue;
+        const page = SC.page(f, f.text), w = Math.round((+f.w || 1) * 1080), h = Math.round((+f.h || 1) * 1920), secs = +f.seconds || 2;
+        const dir = join(ROOT, 'gfx', 'scene-' + createHash('sha1').update(JSON.stringify([page, w, h, secs])).digest('hex').slice(0, 16));
+        const done = existsSync(join(dir, 'done')) ? readdirSync(dir).filter(x => x.endsWith('.png')).sort().map(x => join(dir, x)) : null;
+        keys.push([f.mode + '@' + f.start, dir, done]); if (!done) jobs.push({ page, w, h, seconds: secs, dir });
+      }
+      if (jobs.length) {
+        const t0 = Date.now(); for (const j of jobs) rmSync(j.dir, { recursive: true, force: true });
+        await (await import('./studio/broll-make.mjs')).sceneFrames(jobs);
+        for (const j of jobs) writeFileSync(join(j.dir, 'done'), '');
+        console.log(`scenes: ${jobs.length} drawn in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+      }
+      for (const [key, dir] of keys) assets[key] = { fps: 24, scene: true, frames: readdirSync(dir).filter(x => x.endsWith('.png')).sort().map(x => url(join(dir, x))) };
+    }
     for (const f of CAP.flips || []) {
       if (f.mode !== 10 && f.mode !== 11 && f.mode !== 19 && f.mode !== 26) continue;
       const key = f.mode + '@' + f.start, file = f.mode === 11 ? f.src : f.icon;
@@ -145,8 +164,8 @@ if (!only && process.env.FACECHECK !== '0' && (await p.evaluate(() => !!(window.
 const titles = await p.evaluate(() => window.__titles || []);
 const layered = titles.length > 0 || !!(await p.evaluate(() => (window.__layered ? window.__layered() : false)));
 const gfx = await p.evaluate(() => (window.__graphics ? window.__graphics() : []));
-const GNAME = Object.fromEntries(JSON.parse(readFileSync(join(KIT, 'graphics.json'), 'utf8')).graphics.map(g => [g.mode, g.id]));
-if (gfx.length) { writeFileSync(join(ROOT, 'graphics.json'), JSON.stringify(gfx, null, 1) + '\n'); console.log('graphics', gfx.map(g => `${g.start}s ${GNAME[g.mode] || 'mode ' + g.mode}${g.layer === 'behind' ? ' behind' : ''} ${g.asset}${!['placeholder', 'drawn'].includes(g.asset) && !g.loaded ? ' (asset failed to load)' : ''}`).join(', ')); }
+const GNAME = Object.fromEntries(JSON.parse(readFileSync(join(KIT, 'graphics.json'), 'utf8')).graphics.map(g => [g.mode, g.id]).concat([[39, 'scene']]));
+if (gfx.length) { writeFileSync(join(ROOT, 'graphics.json'), JSON.stringify(gfx, null, 1) + '\n'); console.log('graphics', gfx.map(g => `${g.start}s ${GNAME[g.mode] || 'mode ' + g.mode}${g.layer === 'behind' ? ' behind' : ''} ${g.asset}${!['placeholder', 'drawn', 'html'].includes(g.asset) && !g.loaded ? ' (asset failed to load)' : ''}`).join(', ')); }
 // one-word captions: every spoken word gets its own slot, back to back (words.json, checked by npm run smoke)
 const capLayer = await p.evaluate(() => window.__captionLayer || 'front');
 if (capLayer === 'behind') console.log('captions: behind the person (on the title layer, under the mask)');

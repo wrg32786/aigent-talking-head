@@ -21,6 +21,16 @@ const MODE = [['recreate', 'Use all'], ['influence', 'Use parts'], ['off', 'Off'
 const READING = ['queued', 'downloading', 'tearing'];
 // One short line when the reference set the Look (or is about to), with the way back to your own picks
 // Influence: which parts of the reference to take, one switch each (reference.parts)
+// What Recreate takes besides the Look (its shot plan, framing, cutaways and sounds), and what was made for the menu
+// from it (kit/scenes.cjs): the scenes a reference had that the menu did not, with a REF badge on the Look step
+export function RefPlan({ ex, mode }) {
+  const pl = ex && ex.plan, made = (ex && ex.scenes) || [];
+  const bits = mode === 'recreate' && pl ? [pl.shots > 1 && `${pl.shots} shots`, pl.framing && pl.framing.length && `framing ${pl.framing.slice(0, 3).join(', ')}`, pl.cutaways && `${pl.cutaways} cutaway spot${pl.cutaways === 1 ? '' : 's'} for B-roll`, pl.sounds && `${pl.sounds} sound effect${pl.sounds === 1 ? '' : 's'}`, pl.noBed && 'no music bed'].filter(Boolean) : [];
+  if (!bits.length && !made.length) return null;
+  return <>{bits.length > 0 && <p className="ref-plan" id="ref-plan">Also from it: {bits.join(', ')}.</p>}
+    {made.length > 0 && <p className="ref-made" id="ref-made">Made for your menu: {made.map((x, i) => <span key={x.id}>{i ? ', ' : ''}<b>{x.name}</b></span>)}. On the Look step with a REF badge, for every job.</p>}</>;
+}
+
 export function RefParts({ V, s, patch }) {
   const parts = (V.env && V.env.refParts) || [], on = { ...((V.env && V.env.influenceParts) || {}), ...(s.reference.parts || {}) };
   if (!parts.length) return null;
@@ -77,6 +87,7 @@ function Looks({ CAT, V, s, apply, patch, reloadCat, hidden, go }) {
       <Button id="ref-clear" size="sm" variant="ghost" label="Clear reference" onClick={clear} />
       <button type="button" className="linkish" id="ref-open" onClick={() => go && go('reference', true)}>Breakdown</button>
       {r.mode === 'influence' && <RefParts V={V} s={s} patch={patch} />}
+      <RefPlan ex={ex} mode={r.mode} />
     </div> : s.undoRef ? <p className="fine ref-undo" id="ref-undo">Reference cleared. <button type="button" className="linkish" id="ref-undo-btn" onClick={undo}>Undo</button></p> : null}
   </section>;
 }
@@ -90,7 +101,7 @@ function Layers({ CAT, V, s, apply, patch, hidden, tab, setTab }) {
   const cur = layers.some(c => c.id === tab) ? tab : ((layers.find(l => l.groups.some(g => g.id === tab)) || layers[0]).id);
   const L = layers.find(x => x.id === cur), ql = q.trim().toLowerCase();
   useEffect(() => { if (focusKey.current) { const b = [...gridRef.current.querySelectorAll('[data-focus]')].find(x => x.dataset.focus === focusKey.current); if (b) b.focus({ preventScroll: true }); focusKey.current = null; } });
-  const match = it => !ql || it.id.includes(ql) || (it.label || '').toLowerCase().includes(ql);
+  const match = it => !ql || it.id.includes(ql) || (it.made && it.made.name.toLowerCase().includes(ql)) || (it.label || '').toLowerCase().includes(ql);
   // search looks across every layer, so you never need to know which one holds it
   const groups = ql ? layers.flatMap(l => l.groups.map(g => ({ ...g, label: `${l.label}: ${g.label}`, items: g.items.filter(r => match(CAT.items[r])) }))).filter(g => g.items.length) : L.groups;
   const togglePause = () => { localStorage.setItem('studio.paused', paused ? '0' : '1'); setPaused(!paused); };
@@ -135,18 +146,20 @@ const SRC = { you: 'YOU', ref: 'REF', look: 'LOOK' }, SRC_TIP = { you: 'Your pic
 function Tile({ it, st, src, paused, setPick, setTip, block, need, sw }) {
   const info = it.mode === 'info', kind = KIND_NAME[it.kind] || it.kind, canDeny = !info && it.mode !== 'one' && !block, did = 'd-' + it.ref.replace(/[^a-z0-9]/gi, '-');
   const still = paused && it.preview && it.preview.animated ? it.preview.still : null, showAnim = it.preview && (!paused || !it.preview.animated);
-  const flag = info ? 'info' : it.needsCopy ? 'your words' : it.preview && (!it.preview.animated || still) ? 'still' : null;
+  const flag = info ? 'info' : it.needsCopy ? 'your words' : it.made ? null : it.preview && (!it.preview.animated || still) ? 'still' : null;
+  const pv = p => (p && p.url) || (p && p.src ? file(p.src) : null);
   const deny = () => setPick(it, st === 'deny' ? 'clear' : 'deny', 'p:' + it.ref);
-  return <div className={`tile ${st || ''} ${info ? 'info' : ''} ${block ? 'blocked' : ''}`} data-blocked={block ? block.id : undefined} onMouseEnter={e => setTip({ el: e.currentTarget, it, block, need })} onMouseLeave={() => setTip(null)} onFocus={e => setTip({ el: e.currentTarget, it, block, need })} onBlur={() => setTip(null)}>
+  return <div className={`tile ${st || ''} ${info ? 'info' : ''} ${block ? 'blocked' : ''} ${it.made ? 'scene' : ''}`} data-blocked={block ? block.id : undefined} onMouseEnter={e => setTip({ el: e.currentTarget, it, block, need })} onMouseLeave={() => setTip(null)} onFocus={e => setTip({ el: e.currentTarget, it, block, need })} onBlur={() => setTip(null)}>
     <button className="pick" type="button" data-focus={'p:' + it.ref} aria-pressed={info ? undefined : String(st === 'allow')} aria-describedby={did}
       aria-label={info ? `${it.id}, ${kind}, shown for reference` : block ? `${it.id}, ${kind}. ${block.reason}. ${block.act}` : `Pick ${it.id}, ${kind}`}
       onClick={() => { if (info) return toast(`${it.id}: set it with ${it.flag}`, true); if (block) return sw(); setPick(it, st === 'allow' ? 'clear' : 'allow', 'p:' + it.ref); }}
       onContextMenu={e => { if (!canDeny) return; e.preventDefault(); deny(); }}
       onKeyDown={e => { if ((e.key === 'f' || e.key === 'F') && canDeny) { e.preventDefault(); deny(); } }}>
-      <span className="media">{showAnim ? <img src={file(it.preview.src)} alt="" loading="lazy" decoding="async" width={120} height={160} /> : still ? <img src={file(still)} alt="" loading="lazy" width={120} height={160} /> : <span className="np">{it.preview ? 'Paused' : it.id}</span>}</span>
-      <span className="nm">{it.id}</span>{block ? <span className="ds why" id={did}>{block.reason}</span> : <span className="ds" id={did}>{it.label || ''}</span>}
+      <span className="media">{showAnim ? <img src={pv(it.preview)} alt="" loading="lazy" decoding="async" width={120} height={160} /> : still ? <img src={file(still)} alt="" loading="lazy" width={120} height={160} /> : <span className="np">{it.preview ? 'Paused' : it.id}</span>}</span>
+      <span className="nm">{it.made ? it.made.name : it.id}</span>{block ? <span className="ds why" id={did}>{block.reason}</span> : <span className="ds" id={did}>{it.label || ''}</span>}
     </button>
     {!block && (need || flag) && <span className={'flag' + (need ? ' need' : '')} aria-hidden="true">{need ? 'needs setup' : flag}</span>}
+    {it.made && src !== 'ref' && <span className="made" title={it.made.by === 'agent' ? 'Made by your agent' : 'Made from a reference'} data-made={it.made.by}>REF<span className="sr">, {it.made.by === 'agent' ? 'made by your agent' : 'made from a reference'}</span></span>}
     {src && <span className={'src src-' + src} title={SRC_TIP[src]} data-src={src}>{SRC[src]}<span className="sr">, {SRC_TIP[src]}</span></span>}
     <span className="state" aria-hidden="true">{st === 'allow' ? <Icon n="check" /> : st === 'deny' ? <Icon n="x" /> : null}</span>
     {canDeny && <button className="forbid" type="button" data-focus={'f:' + it.ref} aria-pressed={String(st === 'deny')} aria-label={`Forbid ${it.id}`} title={st === 'deny' ? 'Forbidden. Click to allow again.' : 'Forbid'} onClick={() => setPick(it, st === 'deny' ? 'clear' : 'deny', 'f:' + it.ref)}><Icon n="ban" /></button>}
@@ -167,7 +180,7 @@ function HoverCard({ tip }) {
   }, [tip]);
   const it = tip && tip.it;
   return <div id="tip" ref={ref} className="hovercard glass" role="tooltip" hidden={!tip} style={{ left: pos.left, top: pos.top }}>
-    {it && <><span className="k">{KIND_NAME[it.kind] || it.kind}</span><b>{it.id}</b>{it.label && <p>{it.label}</p>}
+    {it && <><span className="k">{it.made ? (it.made.kind === 'effect' ? 'Effect, made for you' : 'Graphic, made for you') : KIND_NAME[it.kind] || it.kind}</span><b>{it.made ? it.made.name : it.id}</b>{it.label && <p>{it.label}</p>}
       {tip.block ? <p className="why" id="tip-why"><b>{tip.block.reason}.</b> {tip.block.why} Click to {tip.block.act[0].toLowerCase() + tip.block.act.slice(1)}.</p> : tip.need ? <p className="why need" id="tip-why">{tip.need}</p> : null}
       {tip.block ? null : it.mode === 'info' ? <p><code>{it.flag || ''}</code></p> : <p className="k">{it.mode === 'one' ? 'Click to pick. One per reel.' : 'Click to pick. Right-click or F to forbid.'}</p>}</>}
   </div>;

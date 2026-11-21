@@ -72,6 +72,8 @@ export function App() {
   }, []);
   const patch = useCallback(p => api('/api/state', p).then(apply), [apply]);
   const reloadCat = useCallback(async () => setCat(await api('/api/catalog')), []);
+  // a scene made from a reference or by your agent joins the menu: the catalog is read again when the list changes
+  useEffect(() => { if (V && CAT && V.scenes != null && (CAT.scenesSig || '') !== V.scenes) reloadCat().catch(() => {}); }, [V && V.scenes, CAT && CAT.scenesSig]);
 
   const setTheme = t => { document.documentElement.dataset.theme = t; localStorage.setItem('studio.theme', t); setThemeState(t); };
   const setGlass = on => { if (on) delete document.documentElement.dataset.glass; else document.documentElement.dataset.glass = 'off'; localStorage.setItem('studio.glass', on ? '1' : '0'); setGlassState(on); };
@@ -170,7 +172,7 @@ export function App() {
           </Fragment>
           <footer className="stepnav glass" id="stepnav">
             <span style={{ visibility: i ? 'visible' : 'hidden' }}><Button id="prev" variant="ghost" label="Back" icon={<Icon n="left" />} onClick={() => go(STEPS[Math.max(0, i - 1)], true)} /></span>
-            <PicksTray s={s} patch={patch} />
+            <PicksTray s={s} patch={patch} cat={CAT} />
             <AskAgent step={step} apply={apply} openChat={openChat} />
             {i < STEPS.length - 1 ? <Button id="next" variant="primary" label={stepName(STEPS[i + 1])} endContent={<Icon n="right" />} onClick={() => go(STEPS[i + 1], true)} /> : <span className="nextpad" />}
           </footer>

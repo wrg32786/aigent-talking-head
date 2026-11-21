@@ -37,6 +37,8 @@
 //            --recipe-titles also uses the recipe's title text and times instead of titles drafted from your words, only
 //            where you say that text (kit/spoken.cjs); recipe stickers and labels show only words you say.
 //            --capture-sources captures the recipe's confirmed screen-card sources (public pages) first, see kit/capture.mjs.
+//          --scenes id,id  place these scenes from the library (kit/scenes.cjs; effects and graphics made from a reference
+//            or by your agent) once each, spread over the reel. Recipe graphics of type scene play from its scenes.json.
 //          --clip <file>  the video to use (same as passing the path; reads well with --recipe)
 //            A recipe's graphics (ordinal stickers, app labels, screen cards) land at the recipe's times; icon and src
 //            paths are relative to the recipe, and anything left out is drawn as a neutral placeholder.
@@ -96,7 +98,7 @@ const KIT = __dirname, ROOT = path.dirname(KIT);
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['words', 'pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
+const VALUED = new Set(['words', 'scenes', 'pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const JSON_OUT = flag('json');
@@ -429,6 +431,11 @@ if (!flag('rebuild')) {
       const byRole = RECUT ? require('./shotplan.cjs').matchRoles(mine, rt) : null; // Recreate: by what each title does (hook, number, timer, brand)
       mine.forEach((f, i) => { const r = byRole ? byRole.get(f) : rt[i]; if (!r) return; if (r.entrance && !used.has(r.entrance)) { f.entrance = r.entrance; used.add(r.entrance); set.add(f); } if (r.layer) f.layer = r.layer; if (r.place) f.place = r.place; if (r.lockup) f.lockup = r.lockup; });
       mine.forEach(f => { if (!set.has(f) && f.entrance && used.has(f.entrance)) delete f.entrance; }); // each entrance once; the engine fills the rest
+      if (RECUT) { // a timer or number slot in the reference none of your titles took: a title from your matching words there
+        const len = segs.reduce((a, x) => a + x.out - x.in, 0), R0 = +(recipe.card.source && recipe.card.source.duration) || recipe.shots[recipe.shots.length - 1].end || len;
+        const made = require('./shotplan.cjs').fillSlots(rt, [...byRole.values()], S.timeline(segs, build), { k: len / R0, len, taken: mine });
+        if (made.length) { caps.flips = caps.flips.concat(made).sort((a, b) => a.start - b.start); console.log(`recipe title slots: ${made.map(f => `"${f.text}" (${f.role}) at ${f.start}s`).join(', ')} from your words`); }
+      }
       console.log(`recipe titles: entrance, layer and place pattern applied to ${Math.min(mine.length, rt.length)} of your ${mine.length} titles (pass --recipe-titles to use the recipe's text)`);
     }
     fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
@@ -452,6 +459,41 @@ if (!flag('rebuild')) {
     // --capture-sources: capture the recipe's confirmed screen-card sources (public pages) first (kit/capture.mjs)
     if (recipe && flag('capture-sources')) { try { sh(process.execPath, [path.join(KIT, 'capture.mjs'), '--recipe', recipe.file], ROOT); } catch { console.warn('note: some sources were not captured (listed above); their cards use the placeholder'); } }
     const gfx = recipe ? RM.graphicFlips(recipe) : [];
+    // Recreate: the reference's graphics at its times scaled to your edit, like its shots and sounds
+    if (RECUT && gfx.length) {
+      const len = segs.reduce((a, x) => a + x.out - x.in, 0), R0 = +(recipe.card.source && recipe.card.source.duration) || recipe.shots[recipe.shots.length - 1].end || len, k = len / R0;
+      if (Math.abs(k - 1) > 0.01) { for (const g of gfx) { const d = g.end - g.start; g.start = +(g.start * k).toFixed(3); g.end = +(g.start + Math.max(0.6, Math.min(d, d * k + 0.4))).toFixed(3); } console.log(`recut: ${gfx.length} graphics from the reference at its times, scaled by ${k.toFixed(2)}`); }
+    }
+    // scenes (kit/scenes.cjs): what the menu had no item for, made from the reference (its scenes.json, else the
+    // library) or picked from the menu (--scenes). {{text}} shows a word you say then, never the reference's words.
+    {
+      const SC = require('./scenes.cjs'), len = segs.reduce((a, x) => a + x.out - x.in, 0), said = S.timeline(segs, build);
+      let local = {}; try { if (recipe) for (const x of JSON.parse(fs.readFileSync(path.join(path.dirname(recipe.file), 'scenes.json'), 'utf8')).scenes || []) if (!SC.check(x).length) local[x.id] = x; } catch {}
+      const wordAt = (a, b) => said.filter(w => w.end > a && w.start < b).map(w => String(w.word).replace(/[^\p{L}\p{N}'$%+-]/gu, '')).filter(w => w.length > 1).sort((x, y) => y.length - x.length)[0] || null;
+      const fill = (g, sc) => {
+        const needs = /\{\{\s*text\s*\}\}/.test(sc.html || '');
+        const text = needs ? wordAt(g.start - 0.15, g.start + 1) : null;
+        if (needs && !text) return `scene ${sc.name} at ${g.start}s: no word said there for its text`;
+        Object.assign(g, { mode: 39, scene: sc.id, sceneName: sc.name, html: sc.html, css: sc.css || '', seconds: sc.seconds, x: sc.box.x, y: sc.box.y, w: sc.box.w, h: sc.box.h, layer: 'front', ...(text ? { text } : {}), ...(sc.loop ? { loop: true } : {}) });
+        return null;
+      };
+      for (let i = gfx.length - 1; i >= 0; i--) { const g = gfx[i]; if (g.mode !== 39) continue; const sc = local[g.scene] || SC.get(g.scene);
+        const why = !sc ? `scene ${g.scene} at ${g.start}s: not in the recipe's scenes.json or the scene library` : fill(g, sc);
+        if (why) { console.log('recipe graphic dropped: ' + why); gfx.splice(i, 1); } }
+      // picked on the Look step: each once, spread over the reel; an effect on the cut nearest its spot, a graphic on a word
+      const picked = String(opt('scenes') || '').split(',').map(x => x.trim()).filter(Boolean);
+      picked.forEach((id, i) => {
+        const sc = local[id] || SC.get(id); if (!sc) { console.log(`scene ${id}: not in the scene library, left out`); return; }
+        if (gfx.some(g => g.scene === id)) return;
+        let at = len * (i + 1) / (picked.length + 1);
+        if (sc.kind === 'effect' && seams.length) at = Math.max(0, seams.reduce((b, x) => Math.abs(x - at) < Math.abs(b - at) ? x : b, seams[0]) - 0.1);
+        else { const w = said.find(w => w.start >= at - 0.3); if (w) at = w.start; }
+        if (at > len - 0.6) return;
+        const g = { start: +at.toFixed(3), end: +Math.min(len, at + sc.seconds + 0.2).toFixed(3) }, why = fill(g, sc);
+        if (why) console.log('scene left out: ' + why); else { gfx.push(g); console.log(`scene: ${sc.name} at ${g.start}s (picked)`); }
+      });
+      gfx.sort((a, b) => a.start - b.start);
+    }
     for (const g of gfx) if (g.source && !g.src) console.log(`note: screen card at ${g.start}s: source ${g.source} not captured yet; placeholder drawn (npm run capture -- --recipe ${recipe.file}, or --capture-sources, once the user confirms the URL)`);
     // a burst sized to the head (head, head-y): measure your clip's head with the person mask and set size and y
     let hwMemo;

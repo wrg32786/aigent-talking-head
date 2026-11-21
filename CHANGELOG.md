@@ -2,6 +2,18 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.22.0 (unreleased)
+
+Release notes: [docs/releases/v1.22.0.md](docs/releases/v1.22.0.md). What the reference has and the menu lacks is made for the menu.
+
+- **Scenes.** `kit/scenes.cjs`: an effect or graphic as a small HTML and CSS scene, rendered like a Make card (`kit/studio/broll-make.mjs` `sceneFrames`: headless Chrome, JavaScript off, every request blocked but `data:`, each CSS animation set to the frame time) into transparent frames that `kit/overlay.html` draws as mode 39, in its box, in front, with a short fade out. `check` refuses scripts, event handlers, frames, links, `@import` and any URL that is not `data:`. Saved in `scenes/local/` (`SCENES_DIR`), one copy of the same scene.
+- **Made from the reference.** `kit/videomd2reel.cjs` (every teardown) makes a scene of the sticker's own image (`packaging/sticker_NN.png`, or the sticker's file) instead of a placeholder, of the two most used styled text labels (decorative or boxed or outlined text that is not your captions or a title: fill, outline, box colour, tilt, entrance), and of effects the reference's description names (light leak, flash, vignette pulse, speed lines, scanlines, confetti; only when rea-video's vision pass ran). They go in the recipe as `type scene`, in `scenes.json` beside it, and in the library; the report lists them under "Made for the menu". `--no-scenes` keeps them out of the library.
+- **In the menu with a REF badge.** The catalog adds the library's scenes to Graphics and Color and finish under "Made from your references", each with a still rendered on first view (`/api/scenes/<id>/still.png`) and its name on the tile and in Picks. Picking one sends `--scenes` to the reel (each placed once, an effect on a cut, a graphic on a word you say). The page reloads the menu when a scene is added or removed.
+- **For your agent.** `studio_make_scene` (MCP) and `GET/POST /api/scenes`, `GET/DELETE /api/scenes/<id>` make, read and take out scenes; Studio says what was added in chat.
+- **Recreate: no bed, scaled graphics, title slots.** A reference with no music bed now sets the bed off on Recreate (and on Influence with sound on). On `--recut` the recipe's graphics are scaled to your length like its shots and sounds. A timer or number title in the reference that none of your titles took gets a title from your own words near its time ("five minutes", "three easy tricks"), whole words only, in the reference title's style (`shotplan.cjs` `fillSlots`).
+- **The reference card says what Recreate brings.** Its shots, framing, cutaway spots, sounds and no music bed, and what was made for your menu (`extract` now returns `plan` and `scenes`).
+- **Tests and docs.** `tests/ref-scenes.test.mjs` (in `npm run check`), `tests/studio-scenes.e2e.mjs` and a mode 39 render step (in `npm run smoke`); `docs/studio.md`, `docs/reel-md.md`.
+
 ## 1.21.0 (unreleased)
 
 Release notes: [docs/releases/v1.21.0.md](docs/releases/v1.21.0.md). Recreate re-cuts your take to the reference's shot plan.
