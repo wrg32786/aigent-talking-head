@@ -1027,7 +1027,9 @@ try {
     const jobs = Math.max(1, +process.env.SMOKE_E2E_JOBS || 2), out = new Array(E2E.length);
     const one = k => new Promise(done => { const t0 = Date.now(), c = spawn(node, [join(dirname(KIT), 'tests', E2E[k][1])], { cwd: dirname(KIT), stdio: ['ignore', 'pipe', 'pipe'], env: process.env });
       let log = ''; c.stdout.on('data', d => { log += d; }); c.stderr.on('data', d => { log += d; });
-      c.on('close', code => { out[k] = { code, log, s: Math.round((Date.now() - t0) / 1000) }; done(); }); });
+      // one that hangs is stopped with its log, instead of holding every result until the CI step times out
+      const lim = (+process.env.SMOKE_E2E_TIMEOUT || 360) * 1000, kill = setTimeout(() => { log += `\n[smoke] ${E2E[k][1]} timed out after ${lim / 1000} s and was stopped\n`; c.kill('SIGKILL'); }, lim);
+      c.on('close', code => { clearTimeout(kill); out[k] = { code, log, s: Math.round((Date.now() - t0) / 1000) }; done(); }); });
     let next = 0; await Promise.all(Array.from({ length: Math.min(jobs, E2E.length) }, async () => { while (next < E2E.length) await one(next++); }));
     for (let k = 0; k < E2E.length; k++) step(E2E[k][0], () => { if (out[k].code !== 0) { process.stderr.write(out[k].log.slice(-6000)); fail(`${E2E[k][1]} exited ${out[k].code}`); } });
   }
