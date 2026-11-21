@@ -7,5 +7,6 @@ export async function upload(kind, files, s, apply) {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { toast(j.error || 'upload failed'); break; }
     apply(j);
+    if (j.reset && j.note) toast(j.note, true);
   }
 }

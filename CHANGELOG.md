@@ -13,6 +13,16 @@ Release notes: [docs/releases/v1.20.0.md](docs/releases/v1.20.0.md). Settings th
 - **Nothing silently ignored.** The draft and render never send a ruled out pick to the reel; `compose` notes "not used: ... (reason)". Sound map was a tile that did nothing: it now reaches the reel (`--sfx-map`, `--no-sfx-map` on `npm run reel`). Effects and the Behind or Auto title layer say "needs setup" until the effects pass is set up, and the split and framed b-roll say your head stays under the panel until the person mask is.
 - **For your agent.** `studio_set_selections` refuses a ruled out pick with the reason and how to switch, takes `switchFor` (the one click switch) and `undoChange`, and returns `turnedOff` with the line the page shows. Its description lists the rules.
 - **Tests and docs.** `tests/studio-conflicts.test.mjs` (in `npm run check`: every rule against the engine, turn off and Undo, refuse, switch, compose, the page bundles the same file, MCP) and `tests/studio-conflicts.e2e.mjs` (in `npm run smoke`, Chrome, dark, light and phone); docs/studio.md.
+## 1.18.1 (unreleased)
+
+Release notes: [docs/releases/v1.18.1.md](docs/releases/v1.18.1.md). Uploading new footage starts a fresh edit, Finish shows only the current draft, and you can clear all B-roll from the timeline.
+
+- **A new upload starts a fresh edit.** Dropping or choosing a new talking-head file on a board that already has an edit (or adding one from a link, a kept take, or your agent) clears cuts, pieces, B-roll spots and the timeline, the reference, and the draft and render state. The look resets too, unless you turned **Keep my look** on in **New video** (then only the look carries). The first file on a clean board does not wipe a look you just picked. Files are never deleted: earlier reels stay in Outputs, and **Open a past video** still opens other jobs. Use **New video** if you want the new take as its own job.
+- **Finish shows only the current draft.** The Draft, Check and Render step never plays a render from another draft or take. If there is no video yet, it shows the plan or a fast preview of this draft's cuts. Show original compares a reel with the take only when that reel was rendered from the current draft, matched on the build key saved in `reel-vN.settings.json` and `reel-vN.build/meta.json`. Earlier reels stay in the Outputs library, each with its player, date, source take and draft, **Edit this reel**, and **Download**.
+- **The leftover B-roll bug.** The B-roll timeline was rebuilt from `jobs/<job>/build/cut.json` even after the footage changed, so spots from the last video stayed on screen with no way to clear them. The leftover build is now ignored until you draft again (`draftStale` / `draftIsCurrent` in `kit/studio/core.mjs`).
+- **Clear all B-roll.** On the B-roll step, when any spot is filled: **Clear all B-roll**, a confirm, then **Undo**. Library clips are unchanged (`POST /api/broll/clear`, `undo: true`).
+- **MCP.** New `clear_broll` (`undo` puts the last clear back). `fill_slot` with `clear` and `all` does the same.
+- **Tests and docs.** `tests/studio-reset.test.mjs` (in `npm run check`); docs/studio.md, docs/mcp.md, AGENTS.md and the Studio skill.
 
 ## 1.18.0 (unreleased)
 

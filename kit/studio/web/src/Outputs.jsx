@@ -1,5 +1,5 @@
 // The Outputs library: every render of this video with the settings that made it (look, length, pieces, b-roll,
-// files), and the other videos' latest. Re-open puts a version back in the editor exactly as it was; Compare plays
+// files), and the other videos' latest. Edit this reel puts a version back in the editor exactly as it was; Compare plays
 // two versions side by side and marks what changed. Nothing is deleted from here.
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
@@ -9,19 +9,20 @@ import { Spinner } from './ui.jsx';
 
 const when = iso => { if (!iso) return ''; const d = new Date(iso), today = new Date().toDateString() === d.toDateString();
   return (today ? 'Today ' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ', ') + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); };
-const ROWS = [['Rendered', v => when(v.at)], ['Look', v => v.settings ? v.settings.look : 'Not recorded'], ['Length', v => [v.seconds ? `${Math.round(v.seconds)} s` : null, v.settings && v.settings.pieces ? (k => `${k} piece${k === 1 ? '' : 's'}`)(v.settings.count != null ? v.settings.count : v.settings.pieces.length) : null].filter(Boolean).join(', ') || 'Not recorded'],
-  ['B-roll', v => v.settings ? v.settings.broll : 'Not recorded'], ['Files', v => v.files.map(f => f.label).join(', ')]];
+const ROWS = [['Rendered', v => when(v.at)], ['Take', v => v.take || 'Not recorded'], ['Draft', v => v.draft || 'Not recorded'], ['Look', v => v.settings ? v.settings.look : 'Not recorded'], ['Length', v => [v.seconds ? `${Math.round(v.seconds)} s` : null, v.settings && v.settings.pieces ? (k => `${k} piece${k === 1 ? '' : 's'}`)(v.settings.count != null ? v.settings.count : v.settings.pieces.length) : null].filter(Boolean).join(', ') || 'Not recorded'],
+  ['B-roll', v => v.settings ? v.settings.broll : 'Not recorded']];
 
 function Version({ v, latest, running, onReopen, cmp, onCompare }) {
   const [files, setFiles] = useState(false);
   return <li className={'ov glass-card' + (latest ? ' latest' : '')} data-version={v.v}>
     <video src={file(v.reel)} preload="metadata" controls playsInline aria-label={`Version ${v.v}`} />
-    <header><b>v{v.v}</b>{latest && <Badge label="Latest" variant="cyan" />}</header>
+    <header><b>v{v.v}</b><span className="ov-flags">{v.current && <Badge label="This draft" variant="cyan" />}{latest && <Badge label="Latest" variant="cyan" />}</span></header>
     <dl>{ROWS.map(([k, f]) => <div key={k}><dt>{k}</dt><dd>{f(v)}</dd></div>)}</dl>
     {files && <ul className="ov-files">{v.files.map(f => <li key={f.path}><a href={file(f.path)} download>{f.label}</a> <span className="fine mono">{f.path.split('/').pop()}</span></li>)}</ul>}
     <footer>
-      <Button size="sm" variant="secondary" label="Re-open" className="ov-reopen" isDisabled={!v.reopen || running} onClick={() => onReopen(v)} />
+      <Button size="sm" variant="secondary" label="Edit this reel" className="ov-reopen" isDisabled={!v.reopen || running} onClick={() => onReopen(v)} />
       <Button size="sm" variant={cmp ? 'primary' : 'ghost'} label={cmp ? 'Comparing' : 'Compare'} className="ov-compare" onClick={() => onCompare(v)} />
+      <a className="btn ghost sm ov-download" href={file(v.reel) + '?download'} download={(v.reel || '').split('/').pop()}>Download</a>
       <Button size="sm" variant="ghost" label={files ? 'Hide files' : 'Files'} className="ov-files-btn" onClick={() => setFiles(!files)} />
     </footer>
     {!v.reopen && <p className="fine">No saved build behind this one, so it plays but cannot re-open.</p>}
@@ -41,7 +42,7 @@ export function Outputs({ V, s, apply, go, open, setOpen }) {
   const openJob = job => api('/api/videos/open', { job }).then(j => { apply(j); close(); go('finish', true); toast(`Opened ${job}`, true); }).catch(e => setErr(e.message));
   const vs = lib ? lib.versions : [], pair = cmp.map(n => vs.find(v => v.v === n)).filter(Boolean);
   return <dialog ref={ref} className="fb outputs glass" id="outputs" aria-labelledby="out-h" onClose={close} onCancel={e => { e.preventDefault(); close(); }}>
-    <header className="fb-h"><div><h2 id="out-h">Outputs</h2><p className="fine">Every render, with the settings that made it. Re-open one to edit from exactly there.</p></div>
+    <header className="fb-h"><div><h2 id="out-h">Outputs</h2><p className="fine">Every finished render, with its date, source take and draft. Edit this reel puts one back in the editor.</p></div>
       <div className="seg" role="group" aria-label="Show"><button type="button" id="out-job" aria-pressed={scope === 'job' ? 'true' : 'false'} onClick={() => setScope('job')}>This video</button><button type="button" id="out-all" aria-pressed={scope === 'all' ? 'true' : 'false'} onClick={() => setScope('all')}>All videos</button></div>
       <IconBtn n="x" label="Close" onClick={close} /></header>
     <div className="out-b">
