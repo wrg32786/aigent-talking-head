@@ -61,16 +61,22 @@ try {
     await pg.waitForFunction(() => { const r = document.querySelector('#grid [data-group="ref-made"]').getBoundingClientRect(); return r.top < innerHeight && r.bottom > 0; }, null, { timeout: 8000 });
     await pg.evaluate(() => scrollTo(0, 0));
   });
-  await t('the made scene is a Graphics tile with a REF badge and its own still; picking it sticks', async () => {
+  await t('the made scene is a Graphics tile that says Made for you, with its own still; picking it sticks', async () => {
     await pg.click('#tab-graphics'); await pg.waitForSelector(tile(made.id));
     assert.ok(/Made from your references/.test(await pg.textContent('#grid')));
-    assert.strictEqual(await pg.$eval(tile(made.id) + ' .made', e => e.textContent.trim().slice(0, 3)), 'REF');
+    assert.strictEqual(await pg.$eval(tile(made.id) + ' .made', e => e.firstChild.textContent), 'Made for you');
+    assert.strictEqual(await pg.$(tile(made.id) + ' .src[data-src="ref"]'), null, 'one label: a made scene never also says From reference');
+    assert.ok(!/\bREF\b/.test(await pg.textContent('#grid')), 'no REF badge');
     await pg.$eval(tile(made.id), e => e.scrollIntoView());
     const w = await pg.waitForFunction(sel => { const i = document.querySelector(sel + ' img'); return i && i.complete && i.naturalWidth > 0 && i.naturalWidth; }, tile(made.id), { timeout: 60000 });
     assert.ok(await w.jsonValue() > 0);
     await pg.click(tile(made.id) + ' .pick');
     await pg.waitForSelector(tile(made.id) + ' .pick[aria-pressed="true"]');
     const s = (await api('/api/state')).state; assert.ok(s.picks.graphic.allow.includes(made.id), JSON.stringify(s.picks.graphic));
+    // the Picks tray names it (never the ref-... id) and marks it Made for you
+    await pg.click('#picks-open'); const chip = `#picks-panel .chip[data-pick="graphic:${made.id}"]`; await pg.waitForSelector(chip);
+    assert.strictEqual((await pg.textContent(chip)).trim(), made.name); assert.strictEqual(await pg.getAttribute(chip, 'title'), 'Made for you');
+    assert.ok(!(await pg.textContent('#picks-panel')).includes('ref-'), 'no ids in the tray'); await pg.keyboard.press('Escape'); await pg.waitForSelector('#picks-panel', { state: 'detached' });
     await theme(pg, 'dark'); await pg.click('#tab-graphics'); await pg.$eval(tile(made.id), e => e.scrollIntoView({ block: 'center' })); await shot(pg, 'scenes-look-dark.png', false);
     await theme(pg, 'light'); await pg.click('#tab-graphics'); await pg.$eval(tile(made.id), e => e.scrollIntoView({ block: 'center' })); await shot(pg, 'scenes-look-light.png', false);
     await theme(pg, 'dark'); await pg.evaluate(() => scrollTo(0, 0)); await shot(pg, 'scenes-ref-card.png');
@@ -82,7 +88,7 @@ try {
     const bad = await fetch(url + '/api/scenes', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'x', kind: 'effect', seconds: 1, html: '<script>1</script>' }) });
     assert.ok(bad.status >= 400, 'a scene with a script is refused');
     await pg.click('#tab-color'); await pg.waitForSelector(tile(agent.id), { timeout: 15000 });
-    assert.strictEqual(await pg.$eval(tile(agent.id) + ' .made', e => e.dataset.made), 'agent');
+    assert.strictEqual(await pg.$eval(tile(agent.id) + ' .made', e => e.dataset.made), 'agent'); assert.strictEqual(await pg.$eval(tile(agent.id) + ' .made', e => e.firstChild.textContent), 'Made for you');
     await api('/api/scenes/' + made.id, undefined, 'DELETE');
     await pg.click('#tab-graphics'); await pg.waitForFunction(sel => !document.querySelector(sel), tile(made.id), { timeout: 15000 });
     const s = (await api('/api/state')).state; assert.ok(!((s.picks.graphic || {}).allow || []).includes(made.id));

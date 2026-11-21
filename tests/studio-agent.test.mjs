@@ -28,7 +28,9 @@ const CLIP = join(STATE, 'clip.mp4');
 const hasFfmpeg = spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' }).status === 0;
 if (hasFfmpeg) spawnSync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=320x568:rate=24:duration=2', '-pix_fmt', 'yuv420p', CLIP]);
 else { const b = Buffer.alloc(4096); b.writeUInt32BE(32, 0); b.write('ftypisom', 4); writeFileSync(CLIP, b); }
+let releaseSlow; const slowGate = new Promise(r => { releaseSlow = r; });
 const media = http.createServer((req, res) => {
+  if (req.url === '/slow.mp4') return void slowGate.then(() => { const b = readFileSync(CLIP); res.writeHead(200, { 'content-type': 'video/mp4', 'content-length': b.length }); res.end(b); }); // held until the test lets it go
   if (req.url === '/clip.mp4') { const b = readFileSync(CLIP); res.writeHead(200, { 'content-type': 'video/mp4', 'content-length': b.length }); return res.end(b); }
   if (req.url === '/page.mp4') { res.writeHead(200, { 'content-type': 'text/html' }); return res.end('<html>not a video</html>'); }
   if (req.url === '/v1/models') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ data: [{ id: 'llama3.2' }, { id: 'qwen2.5' }] })); }
@@ -40,7 +42,7 @@ const media = http.createServer((req, res) => {
 await new Promise(r => media.listen(0, '127.0.0.1', r));
 const MEDIA = `http://127.0.0.1:${media.address().port}`;
 
-const env = { ...process.env, CI: '1', STUDIO_DIR: STATE, STUDIO_TEARDOWN: 'tests/fixtures/fake-teardown.mjs', STUDIO_CHAT: '', ANTHROPIC_API_KEY: '', OPENAI_API_KEY: '', YTDLP: join(STATE, 'no-yt-dlp'), PATH: (process.env.PATH || '').split(':').filter(d => !existsSync(join(d, 'yt-dlp'))).join(':') };
+const env = { ...process.env, CI: '1', STUDIO_DIR: STATE, STUDIO_TEARDOWN: 'tests/fixtures/fake-teardown.mjs', STUDIO_SETUP: 'tests/fixtures/fake-setup.mjs', STUDIO_CHAT: '', ANTHROPIC_API_KEY: '', OPENAI_API_KEY: '', YTDLP: join(STATE, 'no-yt-dlp'), PATH: (process.env.PATH || '').split(':').filter(d => !existsSync(join(d, 'yt-dlp'))).join(':') };
 const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), '--port', '0', '--no-open'], { cwd: ROOT, env });
 const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out))); });
 const port = +url.split(':').pop();
@@ -94,6 +96,31 @@ try {
     const r = await req('/api/chat', { text: 'calmer please' }); assert.strictEqual(r.j.via, 'local'); assert.ok(/local qwen2\.5/.test(r.j.reply) && /teardown seen/.test(r.j.reply), r.j.reply);
     assert.strictEqual((await req('/api/llm/models?base=' + encodeURIComponent('http://127.0.0.1:9/v1'))).status, 502);
     await req('/api/settings', { chat: { backend: 'agent' } });
+  });
+  await t('reference lane: a link still downloading does not block other work, switching videos waits for it, Draft says when Recreate needs it, and Stop cancels it', async () => {
+    const task = async () => (await req('/api/state')).j.task, item = async id => (await req('/api/state')).j.state.reference.queue.find(q => q.id === id);
+    await req('/api/reference/clear', {}); // no reference in use, so Recreate has to wait for the new link
+    const r = await req('/api/reference/url', { url: `${MEDIA}/slow.mp4`, mode: 'recreate' }), id = r.j.added[0].id;
+    await until(async () => (await item(id)).status === 'downloading');
+    const t0 = await task(); assert.ok(!t0 || t0.status !== 'running', 'the download is not the running task');
+    assert.strictEqual((await req('/api/videos')).j.busy, 'A reference link is still downloading');
+    const sw = await req('/api/videos/new', { name: 'lane-' + process.pid }); assert.strictEqual(sw.status, 409); assert.ok(/reference link is still downloading/.test(sw.j.error), sw.j.error);
+    // another task runs beside it (it used to be refused with "busy: reference is running")
+    const ins = await req('/api/fix/install', { id: 'ytdlp' }); assert.strictEqual(ins.status, 202, JSON.stringify(ins.j).slice(0, 300)); assert.strictEqual(ins.j.task.kind, 'install');
+    await until(async () => (await task()).status !== 'running'); assert.strictEqual((await task()).kind, 'install');
+    assert.strictEqual((await item(id)).status, 'downloading', 'still downloading in its own lane');
+    // a second link waits its turn: one download at a time
+    const r2 = await req('/api/reference/url', { url: `${MEDIA}/clip.mp4` }), id2 = r2.j.added[0].id; await sleep(400); assert.strictEqual((await item(id2)).status, 'queued');
+    // Draft: Recreate needs the reference that is still downloading, and says so (not a generic busy)
+    const up = await fetch(`${url}/api/upload?kind=footage&name=lane-take.mp4`, { method: 'POST', body: 'not really a video' }); assert.strictEqual(up.status, 200); const foot = (await up.json()).path;
+    const d = await req('/api/draft', {}); assert.strictEqual(d.status, 409, JSON.stringify(d.j).slice(0, 300));
+    assert.ok(/^The reference is still downloading\. Recreate needs it/.test(d.j.error) && !/busy/.test(d.j.error), d.j.error);
+    await req('/api/footage/remove', { path: foot });
+    // Stop on the queue item cancels the download; the next link starts by itself and is read
+    assert.strictEqual((await req('/api/reference/item', { id, action: 'remove' })).status, 200); assert.ok(!(await item(id)));
+    const it2 = await until(async () => { const x = await item(id2); return x.status === 'ready' || x.status === 'failed' ? x : null; }, 120e3); assert.strictEqual(it2.status, 'ready', it2.error);
+    await until(async () => !(await req('/api/videos')).j.busy);
+    releaseSlow(); await req('/api/state', { reference: { mode: 'influence' } });
   });
   await t('agent channel: a page message is queued, the hook reports it, nothing is marked seen', async () => {
     await req('/api/reset', {}); await req('/api/state', { job: JOB });
@@ -177,7 +204,7 @@ try {
   });
 } finally {
   try { await client?.close(); } catch {}
-  srv.kill(); media.close();
+  srv.kill(); releaseSlow(); media.closeAllConnections(); media.close();
   rmSync(STATE, { recursive: true, force: true });
   for (const d of [join(ROOT, 'teardown'), join(ROOT, 'teardown-in', 'studio')]) if (existsSync(d)) for (const f of readdirSync(d)) if (f.includes(JOB)) rmSync(join(d, f), { recursive: true, force: true });
   rmSync(join(ROOT, 'packs', 'local', `ref-${JOB}`.slice(0, 48)), { recursive: true, force: true });

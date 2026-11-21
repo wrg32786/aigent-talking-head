@@ -4,7 +4,7 @@ import { Switch } from '@astryxdesign/core/Switch';
 import { Kbd } from '@astryxdesign/core/Kbd';
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
 import { api, file, toast, pickState, isPaused, Icon, IconBtn, KIND_NAME, RM } from './lib.jsx';
-import { RefMode, RefNotice, RefParts, RefPlan } from './RefCard.jsx';
+import { RefMode, RefNotice, RefParts, RefPlan, REF_LABEL, MADE_LABEL } from './RefCard.jsx';
 import { upload } from './upload.js';
 import { WordsBrands } from './Brands.jsx';
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react';
@@ -102,12 +102,19 @@ function Layers({ CAT, V, s, apply, patch, hidden, tab, setTab }) {
   const keyTabs = e => { if (!['ArrowRight', 'ArrowLeft'].includes(e.key)) return; const i = layers.findIndex(x => x.id === cur); const n = layers[(i + (e.key === 'ArrowRight' ? 1 : layers.length - 1)) % layers.length].id; setTab(n); requestAnimationFrame(() => document.getElementById('tab-' + n)?.focus()); };
   const setPick = (it, how, key) => { focusKey.current = key; patch({ picks: { [it.ref]: how } }); };
   const src = V && V.look ? { pack: new Set(V.look.pack), ref: new Set(V.look.ref), added: new Set(V.look.added) } : { pack: new Set(), ref: new Set(), added: new Set() };
+  // why the reference picked it (kit/studio/reference.mjs summarize), shown on the tile's card and on the layer line
+  const why = (V && V.look && V.look.why) || {}, whyOf = (it, sc) => (sc === 'ref' && why[it.ref]) || null;
+  const nameOf = it => (it.made ? it.made.name : it.id);
   // a badge only on what is picked (or set by the Look): From reference, Yours or From the Look
   const sourceOf = (it, st) => st === 'allow' ? (src.added.has(it.ref) ? 'ref' : 'you') : st ? null : src.pack.has(it.ref) ? 'look' : null;
   // what rules out what (kit/studio/conflicts.mjs, the same rules the server and the agent use)
   const ctx = contextOf(s, CAT, { effectsReady: !V || !V.env || V.env.effectsReady !== false });
   const refOn = s.reference && s.reference.mode !== 'off' && s.reference.extracted;
-  const refIn = x => refOn ? x.items.filter(r => src.added.has(r) && pickState(s, CAT.items[r]) === 'allow').length : 0;
+  const refPicks = x => refOn ? x.items.filter(r => CAT.items[r] && src.added.has(r) && pickState(s, CAT.items[r]) === 'allow') : [];
+  const refIn = x => refPicks(x).length;
+  // one short line for the layer: the first pick with its reason, and how many more
+  const refLine = x => { const p = refPicks(x); if (!p.length) return null; const first = p.find(r => why[r]) || p[0], more = p.length - 1;
+    return `From the reference: ${nameOf(CAT.items[first])}${why[first] ? ', ' + why[first] : ''}${more > 0 ? `, and ${more} more` : ''}.`; };
   return <section className="step" id="s-menu" data-step="style" aria-labelledby="h-menu" hidden={hidden}>
     <div className="block glass-card">
       <div className="bh"><h3 id="h-menu">Layers</h3>
@@ -119,16 +126,16 @@ function Layers({ CAT, V, s, apply, patch, hidden, tab, setTab }) {
       <div className="tabs" role="tablist" id="tabs" aria-label="Layers" ref={tabsRef} onKeyDown={keyTabs}>
         {layers.map(x => { const any = x.items.some(r => pickState(s, CAT.items[r])) || (x.id === 'audio' && (s.music.bed !== 'auto' || s.sound.sfx === 'off' || s.pace.tighten != null));
           return <button key={x.id} className="tab" role="tab" type="button" id={'tab-' + x.id} aria-selected={String(x.id === cur)} aria-controls="grid" tabIndex={x.id === cur ? 0 : -1} onClick={() => setTab(x.id)}>
-            {x.label}{refIn(x) > 0 ? <span className="pd pd-ref" title="From reference" aria-label="has picks from the reference" /> : any && <span className="pd" title="has your picks" aria-label="has your picks" />}</button>; })}
+            {x.label}{refIn(x) > 0 ? <span className="pd pd-ref" title={REF_LABEL} aria-label="has picks from the reference" /> : any && <span className="pd" title="has your picks" aria-label="has your picks" />}</button>; })}
       </div>
       <label className="tabselect"><span className="sr">Layer</span><select id="tabselect" value={cur} onChange={e => setTab(e.target.value)}>{layers.map(x => <option key={x.id} value={x.id}>{x.label} ({x.count})</option>)}</select></label>
-      <p id="tabhint" className="fine">{ql ? `Every layer, matching "${q.trim()}".` : L.hint || ''}{!ql && refIn(L) > 0 && <> <span className="src src-ref" id="layer-ref">From reference</span> {refIn(L)} here. Click any to change it.</>}</p>
+      <p id="tabhint" className="fine">{ql ? `Every layer, matching "${q.trim()}".` : L.hint || ''}{!ql && refIn(L) > 0 && <span className="layer-ref" id="layer-ref" data-n={refIn(L)}>{refLine(L)}</span>}</p>
       <ChangeNote s={s} patch={patch} />
       {!ql && cur === 'audio' && <Sound CAT={CAT} s={s} apply={apply} patch={patch} ctx={ctx} />}
       <div id="grid" className="layer-groups" role="tabpanel" aria-labelledby={'tab-' + cur} ref={gridRef}>
         {groups.length ? groups.map(g => <section key={g.label} className="lg" data-group={g.id} aria-label={g.label}>
           {(groups.length > 1 || ql) && <h4 className="lg-h">{g.label}<span className="fine"> {g.items.length}</span></h4>}
-          <div className="grid">{g.items.map(r => CAT.items[r]).filter(Boolean).map(it => { const st = pickState(s, it); const block = st === 'deny' ? null : blockOf(it, ctx); return <Tile key={it.ref} it={it} st={st} src={sourceOf(it, st)} paused={paused} setPick={setPick} setTip={setTip} block={block} need={needsOf(it, ctx)} sw={() => { focusKey.current = 'p:' + it.ref; patch({ switchFor: it.ref }); }} />; })}</div>
+          <div className="grid">{g.items.map(r => CAT.items[r]).filter(Boolean).map(it => { const st = pickState(s, it); const block = st === 'deny' ? null : blockOf(it, ctx); const sc = sourceOf(it, st); return <Tile key={it.ref} it={it} st={st} src={sc} why={whyOf(it, sc)} paused={paused} setPick={setPick} setTip={setTip} block={block} need={needsOf(it, ctx)} sw={() => { focusKey.current = 'p:' + it.ref; patch({ switchFor: it.ref }); }} />; })}</div>
         </section>) : <p className="fine">Nothing matches that search.</p>}
       </div>
     </div>
@@ -136,25 +143,27 @@ function Layers({ CAT, V, s, apply, patch, hidden, tab, setTab }) {
   </section>;
 }
 
-const SRC = { you: 'YOU', ref: 'REF', look: 'LOOK' }, SRC_TIP = { you: 'Your pick', ref: 'From reference', look: 'From the Look' };
-function Tile({ it, st, src, paused, setPick, setTip, block, need, sw }) {
+// A tile wears one label: "Made for you" on a scene made from a reference (or by your agent), "From reference" on a
+// built-in option the reference picked, and YOU or LOOK for the other two sources.
+const SRC = { you: 'YOU', ref: REF_LABEL, look: 'LOOK' }, SRC_TIP = { you: 'Your pick', ref: 'Picked by the reference', look: 'From the Look' };
+function Tile({ it, st, src, why, paused, setPick, setTip, block, need, sw }) {
   const info = it.mode === 'info', kind = KIND_NAME[it.kind] || it.kind, canDeny = !info && it.mode !== 'one' && !block, did = 'd-' + it.ref.replace(/[^a-z0-9]/gi, '-');
   const still = paused && it.preview && it.preview.animated ? it.preview.still : null, showAnim = it.preview && (!paused || !it.preview.animated);
   const flag = info ? 'info' : it.needsCopy ? 'your words' : it.made ? null : it.preview && (!it.preview.animated || still) ? 'still' : null;
   const pv = p => (p && p.url) || (p && p.src ? file(p.src) : null);
   const deny = () => setPick(it, st === 'deny' ? 'clear' : 'deny', 'p:' + it.ref);
-  return <div className={`tile ${st || ''} ${info ? 'info' : ''} ${block ? 'blocked' : ''} ${it.made ? 'scene' : ''}`} data-blocked={block ? block.id : undefined} onMouseEnter={e => setTip({ el: e.currentTarget, it, block, need })} onMouseLeave={() => setTip(null)} onFocus={e => setTip({ el: e.currentTarget, it, block, need })} onBlur={() => setTip(null)}>
+  return <div className={`tile ${st || ''} ${info ? 'info' : ''} ${block ? 'blocked' : ''} ${it.made ? 'scene' : ''}`} data-blocked={block ? block.id : undefined} onMouseEnter={e => setTip({ el: e.currentTarget, it, block, need, why })} onMouseLeave={() => setTip(null)} onFocus={e => setTip({ el: e.currentTarget, it, block, need, why })} onBlur={() => setTip(null)}>
     <button className="pick" type="button" data-focus={'p:' + it.ref} aria-pressed={info ? undefined : String(st === 'allow')} aria-describedby={did}
       aria-label={info ? `${it.id}, ${kind}, shown for reference` : block ? `${it.id}, ${kind}. ${block.reason}. ${block.act}` : `Pick ${it.id}, ${kind}`}
       onClick={() => { if (info) return toast(`${it.id}: set it with ${it.flag}`, true); if (block) return sw(); setPick(it, st === 'allow' ? 'clear' : 'allow', 'p:' + it.ref); }}
       onContextMenu={e => { if (!canDeny) return; e.preventDefault(); deny(); }}
       onKeyDown={e => { if ((e.key === 'f' || e.key === 'F') && canDeny) { e.preventDefault(); deny(); } }}>
       <span className="media">{showAnim ? <img src={pv(it.preview)} alt="" loading="lazy" decoding="async" width={120} height={160} /> : still ? <img src={file(still)} alt="" loading="lazy" width={120} height={160} /> : <span className="np">{it.preview ? 'Paused' : it.id}</span>}</span>
-      <span className="nm">{it.made ? it.made.name : it.id}</span>{block ? <span className="ds why" id={did}>{block.reason}</span> : <span className="ds" id={did}>{it.label || ''}</span>}
+      <span className="nm">{it.made ? it.made.name : it.id}</span>{block ? <span className="ds why" id={did}>{block.reason}</span> : <span className="ds" id={did}>{why ? `From the reference: ${why}. ` : ''}{it.label || ''}</span>}
     </button>
     {!block && (need || flag) && <span className={'flag' + (need ? ' need' : '')} aria-hidden="true">{need ? 'needs setup' : flag}</span>}
-    {it.made && src !== 'ref' && <span className="made" title={it.made.by === 'agent' ? 'Made by your agent' : 'Made from a reference'} data-made={it.made.by}>REF<span className="sr">, {it.made.by === 'agent' ? 'made by your agent' : 'made from a reference'}</span></span>}
-    {src && <span className={'src src-' + src} title={SRC_TIP[src]} data-src={src}>{SRC[src]}<span className="sr">, {SRC_TIP[src]}</span></span>}
+    {it.made && <span className="made" title={it.made.by === 'agent' ? 'Made by your agent' : 'Made from a reference'} data-made={it.made.by}>{MADE_LABEL}<span className="sr">, {it.made.by === 'agent' ? 'by your agent' : 'from a reference'}</span></span>}
+    {src && !it.made && <span className={'src src-' + src} title={SRC_TIP[src]} data-src={src}>{SRC[src]}{src !== 'ref' && <span className="sr">, {SRC_TIP[src]}</span>}</span>}
     <span className="state" aria-hidden="true">{st === 'allow' ? <Icon n="check" /> : st === 'deny' ? <Icon n="x" /> : null}</span>
     {canDeny && <button className="forbid" type="button" data-focus={'f:' + it.ref} aria-pressed={String(st === 'deny')} aria-label={`Forbid ${it.id}`} title={st === 'deny' ? 'Forbidden. Click to allow again.' : 'Forbid'} onClick={() => setPick(it, st === 'deny' ? 'clear' : 'deny', 'f:' + it.ref)}><Icon n="ban" /></button>}
   </div>;
@@ -175,6 +184,7 @@ function HoverCard({ tip }) {
   const it = tip && tip.it;
   return <div id="tip" ref={ref} className="hovercard glass" role="tooltip" hidden={!tip} style={{ left: pos.left, top: pos.top }}>
     {it && <><span className="k">{it.made ? (it.made.kind === 'effect' ? 'Effect, made for you' : 'Graphic, made for you') : KIND_NAME[it.kind] || it.kind}</span><b>{it.made ? it.made.name : it.id}</b>{it.label && <p>{it.label}</p>}
+      {tip.why && <p className="why ref" id="tip-ref">From the reference: {tip.why}.</p>}
       {tip.block ? <p className="why" id="tip-why"><b>{tip.block.reason}.</b> {tip.block.why} Click to {tip.block.act[0].toLowerCase() + tip.block.act.slice(1)}.</p> : tip.need ? <p className="why need" id="tip-why">{tip.need}</p> : null}
       {tip.block ? null : it.mode === 'info' ? <p><code>{it.flag || ''}</code></p> : <p className="k">{it.mode === 'one' ? 'Click to pick. One per reel.' : 'Click to pick. Right-click or F to forbid.'}</p>}</>}
   </div>;

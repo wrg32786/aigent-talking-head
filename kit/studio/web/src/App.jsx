@@ -55,6 +55,9 @@ export function App() {
   const [wizOpen, setWizOpen] = useState(/wizards/.test(location.hash));
   const [log, setLog] = useState('');
   const [recLive, setRecLive] = useState(null);
+  // the theme button leaves the top bar on a phone (studio.css), so only there does More carry it
+  const [narrow, setNarrow] = useState(() => matchMedia('(max-width: 640px)').matches);
+  useEffect(() => { const m = matchMedia('(max-width: 640px)'), on = () => setNarrow(m.matches); m.addEventListener('change', on); return () => m.removeEventListener('change', on); }, []);
   const mainRef = useRef(null);
 
   const seen = useRef({ boot: null, seq: 0, video: null });
@@ -145,14 +148,10 @@ export function App() {
           <button className="icon-btn fab" id="chat-open" type="button" aria-controls="chat" aria-expanded={String(chatOpen)} aria-label="Open chat" onClick={() => setChatOpen(true)}><Icon n="chat" /><span className={'dot ' + agentState} id="fab-dot" aria-hidden="true" /></button>
           <IconBtn id="open-settings" n="sliders" label="Settings" aria-haspopup="dialog" onClick={() => setSettingsOpen(true)} />
           <MoreMenu id="more-open" label="More" items={[
-            { id: 'more-new-video', label: 'New video', icon: 'plus', onClick: () => setVideoMode('new') },
-            { id: 'more-open-video', label: 'Open a past video', icon: 'film', onClick: () => setVideoMode('open') },
-            { id: 'more-outputs', label: 'Outputs', icon: 'film', onClick: () => setOutputsOpen(true) },
-            { id: 'more-wizards', label: 'Wizards', icon: 'spark', onClick: () => setWizOpen(true) },
-            { id: 'more-connect', label: 'Connect agent', icon: 'plug', onClick: openConnect },
+            { id: 'more-open-video', label: 'Past videos', icon: 'film', onClick: () => setVideoMode('open') },
             { id: 'more-setup', label: 'Setup check', icon: 'check', onClick: openSetup },
-            { id: 'more-keys', label: 'API keys and providers', icon: 'link', onClick: openKeys },
-            { id: 'more-theme', label: theme === 'dark' ? 'Light theme' : 'Dark theme', icon: theme === 'dark' ? 'sun' : 'moon', onClick: () => setTheme(theme === 'dark' ? 'light' : 'dark') },
+            { id: 'more-keys', label: 'API keys', icon: 'link', onClick: openKeys },
+            narrow && { id: 'more-theme', label: theme === 'dark' ? 'Light theme' : 'Dark theme', icon: theme === 'dark' ? 'sun' : 'moon', onClick: () => setTheme(theme === 'dark' ? 'light' : 'dark') },
           ]} />
         </div>
       </header>
@@ -172,7 +171,7 @@ export function App() {
           </Fragment>
           <footer className="stepnav glass" id="stepnav">
             <span style={{ visibility: i ? 'visible' : 'hidden' }}><Button id="prev" variant="ghost" label="Back" icon={<Icon n="left" />} onClick={() => go(STEPS[Math.max(0, i - 1)], true)} /></span>
-            <PicksTray s={s} patch={patch} cat={CAT} />
+            <PicksTray s={s} patch={patch} cat={CAT} added={(V.look && V.look.added) || []} openLayer={pickTab} />
             <AskAgent step={step} apply={apply} openChat={openChat} />
             {i < STEPS.length - 1 ? <Button id="next" variant="primary" label={stepName(STEPS[i + 1])} endContent={<Icon n="right" />} onClick={() => go(STEPS[i + 1], true)} /> : <span className="nextpad" />}
           </footer>
