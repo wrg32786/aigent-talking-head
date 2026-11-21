@@ -17,6 +17,10 @@ export function useRun(V, s, log, setLog) {
   const clear = () => { setChoices(null); setReceipt(null); setLog(''); };
   useEffect(() => { if (t && !running && (t.kind === 'draft' || t.kind === 'render') && last.current !== t.id + t.status) { last.current = t.id + t.status; loadChoices(); } });
   useEffect(() => { if (!choices && s.job && loadedFor.current !== s.job) { loadedFor.current = s.job; loadChoices(); } }, [s.job, choices]);
+  // a new or opened video: the last board's draft picks are not this one's. This hook lives above the per-video key
+  // in App, so it resets here (else the new board said "Draft ready" and Render was on with no draft)
+  const vid = (s.videoSeq || 0) + ':' + (s.job || ''), vidSeen = useRef(vid);
+  useEffect(() => { if (vidSeen.current === vid) return; vidSeen.current = vid; loadedFor.current = s.job || null; setChoices(null); setReceipt(null); setDirty(false); if (s.job) loadChoices(); }, [vid]);
   useEffect(() => { if (!running) return; const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, [running]);
   useEffect(() => { if (t && (!running || !log)) setLog(t.lines.join('\n')); }, [t && t.id, t && t.status, t && t.lines && t.lines.length]);
   return { choices, setChoices, receipt, setReceipt, dirty, setDirty, loadChoices, clear, now, running };

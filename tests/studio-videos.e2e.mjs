@@ -7,7 +7,7 @@
 // Needs Chrome and ffmpeg. Run: node tests/studio-videos.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
 import assert from 'assert';
 import { spawn } from 'child_process';
-import { mkdtempSync, rmSync, existsSync, mkdirSync, copyFileSync } from 'fs';
+import { mkdtempSync, rmSync, existsSync, mkdirSync, copyFileSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -29,7 +29,12 @@ let n = 0; const t = async (name, fn) => { await fn(); n++; console.log('ok ' + 
 const INBOX = join(ROOT, 'inbox', 'studio', OLD), TAKE = `inbox/studio/${OLD}/take.mp4`;
 mkdirSync(INBOX, { recursive: true }); rawTake(join(ROOT, TAKE));
 mkdirSync(join(ROOT, 'jobs', OLD), { recursive: true }); copyFileSync(join(ROOT, TAKE), join(ROOT, 'jobs', OLD, 'reel-v1.mp4'));
+// the old video was drafted: its picks are on Review (and must not follow you to the new video)
+writeFileSync(join(ROOT, 'jobs', OLD, 'choices.json'), JSON.stringify({ locksText: '', captions: { style: 'kinetic', entrance: 'pop' }, music: { bed: 'none' }, punch: true, beats: [{ n: 1, start: 0, end: 3, transitionWhy: 'x', finishWhy: 'y' }], titles: [], graphics: [] }));
 
+// the board as a session that drafted the old video left it (so its draft counts as current)
+process.env.STUDIO_DIR = STATE;
+{ const C = await import('../kit/studio/core.mjs'), d = C.defaultState(); writeFileSync(join(STATE, 'state.json'), JSON.stringify({ ...d, job: OLD, footage: [TAKE], pack: 'cinematic', music: { ...d.music, bed: 'none' } })); }
 const env = { ...process.env, CI: '1', STUDIO_DIR: STATE, STUDIO_CHAT: '', ANTHROPIC_API_KEY: '', OPENAI_API_KEY: '' };
 const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), '--port', '0', '--no-open'], { cwd: ROOT, env });
 const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out))); });
@@ -58,6 +63,7 @@ try {
   });
 
   await t('Start fresh: a clean board for the new job on Start, the look kept, nothing deleted', async () => {
+    await pg.waitForSelector('#choices-fold', { state: 'attached', timeout: 15e3 }); // the old video's draft picks are loaded
     await pg.click('#nv-start');
     await pg.waitForFunction(j => document.querySelector('#job').value === j, NEW, { timeout: 15e3 });
     await pg.waitForFunction(() => !document.querySelector('dialog#new-video[open]') && document.querySelector('main').dataset.step === 'start', null, { timeout: 15e3 });
@@ -67,6 +73,14 @@ try {
     assert.deepStrictEqual(v.outputs, []);
     for (const f of [TAKE, `jobs/${OLD}/reel-v1.mp4`]) assert.ok(existsSync(join(ROOT, f)), 'kept ' + f);
     assert.ok(existsSync(join(STATE, 'videos', OLD + '.json')));
+  });
+
+  await t('the new video has no draft: Review does not show the last video\'s picks, and Render waits for a draft', async () => {
+    await pg.click('#stepper button[data-step="review"]'); await pg.waitForFunction(() => document.querySelector('main').dataset.step === 'review');
+    await pg.waitForTimeout(600);
+    assert.strictEqual(await pg.$('#choices-fold'), null, 'no picks from the last video');
+    assert.strictEqual((await pg.textContent('#draft')).trim(), 'Draft', 'the button says Draft, not Draft again');
+    await pg.click('#stepper button[data-step="start"]'); await pg.waitForFunction(() => document.querySelector('main').dataset.step === 'start');
   });
 
   await t('More, Past videos: the old job with its date and reel count; opening it brings its footage back', async () => {
