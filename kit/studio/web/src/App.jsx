@@ -108,13 +108,14 @@ export function App() {
 
   const s = V.state, t = V.task, running = t && t.status === 'running';
   const picksAny = Object.values(s.picks).some(p => p.allow.length || p.deny.length);
-  const done = { footage: !!(s.footage.length || s.clips), cut: !!(V.cut && V.cut.candidates && V.cut.candidates.length), look: !!(s.pack || picksAny || s.reference.extracted), broll: !!(V.broll && V.broll.beats && V.broll.beats.some(b => b.slot)), finish: !!(V.outputs || []).length };
+  const done = { footage: !!(s.footage.length || s.clips), cut: !!(V.cut && V.cut.candidates && V.cut.candidates.length), look: !!(s.pack || picksAny || s.reference.extracted), broll: !!(V.broll && V.broll.beats && V.broll.beats.some(b => b.slot)), finish: !!(V.currentOutputs || []).length };
   const i = STEPS.indexOf(step);
   const openConnect = () => { setSettingsOpen(false); setChatOpen(false); setConnectOpen(true); };
   const openSetup = () => { setSettingsOpen(false); setSetupOpen(true); };
   const openKeys = () => { setSettingsOpen(false); setKeysOpen(true); };
   const openChat = () => setChatOpen(true);
-  const ctx = { CAT, V, s, apply, patch, go, reloadCat, setLog, log, openConnect, openSetup, openKeys, openChat };
+  const openOutputs = () => setOutputsOpen(true), openNewVideo = () => setVideoMode('new');
+  const ctx = { CAT, V, s, apply, patch, go, reloadCat, setLog, log, openConnect, openSetup, openKeys, openChat, openOutputs, openNewVideo };
   const env = V.env, a = env.agent || {}, agentState = env.backend !== 'agent' ? 'alt' : a.listening ? 'on' : a.connected ? 'busy' : 'off';
   const pill = !t ? 'Ready' : running ? `${cap1(t.kind)} running` : t.status === 'failed' ? `${cap1(t.kind)} failed` : `${cap1(t.kind)} ${t.status}`;
 

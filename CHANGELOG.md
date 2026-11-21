@@ -9,6 +9,17 @@ Release notes: [docs/releases/v1.18.2.md](docs/releases/v1.18.2.md). Recreate dr
 - **Recreate keeps your pieces.** With a reference on Recreate, Draft used the whole take even when you kept pieces on Cut (`fromPieces = ... && !recreate` in `draftSteps`), so a line you cut out came back. The draft was saved under the take's key while Your edit and Finish asked for the pieces' key, so after every draft Studio still said "Your pieces changed since the draft" (`drafted: false, stale: true`) and Render never came on. Recreate now drafts from your pieces, already cut (`--as-is`), with the reference's Reel.md as the recipe, and the draft counts as done.
 - **Tests.** `tests/studio-recreate-pieces.test.mjs` (in `npm run smoke`, it needs ffmpeg).
 
+## 1.18.1 (unreleased)
+
+Release notes: [docs/releases/v1.18.1.md](docs/releases/v1.18.1.md). Uploading new footage starts a fresh edit, Finish shows only the current draft, and you can clear all B-roll from the timeline.
+
+- **A new upload starts a fresh edit.** Dropping or choosing a new talking-head file on a board that already has an edit (or adding one from a link, a kept take, or your agent) clears cuts, pieces, B-roll spots and the timeline, the reference, and the draft and render state. The look resets too, unless you turned **Keep my look** on in **New video** (then only the look carries). The first file on a clean board does not wipe a look you just picked. Files are never deleted: earlier reels stay in Outputs, and **Open a past video** still opens other jobs. Use **New video** if you want the new take as its own job.
+- **Finish shows only the current draft.** The Draft, Check and Render step never plays a render from another draft or take. If there is no video yet, it shows the plan or a fast preview of this draft's cuts. Show original compares a reel with the take only when that reel was rendered from the current draft, matched on the build key saved in `reel-vN.settings.json` and `reel-vN.build/meta.json`. Earlier reels stay in the Outputs library, each with its player, date, source take and draft, **Edit this reel**, and **Download**.
+- **The leftover B-roll bug.** The B-roll timeline was rebuilt from `jobs/<job>/build/cut.json` even after the footage changed, so spots from the last video stayed on screen with no way to clear them. The leftover build is now ignored until you draft again (`draftStale` / `draftIsCurrent` in `kit/studio/core.mjs`).
+- **Clear all B-roll.** On the B-roll step, when any spot is filled: **Clear all B-roll**, a confirm, then **Undo**. Library clips are unchanged (`POST /api/broll/clear`, `undo: true`).
+- **MCP.** New `clear_broll` (`undo` puts the last clear back). `fill_slot` with `clear` and `all` does the same.
+- **Tests and docs.** `tests/studio-reset.test.mjs` (in `npm run check`); docs/studio.md, docs/mcp.md, AGENTS.md and the Studio skill.
+
 ## 1.18.0 (unreleased)
 
 Release notes: [docs/releases/v1.18.0.md](docs/releases/v1.18.0.md). B-roll: the split panel sits behind your head, and a new framed layout.

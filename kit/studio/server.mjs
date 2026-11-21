@@ -110,7 +110,7 @@ function addFootageLink(raw) {
     setImport(id, x => { x.received = received; x.size = size; });
   } }).then(r => {
     const relp = `${dir}/${r.name}`.split(sep).join('/');
-    setImport(id, (x, st) => { Object.assign(x, { status: 'ready', file: relp, name: r.name, received: r.size, size: r.size }); if (!st.footage.includes(relp)) st.footage.push(relp); st.clips = null; });
+    setImport(id, (x, st) => { Object.assign(x, { status: 'ready', file: relp, name: r.name, received: r.size, size: r.size }); const radd = C.addFootage(st, relp); if (radd.reset) C.applyPatch(st, { reply: radd.note, from: 'studio', kind: 'action' }); });
   }).catch(e => setImport(id, x => { x.status = e.name === 'AbortError' ? 'cancelled' : 'failed'; x.error = e.name === 'AbortError' ? null : e.message; }))
     .finally(() => imports.delete(id));
   return id;
@@ -136,7 +136,8 @@ function view(s) {
   let combo = { pieces: [], seconds: 0, key: '' }; try { combo = comboOf(s); } catch {}
   let edit = null; try { edit = editOf(s, { combo, cut, broll }); } catch (e) { edit = { error: e.message }; }
   let look = null; try { look = lookSources(s); } catch {}
-  return { seq: ++viewSeq, boot: BOOT, state: s, look, compose: comp, outputs: C.outputsOf(s), reopenable, scripts, cut, broll, pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
+  const outputs = C.outputsOf(s), currentOutputs = currentOutputsOf(s);
+  return { seq: ++viewSeq, boot: BOOT, state: s, look, compose: comp, outputs, currentOutputs, draftPreview: draftPreviewOf(s), reopenable, scripts, cut, broll, pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
 }
 
 // what a finished draft says (a draft is a plan: no video until Render)
@@ -254,7 +255,7 @@ function draftSteps(s) {
       wordsArg = ['--words', wf];
     }
   }
-  return { steps: [[process.env.STUDIO_REEL || 'kit/reel.cjs', [...src, ...wordsArg, '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])], stepEnv]], lockString: comp.lockString, txPrompt: stepEnv.TX_PROMPT || null, key: 'take:' + footageKey(s), from: 'take' };
+  return { steps: [[process.env.STUDIO_REEL || 'kit/reel.cjs', [...src, ...wordsArg, '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])], stepEnv]], lockString: comp.lockString, txPrompt: stepEnv.TX_PROMPT || null, key: 'take:' + C.footageKey(s), from: 'take' };
 }
 function renderSteps(s) {
   if (!s.job || !existsSync(join(ROOT, 'jobs', s.job, 'build', 'cut.json'))) throw Object.assign(new Error('make a draft first'), { code: 400 });
@@ -265,7 +266,7 @@ function renderSteps(s) {
   // the b-roll lane goes into cut.json first (kit/studio/broll-run.mjs), with credits.txt for the clips it uses
   const bp = BRL.plan(s), steps = [];
   if (bp) { const f = join('jobs', s.job, 'broll.json'); writeFileSync(join(ROOT, f), JSON.stringify(bp, null, 1)); steps.push(['kit/studio/broll-run.mjs', ['apply', '--name', s.job, '--plan', f]]); }
-  steps.push([process.env.STUDIO_REEL || 'kit/reel.cjs', args]);
+  steps.push([process.env.STUDIO_REEL || 'kit/reel.cjs', args, { STUDIO_DRAFT_KEY: draftKey(s), STUDIO_FOOTAGE_KEY: C.footageKey(s) }]);
   let fx = null;
   if (comp.effects.length && env().effectsReady) {
     const ch = readChoices(s); fx = C.fxPlan(ch, comp.effects);
@@ -287,11 +288,10 @@ function swapOf(s) {
 const clipsDirOf = s => s.clips ? resolve(ROOT, s.clips) : join(ROOT, 'jobs', s.job || '-', 'clips');
 const clipsJsonPath = s => join(clipsDirOf(s), 'clips.json');
 const cleanupFile = s => join('jobs', s.job, 'cleanup.json');
-const footageKey = s => JSON.stringify([s.footage, s.clips]);
 // the clean-up plan the next draft uses: only while it is on and the footage is the footage it was made from
 function cleanupFor(s) {
   const c = s.cleanup;
-  if (!s.job || !c || !c.on || c.footage !== footageKey(s) || !existsSync(clipsJsonPath(s)) || !existsSync(join(ROOT, cleanupFile(s)))) return null;
+  if (!s.job || !c || !c.on || c.footage !== C.footageKey(s) || !existsSync(clipsJsonPath(s)) || !existsSync(join(ROOT, cleanupFile(s)))) return null;
   return cleanupFile(s);
 }
 function cleanupView(s, silence) {
@@ -301,7 +301,7 @@ function cleanupView(s, silence) {
   for (const it of items) if (dec[it.id] !== undefined) it.remove = !!dec[it.id];
   const rel = relOf(join(clipsDirOf(s), 'x')).replace(/\/x$/, ''), served = rel.startsWith('jobs/') || rel.startsWith('inbox/studio/');
   const clips = Object.fromEntries((cj.clips || []).map(x => [x.id, { file: served ? `${rel}/${basename(x.file)}` : null, dur: +x.dur, status: x.status, text: x.text }]));
-  return { ready: true, silence: sil, items, clips, on: !!cleanupFor(s), stale: !!(c.on && c.footage !== footageKey(s)), plan: RV.plan(items, {}, cj) };
+  return { ready: true, silence: sil, items, clips, on: !!cleanupFor(s), stale: !!(c.on && c.footage !== C.footageKey(s)), plan: RV.plan(items, {}, cj) };
 }
 const readChoices = s => { try { return JSON.parse(readFileSync(choicesPath(s), 'utf8')); } catch { return null; } };
 function receiptOf(s, ch) {
@@ -542,7 +542,7 @@ function draftFrom(s, combo = comboOf(s)) {
   const f = (s.finish && s.finish.from) || 'auto', own = combo.pieces.some(x => x.kind !== 'testimonial');
   return f === 'take' || !own ? 'take' : 'pieces';
 }
-const draftKey = (s, combo = comboOf(s)) => draftFrom(s, combo) === 'pieces' ? 'pieces:' + combo.key : 'take:' + footageKey(s);
+const draftKey = (s, combo = comboOf(s)) => draftFrom(s, combo) === 'pieces' ? 'pieces:' + combo.key : 'take:' + C.footageKey(s);
 // the pieces as already cut files, with a clips.json beside them that carries each one's words (one transcript)
 function comboFiles(s, combo) {
   const W = {}, wordsFor = rel => (W[rel] = W[rel] || wordsOf(rel) || []), words = wordsFor(combo.source), cutsDir = join(ROOT, `inbox/studio/${s.job}/cuts`), cj = join(cutsDir, 'clips.json');
@@ -594,23 +594,72 @@ function editOf(s, v) {
 function saveSettings(s) {
   const dir = join(ROOT, 'jobs', s.job || '-'); let v = 0; try { v = Math.max(0, ...readdirSync(dir).map(f => +(f.match(/^reel-v(\d+)\.mp4$/) || [0, 0])[1])); } catch {} if (!v) return null;
   const vw = view(s), e = vw.edit, combo = vw.combo, files = C.outputsOf(s).filter(f => new RegExp(`reel(-fx)?-v${v}(-[a-z0-9]+)?\\.mp4$`).test(f));
-  const out = { version: v, at: new Date().toISOString(), job: s.job, making: e.making.text, format: e.making.format, look: e.look.text, pack: s.pack || null, reference: e.look.reference, from: e.from.text, pieces: combo.pieces.map(x => ({ id: x.id, kind: x.kind, label: x.label, seconds: x.seconds, lines: x.lines || null })), count: pieceN(combo), seconds: combo.seconds,
+  const key = draftKey(s), footage = C.footageKey(s), takes = C.takeNames(s);
+  const out = { version: v, at: new Date().toISOString(), job: s.job, key, footage, takes, making: e.making.text, format: e.making.format, look: e.look.text, pack: s.pack || null, reference: e.look.reference, from: e.from.text, pieces: combo.pieces.map(x => ({ id: x.id, kind: x.kind, label: x.label, seconds: x.seconds, lines: x.lines || null })), count: pieceN(combo), seconds: combo.seconds,
     broll: e.broll.text, sound: e.sound.text, export: s.export || null, files };
   try { writeFileSync(join(dir, `reel-v${v}.settings.json`), JSON.stringify(out, null, 1)); } catch {}
+  const metaF = join(dir, `reel-v${v}.build`, 'meta.json');
+  if (existsSync(metaF)) { try { const meta = JSON.parse(readFileSync(metaF, 'utf8')); writeFileSync(metaF, JSON.stringify({ ...meta, key, footage, takes, from: out.from }, null, 1) + '\n'); } catch {} }
   return out;
 }
-function versionsOf(job) {
+
+// reels rendered from the current draft only (the build key in reel-vN.settings.json / reel-vN.build/meta.json)
+function currentOutputsOf(s) {
+  if (!s || !s.job || !C.draftIsCurrent(s)) return [];
+  const cur = new Set(versionsOf(s.job, s).filter(v => v.current).map(v => v.v));
+  return C.outputsOf(s).filter(f => cur.has(+(f.match(/reel(?:-fx)?-v(\d+)/) || [0, 0])[1]));
+}
+// a fast preview of the current draft: the cut segments, no captions or look. Never a render from another draft.
+const slash = x => String(x).replace(/\\/g, '/').replace(/^\.\//, '');
+function previewRel(s, raw) {
+  if (!raw || typeof raw !== 'string' || /^[a-z]+:/i.test(raw)) return null;
+  const cand = [];
+  if (raw.startsWith('/')) {
+    const rel = raw.startsWith(ROOT) ? raw.slice(ROOT.length).replace(/^[\\/]+/, '') : null;
+    if (rel) cand.push(rel);
+  } else {
+    cand.push(raw, join('jobs', s.job, 'build', raw), join('jobs', s.job, raw));
+  }
+  for (const c of cand) {
+    const rel = slash(c);
+    const abs = resolve(ROOT, rel);
+    if (!abs.startsWith(ROOT) || !existsSync(abs)) continue;
+    const r = rel.split(sep).join('/');
+    if (SERVE.some(p => r.startsWith(p))) return r;
+  }
+  return null;
+}
+function draftPreviewOf(s) {
+  if (!s || !s.job || !C.draftIsCurrent(s)) return null;
+  const cutF = join(ROOT, 'jobs', s.job, 'build', 'cut.json');
+  if (!existsSync(cutF)) return null;
+  let cut; try { cut = JSON.parse(readFileSync(cutF, 'utf8')); } catch { return null; }
+  const segs = [];
+  for (const x of cut.segs || []) {
+    const file = previewRel(s, x.file || x.src);
+    if (!file) continue;
+    const a = +(x.in ?? x.src_in ?? 0), b = +(x.out ?? x.src_out ?? 0);
+    if (!(b > a)) continue;
+    segs.push({ file, in: +a.toFixed(3), out: +b.toFixed(3) });
+  }
+  if (!segs.length) return null;
+  return { segs, seconds: +segs.reduce((a, x) => a + x.out - x.in, 0).toFixed(2) };
+}
+function versionsOf(job, s = null) {
   const dir = join(ROOT, 'jobs', job); if (!existsSync(dir)) return [];
   const files = C.outputsOf({ job }), snaps = Object.fromEntries((() => { try { return SNAP.list(dir); } catch { return []; } })().map(x => [x.v, x]));
   const vs = [...new Set(files.map(f => +(f.match(/reel(?:-fx)?-v(\d+)[^/]*$/) || [0, 0])[1]).filter(Boolean))].sort((a, b) => b - a);
-  return vs.map(v => { let st = null; try { st = JSON.parse(readFileSync(join(dir, `reel-v${v}.settings.json`), 'utf8')); } catch {}
+  return vs.map(v => { const ident = C.outputIdentity(job, v); let st = ident.settings;
+
     const fs_ = files.filter(f => new RegExp(`/reel(-fx)?-v${v}(-[a-z0-9]+)?\\.mp4$`).test(f)), main = fs_.find(f => new RegExp(`/reel-v${v}\\.mp4$`).test(f)) || fs_[0];
     let at = null; try { at = statSync(join(ROOT, main)).mtime.toISOString(); } catch {}
     return { v, reel: main, files: fs_.map(f => ({ path: f, label: /-fx-/.test(f) ? 'With effects' : new RegExp(`-v${v}\\.mp4$`).test(f) ? 'Reel' : 'Export ' + (f.match(/-v\d+-([a-z0-9]+)\.mp4$/) || [0, ''])[1] })).sort((a, b) => (a.label === 'Reel' ? 0 : a.label === 'With effects' ? 1 : 2) - (b.label === 'Reel' ? 0 : b.label === 'With effects' ? 1 : 2) || a.path.localeCompare(b.path)), at: (st && st.at) || at, seconds: main ? +(durOf(main) || 0).toFixed(1) || null : null,
-      settings: st, reopen: !!(snaps[v] && snaps[v].snapshot) }; });
+      settings: st, reopen: !!(snaps[v] && snaps[v].snapshot),
+      take: (ident.takes && ident.takes.length ? ident.takes.join(', ') : null), draft: ident.from || (st && st.from) || null, key: ident.key || null,
+      current: !!(s && s.job === job && C.outputMatchesDraft(s, ident, draftKey(s))) }; });
 }
 function outputsLib(s, all) {
-  const out = { job: s.job, versions: s.job ? versionsOf(s.job) : [] };
+  const out = { job: s.job, versions: s.job ? versionsOf(s.job, s) : [] };
   if (all) out.jobs = C.listVideos(s.job).filter(x => x.job !== s.job && x.outputs).slice(0, 60).map(x => { const vs = versionsOf(x.job), last = vs[0];
     return { job: x.job, at: x.at, versions: vs.length, look: last && last.settings ? last.settings.look : null, seconds: last ? last.seconds : null }; });
   return out;
@@ -816,12 +865,14 @@ async function api(req, res, u) {
     mkdirSync(join(ROOT, dir), { recursive: true });
     const relp = join(dir, name).split(sep).join('/'), dest = join(ROOT, relp);
     await new Promise((ok, bad) => { const w = createWriteStream(dest); req.pipe(w); w.on('finish', ok); w.on('error', bad); req.on('error', bad); });
+    let radd = null;
     const s = update(st => {
-      if (kind === 'footage') { if (!st.footage.includes(relp)) st.footage.push(relp); st.clips = null; }
+      if (kind === 'footage') radd = C.addFootage(st, relp);
       if (kind === 'reference') { st.reference = { ...st.reference, file: relp, url: null, status: 'uploaded', extracted: null, out: null, applied: false }; }
       if (kind === 'music') { st.music.upload = relp; st.music.bed = 'upload'; }
     });
-    return json(res, 200, { ok: true, path: relp, ...view(s) });
+    if (radd && radd.reset) { C.applyPatch(s, { reply: radd.note, from: 'studio', kind: 'action' }); C.save(s); pushState(); }
+    return json(res, 200, { ok: true, path: relp, ...(radd && radd.reset ? { reset: true, note: radd.note } : {}), ...view(s) });
   }
   // Record now (kit/studio/record.mjs): start, numbered chunks while filming, finish converts to mp4
   if (p === '/api/record/start' && M === 'POST') { const b = await readBody(req); const id = update(st => REC.start(st, b)); return json(res, 200, { id, ...view(C.load()) }); }
@@ -967,7 +1018,7 @@ async function api(req, res, u) {
     // the page shows the short ask (attach.kind fix); the agent reads the whole instruction
     return json(res, 200, await chatTurn(text, false, { kind: 'fix', fix: String(b.id), label: FX.describe(String(b.id)).label }));
   }
-  if (p === '/api/footage/remove' && M === 'POST') { const b = await readBody(req); const s = update(st => { st.footage = st.footage.filter(f => f !== b.path); }); return json(res, 200, view(s)); }
+  if (p === '/api/footage/remove' && M === 'POST') { const b = await readBody(req); const s = update(st => { const n = (st.footage || []).length, stamp = C.draftStamp(st); st.footage = st.footage.filter(f => f !== b.path); if (st.footage.length !== n) C.onFootageListChanged(st, { stamp }); }); return json(res, 200, view(s)); }
   if (p === '/api/reference' && M === 'POST') {
     const b = await readBody(req), s = C.load();
     if (b.url || b.urls) { const added = addLinks([].concat(b.urls || [], b.url || [])); return json(res, 202, { added, ...view(C.load()) }); }
@@ -1031,7 +1082,7 @@ async function api(req, res, u) {
     const s = C.load(); const d = draftSteps(s); // checks the footage first, so an empty job says that before a missing tool
     const miss = needFor('draft'); if (miss) return json(res, 400, miss);
     update(st => { st.lockedAtDraft = d.lockString || ''; st.drafted = null; });
-    runTask('draft', () => d.steps, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; }); BRL.autoPick(s.job); return { choices: !!readChoices(C.load()), note: DRAFT_DONE, from: d.from }; });
+    runTask('draft', () => d.steps, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; delete st.draftStale; }); BRL.autoPick(s.job); return { choices: !!readChoices(C.load()), note: DRAFT_DONE, from: d.from }; });
     return json(res, 202, { ...view(C.load()), from: d.from });
   }
   // ---------- pieces and the Combo (kit/studio/pieces.mjs) ----------
@@ -1095,13 +1146,14 @@ async function api(req, res, u) {
     if (task && task.status === 'running') return json(res, 409, { error: 'wait for the running task to finish' });
     let r; try { r = SNAP.reopen(join(ROOT, 'jobs', s.job), String(b.reel || '').split('/').pop()); } catch (e) { return json(res, 400, { error: e.message }); }
     // the reopened build is what Render uses now, whatever the pieces say: it counts as drafted
-    update(st => { st.drafted = { key: draftKey(st), from: 'reopen', reel: r.reel, at: Date.now() }; if (S.load().actionNotes !== false) C.applyPatch(st, { reply: `${r.reel} is back in the editor. Change the picks, then Render makes the next version.${r.backup ? ' The draft it replaced is saved as ' + r.backup + '.' : ''}`, from: 'Studio', kind: 'action' }); });
+    update(st => { st.drafted = { key: draftKey(st), from: 'reopen', reel: r.reel, at: Date.now() }; delete st.draftStale; if (S.load().actionNotes !== false) C.applyPatch(st, { reply: `${r.reel} is back in the editor. Change the picks, then Render makes the next version.${r.backup ? ' The draft it replaced is saved as ' + r.backup + '.' : ''}`, from: 'Studio', kind: 'action' }); });
     return json(res, 200, { reopened: r, ...view(C.load()) });
   }
   if (p === '/api/task/cancel' && M === 'POST') { if (task && task.status === 'running') { task.cancel = true; task.proc && task.proc.kill('SIGTERM'); } return json(res, 200, view(C.load())); }
-  if (p === '/api/choices' && M === 'GET') { const s = C.load(), ch = readChoices(s); return json(res, 200, { choices: ch, receipt: receiptOf(s, ch) }); }
+  if (p === '/api/choices' && M === 'GET') { const s = C.load(); if (!C.draftIsCurrent(s)) return json(res, 200, { choices: null, receipt: null, stale: true }); const ch = readChoices(s); return json(res, 200, { choices: ch, receipt: receiptOf(s, ch) }); }
   if (p === '/api/choices' && M === 'POST') {
     const b = await readBody(req), s = C.load(), cur = readChoices(s);
+    if (!C.draftIsCurrent(s) || !cur) return json(res, 409, { error: 'Draft this footage first.' });
     if (!cur) return json(res, 400, { error: 'make a draft first' });
     for (const k of ['beats', 'titles', 'graphics']) if (Array.isArray(b[k])) cur[k] = b[k];
     writeFileSync(choicesPath(s), JSON.stringify(cur, null, 2) + '\n');
@@ -1136,9 +1188,9 @@ async function api(req, res, u) {
     writeFileSync(join(ROOT, cleanupFile(s0)), JSON.stringify(pl, null, 1) + '\n');
     const removed = items.filter(it => dec[it.id] !== undefined ? dec[it.id] : it.remove);
     const note = `Clean-up: ${removed.filter(x => x.type === 'silence').length} pauses, ${removed.filter(x => x.type === 'filler').length} filler words and ${items.filter(x => x.type === 'take').length - pl.keep.length} retakes left out, ${pl.saved} s shorter. ${b.redraft === false ? 'Used on the next draft.' : 'Redrafting.'}`;
-    update(st => { st.cleanup = { on: true, silence: sil || (st.cleanup && st.cleanup.silence) || 0.7, decisions: dec, footage: footageKey(st), at: new Date().toISOString(), saved: pl.saved };
+    update(st => { st.cleanup = { on: true, silence: sil || (st.cleanup && st.cleanup.silence) || 0.7, decisions: dec, footage: C.footageKey(st), at: new Date().toISOString(), saved: pl.saved };
       if (S.load().actionNotes !== false) C.applyPatch(st, { reply: note, from: 'Studio', kind: 'action' }); });
-    if (b.redraft !== false) { const s = C.load(), d = draftSteps(s); update(st => { st.lockedAtDraft = d.lockString || ''; st.drafted = null; }); runTask('draft', () => d.steps, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; }); return { choices: !!readChoices(C.load()), cleanup: pl, note: DRAFT_DONE }; }); }
+    if (b.redraft !== false) { const s = C.load(), d = draftSteps(s); update(st => { st.lockedAtDraft = d.lockString || ''; st.drafted = null; }); runTask('draft', () => d.steps, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; delete st.draftStale; }); return { choices: !!readChoices(C.load()), cleanup: pl, note: DRAFT_DONE }; }); }
     return json(res, 202, { ...cleanupView(C.load()), plan: pl, ...view(C.load()) });
   }
   // comment on the preview: a click or a box on a frame, sent to whoever answers the chat, with the frame saved in the job

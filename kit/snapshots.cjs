@@ -48,7 +48,8 @@ function save(dir, reel, { name } = {}) {
   for (const [from, to] of [[path.join(dir, 'choices.json'), 'choices.json'], [path.join(dir, 'clips', 'clips.json'), 'clips.json'], [path.join(dir, 'cleanup.json'), 'cleanup.json'], [path.join(dir, 'broll.json'), 'broll.json'], [path.join(dir, 'fx.json'), 'fx.json']])
     if (fs.existsSync(from)) fs.copyFileSync(from, path.join(out, to));
   let kit = null; try { kit = require(path.join(ROOT, 'package.json')).version; } catch {}
-  fs.writeFileSync(path.join(out, 'meta.json'), JSON.stringify({ reel: reel ? path.basename(reel) : null, saved: new Date().toISOString(), kit, media }, null, 1) + '\n');
+  const key = process.env.STUDIO_DRAFT_KEY || undefined, footage = process.env.STUDIO_FOOTAGE_KEY || undefined;
+  fs.writeFileSync(path.join(out, 'meta.json'), JSON.stringify({ reel: reel ? path.basename(reel) : null, saved: new Date().toISOString(), kit, media, ...(key ? { key } : {}), ...(footage ? { footage } : {}) }, null, 1) + '\n');
   return out;
 }
 

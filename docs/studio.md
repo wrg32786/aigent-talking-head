@@ -431,6 +431,8 @@ The B-roll step sits between Look and Finish. Its **spots** come from the draft:
 - Studio puts on what it can place for free: a library clip, Pexels or Pixabay when you set a key, a card when Chrome is here. A spot with only a search waits for you. Generating never runs on its own.
 - Each idea starts on the word it is about and says **why** ("You say "doubled". Show it as a number."). Placed spots say **picked**; the chat says how many were placed.
 
+**Clear all B-roll** (when any spot is filled) takes every clip off the timeline. It asks first, then **Undo** puts them back. Library clips are unchanged.
+
 **Suggest b-roll again** runs the same rules on the empty spots. Click a spot to see **How it sits**, **Timing** and **Why this**, **Use it** or **Keep empty** for an idea, and **Remove** for what is there. **Use it** never needs a key: the idea's clip, its card, a library match, stock with a key, else a card made from the spot's words. With no Chrome it says so and shows the Chrome fix button.
 
 **Options for this spot:**
@@ -484,9 +486,9 @@ Finish is the one place that makes videos, in three steps shown across the top: 
 
 Render stays off until the reel is drafted, and when your pieces changed after the draft it says "Your pieces changed since the draft. Draft again first." (Your edit says so too.) Agents start the same runs with `studio_run` (`from: pieces | take` for a draft, `exports: { reel, clips, plain }` for a render) or set them with `finish` in `studio_set_selections`.
 
-Draft first. "Picks and why" opens with each pick per beat and the reason. The log is folded below it, and **For your agent** copies this reel as an instruction for your agent. Render then builds the reel, applies your choices edits, and lists every output (`reel-vN.mp4` and the export) with a player and a download link. The effects pass (camera moves, person-mask effects) runs when the effects venv is set up; without it, Studio says the picked effects need it, with **Install** and the agent buttons, and the reel renders without them. When the draft tightened pauses, **Pauses cut** lists each one with **Keep this pause** (`pace.keepPauses`, `--keep-pauses clip@seconds`). A cancel that lands after the render wrote its video keeps the video; the task ends done.
+Draft first. "Picks and why" opens with each pick per beat and the reason. The log is folded below it, and **For your agent** copies this reel as an instruction for your agent. Render then builds the reel, applies your choices edits, and lists this draft's output (`reel-vN.mp4` and the export) with a player and a download link. Earlier reels stay in the [Outputs library](#outputs), not on this step. The effects pass (camera moves, person-mask effects) runs when the effects venv is set up; without it, Studio says the picked effects need it, with **Install** and the agent buttons, and the reel renders without them. When the draft tightened pauses, **Pauses cut** lists each one with **Keep this pause** (`pace.keepPauses`, `--keep-pauses clip@seconds`). A cancel that lands after the render wrote its video keeps the video; the task ends done.
 
-Draft plans the reel; it makes no video. When it ends the step says "Plan ready, no video yet. Check it below, then Render." The Check tools (Show original, the edit receipt, the clean-up pass, Picks and why) show once there is a draft.
+Draft plans the reel; it makes no video. When it ends the step says "Plan ready, no video yet. Check it below, then Render." Finish shows only this draft: the plan, or a fast preview of its cuts, never a render from another draft or take. The Check tools (Show original, the edit receipt, the clean-up pass, Picks and why) show once there is a current draft. If this job already has earlier reels, a note points you to Outputs, and to New video if you want this take as its own job.
 
 ![Finish after a render: the reel and each piece as its own reel under Clips from your pieces](studio/finish-rendered.png)
 
@@ -502,7 +504,7 @@ Five tools in Look (the Reference view) and Finish help you see what changed and
 
 <img src="studio/swap-desktop.png" width="620" alt="What to swap: the reference video next to a list of its parts, each with a time button, a kind such as Hook, Cut, Title or CTA, what happens there, chips for matching picks and a Use button">
 
-**Show original** (Finish step). Your reel and the reference on one clock: side by side, or the reference laid over your reel with an opacity slider. One play button and one scrubber drive both. If the reference starts earlier or later than your reel, set "Original starts at" in seconds. The reference plays muted unless you tick its sound.
+**Show original** (Finish step). Your reel and the reference on one clock: side by side, or the reference laid over your reel with an opacity slider. It only plays a reel that was rendered from the current draft (matched on the build key saved in `reel-vN.settings.json` and `reel-vN.build/meta.json`). One play button and one scrubber drive both. If the reference starts earlier or later than your reel, set "Original starts at" in seconds. The reference plays muted unless you tick its sound.
 
 <img src="studio/compare-desktop.png" width="620" alt="Show original: the reference and your reel side by side at the same moment, with one play button, one scrubber, a start offset and a sound checkbox">
 
@@ -579,6 +581,8 @@ When a reel is done, **New video** clears the board for the next one. Open it wi
 
 **Keep my look** is on by default and keeps the pack, style picks, music, sound, pace, export size and brand logos for the new reel. Turn it off to go back to the defaults too. Your words (the glossary), API keys, settings and your agent's connection never change.
 
+**Uploading a new talking-head file** on a board that already has an edit also starts a fresh edit for this video: cuts, pieces, B-roll spots and the timeline, the reference, and the draft are cleared. The look resets too, unless you chose **Keep my look** when you started this video with New video. The first file you add to a clean board does not wipe a look you just picked. Files are never deleted. Earlier reels stay in Outputs, each with its player, date, source take and draft, **Edit this reel**, and **Download**. Use **New video** if you want the new take as its own job. **Open a past video** still opens your other jobs. A leftover draft on disk is ignored until you draft again, so the B-roll step no longer shows the last video's spots.
+
 Nothing is deleted. The old reel's files stay where they were (`inbox/studio/<job>/`, `jobs/<job>/` with its renders and `reel-vN.build/` saves), and its whole session is saved to `jobs/.studio/videos/<job>.json`.
 
 <img src="studio/new-video-open.png" width="560" alt="Open a past video: launch-teaser, Nov 20, 1 reel">
@@ -603,11 +607,11 @@ API: `GET /api/wizard` (the wizards, goals and clip counts, from `kit/studio/wiz
 
 <img src="studio/outputs.png" width="720" alt="The Outputs library: v2 and v1 of this video with when each was rendered, its look, length and pieces, b-roll and files, and Re-open, Compare and Files">
 
-**Outputs** in the top bar (or **More**, Outputs) lists every render of this video, newest first, with the settings that made it: when, the look, the length and how many pieces, the b-roll and the files (the reel, with effects, each export). Every Render writes them beside the reel as `jobs/<job>/reel-vN.settings.json`, so a version can say how it was made after the session has moved on.
+**Outputs** in the top bar (or **More**, Outputs) lists every finished render of this video, newest first, with the settings that made it: when, the source take and draft, the look, the length and how many pieces, and the b-roll. Every Render writes them beside the reel as `jobs/<job>/reel-vN.settings.json` (and the build key in `reel-vN.build/meta.json`), so a version can say how it was made after the session has moved on. When the footage changes, earlier reels stay here instead of on Finish.
 
-- **Re-open** puts that version back in the editor exactly as it was (the same as Re-open on Finish and `reopen_reel`); Render then makes the next version.
+- **Edit this reel** puts that version back in the editor exactly as it was (the same as Edit this reel on Finish and `reopen_reel`); Render then makes the next version.
+- **Download** saves the reel. **Files** lists each export too.
 - **Compare** two versions to play them side by side, with what changed between them marked.
-- **Files** lists each file to download.
 - **All videos** adds your other videos with how many versions each has and its latest look; pick one to open it.
 
 Nothing is deleted from here.
