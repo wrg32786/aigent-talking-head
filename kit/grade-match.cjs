@@ -67,7 +67,7 @@ function match({ python, build, segs, shotStart, targets, strength = STRENGTH, s
     fs.writeFileSync(tf, JSON.stringify(gs.map(g => targets[g.shot] || null)));
     let res;
     try { res = py(python, ['fit', path.resolve(build, file), '--spans', gs.map(g => `${r3(g.a)}-${r3(g.b)}`).join(','), '--targets', tf, '--out-dir', sub, '--strength', String(strength), '--skin', String(skin), '--size', String(size)]); }
-    catch (e) { why = String(e.message).split('\n')[0]; single = false; return; }
+    catch (e) { why = String(e.stderr || '').trim().split(/\r?\n/).pop() || 'the colour step stopped'; single = false; return; } // the tool's own last line, never the command line
     if (!res.ok) { why = res.why; single = false; return; }
     if (!res.single) single = false;
     gs.forEach((g, n) => {

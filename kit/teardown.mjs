@@ -181,7 +181,8 @@ writeFileSync(join(out, 'Reel.md'), res.md);
 writeFileSync(join(out, 'teardown.md'), res.report);
 // B-roll: where the reference shows it (screen panels, split screens, shots with no speaker), what it showed and how
 // it is treated (kit/broll_fx.py measures the motion, shake, glitch, colour and the way in and out). kit/broll-slots.cjs
-{
+// (a fault in this step must not lose the breakdown: the recipe is already written, so it is kept without the block)
+try {
   const BS = require('./broll-slots.cjs');
   const cands = [];
   for (const g of (res.graphics || []).filter(g => g.type === 'screen-card')) {
@@ -208,7 +209,7 @@ writeFileSync(join(out, 'teardown.md'), res.report);
   res.md = BS.appendBlock(res.md, slots);
   writeFileSync(join(out, 'Reel.md'), res.md);
   console.log(`b-roll: ${slots.length} slot${slots.length === 1 ? '' : 's'} in the reference${slots.length ? ' (' + slots.map(x => `${x.kind} ${x.start}-${x.end}s${x.shows ? ' ' + x.shows : ''}, ${x.fx.motion}, in ${x.fx.in}`).join('; ') + ')' : ''}`);
-}
+} catch (e) { console.warn('note: the B-roll slots of the reference were not read (' + String(e.message).split('\n')[0] + '); the rest of the breakdown is kept'); }
 // titles.json again, as the recipe has them: which titles' text we are not sure of (lowConfidence, why), and the look read
 writeFileSync(join(out, 'titles.json'), JSON.stringify(res.titles, null, 1));
 if (res.titleLook) writeFileSync(join(out, 'title-look.json'), JSON.stringify(res.titleLook, null, 1));
