@@ -122,7 +122,7 @@ function bullets(text) {
   return o;
 }
 function fenced(body, name) {
-  const m = body.match(new RegExp('^```' + name + '[ \\t]*\\n([\\s\\S]*?)^```', 'm'));
+  const m = body.match(new RegExp('^```' + name + '[ \\t]*\\r?\\n([\\s\\S]*?)^```', 'm'));
   return m ? m[1].split(/\r?\n/).filter(l => l.trim()) : null;
 }
 // "#07 16.2-18.5 | key value | key value" (the VIDEO.md timeline line)

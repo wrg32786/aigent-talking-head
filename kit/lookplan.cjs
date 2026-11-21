@@ -55,13 +55,14 @@ function shots(look, len, seed = '') {
   const change = spreader(clamp(+fr.changeRate || 0, 0, 1), 0.99);
   let prev = null, close = false;
   return durs.map((dur, i) => {
-    const cls = (pickers.find(([, pick]) => pick()) || classes[0] || ['MCU'])[0], c = (fr.classes || {})[cls] || { faceH: 0.17, eyeY: 0.33, cx: 0.5 };
+    // a look with no framing measured at all (no speaker on screen in the reference) sets no face target: the take keeps its framing
+    const cls = (pickers.find(([, pick]) => pick()) || classes[0] || ['MCU'])[0], known = classes.length > 0, c = (fr.classes || {})[cls] || { faceH: 0.17, eyeY: 0.33, cx: 0.5 };
     // the same class twice in a row: the look's closer and wider framings of it take turns as often as its framing
     // changed on a cut (a short shot takes the closer one, as a punch-in does), so the cut reads
     if (cls !== prev) close = dur < mid * 0.6; else if (change()) close = dur < mid * 0.6 ? true : !close;
     prev = cls;
     const faceH = close ? c.hi || c.faceH : c.lo || c.faceH;
-    const o = { dur: r3(dur), cls, framing: RF.CLASS_WORDS[cls], face: { faceH, eyeY: c.eyeY, cx: c.cx != null ? c.cx : 0.5 } };
+    const o = { dur: r3(dur), cls, framing: RF.CLASS_WORDS[cls], face: known ? { faceH, eyeY: c.eyeY, cx: c.cx != null ? c.cx : 0.5 } : null };
     if (i) { const tr = tm.find(([, pick]) => pick()); if (tr) o.transition = tr[0]; const m = mv.find(([, pick]) => pick()); if (m) o.move = m[0]; if (shake()) o.shake = true; if (away() && dur >= 1.5) o.cutaway = true; }
     return o;
   });

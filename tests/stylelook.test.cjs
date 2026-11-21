@@ -229,6 +229,22 @@ t('match.json: each part scored, null where nothing could be measured, honest ab
   const b = path.join(dir, 'b'); fs.mkdirSync(b); FID.write(b, m); assert.deepStrictEqual(FID.read(b), m); FID.drop(b); assert.strictEqual(FID.read(b), null);
 });
 
+t('a look with no framing measured sets no face target, so the take is not zoomed to a made-up face size', () => {
+  const look = SL.fromTeardown(td);
+  const bare = LK.shots({ ...look, framing: { mix: {}, classes: {} } }, 30, 'job');
+  assert.ok(bare.length > 1 && bare.every(s => s.face === null), JSON.stringify(bare.map(s => s.face)));
+  assert.ok(LK.shots(look, 30, 'job').every(s => s.face && s.face.faceH > 0), 'a look with framing still sets every target');
+});
+
+t('a Reel.md saved with Windows line endings reads the same as one with Unix ones', () => {
+  const lf = fs.readFileSync(path.join(td, 'Reel.md'), 'utf8').replace(/\r\n/g, '\n'), f = path.join(dir, 'crlf.Reel.md');
+  fs.writeFileSync(f, lf.replace(/\n/g, '\r\n'));
+  const a = RM.load(path.join(td, 'Reel.md')), b = RM.load(f);
+  for (const k of ['shots', 'titles', 'graphics', 'sfx']) { assert.ok((a[k] || []).length === (b[k] || []).length, `${k}: ${(a[k] || []).length} with LF, ${(b[k] || []).length} with CRLF`); }
+  assert.ok(b.shots.length >= 8, 'the shots are read: ' + b.shots.length);
+  assert.deepStrictEqual(RM.validate(b).errs, RM.validate(a).errs);
+});
+
 t('reel.cjs: --style-look with --recipe is refused, and so is a look that does not exist', () => {
   const run = a => spawnSync(process.execPath, [path.join(ROOT, 'kit', 'reel.cjs'), ...a, '--jobs', path.join(dir, 'jobs'), '--name', 'x', '--draft'], { encoding: 'utf8', env: { ...process.env } });
   const both = run(['--style-look', 'list-reel', '--recipe', path.join(td, 'Reel.md'), '--clip', 'nope.mp4']);
