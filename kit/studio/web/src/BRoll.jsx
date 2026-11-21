@@ -16,6 +16,10 @@ const TABS = [['library', 'Library'], ['upload', 'Your uploads'], ['stock', 'Sto
 const t1 = x => (+x).toFixed(1);
 const money = e => (e && e.usd != null ? `$${(+e.usd).toFixed(2)}` : 'cost unknown');
 const STOP = new Set('the a an and or but so of to in on at for with by from is are was were be it its this that i you we they my your our just really very like about into than then there here what when where which who how all can will would not now used every'.split(' '));
+// the short name on a filled spot, and the placements whose preview shows where you sit (kit/split.cjs)
+const SHORT = { full: 'Full', top: 'Split', pip: 'PiP', frame: 'Framed' };
+const LAYOUT_PREVIEW = new Set(['top', 'frame', 'pip']);
+const PLACE_TIP = { full: 'The clip covers the frame', top: 'The clip on top, you below with your head over its edge', pip: 'A small box over you', frame: 'Two rounded cards: the clip up top, you smaller below, head breaking out' };
 const queryOf = t => [...new Set(String(t || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(w => w.length > 3 && !STOP.has(w)).sort((a, b) => b.length - a.length))].slice(0, 2).join(' ');
 
 function Thumb({ c, onClick, on }) {
@@ -231,7 +235,7 @@ export function BRoll({ V, apply, go, openKeys }) {
         <div className="blane spots" id="broll-lane" role="list" aria-label="Spots">
           {B.beats.map(b => <button key={b.n} type="button" role="listitem" className={'beat spot' + (b.n === sel ? ' sel' : '') + (b.slot ? ' filled' : '') + (b.idea ? ' has-idea' : '') + (b.ref ? ' ref' : '')} data-beat={b.n} style={{ flexGrow: Math.max(1, b.seconds) }} onClick={() => setSel(b.n)} aria-pressed={String(b.n === sel)}>
             <span className="sp-top"><span className="bt">{clock(b.slot ? b.slot.at : b.start)}</span>{b.ref && <em className="sp-ref" title={b.ref.detail}>REF</em>}{b.slot && b.slot.by && b.slot.by !== 'you' && <em className="sp-by">{b.slot.by === 'Studio' ? 'picked' : b.slot.by}</em>}</span>
-            {b.slot ? <span className="bslot"><img src={b.slot.clip.thumb || ''} alt="" /><em>{b.slot.place === 'full' ? 'Full' : b.slot.place === 'top' ? 'Split' : 'PiP'}</em></span> : null}
+            {b.slot ? <span className="bslot"><img src={b.slot.clip.thumb || ''} alt="" /><em>{SHORT[b.slot.place] || 'Full'}</em></span> : null}
             <span className="sp-t">{spotTitle(b)}</span>
             <span className="btx">{b.text ? `"${b.text.length > 64 ? b.text.slice(0, 62) + '...' : b.text}"` : 'No words'}</span>
           </button>)}
@@ -243,11 +247,11 @@ export function BRoll({ V, apply, go, openKeys }) {
           {beat.idea && <div className="idea" id="beat-idea"><Icon n="spark" /><span><b>{beat.idea.by === 'the rules' || beat.idea.by === 'Studio' ? 'Picked from your words' : beat.idea.by}</b>: {beat.idea.idea}{beat.idea.place ? ` (${B.places[beat.idea.place].toLowerCase()})` : ''}{beat.idea.why && <small className="why" id="idea-why">{beat.idea.why}</small>}</span>
             <Button id="idea-approve" size="sm" variant="primary" label="Use it" isLoading={busy === 'idea' + beat.n} onClick={() => idea(beat.n, 'approve')} /><Button id="idea-dismiss" size="sm" variant="ghost" label="Keep empty" onClick={() => idea(beat.n, 'dismiss')} /></div>}
           {beat.slot && <div className="slot-set" id="slot-set">
-            <div className="slot-prev">{beat.slot.clip.kind === 'video' ? <video src={beat.slot.clip.url + '#t=' + beat.slot.in} muted playsInline preload="metadata" controls /> : <img src={beat.slot.clip.url} alt="" />}</div>
+            <div className={'slot-prev lay-' + (beat.slot.place || 'full')} id="slot-prev">{beat.slot.clip.kind === 'video' ? <video src={beat.slot.clip.url + '#t=' + beat.slot.in} muted playsInline preload="metadata" controls={beat.slot.place === 'full' || !beat.slot.place} /> : <img src={beat.slot.clip.url} alt="" />}{LAYOUT_PREVIEW.has(beat.slot.place) && <span className="lay-you" aria-hidden="true"><i className="bd" /><i className="hd" /></span>}</div>
             <div className="col">
               <span className="fine">{beat.slot.clip.name} · {beat.slot.clip.source}{beat.slot.by && beat.slot.by !== 'you' ? ` · ${beat.slot.by === 'Studio' ? 'picked from your words' : 'placed by ' + beat.slot.by}` : ''}</span>
               <span className="lbl">How it sits</span>
-              <div className="seg-row" role="radiogroup" aria-label="Placement">{Object.entries(B.places).map(([k, l]) => <button key={k} type="button" role="radio" id={'place-' + k} aria-checked={String(beat.slot.place === k)} className={'chip place ' + k + (beat.slot.place === k ? ' on' : '')} onClick={() => fill({ clip: beat.slot.clip.id, place: k })}><i aria-hidden="true" />{l}</button>)}</div>
+              <div className="seg-row" role="radiogroup" aria-label="Placement">{Object.entries(B.places).map(([k, l]) => <button key={k} type="button" role="radio" id={'place-' + k} aria-checked={String(beat.slot.place === k)} className={'chip place plc-' + k + (beat.slot.place === k ? ' on' : '')} title={PLACE_TIP[k]} onClick={() => fill({ clip: beat.slot.clip.id, place: k })}><i aria-hidden="true" />{l}</button>)}</div>
               <span className="lbl">Timing</span>
               <div className="row">
                 <label className="inl"><span className="fine">Starts</span><input id="slot-offset" type="number" step={0.1} min={0} max={beat.seconds} defaultValue={beat.slot.offset} key={'o' + beat.n + beat.slot.offset} onBlur={e => fill({ clip: beat.slot.clip.id, offset: +e.target.value })} /><span className="fine">s in</span></label>

@@ -17,6 +17,7 @@ import { mkdtempSync, mkdirSync, rmSync, existsSync, readFileSync, statSync, wri
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
@@ -134,6 +135,27 @@ try {
     const ins = LANE.inserts({ 2: { clip: 'a', place: 'top' }, 3: { clip: 'gone' } }, b, id => (id === 'a' ? { id: 'a', kind: 'image' } : null), () => '/x/a.png');
     assert.deepStrictEqual(ins, [{ file: '/x/a.png', at: 3.2, dur: 3.5, in: 0, place: 'top', image: true, beat: 2, clip: 'a', studio: true }]);
     assert.strictEqual(LANE.queryOf('Now the dashboard shows every sale'), 'dashboard shows');
+  });
+  await t('split layouts: the split panel behind the top of your head, framed cards with your head over the edge (kit/split.cjs)', async () => {
+    const SPL = createRequire(import.meta.url)('../kit/split.cjs');
+    assert.deepStrictEqual(LANE.PLACES, ['full', 'top', 'pip', 'frame']); assert.strictEqual(LANE.PLACE_LABEL.frame, 'Framed cards');
+    assert.deepStrictEqual(SPL.PLACES, LANE.PLACES, 'one list of placements');
+    const face = { crown: 400, cx: 600 };
+    const top = SPL.layout({ place: 'top' }, face);
+    assert.strictEqual(top.dy, 960 - 72 - 400, 'the top of the head 72 px into the panel'); assert.deepStrictEqual([top.band.y0 < 888, top.band.y1], [true, 960]);
+    assert.ok(top.capY < 888 - 30, 'captions sit above the head on the panel');
+    const flat = SPL.layout({ place: 'top' }, face, { mask: false }); assert.strictEqual(flat.dy, 960 + 28 - 400, 'no mask: the head stays under the seam'); assert.strictEqual(flat.band, null);
+    assert.strictEqual(SPL.layout({ place: 'top', overlap: 30 }, face).dy, 960 - 30 - 400);
+    const old = SPL.layout({ place: 'top' }, null); assert.strictEqual(old.dy, 960 - (0.4 * 1920 - 480), 'no face track: the old split');
+    const fr = SPL.layout({ place: 'frame' }, face);
+    assert.ok(fr.card.w < 1080 && fr.card.h < 960, 'the framed card is smaller than the split presenter');
+    assert.ok(fr.dx <= fr.card.x && fr.dx + fr.sw >= fr.card.x + fr.card.w && fr.dy <= fr.card.y && fr.dy + fr.sh >= fr.card.y + fr.card.h, 'your picture covers the card');
+    assert.ok(Math.abs(400 * fr.s + fr.dy - (fr.card.y - 60)) <= 1, 'the head breaks out over the card top');
+    assert.ok(fr.capY > fr.panel.y + fr.panel.h && fr.capY < fr.card.y - 100, 'the caption line sits between the cards');
+    assert.deepStrictEqual(SPL.mapZone([500, 500, 700, 800, 400], top), [500, 988, 700, 1288, 888]);
+    assert.ok(SPL.lightBg({ place: 'frame' }) && !SPL.lightBg({ place: 'frame', frameBg: ['#101418', '#000000'] }) && !SPL.lightBg({ place: 'top' }));
+    assert.strictEqual(SPL.layout({ place: 'frame', frameColor: 'red' }, face).color, '#3d8bff', 'only a hex colour');
+    assert.strictEqual(SPL.layout({ place: 'full' }, face), null);
   });
   await t('slots over the server: upload to the library and onto a beat, change the placement and timing, clear', async () => {
     assert.strictEqual((await req('/api/state', { job: JOB })).status, 200);
