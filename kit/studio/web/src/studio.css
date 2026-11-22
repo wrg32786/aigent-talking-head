@@ -1194,6 +1194,25 @@ dialog.wizards .fb-h > div:first-child { flex: 1; } dialog.wizards .fb-h p { mar
 @media (prefers-reduced-motion: reduce) { .rn-spin { animation: none; } }
 .tab .pd.pd-ref { background: #e0a33a; } [data-theme="light"] .tab .pd.pd-ref { background: #b7790f; }
 #ref-notice-td { margin: 12px 16px 0; }
+/* your saved look over the reference's: one line and one button, in the reference notice's shape */
+.ref-card .saved-look, .rs .saved-look { margin: 0; }
+#saved-look-td { margin: 12px 16px 0; }
+.saved-look p { flex: 1 1 200px; }
+/* titles the breakdown may have misread: one line by the reference card and by Draft, and the fields to fix them */
+.title-check-line { display: flex; align-items: center; gap: 6px; margin: 0; }
+.title-check-line svg, .tc-h .lbl svg { width: 14px; height: 14px; flex: none; color: #e0a33a; }
+[data-theme="light"] .title-check-line svg, [data-theme="light"] .tc-h .lbl svg { color: #9a6408; }
+#draft-title-check { margin: 0 0 10px; }
+.title-checks { margin: 12px 16px 0; padding: 10px 12px; border-radius: 12px; border: 1px solid color-mix(in srgb, #e0a33a 40%, transparent); background: color-mix(in srgb, #e0a33a 7%, transparent); }
+.tc-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.tc-h .lbl { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--foreground); }
+.tc-h .lbl svg { align-self: center; }
+.tc-h .fine { margin: 0; }
+.tc-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.tc-row { display: flex; align-items: center; gap: 8px; }
+.tc-at { flex: none; width: 34px; }
+.tc-row input { flex: 1 1 0; min-width: 0; min-height: 34px; border-radius: 8px; border: 1px solid var(--input); background: var(--background); color: var(--foreground); padding: 4px 10px; font: inherit; font-size: 14px; }
+.tc-why { margin: 3px 0 0 42px; font-size: 12px; }
 #tabhint .src { height: 16px; margin-left: 4px; vertical-align: 1px; }
 
 /* reference card: Influence part switches, and which parts of the breakdown ran */

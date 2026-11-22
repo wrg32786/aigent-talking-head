@@ -7,7 +7,7 @@ import { upload } from './upload.js';
 import { canWrite, NO_WRITER } from './Scripts.jsx';
 import { FixActions } from './Fix.jsx';
 import { Stages } from './Stages.jsx';
-import { RefMode, RefNotice, RefParts, RefPlan } from './RefCard.jsx';
+import { RefMode, RefNotice, RefParts, RefPlan, SavedLookNote } from './RefCard.jsx';
 
 export function Reference({ CAT, V, s, apply, patch }) {
   const r = s.reference, env = V.env, q = r.queue || [], t = env.tools || {};
@@ -85,9 +85,11 @@ function Breakdown({ CAT, V, s, apply, patch }) {
       <RefMode id="ref-mode" mode={r.mode} patch={patch} />
     </div>
     <RefRan V={V} s={s} apply={apply} ran={Array.isArray(ex.ran) ? ex.ran : []} fallback={/fallback/.test(engine || '')} />
-    <RefNotice s={s} patch={patch} id="ref-notice-td" />
+    {/* one notice: when your saved look sits over the reference's, that line replaces "We set your look" */}
+    {V.savedLook && V.savedLook.inUse ? <SavedLookNote V={V} apply={apply} id="saved-look-td" /> : <RefNotice s={s} patch={patch} id="ref-notice-td" />}
     {r.mode === 'influence' && <RefParts V={V} s={s} patch={patch} />}
     <RefPlan ex={ex} mode={r.mode} id="ref-plan-td" />
+    <TitleChecks list={ex.checks || []} apply={apply} />
     <div className="row ref-script"><Button id="ref-script" variant="secondary" size="sm" label="Write script from this reference" icon={<Icon n="script" />} isDisabled={!canWrite(V.env)}
       onClick={() => api('/api/scripts/from-reference', {}).then(j => { apply(j); toast(V.env.backend === 'agent' ? 'Sent to your agent with the breakdown' : 'Writing the script', true); }).catch(() => {})} />
       {!canWrite(V.env) && <span className="fine">{NO_WRITER}</span>}</div>
@@ -110,6 +112,28 @@ function Breakdown({ CAT, V, s, apply, patch }) {
     </details>
     {V.swap && V.swap.parts && V.swap.parts.length > 0 && <details className="td-fold" id="ref-byhand"><summary>Pick parts by hand</summary><Swap CAT={CAT} sw={V.swap} s={s} apply={apply} patch={patch} /></details>}
   </div>;
+}
+
+// Titles whose text the breakdown is not sure it read right (the recipe's check field): each with the reason and a field
+// to fix the words before a draft. Save writes the text into the reference's recipe; saving it as it is says it was right.
+const tcAt = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`, cap = t => (t ? t.charAt(0).toUpperCase() + t.slice(1) : '');
+function TitleChecks({ list, apply }) {
+  if (!list.length) return null;
+  return <div className="title-checks" id="title-checks" role="group" aria-labelledby="title-checks-h">
+    <div className="tc-h"><span className="lbl" id="title-checks-h"><Icon n="info" />Check this text</span><span className="fine">{list.length === 1 ? 'We may have misread this title.' : `We may have misread these ${list.length} titles.`} Fix the words, or save them as they are.</span></div>
+    <ul className="tc-list">{list.map(c => <TitleCheck key={c.n} c={c} apply={apply} />)}</ul>
+  </div>;
+}
+function TitleCheck({ c, apply }) {
+  const [text, setText] = useState(c.text), [busy, setBusy] = useState(false), id = 'tc-' + c.n;
+  const save = e => { e.preventDefault(); if (!text.trim()) return; setBusy(true);
+    api('/api/reference/title', { n: c.n, text }).then(j => { apply(j); toast(j.note, true); }).catch(() => {}).finally(() => setBusy(false)); };
+  return <li className="tc" data-title={c.n}><form className="tc-row" onSubmit={save}>
+    <span className="tc-at mono" aria-hidden="true">{tcAt(c.at)}</span>
+    <label className="sr" htmlFor={id}>Text of the title at {tcAt(c.at)}</label>
+    <input id={id} className="grow" value={text} spellCheck="false" autoComplete="off" aria-describedby={id + '-why'} onChange={e => setText(e.target.value)} />
+    <Button id={id + '-save'} type="submit" size="sm" variant="secondary" label="Save" isLoading={busy} isDisabled={!text.trim()} /></form>
+    <p className="fine tc-why" id={id + '-why'}>{cap(c.why)}.</p></li>;
 }
 
 // One row, only when something was not read: which parts ran, a fix for each that did not (never a command), and the

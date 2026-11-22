@@ -132,7 +132,9 @@ export function defaultState() {
     finish: { from: 'auto', reel: true, clips: false, plain: false }, drafted: null, styleLook: null, point: '', fontLock: false };
 }
 export function load() {
-  try { const s = JSON.parse(readFileSync(statePath(), 'utf8')); return oneBed({ ...defaultState(), ...s, reference: { ...defaultState().reference, ...(s.reference || {}) } }); }
+  try { const s = JSON.parse(readFileSync(statePath(), 'utf8')), o = oneBed({ ...defaultState(), ...s, reference: { ...defaultState().reference, ...(s.reference || {}) } });
+    dropRefEntrances(o); // an older session's entrance picks that are only the reference's (kit/studio/reference.mjs)
+    return o; }
   catch { return defaultState(); }
 }
 // one place decides the music bed: music.bed. An older session kept a bed pick in picks.bed as well (a reference's bed),
@@ -171,19 +173,29 @@ export const KIT_BRANDS = ['kit/example/skool-logo.svg'];
 // s.lastChange says so ("Single word captions turned off the Typewriter caption entrance.") with { undoChange: true }
 // to put it back; a ruled out pick the same patch asked for is refused with the reason. switchFor: "kind:id" picks it
 // and makes the one change it needs (the page's one click switch on a greyed option).
+//   useReferenceLook: true takes off the kept picks that sit over a reference's look in Recreate and Copy the look
+//   (kit/studio/reference.mjs savedLookOf), with the same one Undo.
 const SETTLE_KEYS = ['pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'reference', 'switchFor'];
 const lookSnap = s => JSON.parse(JSON.stringify({ pack: s.pack || null, picks: s.picks || {}, music: s.music, sound: s.sound, pace: s.pace,
-  reference: s.reference ? { mode: s.reference.mode, added: s.reference.added, prev: s.reference.prev, auto: s.reference.auto, applied: s.reference.applied } : null }));
+  reference: s.reference ? { mode: s.reference.mode, added: s.reference.added, prev: s.reference.prev, auto: s.reference.auto, applied: s.reference.applied, kept: s.reference.kept ?? null, keptFor: s.reference.keptFor ?? null, keptOff: s.reference.keptOff ?? null } : null, entranceLock: !!s.entranceLock }));
 export const effectsReady = () => existsSync(join(ROOT, 'effects', '.venv'));
 export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
   const errs = [], log = [];
   if (!p || typeof p !== 'object') return { errs: ['patch must be an object'], log, noop: false };
-  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands', 'finish', 'switchFor', 'undoChange', 'styleLook', 'point', 'sizes'];
+  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands', 'finish', 'switchFor', 'undoChange', 'useReferenceLook', 'styleLook', 'point', 'sizes'];
   for (const k of Object.keys(p)) if (!known.includes(k)) errs.push(`unknown field "${k}" (${known.join(', ')})`);
   if (p.undoChange) {
     const u = s.lastChange && s.lastChange.undo; if (!u) { errs.push('undoChange: nothing to undo'); return { errs, log, noop: false }; }
     Object.assign(s, { pack: u.pack, picks: u.picks, music: u.music, sound: u.sound, pace: u.pace }); if (u.reference && s.reference) Object.assign(s.reference, u.reference);
+    if (u.entranceLock !== undefined) s.entranceLock = u.entranceLock;
     delete s.lastChange; log.push('undid the last change'); return { errs, log, noop: false };
+  }
+  if (p.useReferenceLook) {
+    const snap = lookSnap(s), u = useReferenceLook(s, cat);
+    if (!u) return { errs, log, noop: true };
+    s.lastChange = { text: "Switched to the reference's look.", off: [], undo: snap, at: Date.now() };
+    log.push(`the reference's look is in use (took off ${u.off.map(x => x.label).join(', ')})`);
+    return { errs, log, off: [], noop: false };
   }
   const touches = !nested && SETTLE_KEYS.some(k => p[k] !== undefined), before = touches ? lookSnap(s) : null;
   let switched = '';
@@ -199,7 +211,7 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
     if (p.pack && !cat.packs.some(x => x.name === p.pack)) errs.push(`pack: no pack named "${p.pack}" (${cat.packs.map(x => x.name).join(', ')})`);
     else { s.pack = p.pack || null; log.push(s.pack ? `pack ${s.pack}` : 'no pack'); }
   }
-  if (p.clearPicks) { s.picks = {}; s.fontLock = false; log.push('cleared every pick'); }
+  if (p.clearPicks) { s.picks = {}; s.fontLock = false; s.entranceLock = false; if (!nested) touchKept(s); log.push('cleared every pick'); }
   for (const [ref, how] of Object.entries(p.picks || {})) {
     const it = cat.items[ref];
     if (!it) { errs.push(`no such effect "${ref}" (use kind:id from the catalog, e.g. transition:whip)`); continue; }
@@ -222,6 +234,10 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
     log.push(`${how === 'clear' ? 'cleared' : how === 'allow' ? 'picked' : 'forbade'} ${it.kind} ${it.id}`);
     // a font you pick yourself holds over a reference's font from here on (the lock); taking your last one back hands it back
     if (it.kind === 'font' && !nested) s.fontLock = slot.allow.length > 0;
+    // an entrance you pick yourself is a lock; the ones a reference read never are (kit/studio/reference.mjs)
+    if (it.kind === 'entrance' && !nested) s.entranceLock = slot.allow.length > 0 || slot.deny.length > 0;
+    // and any pick you change while a reference's style is copied is yours for this video, not your saved look
+    if (!nested) touchKept(s, it.kind);
     // you took back or forbade a pick the reference set: it is yours now, and Back to my look leaves it alone
     if (how !== 'allow' && s.reference && s.reference.added) s.reference.added = s.reference.added.filter(x => x !== ref);
   }
@@ -341,7 +357,9 @@ export function compose(s, { refPack = null } = {}) {
   const pack = refPack || s.pack;
   if (pack) args.push('--pack', pack);
   const tr = allowed(s, 'transition'); if (tr && tr.length) locks.transitions = tr;
-  const ti = allowed(s, 'entrance'); if (ti && ti.length) locks.titles = ti;
+  // title entrances: only the ones you picked yourself are a lock. A reference's are a preference (its recipe, or the
+  // reference pack's entranceOrder), so a rebuild can use any entrance.
+  const ti = refEntrancesOnly(s) ? null : allowed(s, 'entrance'); if (ti && ti.length) locks.titles = ti;
   // graphics: the kit's in the lock; scenes (ref-..., made from a reference or by your agent) placed by --scenes
   const g0 = s.picks.graphic, isScene = id => /^ref-/.test(id), g = g0 && { allow: g0.allow.filter(id => !isScene(id)), deny: g0.deny.filter(id => !isScene(id)) };
   if (g && (g.allow.length || g.deny.length)) locks.graphics = { ...(g.allow.length ? { allow: g.allow.slice() } : {}), ...(g.deny.length ? { deny: g.deny.slice() } : {}) };
@@ -408,7 +426,7 @@ export function lockStringOf(l) {
 // ---------- reference ----------
 // kit/studio/reference.mjs: extract, referenceLook, influencePack and the rest of what a reference gives Studio
 export * from './reference.mjs';
-import { REF_PARTS, refParts, referencePicks, setReferenceLook, copiesStyle, clearFontPick, syncRefFont } from './reference.mjs';
+import { REF_PARTS, refParts, referencePicks, setReferenceLook, copiesStyle, clearFontPick, syncRefFont, refEntrancesOnly, dropRefEntrances, touchKept, useReferenceLook } from './reference.mjs';
 
 // a pack whose style must sit inside its locks (pack validate refuses a style transition outside them)
 export function fitStyle(pack) {

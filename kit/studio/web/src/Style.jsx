@@ -3,7 +3,7 @@ import { Button } from '@astryxdesign/core/Button';
 import { Switch } from '@astryxdesign/core/Switch';
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
 import { api, quiet, file, toast, pickState, isPaused, Icon, IconBtn, KIND_NAME, RM, showName, STEP_LAYERS, LAYER_STEP, LAYER_LABEL, layerOf, stepName } from './lib.jsx';
-import { RefMode, RefNotice, RefParts, RefPlan, REF_LABEL, MADE_LABEL, refName, refBrought, LookChips } from './RefCard.jsx';
+import { RefMode, RefNotice, RefParts, RefPlan, REF_LABEL, MADE_LABEL, refName, refBrought, LookChips, SavedLookNote, TitleCheckLine } from './RefCard.jsx';
 import { Fold } from './ui.jsx';
 import { upload } from './upload.js';
 import { WordsBrands } from './Brands.jsx';
@@ -123,8 +123,10 @@ function Looks({ CAT, V, s, apply, patch, reloadCat, go, setTab, looks: saved })
       <RefMore reloadCat={reloadCat} apply={apply} clear={clear} open={() => go && go('reference', true)} canSave={!(isLook && saved && saved.on)} />
     </div>
     <RefMode id="ref-card-mode" mode={r.mode} patch={patch} />
+    <SavedLookNote V={V} apply={apply} />
     {r.mode === 'influence' && <RefParts V={V} s={s} patch={patch} />}
     <RefPlan ex={ex} mode={r.mode} onMade={showMade} />
+    <TitleCheckLine s={s} go={go} />
   </div> : picked ? <div className="ref-card glass-card first" id="look-card" key="card">
     <div className="rc-h"><span className="src src-ref">Saved look</span>
       <div className="rc-t"><b id="look-card-name">Your look from {picked.name}</b><span className="fine">Its style on your own words. Change anything you like.</span></div>

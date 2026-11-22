@@ -6,6 +6,7 @@ import { copyText } from './Connect.jsx';
 import { api, file, toast, fmtS, cap1, Icon, matchChips } from './lib.jsx';
 import { Compare, Cleanup, Receipt } from './Review.jsx';
 import { Fold, Hint } from './ui.jsx';
+import { TitleCheckLine } from './RefCard.jsx';
 
 // What Review and Render share (both stay mounted): the last draft's choices and receipt, the task log and a clock
 // while something runs. One copy, held by the App, so a redraft on Review is what Render sees.
@@ -36,7 +37,7 @@ function standing(V, s, run) {
 
 // Review: Draft (a quick plan, no video), then check what we picked: how close it is to the reference, the receipt,
 // the clean-up pass and every pick with its reason. Only the current draft shows here, never an earlier render.
-export function ReviewStep({ CAT, V, s, apply, patch, hidden, run }) {
+export function ReviewStep({ CAT, V, s, apply, patch, go, hidden, run }) {
   const { t, running, fin, combo, n, isDrafted, stale, took, ticking } = standing(V, s, run), c = V.compose;
   const drafted = !!run.choices, mine = running && t.kind !== 'render';
   const lineN = combo.pieces.reduce((a, x) => a + (x.kind === 'piece' && x.lines ? x.lines.length : 1), 0), fromPieces = combo.from === 'pieces';
@@ -52,6 +53,7 @@ export function ReviewStep({ CAT, V, s, apply, patch, hidden, run }) {
   return <section className="step" id="s-review" data-step="review" aria-labelledby="h-review" hidden={hidden}>
     <header className="sh"><h2 id="h-review">Review</h2><p className="sub">Draft first, check what we picked, then render once.</p></header>
     <NeedFix V={V} ids={['ffmpeg', 'python', 'npm']} what="Drafting" apply={apply} />
+    <TitleCheckLine s={s} go={go} id="draft-title-check" />
     <div className="runbar glass-card" id="draft-bar">
       <Button id="draft" size="lg" variant={good ? 'secondary' : 'primary'} label={isDrafted || stale ? 'Draft again' : 'Draft'} isDisabled={running || !s.job || (!s.footage.length && !s.clips) || !fin.reel}
         onClick={() => { run.clear(); api('/api/draft', {}).then(apply).catch(() => {}); }} />
