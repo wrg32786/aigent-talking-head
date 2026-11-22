@@ -53,7 +53,7 @@ export function NewVideo({ s, V, apply, go, mode, setMode }) {
       <label className="nv-name" htmlFor="nv-name"><span>Name</span>
         <input id="nv-name" ref={nameRef} placeholder="name-your-reel" autoComplete="off" spellCheck="false" value={name} onChange={e => setName(e.target.value)} aria-describedby="nv-name-hint" /></label>
       <p className="fine" id="nv-name-hint">{name && clean !== name ? <>Saved as <b className="mono">{clean || 'video-' + new Date().toISOString().slice(0, 10)}</b></> : 'Lowercase letters, numbers and dashes. Leave it empty for today\'s date.'}</p>
-      <Toggle id="nv-keep" label="Keep my look" description="Pack, style picks, music, sound, pace, export and brand logos." checked={keep} onChange={setKeep} />
+      <Toggle id="nv-keep" label="Keep my look" description="Pack, style picks, music, sound, pace, export and brand logos. After a reference, your own look." checked={keep} onChange={setKeep} />
     </form>}
     {mode === 'open' && <ul className="fb-list nv-list" id="nv-list" aria-label="Past videos">
       {!list ? <li className="fb-empty"><Spinner label="Loading videos" /></li>

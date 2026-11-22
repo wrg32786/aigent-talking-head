@@ -41,7 +41,7 @@ Two steps have a second view, behind a small switch above the step. **Picture** 
 
 **Your edit.** One quiet line above every step after Start says what you are making (one reel, clips, plain clips; the aspect), from what ("our N best lines" when they are our pick, "your N lines" when you chose them, or the whole take), the look and the b-roll spots, and the sound once you change it. The one Next button is in the bar at the bottom. Click a part to open its step: the look opens Picture and the sound opens Music and sounds. With a reference in use the look part says `Recreating <name>` or `The look of <name>, your words`. When you change your pieces after a draft it says so. Agents read the same thing with `get_edit` (`GET /api/edit`). The chat sits on the right (behind the chat button on a phone). Dark is the default; switch to light with the sun button or in Settings.
 
-![Studio in the light theme, the AIgent cream with deep teal: the Style step (now Picture)](studio/light.png)
+![Studio in the light theme, the AIgent cream with deep teal: the Cut step](studio/light.png)
 
 ## What you can do
 
@@ -105,7 +105,7 @@ The Text layer has one switch, **Make hard-to-read words easier to read**: when 
 
 ![The Music and sounds step in the light theme: one line for what the reference brought, then Music, Sounds and Pace](studio/music-light.png)
 
-![The Look step (now Picture): a row of Looks, the Hormozi hook reference card with Recreate, Influence and Off, and the Graphics layer with a From reference badge on lower-third](studio/look-layers.png)
+![The Look step (now Picture): the built-in Looks as previews of your face, Save as a new Look, and the Layers panel on Text](studio/look-layers.png)
 
 Every option lives in exactly one of 9 layers (`layers` in `kit/studio/categories.json`, computed by `layersOf` in `kit/studio/core.mjs`). Before 1.28.0 one step, Look, showed all 9. Now three steps share most of them, visual steps first and sound on its own step, and B-roll keeps its own layer. The layers and `categories.json` are unchanged: each step shows its own subset (`STEP_LAYERS` in `kit/studio/web/src/steps.js`).
 
@@ -632,7 +632,7 @@ Off by default. Turn on **Allow generating** in API keys and providers and add a
 <a id="finish"></a>
 ## Review and Render (1.28.0)
 
-![The Finish step (now Review): Draft, Check and Render in order, the Make card with Your 2 pieces or The whole take, the reel, clips and plain clips chips and the export size, then Redraft and Render v4](studio/finish.png)
+![The Finish step (now Review and Render): Draft, Check and Render in order, the Make card with Your 2 pieces or The whole take, the reel, clips and plain clips chips and the export size, then Redraft and Render v4](studio/finish.png)
 
 Finish, the old last step before Post, is now two steps. **Review** drafts the reel and lets you check it. **Render** is the one place that makes videos. Both show only the current draft; earlier reels stay in the [Outputs library](#outputs).
 
@@ -705,7 +705,7 @@ On a phone the two videos stay side by side at half width and the lists stack: [
 ## On a phone
 
 <p>
-<img src="studio/phone.png" width="260" alt="Studio at phone width: the Style step (now Picture) with packs and the effects grid">
+<img src="studio/phone.png" width="260" alt="Studio on a phone in dark: the Cut step with Your edit wrapped on four lines and the step dots">
 <img src="studio/menu-phone.png" width="260" alt="The effects menu at phone width: a category drop-down and three tiles per row with forbid buttons">
 <img src="studio/settings-phone.png" width="260" alt="Settings as a full-screen sheet on a phone">
 </p>
@@ -757,7 +757,7 @@ A double-click app with no installer at all is planned: [docs/desktop-app-plan.m
 
 When a reel is done, **New video** clears the board for the next one. Open it with the **+** next to the reel name, or **More**, New video. Give the new reel a name (it is cleaned the same way as the name field: lowercase letters, numbers and dashes; leave it empty for `video-<date>`) and press **Start fresh**. You land on Start with an empty board: no footage, cuts, reference, b-roll, review notes, draft or chat.
 
-**Keep my look** is on by default and keeps the pack, style picks, music, sound, pace, export size and brand logos for the new reel. Turn it off to go back to the defaults too. A kept look never goes over a reference: choosing Recreate or Copy the look sets the board from the reference alone. Your words (the glossary), API keys, settings and your agent's connection never change.
+**Keep my look** is on by default and keeps the pack, style picks, music, sound, pace, export size and brand logos for the new reel. After a Recreate, Copy the look or Influence it is your own look, not the reference's; Save as a new Look keeps the reference's. Turn it off to go back to the defaults too. A kept look never goes over a reference: choosing Recreate or Copy the look sets the board from the reference alone. Your words (the glossary), API keys, settings and your agent's connection never change.
 
 **Uploading a new talking-head file** on a board that already has an edit also starts a fresh edit for this video: cuts, pieces, B-roll spots and the timeline, the reference, and the draft are cleared. The look resets too, unless you chose **Keep my look** when you started this video with New video. The first file you add to a clean board does not wipe a look you just picked. Files are never deleted. Earlier reels stay in Outputs, each with its player, date, source take and draft, **Edit this reel**, and **Download**. Use **New video** if you want the new take as its own job. **Open a past video** still opens your other jobs. A leftover draft on disk is ignored until you draft again, so the B-roll step no longer shows the last video's spots.
 

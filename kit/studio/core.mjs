@@ -667,6 +667,7 @@ export function clearBrollTimeline(s) {
 // the job name, your words, chat, takes, transcripts and files on disk stay.
 export function resetEdit(s, { keepLook = s.keepLook === true } = {}) {
   const d = defaultState();
+  if (keepLook) { const mine = ownLook(s); if (mine !== s) for (const k of LOOK_KEYS) { if (mine[k] !== undefined) s[k] = clone(mine[k]); else delete s[k]; } } // your look, not the reference's
   s.cut = null;
   s.lines = {};
   delete s.pieces;

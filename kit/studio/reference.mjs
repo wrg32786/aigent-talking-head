@@ -294,14 +294,16 @@ function restoreLook(s, h) {
   if (plainPace(s.pace) && !plainPace(h.pace)) s.pace = { ...s.pace, tighten: h.pace.tighten == null ? null : h.pace.tighten, punch: h.pace.punch || 'on' };
   if (!(s.pace && s.pace.motion) && h.pace && h.pace.motion) s.pace = { ...s.pace, motion: h.pace.motion };
 }
-// Keep my look on New video (1.29.0): the look you take into the next video is yours, not the reference's. A copy of
+// Keep my look on New video and on new footage (1.29.0): the look you take into the next video is yours, not the
+// reference's (Recreate, Copy the look and Influence). A copy of
 // the board with what the reference set taken out (your changes since stay) and the look it set aside put back.
 // The board itself is not changed.
 export function ownLook(s) {
   const r = s.reference; if (!r || r.mode === 'off' && !r.prevLook) return s;
-  const c = cloneOf(s);
+  const c = cloneOf(s); c.picks = c.picks || {};
   if (r.mode !== 'off') undoReferenceLook(c);
   restoreLook(c, c.reference.prevLook);
+  for (const [k, v] of Object.entries(c.picks)) if (k !== 'font' && !slotOn(v)) delete c.picks[k]; // no empty slots left behind
   return c;
 }
 export function syncRefLook(s) {

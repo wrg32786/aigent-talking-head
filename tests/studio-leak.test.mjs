@@ -171,9 +171,9 @@ try {
     assert.strictEqual(SLK.plan(s, ROOT), null); s.reference.mode = 'off'; assert.strictEqual(SLK.plan(s, ROOT).name, 'old-look'); });
 
   t('Keep my look after a Recreate or Copy the look takes your own look into the new video, not the reference\'s', () => {
-    for (const mode of ['recreate', 'look']) {
+    for (const mode of ['recreate', 'look', 'influence']) {
       const s = useRef(oldBoard(), A, mode);
-      assert.notStrictEqual(s.pack, 'hormozi-bold', 'the reference is in use on the board');
+      if (mode !== 'influence') assert.notStrictEqual(s.pack, 'hormozi-bold', 'the reference is in use on the board');
       ok(s, { picks: { 'finish:chroma': 'allow' } }); // a pick made after the reference is yours
       const refAdded = (s.reference.added || []).slice();
       C.freshSession(s, { job: 'next-one', keepLook: true });
@@ -184,6 +184,13 @@ try {
       for (const ref of refAdded) { const [k, id] = [ref.slice(0, ref.indexOf(':')), ref.slice(ref.indexOf(':') + 1)]; if (k === 'bed') continue;
         assert.ok(!(s.picks[k] && s.picks[k].allow.includes(id)) || OLD.picks[ref], `${mode}: the reference's ${ref} does not ride into the new video`); }
       assert.ok(!s.reference || !s.reference.out, 'the new video has no reference');
+      assert.ok(Object.values(s.picks).every(v => (v.allow || []).length + (v.deny || []).length > 0), mode + ': no empty slots');
+    }
+    for (const mode of ['recreate', 'look']) { // new footage with Keep my look on goes the same way
+      const s = useRef(oldBoard(), A, mode); ok(s, { picks: { 'finish:chroma': 'allow' } });
+      C.resetEdit(s, { keepLook: true });
+      assert.strictEqual(s.pack, 'hormozi-bold', mode + ': new footage keeps your Look');
+      assert.ok(s.picks.finish.allow.includes('chroma') && s.picks.transition.allow.includes('glitch'), mode + ': and your picks');
     }
     const off = C.freshSession(useRef(oldBoard(), A, 'recreate'), { job: 'clean', keepLook: false });
     assert.ok(!off.pack && !Object.keys(off.picks).filter(k => k !== 'font').length, 'without Keep my look the board is clean');
