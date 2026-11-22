@@ -85,7 +85,7 @@
 //            (the order given); auto decides from how many sentences the files share
 //          --keep-pauses "clip-003@2.72,clip-005@1.1"  with --tighten, leave these pauses (clip id @ clip seconds, as
 //            listed in choices.json "pauses") uncut
-//          --no-boost  skip the legibility pass (on by default: a caption moment under 3:1 gets a soft shadow behind that word, also when the style has none, and is drawn again)
+//          --no-boost  skip the legibility pass and take out the moments an earlier build marked (on by default: a caption moment under 3:1 gets a soft shadow behind that word, also when the style has none, and is drawn again)
 // A title behind the head moves in front when the person mask covers more than 22% of its letters (cut.json "behindMax";
 // kit/cover.py); a face title moves to the slot above the head. Left and right titles keep a 6.5% side margin and shrink to fit.
 // Writes jobs/<name>/: clips/ (clip.py output), build/ (cut.json, captions.js, theme.js, overlay frames), reel-vN.mp4.
@@ -882,6 +882,10 @@ if (splitIns().length && !cut.mask && !flag('no-mask') && fxReady()) { cut.mask 
 { const capF = path.join(build, 'captions.js');
   if (fs.existsSync(capF)) { const caps = R.readCaptions(capF), noMask = flag('no-mask') || !cut.mask || !fxReady();
     if ((caps.personMask === false) !== noMask) { if (noMask) caps.personMask = false; else delete caps.personMask; fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); } } }
+// --no-boost is a choice about the look (report 4 item 19): the moments an earlier build marked for the legibility
+// shadow (captions.js "boost") go too, so a rebuild draws every word in the style as picked
+if (flag('no-boost')) { const capF = path.join(build, 'captions.js');
+  if (fs.existsSync(capF)) { const caps = R.readCaptions(capF); if (Array.isArray(caps.boost) && caps.boost.length) { console.log(`legibility: off for this reel, ${caps.boost.length} marked moment${caps.boost.length > 1 ? 's' : ''} cleared`); delete caps.boost; fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); } } }
 sh(process.execPath, [path.join(KIT, 'render.mjs'), LEN.toFixed(2)], build);
 // screen cards behind the head render to ovlp/; assemble.cjs needs to know (with the head mask below, else in front)
 { let lj = {}; try { lj = JSON.parse(fs.readFileSync(path.join(build, 'layers.json'), 'utf8')); } catch {}

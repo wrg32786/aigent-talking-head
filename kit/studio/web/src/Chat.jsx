@@ -15,7 +15,7 @@ function Suggest({ m, apply, go }) {
     {g.step && <Button className="sg-show" size="sm" variant="ghost" label="Show me" onClick={() => go(g.step, true)} />}</span>;
 }
 
-export function Chat({ V, s, apply, go, open, setOpen, agentState, openConnect }) {
+export function Chat({ V, s, apply, go, open, setOpen, close, agentState, openConnect }) {
   const e = V.env, a = e.agent || {}, backend = e.backend, name = a.name || 'Your agent';
   const ol = useRef(null), input = useRef(null), fab = useRef(null), atBottom = useRef(true);
   const [text, setText] = useState(''), [busy, setBusy] = useState(false);
@@ -39,7 +39,7 @@ export function Chat({ V, s, apply, go, open, setOpen, agentState, openConnect }
     <header className="ch"><h2 id="h-chat">Chat</h2>
       <div id="agentbar" className={'agentbar ' + agentState} role="status" aria-live="polite" title={agentState === 'busy' ? 'Busy in the terminal. Messages wait for its next step.' : undefined}>
         <StatusDot variant={DOT[agentState]} label={label} isPulsing={agentState === "on"} /><span aria-hidden="true">{label}</span></div>
-      <IconBtn className="only-sm" id="chat-close" n="x" label="Close chat" onClick={() => { setOpen(false); document.getElementById('chat-open')?.focus({ preventScroll: true }); }} />
+      <IconBtn id="chat-close" n="x" label="Close chat" onClick={() => { close(); setTimeout(() => document.getElementById('chat-open')?.focus({ preventScroll: true }), 0); }} />
     </header>
     <p id="chatmode" className="sr">{backend === 'agent' ? 'Separate from your terminal conversation.' : ''}</p>
     <ol id="msgs" className="msgs" aria-live="polite" ref={ol} onScroll={ev => { const o = ev.currentTarget; atBottom.current = o.scrollHeight - o.scrollTop - o.clientHeight < 40; }}>

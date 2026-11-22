@@ -200,6 +200,7 @@ function Layers({ step, bare, CAT, V, s, apply, patch, tab, setTab }) {
       <p id="tabhint" className="fine">{ql ? `Every step, matching "${q.trim()}".` : L.hint || ''}{!ql && refIn(L) > 0 && <span className="layer-ref" id="layer-ref" data-n={refIn(L)}>{refLine(L)}</span>}{!ql && cur === 'fonts' && fontLine && <span className="layer-ref" id="font-ref" data-locked={String(!!(V.refFont && V.refFont.locked))}>{fontLine}</span>}</p>
       <ChangeNote s={s} patch={patch} />
       {!ql && cur === 'motion' && <div className="layer-extra" id="motion-extra"><Switch id="punch" size="sm" label="Zoom punch on the cuts" value={s.pace.punch !== 'off'} onChange={on => patch({ pace: { punch: on ? 'on' : 'off' } })} /></div>}
+      {!ql && cur === 'text' && <div className="layer-extra" id="text-extra"><Switch id="boost" size="sm" label="Make hard-to-read words easier to read" value={V && V.boost ? V.boost.on : s.boost !== 'off'} onChange={on => patch({ boost: on ? 'on' : 'off' })} /></div>}
       {grid}
     </div>
     <HoverCard tip={tip} />

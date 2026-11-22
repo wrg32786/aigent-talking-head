@@ -85,6 +85,7 @@ function Breakdown({ CAT, V, s, apply, patch }) {
       <RefMode id="ref-mode" mode={r.mode} patch={patch} />
     </div>
     <RefRan V={V} s={s} apply={apply} ran={Array.isArray(ex.ran) ? ex.ran : []} fallback={/fallback/.test(engine || '')} />
+    {ex.vision === 'off' && <p className="fine ref-vision" id="ref-vision" role="note">We read this reference without the vision pass, so titles may be misread.</p>}
     <RefNotice s={s} patch={patch} id="ref-notice-td" />
     {r.mode === 'influence' && <RefParts V={V} s={s} patch={patch} />}
     <RefPlan ex={ex} mode={r.mode} id="ref-plan-td" />

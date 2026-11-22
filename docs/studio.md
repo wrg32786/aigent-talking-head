@@ -98,6 +98,8 @@ You can change your mind at any time. **Just my footage** turns a reference off 
 <a id="look-and-its-9-layers"></a>
 ## The 9 layers and the steps that show them (1.28.0)
 
+The Text layer has one switch, **Make hard-to-read words easier to read**: when a caption word is hard to read against the picture, the build puts a soft shadow behind that word. It is on by default. It starts off when the reference whose style you copy draws its captions with no outline or no shadow, and your own choice always wins (`boost` in `studio_set_selections`: `on`, `off` or null).
+
 ![The Picture step in dark: the reference card with Recreate, Copy the look, Influence and Off, then the row of Looks](studio/picture.png)
 
 ![The Music and sounds step in the light theme: one line for what the reference brought, then Music, Sounds and Pace](studio/music-light.png)
@@ -474,6 +476,8 @@ The Posting group holds your Buffer key and the keys for the video host (Cloudfl
 Folders must be full paths; Studio makes them if needed and checks it can write there before saving. The `studio_settings` MCP tool reads and changes the same file.
 
 ## Chat
+
+The chat has a Close button at every width. On a wide screen it puts the chat away and the page takes the room; the chat button in the top bar brings it back, and a reload keeps it where you left it. On a phone it closes the chat sheet.
 
 The Studio chat is answered by one of these, picked in Settings:
 

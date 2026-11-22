@@ -48,6 +48,10 @@ export function extract(recipePath) {
     preset: br.preset && br.preset !== 'none' ? br.preset : null, look: st.look || null, captionStyle: st.captions || null,
     transitions: tcount, entrances: real('entrance', entrances), finishes: real('finish', finishes), graphics: real('graphic', graphics), effects: real('effect', effects),
     // the font read from the words on screen and matched to a pairing we ship (kit/fontmatch.py), or null
+    // the breakdown ran with no vision model on the frames (Reel.md Style vision: off): the page says so in one line
+    vision: st.vision === 'off' ? 'off' : null,
+    // its captions are drawn bare (no outline, or no shadow): the legibility shadow then starts off (boostOf)
+    captionPlain: st['caption-outline'] === 'none' || st['caption-shadow'] === 'none',
     font: st['font-match'] && br.fonts && !/^(none|theme)$/i.test(String(br.fonts)) ? { pairing: String(br.fonts).split(',')[0].trim(), kind: st.font || null, face: st['font-face'] || null, match: String(st['font-match']).toLowerCase() } : null,
     music: { bed: mu.bed && !/^(none|auto)$/i.test(mu.bed) ? mu.bed : null, ...(mu.bed === 'none' ? { noBed: true } : {}), energy: mu.energy || null, beatSync: mu['beat-sync'] || null }, punch: st.punch || null,
     ran: ranOf(dirname(recipePath), r),
@@ -196,6 +200,15 @@ export function refFontOf(s, lookFont = null) {
   const r = s.reference, ref = copiesStyle(r), look = !ref && !!s.styleLook; if (!ref && !look) return null;
   const f = ref ? (r.extracted && r.extracted.font) || null : lookFont;
   return { from: ref ? 'reference' : 'look', locked: !!s.fontLock, font: f };
+}
+
+// "Make hard-to-read words easier to read" (Text and graphics): the soft shadow the build puts behind a caption word
+// that reads under 3:1. It changes the look, so it is a choice: yours when you set it (state.boost on or off), else on,
+// unless the reference whose style we copy draws its captions with no outline or no shadow. Off sends --no-boost.
+export function boostOf(s) {
+  if (s.boost === 'on' || s.boost === 'off') return { on: s.boost === 'on', by: 'you' };
+  const r = s.reference, plain = copiesStyle(r) && !!(r.extracted && r.extracted.captionPlain);
+  return { on: !plain, by: plain ? 'reference' : 'default' };
 }
 
 // sets the Look from the reference for its mode, after taking out what an earlier mode or reference set.

@@ -298,7 +298,9 @@ if (target) {
       ['studio-cut-server.test.mjs', 'Studio Cut server tests (tests/studio-cut-server.test.mjs: the Cut routes, the point, topics, Pacing and the stitched previews over HTTP)'],
       ['studio-stages.test.mjs', 'Studio stage status tests (tests/studio-stages.test.mjs: teardown log lines to the stage line, the list and the bar)'],
       ['py-utf8.test.mjs', 'Python reads and writes utf-8 (tests/py-utf8.test.mjs: every text open() names the encoding, so a breakdown works on Windows)'],
-      ['split-panel.test.mjs', 'the split panel (tests/split-panel.test.mjs: the head band covers the shadow under the seam in 9:16, 4:5 and 1:1; a wide clip is shown whole on its own blur, flush on the seam; with ffmpeg, a render with no shadow on the head)']]) {
+      ['split-panel.test.mjs', 'the split panel (tests/split-panel.test.mjs: the head band covers the shadow under the seam in 9:16, 4:5 and 1:1; a wide clip is shown whole on its own blur, flush on the seam; with ffmpeg, a render with no shadow on the head)'],
+      ['title-outline-boost.test.mjs', 'title partners follow the caption outline, and the legibility shadow is a choice (tests/title-outline-boost.test.mjs: no stroke with captionOutline none, the Studio switch and its default, --no-boost)'],
+      ['teardown-phrases.test.mjs', 'phrases on screen are not one-word captions (tests/teardown-phrases.test.mjs: a fixture breakdown whose text tracks show phrases gives kinetic with the reason, a one-word reel stays one-word, the vision pass off is said in the recipe, teardown.md and on the page)']]) {
       const e2 = [];
       try { execFileSync(process.execPath, [join(ROOT, 'tests', f)], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
       catch (e) { e2.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
