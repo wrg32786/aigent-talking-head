@@ -125,7 +125,7 @@ function lensStarts({ segs, words, fileOf, python, firstSound = () => null, pose
     const bfps = Math.min(8, Math.max(o.bodyFps, Math.ceil(14 / Math.max(0.5, secs))));
     const spans = [...mine.map(w => [w.lo, w.hi + 0.09, o.fps]), ...some.map(s => [...bodyOf(s), bfps])];
     const got = poseFn(python, file, spans);
-    if (!got || got.some(g => !g)) { out.lines.push('start on the lens: the face could not be read (Python with opencv missing?); starts stay where they are'); return out; }
+    if (!got || got.some(g => !g)) { out.lines.push('start on the lens: the face could not be read (Python with opencv missing?); starts stay where they are'); break; }
     const base = baseOf(got.slice(mine.length).flat(), o);
     if (!base) { out.lines.push('start on the lens: too few frames with a face to know where the speaker looks; starts stay where they are'); continue; }
     mine.forEach((w, n) => {

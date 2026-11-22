@@ -30,6 +30,8 @@ def cover_frame(video, t, cropx=0.5):
     vf = f'scale={AW}:{AH}:force_original_aspect_ratio=increase,crop={AW}:{AH}:(iw-{AW})*{cropx}:(ih-{AH})*0.5'
     r = subprocess.run(['ffmpeg', '-v', 'error', '-ss', f'{max(0.0, t):.3f}', '-i', video, '-frames:v', '1', '-vf', vf,
                         '-f', 'rawvideo', '-pix_fmt', 'bgr24', '-'], stdout=subprocess.PIPE)
+    if r.returncode and not r.stdout:  # a video ffmpeg cannot read is a fault to report, not a shot with no face
+        raise RuntimeError(f'ffmpeg could not read {video}')
     if len(r.stdout) < AW * AH * 3:
         return None
     return np.frombuffer(r.stdout[:AW * AH * 3], np.uint8).reshape(AH, AW, 3)

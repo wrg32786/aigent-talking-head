@@ -189,7 +189,7 @@ function summary(look) {
     framing: mix.length ? `${mix.map(([c, s]) => `${RF.CLASS_WORDS[c]} ${pct(s)}`).join(', ')}${top ? `; face ${pct(top.faceH)} of the frame, eyes ${pct(top.eyeY)} down` : ''}` : 'not measured',
     grade: look.grade && look.grade.target ? `matched to the reference's colour (Lab ${look.grade.target.mean.map(x => Math.round(x)).join(', ')})${look.grade.finish ? ', finish ' + look.grade.finish : ''}` : look.grade && look.grade.finish ? 'finish ' + look.grade.finish : 'your own colour',
     captions: [look.captions.style, look.captions.position, look.captions.color, look.captions.case && look.captions.case + ' case'].filter(Boolean).join(', '),
-    titles: look.titles.on ? `${look.titles.perMin} a minute, ${look.titles.layer}${look.titles.entrances.length ? ', ' + look.titles.entrances.join(' / ') : ''}` : 'off',
+    titles: look.titles.on ? `${look.titles.perMin} a minute, ${look.titles.layer}${(look.titles.entrances || []).length ? ', ' + look.titles.entrances.join(' / ') : ''}` : 'off',
     stickers: st ? `${st.shape === 'starburst' ? `starburst, ${st.spikes} points` : 'round seal'}${st.color ? ', ' + st.color : ''}, ${st.layer === 'behind' ? 'behind the head' : 'in front'}` : 'none',
     transitions: tr.length ? tr.map(([k, s]) => `${k} ${pct(s)}`).join(', ') + ', the rest hard cuts' : 'hard cuts',
     pace: `a cut every ${look.pace.shotMean} s (${look.pace.shotMin} to ${look.pace.shotMax} s)${look.pace.wordsPerSecond ? `, ${look.pace.wordsPerSecond} words a second` : ''}`,

@@ -21,6 +21,7 @@ Needs only opencv and numpy.
 """
 import argparse, json, math, os, subprocess, sys
 import numpy as np
+from framing import parse_spans  # the same folder
 
 AW, AH, FPS = 270, 480, 8
 
@@ -36,7 +37,8 @@ def read_frames(video, fps=FPS):
         yield (n + 0.5) / fps, np.frombuffer(raw, np.uint8).reshape(AH, AW)
         n += 1
     p.stdout.close()
-    p.wait()
+    if p.wait() and not n:  # a video ffmpeg cannot read is a fault to report, not a shot with no move
+        raise RuntimeError(f'ffmpeg could not read {video}')
 
 
 def step(a, b):
@@ -91,14 +93,6 @@ def measure_spans(video, spans, edge=0.09):
     return [measure_frames([x[1] for x in f], (b - a) / max(1e-6, f[-1][0] - f[0][0]) if len(f) > 1 else 1.0) for f, (a, b) in zip(held, spans)]
 
 
-def parse_spans(s):
-    out = []
-    for part in str(s or '').split(','):
-        part = part.strip()
-        if part:
-            a, b = part.split('-', 1)
-            out.append((float(a), float(b)))
-    return out
 
 
 if __name__ == '__main__':
