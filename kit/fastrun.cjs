@@ -47,13 +47,14 @@ function cropLoss(w, h, W, H) {
 }
 // "whole" or "fill" for an insert: what it asks for, else whole in a framed panel when filling it would crop more
 // than a fifth of the picture away. The render asks this for every place but the split panel (place top), which
-// kit/assemble.cjs draws by kit/split.cjs fitOf; the top rule here is kept for callers that have only this file.
-const WHOLE_OVER = 0.2;
+// kit/assemble.cjs draws by kit/split.cjs fitOf; the top rule here is that same rule (whole for a clip 16:10 or wider).
+const WHOLE_OVER = 0.2, SPL_WIDE = 1.6; // SPL_WIDE: kit/split.cjs WIDE
 function fitFor(insert, src, W, H) {
   const f = String(insert.fit || '').toLowerCase();
   if (f === 'whole' || f === 'fill') return f;
   if (insert.run) return 'whole';
   if (!['top', 'frame'].includes(insert.place) || !src) return 'fill';
+  if (insert.place === 'top') return src.w / src.h >= SPL_WIDE ? 'whole' : 'fill'; // the render's split-panel rule (kit/split.cjs fitOf)
   return cropLoss(src.w, src.h, W, H) > WHOLE_OVER ? 'whole' : 'fill';
 }
 function sizeOf(file) {

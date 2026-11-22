@@ -60,13 +60,13 @@ const Y=CAP.captionY||1300; // caption band: chest, below the face box. Measure 
 // A label that only repeats the caption is not drawn (Studio report 4, item 13: a teardown read the caption word
 // "designer" as an app label, and the draft drew DESIGNER over the caption that said it). An app label (mode 10) whose
 // words are all caption words on screen during its time is left out; render.mjs prints each one. A label with its own
-// icon is a real app, not a misread caption word, so it stays (as does one with "keep": true). Since 1.28.0 only a label
-// the teardown was not sure it read right ("check" in the recipe, low OCR confidence or letters that are not a word)
-// is left out: a cleanly read "Figma" label shows even while the caption says Figma.
+// icon is a real app, not a misread caption word, so it stays (as does one with "keep": true): a Figma label with its
+// app icon shows while the caption says Figma. A plain text label with no icon that repeats the caption word on screen
+// is left out however cleanly it was read. "check" (1.28.0) marks the ones the teardown was not sure of in the recipe.
 window.__dropped=[];
 const flips=(()=>{const all=CAP.flips.map(f=>[f.start,f.end,f.text,f.mode,f]),nw=w=>String(w).toLowerCase().replace(/[^a-z0-9]/g,'');
  const said=[];for(const c of all)if(c[3]===0){const o=c[4],ws=o.words&&o.words.length?o.words:String(c[2]||'').split(/\s+/).filter(Boolean).map(w=>[c[0],c[1],w]);for(const w of ws)said.push([+w[0],+w[1],nw(w[2])])}
- return all.filter(c=>{if(c[3]!==10||c[4].keep===true||c[4].icon||c[4].src||!(c[4].check||c[4].lowConfidence))return true;const ws=String(c[2]||'').split(/[\s|]+/).map(nw).filter(Boolean),e=c[1]>90?c[0]+4:c[1];
+ return all.filter(c=>{if(c[3]!==10||c[4].keep===true||c[4].icon||c[4].src)return true;const ws=String(c[2]||'').split(/[\s|]+/).map(nw).filter(Boolean),e=c[1]>90?c[0]+4:c[1];
   if(!ws.length||!ws.every(w=>said.some(q=>q[2]===w&&q[0]<e+.2&&q[1]>c[0]-.2)))return true;
   window.__dropped.push({start:c[0],end:c[1],mode:c[3],text:String(c[2]),why:'the caption says the same word at that moment'});return false})})();
 // mode 7 = kinetic title (one per beat). Seven entrances, each used once per video, resolved in time order; flicker only

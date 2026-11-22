@@ -118,13 +118,15 @@ if (!hasFf) console.log('skip glow, dim and shadow checks read from stills (need
   ok(/label 'DESIGNER' at 1\.30 s not drawn: the caption says the same word at that moment/.test(r.log), 'a label marked check that repeats the caption word is not drawn, and the build log says so');
   ok(!/label 'FIGMA'/.test(r.log), 'a label with a word of its own stays');
   const lay = JSON.parse(readFileSync(join(r.d, 'layout.json'), 'utf8')).elements.filter(e => e.mode === 10).map(e => e.text);
-  ok(lay.length === 2 && lay.includes('FIGMA') && lay.includes('SHIPS'), `a label with its own word stays, and so does one read cleanly that the caption also says (${lay.join(', ')})`);
-  ok(!/label 'SHIPS'/.test(r.log), 'a cleanly read label is drawn even while the caption says its word (only a label marked check is left out)');
+  ok(lay.length === 1 && lay.includes('FIGMA'), `a label with its own word stays; a plain text one that repeats the caption is left out (${lay.join(', ')})`);
+  ok(/label 'SHIPS' at 3\.10 s not drawn: the caption says the same word at that moment/.test(r.log), 'a plain text label with no icon that repeats the caption word is not drawn, even read cleanly');
 }
 { // a real app with its own icon is not a misread caption word: it stays when the caption says its name
   const flips = [{ start: 1, end: 2.4, text: 'I use Figma daily', mode: 0, words: [[1, 1.2, 'I'], [1.2, 1.5, 'use'], [1.5, 2.1, 'Figma'], [2.1, 2.4, 'daily']] }, { start: 1.4, end: 2.9, text: 'Figma', mode: 10, icon: 'figma.png' }];
   const r = draw({ ...base, flips }, 4);
   ok(!/label 'Figma'.*not drawn/.test(r.log), 'a label with its own icon stays when the caption says its name');
+  const lay = JSON.parse(readFileSync(join(r.d, 'layout.json'), 'utf8')).elements.filter(e => e.mode === 10).map(e => e.text);
+  ok(lay.includes('Figma'), `the Figma app label with its icon is drawn (${lay.join(', ')})`);
 }
 { // a word said before a title that is also one of the title's words leaves ahead of it, so the check passes on a plain draft
   const flips = [{ start: 3, end: 4.6, text: 'that is the plan', mode: 0, words: [[3, 3.3, 'that'], [3.3, 3.5, 'is'], [3.5, 3.7, 'the'], [3.7, 4.4, 'plan']] },

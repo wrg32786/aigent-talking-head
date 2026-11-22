@@ -55,6 +55,7 @@ export function Pieces({ V, apply, player, src, stitch, spans, onClips }) {
       <span className="fine">Topics</span>
       {P.topics.map(t => <button type="button" key={t} className={'chip' + (tp === t ? ' on' : '')} aria-pressed={tp === t ? 'true' : 'false'} data-topic={t} onClick={() => setTopic(tp === t ? null : t)}>{t}</button>)}
     </div>}
+    {P.topics.length > 0 && P.topicsBy && P.topicsBy !== 'rules' && <p className="fine" id="pieces-topics-by">Themes named by your chat's model from this transcript.</p>}
     <div className="pz-grid" id="pieces-grid">
       {cats.map(c => { const list = P.pieces.filter(p => p.category === c.id && shown(p)); if (tp && !list.length) return null;
         return <section key={c.id} className="pz-cat glass-card" data-cat={c.id} aria-label={c.label}>

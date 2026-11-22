@@ -56,9 +56,10 @@ Release notes: [docs/releases/v1.28.0.md](docs/releases/v1.28.0.md). Recreate no
 
 ### Will's picks from the review
 
-- **App labels:** only a label the teardown was not sure it read right (low OCR confidence or letters that are not a word, `check <why>` in the Reel.md graphics line, `check` on the flip) is left out when the caption says the same word; a cleanly read label shows. `kit/teardown.py` carries the label's OCR confidence, `kit/videomd2reel.cjs` marks the doubt, `kit/overlay.html` drops only marked labels. Test: `tests/label-check.test.cjs`, `tests/title-rules.test.mjs`.
+- **App labels:** a plain text label with no icon that repeats the caption word on screen is left out however cleanly it was read; a label with its own icon (a Figma app label) or `keep: true` shows. A label the teardown was not sure it read right (low OCR confidence or letters that are not a word) is marked `check <why>` in the Reel.md graphics line and `check` on the flip. `kit/teardown.py` carries the label's OCR confidence, `kit/videomd2reel.cjs` marks the doubt. Test: `tests/label-check.test.cjs`, `tests/title-rules.test.mjs`.
 - **Feed 4:5 and square:** up to 180 s like a reel (`kit/exports.json` was 140). A longer reel ends after the last word before the limit (`kit/exports.cjs` `endOf`, `wordsOf`), in the reframed versions, plain crops, 9:16 copies and `npm run verify`. Test: `tests/facewindow.test.cjs`.
-- **Topics:** unchanged. With a model key as the chat backend, opening Cut sends the take's lines to that provider to name the themes; said in the release notes.
+- **Topics:** with a model key as the chat backend, opening Cut sends the take's lines to that provider to name the themes; a line under the topics on Cut says so (`#pieces-topics-by`) and the release notes too.
+- **Split panel fit:** `kit/fastrun.cjs` `fitFor` for place top now follows the render rule in `kit/split.cjs` `fitOf` (an upright clip fills unless `fit: "whole"`); `tests/fastrun.test.mjs` matches. No render change.
 
 ## 1.27.3 (unreleased)
 

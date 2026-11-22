@@ -18,7 +18,7 @@ import { createRequire } from 'module';
 try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); } catch { console.log('skip the fast run tests (needs ffmpeg)'); process.exit(0); }
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url))), require = createRequire(import.meta.url);
-const FR = require('../kit/fastrun.cjs'), BS = require('../kit/broll-slots.cjs'), RM = require('../kit/reelmd.cjs');
+const FR = require('../kit/fastrun.cjs'), BS = require('../kit/broll-slots.cjs'), RM = require('../kit/reelmd.cjs'), SPL = require('../kit/split.cjs');
 const TMP = mkdtempSync(join(tmpdir(), 'fastrun-test-'));
 process.env.STUDIO_DIR = join(TMP, 'studio'); process.env.STUDIO_BROLL_LIBRARY = join(TMP, 'lib'); mkdirSync(process.env.STUDIO_DIR, { recursive: true });
 let n = 0; const t = async (name, fn) => { await fn(); n++; console.log('ok ' + name); };
@@ -86,7 +86,9 @@ try {
     assert.strictEqual(FR.cropLoss(1920, 1080, 1080, 960), 0.367, 'a 16:9 clip made to fill the split panel loses 37 percent');
     assert.strictEqual(FR.fitFor({ place: 'top' }, { w: 1920, h: 1080 }, 1080, 960), 'whole');
     assert.strictEqual(FR.fitFor({ place: 'top' }, { w: 1440, h: 1080 }, 1080, 960), 'fill', 'a 4:3 clip loses 16 percent: it fills');
-    assert.strictEqual(FR.fitFor({ place: 'top' }, { w: 1080, h: 1920 }, 1080, 960), 'whole', 'an upright clip in the wide panel too');
+    assert.strictEqual(FR.fitFor({ place: 'top' }, { w: 1080, h: 1920 }, 1080, 960), 'fill', 'an upright clip in the split panel fills it, as the render draws it (kit/split.cjs fitOf)');
+    assert.strictEqual(FR.fitFor({ place: 'top', fit: 'whole' }, { w: 1080, h: 1920 }, 1080, 960), 'whole', 'unless the insert asks for whole');
+    assert.strictEqual(SPL.fitOf({}, { w: 1080, h: 1920 }), 'cover', 'the render rule: an upright clip covers the split panel');
     assert.strictEqual(FR.fitFor({ place: 'top', fit: 'fill' }, { w: 1920, h: 1080 }, 1080, 960), 'fill');
     assert.strictEqual(FR.fitFor({ place: 'full' }, { w: 1920, h: 1080 }, 1080, 1920), 'fill', 'a full cutaway still fills the frame');
     assert.strictEqual(FR.fitFor({ place: 'full', fit: 'whole' }, { w: 1920, h: 1080 }, 1080, 1920), 'whole');
