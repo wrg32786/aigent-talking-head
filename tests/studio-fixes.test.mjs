@@ -45,7 +45,7 @@ await t('reference link messages: plain words, a fix id, the command only in the
 
 // a line of source that is a user-facing string with a command, outside comments and CLI-only output
 const COMMENT = /^\s*(\/\/|\*|\/\*|#)/;
-const CLI_ONLY = /console\.(log|error|warn)|process\.stderr|usage:|README\.md|die\(|^\s*\/\/|kit\/setup\.mjs['"]|STUDIO_SETUP/;
+const CLI_ONLY = /console\.(log|error|warn)|process\.stderr|usage:|README\.md|die\(|^\s*\/\/|kit\/setup\.mjs['"]|STUDIO_SETUP|^const TERMINAL_LINE = /; // TERMINAL_LINE: the pattern that keeps command lines OFF the page
 await t('page source: a command only inside an instruction for an agent (forAgent)', () => {
   const dir = join(ROOT, 'kit', 'studio', 'web', 'src'), bad = [];
   for (const f of readdirSync(dir).filter(x => /\.jsx?$/.test(x))) readFileSync(join(dir, f), 'utf8').split('\n').forEach((l, i) => { if (!COMMENT.test(l) && CMD.test(l) && !/forAgent/.test(l)) bad.push(`${f}:${i + 1}: ${l.trim().slice(0, 120)}`); });

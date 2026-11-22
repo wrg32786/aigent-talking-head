@@ -169,7 +169,9 @@ function runTask(kind, steps, done, hooks = {}) {
   if (cur && cur.status === 'running') throw Object.assign(new Error(`busy: ${cur.kind} is running`), { code: 409 });
   const me = { id: ++seq, kind, status: 'running', startedAt: Date.now(), lines: [], proc: null };
   if (lane) refTask = me; else task = me;
-  const log = l => { for (const x of String(l).split(/\r?\n/)) if (x.trim()) { me.lines.push(x.slice(0, 400)); if (me.lines.length > 400) me.lines.shift(); if (!lane) send('log', { id: me.id, line: x.slice(0, 400) }); if (hooks.line) try { hooks.line(x); } catch {} } };
+  // an engine note that names a command (for someone at a terminal) stays out of the page's "What ran": we never show
+  // users commands. Hooks still see every line.
+  const log = l => { for (const x of String(l).split(/\r?\n/)) if (x.trim()) { if (TERMINAL_LINE.test(x)) { if (hooks.line) try { hooks.line(x); } catch {} continue; } me.lines.push(x.slice(0, 400)); if (me.lines.length > 400) me.lines.shift(); if (!lane) send('log', { id: me.id, line: x.slice(0, 400) }); if (hooks.line) try { hooks.line(x); } catch {} } };
   if (!lane) update(s => { s.task = { id: me.id, kind, status: 'running' }; });
   (async () => {
     let out = '';
@@ -666,6 +668,7 @@ function fromText(s, combo) {
   const by = piecesState(s, combo.source).by, lines = `line${n === 1 ? '' : 's'}`;
   return by === 'ai' ? `our ${n} best ${lines}, ${secs}` : !by || by === 'you' || by === 'ai, changed by you' ? `your ${n} ${lines}, ${secs}` : `${n} ${lines}, ${secs}, picked by ${by}`;
 }
+const TERMINAL_LINE = /\b(npm run|npx|pip install|python -m)\b/;
 function editOf(s, v) {
   const combo = v.combo, o = outputOf(s), cut = v.cut || {}, from = draftFrom(s, combo), fin = { ...C.defaultState().finish, ...(s.finish || {}) };
   const fmt = (CUT.FORMATS[o.format] || {}).label || o.format, aspect = CUT.aspectOf(o);

@@ -312,6 +312,8 @@ export function syncRefLook(s) {
 // what you picked after the reference is yours, listed in `yours` for the agent.
 // null when no reference is broken down, else { inUse, by: [{ ref, kind, id, deny, label }], text, mode, name, yours }
 export const SAVED_LOOK_TEXT = "Your saved look is in use, not the reference's";
+// in Influence the reference does go on top, so the line says that instead of "not the reference's"
+export const SAVED_LOOK_BASE_TEXT = "Your saved look is the base, with the reference on top";
 const PART_KEYS = ['captions', 'titles', 'transitions', 'grade', 'effects', 'graphics', 'pace', 'sound', 'fonts', 'look'];
 const KIND_WORD = { captionStyle: 'caption style', captionEntrance: 'caption entrance', look: 'caption look', theme: 'theme', titleLayer: 'title layer', entrance: 'title entrance', transition: 'transition', finish: 'finish', font: 'font', effect: 'effect', graphic: 'graphic', editing: 'editing' };
 export function ownParts(s, cat = catalog()) {
@@ -342,7 +344,7 @@ function earlierLook(s, cat) {
 export function savedLookOf(s, cat = catalog()) {
   const r = s.reference; if (!r || !r.extracted) return null;
   const copies = copiesStyle(r), by = copies ? [] : earlierLook(s, cat);
-  return { inUse: by.length > 0, by, text: by.length ? SAVED_LOOK_TEXT : null, mode: r.mode, name: copies ? null : (r.mode === 'off' && s.styleLook) || s.pack || null, yours: copies ? ownParts(s, cat) : [] };
+  return { inUse: by.length > 0, by, text: by.length ? (r.mode === 'influence' ? SAVED_LOOK_BASE_TEXT : SAVED_LOOK_TEXT) : null, mode: r.mode, name: copies ? null : (r.mode === 'off' && s.styleLook) || s.pack || null, yours: copies ? ownParts(s, cat) : [] };
 }
 // the one button: the board is set from the reference alone. With the reference Off or on Influence it comes on in the
 // mode you last copied it with (else Copy the look, so your own cut stays), and your earlier look is set aside; in

@@ -126,7 +126,7 @@ try {
   });
   await t('Influence keeps your look under the reference, so the line shows; what the reference set is not counted', async () => {
     const s = withRef(old(), 'influence'), sl = C.savedLookOf(s, cat);
-    assert.strictEqual(sl.inUse, true); assert.strictEqual(sl.mode, 'influence'); assert.ok(refs(sl).includes('titleLayer:front') && refs(sl).includes('entrance:pop-zoom'), refs(sl).join(' '));
+    assert.strictEqual(sl.inUse, true); assert.strictEqual(sl.mode, 'influence'); assert.strictEqual(sl.text, 'Your saved look is the base, with the reference on top', 'Influence: the reference goes on top, so the line does not say "not the reference\'s"'); assert.ok(refs(sl).includes('titleLayer:front') && refs(sl).includes('entrance:pop-zoom'), refs(sl).join(' '));
     assert.ok(!sl.by.some(b => s.reference.added.includes(b.ref)));
     assert.strictEqual(C.savedLookOf(withRef(C.defaultState(), 'influence'), cat).inUse, false, 'an empty board on Influence: nothing earlier');
     const d = C.defaultState(), tr = Object.values(cat.items).find(i => i.kind === 'transition' && !EX.transitions[i.id]).id; C.applyPatch(d, { picks: { [`transition:${tr}`]: 'deny' } }, cat); withRef(d, 'influence');
