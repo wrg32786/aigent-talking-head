@@ -8,7 +8,7 @@ npm run studio
 
 That starts Studio on http://127.0.0.1:4757 and opens your browser. `--port <n>` picks another port, `--no-open` skips the browser. Never used a terminal? Run the one-line installer in [Setup](#setup-without-a-terminal) and double-click the "Talking Head Studio" icon it puts on your desktop.
 
-![Studio on a laptop in dark: the six step dots with Cut open, Your edit across the top, the Pieces sorted by what each line does, Ask my agent next to Look, and the chat with Claude Code](studio/desktop.png)
+![Studio on a laptop in dark: the step dots (six in this older picture, eight now) with Cut open, Your edit across the top, the Pieces sorted by what each line does, Ask my agent next to Look, and the chat with Claude Code](studio/desktop.png)
 
 ![The same Cut step in the light theme](studio/light.png)
 
@@ -41,7 +41,7 @@ Two steps have a second view, behind a small switch above the step. **Picture** 
 
 **Your edit.** One quiet line above every step after Start says what you are making (one reel, clips, plain clips; the aspect), from what ("our N best lines" when they are our pick, "your N lines" when you chose them, or the whole take), the look and the b-roll spots, and the sound once you change it. The one Next button is in the bar at the bottom. Click a part to open its step: the look opens Picture and the sound opens Music and sounds. With a reference in use the look part says `Recreating <name>` or `The look of <name>, your words`. When you change your pieces after a draft it says so. Agents read the same thing with `get_edit` (`GET /api/edit`). The chat sits on the right (behind the chat button on a phone). Dark is the default; switch to light with the sun button or in Settings.
 
-![Studio in the light theme, the AIgent cream with deep teal: the Style step](studio/light.png)
+![Studio in the light theme, the AIgent cream with deep teal: the Style step (now Picture)](studio/light.png)
 
 ## What you can do
 
@@ -68,9 +68,9 @@ Two steps have a second view, behind a small switch above the step. **Picture** 
 7. **Chat.** Type "calm and cinematic, no glitch, typewriter titles". See [Chat](#chat).
 8. **Review and Render.** Draft on Review runs `npm run reel ... --draft` and shows the choices table: every transition, finish, title and graphic per beat, with why it was picked. Change any cell and apply; the change is pinned. Render builds the reel (and the export size you picked) with progress, then plays it with a download link. See [Review and Render](#review-and-render-1280).
 
-![The Look step: the built-in Looks as previews of your face, Save as a new Look, and the Layers panel on Text with caption previews](studio/look-layers.png)
+![The Look step (now Picture): the built-in Looks as previews of your face, Save as a new Look, and the Layers panel on Text with caption previews](studio/look-layers.png)
 
-![The same Look step in the light theme](studio/look-layers-light.png)
+![The same Look step (now Picture) in the light theme](studio/look-layers-light.png)
 
 ## Start: what guides the edit (1.28.0)
 
@@ -105,7 +105,7 @@ The Text layer has one switch, **Make hard-to-read words easier to read**: when 
 
 ![The Music and sounds step in the light theme: one line for what the reference brought, then Music, Sounds and Pace](studio/music-light.png)
 
-![The Look step: a row of Looks, the Hormozi hook reference card with Recreate, Influence and Off, and the Graphics layer with a From reference badge on lower-third](studio/look-layers.png)
+![The Look step (now Picture): a row of Looks, the Hormozi hook reference card with Recreate, Influence and Off, and the Graphics layer with a From reference badge on lower-third](studio/look-layers.png)
 
 Every option lives in exactly one of 9 layers (`layers` in `kit/studio/categories.json`, computed by `layersOf` in `kit/studio/core.mjs`). Before 1.28.0 one step, Look, showed all 9. Now three steps share most of them, visual steps first and sound on its own step, and B-roll keeps its own layer. The layers and `categories.json` are unchanged: each step shows its own subset (`STEP_LAYERS` in `kit/studio/web/src/steps.js`).
 
@@ -556,7 +556,7 @@ By hand, from the kit folder, `npm run studio:connect -- claude` (or `codex`, `c
 
 `npm run studio:agent` starts Studio in the background and prints its URL as JSON (`--no-open`, `--port`, `--stop`), so an agent's terminal is not held by the server. `tests/studio-agent.test.mjs` runs the whole loop with a scripted MCP client acting as the agent.
 
-![Studio on a tablet: the Style step with the chat beside it](studio/tablet.png)
+![Studio on a tablet: the Style step (now Picture) with the chat beside it](studio/tablet.png)
 
 ## AG-UI
 
@@ -632,7 +632,7 @@ Off by default. Turn on **Allow generating** in API keys and providers and add a
 <a id="finish"></a>
 ## Review and Render (1.28.0)
 
-![The Finish step: Draft, Check and Render in order, the Make card with Your 2 pieces or The whole take, the reel, clips and plain clips chips and the export size, then Redraft and Render v4](studio/finish.png)
+![The Finish step (now Review): Draft, Check and Render in order, the Make card with Your 2 pieces or The whole take, the reel, clips and plain clips chips and the export size, then Redraft and Render v4](studio/finish.png)
 
 Finish, the old last step before Post, is now two steps. **Review** drafts the reel and lets you check it. **Render** is the one place that makes videos. Both show only the current draft; earlier reels stay in the [Outputs library](#outputs).
 
@@ -705,7 +705,7 @@ On a phone the two videos stay side by side at half width and the lists stack: [
 ## On a phone
 
 <p>
-<img src="studio/phone.png" width="260" alt="Studio at phone width: the Style step with packs and the effects grid">
+<img src="studio/phone.png" width="260" alt="Studio at phone width: the Style step (now Picture) with packs and the effects grid">
 <img src="studio/menu-phone.png" width="260" alt="The effects menu at phone width: a category drop-down and three tiles per row with forbid buttons">
 <img src="studio/settings-phone.png" width="260" alt="Settings as a full-screen sheet on a phone">
 </p>
@@ -805,7 +805,7 @@ Nothing is deleted from here.
 ### The top bar
 
 <img src="studio/more-menu.png" width="520" alt="The top bar with numbered steps, Wizards, Outputs, Connect agent, theme, Settings and the More menu open with Past videos, Setup check and API keys">
-<img src="studio/top-phone.png" width="260" alt="The top bar on a phone: the reel name and buttons on the first row and the six steps on a second row">
+<img src="studio/top-phone.png" width="260" alt="The top bar on a phone: the reel name and buttons on the first row and the steps (six in this older picture, eight now) on a second row">
 
 The top bar always fits on one line. From 1280 px wide the step bar names every step in its short form (Start, Cut, Picture, Text, B-roll, Music, Review, Render); on a narrower window only the current step shows its name (the others show their number, and hovering a step still names it). The setup pill says how many things there are to fix, and Connect agent shrinks to its plug. **More** (the three dots) holds Past videos, Setup check, API keys, **Wizards** (the [wizards](#wizards)) and **Outputs** (the [Outputs library](#outputs)), each with its name, and works with the keyboard: Enter or Space opens it, the arrow keys move, Enter picks, Escape closes. On a phone the steps get their own row under the reel name, and the theme moves into More too.
 

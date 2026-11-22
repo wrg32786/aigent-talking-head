@@ -450,7 +450,7 @@ export function motionOf(s) {
   return { value: MOTIONS.includes(s.pace && s.pace.motion) ? s.pace.motion : MOTION_DEFAULT, on: !!(ref || s.styleLook),
     options: [{ id: 'subtle', label: 'Subtle' }, { id: 'medium', label: 'Medium' }, { id: 'strong', label: 'Strong' }] };
 }
-import { REF_PARTS, refParts, referencePicks, setReferenceLook, copiesStyle, clearFontPick, syncRefFont, refEntrancesOnly, dropRefEntrances, useReferenceLook, styleKey, boostOf } from './reference.mjs';
+import { REF_PARTS, refParts, referencePicks, setReferenceLook, copiesStyle, clearFontPick, syncRefFont, refEntrancesOnly, dropRefEntrances, useReferenceLook, styleKey, boostOf, ownLook } from './reference.mjs';
 
 // a pack whose style must sit inside its locks (pack validate refuses a style transition outside them)
 export function fitStyle(pack) {
@@ -572,7 +572,8 @@ export function savedVideo(job) { try { return JOB_RE.test(job) ? JSON.parse(rea
 export function freshSession(s, { job = null, keepLook = true } = {}) {
   const d = defaultState(), keep = {};
   for (const k of KEEP_KEYS) if (s[k] !== undefined) keep[k] = s[k];
-  const look = {}; if (keepLook) for (const k of LOOK_KEYS) if (s[k] !== undefined) look[k] = clone(s[k]);
+  const mine = keepLook ? ownLook(s) : null; // after a Recreate or Copy the look, your own look, not the reference's
+  const look = {}; if (keepLook) for (const k of LOOK_KEYS) if (mine[k] !== undefined) look[k] = clone(mine[k]);
   for (const k of Object.keys(s)) delete s[k];
   Object.assign(s, d, keep, look, { job: job || null, keepLook: !!keepLook });
   clearFontPick(s); // a font pick belongs to the video it was made for: it never rides into the next one

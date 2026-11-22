@@ -281,6 +281,29 @@ export function dropAutoIdeas(s, { onlyRef = false } = {}) {
   for (const [k, x] of Object.entries(j.ideas)) { const auto = !x || !x.by || x.by === 'Studio' || x.by === 'the rules'; if (x && x.source === 'reference' ? true : !onlyRef && auto) { delete j.ideas[k]; n++; } }
   return n;
 }
+// what the reference set aside comes back where you have nothing now (Back to my look, and Keep my look on New video)
+function restoreLook(s, h) {
+  if (!h) return;
+  s.picks = s.picks || {};
+  if (!s.pack && h.pack) s.pack = h.pack;
+  for (const [k, v] of Object.entries(h.picks || {})) if (!slotOn(s.picks[k])) s.picks[k] = cloneOf(v);
+  s.entranceLock = slotOn(s.picks.entrance); // entrances that come back are your own picks: a lock
+  if (plainMusic(s.music) && !plainMusic(h.music)) s.music = { ...s.music, bed: h.music.bed, energy: h.music.energy || 'auto' };
+  if (plainSound(s.sound) && !plainSound(h.sound)) s.sound = { ...s.sound, ...h.sound };
+  if (!s.boost && h.boost) s.boost = h.boost;
+  if (plainPace(s.pace) && !plainPace(h.pace)) s.pace = { ...s.pace, tighten: h.pace.tighten == null ? null : h.pace.tighten, punch: h.pace.punch || 'on' };
+  if (!(s.pace && s.pace.motion) && h.pace && h.pace.motion) s.pace = { ...s.pace, motion: h.pace.motion };
+}
+// Keep my look on New video (1.29.0): the look you take into the next video is yours, not the reference's. A copy of
+// the board with what the reference set taken out (your changes since stay) and the look it set aside put back.
+// The board itself is not changed.
+export function ownLook(s) {
+  const r = s.reference; if (!r || r.mode === 'off' && !r.prevLook) return s;
+  const c = cloneOf(s);
+  if (r.mode !== 'off') undoReferenceLook(c);
+  restoreLook(c, c.reference.prevLook);
+  return c;
+}
 export function syncRefLook(s) {
   const r = s.reference; if (!r) return;
   const key = styleKey(r);
@@ -290,17 +313,7 @@ export function syncRefLook(s) {
     const had = clearLookPicks(s); if (!r.prevLook && hadLook(had)) r.prevLook = had;
     r.lookFor = key; dropAutoIdeas(s, { onlyRef: true });
   } else if (!key && r.lookFor) { // back to your own look: what the reference set aside comes back where you have nothing now
-    const h = r.prevLook;
-    if (h) {
-      if (!s.pack && h.pack) s.pack = h.pack;
-      for (const [k, v] of Object.entries(h.picks || {})) if (!slotOn(s.picks[k])) s.picks[k] = cloneOf(v);
-      s.entranceLock = slotOn(s.picks.entrance); // entrances that come back are your own picks: a lock
-      if (plainMusic(s.music) && !plainMusic(h.music)) s.music = { ...s.music, bed: h.music.bed, energy: h.music.energy || 'auto' };
-      if (plainSound(s.sound) && !plainSound(h.sound)) s.sound = { ...s.sound, ...h.sound };
-      if (!s.boost && h.boost) s.boost = h.boost;
-      if (plainPace(s.pace) && !plainPace(h.pace)) s.pace = { ...s.pace, tighten: h.pace.tighten == null ? null : h.pace.tighten, punch: h.pace.punch || 'on' };
-      if (!s.pace.motion && h.pace && h.pace.motion) s.pace = { ...s.pace, motion: h.pace.motion };
-    }
+    restoreLook(s, r.prevLook);
     r.prevLook = null; r.lookFor = null; dropAutoIdeas(s, { onlyRef: true });
   }
 }
