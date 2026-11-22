@@ -41,7 +41,7 @@ function repoint(o, src, dir, copied) {
 
 // the face zones while a split or framed b-roll moves your picture (kit/split.cjs), on the frame's canvas
 function splitZones(fz, cut, { mask, frame }) {
-  const ins = (cut.inserts || []).filter(s => SPL.SPLIT.includes(s.place) && +s.dur > 0); if (!ins.length) return fz.zones;
+  const ins = (cut.inserts || []).filter(s => !s.skip && SPL.SPLIT.includes(s.place) && +s.dur > 0); if (!ins.length) return fz.zones;
   const zones = fz.zones.slice();
   for (const s of ins) {
     const g = SPL.layout(s, SPL.faceOver(fz, +s.at, +s.dur), { mask, frame });
@@ -50,6 +50,8 @@ function splitZones(fz, cut, { mask, frame }) {
   return zones;
 }
 
+// the face track of a picture made here, as read (never the shifted copy in facezone.json: a second run would shift it again)
+const RAW = 'face.raw.json';
 function make({ jobDir, src, name, reel, out, base = null, masks = null, python = process.env.PYTHON || 'python3', env = {}, log = console.log, keep = false } = {}) {
   const P = X.get(name); if (!P || !X.isReframed(name)) throw new Error(`export-frame: ${name} is not a 4:5 or 1:1 size (${X.REFRAMED.join(', ')})`);
   src = path.resolve(src); const dir = path.join(path.resolve(jobDir), 'build-' + name);
@@ -58,7 +60,7 @@ function make({ jobDir, src, name, reel, out, base = null, masks = null, python 
   const run = (cmd, args, extra = {}) => execFileSync(cmd, args, { cwd: dir, stdio: 'inherit', env: { ...process.env, ...env, ...extra } });
   // 2. the build of its own (kept between runs: the scene frames and a picture made here are reused)
   fs.mkdirSync(dir, { recursive: true });
-  for (const f of fs.readdirSync(dir)) { if (f === 'gfx' || f === 'base.mp4' || f === 'base.key' || f === 'facezone.json') continue; fs.rmSync(path.join(dir, f), { recursive: true, force: true }); }
+  for (const f of fs.readdirSync(dir)) { if (f === 'gfx' || f === 'base.mp4' || f === 'base.key' || f === RAW) continue; fs.rmSync(path.join(dir, f), { recursive: true, force: true }); }
   const copied = new Set();
   for (const f of fs.readdirSync(src)) { const p = path.join(src, f); if (!fs.statSync(p).isFile() || BIG.test(f) || GEN.test(f) || f === 'facezone.json' || f === 'cut.json' || f === 'captions.js') continue; fs.copyFileSync(p, path.join(dir, f)); copied.add(f); }
   const cut = repoint(JSON.parse(fs.readFileSync(path.join(src, 'cut.json'), 'utf8')), src, dir, copied);
@@ -67,10 +69,12 @@ function make({ jobDir, src, name, reel, out, base = null, masks = null, python 
   // the picture: the one a render just made, or one assembled here once (kept, keyed by the cut's picture)
   const key = crypto.createHash('sha1').update(picKey(cut)).digest('hex');
   let BASE = base && fs.existsSync(base) ? path.resolve(base) : null;
+  const own = !BASE;
   if (!BASE) {
     const bf = path.join(dir, 'base.mp4'), kf = path.join(dir, 'base.key');
     if (!(fs.existsSync(bf) && fs.existsSync(kf) && fs.readFileSync(kf, 'utf8') === key)) {
       fs.writeFileSync(path.join(dir, 'cut.json'), JSON.stringify(cut, null, 1));
+      fs.rmSync(path.join(dir, RAW), { force: true }); // another picture: its face track goes with it
       run(process.execPath, [path.join(KIT, 'assemble.cjs'), 'base.mp4'], { BASEONLY: '1', BASE: '' }); fs.writeFileSync(kf, key);
     }
     BASE = bf;
@@ -83,13 +87,13 @@ function make({ jobDir, src, name, reel, out, base = null, masks = null, python 
   if (hm && mk) cut.headMask = hm; else delete cut.headMask;
   // 1. the window, from the face in the picture
   let fz = null;
-  const fzSrc = path.join(path.dirname(BASE), 'facezone.json');
+  const fzSrc = own ? path.join(dir, RAW) : path.join(path.dirname(BASE), 'facezone.json'), fzNew = path.join(dir, own ? RAW : 'face.read.json');
   try { if (fs.existsSync(fzSrc)) fz = JSON.parse(fs.readFileSync(fzSrc, 'utf8')); } catch {}
   if (!fz) {
     try {
       const fxPy = path.join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
-      execFileSync(fs.existsSync(fxPy) ? fxPy : python, [path.join(KIT, 'facezone.py'), BASE, path.join(dir, 'facezone.json')], { cwd: dir, stdio: 'inherit', env: { ...process.env, PYTHONUTF8: '1' } });
-      fz = JSON.parse(fs.readFileSync(path.join(dir, 'facezone.json'), 'utf8'));
+      execFileSync(fs.existsSync(fxPy) ? fxPy : python, [path.join(KIT, 'facezone.py'), BASE, fzNew], { cwd: dir, stdio: 'inherit', env: { ...process.env, PYTHONUTF8: '1' } });
+      fz = JSON.parse(fs.readFileSync(fzNew, 'utf8'));
     } catch (e) { log(`note: no face track (${String(e.message).split('\n')[0]}); the ${P.w}x${P.h} frame stays in one place`); }
   }
   const tr = FW.track(fz || { fps: 8, zones: [] }, { h: P.h, len: LEN, cuts: R.timeline(cut).seams, fallback: P.y0 });
@@ -122,7 +126,7 @@ function make({ jobDir, src, name, reel, out, base = null, masks = null, python 
   const full = path.join(dir, 'full.mp4');
   run(process.execPath, [path.join(KIT, 'assemble.cjs'), full], { BASE, BASEONLY: '', ...(mk ? {} : { MASK_WARNED: '1' }) });
   const words = (() => { try { return X.wordsOf(R.readCaptions(capF)); } catch { return []; } })(), END = X.endOf(name, LEN, words);
-  if (LEN > P.maxSec) log(`note: the reel is ${LEN.toFixed(1)} s, longer than ${P.label} allows (${P.maxSec} s); this version ends at ${END.toFixed(2)} s, after the last word before the limit`);
+  if (LEN > P.maxSec) log(`note: the reel is ${LEN.toFixed(1)} s, longer than ${P.label} allows (${P.maxSec} s); this version ends at ${END.toFixed(2)} s${END < P.maxSec ? ', after the last word before the limit' : ''}`);
   execFileSync('ffmpeg', X.ffmpegArgs(name, full, out, LEN, { y0: fixedY, words }), { stdio: 'inherit' });
   if (!keep) fs.rmSync(full, { force: true });
   let LAY = null, FC = null; try { LAY = JSON.parse(fs.readFileSync(path.join(dir, 'layout.json'), 'utf8')); } catch {} try { FC = JSON.parse(fs.readFileSync(path.join(dir, 'facecheck.json'), 'utf8')); } catch {} let TC = null; try { TC = JSON.parse(fs.readFileSync(path.join(dir, 'textcheck.json'), 'utf8')); } catch {}

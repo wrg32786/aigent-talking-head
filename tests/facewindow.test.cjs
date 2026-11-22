@@ -96,6 +96,7 @@ t('a Feed or square version runs as long as a reel (180 s) and ends on a word, n
   assert.deepStrictEqual(words, [[170, 175.2], [175.4, 179.1], [179.3, 180.6]], 'only spoken caption words count');
   assert.strictEqual(X.endOf('feed45', 120, words), 120, 'a reel under the limit is not cut');
   assert.strictEqual(X.endOf('feed45', 190, words), 179.25, 'a word across the limit: the version ends after the word before it, with a breath');
+  assert.strictEqual(X.endOf('feed45', 200, [[178.9, 179.4], [179.4, 180.3]]), 179.4, 'words that touch: it ends where the next word starts, not 0.15 s into it');
   assert.strictEqual(X.endOf('square', 190, [[170, 178]]), 180, 'quiet at the limit: it ends at the limit');
   assert.strictEqual(X.endOf('feed45', 190, [[100, 160], [165, 185]]), 180, 'the last word before it ended long ago: it ends at the limit');
   const a = X.ffmpegArgs('feed45', 'in.mp4', 'out.mp4', 190, { words }); assert.strictEqual(a[a.indexOf('-t') + 1], '179.25');

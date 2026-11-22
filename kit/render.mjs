@@ -44,9 +44,9 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
   }
   // font lockup overrides from cut.json ("lockup" for the job, "hero" per flip start) -> lockover.js
   { let C = {}; try { C = JSON.parse(readFileSync(join(ROOT, 'cut.json'), 'utf8')); } catch {}
-    writeFileSync(join(ROOT, 'lockover.js'), 'window.LOCKOVER=' + JSON.stringify({ lockup: C.lockup || null, hero: C.hero || null, titleLayer: C.titleLayer || null, inserts: [...(C.inserts || []).filter(s => !s.place || s.place === 'full').map(s => ({ at: +s.at, dur: +s.dur, y: s.y, tint: s.tint, line: s.line, arc: s.arc })),
+    writeFileSync(join(ROOT, 'lockover.js'), 'window.LOCKOVER=' + JSON.stringify({ lockup: C.lockup || null, hero: C.hero || null, titleLayer: C.titleLayer || null, inserts: [...(C.inserts || []).filter(s => !s.skip && (!s.place || s.place === 'full')).map(s => ({ at: +s.at, dur: +s.dur, y: s.y, tint: s.tint, line: s.line, arc: s.arc })),
       // split and framed b-roll (kit/split.cjs): the captions sit on the line the layout leaves for them, off your face
-      ...(C.inserts || []).filter(s => SPL.SPLIT.includes(s.place)).map(s => ({ at: +s.at, dur: +s.dur, y: s.y || SPL.layout(s, null, { mask: !!C.mask, frame: C.frame || null }).capY, tint: s.tint, split: s.place, light: SPL.lightBg(s) }))] }) + ';\n'); }
+      ...(C.inserts || []).filter(s => !s.skip && SPL.SPLIT.includes(s.place)).map(s => ({ at: +s.at, dur: +s.dur, y: s.y || SPL.layout(s, null, { mask: !!C.mask, frame: C.frame || null }).capY, tint: s.tint, split: s.place, light: SPL.lightBg(s) }))] }) + ';\n'); }
   if (!existsSync(join(ROOT, 'fxzones.js'))) writeFileSync(join(ROOT, 'fxzones.js'), 'window.FXZONES=[];\n');
   // graphics (modes 10, 11, 19 and 26): icon and screen images as file URLs; a screen recording becomes a short frame list
   // (build/gfx/, 12 fps) so the card can play it frame-accurately. Fonts for the ordinal word, the label, the code

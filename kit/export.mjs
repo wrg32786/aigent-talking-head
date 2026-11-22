@@ -54,7 +54,7 @@ const laid = !X.isReframed(ex) && cap.exportFrame && cap.exportFrame.name === ex
 if (X.isReframed(ex)) console.warn(`note: no build for this reel, so this is a plain crop from the middle: the frame does not follow the face and nothing is laid out again. Render it with: npm run reel -- --rebuild --name ${basename(job)} --export ${ex}`);
 else if (!laid) console.warn(`note: this reel was not laid out for ${ex}, so nothing was moved into its safe area. For that: npm run reel -- --rebuild --name ${basename(job)} --export ${ex}`);
 const words = X.wordsOf(cap), end = X.endOf(ex, len, words);
-if (len > p.maxSec) console.warn(`note: ${len.toFixed(1)} s is longer than ${p.label} allows (${p.maxSec} s); the export ends at ${end.toFixed(2)} s, after the last word before the limit`);
+if (len > p.maxSec) console.warn(`note: ${len.toFixed(1)} s is longer than ${p.label} allows (${p.maxSec} s); the export ends at ${end.toFixed(2)} s${end < p.maxSec ? ', after the last word before the limit' : ''}`);
 execFileSync('ffmpeg', X.ffmpegArgs(ex, file, out, len, { words }), { stdio: 'inherit' });
 const res = { ok: true, export: ex, label: p.label, file: out, size: `${p.w}x${p.h}`, seconds: +end.toFixed(2), laidOut: !!laid, verify: `npm run verify -- ${basename(job)} --export ${ex}` };
 if (JSON_OUT) console.log(JSON.stringify(res)); else console.log(`export ${ex} (${p.label}): ${out}\nCheck it: ${res.verify}`);

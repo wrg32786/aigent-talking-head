@@ -25,10 +25,11 @@ const wordsOf = caps => ((caps && caps.flips) || []).filter(f => f.mode === 0 ||
 // it (a long quiet stretch) also leaves the cut at the cap.
 function endOf(n, len, words = []) {
   const p = get(n); if (!p || !(len > p.maxSec)) return len;
-  const cap = p.maxSec, across = words.some(w => w[0] < cap && w[1] > cap - 0.05);
-  if (!across) return cap;
+  const cap = p.maxSec, across = words.filter(w => w[0] < cap && w[1] > cap - 0.05);
+  if (!across.length) return cap;
   const e = Math.max(0, ...words.filter(w => w[1] <= cap - 0.05).map(w => w[1]));
-  return e > cap - 8 ? Math.min(cap, +(e + 0.15).toFixed(3)) : cap;
+  // the breath stops where the word across the cap starts (words often touch: a breath of 0.15 s was 0.15 s of that word)
+  return e > cap - 8 ? Math.min(cap, +Math.max(e, Math.min(e + 0.15, ...across.map(w => w[0]))).toFixed(3)) : cap;
 }
 function ffmpegArgs(n, src, out, len, { y0, words } = {}) {
   const p = get(n); if (!p) throw new Error('unknown export ' + n + ' (' + NAMES.join(', ') + ')');
