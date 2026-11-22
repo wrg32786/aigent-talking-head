@@ -39,7 +39,7 @@ def main():
     act = (E > fE + 12) | (H > fH + 12)
     t_of = lambda i: i * hop / sr + win / sr / 2
     i_of = lambda t: int(max(0, min(len(act) - 1, round((t - win / sr / 2) * sr / hop))))
-    W = json.load(open(words_f))
+    W = json.load(open(words_f, encoding="utf-8"))
     W = W["words"] if isinstance(W, dict) else W
     def in_word(t):
         for w in W:
@@ -81,7 +81,7 @@ def main():
                 run = 0
             else: run += 1
         return out
-    C = json.load(open(cuts_f)); rows = []
+    C = json.load(open(cuts_f, encoding="utf-8")); rows = []
     for c in C:
         a, b = c["a"], c["b"]
         wa, wb = in_word(a), in_word(b)

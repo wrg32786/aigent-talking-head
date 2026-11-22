@@ -82,7 +82,7 @@ class BeatsTests(unittest.TestCase):
         rc = beats.main([str(self.wav), "--start", "0", "--duration", "6", "--out", str(out)])
         self.assertEqual(rc, 0)
         self.assertTrue(out.is_file())
-        data = out.read_text()
+        data = out.read_text(encoding="utf-8")
         self.assertIn("tempo_bpm", data)
         self.assertIn("onsets", data)
 

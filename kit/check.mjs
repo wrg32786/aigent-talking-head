@@ -194,6 +194,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'cut-points.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
     catch (e) { perrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 6).join(' | ')); }
     results.push({ label: 'cut point tests (tests/cut-points.test.cjs: audio envelope, word ends, lead-ins, tighten, hidden pauses, noises)', errs: perrs, warns: [] });
+    const pyerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'python-json-utf8.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
+    catch (e) { pyerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 6).join(' | ')); }
+    results.push({ label: 'Python reads text files as UTF-8 (tests/python-json-utf8.test.cjs: no open() or read_text() in the platform encoding)', errs: pyerrs, warns: [] });
     const shperrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'recreate-shotplan.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
     catch (e) { shperrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
