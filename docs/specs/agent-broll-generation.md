@@ -19,7 +19,7 @@ This does not replace the Settings-key Generate path we already ship (Higgsfield
 - The user never types a terminal command in Studio. They get click or copy buttons to hand to their agent.
 - Captions stay off the face. We never cut words, and we never start mid-word. A generated clip must not burn in captions, titles or watermarks; Studio lays those out itself.
 - We do not generate screens of real products, real logos or real people. For those the answer is the Vault or a capture, as in the sourcing spec.
-- Nothing costs money without a yes. The click to generate is the yes to start. On a paid backend the agent also confirms spend with the user before it submits a job, because Studio cannot see the price.
+- Nothing costs money without a yes. This path is the stated exception to the sourcing spec's "yes on the page" rule in section 3c: Studio cannot see a price here, so the agent confirms spend in its own chat before it submits a paid job. The click to generate is only the yes to start the brief. An agent that cannot ask (no live chat, or an unattended run) must not submit a paid job. It uses a ready free backend, or writes `failed` with "Spend not confirmed".
 - A generated clip shows its first frame and waits for **Use** before it is placed.
 - Keys, OAuth sessions and CLI logins stay in the user's own tools. Studio stores none of them.
 
@@ -30,7 +30,7 @@ This does not replace the Settings-key Generate path we already ship (Higgsfield
 3. The user clicks **Copy** or **Send to my agent**. Send uses the agent channel we already have. Copy puts the plain-text brief on the clipboard, including the path to the JSON file and the inbox.
 4. The card switches to **Waiting for a clip**. Studio watches the inbox. There is no spinner that pretends we are calling a model. We are waiting for a file.
 5. The agent runs a preflight (section 5), picks a ready backend, renders, and writes the media file plus a sidecar JSON into the inbox out folder.
-6. Studio matches the sidecar to the slot (section 3), shows the first frame, and offers **Use** or **Try again**. On Use, the clip is placed on the slot and added to the Vault marked "Made", with the backend, model, prompt and seed kept for `credits.txt`.
+6. Studio matches the sidecar to the slot (section 3), adds an `ok` clip to the Vault marked "Made" at pickup, shows the first frame, and offers **Use** or **Try again**. On Use, the clip is placed on the slot. The backend, model, prompt, seed and licence notes are kept, and a used clip gets a line in `credits.txt`.
 
 One slot at a time on the card. A single extra control on the B-roll step, not on each card, can **Copy briefs for all empty slots** as one text, for a user who wants the agent to fill several in one sitting.
 
@@ -40,7 +40,7 @@ The brief is written once when the user asks to generate, and is not rewritten u
 
 ### JSON, `aigent.broll.brief/v1`
 
-Studio writes this to `vault/inbox/in/<jobId>-slot-<slotId>.json`.
+Studio writes this to `vault/inbox/in/<jobId>-slot-<slotId>-<briefId>.json`. The matching plain-text file uses the same stem. Try again writes a new brief with a new `briefId` and a new seed (unless the user picked Same seed). The open slot in `plan.json` stores the `briefId` it is waiting for.
 
 ```
 {
@@ -60,7 +60,7 @@ Studio writes this to `vault/inbox/in/<jobId>-slot-<slotId>.json`.
   "motionStrength": "low",
   "seconds": 5.5,
   "aspect": "9:16",
-  "sizeHint": { "9:16": [1080, 1920], "4:5": [1080, 1350], "1:1": [1080, 1080] },
+  "sizeHint": { "9:16": [1080, 1920], "4:5": [1080, 1350], "1:1": [1080, 1080], "16:9": [1920, 1080] },
   "style": {
     "look": "the current look's name, if any",
     "colours": ["#0d1117", "#e8e4d9", "#c4a574"],
@@ -82,11 +82,11 @@ Field notes:
 
 - **`subject` and `prompt`.** `subject` is the one plain line we show the user, the same idea as the sourcing brief. `prompt` is the longer line the agent should send to the model: subject, setting, light, style, and the avoid list spelled out. Studio writes it from the transcript beat, the slot brief, and the current look. The user can edit it before Copy or Send (one box, not a form).
 - **`seconds`.** The slot's length plus one second of handle, as in the sourcing brief. The agent should render at least this long. If a backend has a higher minimum (Seedance 2.5 starts at 4 seconds), render the minimum and say so in the sidecar. Studio will trim to the slot. Trimming B-roll does not cut the user's words.
-- **`aspect`.** One of `9:16`, `4:5` or `1:1`, taken from the size this draft is being made for (Reels and Stories, the Instagram Feed, or square). If the reel will be exported in more than one size, use the size of the slot's frame for the current draft, usually `9:16`. If a backend cannot do `4:5`, the agent renders the closest it can (`9:16` or `3:4`), records that in the sidecar, and may reframe rather than crop the subject off.
+- **`aspect`.** Follows the slot's frame from the sourcing brief, not only the export size. A full cutaway uses the size this draft is being made for (`9:16`, `4:5` or `1:1`). A framed panel or a split uses `16:9` (and `sizeHint` includes `16:9`: `[1920, 1080]`). If a backend cannot do the requested aspect (Higgsfield may not list `4:5`), the agent renders the closest it can, records that in the sidecar, and may reframe rather than crop the subject off.
 - **`motion` and `motionStrength`.** From the slot's effects (`push`, `pan`, `orbit`, `static`, and so on). `motionStrength` is `low`, `medium` or `high`. A still with a slow push is enough when `stillOk` is true and `preferVideo` is false. Video only when the motion needs it (a real camera move, a changing scene).
 - **`style`.** Colours, mood and grain from the current look (and from the reference, on Recreate). Not fonts. Type is Studio's job.
 - **`seed`.** An integer Studio picks and stores on the slot. The agent must pass it when the backend accepts a seed, and must write the seed it actually used in the sidecar. Try again may keep the seed (same picture, different backend) or roll a new one (a new variation). The button does the new seed. A smaller "Same seed" is in a fold, not on the card.
-- **`backend`.** `any` by default, or `comfy-cloud`, `open-higgsfield` or `higgsfield` if the user pinned one. When it is `any`, the agent picks the first ready backend in the order in section 4, after preflight, and confirms spend with the user before a paid job.
+- **`backend`.** `any` by default, or `comfy-cloud`, `open-higgsfield` or `higgsfield` if the user pinned one. When it is `any`, the agent picks the first ready backend in the order in section 4, after preflight, and confirms spend with the user before a paid job. The brief names the pack and the starting skill only. Exact CLI flags, model ids, duration limits and version numbers in section 4 are dated notes for us (as of 22 November 2026). They are not copied into the brief or the UI. The agent must read the live `SKILL.md` at run time, and we must recheck those notes when we build v1.30.
 - **`inboxOut`.** An absolute path, written for the user's OS (Windows 11 in our case). The agent must drop files here, not in a folder of its own choosing.
 - **`doNotGenerate`.** Hard rules. If the subject is a real product screen, a real logo or a real person, Studio should not offer Generate as the first action. The card prefers Capture, Record my screen, or the Vault. If the user still asks, the brief keeps these rules and the agent must refuse and say why in the sidecar (`status: "blocked"`).
 
@@ -101,10 +101,11 @@ Make one B-roll clip for AIgent Talking Head Studio and drop it in the inbox.
 
 Job: five-plugins
 Slot: 2
-Brief file: C:\Users\Will\...\vault\inbox\in\five-plugins-slot-2.json
+Brief file: C:\Users\Will\...\vault\inbox\in\five-plugins-slot-2-b7c1e4.json
 Drop the clip and the sidecar in: C:\Users\Will\...\vault\inbox\out
-Name them: five-plugins-slot-2.mp4 (or .png if you only make a still)
-           five-plugins-slot-2.json
+Name them: five-plugins-slot-2-b7c1e4.mp4 (or .png if you only make a still)
+           five-plugins-slot-2-b7c1e4.json
+Use this briefId in the file names: b7c1e4
 
 What to show: a quiet desk from above, a closed laptop, morning light
 Duration: at least 5.5 seconds
@@ -116,13 +117,15 @@ Do not burn in captions, titles, type or watermarks.
 Do not generate real people, real logos, or screens of real products.
 
 First run a preflight and use the first backend that is ready, in this order:
-1. Comfy Cloud (official comfy-cloud plugin, hosted, needs a signed-in Comfy Cloud account)
-2. Local ComfyUI through open-higgsfield-skills (free, needs a GPU, early)
-3. Official Higgsfield skills (hosted, paid, auth is in the Higgsfield CLI)
+1. Comfy Cloud (official comfy-cloud plugin from Comfy-Org/comfy-skills; start with generate-image or generate-video)
+2. Local ComfyUI through mojomast/open-higgsfield-skills (free, needs a GPU, early; start with flux3-klein-stills, then ltx25-image-to-video)
+3. Official higgsfield-ai/skills (hosted, paid; start with higgsfield-generate; auth is in the Higgsfield CLI)
 
-If the backend is paid, confirm spend with me before you submit.
+Read the live SKILL.md for the pack you pick. Do not trust remembered flags or model ids.
+If the backend is paid, confirm spend with me before you submit. If you cannot ask me, do not submit a paid job: use a free backend or write status "failed" with "Spend not confirmed".
 If none is ready, write a sidecar with status "needs-setup" and a short report, and stop.
 Write the sidecar schema aigent.broll.clip/v1, including the jobId, slotId, briefId, backend, model, prompt, seed, aspect, duration, and any licence notes.
+Name the media file with a bare name only (no folders) in the inbox out directory.
 ```
 
 **Send to my agent** sends this same text, and a pointer to the JSON file, on the existing Studio agent channel.
@@ -143,7 +146,7 @@ Studio creates the folders the first time someone clicks Generate B-roll. It doe
 
 ### Sidecar, `aigent.broll.clip/v1`
 
-The agent writes `vault/inbox/out/<jobId>-slot-<slotId>.json` next to the media file. The media name is in `file`.
+The agent writes the media file first, then the sidecar, both as `*.tmp` and then renamed into place, so Studio never reads a half-written file. Names are `vault/inbox/out/<jobId>-slot-<slotId>-<briefId>.mp4` (or `.png` for a still) and `...-<briefId>.json`. `file` is a bare name in the same folder (for example `five-plugins-slot-2-b7c1e4.mp4`). Studio refuses a `file` value that contains a path, `..`, or a slash.
 
 ```
 {
@@ -163,13 +166,15 @@ The agent writes `vault/inbox/out/<jobId>-slot-<slotId>.json` next to the media 
   "duration_s": 5.5,
   "fps": 24,
   "kind": "video",
-  "file": "five-plugins-slot-2.mp4",
+  "file": "five-plugins-slot-2-b7c1e4.mp4",
   "licenseNotes": "",
   "cost": { "note": "Comfy Cloud credits. Price not reported by the connector." },
   "warnings": [],
   "error": null
 }
 ```
+
+Required on every sidecar: `schema`, `status`, `jobId`, `slotId`, `briefId`. Required when `status` is `ok`: `file`, `kind`, `backend`, `model`, `prompt`, `seed`. `kind` is `video` or `still` (`still` becomes an Image in the Vault). `backend` is `comfy-cloud`, `open-higgsfield` or `higgsfield`. For `needs-setup`, `report` is a short string the card can show. For `failed` or `blocked`, `error` is a short string. Studio measures the real width, height and duration with ffprobe (or an image size for a still) and does not trust the sidecar's numbers for placement.
 
 `status` is one of:
 
@@ -182,17 +187,17 @@ The agent writes `vault/inbox/out/<jobId>-slot-<slotId>.json` next to the media 
 
 ### Slot matching
 
-Studio picks up a result only when all of these are true:
+Studio reads `out/` whenever a job is open, whenever the Vault opens, and while a card is waiting. It picks up a sidecar when all of these are true:
 
-1. A sidecar with `schema` `aigent.broll.clip/v1` has appeared in `out/`.
-2. If `status` is `ok`, the media file named in `file` sits in the same folder, is a known type (`.mp4`, `.webm`, `.mov`, `.m4v`, or `.png` / `.jpg` / `.webp` for a still), and its size has been stable for a couple of seconds (so we do not grab a half-written file).
-3. `jobId` matches the open job, and `slotId` matches a slot in that job's `plan.json`. Prefer `briefId` when it is present and still on that slot.
+1. A sidecar with `schema` `aigent.broll.clip/v1` has appeared in `out/`, and it is valid JSON with the required fields.
+2. If `status` is `ok`, the media file named in `file` sits in the same folder, is a known type (`.mp4`, `.webm`, `.mov`, `.m4v`, or `.png` / `.jpg` / `.webp` for a still), and its size has been stable for a couple of seconds. The agent is expected to write the media first and the sidecar last. `ok` without a media file is not a bad sidecar until a minute has passed; before that we simply wait.
+3. `jobId` matches a job we know, `slotId` matches a slot in that job's `plan.json`, and `briefId` matches the brief that slot is waiting for.
 
-Fallbacks, in order: exact `jobId` + `slotId`; then the filename pattern `<jobId>-slot-<slotId>.*` when the sidecar is missing those fields. No match means we still add a good file to the Vault as "Made, unmatched", and we say "This clip arrived but we could not tell which slot it was for." We never place it on a slot by guessing.
+An older result for the same slot, with a different `briefId` (a first try, after Try again), is added to the Vault as "Made" and is not offered on the slot. A good file whose ids we cannot match is added as "Made, unmatched", and we say "This clip arrived but we could not tell which slot it was for." We never place a clip on a slot by guessing. The only filename fallback, when the sidecar is missing an id field, is the pattern `<jobId>-slot-<slotId>-<briefId>.*`. We do not fall back to a name without `briefId`.
 
 A sidecar for a different job is left in `out/` until that job is open, or the user opens the Vault and keeps it. It is not deleted.
 
-After a successful pickup, Studio moves the sidecar (and only the sidecar) to `inbox/seen/`, and copies the media into the Vault item folder. It does not delete the agent's media file until the Vault copy is good. A setting can "Leave inbox files alone"; the default is to tidy `out/` after a successful copy.
+Every sidecar Studio has acted on (ok, failed, needs-setup, or blocked) is moved to `inbox/seen/`, so it is not shown again on the next scan. For `ok`, Studio also copies the media into the Vault item folder at pickup, before the user clicks Use. It does not delete the agent's media file until the Vault copy is good. A setting can "Leave inbox files alone"; the default is to tidy `out/` after a successful copy. A used clip is the one that gets a line in `credits.txt`. A clip that arrived and was not used still lives in the Vault.
 
 ### Failure, timeout and cancel
 
@@ -200,11 +205,11 @@ After a successful pickup, Studio moves the sidecar (and only the sidecar) to `i
 - **Still waiting.** At 20 minutes we stop the clock and ask **Keep waiting** (another 20 minutes) or **Cancel**. We do not fail the slot on our own.
 - **Cancel.** We stop watching. A late file still goes into the Vault when we next see it (the Vault can notice `out/` whenever it is open), but it is not auto-offered on the slot. The card goes back to Needs B-roll.
 - **Failed or blocked.** One line from `error`, then Try again or, for `needs-setup`, Copy the setup note.
-- **Bad sidecar.** Missing schema, or `ok` without a file: one line, "Your agent left a note we could not read," and we leave the files in `out/`.
+- **Bad sidecar.** Unparseable JSON, a missing schema, missing required fields, a `file` value that is not a bare name, or `ok` with no media after a minute: one line, "Your agent left a note we could not read," and we leave the files in `out/`.
 
 ## 4. The three backends
 
-Studio does not install these, call them, or vendor them. The brief tells the agent what they are and how to ask for one shot. Versions and star counts below are as of 22 November 2026 and will move.
+Studio does not install these, call them, or vendor them. The brief tells the agent what they are, which pack to use, and which skill to start with. How to ask for one shot is in the live `SKILL.md`. Versions, star counts, CLI flags, model ids and duration limits below are dated notes as of 22 November 2026. They will move. They are not copied into the brief or the UI, and we recheck them when we build v1.30.
 
 The agent uses the same brief and the same inbox for all three. After preflight it should say, in one line, which backend it picked and why.
 
@@ -324,8 +329,13 @@ Made for this slot. Check it before you use it.
 
 [ first frame / hover to play ]
 
+Check the licence before commercial use.
+LTX-2.5 weights: Lightricks LTX-2 Community License (not OSI-approved).
+
 [ Use ]  [ Try again ]
 ```
+
+`licenseNotes` is required whenever the weights or the partner model carry use conditions (LTX-2 Community License, a non-commercial FLUX card, a partner-model term). Studio shows that text above **Use**. If the sidecar leaves it empty on a backend that often has conditions (open-higgsfield in particular), we still show a short "Check the licence before commercial use."
 
 ### The words we use
 
@@ -342,6 +352,7 @@ Made for this slot. Check it before you use it.
 | Needs setup | Your agent needs a generation pack set up first. |
 | Blocked | We will not generate this. Use a capture, a recording or something from your Vault. |
 | Setup button | Copy the setup note |
+| Licence line | Check the licence before commercial use. (then the sidecar note, if any) |
 | On a placed clip | Made for this slot. |
 | In the Vault | Made |
 | All empty slots | Copy briefs for all empty slots |
@@ -362,7 +373,7 @@ A first-time user who clicks Generate and has never set up a pack should still g
 The sourcing spec already has generation as the third, optional source, after the Vault and free stock, and already lets a connected agent add a made clip with `add_to_vault`. This spec fills that in:
 
 - The inbox pickup is the path that works with **Copy**, even when no MCP session is live.
-- A connected agent may also call `add_to_vault` and `fill_slot`, but it must still write the sidecar so we have provenance and credits. `fill_slot` with `generate` on the *Settings-key* path stays an ask with a price, as today. It is not how this agent path places a clip.
+- A connected agent may also call `add_to_vault` and `fill_slot`, but it must still write the sidecar so we have provenance and credits. For a made clip, `fill_slot` only offers it (the Use gate still applies). It does not place the clip itself. The same file arriving by tool and by inbox is one Vault item, caught by hash. `fill_slot` with `generate` on the Settings-key path stays an ask with a price, as today. It is not how this agent path offers a clip.
 - A made clip always lands in the Vault, whether or not the user clicks Use on the slot, so the next reel can find it.
 - We still do not generate as a first choice when the Vault has a real capture of the named thing.
 
@@ -382,3 +393,4 @@ The sourcing spec already has generation as the third, optional source, after th
 3. **Comfy Cloud on Cursor and Codex.** The official plugin is Claude-first today. Is it enough to say that plainly in the setup note, or do you want us to also document a manual skill-file copy for those agents?
 4. **Batch generation.** Is "Copy briefs for all empty slots" enough, or do you want a single Generate for every empty slot that the agent may do in one run?
 5. **4:5 on Higgsfield, and short slots under a model's minimum duration.** We plan to accept the closest aspect and the model's minimum length, record both, and trim or letterbox in Studio. Sound right?
+6. **Rights mark for a made clip.** None of the Vault's four marks (Mine, Licensed, Public page, Reference only) quite fits a generated clip, especially one that used LTX or FLUX weights with use conditions. Should made clips get their own mark, or is the "check the licence before commercial use" line on the card enough?

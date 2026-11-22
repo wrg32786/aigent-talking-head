@@ -269,7 +269,7 @@ Pexels and Pixabay through their free APIs, with the user's own free key for eac
 
 ### c. Generation, third and optional
 
-The planned agent path (Comfy Cloud, local ComfyUI and official Higgsfield) is in [agent-broll-generation.md](agent-broll-generation.md), for v1.30.
+The planned agent path (Comfy Cloud, local ComfyUI and official Higgsfield) is in [agent-broll-generation.md](agent-broll-generation.md), for v1.30. On that path the spend yes is in the agent's own chat, not on the Studio page.
 
 Off by default. Two ways to connect it:
 
