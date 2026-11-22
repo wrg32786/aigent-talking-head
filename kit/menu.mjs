@@ -56,6 +56,22 @@ export const ENTRANCE_ABOUT = {
   drop: 'each letter falls in from above with a small bounce and tilt',
   typewriter: 'the letters type on one at a time from the left behind a blinking caret',
 };
+// what each title effect and exit does (the phrase title renderer in kit/overlay.html; names from kit/rules.cjs
+// TITLE_EFFECTS and TITLE_EXITS)
+export const TITLE_EFFECT_ABOUT = {
+  type: 'the title is typed letter by letter behind a caret, about 12 letters a second, line after line',
+  'slot-roll': 'the key word\'s digits roll like a slot reel with motion blur and lock left to right; with "swap" one word of the line rolls through a list while the rest stays put',
+  'count-up': 'the key word counts up with an ease ("count": from, to, unit), then rolls to a final text ("1 Day" to "365 Days" to "1 Year")',
+  'stack-fade': 'lines arrive one at a time; older lines go grey, blur and fade as new ones stack under them',
+  decode: 'random glyphs scramble, then settle into the key word from left to right',
+  'split-flap': 'the title on a flap board: dark tiles flip through characters and settle line by line, the key word in the accent',
+};
+export const TITLE_EXIT_ABOUT = {
+  'blow-up': 'the key word scales up past the lens into a full-frame flash of its colour that fades after the cut',
+  polaroid: 'the picture and the title shrink into a tilted white-border print that slides off, the next shot under it',
+  'glitch-slice': 'the title and the picture tear out sideways in horizontal bands',
+  'dip-black': 'the title fades as the picture dips to black and back',
+};
 // what each caption entrance does to kinetic hero words (capEnter in kit/overlay.html; names from kit/reelmd.cjs CAPTION_LOOK)
 export const CAPTION_ENTRANCE_ABOUT = {
   pop: 'the whole word springs in with a pop (default)',
@@ -154,6 +170,10 @@ export function loadMenu() {
     label: ENTRANCE_ABOUT[id] || 'kinetic title entrance',
   }));
 
+  const titleEffects = [
+    ...R.TITLE_EFFECTS.map(id => ({ kind: 'titleEffect', id, section: 'title-effects', flag: `"effect": "${id}"  on a mode 7 title  or  "titleEffect": "${id}"  for every title`, label: TITLE_EFFECT_ABOUT[id] || 'title effect' })),
+    ...R.TITLE_EXITS.map(id => ({ kind: 'titleExit', id, section: 'title-effects', flag: `"exit": "${id}"  on a mode 7 title  or  "titleExit": "${id}"  for every title`, label: 'exit: ' + (TITLE_EXIT_ABOUT[id] || 'title exit') })),
+  ];
   const captionEntrances = CAPTION_ENTRANCES.map(id => ({
     kind: 'captionEntrance', id, section: 'caption-entrances',
     flag: `--caption-entrance ${id}  or  "captionEntrance": "${id}"`,
@@ -240,6 +260,7 @@ export function loadMenu() {
     { id: 'fonts', title: 'Font pairings', hint: 'Two faces as a lockup. Your own licensed fonts go in kit/fonts/local/.', items: fontPairings },
     { id: 'themes', title: 'Themes', hint: 'Colours, default fonts, optional logo.', items: themeItems },
     { id: 'title-entrances', title: 'Title entrances', hint: 'One kinetic title per beat. Flicker only on the hook and the payoff. Default layer is in front of the person.', items: titleEntrances },
+    { id: 'title-effects', title: 'Title effects and exits', hint: 'A title set as a designed phrase: lines split by "|", small partner words and one larger key word ("key") in the accent, each word on its own time ("words"). An effect is how it arrives, one per title; an exit is how it leaves, and when the title ends on a cut the exit is the transition there. "glow" and "dim" work per title.', items: titleEffects },
     { id: 'caption-entrances', title: 'Caption entrances', hint: 'How kinetic hero words come in, letter by letter. One for the job (--caption-entrance, "captionEntrance", Reel.md caption-entrance) or "entrance" on a caption flip. Applies to the kinetic caption style.', items: captionEntrances },
     { id: 'title-layer', title: 'Title layer', hint: 'Front, behind the head, or auto, per title or for the job. Offer this per title. Agents and --preset auto use auto unless the preset says otherwise.', items: titleLayer },
     { id: 'transitions', title: 'Transitions', hint: 'Named cuts in cut.json. The glitch seam is the default.', items: transitions },
@@ -282,6 +303,8 @@ export function sourceCatalogIds() {
     sfx: (man.sounds || []).map(s => s.id),
     bed: beds,
     entrance: [...R.ENTRANCES],
+    titleEffect: [...R.TITLE_EFFECTS],
+    titleExit: [...R.TITLE_EXITS],
     look: LOOKS.map(x => x.id),
     captionStyle: CAPTION_STYLES.map(x => x.id),
     beatSync: BEAT_SYNC.map(x => x.id),
@@ -389,7 +412,7 @@ export function showcaseHas(html, ids) {
 // any section id above. The preview is the looping WebP from npm run menu:render, when there is one.
 export const LIST_KINDS = {
   transitions: ['transitions'],
-  titles: ['title-entrances'],
+  titles: ['title-entrances', 'title-effects'],
   captions: ['caption-entrances', 'caption-styles'],
   graphics: ['graphics'],
   effects: ['effects'],
@@ -397,7 +420,7 @@ export const LIST_KINDS = {
   packs: ['packs'],
   presets: ['presets'],
 };
-const PREVIEW_DIR = { transitions: 'transitions', 'title-entrances': 'titles', 'caption-entrances': 'caption-entrances', 'caption-styles': 'caption-styles' };
+const PREVIEW_DIR = { transitions: 'transitions', 'title-entrances': 'titles', 'title-effects': 'title-effects', 'caption-entrances': 'caption-entrances', 'caption-styles': 'caption-styles' };
 export function listKind(kind, menu) {
   const m = menu || loadMenu();
   const ids = LIST_KINDS[kind] || (m.sections.some(s => s.id === kind) ? [kind] : null);

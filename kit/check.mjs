@@ -31,7 +31,9 @@ function checkJob(captionsFile, cutFile, label) {
   }
   for (const k of ['card', 'cta']) if (CAP[k]) for (const v of Object.values(CAP[k])) if (typeof v === 'string') R.lintCopy(v).errs.forEach(x => errs.push(`${k}: ${x}`));
   const raw = flips.filter(f => f.mode === R.TITLE_MODE);
-  if (raw.length > R.ENTRANCES.length && !CAP.entranceRepeat && !CAP.titleEntrance) errs.push(`${raw.length} titles; there are ${R.ENTRANCES.length} entrances and none repeats in one video`);
+  const plain = R.resolveTitles(CAP).filter(t => !t.effect).length; // a title with an effect takes no entrance from the pool
+  if (plain > R.ENTRANCES.length && !CAP.entranceRepeat && !CAP.titleEntrance) errs.push(`${plain} titles; there are ${R.ENTRANCES.length} entrances and none repeats in one video`);
+  for (const t of raw) { if (t.effect != null && t.effect !== false && !R.TITLE_EFFECTS.includes(t.effect)) errs.push(`title ${t.start}s: unknown effect "${t.effect}" (${R.TITLE_EFFECTS.join(', ')})`); if (t.exit != null && t.exit !== false && !R.TITLE_EXITS.includes(t.exit)) errs.push(`title ${t.start}s: unknown exit "${t.exit}" (${R.TITLE_EXITS.join(', ')})`); }
   const seen = {};
   for (const t of raw) if (t.entrance) {
     if (!R.ENTRANCES.includes(t.entrance)) errs.push(`title ${t.start}s: unknown entrance "${t.entrance}" (${R.ENTRANCES.join(', ')})`);
@@ -307,7 +309,8 @@ if (target) {
       ['split-panel.test.mjs', 'the split panel (tests/split-panel.test.mjs: the head band covers the shadow under the seam in 9:16, 4:5 and 1:1; a wide clip is shown whole on its own blur, flush on the seam; with ffmpeg, a render with no shadow on the head)'],
       ['title-outline-boost.test.mjs', 'title partners follow the caption outline, and the legibility shadow is a choice (tests/title-outline-boost.test.mjs: no stroke with captionOutline none, the Studio switch and its default, --no-boost)'],
       ['teardown-phrases.test.mjs', 'phrases on screen are not one-word captions (tests/teardown-phrases.test.mjs: a fixture breakdown whose text tracks show phrases gives kinetic with the reason, a one-word reel stays one-word, the vision pass off is said in the recipe, teardown.md and on the page)'],
-      ['phrase-titles.test.mjs', 'phrase titles from the reference, on your words (tests/phrase-titles.test.mjs: text tracks grouped into one title per phrase with lines, key word, build, effect and exit; the recipe carries them and says no running captions; titles the agent read win and stay; mapped onto your words never before a word is said, never on the face, never a one-word caption)']]) {
+      ['phrase-titles.test.mjs', 'phrase titles from the reference, on your words (tests/phrase-titles.test.mjs: text tracks grouped into one title per phrase with lines, key word, build, effect and exit; the recipe carries them and says no running captions; titles the agent read win and stay; mapped onto your words never before a word is said, never on the face, never a one-word caption)'],
+      ['foldin.test.cjs', 'one effect table, look-ahead phrases, the .srt, measured picture checks and joins (tests/foldin.test.cjs: rules, the recipe reader and the overlay name the same entrances, effects and exits; a title exit gives the sound at its seam; an effect whose needs are not met is named in the log; no stranded last word; an .srt from captions.js; a frozen picture and black frames fail outside what the edit does on purpose; joins are notes with stills; Studio has one Effect and one Exit pick)']]) {
       const e2 = [];
       try { execFileSync(process.execPath, [join(ROOT, 'tests', f)], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
       catch (e) { e2.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
@@ -363,6 +366,7 @@ if (target) {
     catch (e) { toerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'words never overlap (tests/text-overlap.test.mjs: every text box on every frame for 9:16, 4:5 and 1:1; a said word leaves when a title enters, a title over a word, two titles, caption lines, an ordinal word)', errs: toerrs, warns: [] });
     for (const [f, what] of [['title-rules.test.mjs', 'titles and the caption bar (tests/title-rules.test.mjs: nothing in the bar while a title is up, the minimum never carries a word past a title, the title check fails on a word drawn under a title and passes with the rule on, beat snap lines and a title\'s own caption word, the partner line, glow and dim, a label that repeats the caption, the shadow on a low-contrast word)'],
+      ['title-effects.test.mjs', 'title effects and exits (tests/title-effects.test.mjs: phrase titles with a key word and word times, glow and dim per title, type, slot-roll and the word swap, count-up, stack-fade, decode, split-flap, the four exits and the cut they replace, the same moment drawn twice is the same picture, running captions off)'],
       ['title-look.test.mjs', 'the look of a reference\'s titles (tests/title-look.test.mjs: two lines, an italic serif key word and a sans partner in capitals, their colours, glow and dim read from drawn frames; the pairing, the Style lines and blur-rise for an unread entrance in the recipe; title text we are not sure of is marked)'],
       ['fontmatch.test.mjs', 'font match tests (tests/fontmatch.test.mjs: words drawn in blackletter, sans, serif and condensed faces come back as their own kind and pairing; weight, case, colour; faces we do not ship land in the right kind)'],
       ['studio-reflook.test.mjs', 'Studio reference look tests (tests/studio-reflook.test.mjs: a reference\'s entrances are a preference and never a lock, the saved look in use with a reference Off or on Influence is found and one switch sets the board from the reference, titles to check are listed and fixed in the reference\'s Reel.md)'],
@@ -408,7 +412,7 @@ if (target) {
     if (!existsSync(doc)) errs.push('docs/effects.md is missing; run npm run menu:render');
     else {
       const md = readFileSync(doc, 'utf8'), menu = loadMenu();
-      const prev = { transitions: 'transitions', 'title-entrances': 'titles', 'caption-entrances': 'caption-entrances', 'caption-styles': 'caption-styles' };
+      const prev = { transitions: 'transitions', 'title-entrances': 'titles', 'title-effects': 'title-effects', 'caption-entrances': 'caption-entrances', 'caption-styles': 'caption-styles' };
       for (const s of menu.sections.filter(x => prev[x.id] || x.id === 'graphics' || x.id === 'effects')) {
         for (const it of s.items) {
           if (!md.includes('`' + it.id + '`')) errs.push(`docs/effects.md is missing ${s.id}:${it.id}`);

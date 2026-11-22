@@ -27,9 +27,10 @@ const SCN = require('../scenes.cjs');
 export const KIND_MODE = {
   transition: 'multi', entrance: 'multi', graphic: 'multi', finish: 'multi', effect: 'multi', font: 'multi',
   captionEntrance: 'one', captionStyle: 'one', look: 'one', theme: 'one', titleLayer: 'one', bed: 'one', beatSync: 'one',
+  titleEffect: 'one', titleExit: 'one', // one Effect and one Exit for the titles of the reel (1.29.0)
 };
 const EDIT_TOGGLES = ['punch', 'tighten', 'cards-auto', 'colour-card', 'chapter-card', 'sfx-cap', 'sfx-map'];
-const ANIMATED = { transition: 'transitions', entrance: 'titles', captionEntrance: 'caption-entrances', captionStyle: 'caption-styles' };
+const ANIMATED = { transition: 'transitions', entrance: 'titles', titleEffect: 'title-effects', titleExit: 'title-effects', captionEntrance: 'caption-entrances', captionStyle: 'caption-styles' };
 const STILL = { transition: 'transition', effect: 'effect', graphic: 'graphic', finish: 'finish', entrance: 'entrance', captionStyle: 'caption', look: 'look', titleLayer: 'titleLayer', theme: 'theme', beatSync: 'beatSync', bed: 'bed', sfx: 'sfx', font: 'font', preset: 'preset' };
 const rel = p => relative(ROOT, p).split('\\').join('/');
 
@@ -388,6 +389,8 @@ export function compose(s, { refPack = null } = {}) {
   if (one('look')) args.push('--look', one('look'));
   if (one('theme')) args.push('--theme', one('theme'));
   if (one('titleLayer')) args.push('--title-layer', one('titleLayer'));
+  if (one('titleEffect')) args.push('--title-effect', one('titleEffect'));
+  if (one('titleExit')) args.push('--title-exit', one('titleExit'));
   // fonts: yours, unless a reference's style is being copied (Recreate, Copy the look, a saved look) and you have not
   // picked a font since. Then the font the teardown matched is used and an older pick is never sent.
   { const mine = (s.picks.font && s.picks.font.allow) || [], fonts = mine.filter(f => f !== 'theme'), copied = copiesStyle(s.reference) || (!!s.styleLook && !(s.reference && s.reference.mode !== 'off' && s.reference.extracted));

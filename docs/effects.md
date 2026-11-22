@@ -2,9 +2,9 @@
 
 Every transition, title entrance, caption entrance and caption style in aigent-talking-head, with a looping preview rendered by the kit itself, the exact name to use, and where to put it. Graphics and video effects are listed at the end.
 
-**56 transitions · 9 title entrances · 10 caption entrances · 7 caption styles · 30 graphics · 51 effects**
+**56 transitions · 9 title entrances · 10 title effects and exits · 10 caption entrances · 7 caption styles · 30 graphics · 51 effects**
 
-Jump to: [Transitions](#transitions) · [Title entrances](#title-entrances) · [Caption entrances](#caption-entrances) · [Caption styles](#caption-styles) · [Graphics](#graphics) · [Effects](#effects) · [Editing principles](#editing-principles) · [For agents](#for-agents)
+Jump to: [Transitions](#transitions) · [Title entrances](#title-entrances) · [Title effects and exits](#title-effects-and-exits) · [Caption entrances](#caption-entrances) · [Caption styles](#caption-styles) · [Graphics](#graphics) · [Effects](#effects) · [Editing principles](#editing-principles) · [For agents](#for-agents)
 
 ## How to pick
 
@@ -96,6 +96,29 @@ Jump to: [Transitions](#transitions) · [Title entrances](#title-entrances) · [
 | <img src="menu/titles/pop-zoom.webp" width="160" alt="pop-zoom title entrance"> | `pop-zoom` | The word pops in from nothing with a small overshoot. | `{ "mode": 7, "text": "Record one take", "entrance": "pop-zoom" }`<br>Reel.md `#01 0.3-1.8 \| entrance pop-zoom \| text Record one take` |
 | <img src="menu/titles/drop.webp" width="160" alt="drop title entrance"> | `drop` | Each letter falls in from above with a small bounce and tilt. | `{ "mode": 7, "text": "Record one take", "entrance": "drop" }`<br>Reel.md `#01 0.3-1.8 \| entrance drop \| text Record one take` |
 | <img src="menu/titles/typewriter.webp" width="160" alt="typewriter title entrance"> | `typewriter` | The letters type on one at a time from the left behind a blinking caret. | `{ "mode": 7, "text": "Record one take", "entrance": "typewriter" }`<br>Reel.md `#01 0.3-1.8 \| entrance typewriter \| text Record one take` |
+
+## Title effects and exits
+
+A title can be set as a designed phrase: one to three lines split by `|`, small partner words in the text colour and one larger key word (`"key"`) in the accent. Add `"phrase": true` to draw the lines as written. `"words": [[start, end, word], ...]` times each word, and a word is never drawn before its start. With no effect the words come in as you say them (`"build": "word"`), typed (`"letter"`) or a line at a time (`"line"`).
+
+An effect is how the title arrives, one per title: `"effect"` on the title, or `"titleEffect"` in `captions.js` for every title that names none. An exit is how it leaves, over its last 0.2 to 0.45 s: `"exit"` on the title, or `"titleExit"` for the job. When the title ends within 0.2 s of a cut, the exit is the transition at that cut: the picture makes the same move, in place of the segment's own transition, and the build log says so. The previews show the title only. `"glow": "soft"` or `"strong"` and `"dim": 0.4` work on one title, also when the job has `titleGlow` and `titleDim` off.
+
+For the whole reel: `--title-effect <name>` and `--title-exit <name>`, or `- title-effect:` and `- title-exit:` under Style in a Reel.md. In Studio they are one Effect and one Exit pick on Text and graphics. Some effects need something from the title: `slot-roll` a number in the key word or a `"swap"` list, `count-up` a number, `stack-fade` two lines or more, and `polaroid`, `glitch-slice` and `dip-black` a cut where the title ends. When a draft from a reference cannot give an effect what it needs, the title comes in by its plain build (an exit just ends) and the build log says which effect was not drawn and why. The table behind this is `kit/title-effects.json`.
+
+<img src="menu/sheets/title-effects.webp" width="720" alt="Animated grid of the title effects and exits, each labelled with its name">
+
+| Preview | Name | What it does | Use |
+|---|---|---|---|
+| <img src="menu/title-effects/type.webp" width="160" alt="type title effect"> | `type` | The title is typed letter by letter behind a caret, about 12 letters a second, line after line. | `{ "mode": 7, "text": "THE ONLY\|Question\|YOU NEED", "phrase": true, "key": "Question", "effect": "type" }` |
+| <img src="menu/title-effects/slot-roll.webp" width="160" alt="slot-roll title effect"> | `slot-roll` | The key word's digits roll like a slot reel with motion blur and lock left to right; with "swap" one word of the line rolls through a list while the rest stays put. | `{ "mode": 7, "text": "$3.9M\|WAS THE LOWEST", "key": "$3.9M", "effect": "slot-roll" }`<br>`{ "mode": 7, "text": "I DON'T KNOW\|How to pitch", "key": "How to pitch", "swap": ["pitch", "market", "do sales"] }` |
+| <img src="menu/title-effects/count-up.webp" width="160" alt="count-up title effect"> | `count-up` | The key word counts up with an ease ("count": from, to, unit), then rolls to a final text ("1 Day" to "365 Days" to "1 Year"). | `{ "mode": 7, "text": "THAT'D KEEP ME GOING FOR\|365 Days", "key": "365 Days", "count": { "from": 1, "to": 365, "unit": "Days", "final": "1 Year" } }` |
+| <img src="menu/title-effects/stack-fade.webp" width="160" alt="stack-fade title effect"> | `stack-fade` | Lines arrive one at a time; older lines go grey, blur and fade as new ones stack under them. | `{ "mode": 7, "text": "THE ONLY\|Question\|YOU NEED", "phrase": true, "key": "Question", "effect": "stack-fade" }` |
+| <img src="menu/title-effects/decode.webp" width="160" alt="decode title effect"> | `decode` | Random glyphs scramble, then settle into the key word from left to right. | `{ "mode": 7, "text": "THE ONLY\|Question\|YOU NEED", "phrase": true, "key": "Question", "effect": "decode" }` |
+| <img src="menu/title-effects/split-flap.webp" width="160" alt="split-flap title effect"> | `split-flap` | The title on a flap board: dark tiles flip through characters and settle line by line, the key word in the accent. | `{ "mode": 7, "text": "THE ONLY\|Question\|YOU NEED", "phrase": true, "key": "Question", "effect": "split-flap" }` |
+| <img src="menu/title-effects/blow-up.webp" width="160" alt="blow-up title exit"> | `blow-up` | Exit: the key word scales up past the lens into a full-frame flash of its colour that fades after the cut. | `{ "mode": 7, "text": "THE ONLY\|Question\|YOU NEED", "phrase": true, "key": "Question", "exit": "blow-up" }` |
+| <img src="menu/title-effects/polaroid.webp" width="160" alt="polaroid title exit"> | `polaroid` | Exit: the picture and the title shrink into a tilted white-border print that slides off, the next shot under it. | `{ "mode": 7, "text": "THE ONLY\|Question\|YOU NEED", "phrase": true, "key": "Question", "exit": "polaroid" }` |
+| <img src="menu/title-effects/glitch-slice.webp" width="160" alt="glitch-slice title exit"> | `glitch-slice` | Exit: the title and the picture tear out sideways in horizontal bands. | `{ "mode": 7, "text": "THE ONLY\|Question\|YOU NEED", "phrase": true, "key": "Question", "exit": "glitch-slice" }` |
+| <img src="menu/title-effects/dip-black.webp" width="160" alt="dip-black title exit"> | `dip-black` | Exit: the title fades as the picture dips to black and back. | `{ "mode": 7, "text": "THE ONLY\|Question\|YOU NEED", "phrase": true, "key": "Question", "exit": "dip-black" }` |
 
 ## Caption entrances
 

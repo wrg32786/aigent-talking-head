@@ -5,7 +5,8 @@
 // Rules: a title never starts before its first word is said and carries its word times, so no word shows early; it
 // never sits on the face (above the head or across the chest only); one title at a time; never a one-word caption.
 'use strict';
-const { TITLE_EFFECTS, TITLE_EXITS, TITLE_BUILDS } = require('./rules.cjs');
+const { TITLE_EFFECTS, TITLE_EXITS, TITLE_BUILDS, titleRow } = require('./rules.cjs');
+const { group } = require('./phrase-group.cjs');
 const r3 = x => Math.round(x * 1000) / 1000;
 const STOP = new Set('a an the and or but of to in on at for with is are was were it its this that these those you your i im we my our be been as by so if do does did just not no dont have has had will would can could they them he she his her me us about into from then than there here what when how why who'.split(' '));
 const bare = w => String(w).toLowerCase().replace(/[^a-z0-9$%']/g, '');
@@ -24,14 +25,10 @@ function shapeOf(t) {
 
 // Your speech in phrases: a new one after a pause, after . ? ! , ; : or at seven words. words: [{ start, end, word }].
 function ourPhrases(words, { max = 7, gap = 0.4 } = {}) {
-  const out = []; let cur = [];
-  const close = () => { if (cur.length) out.push(cur); cur = []; };
-  (words || []).forEach((w, i) => {
-    if (!bare(w.word)) return;
-    cur.push(w);
-    const next = words[i + 1];
-    if (!next || /[.?!,;:]["”)]?$/.test(String(w.word)) || next.start - w.end >= gap || cur.length >= max) close();
-  });
+  // the split with the fewest phrases of two to eight words (seven, and one more sooner than leave a word alone) inside each stretch (kit/phrase-group.cjs), so the last
+  // word of a long stretch is not left alone; a stretch nothing fits (one word, or said too fast to read) comes back
+  // as it is and the rules below join or drop it
+  const out = group((words || []).filter(w => bare(w.word)), { maxWords: max + 1, minWords: 2, maxChars: 60, minDur: 0.3, gap, breakOn: /[.?!,;:]["”)]?$/, alone: w => isNum(w.word) }).map(p => p.words);
   // a word left alone joins the phrase beside it when they run together; a lone word is never a title unless it is a number
   for (let i = out.length - 1; i >= 0; i--) {
     if (out[i].length > 1) continue;
@@ -78,6 +75,9 @@ function mapPhrases(refs, words, { k = 1, len = Infinity, cuts = [] } = {}) {
     if (best < 0 || Math.abs(mine[best].start - at) > tol) continue;
     picks.push({ s, p: mine[best] }); from = best + 1;
   }
+  // a named effect is never swapped in silence: when your words cannot carry it, the line says what is drawn instead
+  // and why (needs and fallbacks: kit/title-effects.json)
+  const fallbacks = [], fell = (id, at, why) => { const r = titleRow(id) || {}; fallbacks.push(`title at ${at}s: ${id} not drawn (${why}); ${r.kind === 'exit' ? 'the title just ends' : 'it comes in by its plain build'}`); };
   const flips = picks.map(({ s, p }, i) => {
     const ws = p.words, ki = s.key ? keyIndex(ws) : -1, { lines, key } = breakLines(ws, s, ki), next = picks[i + 1], lastEnd = Math.min(p.end, len);
     let end = Math.max(lastEnd + 0.35, p.start + Math.max(0.9, (s.end - s.start) * k));
@@ -90,15 +90,15 @@ function mapPhrases(refs, words, { k = 1, len = Infinity, cuts = [] } = {}) {
     if (s.glow) f.glow = true;
     // an effect only where your words can carry it
     let fx = s.effect;
-    if (fx === 'count-up') { const n = ki >= 0 && /^\d[\d,]*$/.test(shown(ws[ki].word)) ? +shown(ws[ki].word).replace(/,/g, '') : null; if (n != null && n > 1) { const unit = ws[ki + 1] && !STOP.has(bare(ws[ki + 1].word)) ? shown(ws[ki + 1].word) : null; f.count = { from: n > 20 ? 1 : 0, to: n, ...(unit ? { unit } : {}) }; } else fx = null; }
-    if (fx === 'slot-roll' && !(ki >= 0 && isNum(ws[ki].word))) fx = null;   // digits roll; your phrase has no second word to swap in
-    if (fx === 'stack-fade' && lines.length < 2) fx = null;
+    if (fx === 'count-up') { const n = ki >= 0 && /^\d[\d,]*$/.test(shown(ws[ki].word)) ? +shown(ws[ki].word).replace(/,/g, '') : null; if (n != null && n > 1) { const unit = ws[ki + 1] && !STOP.has(bare(ws[ki + 1].word)) ? shown(ws[ki + 1].word) : null; f.count = { from: n > 20 ? 1 : 0, to: n, ...(unit ? { unit } : {}) }; } else { fell(fx, f.start, 'it needs a number you say'); fx = null; } }
+    if (fx === 'slot-roll' && !(ki >= 0 && isNum(ws[ki].word))) { fell(fx, f.start, 'it needs a number in the key word'); fx = null; }   // digits roll; your phrase has no second word to swap in
+    if (fx === 'stack-fade' && lines.length < 2) { fell(fx, f.start, 'it needs two lines or more'); fx = null; }
     if (fx) f.effect = fx;
     // an exit that is the transition needs a cut of yours where the title ends (the blow-up plays on its own too)
-    if (s.exit) { const c = cuts.find(c => c >= lastEnd - 0.05 && c <= lastEnd + 1.2 && (!next || c < next.p.start - 0.08)); if (c != null) { f.end = r3(Math.max(c, f.start + 0.3)); f.exit = s.exit; } else if (s.exit === 'blow-up') f.exit = s.exit; }
+    if (s.exit) { const c = cuts.find(c => c >= lastEnd - 0.05 && c <= lastEnd + 1.2 && (!next || c < next.p.start - 0.08)); if (c != null) { f.end = r3(Math.max(c, f.start + 0.3)); f.exit = s.exit; } else if (!(titleRow(s.exit).needs || []).includes('cut')) f.exit = s.exit; else fell(s.exit, f.start, 'it needs a cut of yours where the title ends'); }
     return f;
   });
-  return { flips, line: `phrase titles: ${flips.length} from your words on the reference's ${shapes.length} (its timing, lines, build and effects)${flips.length ? ': ' + flips.slice(0, 4).map(f => `"${f.text.replace(/\|/g, ' / ')}" at ${f.start}s`).join(', ') + (flips.length > 4 ? ', ...' : '') : ''}` };
+  return { flips, fallbacks, line: `phrase titles: ${flips.length} from your words on the reference's ${shapes.length} (its timing, lines, build and effects)${flips.length ? ': ' + flips.slice(0, 4).map(f => `"${f.text.replace(/\|/g, ' / ')}" at ${f.start}s`).join(', ') + (flips.length > 4 ? ', ...' : '') : ''}` };
 }
 
 module.exports = { shapeOf, ourPhrases, keyIndex, breakLines, mapPhrases };

@@ -12,15 +12,21 @@ const KEY_FONTS = ['italic serif', 'serif', 'sans', 'script', 'mono'];
 const r2 = x => Math.round(x * 100) / 100;
 
 // The titles an agent (or a vision model) read from the sheets: checked, cleaned, in time order.
-// { ok, errs, titles: [{ start, end, lines, key, font, glow, effect, exit, build, swap, count }] }
+// { ok, errs, unread, titles: [{ start, end, lines, key, font, glow, effect, exit, build, swap, count }] }
+// A title may come flat or split into how it is set and how it moves ({ start, end, set: { lines, key, font, glow },
+// move: { build, effect, exit, swap, count } }). { start, end, unread: true } is a title the agent saw and could not
+// read: it is counted and left out, so the OCR's read stays for that moment and no words are made up.
+// idea from mojomast/open-higgsfield-skills skills/effect-recipe-read (MIT; forkfield design by marciano71, MIT) and Comfy-Org/comfy-skills technique-consistent-characters (MIT)
 function validateAgentTitles(input) {
-  const errs = [], out = [], list = Array.isArray(input) ? input : input && input.titles;
+  const errs = [], out = [], list = Array.isArray(input) ? input : input && input.titles; let unread = 0;
   if (!Array.isArray(list) || !list.length) return { ok: false, errs: ['titles must be a list with at least one title'], titles: [] };
   if (list.length > 80) return { ok: false, errs: ['at most 80 titles'], titles: [] };
   const str = v => typeof v === 'string' && v.trim() && v.length <= 80 && !/[\u0000-\u001f|]/.test(v);
   list.forEach((t, i) => {
     const at = `title ${i + 1}: `, e = m => errs.push(at + m);
     if (!t || typeof t !== 'object') return e('must be an object');
+    if (t.set || t.move) t = { ...t, ...(t.set && typeof t.set === 'object' ? t.set : {}), ...(t.move && typeof t.move === 'object' ? t.move : {}) };
+    if (t.unread === true) { unread++; return; }
     const start = +t.start, end = +t.end;
     if (!(Number.isFinite(start) && start >= 0 && Number.isFinite(end) && end > start && end - start <= 30)) return e('start and end are seconds in the reference, end after start, at most 30 s apart');
     const lines = Array.isArray(t.lines) ? t.lines : typeof t.text === 'string' ? t.text.split('/') : null;
@@ -46,7 +52,8 @@ function validateAgentTitles(input) {
     out.push(o);
   });
   out.sort((a, b) => a.start - b.start);
-  return { ok: !errs.length, errs, titles: errs.length ? [] : out };
+  if (!errs.length && !out.length) errs.push('no title could be read: nothing is kept, the breakdown\'s own read stays');
+  return { ok: !errs.length, errs, unread, titles: errs.length ? [] : out };
 }
 // Beside the teardown (the folder with Reel.md), so a re-run keeps it.
 function readAgentTitles(dir) {
@@ -107,6 +114,10 @@ function cutFlags(start, end, shots) {
 const EXIT_OF = { flash: 'blow-up', fade: 'dip-black' };   // the transition into the next shot, when the title ends on that cut
 
 // One title per phrase, in time order:
+// Every title says where its read came from and how firm it is (from: ocr | agent, state: proposed | fixed): what the
+// agent read from the sheets is fixed and a re-run of the breakdown never writes over it (titles.agent.json is kept and
+// wins); the OCR's read is proposed. A title nobody could read is left out, never guessed.
+// idea from higgsfield-ai/skills higgsfield-brandkit references/brand-lock.md (MIT)
 // { n, start, end, text ("LINE/LINE"), lines, key, band, y, build, effect, exit, swap, count, onCut, endsOnCut, acrossCut, conf, source }
 // build: how it arrives (word by word, letter by letter, line by line; null = all at once). effect and exit are the
 // nearest of ours when the samples show one (a count, a swapped word, older lines fading, typing); the agent pass
@@ -163,7 +174,7 @@ function phraseTitles(b) {
     const effect = count ? 'count-up' : swap || lines.some(l => l.rolls) ? 'slot-roll' : fades ? 'stack-fade' : build === 'letter' ? 'type' : null;
     const y = med(lines.map(l => l.y));
     out.push({ n: out.length + 1, start, end, text: lines.map(l => l.text).join('/'), lines: lines.map(l => l.text), key, band: bandOf(y), y: r2(y), build, effect, exit: (next && EXIT_OF[next.transition_in]) || null,
-      ...(swap ? { swap } : {}), ...(count ? { count } : {}), ...fl, conf: r2(Math.min(...lines.map(l => l.conf))), fill: (keyL || lines[0]).fill || null, source: 'ocr' });
+      ...(swap ? { swap } : {}), ...(count ? { count } : {}), ...fl, conf: r2(Math.min(...lines.map(l => l.conf))), fill: (keyL || lines[0]).fill || null, source: 'ocr', from: 'ocr', state: 'proposed' });
   }
   return out;
 }
@@ -175,7 +186,7 @@ function withAgent(ocr, agent, shots) {
     const near = (ocr || []).filter(o => o.start < t.end && t.start < o.end).sort((a, z) => (Math.min(z.end, t.end) - Math.max(z.start, t.start)) - (Math.min(a.end, t.end) - Math.max(a.start, t.start)))[0];
     return { n: i + 1, start: t.start, end: t.end, text: t.lines.join('/'), lines: t.lines, key: t.key || null, band: near ? near.band : 'top', y: near ? near.y : null, build: t.build || (near && near.build) || null,
       effect: t.effect || null, exit: t.exit || null, ...(t.swap ? { swap: t.swap } : {}), ...(t.count ? { count: t.count } : {}), ...(t.font ? { font: t.font } : {}), ...(t.glow != null ? { glow: t.glow } : {}),
-      ...cutFlags(t.start, t.end, shots), conf: 1, fill: near ? near.fill : null, source: 'agent' };
+      ...cutFlags(t.start, t.end, shots), conf: 1, fill: near ? near.fill : null, source: 'agent', from: 'agent', state: 'fixed' };
   });
 }
 

@@ -35,9 +35,10 @@ const CAPTION_LOOK = { 'caption-outline': ['captionOutline', ['none', 'thin', 't
 //   title-glow off | soft | strong        a glow in the key word's colour on titles and kinetic key words
 //   title-dim off | 0.1 to 0.8            the picture darker while a title is up
 //   title-entrance <entrance>             the entrance of every title that names none (it may repeat)
+//   title-effect <effect>, title-exit <exit>  the effect and the exit of every title that names none (kit/title-effects.json)
 //   caption-face display | partner        one-word captions in the pairing's key face (default) or its partner face
 // titleLookOf(style) -> the captions.js keys they set ({} when the Style has none), errors pushed to errs.
-const TITLE_KEYS = ['title-lockup', 'title-key-case', 'title-partner-case', 'title-key-color', 'title-partner-color', 'title-glow', 'title-dim', 'title-entrance', 'caption-face'];
+const TITLE_KEYS = ['title-lockup', 'title-key-case', 'title-partner-case', 'title-key-color', 'title-partner-color', 'title-glow', 'title-dim', 'title-entrance', 'title-effect', 'title-exit', 'caption-face'];
 function titleLookOf(st, errs = []) {
   const out = {}, lk = {}, low = k => (st && st[k] != null && !none(st[k]) ? String(st[k]).trim().toLowerCase() : null);
   const col = (k, into) => { const v = low(k); if (!v) return; if (/^#[0-9a-f]{6}$/.test(v) || v === 'accent' || v === 'text') lk[into] = v; else errs.push(`style: ${k} must be a #rrggbb colour, accent or text`); };
@@ -49,11 +50,12 @@ function titleLookOf(st, errs = []) {
   const g = st && st['title-glow'] != null ? String(st['title-glow']).trim().toLowerCase() : null; if (g) { if (['soft', 'strong'].includes(g)) out.titleGlow = g; else if (!['off', 'none', 'no'].includes(g)) errs.push('style: title-glow must be off, soft or strong'); }
   const d = st && st['title-dim'] != null ? String(st['title-dim']).trim().toLowerCase() : null; if (d) { if (/^0?\.\d+$/.test(d) && +d >= 0.05 && +d <= 0.8) out.titleDim = +d; else if (!['off', 'none', 'no', '0'].includes(d)) errs.push('style: title-dim must be off or a number from 0.05 to 0.8'); }
   const e = low('title-entrance'); if (e) { if (ENTRANCES.includes(e)) out.titleEntrance = e; else errs.push(`style: title-entrance must be one of ${ENTRANCES.join(', ')}`); }
+  for (const [k, into, list] of [['title-effect', 'titleEffect', TITLE_EFFECTS], ['title-exit', 'titleExit', TITLE_EXITS]]) { const v = low(k); if (v) { if (list.includes(v)) out[into] = v; else errs.push(`style: ${k} must be one of ${list.join(', ')}`); } }
   const cf = low('caption-face'); if (cf) { if (['display', 'partner'].includes(cf)) { if (cf === 'partner') out.captionFace = 'secondary'; } else errs.push('style: caption-face must be display or partner'); }
   if (Object.keys(lk).length) out.lockup = lk;
   return out;
 }
-const ENTRANCES = ['stagger-rise', 'slam', 'blur-rise', 'slide-left', 'elastic', 'flip', 'pop-zoom', 'drop', 'typewriter'];
+const { ENTRANCES } = require('./rules.cjs'); // one list, from kit/title-effects.json
 const { TITLE_EFFECTS, TITLE_EXITS, TITLE_BUILDS } = require('./rules.cjs');
 const PH = require('./teardown/phrases.cjs');
 const LAYERS = ['front', 'behind', 'auto'];
@@ -538,6 +540,8 @@ function titleLookLines(caps) {
   if (caps.titleGlow) L.push(`- title-glow: ${caps.titleGlow === 'strong' || +caps.titleGlow > 0.7 ? 'strong' : 'soft'}`);
   if (+caps.titleDim > 0) L.push(`- title-dim: ${+(+caps.titleDim).toFixed(2)}`);
   if (caps.titleEntrance) L.push(`- title-entrance: ${caps.titleEntrance}`);
+  if (caps.titleEffect) L.push(`- title-effect: ${caps.titleEffect}`);
+  if (caps.titleExit) L.push(`- title-exit: ${caps.titleExit}`);
   if (caps.captionFace === 'secondary') L.push('- caption-face: partner');
   return L;
 }

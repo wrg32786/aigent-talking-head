@@ -45,7 +45,7 @@ export const RULES = [
   { id: 'caption-entrance', applies: it => it.kind === 'captionEntrance', ok: c => c.style === 'kinetic',
     by: c => c.styleFrom ? `${c.styleFrom}'s ${styleName(c.style)}` : styleName(c.style), reason: c => `Not with ${styleName(c.style)}${c.styleFrom ? `, set by ${c.styleFrom}` : ''}`, why: 'Caption entrances only move Kinetic captions.',
     fix: () => ({ picks: { 'captionStyle:kinetic': 'allow' } }), done: () => 'Switched to Kinetic captions', act: () => 'Switch to Kinetic captions' },
-  { id: 'titles-off', applies: it => it.kind === 'entrance' || it.kind === 'titleLayer', ok: c => c.titles,
+  { id: 'titles-off', applies: it => it.kind === 'entrance' || it.kind === 'titleLayer' || it.kind === 'titleEffect' || it.kind === 'titleExit', ok: c => c.titles,
     by: c => c.titlesFrom, reason: c => `Titles are off in ${c.titlesFrom}`, why: 'Title entrances and the title layer need titles.',
     // titles on, captions kept as they are
     fix: c => ({ picks: { 'look:kinetic': 'allow', [`captionStyle:${c.style}`]: 'allow' } }), done: () => 'Turned titles on', act: () => 'Turn titles on' },
