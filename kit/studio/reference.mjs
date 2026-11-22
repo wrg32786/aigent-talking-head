@@ -181,15 +181,112 @@ export function undoReferenceLook(s) {
 // pick after that is yours and holds (state.fontLock), until the next reference or the next video.
 export const copiesStyle = r => !!r && ['recreate', 'look'].includes(r.mode) && !!(r.extracted || r.out);
 const refKey = r => (r && (r.out || r.active || r.url || r.file)) || null;
+// a reference you chose to copy that is still being read: what you pick while you wait is already yours
+const pendingRef = r => !!r && ['recreate', 'look'].includes(r.mode) && !(r.extracted || r.out) && (r.status === 'running' || (r.queue || []).some(x => ['queued', 'downloading', 'tearing'].includes(x.status)));
+export const styleKey = r => (copiesStyle(r) ? refKey(r) : pendingRef(r) ? 'pending' : null);
 export function clearFontPick(s) { const had = ((s.picks && s.picks.font && s.picks.font.allow) || []).slice(); if (s.picks && s.picks.font) delete s.picks.font; s.fontLock = false; return had; }
 export function syncRefFont(s) {
   const r = s.reference; if (!r) return;
-  const key = copiesStyle(r) ? refKey(r) : null;
-  if (key && r.fontFor !== key) { const had = clearFontPick(s); if (had.length && !r.prevFont) r.prevFont = had; r.fontFor = key; }
+  const key = styleKey(r);
+  if (key && r.fontFor !== key) {
+    if (r.fontFor === 'pending' && key !== 'pending') r.fontFor = key; // the reference you were waiting for is ready: nothing more to clear
+    else { const had = clearFontPick(s); if (had.length && !r.prevFont) r.prevFont = had; r.fontFor = key; }
+  }
   else if (!key && r.fontFor) { // back to your own look (Off, Influence, or the reference is gone): your earlier font comes back
     if (r.prevFont && !((s.picks.font && s.picks.font.allow) || []).length) s.picks.font = { allow: r.prevFont.slice(), deny: [] };
     r.prevFont = null; r.fontFor = null; s.fontLock = false;
   }
+  syncRefLook(s);
+}
+// ---------- the rest of the look and a reference ----------
+// The same rule as the font, for everything else a draft reads from the board: the Look (pack), every pick (caption
+// style, look, theme, title entrances and layer, transitions, finishes, graphics, effects, editing), the music bed and
+// energy, sounds and pace. When a reference whose style we copy comes into use, what was on the board before it (from
+// the video before this one, or earlier in this one) is set aside (reference.prevLook, for Back to my look) and the
+// board starts from the reference alone. What you pick after that is yours and holds. A new reference clears again.
+const cloneOf = x => JSON.parse(JSON.stringify(x));
+const LOOK_DEFAULT = () => ({ pack: null, music: { bed: 'auto', energy: 'auto' }, sound: { sfx: 'on', cap: 'on' }, pace: { tighten: null, punch: 'on' } });
+const slotOn = v => !!v && (((v.allow || []).length + (v.deny || []).length) > 0);
+const plainMusic = m => !m || ((m.bed || 'auto') === 'auto' && (m.energy || 'auto') === 'auto');
+const plainSound = x => !x || ((x.sfx || 'on') === 'on' && (x.cap || 'on') === 'on');
+const plainPace = x => !x || (x.tighten == null && (x.punch || 'on') === 'on');
+// takes every look setting but the font off the board (the font has its own rule above). Returns what was there.
+export function clearLookPicks(s) {
+  const d = LOOK_DEFAULT(), font = s.picks && s.picks.font, picks = Object.fromEntries(Object.entries(s.picks || {}).filter(([k, v]) => k !== 'font' && slotOn(v)));
+  const had = cloneOf({ pack: s.pack || null, picks, music: s.music || d.music, sound: s.sound || d.sound, pace: s.pace || d.pace });
+  s.pack = null; s.picks = font ? { font } : {};
+  s.music = { ...(s.music || {}), ...d.music }; // a music file you added stays in the list, it is just not the bed
+  s.sound = d.sound;
+  s.pace = { ...d.pace, ...(s.pace && s.pace.keepPauses ? { keepPauses: s.pace.keepPauses } : {}) };
+  return had;
+}
+const hadLook = h => !!h && (!!h.pack || Object.keys(h.picks || {}).length > 0 || !plainMusic(h.music) || !plainSound(h.sound) || !plainPace(h.pace));
+// B-roll ideas we made ourselves belong to the draft and the reference they were made for: a new draft or another
+// reference drops the ones still waiting (their search words came from the older cut or the older reference). Ideas
+// your agent or you added stay, and so does every clip already placed. Returns how many went.
+export function dropAutoIdeas(s, { onlyRef = false } = {}) {
+  const j = s.job && s.broll && s.broll[s.job]; if (!j || !j.ideas) return 0; let n = 0;
+  for (const [k, x] of Object.entries(j.ideas)) { const auto = !x || !x.by || x.by === 'Studio' || x.by === 'the rules'; if (x && x.source === 'reference' ? true : !onlyRef && auto) { delete j.ideas[k]; n++; } }
+  return n;
+}
+export function syncRefLook(s) {
+  const r = s.reference; if (!r) return;
+  const key = styleKey(r);
+  if (key && key !== 'pending') r.copyMode = r.mode;
+  if (key && r.lookFor !== key) {
+    if (r.lookFor === 'pending' && key !== 'pending') { r.lookFor = key; return; }
+    const had = clearLookPicks(s); if (!r.prevLook && hadLook(had)) r.prevLook = had;
+    r.lookFor = key; dropAutoIdeas(s, { onlyRef: true });
+  } else if (!key && r.lookFor) { // back to your own look: what the reference set aside comes back where you have nothing now
+    const h = r.prevLook;
+    if (h) {
+      if (!s.pack && h.pack) s.pack = h.pack;
+      for (const [k, v] of Object.entries(h.picks || {})) if (!slotOn(s.picks[k])) s.picks[k] = cloneOf(v);
+      if (plainMusic(s.music) && !plainMusic(h.music)) s.music = { ...s.music, bed: h.music.bed, energy: h.music.energy || 'auto' };
+      if (plainSound(s.sound) && !plainSound(h.sound)) s.sound = { ...s.sound, ...h.sound };
+      if (plainPace(s.pace) && !plainPace(h.pace)) s.pace = { ...s.pace, tighten: h.pace.tighten == null ? null : h.pace.tighten, punch: h.pace.punch || 'on' };
+    }
+    r.prevLook = null; r.lookFor = null; dropAutoIdeas(s, { onlyRef: true });
+  }
+}
+// "Use the reference's look": your own picks since the reference go, and the board is set from the reference again.
+// With the reference Off (or on Influence) it comes back on, in the mode you last copied it with (else Copy the look).
+export function useReferenceLook(s, cat = catalog()) {
+  const r = s.reference; if (!r || !r.extracted) return null;
+  if (!['recreate', 'look'].includes(r.mode)) r.mode = ['recreate', 'look'].includes(r.copyMode) ? r.copyMode : 'look';
+  r.lookFor = null; r.fontFor = null; r.auto = null;
+  return setReferenceLook(s, cat);
+}
+// whose look the next draft uses when a reference is on the board, for the one line the page shows:
+//   { use: 'saved', name, text, button }  the reference is Off and a saved look, a Look or your picks are in use
+//   { use: 'picks', parts, text, button } the reference's style is copied, with your own picks over some parts
+//   null                                  the reference's look alone, or no reference
+const PART_WORDS = { captions: 'captions', titles: 'titles', transitions: 'transitions', grade: 'colour', effects: 'effects', graphics: 'graphics', pace: 'pace', sound: 'sound', fonts: 'fonts', look: 'the Look' };
+const listOf = a => (a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]);
+export function ownParts(s, cat = catalog()) {
+  const r = s.reference || {}, added = new Set(r.added || []), out = new Set();
+  for (const [k, v] of Object.entries(s.picks || {})) {
+    if (k === 'font') continue;
+    const mine = (v.deny || []).length > 0 || (v.allow || []).some(id => !added.has(`${k}:${id}`)); if (!mine) continue;
+    const it = Object.values(cat.items).find(x => (x.kind === 'editing' ? 'editing' : x.kind) === k);
+    out.add(k === 'editing' ? 'pace' : partOf(it) || 'look');
+  }
+  if (s.fontLock) out.add('fonts');
+  if ((s.pack || null) !== ((r.auto && r.auto.pack) || null)) out.add('look');
+  const m = s.music || {}; if ((m.bed || 'auto') !== ((r.auto && r.auto.bed) || 'auto') || (m.energy || 'auto') !== 'auto' || !plainSound(s.sound)) out.add('sound');
+  if (!plainPace(s.pace)) out.add('pace');
+  return Object.keys(PART_WORDS).filter(k => out.has(k));
+}
+export function refLookOf(s, cat = catalog()) {
+  const r = s.reference; if (!r || !r.extracted) return null;
+  const button = "Use the reference's look";
+  if (r.mode === 'off') {
+    const name = s.styleLook || s.pack || null, any = !!name || Object.values(s.picks || {}).some(slotOn);
+    return any ? { use: 'saved', name, text: "Your saved look is in use, not the reference's.", button } : null;
+  }
+  if (!copiesStyle(r)) return null;
+  const parts = ownParts(s, cat);
+  return parts.length ? { use: 'picks', parts, text: `Your picks are in use for ${listOf(parts.map(k => PART_WORDS[k]))}. The rest is the reference's.`, button } : null;
 }
 // what the page says on the Fonts layer: whose font the next draft uses when a reference's style is being copied
 export function refFontOf(s, lookFont = null) {
@@ -203,7 +300,7 @@ export function refFontOf(s, lookFont = null) {
 export function setReferenceLook(s, cat = catalog()) {
   const r = s.reference; if (!r) return null;
   if ((r.added && r.added.length) || r.prev || r.auto) undoReferenceLook(s);
-  syncRefFont(s);
+  syncRefFont(s); // the font and the rest of the look: what was on the board before this reference is set aside
   const p = referenceLook(r.extracted, r.mode, cat, r.parts); if (!p) return null;
   const had = allowedRefs(s), prev = { one: {} };
   for (const ref of Object.keys(p.picks)) { const it = cat.items[ref]; if (it.kind !== 'bed' && it.mode === 'one') { const k = it.kind === 'editing' ? 'editing' : it.kind; prev.one[k] = ((s.picks[k] && s.picks[k].allow) || []).slice(); } }

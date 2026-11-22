@@ -391,9 +391,12 @@ if (!flag('rebuild')) {
   // energy; auto energy reads your pace (kit/rules.cjs scriptEnergy). --bed always wins.
   // --no-bed: no music at all, even when the pack or preset names one (Studio's "No music")
   let bed = flag('no-bed') ? undefined : opt('bed') || (preset && preset.bed) || undefined, energyBed = false;
-  const energyArg = flag('no-bed') ? undefined : opt('music-energy') || (preset && preset.musicEnergy) || (bed === 'auto' ? 'auto' : undefined);
+  // --music-energy auto with a recipe or a style look means "you decide": the recipe's own bed and energy come first
+  // (Studio sends auto whenever nobody picked music, and it used to go over the reference's music)
+  const energyFlag = recipe && opt('music-energy') === 'auto' && (preset && (preset.musicEnergy || (preset.bed && preset.bed !== 'auto'))) ? undefined : opt('music-energy');
+  const energyArg = flag('no-bed') ? undefined : energyFlag || (preset && preset.musicEnergy) || (bed === 'auto' ? 'auto' : undefined);
   if (energyArg && !['auto', ...R.ENERGIES].includes(String(energyArg))) die('--music-energy must be low, mid, high or auto');
-  if (!opt('bed') && energyArg && (bed === 'auto' || !bed || opt('music-energy'))) {
+  if (!opt('bed') && energyArg && (bed === 'auto' || !bed || energyFlag)) {
     const words = []; let off = 0; for (const c of keep) { for (const w of c.words || []) words.push([w[0] + off, w[1] + off]); off += +c.dur; }
     const e = energyArg === 'auto' ? R.scriptEnergy(words) : energyArg; bed = R.pickBed(e, name) || undefined; energyBed = true;
     console.log(`music: ${e} energy${energyArg === 'auto' ? ' (from your pace)' : ''} -> bed ${bed || 'none'} (npm run music lists them by energy)`);

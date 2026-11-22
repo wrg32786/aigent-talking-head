@@ -7,7 +7,7 @@ import { upload } from './upload.js';
 import { canWrite, NO_WRITER } from './Scripts.jsx';
 import { FixActions } from './Fix.jsx';
 import { Stages } from './Stages.jsx';
-import { RefMode, RefNotice, RefParts, RefPlan } from './RefCard.jsx';
+import { RefMode, RefNotice, RefLookLine, RefParts, RefPlan } from './RefCard.jsx';
 
 export function Reference({ CAT, V, s, apply, patch }) {
   const r = s.reference, env = V.env, q = r.queue || [], t = env.tools || {};
@@ -85,7 +85,7 @@ function Breakdown({ CAT, V, s, apply, patch }) {
       <RefMode id="ref-mode" mode={r.mode} patch={patch} />
     </div>
     <RefRan V={V} s={s} apply={apply} ran={Array.isArray(ex.ran) ? ex.ran : []} fallback={/fallback/.test(engine || '')} />
-    <RefNotice s={s} patch={patch} id="ref-notice-td" />
+    {V.refLook ? <RefLookLine V={V} patch={patch} id="ref-look-td" /> : <RefNotice s={s} patch={patch} id="ref-notice-td" />}
     {r.mode === 'influence' && <RefParts V={V} s={s} patch={patch} />}
     <RefPlan ex={ex} mode={r.mode} id="ref-plan-td" />
     <div className="row ref-script"><Button id="ref-script" variant="secondary" size="sm" label="Write script from this reference" icon={<Icon n="script" />} isDisabled={!canWrite(V.env)}

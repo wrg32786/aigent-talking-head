@@ -1,6 +1,6 @@
 // The reference's shared pieces, used by Start (RecreateStart.jsx), the Picture step card (Style.jsx) and the Breakdown (Reference.jsx):
 // RefMode (one control, one vocabulary), RefPlan (what Recreate brings, as chips), RefParts (Influence switches)
-// and RefNotice (one line while a reference is read, or when it set your Look).
+// RefNotice (one line while a reference is read, or when it set your Look) and RefLookLine (whose look is in use).
 import { useEffect, useRef } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { toast, Icon } from './lib.jsx';
@@ -104,4 +104,14 @@ export function RefNotice({ s, patch, id = 'ref-notice' }) {
   return <div className="ref-notice glass-card" id={id} role="status" data-mode={a.mode}><Icon n="spark" />
     <p><b>{a.mode === 'recreate' || a.mode === 'look' ? 'We set your look from the reference.' : 'We set your picks from the reference.'}</b> {a.mode === 'recreate' || a.mode === 'look' ? 'Change anything you like.' : (a.sound ? 'Your Look stays yours. Change anything you like.' : 'Your Look and sound stay yours. Change anything you like.')}</p>
     <Button id={id + '-back'} size="sm" variant="secondary" label="Back to my look" onClick={back} /></div>;
+}
+
+// One line when the next draft would not use the reference's look alone (server: refLook, kit/studio/reference.mjs
+// refLookOf): a saved look in use with the reference Off, or your own picks over parts of it. One button switches.
+export function RefLookLine({ V, patch, id = 'ref-look' }) {
+  const l = V && V.refLook; if (!l) return null;
+  const use = () => patch({ reference: { useLook: true } }).then(() => toast("The reference's look is in use.", true)).catch(() => {});
+  return <div className="ref-notice glass-card" id={id} role="status" data-use={l.use}><Icon n="spark" />
+    <p><b>{l.text}</b></p>
+    <Button id={id + '-use'} size="sm" variant="secondary" label={l.button} onClick={use} /></div>;
 }

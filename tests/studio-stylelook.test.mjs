@@ -53,10 +53,10 @@ try {
   const up = await (await fetch(`${url}/api/upload?kind=footage&name=take.mp4`, { method: 'POST', body: Buffer.alloc(2048) })).json();
   assert.ok(up.path, JSON.stringify(up).slice(0, 300));
 
-  await t('mode look is accepted and kept; an unknown mode is refused; your Look stays yours', async () => {
+  await t('mode look is accepted and kept; an unknown mode is refused; your earlier Look is set aside, not lost', async () => {
     const bad = await api('/api/state', { reference: { mode: 'copy' } }); assert.strictEqual(bad.status, 400); assert.match(bad.error, /influence, recreate, look or off/);
     const v = await api('/api/state', { reference: { mode: 'look' } }); assert.strictEqual(v.status, 200, JSON.stringify(v).slice(0, 300));
-    assert.strictEqual(v.state.reference.mode, 'look'); assert.strictEqual(v.state.pack, 'magazine');
+    assert.strictEqual(v.state.reference.mode, 'look'); assert.strictEqual(v.state.pack, null, 'the Look from before is set aside: the reference is the look (Back to my look brings it back)'); assert.strictEqual(v.state.reference.prevLook.pack, 'magazine');
     assert.strictEqual((await api('/api/state')).state.reference.mode, 'look', 'kept');
     assert.strictEqual(v.state.styleLook, null); assert.deepStrictEqual(v.styleLooks, []); assert.strictEqual(v.match, null);
     assert.strictEqual(v.swap, null, 'no what to swap from its script');

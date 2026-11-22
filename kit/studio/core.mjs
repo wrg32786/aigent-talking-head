@@ -132,11 +132,18 @@ export function defaultState() {
     finish: { from: 'auto', reel: true, clips: false, plain: false }, drafted: null, styleLook: null, point: '', fontLock: false };
 }
 export function load() {
-  try { const s = JSON.parse(readFileSync(statePath(), 'utf8')); return oneBed({ ...defaultState(), ...s, reference: { ...defaultState().reference, ...(s.reference || {}) } }); }
+  try { const s = JSON.parse(readFileSync(statePath(), 'utf8')); return refOnly(oneBed({ ...defaultState(), ...s, reference: { ...defaultState().reference, ...(s.reference || {}) } })); }
   catch { return defaultState(); }
 }
 // one place decides the music bed: music.bed. An older session kept a bed pick in picks.bed as well (a reference's bed),
 // which the draft used while the music panel showed music.bed; the pick (what the draft used) moves into music.bed.
+// a board saved before 1.28.0 with a reference in Recreate or Copy the look still has the last video's picks mixed in
+// with the reference's (nothing recorded whose they were): the first read sets the board from the reference alone
+function refOnly(s) {
+  const r = s.reference;
+  if (r && r.extracted && r.lookFor === undefined && styleKey(r)) { try { setReferenceLook(s); } catch {} if (r.lookFor === undefined) r.lookFor = null; }
+  return s;
+}
 function oneBed(s) {
   const pb = s.picks && s.picks.bed;
   if (pb) { if (pb.allow && pb.allow[0]) s.music = { ...s.music, bed: pb.allow[0] }; delete s.picks.bed; }
@@ -173,7 +180,7 @@ export const KIT_BRANDS = ['kit/example/skool-logo.svg'];
 // and makes the one change it needs (the page's one click switch on a greyed option).
 const SETTLE_KEYS = ['pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'reference', 'switchFor'];
 const lookSnap = s => JSON.parse(JSON.stringify({ pack: s.pack || null, picks: s.picks || {}, music: s.music, sound: s.sound, pace: s.pace,
-  reference: s.reference ? { mode: s.reference.mode, added: s.reference.added, prev: s.reference.prev, auto: s.reference.auto, applied: s.reference.applied } : null }));
+  reference: s.reference ? { mode: s.reference.mode, added: s.reference.added, prev: s.reference.prev, auto: s.reference.auto, applied: s.reference.applied, lookFor: s.reference.lookFor || null, prevLook: s.reference.prevLook || null, fontFor: s.reference.fontFor || null, prevFont: s.reference.prevFont || null } : null }));
 export const effectsReady = () => existsSync(join(ROOT, 'effects', '.venv'));
 export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
   const errs = [], log = [];
@@ -242,6 +249,8 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
   if (p.reference && p.reference.mode !== undefined) { if (!SLK.MODES.includes(p.reference.mode)) errs.push('reference.mode: influence, recreate, look or off'); else { const was = s.reference.mode; s.reference.mode = p.reference.mode; log.push(`reference mode ${p.reference.mode}`);
     // Recreate or Influence sets the Look from the reference; Off takes it back out (your own picks stay)
     if (was !== s.reference.mode || (s.reference.mode !== 'off' && s.reference.extracted && !s.reference.auto)) { const a = setReferenceLook(s, cat); if (a) log.push(`set the look from the reference (${a.n} change${a.n === 1 ? '' : 's'})`); else if (was !== 'off' && s.reference.mode === 'off') log.push('back to your own look'); } } }
+  // "Use the reference's look": your picks since the reference go and the board is set from the reference again
+  if (p.reference && p.reference.useLook) { if (!s.reference.extracted) errs.push('reference.useLook: no reference is broken down yet'); else { const a = useReferenceLook(s, cat); log.push(`the reference's look is in use${a ? ` (${a.n} change${a.n === 1 ? '' : 's'})` : ''}`); } }
   if (p.reference && p.reference.parts !== undefined) {
     const q = p.reference.parts || {}, bad = Object.keys(q).filter(k => !REF_PARTS.some(x => x.id === k) || typeof q[k] !== 'boolean');
     if (bad.length) errs.push(`reference.parts: { ${REF_PARTS.map(x => x.id).join(', ')} } each true or false`);
@@ -408,7 +417,7 @@ export function lockStringOf(l) {
 // ---------- reference ----------
 // kit/studio/reference.mjs: extract, referenceLook, influencePack and the rest of what a reference gives Studio
 export * from './reference.mjs';
-import { REF_PARTS, refParts, referencePicks, setReferenceLook, copiesStyle, clearFontPick, syncRefFont } from './reference.mjs';
+import { REF_PARTS, refParts, referencePicks, setReferenceLook, copiesStyle, clearFontPick, syncRefFont, useReferenceLook, styleKey } from './reference.mjs';
 
 // a pack whose style must sit inside its locks (pack validate refuses a style transition outside them)
 export function fitStyle(pack) {

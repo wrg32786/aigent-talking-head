@@ -33,7 +33,11 @@ const brief = m => ({ id: m.id, text: m.text, at: m.at, ...(m.attach ? { attach:
 // what the agent needs to act on a Studio message, without the whole menu
 export function context(s) {
   let comp = {}; try { comp = C.compose(s); } catch (e) { comp = { errs: [e.message] }; }
-  return { job: s.job, footage: s.footage, point: s.point || null, pack: s.pack, picks: s.picks, music: s.music, sound: s.sound, pace: s.pace, export: s.export,
+  // whose look the next draft uses: with Recreate or Copy the look the style comes from the reference, and the picks
+  // listed are the reference's or the ones the user made after it. Nothing here is from an earlier video.
+  const copies = C.copiesStyle(s.reference) && !!(s.reference && s.reference.extracted), rl = (() => { try { return C.refLookOf(s); } catch { return null; } })();
+  const lookFrom = copies ? { from: 'reference', mode: s.reference.mode, yours: rl && rl.parts ? rl.parts : [], note: 'The style comes from the reference. Do not bring back picks, fonts, music or search words from an earlier video; change a pick only when the user asks for it now.' } : rl ? { from: 'saved', name: rl.name, note: rl.text } : { from: 'yours' };
+  return { job: s.job, footage: s.footage, point: s.point || null, lookFrom, pack: s.pack, picks: s.picks, music: s.music, sound: s.sound, pace: s.pace, export: s.export,
     reference: C.refContext(s), takes: (s.takes || []).map(t => ({ id: t.id, file: t.file, seconds: t.seconds, status: t.status, kept: t.kept })), task: s.task, outputs: C.outputsOf(s), reelArgs: comp.args, problems: comp.errs,
     recentStudioChat: (s.chat || []).slice(-10).map(m => ({ id: m.id, role: m.role, text: m.text, status: m.status, kind: m.kind })) };
 }

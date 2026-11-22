@@ -147,7 +147,7 @@ function view(s) {
   let edit = null; try { edit = editOf(s, { combo, cut, broll }); } catch (e) { edit = { error: e.message }; }
   let look = null; try { look = lookSources(s); } catch {}
   const outputs = C.outputsOf(s), currentOutputs = currentOutputsOf(s);
-  return { seq: ++viewSeq, boot: BOOT, scenes: C.catalog().scenesSig || '', state: s, look, compose: comp, outputs, currentOutputs, sizes: SIZES.viewOf(s, outputs), refFont: C.refFontOf(s, SLK.fontOf(s.styleLook)), draftPreview: draftPreviewOf(s), match: matchOf(s), styleLooks: SLK.list(), reopenable, scripts, cut, broll, pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: noTimeline(s) ? null : swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
+  return { seq: ++viewSeq, boot: BOOT, scenes: C.catalog().scenesSig || '', state: s, look, compose: comp, outputs, currentOutputs, sizes: SIZES.viewOf(s, outputs), refFont: C.refFontOf(s, SLK.fontOf(s.styleLook)), refLook: (() => { try { return C.refLookOf(s); } catch { return null; } })(), draftPreview: draftPreviewOf(s), match: matchOf(s), styleLooks: SLK.list(), reopenable, scripts, cut, broll, pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: noTimeline(s) ? null : swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
 }
 
 // Copy the look (kit/studio/stylelooks.mjs): the reference's timeline is not used, so no "what to swap" and no spots from it
@@ -292,7 +292,7 @@ function draftSteps(s) {
 // a draft starts: remember its locks, drop a saved look that is gone, and say in the task log which look it uses
 function startDraft(d, done) {
   const sl = d.styleLook;
-  update(st => { st.lockedAtDraft = d.lockString || ''; st.drafted = null; if (sl && sl.clear) st.styleLook = null; });
+  update(st => { st.lockedAtDraft = d.lockString || ''; st.drafted = null; if (sl && sl.clear) st.styleLook = null; C.dropAutoIdeas(st); /* ideas we made for the older draft go: their search words came from its cut */ });
   const tk = runTask('draft', () => d.steps, done);
   if (sl && sl.note) { tk.lines.push(sl.note); send('log', { id: tk.id, line: sl.note }); }
   return tk;
@@ -527,6 +527,11 @@ function cutSteps(s, ids, over) {
   if (!keep.length) throw Object.assign(new Error('keep at least one clip'), { code: 400 });
   const comp = C.compose(s, { refPack: refPackName(s) }); if (comp.errs.length) throw Object.assign(new Error(comp.errs.join('; ')), { code: 400 });
   const base = comp.args.slice(); const e = base.indexOf('--export'); if (e >= 0) base.splice(e, 2);
+  // a clip made on its own takes the same style as the reel: the reference's look in Recreate and Copy the look (a clip
+  // cannot be re-cut to the reference's timeline, so Recreate gives it the look), or your saved look with no reference
+  try { const rd = C.recreateRecipe(s, ROOT) ? SLK.refDir(s, ROOT) : null;
+    if (rd) { const nm = SLK.saveFrom(rd, SLK.jobLookName(s.job)).name; const i = base.indexOf('--pack'); if (i >= 0) base.splice(i, 2); base.push('--style-look', nm); }
+    else SLK.forDraft(s, ROOT, base); } catch (err) { console.error('clips: the reference look could not be used: ' + err.message); }
   const tight = o.goal === 'ad' && !base.includes('--tighten') && !base.includes('--no-tighten') ? ['--tighten', '0.25'] : [];
   const REEL = process.env.STUDIO_REEL || 'kit/reel.cjs', steps = [], plan = [];
   // every piece is extracted on its snapped ranges, then handed to the reel as already cut: a clips.json beside the
@@ -824,6 +829,7 @@ function addLinks(urls) {
       q.push(it); added.push(it);
     }
     if (q.length > 30) st.reference.queue = q.slice(-30);
+    C.syncRefFont(st); // Recreate or Copy the look with a link on its way: the older look is set aside now, so what you pick while it is read is yours
   });
   setImmediate(pump);
   return added;
@@ -1183,7 +1189,7 @@ async function api(req, res, u) {
     else if (b.action === 'remove') {
       if (['downloading', 'tearing'].includes(it.status) && refTask && refTask.status === 'running') { refTask.cancel = true; refTask.proc && refTask.proc.kill('SIGTERM'); }
       if (it.file && b.deleteFile !== false) rmSync(it.file, { force: true });
-      update(st => { st.reference.queue = st.reference.queue.filter(x => x.id !== id); if (st.reference.active === id) { C.undoReferenceLook(st); } if (st.reference.active === id) { st.reference = { ...st.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null }; C.syncRefFont(st); } });
+      update(st => { st.reference.queue = st.reference.queue.filter(x => x.id !== id); if (st.reference.active === id) { C.undoReferenceLook(st); } if (st.reference.active === id) { st.reference = { ...st.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null }; } C.syncRefFont(st); });
     } else return json(res, 400, { error: 'action: use, retry or remove' });
     return json(res, 200, view(C.load()));
   }
@@ -1191,10 +1197,10 @@ async function api(req, res, u) {
     // Clear reference: the reference and every pick it added go, as one undo ({ undo: true } puts it all back)
     const b = await readBody(req).catch(() => ({}));
     if (b.undo) { const s0 = C.load(); if (!s0.undoRef) return json(res, 400, { error: 'nothing to undo' });
-      const st = update(x => { const u = x.undoRef; x.reference = u.reference; x.picks = u.picks; x.pack = u.pack; x.music = u.music; if (u.fontLock !== undefined) x.fontLock = u.fontLock; delete x.undoRef; }); return json(res, 200, { ...view(st), note: 'The reference is back, with its picks.' }); }
+      const st = update(x => { const u = x.undoRef; x.reference = u.reference; x.picks = u.picks; x.pack = u.pack; x.music = u.music; if (u.sound) x.sound = u.sound; if (u.pace) x.pace = u.pace; if (u.fontLock !== undefined) x.fontLock = u.fontLock; delete x.undoRef; }); return json(res, 200, { ...view(st), note: 'The reference is back, with its picks.' }); }
     const s0 = C.load(); if (!s0.reference.extracted && !s0.reference.file && !s0.reference.url) return json(res, 400, { error: 'no reference to clear' });
     let n = 0;
-    const st = update(x => { x.undoRef = JSON.parse(JSON.stringify({ reference: x.reference, picks: x.picks, pack: x.pack || null, music: x.music, fontLock: !!x.fontLock }));
+    const st = update(x => { x.undoRef = JSON.parse(JSON.stringify({ reference: x.reference, picks: x.picks, pack: x.pack || null, music: x.music, sound: x.sound, pace: x.pace, fontLock: !!x.fontLock }));
       n = C.undoReferenceLook(x);
       x.reference = { ...x.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null, added: [], prev: null, auto: null }; C.syncRefFont(x); });
     return json(res, 200, { ...view(st), note: `Cleared the reference${n ? ` and the ${n} pick${n === 1 ? '' : 's'} it added` : ''}. Undo puts it back.` });
