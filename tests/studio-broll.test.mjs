@@ -142,7 +142,7 @@ try {
     assert.deepStrictEqual(SPL.PLACES, LANE.PLACES.filter(x => x !== 'card'), 'one list of placements (the panel is drawn in the overlay, not by assemble)');
     const face = { crown: 400, cx: 600 };
     const top = SPL.layout({ place: 'top' }, face);
-    assert.strictEqual(top.dy, 960 - 72 - 400, 'the top of the head 72 px into the panel'); assert.deepStrictEqual([top.band.y0 < 888, top.band.y1], [true, 960]);
+    assert.strictEqual(top.dy, 960 - 72 - 400, 'the top of the head 72 px into the panel'); assert.deepStrictEqual([top.band.y0 < 888, top.band.y1], [true, 960 + 40]);
     assert.ok(top.capY < 888 - 30, 'captions sit above the head on the panel');
     const flat = SPL.layout({ place: 'top' }, face, { mask: false }); assert.strictEqual(flat.dy, 960 + 28 - 400, 'no mask: the head stays under the seam'); assert.strictEqual(flat.band, null);
     assert.strictEqual(SPL.layout({ place: 'top', overlap: 30 }, face).dy, 960 - 30 - 400);

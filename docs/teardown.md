@@ -105,6 +105,8 @@ Without rea-video, `npm run teardown` falls back to the built-in analyzer (`kit/
 
 ## How sure is this
 
+When the breakdown ran with no vision model on the frames (`analysis.vlm` in `breakdown.json` is off or not configured), the Reel.md Style says `vision: off`, `teardown.md` says "We read this reference without the vision pass, so titles may be misread", and Studio shows that line with the reference. The recipe never says `captions: one-word` when the text tracks (`shots[].text.items`) show phrases of two or more words on most moments with big text: it says `kinetic` and `teardown.md` gives the reason. Titles are still one per big word we could read; one title per phrase comes in 1.29.0.
+
 Measured on the 40 second demo reel in `kit/example/demo-reel/` (20 shots, effect labels as titles, kinetic captions, the yeehaw bed, no finish), and on a control reel rendered from the showcase presenter with known finishes:
 
 - **Cuts**: rea-video found all 20 shots of the demo reel. The fallback finds the hard cuts and some effect changes, and misses some jump cuts on the same take.

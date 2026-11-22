@@ -48,6 +48,10 @@ export function extract(recipePath) {
     preset: br.preset && br.preset !== 'none' ? br.preset : null, look: st.look || null, captionStyle: st.captions || null,
     transitions: tcount, entrances: real('entrance', entrances), finishes: real('finish', finishes), graphics: real('graphic', graphics), effects: real('effect', effects),
     // the font read from the words on screen and matched to a pairing we ship (kit/fontmatch.py), or null
+    // the breakdown ran with no vision model on the frames (Reel.md Style vision: off): the page says so in one line
+    vision: st.vision === 'off' ? 'off' : null,
+    // its captions are drawn bare (no outline, or no shadow): the legibility shadow then starts off (boostOf)
+    captionPlain: st['caption-outline'] === 'none' || st['caption-shadow'] === 'none',
     font: st['font-match'] && br.fonts && !/^(none|theme)$/i.test(String(br.fonts)) ? { pairing: String(br.fonts).split(',')[0].trim(), kind: st.font || null, face: st['font-face'] || null, match: String(st['font-match']).toLowerCase() } : null,
     music: { bed: mu.bed && !/^(none|auto)$/i.test(mu.bed) ? mu.bed : null, ...(mu.bed === 'none' ? { noBed: true } : {}), energy: mu.energy || null, beatSync: mu['beat-sync'] || null }, punch: st.punch || null,
     ran: ranOf(dirname(recipePath), r),
@@ -244,7 +248,8 @@ const plainPace = x => !x || (x.tighten == null && (x.punch || 'on') === 'on');
 // takes every look setting but the font off the board (the font has its own rule above). Returns what was there.
 export function clearLookPicks(s) {
   const d = LOOK_DEFAULT(), font = s.picks && s.picks.font, picks = Object.fromEntries(Object.entries(s.picks || {}).filter(([k, v]) => k !== 'font' && slotOn(v)));
-  const had = cloneOf({ pack: s.pack || null, picks, music: s.music || d.music, sound: s.sound || d.sound, pace: s.pace || d.pace });
+  const had = cloneOf({ pack: s.pack || null, picks, music: s.music || d.music, sound: s.sound || d.sound, pace: s.pace || d.pace, ...(s.boost ? { boost: s.boost } : {}) });
+  delete s.boost; // the hard-to-read words switch is part of the look too
   s.pack = null; s.picks = font ? { font } : {}; s.entranceLock = false;
   s.music = { ...(s.music || {}), ...d.music }; // a music file you added stays in the list, it is just not the bed
   s.sound = d.sound;
@@ -276,6 +281,7 @@ export function syncRefLook(s) {
       s.entranceLock = slotOn(s.picks.entrance); // entrances that come back are your own picks: a lock
       if (plainMusic(s.music) && !plainMusic(h.music)) s.music = { ...s.music, bed: h.music.bed, energy: h.music.energy || 'auto' };
       if (plainSound(s.sound) && !plainSound(h.sound)) s.sound = { ...s.sound, ...h.sound };
+      if (!s.boost && h.boost) s.boost = h.boost;
       if (plainPace(s.pace) && !plainPace(h.pace)) s.pace = { ...s.pace, tighten: h.pace.tighten == null ? null : h.pace.tighten, punch: h.pace.punch || 'on' };
     }
     r.prevLook = null; r.lookFor = null; dropAutoIdeas(s, { onlyRef: true });
@@ -352,6 +358,14 @@ export function dropRefEntrances(s) {
   if (!refEntrancesOnly(s)) return false;
   delete s.picks.entrance; if (s.reference.added) s.reference.added = s.reference.added.filter(x => !x.startsWith('entrance:'));
   return true;
+}
+// "Make hard-to-read words easier to read" (Text and graphics): the soft shadow the build puts behind a caption word
+// that reads under 3:1. It changes the look, so it is a choice: yours when you set it (state.boost on or off), else on,
+// unless the reference whose style we copy draws its captions with no outline or no shadow. Off sends --no-boost.
+export function boostOf(s) {
+  if (s.boost === 'on' || s.boost === 'off') return { on: s.boost === 'on', by: 'you' };
+  const r = s.reference, plain = copiesStyle(r) && !!(r.extracted && r.extracted.captionPlain);
+  return { on: !plain, by: plain ? 'reference' : 'default' };
 }
 
 // sets the Look from the reference for its mode, after taking out what an earlier mode or reference set.

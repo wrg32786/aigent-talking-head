@@ -6,6 +6,7 @@ const RF = require('../reframe.cjs');
 const GM = require('../grade-match.cjs');
 const { r2, pad2, clean, hexOK } = require('./util.cjs');
 const { themeFor, jobTransition } = require('./palette.cjs');
+const { visionPass } = require('./captions.cjs');
 
 // brand names the breakdown read (rea-video packaging.brands or video_context.brands), for a title's role
 const colourless = b => [].concat((b.packaging && b.packaging.brands) || [], (b.video_context && b.video_context.brands) || []).map(x => typeof x === 'string' ? x : x && (x.name || x.text)).filter(Boolean);
@@ -47,7 +48,9 @@ function recipeMd(c) {
     // the font read from the words on screen, matched to a pairing we ship (kit/fontmatch.py); the pairing itself is Brand kit fonts
     ...(font ? [`- font: ${[font.category, font.weight].filter(Boolean).join(' ')}`, `- font-face: ${font.face}`, `- font-match: ${font.match}`] : tlook && tlook.pairing ? [`- font: ${tlook.key.category}`, '- font-match: close'] : []), `- titles: ${titles.length ? 'on' : 'off'}`, ...titleLookLines(tlook, font), `- title-layer: ${layerDefault}`,
     `- finish: ${jobFinish ? jobFinish.split(',').join(', ') : 'none'}`, `- transition: ${jobTransition(shots)}`, `- glitch: ${shots.some(s => s.tx && s.tx.name === 'glitch') ? 'on' : 'off'}`,
-    `- punch: ${zoomShots || jumpCuts || avgShot < 3 ? 'on' : 'off'}`, '- effects: none', '',
+    `- punch: ${zoomShots || jumpCuts || avgShot < 3 ? 'on' : 'off'}`, '- effects: none',
+    // no model looked at the frames (breakdown.json analysis.vlm): Studio says so with the reference
+    ...(visionPass(b) === 'off' ? ['- vision: off'] : []), '',
     '## Shots', '', '```videomd-timeline'];
   for (const s of shots) {
     const f = [`#${pad2(s.n)} ${s.start}-${s.end}`, `story ${s.n === 1 ? 'hook' : s.n === shots.length ? 'payoff' : 'beat'}`];

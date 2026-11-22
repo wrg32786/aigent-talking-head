@@ -1074,6 +1074,7 @@ try {
       ['Studio stage status in Chrome: one live line under a reference bar, the folded list with checks, a reload keeps the stage, a stopped stage with Try again (tests/studio-stages.e2e.mjs)', 'studio-stages.e2e.mjs'],
       ['Studio steps in Chrome: the eight steps, Copy the look on Start, old links land, layers per step (tests/studio-steps.e2e.mjs)', 'studio-steps.e2e.mjs'],
       ['Studio whose look is in use, in Chrome: a saved look with the reference Off says so with one button, the button sets the board from the reference alone, a pick after it is yours with no line (tests/studio-leak.e2e.mjs)', 'studio-leak.e2e.mjs'],
+      ['Studio small fixes in Chrome: Close on the chat at every width and the button that brings it back, the switch for hard-to-read words, the vision pass line on a reference (tests/studio-small-fixes.e2e.mjs)', 'studio-small-fixes.e2e.mjs'],
       ['Studio stopping and the wizards in Chrome: Copy a reference opens its link screen, the Studio stopped bar with Copy for my agent, the wizards say Studio is not running with Try again, both come back when Studio does (tests/studio-offline.e2e.mjs)', 'studio-offline.e2e.mjs'],
     ];
     const jobs = Math.max(1, +process.env.SMOKE_E2E_JOBS || 2), out = new Array(E2E.length);

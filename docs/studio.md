@@ -98,6 +98,8 @@ You can change your mind at any time. **Just my footage** turns a reference off 
 <a id="look-and-its-9-layers"></a>
 ## The 9 layers and the steps that show them (1.28.0)
 
+The Text layer has one switch, **Make hard-to-read words easier to read**: when a caption word is hard to read against the picture, the build puts a soft shadow behind that word. It is on by default. It starts off when the reference whose style you copy draws its captions with no outline or no shadow, and your own choice always wins (`boost` in `studio_set_selections`: `on`, `off` or null).
+
 ![The Picture step in dark: the reference card with Recreate, Copy the look, Influence and Off, then the row of Looks](studio/picture.png)
 
 ![The Music and sounds step in the light theme: one line for what the reference brought, then Music, Sounds and Pace](studio/music-light.png)
@@ -475,6 +477,8 @@ Folders must be full paths; Studio makes them if needed and checks it can write 
 
 ## Chat
 
+The chat has a Close button at every width. On a wide screen it puts the chat away and the page takes the room; the chat button in the top bar brings it back, and a reload keeps it where you left it. On a phone it closes the chat sheet.
+
 The Studio chat is answered by one of these, picked in Settings:
 
 - **Your terminal agent (default).** Claude Code, Codex, Cursor or any MCP client, running in your terminal. See the next section.
@@ -595,7 +599,7 @@ The B-roll step sits between Text and graphics and Music and sounds. It needs a 
 
 **Testimonials keep their own sound.** Testimonial pieces show under **Testimonials**. **Play in my reel** puts one into your Combo between your pieces (before your last piece, or after the one you pick), so it plays with its own voice instead of over yours. Draft again to hear it; Your edit says "1 testimonial". Agents use `add_testimonial`.
 
-**Placement:** **Full cutaway** covers the frame. **Split top panel** puts the clip in the top half and you in the bottom half, moved so the top of your head reaches a little into the panel: with the person mask your head draws over it, so the panel sits behind your head (without the mask your head stays just under the seam). **Picture in picture** puts a small framed 16:9 box at the top right. **Framed cards** puts the clip in a rounded card up top and you smaller in a second card below, your head breaking out over its top edge, with a thin blue border and a soft glow on a cream backdrop. On both the split and the framed cards your captions move to the line the layout leaves for them, off your face (dark on the cream backdrop). The preview next to the chips shows where the clip and you sit. **Starts** is seconds into the spot (a short lead in by default), **Length** is up to 3.5 s by default and never past the spot or the clip, **From** is the clip's in point.
+**Placement:** **Full cutaway** covers the frame. **Split top panel** puts the clip in the top half and you in the bottom half, moved so the top of your head reaches a little into the panel: with the person mask your head draws over it, so the panel sits behind your head (without the mask your head stays just under the seam). A wide clip, such as a website, is shown whole in the panel, sharp and sitting on the seam, over a soft blurred copy of itself; a squarer clip fills the panel. **Picture in picture** puts a small framed 16:9 box at the top right. **Framed cards** puts the clip in a rounded card up top and you smaller in a second card below, your head breaking out over its top edge, with a thin blue border and a soft glow on a cream backdrop. On both the split and the framed cards your captions move to the line the layout leaves for them, off your face (dark on the cream backdrop). The preview next to the chips shows where the clip and you sit. **Starts** is seconds into the spot (a short lead in by default), **Length** is up to 3.5 s by default and never past the spot or the clip, **From** is the clip's in point.
 
 ![Split top panel with the top of the presenter's hair over the panel's lower edge, and Framed cards: the clip in a rounded card up top, the presenter smaller in a card below with the hair breaking out over its top edge, thin blue borders and a soft glow on a cream backdrop](studio/broll-split-framed.jpg)
 

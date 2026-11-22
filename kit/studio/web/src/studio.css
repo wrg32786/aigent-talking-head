@@ -434,6 +434,13 @@ html { background: var(--background); } body { background: transparent; }
   .chat.glass { top: calc(var(--top) + 12px); height: calc(100vh - var(--top) - 24px); margin: 12px 12px 0 0; border: 1px solid var(--glass-edge); border-radius: 20px; overflow: hidden; box-shadow: var(--glass-hi), var(--glass-shadow); }
   .stepnav.glass { bottom: 12px; margin: auto -12px 12px; padding: 10px 12px; border: 1px solid var(--glass-edge); border-radius: 18px; box-shadow: var(--glass-hi), var(--glass-shadow); }
 }
+/* The chat put away on a wide screen (Close in its header): the page takes the room, and the chat button in the top bar brings it back. */
+@media (min-width: 901px) {
+  .layout.nochat { grid-template-columns: minmax(0, 1fr); }
+  .layout.nochat > .chat { display: none; }
+  .fab.away { display: inline-grid; position: relative; }
+  .fab.away .dot { position: absolute; top: 8px; right: 7px; width: 7px; height: 7px; box-shadow: 0 0 0 2px var(--background); } .fab.away .dot.on { background: var(--success); } .fab.away .dot.busy { background: var(--warning); } .fab.away .dot.off { background: var(--destructive); }
+}
 @media (pointer: coarse) { .kbdwrap { display: none; } }
 @media (max-width: 900px) { .chat.glass { background: color-mix(in srgb, var(--card) 94%, transparent); } }
 .settings-sheet form { min-height: 100%; }
@@ -1424,3 +1431,4 @@ button.rp-made { cursor: pointer; } button.rp-made:hover { background: color-mix
 #s-music.sound-cards { margin-top: 12px; }
 .sound-cards .sound-pace { grid-column: 1 / -1; margin: 2px 4px 0; display: block; }
 .sound-card:first-child { grid-row: auto; }
+.teardown > .ref-vision { margin: 10px 16px 0; }

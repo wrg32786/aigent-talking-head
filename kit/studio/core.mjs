@@ -129,7 +129,7 @@ export function defaultState() {
     reference: { file: null, url: null, mode: 'influence', status: 'none', out: null, extracted: null, applied: false, queue: [], active: null },
     pack: null, picks: {}, music: { bed: 'auto', energy: 'auto', upload: null }, sound: { sfx: 'on', cap: 'on' }, pace: { tighten: null, punch: 'on' },
     export: 'reels', sizes: [], chat: [], task: null, outputs: [], takes: [], output: null, cut: null, tx: {}, lines: {}, broll: {},
-    finish: { from: 'auto', reel: true, clips: false, plain: false }, drafted: null, styleLook: null, point: '', fontLock: false };
+    finish: { from: 'auto', reel: true, clips: false, plain: false }, drafted: null, styleLook: null, point: '', fontLock: false, boost: null };
 }
 export function load() {
   try { const s = JSON.parse(readFileSync(statePath(), 'utf8')), o = refOnly(oneBed({ ...defaultState(), ...s, reference: { ...defaultState().reference, ...(s.reference || {}) } }));
@@ -189,7 +189,7 @@ export const effectsReady = () => existsSync(join(ROOT, 'effects', '.venv'));
 export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
   const errs = [], log = [];
   if (!p || typeof p !== 'object') return { errs: ['patch must be an object'], log, noop: false };
-  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands', 'finish', 'switchFor', 'undoChange', 'useReferenceLook', 'styleLook', 'point', 'sizes'];
+  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands', 'finish', 'switchFor', 'undoChange', 'useReferenceLook', 'styleLook', 'point', 'sizes', 'boost'];
   for (const k of Object.keys(p)) if (!known.includes(k)) errs.push(`unknown field "${k}" (${known.join(', ')})`);
   if (p.undoChange) {
     const u = s.lastChange && s.lastChange.undo; if (!u) { errs.push('undoChange: nothing to undo'); return { errs, log, noop: false }; }
@@ -274,6 +274,8 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
   }
   // a saved style look for drafts with no reference in use; null clears it
   // the point of the video, one optional line (kit/studio/point.mjs): it steers what we pick on the Cut step
+  // the legibility shadow behind hard-to-read words: on, off, or null (we decide: on, unless the reference's captions have no outline or no shadow)
+  if (p.boost !== undefined) { if (![null, 'on', 'off'].includes(p.boost)) errs.push('boost: on, off or null'); else if (p.boost !== (s.boost ?? null)) { s.boost = p.boost; log.push(p.boost === 'off' ? 'hard-to-read words are left as they are' : p.boost === 'on' ? 'hard-to-read words get a soft shadow' : 'hard-to-read words: we decide'); } }
   if (p.point !== undefined) { const v = cleanPoint(p.point); if (v !== (s.point || '')) { s.point = v; log.push(v ? `point: ${v}` : 'no point set'); } }
   if (p.styleLook !== undefined) {
     const n = p.styleLook === null || p.styleLook === '' ? null : p.styleLook;
@@ -389,6 +391,7 @@ export function compose(s, { refPack = null } = {}) {
     else if (fonts.length) args.push('--fonts', fonts.join(','));
     else if (copied && mine.includes('theme')) args.push('--fonts', 'theme'); }
   if (one('beatSync') === 'no-beat-sync') args.push('--no-beat-sync');
+  if (!boostOf(s).on) args.push('--no-boost');
   const ed = s.picks.editing || { allow: [], deny: [] }, on = id => ed.allow.includes(id), off = id => ed.deny.includes(id);
   if (on('cards-auto') || on('colour-card') || on('chapter-card')) args.push('--cards', 'auto');
   if (off('cards-auto') || (off('colour-card') && off('chapter-card'))) { args.push('--cards', 'off'); locks.cards = false; }
@@ -434,7 +437,7 @@ export function lockStringOf(l) {
 // ---------- reference ----------
 // kit/studio/reference.mjs: extract, referenceLook, influencePack and the rest of what a reference gives Studio
 export * from './reference.mjs';
-import { REF_PARTS, refParts, referencePicks, setReferenceLook, copiesStyle, clearFontPick, syncRefFont, refEntrancesOnly, dropRefEntrances, useReferenceLook, styleKey } from './reference.mjs';
+import { REF_PARTS, refParts, referencePicks, setReferenceLook, copiesStyle, clearFontPick, syncRefFont, refEntrancesOnly, dropRefEntrances, useReferenceLook, styleKey, boostOf } from './reference.mjs';
 
 // a pack whose style must sit inside its locks (pack validate refuses a style transition outside them)
 export function fitStyle(pack) {
@@ -536,7 +539,7 @@ export function outputsOf(s) {
 // it again puts you back where you were. What carries over: your words (glossary) and the counters; with
 // keepLook, the look too (pack, picks, music, sound, pace, export, brand logos, the saved style look). Keys, settings and the agent
 // connection live in other files and are never touched here.
-export const LOOK_KEYS = ['pack', 'picks', 'music', 'sound', 'pace', 'export', 'sizes', 'brands', 'styleLook'];
+export const LOOK_KEYS = ['pack', 'picks', 'music', 'sound', 'pace', 'export', 'sizes', 'brands', 'styleLook', 'boost'];
 const KEEP_KEYS = ['format', 'version', 'rev', 'updated', 'chatSeq', 'refSeq', 'importSeq', 'commentSeq', 'videoSeq', 'glossary'];
 const VIDEO_EXT = /\.(mp4|mov|m4v|webm|mkv)$/i;
 export const videosDir = () => join(stateDir(), 'videos');

@@ -1,10 +1,12 @@
 // Teardown converter (kit/videomd2reel.cjs): the teardown.md report.
 'use strict';
+const { visionPass, VISION_OFF } = require('./captions.cjs');
 
 function report(c) {
   const { tlook, b, extras, src, name, dur, engine, shots, titles, dropped, graphics, scenes, lines, speech, cs, look, colours, bpm, hasMusic, bed, beatEdit, jobFinish, ambient, zoomShots, jumpCuts, avgShot } = c;
   const R = [`# Teardown report: ${src.file || name}`, '', `Engine: ${engine}. ${b.x_engine ? 'rea-video was not available, so this is the lightweight built-in analyzer.' : 'rea-video did the breakdown; this report maps it onto the talking-head menu.'}`, '',
     'Every line below is a measurement or a guess from one. Check the contact sheet, fix the Reel.md, then remake.', '',
+    ...(visionPass(b) === 'off' ? [`${VISION_OFF}. No model looked at the frames: the text is what OCR read, and how a title comes in is a guess. Check every title against the contact sheet.`, ''] : []),
     `![contact sheet](contact.jpg)`, '',
     '| What | Detected | How |', '|---|---|---|',
     `| Length, shots | ${dur}s, ${shots.length} shots (avg ${avgShot.toFixed(1)}s) | scene cuts${jumpCuts ? `, ${jumpCuts} jump cuts` : ''} |`,
@@ -56,6 +58,8 @@ function report(c) {
   R.push('## Shots', '', '| # | Time | Finish | Why |', '|---|---|---|---|');
   shots.forEach(s => R.push(`| ${s.n} | ${s.start}-${s.end}s | ${s.finish || 'none'} | ${s.finishWhy} |`));
   R.push('', '## How sure is this', '', '- Cuts, length, BPM and caption timing are measured and usually right.',
+    ...(visionPass(b) === 'off' ? ['- The vision pass was off, so title text and entrances are less sure than usual.'] : []),
+    ...(cs.was ? [`- The captions first read as ${cs.was}. The text tracks show phrases, so the recipe says ${cs.style}. The titles below are still one per big word we could read, not one per phrase: add the missing lines by hand.`] : []),
     '- Caption style, entrances and finishes are the nearest match from a short menu. A custom look maps to the closest shipped one.',
     '- Graphics are found from shape and colour plus OCR. A white tile on a white shirt, or an ordinal word OCR cannot read, is missed or guessed (marked ~).',
     '- A finish is only kept when the grade changes across shots or is strong. An even warm or cool cast on every shot is read as the room light.',

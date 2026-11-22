@@ -52,7 +52,12 @@ export function App() {
   const [looksList, setLooksList] = useState(null);
   const [theme, setThemeState] = useState(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
   const [glass, setGlassState] = useState(document.documentElement.dataset.glass !== 'off');
-  const [chatOpen, setChatOpen] = useState(/chat/.test(location.hash));
+  const [chatOpen, setChatOpenState] = useState(/chat/.test(location.hash));
+  // the chat can be put away at any width (Close in its header) and comes back from the chat button in the top bar;
+  // on a wide screen that is remembered, so a reload keeps it away
+  const [chatAway, setChatAway] = useState(() => !/chat/.test(location.hash) && localStorage.getItem('studio.chat') === 'away');
+  const setChatOpen = useCallback(on => { setChatOpenState(on); if (on) { setChatAway(false); localStorage.setItem('studio.chat', 'open'); } }, []);
+  const closeChat = useCallback(() => { setChatOpenState(false); if (matchMedia('(min-width: 901px)').matches) { setChatAway(true); localStorage.setItem('studio.chat', 'away'); } }, []);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [keysOpen, setKeysOpen] = useState(/keys/.test(location.hash));
   const [connectOpen, setConnectOpen] = useState(/connect/.test(location.hash));
@@ -174,7 +179,7 @@ export function App() {
           <button type="button" className={'connect-btn ' + agentState} id="connect-open" aria-haspopup="dialog" onClick={openConnect} title={agentState === 'on' ? `${a.name} connected` : 'Connect your terminal agent'}><Icon n="plug" /><span className="cb-l">{agentState === 'on' || agentState === 'busy' ? (a.name || 'Agent') : 'Connect agent'}</span></button>
           <span id="taskpill" role="status" aria-live="polite" className={t ? '' : 'idle'}>{t ? <Badge label={pill} variant={running ? 'cyan' : t.status === 'failed' ? 'error' : 'neutral'} /> : <span className="sr">{pill}</span>}</span>
           <button type="button" className="icon-btn theme-btn" id="theme" data-mode={theme} aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} title={theme === 'dark' ? 'Light theme' : 'Dark theme'} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}><Icon n="moon" className="tm-moon" /><Icon n="sun" className="tm-sun" /></button>
-          <button className="icon-btn fab" id="chat-open" type="button" aria-controls="chat" aria-expanded={String(chatOpen)} aria-label="Open chat" onClick={() => setChatOpen(true)}><Icon n="chat" /><span className={'dot ' + agentState} id="fab-dot" aria-hidden="true" /></button>
+          <button className={'icon-btn fab' + (chatAway ? ' away' : '')} id="chat-open" type="button" aria-controls="chat" aria-expanded={String(chatOpen || !chatAway)} title="Open chat" aria-label="Open chat" onClick={() => setChatOpen(true)}><Icon n="chat" /><span className={'dot ' + agentState} id="fab-dot" aria-hidden="true" /></button>
           <IconBtn id="open-settings" n="sliders" label="Settings" aria-haspopup="dialog" onClick={() => setSettingsOpen(true)} />
           <MoreMenu id="more-open" label="More" items={[
             { id: 'more-open-video', label: 'Past videos', icon: 'film', onClick: () => setVideoMode('open') },
@@ -186,7 +191,7 @@ export function App() {
           ]} />
         </div>
       </header>
-      <div className="layout">
+      <div className={'layout' + (chatAway ? ' nochat' : '')}>
         <main id="main" data-step={step} data-view={step === 'picture' ? picView : step === 'render' ? outView : 'main'} ref={mainRef}>
           {!post && step !== 'start' && <YourEdit V={V} s={s} go={go} step={step} />}
           {step === 'picture' && (refAny || breakdown) && <ViewSwitch id="look-switch" label="Picture" value={picView} set={v => { setPicView(v); history.replaceState(null, '', '#step=' + (v === 'reference' ? 'reference' : 'picture')); }} views={[['main', 'Your picture', 'look-sub-style'], ['reference', 'How the reference was made', 'look-sub-reference', refOn]]} />}
@@ -213,7 +218,7 @@ export function App() {
             {i < STEPS.length - 1 ? <Button id="next" variant={step === 'review' && !drafted ? 'secondary' : 'primary'} label={stepName(STEPS[i + 1])} endContent={<Icon n="right" />} onClick={() => go(STEPS[i + 1], true)} /> : <span className="nextpad" />}
           </footer>
         </main>
-        <Chat key={s.videoSeq || 0} {...ctx} open={chatOpen} setOpen={setChatOpen} agentState={agentState} />
+        <Chat key={s.videoSeq || 0} {...ctx} open={chatOpen} setOpen={setChatOpen} close={closeChat} agentState={agentState} />
       </div>
       <Settings {...ctx} open={settingsOpen} setOpen={setSettingsOpen} theme={theme} setTheme={setTheme} glass={glass} setGlass={setGlass} />
       <Connect {...ctx} open={connectOpen} setOpen={setConnectOpen} />
