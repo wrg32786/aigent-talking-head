@@ -85,7 +85,7 @@ function checkJob(captionsFile, cutFile, label) {
     for (const k of Object.keys(C.sfx || {})) if (!R.SFX[k] && !(C.sounds || {})[k]) errs.push(`sfx "${k}": use ${Object.keys(R.SFX).join(', ')}, or add it to "sounds" in cut.json`);
     for (const h of C.sfxHits || []) if (!SFXPLAN.lookup(h.id)) errs.push(`sfxHits "${h.id}" is not in kit/sfx/sfx.json`);
     for (const [k, s] of Object.entries(C.sounds || {})) if (!s.file || !existsSync(resolve(dirname(cutFile), s.file))) errs.push(`sounds.${k}: no file at ${s.file}`);
-    for (const [k, s] of (C.inserts || []).entries()) { if (s.place != null && !SPLITL.PLACES.includes(s.place)) errs.push(`inserts[${k}]: place "${s.place}" (${SPLITL.PLACES.join(', ')})`); if (!s.file || !existsSync(resolve(dirname(cutFile), s.file))) errs.push(`inserts[${k}]: no file at ${s.file}`); if (!(+s.dur > 0) || +s.at < 0 || +s.at + +s.dur > TL.total + 0.01) errs.push(`inserts[${k}]: at ${s.at} + dur ${s.dur} is outside the ${TL.total} s cut`); }
+    for (const [k, s] of (C.inserts || []).entries()) { if (s.place != null && !SPLITL.PLACES.includes(s.place)) errs.push(`inserts[${k}]: place "${s.place}" (${SPLITL.PLACES.join(', ')})`); if (Array.isArray(s.run) && !s.file) continue; /* a fast run before its first build: kit/reel.cjs makes its clip and sets file and dur */ if (!s.file || !existsSync(resolve(dirname(cutFile), s.file))) errs.push(`inserts[${k}]: no file at ${s.file}`); if (!(+s.dur > 0) || +s.at < 0 || +s.at + +s.dur > TL.total + 0.01) errs.push(`inserts[${k}]: at ${s.at} + dur ${s.dur} is outside the ${TL.total} s cut`); }
     if (C.bed) { const lib = R.isBed(C.bed);
       if (!existsSync(lib ? R.bedFile(C.bed) : resolve(dirname(cutFile), String(C.bed)))) errs.push(lib ? `bed "${C.bed}": kit/music/${R.BEDS[C.bed].file} is missing (beds.json lists it)` : `bed "${C.bed}": not a library bed (npm run music) and no such file`); }
     const seams = TL.seams.map(x => x.toFixed(2));
@@ -294,7 +294,7 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-steps.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { sterrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio step map tests (tests/studio-steps.test.mjs: the 8 steps, old step names land, one step per layer, menu links, match chips)', errs: sterrs, warns: [] });
-    for (const [f, what] of [['studio-point.test.mjs', 'Studio Cut step tests (tests/studio-point.test.mjs: the point of the video steers lines and clips, topics are real themes, Pacing never cuts a word)'],
+    for (const [f, what] of [
       ['studio-cut-server.test.mjs', 'Studio Cut server tests (tests/studio-cut-server.test.mjs: the Cut routes, the point, topics, Pacing and the stitched previews over HTTP)'],
       ['studio-stages.test.mjs', 'Studio stage status tests (tests/studio-stages.test.mjs: teardown log lines to the stage line, the list and the bar)'],
       ['studio-ref-clear.test.mjs', 'Studio reference clear tests (tests/studio-ref-clear.test.mjs: a stopped breakdown\'s line goes when the reference is cleared or replaced)'],

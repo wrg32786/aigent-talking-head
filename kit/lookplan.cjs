@@ -70,7 +70,7 @@ function shots(look, len, seed = '') {
 
 // Re-cut segs (in place) to the look's shot list on your own pauses and set each shot's transition, move and shake.
 // quiet(i, a, b) as kit/shotplan.cjs wants it. Returns { rc, plan (the shot list), shakeAt, lines }.
-function cut({ look, segs, words, quiet, seed = '', wantPunch = true, motion = SPL.MOTION_DEFAULT }) {
+function cut({ look, segs, words, quiet, seed = '', motion = SPL.MOTION_DEFAULT }) {
   const len = segs.reduce((a, s) => a + s.out - s.in, 0), plan = shots(look, len, seed);
   const rc = SPL.recut(segs, words, plan, quiet);
   segs.splice(0, segs.length, ...rc.segs);

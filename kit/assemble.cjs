@@ -229,7 +229,8 @@ if (panelsOn) {
 // default 460, with a thin white edge, top right; "pipX" and "pipY" move it). A still picture ("image": true, or a
 // .jpg, .png or .webp file) holds for the span with a slow push in.
 // "fit": "whole" shows the clip whole, sharp over its own blurred copy; "fill" crops it to fill. Left out, a clip in the
-// split or framed panel is whole when filling would crop more than a fifth of it away, and fills otherwise.
+// framed panel is whole when filling would crop more than a fifth of it away, and fills otherwise; the split panel has
+// its own rule (kit/split.cjs fitOf: whole for a clip 16:10 or wider).
 // "run": ["a.png", "b.mp4", ...] is a fast run (kit/fastrun.cjs): kit/reel.cjs makes one clip of them, cut on the
 // bed's beats or half beats ("step": "beat" | "half" | seconds), and it plays here as one insert.
 // "place": "frame" (Framed, kit/split.cjs): the b-roll in a rounded card up top and you smaller in a card below, your head
@@ -271,8 +272,8 @@ const chromeFile = g => {
     f.push(`${head},split[wa${k}][wb${k}]`, `[wa${k}]scale=${e2(W / 4)}:${e2(H / 4)}:force_original_aspect_ratio=increase,crop=${e2(W / 4)}:${e2(H / 4)},boxblur=8:2,scale=${W}:${H},eq=brightness=-0.08:saturation=0.9[wg${k}]`, `[wb${k}]${fg}[wf${k}]`);
     src = `[wg${k}][wf${k}]overlay=${b.x}:${b.y}:shortest=1`;
   // "fit": "whole" (kit/fastrun.cjs): the clip is shown whole, sharp over its own blurred copy, instead of cropped to
-  // fill. It is the default in the split and framed panels when filling would crop more than a fifth of the picture
-  // away (a 16:9 clip in the split panel lost its outer 37 percent); "fit": "fill" keeps the crop. A fast run is whole.
+  // fill. It is the default in the framed panel when filling would crop more than a fifth of the picture away;
+  // "fit": "fill" keeps the crop. A fast run is whole. The split panel (place top) is drawn above, by kit/split.cjs fitOf.
   } else if (place !== 'top' && FRUN.fitFor({ ...s, place }, s.fit || place !== 'frame' ? null : FRUN.sizeOf(s.file), W, H) === 'whole') {
     // a still keeps its slow push in: it is made a little small and grows to fill its room, never cropped
     const [w2, h2] = still ? [Math.round(W * 1.1 / 2) * 2, Math.round(H * 1.1 / 2) * 2] : [W, H];

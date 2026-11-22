@@ -823,7 +823,7 @@ let cut = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8'));
 // --motion on a rebuild: the camera moves already on the pieces are sized again
 if (flag('rebuild') && opt('motion')) {
   const m = SHP.motionOf(opt('motion')); if (!m) die('--motion must be subtle, medium or strong');
-  if (m !== cut.motion && RC.resizeMoves(cut.segs, m)) { cut.motion = m; fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); console.log(RC.motionLine(cut.segs, m)); }
+  if (m !== cut.motion && RC.resizeMoves(cut.segs, m)) { cut.motion = m; RF.capMoves(cut.segs, { big: R.PUNCH.big }).forEach(l => console.log(l)); /* a resized move keeps the head in frame, as on a draft */ fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); console.log(RC.motionLine(cut.segs, m)); }
 }
 if (flag('no-beat-sync')) cut.beatSync = false;
 else if (flag('beat-sync')) cut.beatSync = true;
@@ -870,8 +870,6 @@ if (cut.sfxMap) {
     const caps = R.readCaptions(capF);
     if (caps.exportFrame && X.isReframed(caps.exportFrame.name)) { delete caps.exportFrame; fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); }
   } }
-// copy lint and title/sound rules: printed, not blocking (npm run check -- <name> and npm run verify fail on errors)
-try { sh(process.execPath, [path.join(KIT, 'check.mjs'), build, '--warn-only'], build); } catch {}
 // fast runs (kit/fastrun.cjs): an insert with "run": [files] becomes one clip, cut on the bed's beats or half beats
 // when there is a bed (build/beat-grid.json), and plays as one insert. Made again only when its files or times change.
 if ((cut.inserts || []).some(x => Array.isArray(x.run))) {
@@ -879,6 +877,8 @@ if ((cut.inserts || []).some(x => Array.isArray(x.run))) {
   try { const lines = FRUN.resolve(cut, build, B.wantBeatSync(cut) && cut.bed ? B.loadGrid(build) : null); lines.forEach(l => console.log(l)); fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); }
   catch (e) { die('fast run: ' + String(e.stderr || e.message).trim().split('\n').slice(-3).join(' ')); }
 }
+// copy lint and title/sound rules: printed, not blocking (npm run check -- <name> and npm run verify fail on errors)
+try { sh(process.execPath, [path.join(KIT, 'check.mjs'), build, '--warn-only'], build); } catch {}
 
 // base.mp4 (the graded picture alone, BASEONLY) is made once per picture: the face zone and the person mask both read it,
 // and a rebuild that only changes captions, titles, sounds or layers reuses it (base.sig: the cut without those keys)
@@ -893,7 +893,7 @@ const ensureBase = () => { const bf = path.join(build, 'base.mp4'), sf = path.jo
 // the captions keep clear of where your face is on screen; they also need the person mask over those spans to put the
 // top of your head over the panel (on by default, --no-mask keeps the head under the panel)
 const SPL = require('./split.cjs');
-const splitIns = () => (cut.inserts || []).filter(s => SPL.SPLIT.includes(s.place) && +s.dur > 0);
+const splitIns = () => (cut.inserts || []).filter(s => !s.skip && SPL.SPLIT.includes(s.place) && +s.dur > 0);
 const fxReady = () => fs.existsSync(path.join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python'));
 function splitZones(fz) {
   const ins = splitIns(); if (!ins.length) return fz.zones;

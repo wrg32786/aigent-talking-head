@@ -45,8 +45,9 @@ function cropLoss(w, h, W, H) {
   const a = w / h, b = W / H;
   return +(1 - Math.min(a / b, b / a)).toFixed(3);
 }
-// "whole" or "fill" for an insert: what it asks for, else whole in a split or framed panel when filling it would
-// crop more than a fifth of the picture away (a 16:9 clip in the split panel loses 37 percent)
+// "whole" or "fill" for an insert: what it asks for, else whole in a framed panel when filling it would crop more
+// than a fifth of the picture away. The render asks this for every place but the split panel (place top), which
+// kit/assemble.cjs draws by kit/split.cjs fitOf; the top rule here is kept for callers that have only this file.
 const WHOLE_OVER = 0.2;
 function fitFor(insert, src, W, H) {
   const f = String(insert.fit || '').toLowerCase();
