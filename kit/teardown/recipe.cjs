@@ -87,6 +87,7 @@ function recipeMd(c) {
       const f = [`#${pad2(i + 1)} ${g.start}-${g.end}`, `type ${g.type}`];
       if (g.text) f.push(`${g.guess ? 'text~' : 'text'} ${g.text}`);
       if (g.layer) f.push(`layer ${g.layer}`);
+      if (g.lowConfidence) f.push(`check ${String(g.why || 'text').replace(/\s*\|\s*/g, ' ')}`); // a label we are not sure we read right
       if (g.type === 'ordinal-sticker' && g.shape === 'starburst') f.push('shape starburst', `spikes ${g.spikes || 12}`);
       for (const k of ['color', 'tile', 'border']) if (hexOK(g[k])) f.push(`${k} ${g[k].toLowerCase()}`);
       for (const k of ['x', 'y', 'w', 'size']) if (g[k] != null) f.push(`${k} ${g[k]}`);

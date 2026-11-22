@@ -121,14 +121,15 @@ function make({ jobDir, src, name, reel, out, base = null, masks = null, python 
   // 4. picture, masks, b-roll and sound, then 5. the frame cut out of it
   const full = path.join(dir, 'full.mp4');
   run(process.execPath, [path.join(KIT, 'assemble.cjs'), full], { BASE, BASEONLY: '', ...(mk ? {} : { MASK_WARNED: '1' }) });
-  if (LEN > P.maxSec) log(`note: the reel is ${LEN.toFixed(1)} s, longer than ${P.label} allows (${P.maxSec} s); this version is trimmed`);
-  execFileSync('ffmpeg', X.ffmpegArgs(name, full, out, LEN, { y0: fixedY }), { stdio: 'inherit' });
+  const words = (() => { try { return X.wordsOf(R.readCaptions(capF)); } catch { return []; } })(), END = X.endOf(name, LEN, words);
+  if (LEN > P.maxSec) log(`note: the reel is ${LEN.toFixed(1)} s, longer than ${P.label} allows (${P.maxSec} s); this version ends at ${END.toFixed(2)} s, after the last word before the limit`);
+  execFileSync('ffmpeg', X.ffmpegArgs(name, full, out, LEN, { y0: fixedY, words }), { stdio: 'inherit' });
   if (!keep) fs.rmSync(full, { force: true });
   let LAY = null, FC = null; try { LAY = JSON.parse(fs.readFileSync(path.join(dir, 'layout.json'), 'utf8')); } catch {} try { FC = JSON.parse(fs.readFileSync(path.join(dir, 'facecheck.json'), 'utf8')); } catch {} let TC = null; try { TC = JSON.parse(fs.readFileSync(path.join(dir, 'textcheck.json'), 'utf8')); } catch {}
   const n = a => (LAY ? LAY.elements.filter(e => String(e.action).includes(a)).length : 0);
   const layout = LAY ? { safeArea: n('safe-area'), moved: n('shift'), hidden: LAY.elements.filter(e => e.action === 'hide').length, face: n('face') } : null;
   log(`${name}: ${out}${layout ? ` (${layout.safeArea} placed inside the frame, ${layout.face} moved off the face${FC ? ', ' + FC.overlapMoments + ' moments with text on the face' : ''}${TC ? ', ' + TC.clashFrames + ' frames with two words on the same spot' : ''})` : ''}`);
-  return { name, file: out, dir, size: `${P.w}x${P.h}`, label: P.use || P.label, seconds: +Math.min(LEN, P.maxSec).toFixed(2), window: st, layout, faceHits: FC ? FC.overlapMoments : null, textClashes: TC ? TC.clashFrames : null, masks: !!mk };
+  return { name, file: out, dir, size: `${P.w}x${P.h}`, label: P.use || P.label, seconds: +END.toFixed(2), window: st, layout, faceHits: FC ? FC.overlapMoments : null, textClashes: TC ? TC.clashFrames : null, masks: !!mk };
 }
 
 module.exports = { make, picKey, lenOf, splitZones };

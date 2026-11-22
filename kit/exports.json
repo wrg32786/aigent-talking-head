@@ -4,7 +4,7 @@
   "tiktok": { "label": "TikTok (9:16)", "w": 1080, "h": 1920, "y0": 0, "safe": { "top": 160, "bottom": 440, "left": 60, "right": 140 }, "maxSec": 600, "videoKbps": 8000, "audioKbps": 192 },
   "reels": { "label": "Instagram and Facebook Reels (9:16)", "w": 1080, "h": 1920, "y0": 0, "safe": { "top": 220, "bottom": 420, "left": 60, "right": 120 }, "maxSec": 180, "videoKbps": 5000, "audioKbps": 192 },
   "shorts": { "label": "YouTube Shorts (9:16)", "w": 1080, "h": 1920, "y0": 0, "safe": { "top": 160, "bottom": 380, "left": 60, "right": 140 }, "maxSec": 180, "videoKbps": 8000, "audioKbps": 192 },
-  "feed45": { "label": "Feed post (4:5, Instagram, Facebook, LinkedIn, X)", "use": "For the Instagram Feed", "file": "feed-4x5", "reframe": true, "w": 1080, "h": 1350, "y0": 285, "safe": { "top": 60, "bottom": 120, "left": 60, "right": 60 }, "maxSec": 140, "videoKbps": 6000, "audioKbps": 192 },
-  "square": { "label": "Square (1:1)", "use": "Square, for feeds", "file": "square-1x1", "reframe": true, "w": 1080, "h": 1080, "y0": 420, "safe": { "top": 50, "bottom": 90, "left": 50, "right": 50 }, "maxSec": 140, "videoKbps": 6000, "audioKbps": 192 }
+  "feed45": { "label": "Feed post (4:5, Instagram, Facebook, LinkedIn, X)", "use": "For the Instagram Feed", "file": "feed-4x5", "reframe": true, "w": 1080, "h": 1350, "y0": 285, "safe": { "top": 60, "bottom": 120, "left": 60, "right": 60 }, "maxSec": 180, "videoKbps": 6000, "audioKbps": 192 },
+  "square": { "label": "Square (1:1)", "use": "Square, for feeds", "file": "square-1x1", "reframe": true, "w": 1080, "h": 1080, "y0": 420, "safe": { "top": 50, "bottom": 90, "left": 50, "right": 50 }, "maxSec": 180, "videoKbps": 6000, "audioKbps": 192 }
  }
 }

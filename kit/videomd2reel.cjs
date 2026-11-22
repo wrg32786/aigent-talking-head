@@ -90,6 +90,9 @@ function convert(b, extras = {}, opts = {}) {
   (extras.titles || []).forEach((x, i) => { if (picked[i] && x && x.layer) { picked[i].layer = x.layer; picked[i].overlap = x.person_overlap; } });
   ((extras.title_look || {}).rows || []).forEach((x, i) => { if (picked[i] && x) picked[i].look = { lines: x.lines, italic: !!(x.key && x.key.italic), kind: (x.key && x.key.category) || null, glow: x.glow ?? null, dim: x.dim ?? null }; });
   const graphics = mapGraphics(b, extras);
+  // an app label we are not sure we read right (low OCR confidence, letters that are not a word): marked "check", and
+  // only such a label is left out when the caption says the same word (kit/overlay.html); a label read cleanly stays
+  for (const g of graphics) if (g.type === 'app-label' && g.text) { const why = textDoubt({ ...g, conf: g.conf }, []); if (why) { g.lowConfidence = true; g.why = why; } }
   // a title that is a graphic's own word (FIRST on a sticker, the label under an icon) belongs to that graphic
   const inBox = (bb, box) => bb && box && bb[0] + bb[2] / 2 >= box[0] && bb[0] + bb[2] / 2 <= box[0] + box[2] && bb[1] + bb[3] / 2 >= box[1] && bb[1] + bb[3] / 2 <= box[1] + box[3];
   const owned = t => graphics.find(g => t.start < g.end + 0.3 && g.start < t.end + 0.3 && (inBox(t.bbox, g.bbox) || [g.cue, g.text].filter(Boolean).some(x => { const a = norm(x), c = norm(t.text); return a && c && (sameWord(a, c) || (c.length >= 4 && a.includes(c))); })));

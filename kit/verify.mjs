@@ -62,7 +62,7 @@ const ok = (cond, msg) => { lines.push((cond ? 'ok    ' : 'FAIL  ') + msg); retu
 const j = JSON.parse(sh('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,codec_name,width,height,r_frame_rate,sample_rate,channels:format=duration', '-of', 'json', file]));
 const v = j.streams.find(s => s.codec_type === 'video'), a = j.streams.find(s => s.codec_type === 'audio');
 const fr = v ? v.r_frame_rate.split('/').reduce((x, y) => x / y) : 0, dur = +j.format.duration;
-const WANT = EXP ? [EXP.w, EXP.h] : [1080, 1920], TOTAL = EXP ? Math.min(TL.total, EXP.maxSec) : TL.total;
+const WANT = EXP ? [EXP.w, EXP.h] : [1080, 1920], TOTAL = EXP ? X.endOf(EXN, TL.total, X.wordsOf(CAP)) : TL.total;
 ok(v && v.width === WANT[0] && v.height === WANT[1], `video ${v ? v.width + 'x' + v.height : 'missing'} (${WANT.join('x')}${EXP ? ', ' + EXP.label : ''})`);
 ok(v && Math.abs(fr - FPS) < 0.01, `frame rate ${fr.toFixed(3)} (${FPS})`);
 ok(v && v.codec_name === 'h264', `video codec ${v && v.codec_name} (h264)`);

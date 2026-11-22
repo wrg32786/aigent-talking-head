@@ -90,6 +90,16 @@ t('shiftZones: the face as the new frame sees it sits a little above its middle'
   const mid = (z[1] + z[3]) / 2 - X.fixedY('feed45'); assert.ok(Math.abs(mid / 1350 - FW.AIM) < 0.05, `face centre at ${mid} of 1350`);
   assert.strictEqual(z[0], 340); assert.strictEqual(z[2], 740);
 });
+t('a Feed or square version runs as long as a reel (180 s) and ends on a word, never inside one', () => {
+  assert.strictEqual(X.get('feed45').maxSec, 180); assert.strictEqual(X.get('square').maxSec, 180);
+  const words = X.wordsOf({ flips: [{ mode: 0, start: 170, end: 184, words: [[170, 175.2, 'so'], [175.4, 179.1, 'what'], [179.3, 180.6, 'next']] }, { mode: 7, start: 1, end: 2, words: [[1, 2, 'x']] }] });
+  assert.deepStrictEqual(words, [[170, 175.2], [175.4, 179.1], [179.3, 180.6]], 'only spoken caption words count');
+  assert.strictEqual(X.endOf('feed45', 120, words), 120, 'a reel under the limit is not cut');
+  assert.strictEqual(X.endOf('feed45', 190, words), 179.25, 'a word across the limit: the version ends after the word before it, with a breath');
+  assert.strictEqual(X.endOf('square', 190, [[170, 178]]), 180, 'quiet at the limit: it ends at the limit');
+  assert.strictEqual(X.endOf('feed45', 190, [[100, 160], [165, 185]]), 180, 'the last word before it ended long ago: it ends at the limit');
+  const a = X.ffmpegArgs('feed45', 'in.mp4', 'out.mp4', 190, { words }); assert.strictEqual(a[a.indexOf('-t') + 1], '179.25');
+});
 t('file names and plain labels', () => {
   assert.strictEqual(path.basename(X.outName('/j/reel-v1.mp4', 'feed45')), 'reel-v1-feed-4x5.mp4');
   assert.strictEqual(path.basename(X.outName('/j/reel-v3.mp4', 'square')), 'reel-v3-square-1x1.mp4');

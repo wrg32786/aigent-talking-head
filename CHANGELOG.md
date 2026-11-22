@@ -54,6 +54,12 @@ Release notes: [docs/releases/v1.28.0.md](docs/releases/v1.28.0.md). Recreate no
 - **The chat closes at every width (item 20).** `#chat-close` showed on small screens only. It now shows always: on a wide screen it puts the chat away (the page takes the room), the chat button in the top bar brings it back, and the choice is kept across reloads (`localStorage` `studio.chat`). On a phone it closes the sheet as before. Test: `tests/studio-small-fixes.e2e.mjs`, in `npm run smoke`.
 - **Phrases are not one-word captions, and we say when the vision pass was off (item 16, the cheap part).** The teardown never writes `captions: one-word` when `breakdown.json` `shots[].text.items` show phrases of two or more words on a third or more of the moments with big text (4 or more different phrases; `kit/teardown/captions.cjs` `phrasesOnScreen`). It writes `kinetic`, and `teardown.md` says why. When `analysis.vlm` is off or `not_configured`, the Reel.md Style gets `vision: off`, `teardown.md` says "We read this reference without the vision pass, so titles may be misread", and Studio shows that line on the reference card. One title per phrase is not in this release. Tests: `tests/teardown-phrases.test.mjs`.
 
+### Will's picks from the review
+
+- **App labels:** only a label the teardown was not sure it read right (low OCR confidence or letters that are not a word, `check <why>` in the Reel.md graphics line, `check` on the flip) is left out when the caption says the same word; a cleanly read label shows. `kit/teardown.py` carries the label's OCR confidence, `kit/videomd2reel.cjs` marks the doubt, `kit/overlay.html` drops only marked labels. Test: `tests/label-check.test.cjs`, `tests/title-rules.test.mjs`.
+- **Feed 4:5 and square:** up to 180 s like a reel (`kit/exports.json` was 140). A longer reel ends after the last word before the limit (`kit/exports.cjs` `endOf`, `wordsOf`), in the reframed versions, plain crops, 9:16 copies and `npm run verify`. Test: `tests/facewindow.test.cjs`.
+- **Topics:** unchanged. With a model key as the chat backend, opening Cut sends the take's lines to that provider to name the themes; said in the release notes.
+
 ## 1.27.3 (unreleased)
 
 Release notes: [docs/releases/v1.27.3.md](docs/releases/v1.27.3.md). macOS fixes from @mmjohnson84BMP (#70), and the follow-ups it left.

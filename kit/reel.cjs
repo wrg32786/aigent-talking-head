@@ -1042,7 +1042,8 @@ if (EXN && EXN.names.length) {
   for (const n of [EXN.main, ...EXN.extra].filter(Boolean)) {
     const f = X.outName(out, n);
     if (LEN > X.get(n).maxSec) console.warn(`note: the reel is ${LEN.toFixed(1)} s, longer than ${X.get(n).label} allows (${X.get(n).maxSec} s); the export is trimmed`);
-    execFileSync('ffmpeg', X.ffmpegArgs(n, out, f, LEN), { stdio: 'inherit' });
+    const words = (() => { try { return X.wordsOf(R.readCaptions(path.join(build, 'captions.js'))); } catch { return []; } })();
+    execFileSync('ffmpeg', X.ffmpegArgs(n, out, f, LEN, { words }), { stdio: 'inherit' });
     console.log(`export ${n}: ${f}`);
     exportsMade.push({ name: n, file: f, size: `${X.get(n).w}x${X.get(n).h}`, label: X.fileInfo(f).use });
   }

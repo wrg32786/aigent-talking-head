@@ -18,11 +18,23 @@ function frameOf(n, { reframed = isReframed(n) } = {}) { const p = get(n); if (!
 // the safe rect in reel (1080x1920) coordinates
 function safeRect(n) { const p = get(n); if (!p) return null; const y0 = isReframed(n) ? fixedY(n) : p.y0; return { x0: p.safe.left, x1: 1080 - p.safe.right, y0: y0 + p.safe.top, y1: y0 + p.h - p.safe.bottom }; }
 // y0: where the frame is cut from the source picture (a reframed build passes its fixed y; a plain crop uses the preset's)
-function ffmpegArgs(n, src, out, len, { y0 } = {}) {
+// the spoken words of a captions.js as [start, end] in reel time (the caption flips, mode 0)
+const wordsOf = caps => ((caps && caps.flips) || []).filter(f => f.mode === 0 || f.mode == null).flatMap(f => (f.words || []).map(w => [+w[0], +w[1]])).filter(w => w[1] > w[0]);
+// where a version longer than its preset allows ends: on the last word that ends before the cap (a short breath after
+// it), never inside a word. With nothing said across the cap it ends at the cap; a word that ends more than 8 s before
+// it (a long quiet stretch) also leaves the cut at the cap.
+function endOf(n, len, words = []) {
+  const p = get(n); if (!p || !(len > p.maxSec)) return len;
+  const cap = p.maxSec, across = words.some(w => w[0] < cap && w[1] > cap - 0.05);
+  if (!across) return cap;
+  const e = Math.max(0, ...words.filter(w => w[1] <= cap - 0.05).map(w => w[1]));
+  return e > cap - 8 ? Math.min(cap, +(e + 0.15).toFixed(3)) : cap;
+}
+function ffmpegArgs(n, src, out, len, { y0, words } = {}) {
   const p = get(n); if (!p) throw new Error('unknown export ' + n + ' (' + NAMES.join(', ') + ')');
   const vf = [p.h < 1920 ? `crop=1080:${p.h}:0:${y0 != null ? y0 : p.y0}` : null, p.w !== 1080 ? `scale=${p.w}:-2` : null].filter(Boolean);
   const k = p.videoKbps;
-  return ['-v', 'error', '-y', '-i', src, ...(len > p.maxSec ? ['-t', String(p.maxSec)] : []), ...(vf.length ? ['-vf', vf.join(',')] : []),
+  return ['-v', 'error', '-y', '-i', src, ...(len > p.maxSec ? ['-t', String(endOf(n, len, words))] : []), ...(vf.length ? ['-vf', vf.join(',')] : []),
     '-c:v', 'libx264', '-preset', 'medium', '-profile:v', 'high', '-pix_fmt', 'yuv420p', '-b:v', k + 'k', '-maxrate', Math.round(k * 1.25) + 'k', '-bufsize', k * 2 + 'k',
     '-c:a', 'aac', '-b:a', p.audioKbps + 'k', '-ar', '48000', '-movflags', '+faststart', out];
 }
@@ -46,4 +58,4 @@ function fileInfo(f) {
   return { v: +m[2], fx: !!m[1], name, size: p ? SIZE(p) : '9:16', w: p ? p.w : 1080, h: p ? p.h : 1920, main: !tail,
     use: !p || p.h === 1920 ? (tail ? `For ${p.label.replace(/ \(9:16\)$/, '')}, a smaller file` : 'For Reels and Stories') : p.use || p.label };
 }
-module.exports = { EX, NAMES, REFRAMED, FILE_RE, get, isReframed, fixedY, frameOf, safeRect, ffmpegArgs, suffixOf, outName, parseList, fileInfo };
+module.exports = { EX, NAMES, REFRAMED, FILE_RE, get, isReframed, fixedY, frameOf, safeRect, ffmpegArgs, endOf, wordsOf, suffixOf, outName, parseList, fileInfo };

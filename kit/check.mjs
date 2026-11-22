@@ -299,6 +299,7 @@ if (target) {
       ['studio-stages.test.mjs', 'Studio stage status tests (tests/studio-stages.test.mjs: teardown log lines to the stage line, the list and the bar)'],
       ['studio-ref-clear.test.mjs', 'Studio reference clear tests (tests/studio-ref-clear.test.mjs: a stopped breakdown\'s line goes when the reference is cleared or replaced)'],
       ['py-utf8.test.mjs', 'Python reads and writes utf-8 (tests/py-utf8.test.mjs: every text open() names the encoding, so a breakdown works on Windows)'],
+      ['label-check.test.cjs', 'app labels and check (tests/label-check.test.cjs: an app label carries its OCR confidence, a low one is a doubt, "check" in a Reel.md graphics line reaches the flip)'],
       ['split-panel.test.mjs', 'the split panel (tests/split-panel.test.mjs: the head band covers the shadow under the seam in 9:16, 4:5 and 1:1; a wide clip is shown whole on its own blur, flush on the seam; with ffmpeg, a render with no shadow on the head)'],
       ['title-outline-boost.test.mjs', 'title partners follow the caption outline, and the legibility shadow is a choice (tests/title-outline-boost.test.mjs: no stroke with captionOutline none, the Studio switch and its default, --no-boost)'],
       ['teardown-phrases.test.mjs', 'phrases on screen are not one-word captions (tests/teardown-phrases.test.mjs: a fixture breakdown whose text tracks show phrases gives kinetic with the reason, a one-word reel stays one-word, the vision pass off is said in the recipe, teardown.md and on the page)']]) {

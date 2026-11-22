@@ -761,7 +761,8 @@ def detect_graphics(video, cues, seg=None, step=0.25):
             continue
         tl = e["d"][len(e["d"]) // 2]["tile"]
         out.append({"type": "app-label", "start": a, "end": round(max(z, labels[0].get("t1", z)), 2), "text": re.sub(r"\s+", " ", str(labels[0]["text"])).strip(), "cue": labels[0]["text"],
-                    "bbox": bb, "tile": tl, "samples": len(e["d"])})
+                    "bbox": bb, "tile": tl, "samples": len(e["d"]),
+                    **({"conf": labels[0]["conf"]} if labels[0].get("conf") is not None else {})})
     out.sort(key=lambda x: x["start"])
     return out
 

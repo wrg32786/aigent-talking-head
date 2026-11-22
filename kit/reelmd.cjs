@@ -327,6 +327,7 @@ function graphicFlips(r) {
     const text = v(g, 'text'); if (text != null && !none(text)) f.text = f.mode === 23 || f.mode === 28 ? String(text) : String(text).replace(/\s*\/\s*/g, ' ');
     for (const k of ['layer', 'color', 'ink', 'border', 'tile', 'sub', 'left', 'right', 'shape', 'glyph', 'title', 'values', 'labels', 'kind', 'tag', 'keyword', 'corner', 'live', 'clock', 'cues', 'cam', 'cursor', 'style', 'case', 'bg', 'scene']) { const x = v(g, k); if (x != null && !none(x)) f[k] = String(x); }
     for (const k of ['x', 'y', 'w', 'h', 'in', 'size', 'step', 'of', 'count', 'speed', 'opacity', 'spikes']) { const x = v(g, k); if (x != null && x !== '' && !isNaN(+x)) f[k] = +x; }
+    { const x = g.check; if (x != null && !none(x)) f.check = String(x) || 'text'; } // the teardown is not sure it read this right
     { const x = v(g, 'items'); if (x != null && !none(x)) f.items = String(x).split(';').map(s => s.trim()).filter(Boolean); }
     { const x = v(g, 'details'); if (x != null && !none(x)) f.details = String(x).split(';').map(s => s.trim()); }
     { const x = v(g, 'at'); if (x != null && !none(x)) f.at = String(x).split(/[;,]/).map(s => +s.trim()).filter(n => !isNaN(n)); }

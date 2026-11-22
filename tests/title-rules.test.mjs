@@ -113,12 +113,13 @@ if (!hasFf) console.log('skip glow, dim and shadow checks read from stills (need
   ok(corner(px(off, 2)) === 0 && halo(px(off, 2)) < halo(A) + 2000, '"glow": false and "dim": false on a title leave that one out');
 }
 { const flips = [{ start: 1, end: 2.4, text: 'you pay a designer', mode: 0, words: [[1, 1.2, 'you'], [1.2, 1.4, 'pay'], [1.4, 1.5, 'a'], [1.5, 2.3, 'designer']] },
-    { start: 1.3, end: 2.6, text: 'DESIGNER', mode: 10 }, { start: 3, end: 4, text: 'FIGMA', mode: 10 }, { start: 3, end: 4, text: 'then it ships', mode: 0, words: [[3, 3.3, 'then'], [3.3, 3.6, 'it'], [3.6, 3.95, 'ships']] }];
+    { start: 1.3, end: 2.6, text: 'DESIGNER', mode: 10, check: 'read with low confidence (60%)' }, { start: 3, end: 4, text: 'FIGMA', mode: 10 }, { start: 3.1, end: 3.9, text: 'SHIPS', mode: 10 }, { start: 3, end: 4, text: 'then it ships', mode: 0, words: [[3, 3.3, 'then'], [3.3, 3.6, 'it'], [3.6, 3.95, 'ships']] }];
   const r = draw({ ...base, flips }, 5, { stills: [2] });
-  ok(/label 'DESIGNER' at 1\.30 s not drawn: the caption says the same word at that moment/.test(r.log), 'a label that repeats the caption word is not drawn, and the build log says so');
+  ok(/label 'DESIGNER' at 1\.30 s not drawn: the caption says the same word at that moment/.test(r.log), 'a label marked check that repeats the caption word is not drawn, and the build log says so');
   ok(!/label 'FIGMA'/.test(r.log), 'a label with a word of its own stays');
   const lay = JSON.parse(readFileSync(join(r.d, 'layout.json'), 'utf8')).elements.filter(e => e.mode === 10).map(e => e.text);
-  ok(lay.length === 1 && lay[0] === 'FIGMA', `only the label with its own word is laid out (${lay.join(', ')})`);
+  ok(lay.length === 2 && lay.includes('FIGMA') && lay.includes('SHIPS'), `a label with its own word stays, and so does one read cleanly that the caption also says (${lay.join(', ')})`);
+  ok(!/label 'SHIPS'/.test(r.log), 'a cleanly read label is drawn even while the caption says its word (only a label marked check is left out)');
 }
 { // a real app with its own icon is not a misread caption word: it stays when the caption says its name
   const flips = [{ start: 1, end: 2.4, text: 'I use Figma daily', mode: 0, words: [[1, 1.2, 'I'], [1.2, 1.5, 'use'], [1.5, 2.1, 'Figma'], [2.1, 2.4, 'daily']] }, { start: 1.4, end: 2.9, text: 'Figma', mode: 10, icon: 'figma.png' }];

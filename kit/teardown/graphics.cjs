@@ -31,7 +31,7 @@ function mapGraphics(b, extras) {
         ...(g.shape === 'starburst' ? { shape: 'starburst', spikes: Math.round(cl(+g.spikes || 12, 6, 24)) } : {}),
         ...(g.head_ratio && g.face_w && g.head_cy && cy != null ? { head: r2(g.head_ratio), headY: r2((cy - g.head_cy) * 1920 / (g.face_w * 1080)), faceW: g.face_w } : {}) });
     } else if (g.type === 'app-label') {
-      Object.assign(o, { text: clean(g.text), cue: g.cue, tile: g.tile, x: g.bbox ? r2(cl(g.bbox[0], 0.02, 0.7)) : 0.08, y: g.bbox ? r2(cl(g.bbox[1], 0.05, 0.85)) : 0.5,
+      Object.assign(o, { text: clean(g.text), cue: g.cue, tile: g.tile, ...(g.conf != null ? { conf: +g.conf } : {}), x: g.bbox ? r2(cl(g.bbox[0], 0.02, 0.7)) : 0.08, y: g.bbox ? r2(cl(g.bbox[1], 0.05, 0.85)) : 0.5,
         ...(g.bbox ? { size: Math.round(cl(g.bbox[2] * 1080, 120, 320)) } : {}) });
     } else if (g.type === 'screen-card') {
       // what was shown (OCR inside the card) and any web address read in it: a suggested source to confirm
