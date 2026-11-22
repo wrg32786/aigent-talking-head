@@ -2,6 +2,13 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.29.0 (unreleased)
+
+Release notes: [docs/releases/v1.29.0.md](docs/releases/v1.29.0.md).
+
+- **Keep my look after a reference.** New video with Keep my look (and new footage with it on) after a Recreate, Copy the look or Influence takes your own look along, not the reference's: `kit/studio/reference.mjs` `ownLook` (a copy of the board with `undoReferenceLook` and the set-aside `prevLook` put back, the same rule as Back to my look, now `restoreLook`), used by `kit/studio/core.mjs` `freshSession` and `resetEdit`. Picks you made after the reference stay. Test: `tests/studio-leak.test.mjs`.
+- **Docs.** README and `docs/studio.md` alt text under the older screenshots name today's steps (Look is Picture, Finish is Review, Footage is Start, Style is Picture, Post is a view of Render).
+
 ## 1.28.0 (unreleased)
 
 Release notes: [docs/releases/v1.28.0.md](docs/releases/v1.28.0.md). Recreate now matches the reference's framing and colour shot by shot and draws its starburst stickers, and a new mode, Copy the look, puts a reference's style on your own script and subject.
