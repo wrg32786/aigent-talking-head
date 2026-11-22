@@ -145,6 +145,8 @@ Always show the user the teardown report and contact sheet, and let them change 
 - `Reel.md`: the recipe. Edit it.
 - `teardown.md`: what was detected, per title and per shot, and why.
 - `contact.jpg`: sampled frames with the detected titles boxed and labelled.
+- `title-sheets/` (1.29.0): contact sheets of the stretches where big text is on screen (`sheet-01.jpg` and up, at most 12, 3 to 12 frames a second, every tile labelled with its time in seconds), `sheets.json` (`{ sheets: [{ file, from, to, fps }] }`) and `ask.txt`, a ready instruction for an agent. The text reader misreads designed titles, so an agent that can see pictures reads the sheets and sends the titles back with the MCP tool `set_reference_titles`. When no big text was read at all, the sheets cover the whole reel.
+- `titles.agent.json`: the titles your agent read from the sheets. A re-run keeps it, and the recipe uses these titles ahead of the text reader's.
 - `videomd/`: rea-video's VIDEO.md package, `breakdown.json` and `report.html` (or `fallback.json` from the built-in analyzer).
 - `titles.json`, `extras.json`, `speech.json`: intermediate data. `extras.json` `shots[]` holds each shot's grade stats, and since 1.28.0 `face` (`h`, `eye_y`, `cx`, the box `x0 y0 x1 y1`, and `n` of `of` samples with a face) and `lab` (`mean`, `std`); `graphics[]` holds each ordinal sticker's `shape`, `spikes`, `color` and `layer`.
 

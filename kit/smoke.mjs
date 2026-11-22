@@ -1052,6 +1052,7 @@ try {
     const E2E = [
       ['Studio Record now in Chrome with a fake camera and mic (tests/studio-record.e2e.mjs)', 'studio-record.e2e.mjs'],
       ['Studio scenes made from a reference in Chrome: what Recreate brings on the reference card, the REF tile with its own still, an agent scene without a reload, taking one out (tests/studio-scenes.e2e.mjs)', 'studio-scenes.e2e.mjs'],
+      ['Studio Read the titles with my agent in Chrome: the card in the breakdown, Copy for my agent, Send to my agent when one is connected, the titles it read, both themes (tests/studio-ref-titles.e2e.mjs)', 'studio-ref-titles.e2e.mjs'],
       ['Studio Connect agent, teleprompter speed and pop-out, footage from a link, in Chrome (tests/studio-connect.e2e.mjs)', 'studio-connect.e2e.mjs'],
       ['Studio Cut step in Chrome: footage player, output picker, cut timeline, batch render, pull script (tests/studio-cut.e2e.mjs)', 'studio-cut.e2e.mjs'],
       ['Studio B-roll step in Chrome: lane, placements, API keys, stock, cards, ideas, generate and screen recording against mocks, assemble placements (tests/studio-broll.e2e.mjs)', 'studio-broll.e2e.mjs'],
