@@ -42,6 +42,12 @@ try {
   ok(one.lines === 1 && !one.partner, `one big word alone is one line (${one.lines})`);
   const other = frame([], ['--key', '347 Days', '--partner', "THAT'D KEEP ME GOING FOR"]);
   ok(other.lines === 2 && other.key.italic && other.partner.case === 'upper', `another title of the same look reads the same ("347 Days": ${other.lines} lines, italic ${other.key.italic})`);
+  // the OCR often reads only the big word: the small line just above it is still found, and its capitals read from the letters' shapes
+  const keyOnly = frame(['--key-box']);
+  ok(keyOnly.lines === 2 && keyOnly.partner && keyOnly.partner.place === 'above' && keyOnly.partner.color === '#ffffff' && keyOnly.partner.case === 'upper', `with only the key word's box and text, the partner line is still read (${JSON.stringify(keyOnly.partner)})`);
+  ok(keyOnly.key.category === 'serif' && keyOnly.key.italic && keyOnly.glow >= 0.12, 'and the key word reads the same');
+  const keyAlone = frame(['--key-box', '--one']);
+  ok(keyAlone.lines === 1, 'one word alone with room round it is still one line');
   // ---- every title folded into one look
   const sf = join(dir, 'rows.json'); writeFileSync(sf, JSON.stringify([ref, other, one, null]));
   const sum = py(['summary', '--json', sf]);
@@ -80,6 +86,7 @@ try {
   ok(pre.fonts === 'instrument' && tl && tl.titleLockup === 'full' && tl.titleEntrance === 'blur-rise' && tl.titleGlow && tl.titleDim > 0.3, `the preset carries the look (${JSON.stringify(tl)})`);
   ok(tl.lockup.partnerUpper === true && tl.lockup.heroUpper === false && tl.lockup.partnerColor === '#ffffff' && /^#f/.test(tl.lockup.heroColor) && tl.lockup.arrange === 'stack', 'the lockup: partner in capitals, key word as said, their colours, stacked');
   ok(r.titles[1].check === 'not the number said at that moment' && r.titles[0].check === undefined, 'the check field reads back from the title line');
+  { const w = RM.parse(md.replace(/\n/g, '\r\n')); ok(w.titles.length === r.titles.length && w.shots.length === r.shots.length && w.titles[1].check === r.titles[1].check, `a Reel.md with Windows line endings reads the same (${w.titles.length} titles, ${w.shots.length} shots)`); }
   const back = RM.titleLookLines({ ...tl });
   ok(JSON.stringify(RM.titleLookOf(Object.fromEntries(back.map(l => l.replace(/^- /, '').split(': '))))) === JSON.stringify(tl), 'the Style lines written from a job read back the same');
   { const e = []; RM.titleLookOf({ 'title-lockup': 'three', 'title-glow': 'huge', 'title-dim': '2', 'title-entrance': 'wobble', 'title-key-color': 'yellowish', 'caption-face': 'big' }, e); ok(e.length === 6, `bad values are refused, one error each (${e.length})`); }

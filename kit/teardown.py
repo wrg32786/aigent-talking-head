@@ -851,7 +851,7 @@ def cmd_extras(a):
     # the look of the big titles (kit/titlelook.py): one line or two, serif or sans, italic, case, colours, glow, dim
     try:
         import titlelook
-        tl = titlelook.read_video(a.video, titles, shots, frame_at)
+        tl = titlelook.read_video(a.video, titles, shots, frame_at, cues)
         out["title_look"] = tl
         lk = tl.get("look")
         if lk:

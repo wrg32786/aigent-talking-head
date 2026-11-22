@@ -149,7 +149,7 @@ function view(s) {
   let edit = null; try { edit = editOf(s, { combo, cut, broll }); } catch (e) { edit = { error: e.message }; }
   let look = null; try { look = lookSources(s); } catch {}
   const outputs = C.outputsOf(s), currentOutputs = currentOutputsOf(s);
-  return { seq: ++viewSeq, boot: BOOT, scenes: C.catalog().scenesSig || '', state: s, look, compose: comp, outputs, currentOutputs, sizes: SIZES.viewOf(s, outputs), refFont: C.refFontOf(s, SLK.fontOf(s.styleLook)), draftPreview: draftPreviewOf(s), match: matchOf(s), styleLooks: SLK.list(), reopenable, scripts, cut, broll, pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: noTimeline(s) ? null : swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
+  return { seq: ++viewSeq, boot: BOOT, scenes: C.catalog().scenesSig || '', state: s, look, compose: comp, outputs, currentOutputs, sizes: SIZES.viewOf(s, outputs), refFont: C.refFontOf(s, SLK.fontOf(s.styleLook)), savedLook: C.savedLookOf(s), draftPreview: draftPreviewOf(s), match: matchOf(s), styleLooks: SLK.list(), reopenable, scripts, cut, broll, pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: noTimeline(s) ? null : swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
 }
 
 // Copy the look (kit/studio/stylelooks.mjs): the reference's timeline is not used, so no "what to swap" and no spots from it
@@ -223,7 +223,7 @@ const refPackName = s => s.reference && s.reference.mode === 'influence' && s.re
 // force: write it whatever the mode (Save as a Look from a reference used whole, or off)
 function writeRefPack(s, { force = false } = {}) {
   const name = force ? (s.reference && s.reference.extracted && s.job ? `ref-${s.job}`.slice(0, 48) : null) : refPackName(s); if (!name) return null;
-  const pack = C.fitStyle(C.influencePack(s.reference.extracted, s.job, s.pack));
+  const pack = C.fitStyle(C.influencePack(s.reference.extracted, s.job, s.pack, force ? null : C.refParts(s.reference)));
   const errs = K.validate(pack);
   if (errs.length) throw new Error('reference pack: ' + errs.join('; '));
   const dir = join(K.LOCAL, name); mkdirSync(dir, { recursive: true });
@@ -240,7 +240,7 @@ function lookSources(s, cat = C.catalog()) {
     add(pack, 'transition', l.transitions); add(pack, 'entrance', l.titles); add(pack, 'graphic', l.graphics && l.graphics.allow); add(pack, 'finish', l.finishes); add(pack, 'captionEntrance', l.captionEntrance);
     add(pack, 'transition', st.transition); add(pack, 'entrance', st.entranceOrder); add(pack, 'finish', st.finishPool); add(pack, 'effect', st.effectsFavourites); add(pack, 'look', st.look); add(pack, 'captionStyle', st.captionStyle); }
   const ex = s.reference && s.reference.mode !== 'off' ? s.reference.extracted : null;
-  if (ex) { for (const r of Object.keys(C.referencePicks(ex, null, cat))) ref.add(r); add(ref, 'look', ex.look); }
+  if (ex) { for (const r of Object.keys(C.referencePicks(ex, null, cat))) ref.add(r); add(ref, 'look', ex.look); add(ref, 'entrance', ex.entrances); }
   const added = new Set((s.reference && s.reference.added) || []);
   for (const r of added) ref.add(r);
   // why the reference picked each one (its teardown's reasons, kit/studio/reference.mjs summarize), for the Look step
@@ -1205,6 +1205,23 @@ async function api(req, res, u) {
       n = C.undoReferenceLook(x);
       x.reference = { ...x.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null, added: [], prev: null, auto: null, stages: null }; C.syncRefFont(x); });
     return json(res, 200, { ...view(st), note: `Cleared the reference${n ? ` and the ${n} pick${n === 1 ? '' : 's'} it added` : ''}. Undo puts it back.` });
+  }
+  // the one button under "Your saved look is in use, not the reference's": take off the kept picks that sit over the
+  // reference's look (kit/studio/reference.mjs useReferenceLook). Undo on the page puts them back.
+  if (p === '/api/reference/use-look' && M === 'POST') {
+    let r; const st = update(x => { r = C.applyPatch(x, { useReferenceLook: true }); });
+    return json(res, 200, { ...view(st), log: r.log, note: r.noop ? "The reference's look is already in use." : "Switched to the reference's look. Undo brings your saved look back." });
+  }
+  // fix the text of a title the breakdown may have misread, before a draft: { n, text } rewrites that title in the
+  // reference's Reel.md (kit/studio/reference.mjs fixTitleText) and reads the recipe again
+  if (p === '/api/reference/title' && M === 'POST') {
+    const b = await readBody(req), s0 = C.load(), out = s0.reference && s0.reference.out, recipe = out ? join(ROOT, out, 'Reel.md') : null;
+    if (!recipe || !existsSync(recipe) || !s0.reference.extracted) return json(res, 400, { error: 'Add a reference and let us break it down first.' });
+    try {
+      const fx = C.fixTitleText(recipe, +b.n, b.text), ex = C.extract(recipe);
+      const st = update(x => { x.reference.extracted = ex; const it = (x.reference.queue || []).find(q => q.id === x.reference.active && q.out === out); if (it) it.extracted = ex; });
+      return json(res, 200, { ...view(st), title: fx, note: `Title ${fx.n} saved.` });
+    } catch (e) { return json(res, e.code || 500, { error: e.message }); }
   }
   if (p === '/api/reference/apply' && M === 'POST') {
     const s = C.load(), ex = s.reference.extracted; if (!ex) return json(res, 400, { error: 'tear down a reference first' });

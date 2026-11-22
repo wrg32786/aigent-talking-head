@@ -538,7 +538,7 @@ const OWSEQ=(()=>{const ws=[];for(const c of flips)if(c[3]===0&&(c[4].style||CST
  const ent=flips.filter(c=>c[3]===9||(!TCLEAR&&c[3]===7)).map(c=>+c[0]);for(const x of live)for(const a of ent)if(a>x.s&&a<x.e&&a>=x.z-.05)x.e=Math.max(x.s+MIN,a);
  for(const T of TS)for(const x of live){if(x.e<=x.s)continue;
   if(x.s<T.a){if(x.e>T.a)x.e=T.a}
-  else if(x.s<T.z){if(T.z-x.a<=.3&&x.e-T.z>=.08)x.s=T.z;else x.e=x.s}}
+  else if(x.s<T.z){if(T.z-x.a<=.3+1e-6&&x.e-T.z>=.08-1e-6)x.s=T.z;else x.e=x.s}}
  // a word said earlier that is also one of the title's words ("the plan", a pause, then the title "plan today") does
  // not hold on up to the title: it leaves 0.13 s ahead, so it is never in the bar on the frames just before its own title
  for(const T of TS)for(const x of live){if(x.e>x.s&&x.s<T.a&&x.e>T.a-.13&&T.ws.includes(wnorm(x.w)))x.e=Math.max(x.s,T.a-.13)}

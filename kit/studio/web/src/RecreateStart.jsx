@@ -7,7 +7,7 @@ import { Button } from '@astryxdesign/core/Button';
 import { api, quiet, toast, Icon, STATUS } from './lib.jsx';
 import { upload } from './upload.js';
 import { Stages } from './Stages.jsx';
-import { READING, refName, LookChips } from './RefCard.jsx';
+import { READING, refName, LookChips, SavedLookNote } from './RefCard.jsx';
 import { PointField } from './Cut.jsx';
 
 export const START_MODES = [
@@ -16,7 +16,7 @@ export const START_MODES = [
   ['look', 'Copy the look', 'Same style, your script', 'spark'],
 ];
 
-export function StartMode({ s, apply, patch, go, looks }) {
+export function StartMode({ V, s, apply, patch, go, looks }) {
   const r = s.reference, q = r.queue || [], ex = r.extracted, sm = (ex && ex.summary) || {};
   const [local, setLocal] = useState(null), [url, setUrl] = useState(''), [busy, setBusy] = useState(false);
   const fileIn = useRef(null), box = useRef(null);
@@ -75,6 +75,7 @@ export function StartMode({ s, apply, patch, go, looks }) {
           <Button id="recreate-upload" type="button" variant="secondary" label="Upload" icon={<Icon n="upload" />} onClick={() => fileIn.current.click()} />
           <input type="file" id="recreate-file" ref={fileIn} accept="video/*,.mov,.mp4,.m4v,.webm,.mkv" hidden onChange={e => { addFile([...e.target.files]); e.target.value = ''; }} />
         </form>}
+      {ex && <SavedLookNote V={V} apply={apply} id="saved-look-start" />}
       {!ex && has && <Stages v={live} id="recreate-stages" />}
       {failed && failed.stages && failed.stages.failed ? <Stages v={failed.stages} id="recreate-stages" onRetry={() => api('/api/reference/item', { id: failed.id, action: 'retry' }).then(apply).catch(() => {})} />
         : failed && <p className="err" id="recreate-err" role="alert">{failed.error}</p>}

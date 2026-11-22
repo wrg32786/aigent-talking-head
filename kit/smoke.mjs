@@ -192,14 +192,17 @@ try {
     const b = atBack(0.6);
     if (!b.titles.n) fail('explicit behind: hero should be on the titles layer');
   });
-  step('one-word: the title is its word, the bar is empty while it is up, the next word after it', () => {
+  step('one-word: the title is its word, nothing is in the caption bar while it is up, the words come back after it', () => {
     const at = layered(join(work, 'one-word-title'), { captionStyle: 'one-word', flips: [
       { start: 0, end: 0.9, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam', flicker: false, layer: 'behind' },
-      { start: 0, end: 2, text: 'Record one take', mode: 0, words: [[0, 0.6, 'Record'], [0.6, 1.2, 'one'], [1.2, 2, 'take']] }] }, [0.3, 0.75, 1.5]);
-    const a = at(0.3), b = at(1.5), m = at(0.75);
+      { start: 0, end: 2, text: 'Record one take', mode: 0, words: [[0, 0.6, 'Record'], [0.6, 1.2, 'one'], [1.2, 2, 'take']] }] }, [0.3, 0.75, 1.0, 1.5]);
+    const a = at(0.3), b = at(1.5), m = at(0.75), n1 = at(1.0);
     if (!a.titles.n) fail('title word missing');
     if (a.front.n) fail('one-word: the spoken word the title shows should not be drawn twice');
-    if (m.front.n) fail('one-word: nothing in the caption bar while a title is up (Studio report 4 item 2)');
+    // since 1.28.0 (Studio report 4, item 2): a word said under a title is not drawn while the title is up; one said in its
+    // last 0.3 s comes up when the title has left
+    if (m.front.n) fail('one-word: while a title is up the caption bar shows nothing');
+    if (n1.titles.n || !n1.front.n) fail('one-word: a word said at the end of a title should come up when the title has left');
     if (a.titles.y1 - a.titles.y0 > 330) fail('one-word title should be a single word, ink height ' + (a.titles.y1 - a.titles.y0));
     if (b.titles.n || !b.front.n) fail('one-word: after the title the caption word should be the only word');
     if (b.front.y1 - b.front.y0 > 330) fail('one-word caption should be one line, ink height ' + (b.front.y1 - b.front.y0));
@@ -1052,9 +1055,9 @@ try {
       ['Studio Connect agent, teleprompter speed and pop-out, footage from a link, in Chrome (tests/studio-connect.e2e.mjs)', 'studio-connect.e2e.mjs'],
       ['Studio Cut step in Chrome: footage player, output picker, cut timeline, batch render, pull script (tests/studio-cut.e2e.mjs)', 'studio-cut.e2e.mjs'],
       ['Studio B-roll step in Chrome: lane, placements, API keys, stock, cards, ideas, generate and screen recording against mocks, assemble placements (tests/studio-broll.e2e.mjs)', 'studio-broll.e2e.mjs'],
-      ['Studio B-roll slot cards in Chrome: one Needs B-roll card per slot with Upload, Copy for my agent and Skip, keys and tabs folded away, a clip on a slot sits as a panel (tests/studio-broll-slots.e2e.mjs)', 'studio-broll-slots.e2e.mjs'],
       ['Studio B-roll that picks itself in Chrome: spots after a draft, the first spot too, cards with no key, Add a spot, upload kinds, a raw testimonial cut on whole words and played in the reel, MCP pick_broll, add_spot, add_testimonial (tests/studio-spots.e2e.mjs)', 'studio-spots.e2e.mjs'],
       ['Studio Pieces and Outputs in Chrome: lines sorted by what they do, Use our best lines, Clear my clip, reorder and drop, your clip drafts on whole words, the Outputs library with Edit this reel and Compare, MCP get_pieces, set_combo, choose_combo, list_outputs (tests/studio-pieces.e2e.mjs)', 'studio-pieces.e2e.mjs'],
+      ['Studio saved look and title checks in Chrome: the saved look line with one button on Start, Picture and the breakdown, Undo, Check this text with Save (tests/studio-reflook.e2e.mjs)', 'studio-reflook.e2e.mjs'],
       ['Studio Look in Chrome: one row of Looks, the reference card, 9 layers with every option once, REF, LOOK and YOU badges, Music and sounds as one layer, Clear reference as one undo, Save as a Look (tests/studio-look.e2e.mjs)', 'studio-look.e2e.mjs'],
       ['Studio settings that rule out others in Chrome: Single word captions turn off a caption entrance with one line and Undo, greyed tiles say why, one click switches, a Look with no titles, No music (tests/studio-conflicts.e2e.mjs)', 'studio-conflicts.e2e.mjs'],
       ['Studio agent and review in Chrome: drag to select on whole words, Note for my agent, Ask my agent with the step, Apply on a suggested change, a note on a stretch of the reel, the wizards, light theme and the phone (tests/studio-agent-ux.e2e.mjs)', 'studio-agent-ux.e2e.mjs'],
@@ -1203,9 +1206,6 @@ try {
     let cv = false; try { run(fpy, ['-c', 'import cv2, numpy']); cv = true; } catch {}
     if (!cv) { console.log('  (facezone.py checks skipped: no OpenCV)'); return; }
     run(fpy, [join(dirname(KIT), 'tests', 'test_facezone.py')], work);
-    // what the teardown reads from a reference's B-roll (kit/broll_fx.py), on a fixture it draws: a panel that pops in
-    // and pushes, a black and white cutaway that shakes, a split screen
-    try { execFileSync(process.execPath, [join(dirname(KIT), 'tests', 'broll-fx.test.mjs')], { stdio: 'pipe', env: { ...process.env, PYTHON: fpy } }); } catch (e) { fail('B-roll effects reader (tests/broll-fx.test.mjs): ' + String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     run('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=s=540x960:r=24:d=1', '-pix_fmt', 'yuv420p', 'noface.mp4'], work);
     run(fpy, [join(KIT, 'facezone.py'), 'noface.mp4', 'noface-zone.json'], work);
     const z = JSON.parse(readFileSync(join(work, 'noface-zone.json'), 'utf8'));

@@ -2,7 +2,7 @@
 // was made for the menu, what the breakdown read), referenceLook turns it into picks for Recreate (all of it) or
 // Influence (the parts switched on), and influencePack makes the soft pack Influence uses. Pure: no server, no network.
 // kit/studio/core.mjs re-exports all of it, so callers keep importing from core.
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, renameSync } from 'fs';
 import { dirname, join, basename } from 'path';
 import { createRequire } from 'module';
 import { catalog, applyPatch } from './core.mjs';
@@ -54,7 +54,37 @@ export function extract(recipePath) {
     // what was made for the menu from it (kit/scenes.cjs), and what Recreate re-cuts and brings: its shot plan, framing, cutaways and sounds
     scenes: scenesOf(r, dirname(recipePath)),
     plan: planOf(r),
+    // titles whose text the teardown is not sure it read right (the `check <reason>` field of a title line): every one,
+    // for the page to show with a field to fix it before a draft (fixTitleText below)
+    checks: (r.titles || []).filter(t => t.check).map(t => ({ n: t.n, at: +t.start || 0, text: t.text === true ? '' : String(t.text || ''), why: t.check === true ? 'the text may be misread' : String(t.check) })),
   };
+}
+// Fix the text of one title in a reference's Reel.md before a draft: its `text` is rewritten and its `check` field is
+// taken off; every other byte of the file stays as it was (line endings too). Saving the same text says it was right.
+export function cleanTitleText(text) { return String(text == null ? '' : text).replace(/\s*\|\s*/g, ' / ').replace(/\s+/g, ' ').trim().slice(0, 160); }
+export function fixTitleText(recipePath, n, text) {
+  const fail = (msg, code) => { throw Object.assign(new Error(msg), { code }); };
+  const clean = cleanTitleText(text); if (!clean) fail('Type the text of the title first.', 400);
+  const src = readFileSync(recipePath, 'utf8'), open = /^```reel-titles[ \t]*\r?\n/m.exec(src); if (!open) fail('This reference has no titles.', 404);
+  const from = open.index + open[0].length, close = /^```/m.exec(src.slice(from)), to = close ? from + close.index : src.length;
+  let at = from, done = null;
+  while (at < to && !done) {
+    const nl = src.indexOf('\n', at), end = nl < 0 || nl >= to ? to : nl, raw = src.slice(at, end), cr = raw.endsWith('\r') ? '\r' : '', line = cr ? raw.slice(0, -1) : raw;
+    const m = /^\s*#(\d+)\s/.exec(line);
+    if (m && +m[1] === +n) {
+      const parts = line.split(/(\s+\|\s+)/), out = [parts[0]]; let had = false; // fields and the separators between them
+      for (let i = 1; i < parts.length; i += 2) { const sep = parts[i], f = parts[i + 1] || '';
+        if (/^check(\s|$)/.test(f)) continue;
+        if (/^text(\s|$)/.test(f)) { out.push(sep, 'text ' + clean); had = true; } else out.push(sep, f); }
+      if (!had) out.push(' | ', 'text ' + clean);
+      done = { at, end, line: out.join('') + cr };
+    }
+    at = end + 1;
+  }
+  if (!done) fail(`This reference has no title ${n}.`, 404);
+  const next = src.slice(0, done.at) + done.line + src.slice(done.end);
+  if (next !== src) { const tmp = recipePath + '.tmp'; writeFileSync(tmp, next); renameSync(tmp, recipePath); }
+  return { n: +n, text: clean, changed: next !== src };
 }
 // which parts of the breakdown ran, from what the teardown left beside its Reel.md, each with the fix when one did not:
 // the full reader (rea-video), the speech, the layers and grade (extras.json, the person mask), the contact sheet, the
@@ -117,7 +147,8 @@ export function referencePicks(ex, kinds = null, cat = catalog()) {
   if (!ex) return picks;
   const want = k => !kinds || kinds.includes(k);
   if (want('transition')) for (const t of Object.keys(ex.transitions || {})) picks[`transition:${t}`] = 'allow';
-  if (want('entrance')) for (const e of ex.entrances || []) picks[`entrance:${e}`] = 'allow';
+  // never an entrance: the entrances a teardown read are a preference (the recipe's own titles, the reference pack's
+  // style.entranceOrder), so a rebuild can still use every entrance. Only an entrance you pick yourself is a lock.
   if (want('finish')) for (const f of ex.finishes || []) picks[`finish:${f}`] = 'allow';
   if (want('graphic')) for (const g of ex.graphics || []) picks[`graphic:${g}`] = 'allow';
   if (want('effect')) for (const e of ex.effects || []) picks[`effect:${e}`] = 'allow';
@@ -153,7 +184,7 @@ export const refParts = r => ({ ...INFLUENCE_PARTS, ...((r && r.parts) || {}) })
 export function referenceLook(ex, mode, cat = catalog(), parts = null) {
   if (!ex || !['recreate', 'influence'].includes(mode)) return null;
   const picks = referencePicks(ex, null, cat);
-  for (const x of (ex.summary && ex.summary.suggestions) || []) { const it = cat.items[x.ref]; if (it && it.mode !== 'info') picks[x.ref] = 'allow'; }
+  for (const x of (ex.summary && ex.summary.suggestions) || []) { const it = cat.items[x.ref]; if (it && it.mode !== 'info' && it.kind !== 'entrance') picks[x.ref] = 'allow'; }
   if (mode === 'influence') { const on = { ...INFLUENCE_PARTS, ...(parts || {}) }; for (const r of Object.keys(picks)) { const part = partOf(cat.items[r]); if (part && on[part] === false) delete picks[r]; } }
   for (const r of Object.keys(picks)) if (!cat.items[r] || cat.items[r].mode === 'info') delete picks[r];
   const out = { picks };
@@ -198,13 +229,94 @@ export function refFontOf(s, lookFont = null) {
   return { from: ref ? 'reference' : 'look', locked: !!s.fontLock, font: f };
 }
 
+// ---------- entrances and a reference ----------
+// A session saved before this rule holds the reference's entrances as allow picks (entrance:slam = allow, ...), and
+// those became locks.titles, so a rebuild could use only the entrances the teardown happened to read. When the picks
+// are exactly the reference's entrances and you have not picked an entrance yourself since (state.entranceLock), they
+// are the reference's, not yours: never a lock, and load() takes them off the page.
+export function refEntrancesOnly(s) {
+  const r = s.reference, ex = r && r.mode !== 'off' ? r.extracted : null, p = s.picks && s.picks.entrance;
+  if (!ex || !p || s.entranceLock || (p.deny || []).length) return false;
+  const a = p.allow || [], b = ex.entrances || [];
+  return a.length > 0 && a.length === b.length && a.every(x => b.includes(x));
+}
+export function dropRefEntrances(s) {
+  if (!refEntrancesOnly(s)) return false;
+  delete s.picks.entrance; if (s.reference.added) s.reference.added = s.reference.added.filter(x => !x.startsWith('entrance:'));
+  return true;
+}
+
+// ---------- your saved look and a reference ----------
+// Recreate and Copy the look copy the reference's style. A pick sent to the reel wins over the recipe (flags first), so
+// a pick that was already on the board when the reference came into use (a new video that kept the look of the one
+// before) puts your saved look over the reference's. We remember those picks (reference.kept, for reference.keptFor):
+// while any is still set the page says "Your saved look is in use, not the reference's" with one button that takes
+// them off. A pick you make after the reference came into use is your choice for this video and is never counted.
+//   counted: caption style, caption entrance, look, theme, title layer and title entrances; and transitions and
+//   finishes when you forbade one, or when the reference set none of its own (yours alone would be the lock).
+//   not counted: the Look (a pack is never sent in these modes), a saved style look (the reference wins over it), and
+//   the font (cleared when the reference comes into use, see above).
+export const SAVED_LOOK_TEXT = "Your saved look is in use, not the reference's";
+const KEPT_KINDS = ['captionStyle', 'captionEntrance', 'look', 'theme', 'titleLayer', 'entrance', 'transition', 'finish'];
+const KEPT_WORD = { captionStyle: 'caption style', captionEntrance: 'caption entrance', look: 'caption look', theme: 'theme', titleLayer: 'title layer', entrance: 'title entrance', transition: 'transition', finish: 'finish' };
+const usesRefStyle = r => copiesStyle(r) && !!r.extracted;
+function ownLookRefs(s) {
+  const added = new Set((s.reference && s.reference.added) || []), out = [];
+  for (const k of KEPT_KINDS) { const p = s.picks && s.picks[k]; if (!p) continue;
+    const allow = (p.allow || []).map(id => `${k}:${id}`), deny = (p.deny || []).map(id => `${k}:${id}`);
+    const widens = (k === 'transition' || k === 'finish') && allow.some(x => added.has(x)); // beside the reference's own: nothing of it is ruled out
+    if (!widens) out.push(...allow.filter(x => !added.has(x)));
+    out.push(...deny); }
+  return out;
+}
+// own: your picks as they were before the reference set its own (setReferenceLook reads them first)
+export function syncRefKept(s, own = null) {
+  const r = s.reference; if (!r) return;
+  const key = usesRefStyle(r) ? refKey(r) : null;
+  if (key && r.keptFor !== key) { r.kept = own || ownLookRefs(s); r.keptFor = key; r.keptOff = null; }
+  else if (!key && r.keptFor) { // back to your own look: the picks the switch took off come back
+    for (const x of r.keptOff || []) { const i = x.ref.indexOf(':'), k = x.ref.slice(0, i), id = x.ref.slice(i + 1), pk = s.picks[k] || (s.picks[k] = { allow: [], deny: [] }), one = !['entrance', 'transition', 'finish'].includes(k);
+      if (pk.allow.includes(id) || pk.deny.includes(id) || (one && pk.allow.length)) continue;
+      (x.deny ? pk.deny : pk.allow).push(id); }
+    r.kept = null; r.keptFor = null; r.keptOff = null;
+  }
+}
+// a pick you change yourself while the reference is in use is yours for this video (kind null: every kind)
+export function touchKept(s, kind = null) {
+  const r = s.reference; if (!r || !usesRefStyle(r)) return;
+  if (r.keptFor !== refKey(r)) syncRefKept(s);
+  r.kept = kind ? (r.kept || []).filter(x => !x.startsWith(kind + ':')) : [];
+}
+// null when no reference's style is being copied, else { inUse, by: [{ ref, kind, id, deny, label }], text, mode }
+export function savedLookOf(s, cat = catalog()) {
+  const r = s.reference; if (!r || !usesRefStyle(r)) return null;
+  const now = ownLookRefs(s), kept = r.keptFor === refKey(r) && Array.isArray(r.kept) ? now.filter(x => r.kept.includes(x)) : now;
+  const denied = new Set(KEPT_KINDS.flatMap(k => ((s.picks[k] && s.picks[k].deny) || []).map(id => `${k}:${id}`)));
+  const by = kept.filter(x => cat.items[x]).map(ref => { const i = ref.indexOf(':'), kind = ref.slice(0, i), id = ref.slice(i + 1), deny = denied.has(ref);
+    return { ref, kind, id, deny, label: `${deny ? 'no ' : ''}${KEPT_WORD[kind] || kind} ${id}` }; });
+  return { inUse: by.length > 0, by, text: by.length ? SAVED_LOOK_TEXT : null, mode: r.mode };
+}
+// the one button: take off the kept picks that sit over the reference's look. Returns { n, off } or null when none do.
+export function useReferenceLook(s, cat = catalog()) {
+  const sl = savedLookOf(s, cat); if (!sl || !sl.inUse) return null;
+  const r = s.reference;
+  for (const b of sl.by) { const pk = s.picks[b.kind]; if (!pk) continue;
+    pk.allow = (pk.allow || []).filter(x => x !== b.id); pk.deny = (pk.deny || []).filter(x => x !== b.id);
+    if (!pk.allow.length && !pk.deny.length) delete s.picks[b.kind]; }
+  if (!s.picks.entrance) s.entranceLock = false;
+  r.keptFor = refKey(r); r.kept = [];
+  r.keptOff = [...(r.keptOff || []), ...sl.by.map(b => ({ ref: b.ref, deny: b.deny }))];
+  return { n: sl.by.length, off: sl.by };
+}
+
 // sets the Look from the reference for its mode, after taking out what an earlier mode or reference set.
 // Returns { mode, n, pack, bed, at } (reference.auto, what the page's notice reads) or null when nothing was set.
 export function setReferenceLook(s, cat = catalog()) {
   const r = s.reference; if (!r) return null;
   if ((r.added && r.added.length) || r.prev || r.auto) undoReferenceLook(s);
   syncRefFont(s);
-  const p = referenceLook(r.extracted, r.mode, cat, r.parts); if (!p) return null;
+  const own = ownLookRefs(s); // what was on the board before the reference set anything
+  const p = referenceLook(r.extracted, r.mode, cat, r.parts); if (!p) { syncRefKept(s, own); return null; }
   const had = allowedRefs(s), prev = { one: {} };
   for (const ref of Object.keys(p.picks)) { const it = cat.items[ref]; if (it.kind !== 'bed' && it.mode === 'one') { const k = it.kind === 'editing' ? 'editing' : it.kind; prev.one[k] = ((s.picks[k] && s.picks[k].allow) || []).slice(); } }
   if (p.pack !== undefined) prev.pack = s.pack || null;
@@ -214,10 +326,11 @@ export function setReferenceLook(s, cat = catalog()) {
   r.added = Object.keys(p.picks).filter(x => !had.has(x) && now.has(x));
   r.prev = prev; r.applied = true;
   r.auto = { mode: r.mode, n: r.added.length + (p.pack && p.pack !== prev.pack ? 1 : 0), pack: s.pack || null, bed: s.music.bed, sound: r.mode === 'recreate' || !!refParts(r).sound, at: Date.now() };
+  syncRefKept(s, own);
   return r.auto;
 }
 
-export function influencePack(ex, job, basePack) {
+export function influencePack(ex, job, basePack, parts = null) {
   const base = basePack ? K.load(basePack) : null;
   const presets = require('../preset.cjs').list().map(x => x.name);
   const ext = base ? base.extends : ex.preset && presets.includes(ex.preset) ? ex.preset : 'aigent';
@@ -225,7 +338,8 @@ export function influencePack(ex, job, basePack) {
   const inLock = (key, v) => !bl[key] || bl[key].includes(v);
   if (ex.look) style.look = ex.look;
   if (ex.captionStyle) style.captionStyle = ex.captionStyle;
-  const ents = ex.entrances.filter(e => inLock('titles', e)); if (ents.length) style.entranceOrder = ents;
+  // the entrances the teardown read, in its order: a preference, never a lock (Titles switched off leaves them out)
+  const ents = parts && parts.titles === false ? [] : ex.entrances.filter(e => inLock('titles', e)); if (ents.length) style.entranceOrder = ents;
   const fins = ex.finishes.filter(f => inLock('finishes', f)); if (fins.length) style.finishPool = fins;
   const weights = { ...((base && base.weights && base.weights.transitions) || {}) };
   for (const [t, n] of Object.entries(ex.transitions)) if (inLock('transitions', t)) weights[t] = (weights[t] || 1) + n;

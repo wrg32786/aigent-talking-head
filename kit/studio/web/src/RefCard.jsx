@@ -1,9 +1,10 @@
 // The reference's shared pieces, used by Start (RecreateStart.jsx), the Picture step card (Style.jsx) and the Breakdown (Reference.jsx):
 // RefMode (one control, one vocabulary), RefPlan (what Recreate brings, as chips), RefParts (Influence switches)
-// and RefNotice (one line while a reference is read, or when it set your Look).
+// RefNotice (one line while a reference is read, or when it set your Look), SavedLookNote (your saved look sits over
+// the reference's, with the one switch) and TitleCheckLine (titles the breakdown may have misread).
 import { useEffect, useRef } from 'react';
 import { Button } from '@astryxdesign/core/Button';
-import { toast, Icon } from './lib.jsx';
+import { api, toast, Icon } from './lib.jsx';
 
 // the two labels for what a reference gives you: a built-in option it picked, and a scene made from it for the menu
 export const REF_LABEL = 'From reference', MADE_LABEL = 'Made for you';
@@ -104,4 +105,21 @@ export function RefNotice({ s, patch, id = 'ref-notice' }) {
   return <div className="ref-notice glass-card" id={id} role="status" data-mode={a.mode}><Icon n="spark" />
     <p><b>{a.mode === 'recreate' || a.mode === 'look' ? 'We set your look from the reference.' : 'We set your picks from the reference.'}</b> {a.mode === 'recreate' || a.mode === 'look' ? 'Change anything you like.' : (a.sound ? 'Your Look stays yours. Change anything you like.' : 'Your Look and sound stay yours. Change anything you like.')}</p>
     <Button id={id + '-back'} size="sm" variant="secondary" label="Back to my look" onClick={back} /></div>;
+}
+
+// Recreate and Copy the look: picks kept from the video before sit over the reference's look (the server's
+// savedLook, kit/studio/reference.mjs). One line, one button that takes them off; Undo is on the change note.
+export function SavedLookNote({ V, apply, id = 'saved-look' }) {
+  const sl = V && V.savedLook; if (!sl || !sl.inUse) return null;
+  const use = () => api('/api/reference/use-look', {}).then(j => { apply(j); toast(j.note, true); }).catch(() => {});
+  return <div className="ref-notice saved-look glass-card" id={id} role="status" title={'Kept from before: ' + sl.by.map(b => b.label).join(', ')}><Icon n="info" />
+    <p><b id={id + '-text'}>{sl.text}</b></p>
+    <Button id={id + '-use'} size="sm" variant="primary" label="Use the reference's look" onClick={use} /></div>;
+}
+
+// Recreate draws the reference's titles, so titles the breakdown is not sure of are worth a look before a draft
+export const titleChecks = s => { const r = s.reference || {}; return r.mode === 'recreate' && r.extracted ? (r.extracted.checks || []).length : 0; };
+export function TitleCheckLine({ s, go, id = 'title-check-line' }) {
+  const n = titleChecks(s); if (!n) return null;
+  return <p className="fine title-check-line" id={id} role="status"><Icon n="info" /><span>{n === 1 ? '1 title may be misread.' : `${n} titles may be misread.`} <button type="button" className="linkish" id={id + '-go'} onClick={() => go && go('reference', true)}>{n === 1 ? 'Check it before you draft.' : 'Check them before you draft.'}</button></span></p>;
 }

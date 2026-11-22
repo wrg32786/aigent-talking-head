@@ -55,7 +55,9 @@ try {
     const s = v.state;
     assert.strictEqual(s.pack, 'cinematic', 'its Look');
     for (const tr of Object.keys(EX.transitions)) assert.ok(allow(s, 'transition').includes(tr), 'transition ' + tr);
-    for (const e of EX.entrances) assert.ok(allow(s, 'entrance').includes(e), 'title entrance ' + e);
+    // its title entrances are a preference, never a pick or a lock (report 4 item 9): a rebuild can use any entrance
+    assert.ok(EX.entrances.length > 0, 'the fixture reads entrances'); assert.deepStrictEqual(allow(s, 'entrance'), [], 'no entrance pick from the reference');
+    assert.ok(!/titles=/.test(v.compose.lockString || ''), 'and no titles lock: ' + v.compose.lockString);
     for (const f of EX.finishes) assert.ok(allow(s, 'finish').includes(f), 'grade ' + f);
     assert.deepStrictEqual(allow(s, 'captionStyle'), [EX.captionStyle], 'its caption style, one per reel');
     assert.strictEqual(s.music.bed, EX.music.bed, 'its music'); assert.ok(allow(s, 'beatSync').includes('beat-sync'), 'beat sync'); assert.ok(allow(s, 'editing').includes('punch'), 'pace: punch-ins');
