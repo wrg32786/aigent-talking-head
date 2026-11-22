@@ -537,7 +537,7 @@ const OWSEQ=(()=>{const ws=[];for(const c of flips)if(c[3]===0&&(c[4].style||CST
  const ent=flips.filter(c=>c[3]===9||(!TCLEAR&&c[3]===7)).map(c=>+c[0]);for(const x of live)for(const a of ent)if(a>x.s&&a<x.e&&a>=x.z-.05)x.e=Math.max(x.s+MIN,a);
  for(const T of TS)for(const x of live){if(x.e<=x.s)continue;
   if(x.s<T.a){if(x.e>T.a)x.e=T.a}
-  else if(x.s<T.z){if(T.z-x.a<=.3&&x.e-T.z>=.08)x.s=T.z;else x.e=x.s}}
+  else if(x.s<T.z){if(T.z-x.a<=.3+1e-6&&x.e-T.z>=.08-1e-6)x.s=T.z;else x.e=x.s}}
  return ws})();
 // a word with no time on screen (a title's own word, a word said under a title) is not in the list
 window.__words=OWSEQ?OWSEQ.filter(x=>x.e>x.s+1e-6).map(x=>({start:+x.s.toFixed(3),end:+x.e.toFixed(3),word:String(x.w)})):[];

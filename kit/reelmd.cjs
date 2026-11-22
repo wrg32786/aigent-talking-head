@@ -147,6 +147,7 @@ const list = v => none(v) ? [] : String(v).split(',').map(s => s.trim()).filter(
 
 // ---------- parse ----------
 function parse(text, file = 'Reel.md') {
+  text = String(text).replace(/\r\n?/g, '\n'); // a Reel.md saved with Windows line endings reads the same (its fenced blocks were not found before)
   if (!text.startsWith('---')) throw new Error(`${file}: must start with a --- front matter card (VIDEO.md style)`);
   const end = text.indexOf('\n---', 3);
   if (end < 0) throw new Error(`${file}: front matter is not closed with ---`);
