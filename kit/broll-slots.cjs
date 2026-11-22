@@ -57,8 +57,11 @@ function kindOf(box) {
 // whose content changes, is still one B-roll.
 function detect(cands, measured = [], { faces = [], script = [] } = {}) {
   let out = cands.map((c, i) => {
-    const m = measured[i] || {}, at = Array.isArray(m.at) && m.at.length === 2 && m.at[1] > m.at[0] ? m.at : [c.start, c.end];
     const box = Array.isArray(c.box) && c.box.length === 4 ? c.box.map(Number) : null, kind = KINDS.includes(c.kind) ? c.kind : kindOf(box);
+    // a quick full-frame cutaway keeps the cut times it was found at: the measured edges look 0.7 s around it, which
+    // is its neighbours in a fast run, and five 0.2 s pictures came back overlapping and were never seen as a run
+    const m = measured[i] || {}, quick = kind === 'full' && c.end - c.start <= RUN.max;
+    const at = !quick && Array.isArray(m.at) && m.at.length === 2 && m.at[1] > m.at[0] ? m.at : [c.start, c.end];
     return { start: r2(at[0]), end: r2(at[1]), kind, box: kind === 'full' ? null : box, border: hexOK(c.border) ? c.border.toLowerCase() : null, shows: [cleanWhat(c.shows)].filter(Boolean), shot: c.shot || null, source: c.source || null, fx: fxOf(m) };
   }).sort((a, b) => a.start - b.start);
   out = fastRuns(out).filter(s => s.run || s.end - s.start >= 0.4);

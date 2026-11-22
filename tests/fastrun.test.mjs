@@ -138,6 +138,9 @@ try {
     const cands = [{ start: 10, end: 13, kind: 'full', shows: 'a dashboard' }, ...[0, 1, 2, 3, 4].map(i => ({ start: +(77 + i * 0.21).toFixed(2), end: +(77 + (i + 1) * 0.21).toFixed(2), kind: 'full' })), { start: 80, end: 80.2, kind: 'full' }, { start: 82, end: 82.3, kind: 'full' }, { start: 82.3, end: 82.6, kind: 'full' }];
     const slots = BS.detect(cands, []);
     assert.deepStrictEqual(slots.map(s => [s.start, s.end, s.run || null, s.step || null]), [[10, 13, null, null], [77, 78.05, 5, 0.21]], 'five cuts 0.21 s apart are one slot; one or two quick cutaways are not a run');
+    // what kit/broll_fx.py measure gives for those slots: each edge stretched over its neighbours (it looks 0.7 s around a slot)
+    const measured = cands.map(c => ({ at: [+(c.start - 0.2).toFixed(2), +(c.end + 0.25).toFixed(2)], in: 'cut', out: 'cut' }));
+    assert.deepStrictEqual(BS.detect(cands, measured).map(s => s.run || null), [null, 5], 'the run is still found with the measured edges');
     const line = BS.blockLines(slots)[1]; assert.match(line, /\| run 5 \| step 0\.21$/);
     const md = BS.appendBlock('---\nname: r\n---\n\n# r\n', slots), back = BS.fromRecipe(RM.parse(md, 'Reel.md'));
     assert.deepStrictEqual([back[1].run, back[1].step, back[1].kind], [5, 0.21, 'full']);

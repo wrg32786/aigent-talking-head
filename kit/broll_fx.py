@@ -33,11 +33,10 @@ def _open(path):
     return cap, fps, n
 
 
-def _frames(cap, fps, t0, t1, every=1):
-    """frames between t0 and t1 (seconds) as [(t, bgr small)]"""
+def _each_frame(cap, fps, t0, t1, every=1):
+    """frames between t0 and t1 (seconds) as (t, bgr small), one at a time"""
     i0, i1 = max(0, int(round(t0 * fps))), max(0, int(round(t1 * fps)))
     cap.set(cv2.CAP_PROP_POS_FRAMES, i0)
-    out = []
     for i in range(i0, i1 + 1):
         ok, f = cap.read()
         if not ok:
@@ -45,8 +44,11 @@ def _frames(cap, fps, t0, t1, every=1):
         if (i - i0) % every:
             continue
         h = int(round(f.shape[0] * W / f.shape[1]))
-        out.append((i / fps, cv2.resize(f, (W, h), interpolation=cv2.INTER_AREA)))
-    return out
+        yield i / fps, cv2.resize(f, (W, h), interpolation=cv2.INTER_AREA)
+
+
+def _frames(cap, fps, t0, t1, every=1):
+    return list(_each_frame(cap, fps, t0, t1, every))
 
 
 def _crop(img, box, inset=0.0):
@@ -281,7 +283,7 @@ def splits(video, step=0.25, min_len=0.75):
     dur = n / fps if n else 0
     every = max(1, int(round(step * fps)))
     rows = []
-    for t, f in _frames(cap, fps, 0, dur, every=every):
+    for t, f in _each_frame(cap, fps, 0, dur, every=every):  # one at a time: a long reference is not held in memory
         g = _gray(f)
         h = g.shape[0]
         y0, y1 = int(h * 0.3), int(h * 0.7)
@@ -293,7 +295,7 @@ def splits(video, step=0.25, min_len=0.75):
         if (e[k, :m] > 22).mean() < 0.25 or (e[k, -m:] > 22).mean() < 0.25:
             share[k] = 0
         # a seam is one row that stands out: most of its columns step hard, and the rows around it do not
-        rows.append((t, (y0 + k) / h if share[k] > 0.55 and share[k] > 3 * float(np.median(share)) + 0.1 else None, g))
+        rows.append((t, (y0 + k) / h if share[k] > 0.55 and share[k] > 3 * float(np.median(share)) + 0.1 else None, g.astype(np.uint8)))  # grey is whole numbers: a quarter of the memory, nothing lost
     cap.release()
     spans, cur = [], None
     for t, y, g in rows:
@@ -313,7 +315,7 @@ def splits(video, step=0.25, min_len=0.75):
     for s in spans:
         top = int(s["seam"] * s["first"].shape[0])
         # the top part has to be a different picture from the plain shots
-        if free and min(float(np.mean(np.abs(s["first"][:top] - g[:top]))) for g in free[:: max(1, len(free) // 8)]) < 10:
+        if free and min(float(np.mean(np.abs(s["first"][:top].astype(np.float32) - g[:top]))) for g in free[:: max(1, len(free) // 8)]) < 10:
             continue
         out.append({"start": round(s["start"], 2), "end": round(s["end"] + step, 2), "seam": round(s["seam"], 3), "box": [0, 0, 1, round(s["seam"], 3)]})
     return out
