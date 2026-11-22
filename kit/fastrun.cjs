@@ -84,8 +84,9 @@ function schedule({ n, at, step = 'half', grid = null, max = null }) {
     while (own.length < N + 1) own.push(own[own.length - 1] + gap);
     start = own[0]; durs = own.slice(1).map((t, i) => t - own[i]); onBeat = true;
   } else { const s = fixed || STEP_FALLBACK[step === 'beat' ? 'beat' : 'half']; durs = Array(N).fill(s); }
-  // whole frames, and no step shorter than 3 frames
-  durs = durs.map(d => Math.max(MIN_STEP, Math.round(d * FPS) / FPS));
+  // whole frames, and no step shorter than 3 frames. Each CUT is put on its nearest frame (not each length), so a
+  // half beat of 7.25 frames does not drift off the beat over a long run: the steps come out 7, 7, 8, 7 frames.
+  { let t = 0, f0 = 0; durs = durs.map(d => { t += d; const f1 = Math.max(f0 + Math.round(MIN_STEP * FPS), Math.round(t * FPS)), n = f1 - f0; f0 = f1; return n / FPS; }); }
   if (max != null) { let t = 0; durs = durs.filter(d => (t += d) <= +max + 1e-6); if (!durs.length) durs = [Math.max(MIN_STEP, Math.round(+max * FPS) / FPS)]; }
   let t = 0; const cuts = durs.map(d => { const c = r3(t); t += d; return c; });
   return { at: r3(start), durs: durs.map(d => +d.toFixed(4)), dur: r3(t), cuts, onBeat };

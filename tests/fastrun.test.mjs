@@ -42,6 +42,11 @@ try {
     assert.strictEqual(beat.at, 12.48); assert.ok(beat.durs.every(d => Math.abs(d - 0.42) < 0.012));
     // every step is a whole number of frames, so no cut lands between two frames
     for (const d of [...half.durs, ...beat.durs]) assert.ok(Math.abs(d * 24 - Math.round(d * 24)) < 0.01, 'whole frames: ' + d);
+    // a half beat that is not a whole number of frames (99.4 BPM: 7.25 frames) does not drift: every cut stays
+    // within half a frame of its beat, over 30 cuts
+    const g99 = { beats: Array.from({ length: 40 }, (_, i) => +(0.2 + i * 60 / 99.38).toFixed(4)) }, long = FR.schedule({ n: 30, at: 0.2, step: 'half', grid: g99 });
+    long.cuts.forEach((c, i) => assert.ok(Math.abs(c - i * 30 / 99.38) <= 0.5 / 24 + 0.002, `cut ${i} is on its half beat: ${c} vs ${(i * 30 / 99.38).toFixed(3)}`));
+    assert.ok(new Set(long.durs.map(d => Math.round(d * 24))).size === 2, 'steps of 7 and 8 frames: ' + [...new Set(long.durs.map(d => Math.round(d * 24)))]);
     // past the last beat it carries on at the same pace
     const late = FR.schedule({ n: 6, at: 16.5, step: 'beat', grid }); assert.strictEqual(late.durs.length, 6);
     // no bed: a steady pace; a number is seconds; never faster than 3 frames
