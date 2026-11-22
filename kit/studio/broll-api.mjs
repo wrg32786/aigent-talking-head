@@ -5,13 +5,17 @@
 //     being cut), cutins: [{ clip, after }] (testimonial pieces played with their own sound, in the Combo) }
 // Spots come from the job's draft (build/cut.json and build/captions.js, kit/studio/lane.mjs spots). The API still calls
 // a spot a beat (beat: n), so agents that know fill_slot keep working. Library clips live in kit/studio/broll.mjs.
-import { createWriteStream, existsSync, readFileSync, rmSync, renameSync, copyFileSync } from 'fs';
+import { createWriteStream, existsSync, readFileSync, rmSync, renameSync, copyFileSync, writeFileSync } from 'fs';
 import { spawnSync } from 'child_process';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { randomBytes } from 'crypto';
 import * as KEYS from './keys.mjs';
 import * as BR from './broll.mjs';
+import * as V from './vault.mjs';
+import * as VM from './vault-match.mjs';
+import * as VAPI from './vault-api.mjs';
+import { check as checkArgs } from './vault-schema.mjs';
 import * as LANE from './lane.mjs';
 import * as GEN from './gen.mjs';
 import * as MAKE from './broll-make.mjs';
@@ -22,6 +26,7 @@ import { mkdirSync } from 'fs';
 import { createRequire } from 'module';
 const BS = createRequire(import.meta.url)('../broll-slots.cjs');
 const FRUN = createRequire(import.meta.url)('../fastrun.cjs');
+const BB = createRequire(import.meta.url)('../broll-brief.cjs');
 
 const bad = (m, code = 400, extra) => Object.assign(new Error(m), { code }, extra || {});
 const clean = t => String(t == null ? '' : t).replace(/\u2014/g, ', ').slice(0, 300);
@@ -45,7 +50,7 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     return { cut, caps, beats: LANE.spots(cut, caps, { marks: j.marks, refs }), len };
   }
   const clipBrief = c => c && { id: c.id, name: c.name, source: c.source, kind: c.kind, type: c.type || null, raw: c.raw ? { text: c.raw.text, seconds: c.raw.seconds } : null, seconds: c.seconds, width: c.width, height: c.height, tags: c.tags, license: c.license, author: c.author, sourceUrl: c.sourceUrl,
-    ...(c.run ? { run: { n: (c.run.clips || []).length, step: c.run.step, beat: c.run.beat } } : {}), thumb: c.thumb ? `/api/broll/file?id=${c.id}&thumb=1` : null, url: `/api/broll/file?id=${c.id}`, provider: c.provider || null, prompt: c.prompt || null };
+    ...(c.run ? { run: { n: (c.run.clips || []).length, step: c.run.step, beat: c.run.beat } } : {}), rights: c.rights || 'mine', ...(c.rights === 'public-page' ? { check: 'Check that you may show it.' } : {}), thumb: c.thumb ? `/api/broll/file?id=${c.id}&thumb=1` : null, url: `/api/broll/file?id=${c.id}`, provider: c.provider || null, prompt: c.prompt || null };
   function sources(env = process.env) {
     const st = S.load(), k = Object.fromEntries(KEYS.status(env).map(x => [x.id, x.set])), gen = GEN.PROVIDERS.filter(id => k[id]);
     return [
@@ -59,8 +64,12 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
   function view(s, job = s.job) {
     const d = job ? draftOf(job, s) : null, b = peek(s, job), lib = BR.load().clips, byId = Object.fromEntries(lib.map(c => [c.id, c]));
     const stockOn = ['pexels', 'pixabay'].some(p => KEYS.isSet(p));
-    const beats = d ? d.beats.map(bt => { const sl = b.slots[bt.n], c = sl && byId[sl.clip]; return { ...bt, slot: sl && c ? { ...sl, ...LANE.timing(sl, bt, c), clip: clipBrief(c) } : null, idea: b.ideas[bt.n] ? { ...b.ideas[bt.n], clip: b.ideas[bt.n].clip ? clipBrief(byId[b.ideas[bt.n].clip]) : null } : null,
-      ...(needOf(bt, sl && c, b, job, stockOn) || {}), ...(underOf(bt, d.beats) ? { under: underOf(bt, d.beats) } : {}) }; }) : [];
+    // every B-roll slot of the plan has a brief (what it should show) and the Vault's best items for it, each with its
+    // reason. The first is the suggestion, the next three are what Swap offers. Nothing here leaves the computer.
+    const sb = d ? slotBriefs(s, d, b, byId) : { brief: {}, cands: {} };
+    const beats = d ? d.beats.map(bt => { const sl = b.slots[bt.n], c = sl && byId[sl.clip], br = sb.brief[bt.n]; return { ...bt, slot: sl && c ? { ...sl, ...LANE.timing(sl, bt, c), clip: clipBrief(c) } : null, idea: b.ideas[bt.n] ? { ...b.ideas[bt.n], clip: b.ideas[bt.n].clip ? clipBrief(byId[b.ideas[bt.n].clip]) : null } : null,
+      ...(br ? { brief: { ...br, slot: bt.ref.slot.n, text: BB.text(br) }, candidates: (sb.cands[bt.n] || []).map(candOut) } : {}),
+      ...(needOf(bt, sl && c, b, job, stockOn, br, sb.cands[bt.n]) || {}), ...(underOf(bt, d.beats) ? { under: underOf(bt, d.beats) } : {}) }; }) : [];
     const st = S.load();
     // the B-roll slots the plan keeps (from the reference or the look) and how many have a clip: "6 of 19 filled"
     const planned = beats.filter(x => x.ref && x.ref.slot), slotsDone = planned.filter(x => x.slot || (x.ref.slot.by === 'recipe' && x.ref.slot.file)).length;
@@ -69,15 +78,33 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
       raws: b.raws.slice(-6), cutins: b.cutins.map(x => ({ ...x, clip: clipBrief(byId[x.clip]) })).filter(x => x.clip), testimonials: lib.filter(c => c.type === 'testimonial' && c.raw).slice(0, 24).map(clipBrief),
       undo: !!(b.undo && b.undo.slots) };
   }
+  // the brief of each plan slot (kit/broll-brief.cjs: the plan's own when an agent or you rewrote it, else the rules with
+  // your words, brands and the point), and its candidates from the Vault (kit/studio/vault-match.mjs). An empty slot's
+  // best pick is kept for it, so no two slots are offered the same item first; a filled slot gets what Swap can offer.
+  const briefCtx = s => ({ glossary: s.glossary || [], brands: s.brands || [], point: s.point || '' });
+  const briefFor = (s, bt) => BB.of({ ...bt.ref.slot, line: bt.ref.slot.line || bt.text }, briefCtx(s));
+  function slotBriefs(s, d, b, byId) {
+    const items = V.load().items, used = new Set(Object.values(b.slots).map(x => x.clip)), brief = {}, open = [];
+    for (const bt of d.beats) { const rs = bt.ref && bt.ref.slot; if (!rs || rs.run || (rs.by === 'recipe' && rs.file)) continue; brief[bt.n] = briefFor(s, bt); if (!(b.slots[bt.n] && byId[b.slots[bt.n].clip])) open.push({ key: bt.n, brief: brief[bt.n] }); }
+    const cands = VM.assign(open, items, { used });
+    for (const n of Object.keys(brief)) if (!cands[n]) cands[n] = VM.candidates(brief[n], items, { exclude: used, n: 3 });
+    return { brief, cands };
+  }
+  const candOut = x => ({ id: x.id, reason: x.reason, ok: x.ok, ...(x.check ? { check: x.check } : {}), clip: clipBrief(x.item) });
   // a spot that lies under a plan slot which started on an earlier spot (the slot runs on over it): the slot's number
   const underOf = (bt, beats) => { if (bt.ref && bt.ref.slot) return null; const o = beats.find(x => x.ref && x.ref.slot && x.n !== bt.n && +x.ref.slot.start < bt.end - 0.2 && +x.ref.slot.end > bt.start + 0.2); return o ? o.ref.slot.n : null; };
   // A B-roll slot from the plan with no clip on it: what it needs, in plain words (kit/broll-slots.cjs brief), the
   // ready instruction for an agent, and whether stock can be tried (a key is set). One per slot; skipped ones say so.
-  function needOf(bt, filled, b, job, stockOn) {
+  function needOf(bt, filled, b, job, stockOn, br, cands) {
     const sl = bt.ref && bt.ref.slot; if (!sl || filled || (sl.by === 'recipe' && sl.file)) return null; // a slot the recipe gave its own file is already filled
-    const slot = { ...sl, line: sl.line || bt.text }, br = BS.brief(slot);
-    return { need: { slot: sl.n, kind: sl.kind, ...(sl.run ? { run: sl.run } : {}), what: br.what, line: br.line, seconds: br.seconds, shape: br.shape, treat: br.treat, frame: br.frame, like: !!sl.ref, skipped: !!b.skips[sl.n],
-      stock: stockOn ? (LANE.nounQuery(sl.what || '') || sl.what || LANE.nounQuery(slot.line) || null) : null, ask: BS.agentAsk(slot, { job, spot: bt.n }) } };
+    const slot = { ...sl, line: sl.line || bt.text }, nb = BS.brief(slot), stock = stockOn ? (LANE.nounQuery(sl.what || '') || sl.what || LANE.nounQuery(slot.line) || null) : null;
+    // the one suggestion, in the spec's order: your Vault first, then free stock (only with your key, and not for a
+    // screen: stock is weak there). Stock is not fetched until you press Use it. Generating is never suggested here.
+    const top = cands && cands[0], prov = ['pexels', 'pixabay'].find(k => KEYS.isSet(k));
+    const suggest = top ? { from: 'vault', ...candOut(top) } : stock && prov && br && br.shot !== 'screen recording' ? { from: 'stock', provider: prov, query: stock, reason: `From ${KEYS.byId(prov).name}: "${stock}"` } : null;
+    return { need: { slot: sl.n, kind: sl.kind, ...(sl.run ? { run: sl.run } : {}), what: nb.what, line: nb.line, seconds: nb.seconds, shape: nb.shape, treat: nb.treat, frame: nb.frame, like: !!sl.ref, skipped: !!b.skips[sl.n],
+      ...(br ? { show: BB.text(br) } : {}), suggest, ...(!top && !sl.run ? { none: 'Nothing in your Vault fits yet.' } : {}),
+      stock, ask: BS.agentAsk(slot, { job, spot: bt.n }) } };
   }
   // the render step's plan: every filled slot as an insert, and the credits
   function plan(s) {
@@ -91,7 +118,8 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
   }
   const beatOk = (s, n) => { const d = draftOf(s.job, s); if (!d) throw bad('make a draft first: the beats come from it'); const bt = d.beats.find(x => x.n === +n); if (!bt) throw bad(`no beat ${n} (the draft has ${d.beats.length})`); return bt; };
   function fill(s0, n, clipId, o = {}) {
-    const bt = beatOk(s0, n); if (clipId && !BR.get(clipId)) throw bad(`no b-roll ${clipId}`, 404);
+    const bt = beatOk(s0, n);
+    if (clipId && !BR.get(clipId)) { const it = V.get(clipId); throw it && it.rights === 'reference' ? bad('That is saved as reference only. It is someone else\'s, so it is never placed in a reel.', 403) : it ? bad('That link has no picture yet, so it cannot be placed.') : bad(`no b-roll ${clipId}`, 404); }
     return update(s => { const b = jobState(s);
       if (!clipId) { delete b.slots[n]; return; }
       // on a reference B-roll slot the clip sits the way the reference's did, unless you pick another way
@@ -113,6 +141,8 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     const d = draftOf(s.job, s); if (!d) throw bad('make a draft first: the spots come from it'); const j = peek(s), lib = BR.load().clips;
     const used = new Set(Object.values(j.slots).map(x => x.clip)), taken = Object.entries(j.slots).map(([n, x]) => x.at != null ? +x.at : (d.beats.find(b => b.n === +n) || {}).start).filter(x => x != null);
     const out = [];
+    // plan slots are matched to the Vault by their brief (a slot on a line that serves your point chooses first)
+    const va = VM.assign(d.beats.filter(bt => bt.ref && bt.ref.slot && !bt.ref.slot.run && !j.slots[bt.n] && bt.seconds >= 1.2 && !underOf(bt, d.beats)).map(bt => ({ key: bt.n, brief: briefFor(s, bt) })), V.load().items, { used, n: 1 });
     for (const bt of d.beats) {
       if (j.slots[bt.n] || bt.seconds < 1.2) continue;
       // a spot under a plan slot that started on an earlier spot is taken: nothing else goes on top of that slot
@@ -124,15 +154,14 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
       // library first: the clip that best matches the spot's nouns (then its words), before any stock
       // a reference cutaway says what it showed (Reel.md shot broll): that is the search, before your words
       const what = bt.ref && bt.ref.what ? String(bt.ref.what) : null, wq = what ? (LANE.nounQuery(what) || what) : null;
-      let hit = wq ? (BR.rank(wq + ' ' + what, { exclude: used }).find(c => c.matched >= 1) || null) : null;
+      const vp = bt.ref && bt.ref.slot ? ((va[bt.n] || [])[0] || null) : null;
+      let hit = vp ? (vp.ok && !used.has(vp.id) ? vp.item : null) : wq ? (BR.rank(wq + ' ' + what, { exclude: used }).find(c => c.matched >= 1) || null) : null;
+      if (bt.ref && bt.ref.slot) { if (hit) used.add(hit.id); const rs = bt.ref.slot; if (!hit) continue; // a plan slot with nothing over the bar stays "Needs B-roll", with the best guess as its suggestion
+        out.push({ beat: bt.n, at: +rs.start, offset: +Math.max(0, rs.start - bt.start).toFixed(2), dur: +(rs.end - rs.start).toFixed(2), idea: `${hit.name} from your Vault`, why: vp.reason, role, query: wq || null, card: null, clip: hit.id, place: LANE.KIND_PLACE[rs.kind] || 'full', source: 'vault' }); continue; }
       if (!hit) hit = p && p.query ? (BR.rank(p.query, { exclude: used })[0] || null) : null;
       if (!hit && bt.text) { const r = BR.rank(LANE.nounQuery(bt.text) + ' ' + bt.text, { exclude: used }).find(c => c.matched >= 2); if (r) hit = r; }
       if (!hit && want.length) hit = lib.find(c => want.includes(c.type) && !used.has(c.id) && !(c.raw && c.type === 'testimonial' && j.cutins.some(x => x.clip === c.id))) || null;
       if (hit) used.add(hit.id);
-      // a plan slot with nothing in your library is not an idea: its card says "Needs B-roll" with what to show
-      const rs = bt.ref && bt.ref.slot;
-      if (rs && !hit) continue;
-      if (rs && hit) { out.push({ beat: bt.n, at: +rs.start, offset: +Math.max(0, rs.start - bt.start).toFixed(2), dur: +(rs.end - rs.start).toFixed(2), idea: `${hit.name} from your library`, why: `It matches what this slot should show${rs.what ? ` (${rs.what})` : ''}.`, role, query: wq || null, card: null, clip: hit.id, place: LANE.KIND_PLACE[rs.kind] || 'full', source: 'reference' }); continue; }
       const place = hit && hit.type === 'screen-recording' ? 'top' : hit && hit.type === 'testimonial' ? 'pip' : 'full';
       // a tip about a tool, an app or a screen: a screen recording of it first, then stock
       const screen = !hit && !(p && p.card) && role === 'tip' && p && p.query;
@@ -284,14 +313,33 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
   const rawToFile = (req, max) => new Promise((ok, no) => { const f = join(tmpdir(), 'broll-up-' + randomBytes(4).toString('hex')); const w = createWriteStream(f); let n = 0;
     req.on('data', d => { n += d.length; if (n > max) { no(bad('file too big', 413)); req.destroy(); w.destroy(); rmSync(f, { force: true }); } }); req.pipe(w); w.on('finish', () => ok(f)); w.on('error', no); req.on('error', no); });
 
-  const route = async (p, M, u, req, res) => (p.startsWith('/api/broll') || p.startsWith('/api/keys') ? (await handle(p, M, u, req, res)) !== false : false);
+  // what the Vault routes need from the B-roll step (kit/studio/vault-api.mjs)
+  const dropSlots = id => update(st => { for (const j of Object.values(st.broll || {})) for (const [n, sl] of Object.entries(j.slots || {})) if (sl.clip === id) delete j.slots[n]; });
+  const vaultCtx = { json, readBody, serveFile, rawToFile, get capture() { return chromeOk() && process.env.STUDIO_VAULT_CAPTURE !== '0' ? capturePage : null; },
+    changed: () => update(st => { st.vaultRev = (st.vaultRev || 0) + 1; }), dropSlots,
+    briefOf: n => { const s = C.load(), d = draftOf(s.job, s), bt = d && d.beats.find(x => x.ref && x.ref.slot && x.ref.slot.n === +n); return bt ? briefFor(s, bt) : null; },
+    // a capture made for a slot waits on it as an idea: nothing is placed until the user says yes
+    offer: (n, it, by) => { const s = C.load(), d = draftOf(s.job, s), bt = d && d.beats.find(x => x.ref && x.ref.slot && x.ref.slot.n === +n); if (!bt || !V.placeable(it) || peek(s).slots[bt.n]) return;
+      saveIdeas([{ beat: bt.n, idea: `${it.name} from your Vault`, why: 'Captured for this slot. Look at it before you use it.', clip: it.id, place: LANE.KIND_PLACE[bt.ref.slot.kind] || 'full', source: 'vault' }], by ? CH.prettyName(String(by)) : 'your agent'); } };
+  const route = async (p, M, u, req, res) => (p.startsWith('/api/broll') || p.startsWith('/api/keys') || p.startsWith('/api/vault') ? (await handle(p, M, u, req, res)) !== false : false);
   async function handle(p, M, u, req, res) {
     const s = C.load(), q = k => u.searchParams.get(k);
     // ---------- API keys and providers: the page sees set or not and where from, never a value ----------
     if (p === '/api/keys' && M === 'GET') return json(res, 200, { keys: KEYS.status(), sources: sources(), generate: { on: !!S.load().broll.generate, providers: GEN.list(S.load()) }, file: KEYS.keysPath() });
     if (p === '/api/keys' && M === 'POST') { const b = await readBody(req); KEYS.save(String(b.id || ''), b.remove ? null : b.value); return json(res, 200, { keys: KEYS.status(), sources: sources() }); }
     if (p === '/api/keys/test' && M === 'POST') { const b = await readBody(req); const r = await KEYS.test(String(b.id || ''), b.value ? { value: KEYS.byId(b.id) && KEYS.byId(b.id).pair && typeof b.value === 'object' ? `${b.value.id}:${b.value.secret}` : String(b.value) } : {}); return json(res, 200, { ...r, keys: KEYS.status() }); }
+    if (p.startsWith('/api/vault')) return VAPI.handle(vaultCtx, p, M, u, req, res);
     if (p === '/api/broll' && M === 'GET') return json(res, 200, view(s));
+    // rewrite what a slot should show (set_broll_brief): kept in the draft's plan.json next to the slot
+    if (p === '/api/broll/brief' && M === 'POST') {
+      const b = await readBody(req), by = b.by ? CH.prettyName(String(b.by)) : 'you'; delete b.by; checkArgs('set_broll_brief', b);
+      const f = join(ROOT, 'jobs', String(s.job || '-'), 'build', 'plan.json'), d = draftOf(s.job, s); let pl = null; try { pl = JSON.parse(readFileSync(f, 'utf8')); } catch {}
+      const sl = d && pl && Array.isArray(pl.broll) ? pl.broll.find(x => x.n === b.slot) : null, bt = sl && d.beats.find(x => x.ref && x.ref.slot && x.ref.slot.n === b.slot);
+      if (!sl || !bt) throw bad(`no B-roll slot ${b.slot} in this draft (list_broll shows them)`, 404);
+      sl.brief = BB.merge(briefFor(s, bt), b, by); writeFileSync(f, JSON.stringify(pl, null, 1) + '\n');
+      const v = update(st => { st.vaultRev = (st.vaultRev || 0) + 1; if (by !== 'you') C.applyPatch(st, { reply: `${by} rewrote what slot ${b.slot} should show: ${sl.brief.subject}.`, from: 'assistant', kind: 'action' }); });
+      return json(res, 200, { slot: b.slot, brief: { ...sl.brief, slot: b.slot, text: BB.text(sl.brief) }, broll: view(v) });
+    }
     if (p === '/api/broll/library' && M === 'GET') return json(res, 200, { dir: BR.libDir(), clips: BR.search(q('q') || '', { source: q('source') || null, kind: q('kind') || null }).map(clipBrief) });
     if (p === '/api/broll/file' && M === 'GET') { const c = BR.get(q('id')); if (!c) return json(res, 404, { error: 'not found' }); const f = q('thumb') ? c.thumb && join(BR.libDir(), c.thumb) : BR.pathOf(c); if (!f) return json(res, 404, { error: 'no thumbnail' }); return serveFile(req, res, f); }
     if (p === '/api/broll/upload' && M === 'POST') {
@@ -302,7 +350,7 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
       const v = q('beat') ? fill(C.load(), +q('beat'), c.id, { place: q('place') }) : C.load();
       return json(res, 200, { clip: clipBrief(c), broll: view(v), ...{ state: v } });
     }
-    if (p === '/api/broll/library' && M === 'POST') { const b = await readBody(req); const c = b.action === 'remove' ? BR.remove(b.id) : BR.update(b.id, b); if (b.action === 'remove') update(st => { for (const j of Object.values(st.broll || {})) for (const [n, sl] of Object.entries(j.slots || {})) if (sl.clip === b.id) delete j.slots[n]; }); return json(res, 200, { clip: clipBrief(c), broll: view(C.load()) }); }
+    if (p === '/api/broll/library' && M === 'POST') { const b = await readBody(req); const c = b.action === 'remove' ? BR.remove(b.id) : BR.update(b.id, { name: b.name, tags: b.tags, type: b.type }); if (b.action === 'remove') dropSlots(b.id); return json(res, 200, { clip: clipBrief(c), broll: view(C.load()) }); }
     if (p === '/api/broll/stock' && M === 'GET') return json(res, 200, { provider: q('provider'), results: await BR.searchStock(q('provider'), { query: q('q'), orientation: q('orientation'), min: q('min') != null && q('min') !== '' ? +q('min') : null, max: q('max') != null && q('max') !== '' ? +q('max') : null, page: +(q('page') || 1) }) });
     if (p === '/api/broll/stock/add' && M === 'POST') { const b = await readBody(req); const c = await BR.downloadStock(b.provider, b.item); const v = b.beat != null ? fill(C.load(), b.beat, c.id, { place: b.place, by: b.by }) : C.load(); return json(res, 200, { clip: clipBrief(c), broll: view(v) }); }
     if (p === '/api/broll/make' && M === 'POST') { const b = await readBody(req); const c = await makeCard(b.spec || {}); const v = b.beat != null ? fill(C.load(), b.beat, c.id, { place: b.place, by: b.by }) : C.load(); return json(res, 200, { clip: clipBrief(c), broll: view(v) }); }
