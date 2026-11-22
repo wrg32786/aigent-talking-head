@@ -1,7 +1,7 @@
 // A reference's look on the page (Studio report 4, items 7 and 13), in a real Chrome with no keys and no network:
-// - a Recreate on a board that kept the last video's look says "Your saved look is in use, not the reference's" with
-//   one button, on Start, on the Picture reference card and in the breakdown; the button takes the kept picks off, the
-//   change note's Undo puts them back
+// - a Recreate on a board that kept the last video's look uses the reference's look alone: no line. After Back to my
+//   look the Picture reference card and the breakdown say "Your saved look is in use, not the reference's" with one
+//   button; the button sets the board from the reference again, the change note's Undo puts the saved look back
 // - titles the breakdown may have misread: one line by the reference card and by Draft, and in the breakdown a
 //   "Check this text" list with the reason, a field and Save for each; Save rewrites the title in the reference's
 //   Reel.md and the line counts down
@@ -58,25 +58,21 @@ try {
   pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
   await pg.addInitScript(() => { try { localStorage.setItem('studio.paused', '1'); } catch {} });
 
-  await t('Picture: the reference card says the saved look is in use, with one button, and counts the titles to check', async () => {
-    await open(pg, '#step=picture'); await pg.waitForSelector('#ref-card #saved-look');
-    assert.strictEqual(await text(pg, '#saved-look-text'), SAYS); assert.strictEqual(await text(pg, '#saved-look p'), SAYS, 'one line, nothing else');
-    assert.deepStrictEqual(await pg.$$eval('#saved-look button', x => x.map(e => e.textContent.trim())), ["Use the reference's look"], 'one button');
-    assert.match(await pg.getAttribute('#saved-look', 'title'), /title layer front/);
+  await t('Picture: a Recreate on a board that kept the last look uses the reference\'s look, says nothing, and counts the titles to check', async () => {
+    await open(pg, '#step=picture'); await pg.waitForSelector('#ref-card[data-mode="recreate"]');
+    const v = await api('/api/state'); assert.strictEqual(v.savedLook.inUse, false); assert.strictEqual(v.state.picks.titleLayer, undefined); assert.ok(!v.compose.args.includes('--title-layer') && !/titles=/.test(v.compose.lockString || ''), 'nothing of the kept look is sent');
+    assert.strictEqual(await pg.$('#saved-look'), null, 'the reference wins, so there is no line');
     assert.strictEqual(await text(pg, '#title-check-line'), '2 titles may be misread. Check them before you draft.');
-    await shot(pg, 'r4-saved-look-banner.png');
-    await theme(pg, 'light'); await pg.waitForSelector('#saved-look'); await shot(pg, 'r4-saved-look-banner-light.png'); await theme(pg, 'dark');
     assert.deepStrictEqual(errs, []);
   });
-  await t('Start and Review say it too: the line on the reference box, the count by Draft', async () => {
-    await pg.click('#stepper [data-step="start"]'); await pg.waitForSelector('#recreate-card #saved-look-start');
-    assert.strictEqual(await text(pg, '#saved-look-start-text'), SAYS);
+  await t('Review says it too: the count by Draft', async () => {
+    await pg.click('#stepper [data-step="start"]'); await pg.waitForSelector('#recreate-card'); assert.strictEqual(await pg.$('#recreate-card .saved-look'), null);
     await pg.click('#stepper [data-step="review"]'); await pg.waitForSelector('#draft-title-check');
     assert.strictEqual(await text(pg, '#draft-title-check'), '2 titles may be misread. Check them before you draft.');
     await pg.click('#draft-title-check-go'); await pg.waitForSelector('main[data-step="picture"][data-view="reference"] #title-checks');
   });
   await t('the breakdown lists the titles to check, each with the reason, a field and Save', async () => {
-    assert.strictEqual(await text(pg, '#title-checks-h'), 'Check this text'); assert.strictEqual(await text(pg, '#saved-look-td-text'), SAYS); assert.strictEqual(await pg.$('#ref-notice-td'), null, 'one notice, not "We set your look" beside it');
+    assert.strictEqual(await text(pg, '#title-checks-h'), 'Check this text'); assert.strictEqual(await pg.$('#saved-look-td'), null);
     assert.deepStrictEqual(await pg.$$eval('#title-checks .tc', x => x.map(e => e.dataset.title)), ['1', '3']);
     assert.strictEqual(await pg.inputValue('#tc-1'), 'Kng'); assert.strictEqual(await text(pg, '#tc-1-why'), 'Read with low confidence (82%).');
     assert.strictEqual(await pg.inputValue('#tc-3'), '360 Days'); assert.strictEqual(await text(pg, '#tc-3-why'), 'The number is not in the speech.');
@@ -93,17 +89,31 @@ try {
     assert.deepStrictEqual((await api('/api/state')).state.reference.extracted.checks, []);
     await pg.click('#look-sub-style'); await pg.waitForSelector('#ref-card'); assert.strictEqual(await pg.$('#title-check-line'), null, 'nothing left to check');
   });
+  await t('Back to my look: the reference card and the breakdown say the saved look is in use, with one button', async () => {
+    await api('/api/state', { reference: { mode: 'off' } });
+    await open(pg, '#step=picture'); await pg.waitForSelector('#ref-card #saved-look');
+    assert.strictEqual(await text(pg, '#saved-look-text'), SAYS); assert.strictEqual(await text(pg, '#saved-look p'), SAYS, 'one line, nothing else');
+    assert.deepStrictEqual(await pg.$$eval('#saved-look button', x => x.map(e => e.textContent.trim())), ["Use the reference's look"], 'one button');
+    assert.match(await pg.getAttribute('#saved-look', 'title'), /title layer front/);
+    assert.strictEqual(await pg.$$eval('.saved-look', x => x.length), 1, 'one line on the page');
+    await shot(pg, 'r4-saved-look-banner.png');
+    await theme(pg, 'light'); await pg.waitForSelector('#saved-look'); await shot(pg, 'r4-saved-look-banner-light.png'); await theme(pg, 'dark');
+    await open(pg, '#step=reference'); await pg.waitForSelector('#saved-look-td');
+    assert.strictEqual(await text(pg, '#saved-look-td-text'), SAYS); assert.strictEqual(await pg.$('#ref-notice-td'), null, 'one notice, not a second one beside it');
+    await open(pg, '#step=picture'); await pg.waitForSelector('#ref-card #saved-look');
+  });
   await t('the button switches to the reference\'s look; Undo on the change note brings the saved look back', async () => {
     await pg.click('#saved-look-use'); await pg.waitForSelector('#saved-look', { state: 'detached' });
-    let v = await api('/api/state'); assert.strictEqual(v.savedLook.inUse, false); assert.strictEqual(v.state.picks.titleLayer, undefined); assert.ok(!v.compose.args.includes('--title-layer') && !/titles=/.test(v.compose.lockString || ''));
-    assert.deepStrictEqual(v.state.picks.captionStyle.allow, ['kinetic'], 'the reference\'s caption style stays');
+    let v = await api('/api/state'); assert.strictEqual(v.savedLook.inUse, false); assert.strictEqual(v.state.reference.mode, 'recreate', 'on again, in the mode it was last copied with');
+    assert.strictEqual(v.state.picks.titleLayer, undefined); assert.ok(!v.compose.args.includes('--title-layer') && !/titles=/.test(v.compose.lockString || ''));
+    assert.deepStrictEqual(v.state.picks.captionStyle.allow, ['kinetic'], 'the reference\'s caption style');
     await pg.waitForSelector('#change-note'); assert.strictEqual(await text(pg, '#change-note span'), "Switched to the reference's look.");
     await pg.click('#change-undo'); await pg.waitForSelector('#saved-look');
-    v = await api('/api/state'); assert.strictEqual(v.savedLook.inUse, true); assert.deepStrictEqual(v.state.picks.titleLayer.allow, ['front']);
+    v = await api('/api/state'); assert.strictEqual(v.savedLook.inUse, true); assert.strictEqual(v.state.reference.mode, 'off'); assert.deepStrictEqual(v.state.picks.titleLayer.allow, ['front']);
     await pg.click('#saved-look-use'); await pg.waitForSelector('#saved-look', { state: 'detached' });
     // a pick made now is a choice for this video: no line comes back
     await api('/api/state', { picks: { 'titleLayer:behind': 'allow' } }); await pg.waitForTimeout(500);
-    assert.strictEqual((await api('/api/state')).savedLook.inUse, false); assert.strictEqual(await pg.$('#saved-look'), null);
+    v = await api('/api/state'); assert.strictEqual(v.savedLook.inUse, false); assert.deepStrictEqual(v.savedLook.yours, ['titles']); assert.strictEqual(await pg.$('#saved-look'), null);
     assert.deepStrictEqual(errs, []);
   });
 } finally {

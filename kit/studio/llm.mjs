@@ -44,6 +44,7 @@ export function systemPrompt(state, cat, scripts = []) {
     'Current session: ' + JSON.stringify(session),
     state.point ? `The point of this video, in the user's words: "${state.point}". Let it guide what you pick and write.` : '',
     ref.active ? 'Reference teardown (what the reel the user linked or uploaded does; "the reference" means this one; its suggestions are menu refs you may use in picks): ' + JSON.stringify(ref.active) : 'No reference has been broken down yet.',
+    ref.active && ['recreate', 'look'].includes(ref.mode) ? 'The look of this video comes from the reference (' + (ref.mode === 'recreate' ? 'Recreate' : 'Copy the look') + '). The picks in the current session are the reference\'s or ones the user made after it. Change a pick only when the user asks for it now; never bring back a style from an earlier video.' : '',
     ref.others.length ? 'Other references in the queue: ' + JSON.stringify(ref.others) : '',
     'Scripts: when the user asks you to write or rewrite a script (what they will say on camera), also return "script": {"id": "<an existing id to replace it, or leave out for a new one>", "title": "...", "text": "..."}. ' + SCRIPT_FORMAT + ' When asked for one from the reference, follow its hook, shot count, pacing and beat times. Write it so it sounds human: ' + HUMANIZER_RULES.join(' '),
     scripts.length ? 'Saved scripts: ' + JSON.stringify(scripts.slice(0, 12).map(x => ({ id: x.id, title: x.title, words: x.words, seconds: x.seconds }))) : '',

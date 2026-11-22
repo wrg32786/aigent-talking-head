@@ -98,7 +98,7 @@ try {
     const a = await req('/api/reference/url', { urls: [`${MEDIA}/ref.mp4`] }); assert.ok([200, 202].includes(a.status), JSON.stringify(a).slice(0, 300));
     const mid = (await req('/api/state')).state;
     assert.ok(!mid.reference.extracted && ['queued', 'downloading'].includes(mid.reference.queue[0].status), 'still being read: ' + mid.reference.queue[0].status);
-    assert.strictEqual(mid.pack, 'magazine', 'nothing set yet');
+    assert.strictEqual(mid.pack, null, 'the Look from before is set aside as soon as you choose to copy the reference, so what you pick while it is read is yours'); assert.strictEqual(mid.reference.auto || null, null, 'nothing set from the reference yet');
     release();
     const s = await until(async () => { const x = (await req('/api/state')).state; return x.reference.extracted && x.reference.auto ? x : null; });
     assert.strictEqual(s.pack, 'cinematic'); assert.deepStrictEqual(allow(s, 'captionStyle'), [EX.captionStyle]); assert.strictEqual(s.reference.auto.mode, 'recreate');

@@ -1,7 +1,7 @@
 // The reference's shared pieces, used by Start (RecreateStart.jsx), the Picture step card (Style.jsx) and the Breakdown (Reference.jsx):
 // RefMode (one control, one vocabulary), RefPlan (what Recreate brings, as chips), RefParts (Influence switches)
-// RefNotice (one line while a reference is read, or when it set your Look), SavedLookNote (your saved look sits over
-// the reference's, with the one switch) and TitleCheckLine (titles the breakdown may have misread).
+// RefNotice (one line while a reference is read, or when it set your Look), SavedLookNote (your saved look is in use,
+// not the reference's, with the one switch) and TitleCheckLine (titles the breakdown may have misread).
 import { useEffect, useRef } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { api, toast, Icon } from './lib.jsx';
@@ -107,12 +107,13 @@ export function RefNotice({ s, patch, id = 'ref-notice' }) {
     <Button id={id + '-back'} size="sm" variant="secondary" label="Back to my look" onClick={back} /></div>;
 }
 
-// Recreate and Copy the look: picks kept from the video before sit over the reference's look (the server's
-// savedLook, kit/studio/reference.mjs). One line, one button that takes them off; Undo is on the change note.
+// The reference wins by default, so this shows only when an earlier look is in use over it: the reference is Off
+// (Back to my look) or on Influence (the server's savedLook, kit/studio/reference.mjs savedLookOf). One line, one
+// button that sets the board from the reference alone; Undo is on the change note.
 export function SavedLookNote({ V, apply, id = 'saved-look' }) {
   const sl = V && V.savedLook; if (!sl || !sl.inUse) return null;
   const use = () => api('/api/reference/use-look', {}).then(j => { apply(j); toast(j.note, true); }).catch(() => {});
-  return <div className="ref-notice saved-look glass-card" id={id} role="status" title={'Kept from before: ' + sl.by.map(b => b.label).join(', ')}><Icon n="info" />
+  return <div className="ref-notice saved-look glass-card" id={id} role="status" title={'In use: ' + sl.by.map(b => b.label).join(', ')}><Icon n="info" />
     <p><b id={id + '-text'}>{sl.text}</b></p>
     <Button id={id + '-use'} size="sm" variant="primary" label="Use the reference's look" onClick={use} /></div>;
 }

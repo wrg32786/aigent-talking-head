@@ -85,8 +85,9 @@ function Breakdown({ CAT, V, s, apply, patch }) {
       <RefMode id="ref-mode" mode={r.mode} patch={patch} />
     </div>
     <RefRan V={V} s={s} apply={apply} ran={Array.isArray(ex.ran) ? ex.ran : []} fallback={/fallback/.test(engine || '')} />
-    {/* one notice: when your saved look sits over the reference's, that line replaces "We set your look" */}
-    {V.savedLook && V.savedLook.inUse ? <SavedLookNote V={V} apply={apply} id="saved-look-td" /> : <RefNotice s={s} patch={patch} id="ref-notice-td" />}
+    {/* your saved look in use (the reference Off, or Influence), then what the reference set (nothing when it is Off) */}
+    <SavedLookNote V={V} apply={apply} id="saved-look-td" />
+    <RefNotice s={s} patch={patch} id="ref-notice-td" />
     {r.mode === 'influence' && <RefParts V={V} s={s} patch={patch} />}
     <RefPlan ex={ex} mode={r.mode} id="ref-plan-td" />
     <TitleChecks list={ex.checks || []} apply={apply} />
