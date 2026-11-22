@@ -184,7 +184,7 @@ export const KIT_BRANDS = ['kit/example/skool-logo.svg'];
 //   earlier look that was in use is set aside, your picks since the reference go. The same one Undo puts it back.
 const SETTLE_KEYS = ['pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'reference', 'switchFor'];
 const lookSnap = s => JSON.parse(JSON.stringify({ pack: s.pack || null, picks: s.picks || {}, music: s.music, sound: s.sound, pace: s.pace,
-  reference: s.reference ? { mode: s.reference.mode, added: s.reference.added, prev: s.reference.prev, auto: s.reference.auto, applied: s.reference.applied, lookFor: s.reference.lookFor || null, prevLook: s.reference.prevLook || null, fontFor: s.reference.fontFor || null, prevFont: s.reference.prevFont || null, copyMode: s.reference.copyMode || null } : null, entranceLock: !!s.entranceLock, fontLock: !!s.fontLock }));
+  reference: s.reference ? { mode: s.reference.mode, added: s.reference.added, prev: s.reference.prev, auto: s.reference.auto, applied: s.reference.applied, lookFor: s.reference.lookFor || null, prevLook: s.reference.prevLook || null, fontFor: s.reference.fontFor || null, prevFont: s.reference.prevFont || null, copyMode: s.reference.copyMode || null } : null, entranceLock: !!s.entranceLock, fontLock: !!s.fontLock, boost: s.boost ?? null }));
 export const effectsReady = () => existsSync(join(ROOT, 'effects', '.venv'));
 export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
   const errs = [], log = [];
@@ -196,6 +196,7 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
     Object.assign(s, { pack: u.pack, picks: u.picks, music: u.music, sound: u.sound, pace: u.pace }); if (u.reference && s.reference) Object.assign(s.reference, u.reference);
     if (u.entranceLock !== undefined) s.entranceLock = u.entranceLock;
     if (u.fontLock !== undefined) s.fontLock = u.fontLock;
+    if ('boost' in u) s.boost = u.boost;
     delete s.lastChange; log.push('undid the last change'); return { errs, log, noop: false };
   }
   if (p.useReferenceLook) {
@@ -689,6 +690,7 @@ export function resetEdit(s, { keepLook = s.keepLook === true } = {}) {
     s.sizes = [];
     delete s.brands;
     s.styleLook = null;
+    s.boost = null;
   }
   return s;
 }

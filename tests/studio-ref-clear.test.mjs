@@ -25,6 +25,19 @@ let n = 0;
     assert.strictEqual((await req('/api/reference/clear', { undo: true })).status, 200); assert.strictEqual((await ref()).stages.failed, 'cuts', 'Undo puts the reference back as it was');
     const up = await fetch(`${url}/api/upload?kind=reference&name=other.mp4`, { method: 'POST', body: Buffer.from('not a video') }); assert.strictEqual(up.status, 200, await up.text());
     const r2 = await ref(); assert.ok(/other\.mp4$/.test(r2.file) && !r2.stages, 'a new reference file does not show the last one\'s stopped line: ' + JSON.stringify(r2.stages)); n++; console.log('ok a new reference file starts with no stopped line');
+    // the reference wins, for a second file too: a file always breaks down into the same folder, so the look was never cleared again
+    const tdOut = `teardown/studio-${JOB}`, ex = C.extract(join(ROOT, 'examples', 'recipes', 'cinematic.Reel.md'));
+    const seed = () => writeFileSync(join(SDIR, 'state.json'), JSON.stringify({ ...C.defaultState(), job: JOB, picks: { captionStyle: { allow: ['one-word'], deny: [] } },
+      reference: { ...C.defaultState().reference, mode: 'recreate', file: `teardown-in/studio/${JOB}/a.mp4`, status: 'ready', out: tdOut, extracted: ex, lookFor: tdOut, fontFor: tdOut, prevLook: { pack: null, picks: {}, boost: 'off' } } }));
+    seed();
+    assert.strictEqual((await req('/api/reference/clear', {})).status, 200); assert.strictEqual((await req('/api/state')).j.state.boost, 'off', 'Clear reference brings the earlier look back');
+    assert.strictEqual((await req('/api/reference/clear', { undo: true })).status, 200); assert.ok((await req('/api/state')).j.state.boost == null, 'Undo sets the hard-to-read words switch aside again with the rest of the earlier look'); n++; console.log('ok Undo of Clear reference does not leave the earlier look\'s switch on the reference');
+    seed();
+    const up2 = await fetch(`${url}/api/upload?kind=reference&name=b.mp4`, { method: 'POST', body: Buffer.from('not a video') }); assert.strictEqual(up2.status, 200);
+    const r3 = await ref(); assert.ok(r3.lookFor == null && r3.fontFor == null, 'a second file is a new reference');
+    await req('/api/reference', {}); // the breakdown starts (and fails on this file, which is fine): the look is cleared from that moment
+    const s3 = (await req('/api/state')).j.state; assert.ok(!s3.picks.captionStyle, 'a pick made under the first file does not ride into the second: ' + JSON.stringify(s3.picks));
+    assert.strictEqual(s3.reference.prevLook.boost, 'off', 'the look from before the first reference is still the one kept for Back to my look'); n++; console.log('ok a second reference file clears the picks made under the first');
   } finally { srv.kill(); rmSync(STATE, { recursive: true, force: true }); for (const d of [['inbox', 'studio'], ['teardown-in', 'studio'], ['jobs']]) rmSync(join(ROOT, ...d, JOB), { recursive: true, force: true }); }
 }
 

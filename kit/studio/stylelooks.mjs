@@ -7,6 +7,7 @@
 import { existsSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { createRequire } from 'module';
+import { styleKey } from './reference.mjs';
 
 const require = createRequire(import.meta.url);
 const SL = require('../stylelook.cjs');
@@ -40,6 +41,7 @@ export function plan(s, root) {
   const r = s.reference || {}, dir = refDir(s, root);
   if (r.mode === 'look' && dir) return { kind: 'reference', name: jobLookName(s.job || 'reference'), dir };
   if (r.extracted && (r.mode === 'recreate' || r.mode === 'influence')) return null;
+  if (styleKey(r)) return null; // a reference you chose to copy, still being read or its folder gone: never the last video's saved look
   if (!s.styleLook) return null;
   return { kind: exists(s.styleLook) ? 'saved' : 'missing', name: s.styleLook };
 }

@@ -1004,7 +1004,7 @@ async function api(req, res, u) {
     let radd = null;
     const s = update(st => {
       if (kind === 'footage') radd = C.addFootage(st, relp);
-      if (kind === 'reference') { st.reference = { ...st.reference, file: relp, url: null, status: 'uploaded', extracted: null, out: null, applied: false, stages: null }; } // an earlier breakdown's "We stopped while" is not this file's
+      if (kind === 'reference') { st.reference = { ...st.reference, file: relp, url: null, status: 'uploaded', extracted: null, out: null, applied: false, stages: null }; C.undoReferenceLook(st); st.reference.lookFor = null; st.reference.fontFor = null; /* another file is another reference: what you picked under the last one does not ride into it */ } // an earlier breakdown's "We stopped while" is not this file's
       if (kind === 'music') { st.music.upload = relp; st.music.bed = 'upload'; }
     });
     if (radd && radd.reset) { C.applyPatch(s, { reply: radd.note, from: 'studio', kind: 'action' }); C.save(s); pushState(); }
@@ -1171,7 +1171,7 @@ async function api(req, res, u) {
     const t = teardownSteps(s, null);
     const run = STG.newRun(), stages = () => STG.view(run, { skip: ['download'] });
     STG.feed(run, 'stage cuts', Date.now());
-    update(st => { st.reference.status = 'running'; st.reference.url = b.url || null; st.reference.out = t.out; st.reference.stages = stages(); });
+    update(st => { st.reference.status = 'running'; st.reference.url = b.url || null; st.reference.out = t.out; st.reference.stages = stages(); C.syncRefFont(st); /* as a link does when it is added: what you pick while the file is read is yours */ });
     runTask('teardown', () => t.steps, () => {
       const recipe = join(ROOT, t.out, 'Reel.md');
       if (!existsSync(recipe)) throw new Error('teardown wrote no Reel.md');
@@ -1205,10 +1205,10 @@ async function api(req, res, u) {
     // Clear reference: the reference and every pick it added go, as one undo ({ undo: true } puts it all back)
     const b = await readBody(req).catch(() => ({}));
     if (b.undo) { const s0 = C.load(); if (!s0.undoRef) return json(res, 400, { error: 'nothing to undo' });
-      const st = update(x => { const u = x.undoRef; x.reference = u.reference; x.picks = u.picks; x.pack = u.pack; x.music = u.music; if (u.sound) x.sound = u.sound; if (u.pace) x.pace = u.pace; if (u.fontLock !== undefined) x.fontLock = u.fontLock; delete x.undoRef; }); return json(res, 200, { ...view(st), note: 'The reference is back, with its picks.' }); }
+      const st = update(x => { const u = x.undoRef; x.reference = u.reference; x.picks = u.picks; x.pack = u.pack; x.music = u.music; if (u.sound) x.sound = u.sound; if (u.pace) x.pace = u.pace; if (u.fontLock !== undefined) x.fontLock = u.fontLock; if ('boost' in u) x.boost = u.boost; if ('entranceLock' in u) x.entranceLock = u.entranceLock; delete x.undoRef; }); return json(res, 200, { ...view(st), note: 'The reference is back, with its picks.' }); }
     const s0 = C.load(); if (!s0.reference.extracted && !s0.reference.file && !s0.reference.url) return json(res, 400, { error: 'no reference to clear' });
     let n = 0;
-    const st = update(x => { x.undoRef = JSON.parse(JSON.stringify({ reference: x.reference, picks: x.picks, pack: x.pack || null, music: x.music, sound: x.sound, pace: x.pace, fontLock: !!x.fontLock }));
+    const st = update(x => { x.undoRef = JSON.parse(JSON.stringify({ reference: x.reference, picks: x.picks, pack: x.pack || null, music: x.music, sound: x.sound, pace: x.pace, fontLock: !!x.fontLock, boost: x.boost ?? null, entranceLock: !!x.entranceLock }));
       n = C.undoReferenceLook(x);
       x.reference = { ...x.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null, added: [], prev: null, auto: null, stages: null }; C.syncRefFont(x); });
     return json(res, 200, { ...view(st), note: `Cleared the reference${n ? ` and the ${n} pick${n === 1 ? '' : 's'} it added` : ''}. Undo puts it back.` });

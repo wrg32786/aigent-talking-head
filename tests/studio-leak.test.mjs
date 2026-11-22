@@ -24,6 +24,7 @@ const C = await import('../kit/studio/core.mjs');
 const LANE = await import('../kit/studio/lane.mjs');
 const CH = await import('../kit/studio/channel.mjs');
 const LLM = await import('../kit/studio/llm.mjs');
+const SLK = await import('../kit/studio/stylelooks.mjs');
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok ' + name); };
 const cat = C.catalog();
 const ok = (s, p) => { const r = C.applyPatch(s, p, cat); assert.deepStrictEqual(r.errs, [], JSON.stringify(p)); return r; };
@@ -158,6 +159,16 @@ try {
     const src = readFileSync(join(ROOT, 'kit', 'reel.cjs'), 'utf8');
     assert.ok(/const energyFlag = recipe && opt\('music-energy'\) === 'auto' && \(preset && \(preset\.musicEnergy \|\| \(preset\.bed && preset\.bed !== 'auto'\)\)\) \? undefined : opt\('music-energy'\);/.test(src));
     assert.ok(/\(bed === 'auto' \|\| !bed \|\| energyFlag\)/.test(src), 'the recipe\'s bed is replaced only by an energy you picked'); });
+
+  t('the hard-to-read words switch and the camera move size are part of the look: set aside, back with Back to my look, and Undo knows them', () => {
+    const s = C.defaultState(); s.job = 'only-switches'; ok(s, { boost: 'off', pace: { motion: 'strong' } }); useRef(s, A, 'recreate');
+    assert.ok(s.boost == null && !s.pace.motion, 'both are set aside'); assert.ok(s.reference.prevLook, 'a look that is only these two is still kept');
+    ok(s, { reference: { mode: 'off' } }); assert.strictEqual(s.boost, 'off'); assert.strictEqual(s.pace.motion, 'strong');
+    ok(s, { useReferenceLook: true }); assert.ok(s.boost == null); ok(s, { undoChange: true }); assert.strictEqual(s.boost, 'off', 'Undo of Use the reference\'s look brings the switch back'); });
+
+  t('a saved look from the last video is not the plan while a reference you chose to copy is still being read', () => {
+    const s = C.defaultState(); s.job = 'waiting'; s.styleLook = 'old-look'; s.reference = { ...s.reference, mode: 'recreate', status: 'running', url: 'https://example.com/v' };
+    assert.strictEqual(SLK.plan(s, ROOT), null); s.reference.mode = 'off'; assert.strictEqual(SLK.plan(s, ROOT).name, 'old-look'); });
 
   console.log(`\n${n} studio leak tests passed`);
 } finally { rmSync(TMP, { recursive: true, force: true }); }

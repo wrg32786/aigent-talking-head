@@ -272,7 +272,7 @@ export function clearLookPicks(s) {
   s.pace = { ...d.pace, ...(s.pace && s.pace.keepPauses ? { keepPauses: s.pace.keepPauses } : {}) };
   return had;
 }
-const hadLook = h => !!h && (!!h.pack || Object.keys(h.picks || {}).length > 0 || !plainMusic(h.music) || !plainSound(h.sound) || !plainPace(h.pace));
+const hadLook = h => !!h && (!!h.pack || Object.keys(h.picks || {}).length > 0 || !plainMusic(h.music) || !plainSound(h.sound) || !plainPace(h.pace) || !!h.boost || !!(h.pace && h.pace.motion));
 // B-roll ideas we made ourselves belong to the draft and the reference they were made for: a new draft or another
 // reference drops the ones still waiting (their search words came from the older cut or the older reference). Ideas
 // your agent or you added stay, and so does every clip already placed. Returns how many went.
@@ -299,6 +299,7 @@ export function syncRefLook(s) {
       if (plainSound(s.sound) && !plainSound(h.sound)) s.sound = { ...s.sound, ...h.sound };
       if (!s.boost && h.boost) s.boost = h.boost;
       if (plainPace(s.pace) && !plainPace(h.pace)) s.pace = { ...s.pace, tighten: h.pace.tighten == null ? null : h.pace.tighten, punch: h.pace.punch || 'on' };
+      if (!s.pace.motion && h.pace && h.pace.motion) s.pace = { ...s.pace, motion: h.pace.motion };
     }
     r.prevLook = null; r.lookFor = null; dropAutoIdeas(s, { onlyRef: true });
   }
