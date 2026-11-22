@@ -26,6 +26,7 @@ import wordmarkLight from './brand/aigent-wordmark-for-white.svg';
 import { SetupCheck } from './Setup.jsx';
 import { NewVideo, cleanJob } from './NewVideo.jsx';
 import { FixActions } from './Fix.jsx';
+import { Vault } from './Vault.jsx';
 
 const hashStep = () => (location.hash.match(/step=([a-z]+)/) || [])[1];
 const hashMenu = () => (location.hash.match(/menu=([a-z-]+)/) || [])[1];
@@ -65,6 +66,8 @@ export function App() {
   const [videoMode, setVideoMode] = useState(/new-video/.test(location.hash) ? 'new' : null);
   const [outputsOpen, setOutputsOpen] = useState(/outputs/.test(location.hash));
   const [wizOpen, setWizOpen] = useState(/wizards/.test(location.hash));
+  // the Vault panel: null when closed, { beat } when open (the B-roll spot it was opened for, or null from the top bar)
+  const [vault, setVault] = useState(null);
   const [log, setLog] = useState('');
   const [recLive, setRecLive] = useState(null);
   // the theme button leaves the top bar on a phone (studio.css), so only there does More carry it
@@ -154,8 +157,8 @@ export function App() {
   const openSetup = () => { setSettingsOpen(false); setSetupOpen(true); };
   const openKeys = () => { setSettingsOpen(false); setKeysOpen(true); };
   const openChat = () => setChatOpen(true);
-  const openOutputs = () => setOutputsOpen(true), openNewVideo = () => setVideoMode('new');
-  const ctx = { CAT, V, s, apply, patch, go, reloadCat, setLog, log, openConnect, openSetup, openKeys, openChat, openOutputs, openNewVideo, looks };
+  const openOutputs = () => setOutputsOpen(true), openNewVideo = () => setVideoMode('new'), openVault = beat => setVault({ beat: typeof beat === 'number' ? beat : null });
+  const ctx = { CAT, V, s, apply, patch, go, reloadCat, setLog, log, openConnect, openSetup, openKeys, openChat, openOutputs, openNewVideo, openVault, looks };
   const refAny = !!(s.reference.extracted || s.reference.file || (s.reference.status && s.reference.status !== 'none') || (s.reference.queue || []).length), post = step === 'render' && outView === 'post', breakdown = step === 'picture' && picView === 'reference';
   const env = V.env, a = env.agent || {}, agentState = env.backend !== 'agent' ? 'alt' : a.listening ? 'on' : a.connected ? 'busy' : 'off';
   const pill = !t ? 'Ready' : running ? `${cap1(t.kind)} running` : t.status === 'failed' ? `${cap1(t.kind)} failed` : `${cap1(t.kind)} ${t.status}`;
@@ -177,6 +180,7 @@ export function App() {
           {recLive && step !== 'start' && <button type="button" className="rec-pill" id="rec-pill" onClick={() => go('start', true)} aria-label="Recording, go back to the recorder"><i aria-hidden="true" />{recLive.phase === 'paused' ? 'Paused' : recLive.phase === 'saving' ? 'Saving take' : 'Recording'}</button>}
           {env.setup && !env.setup.ready && (() => { const nm = Object.values(env.setup.missing).filter(x => x.need === 'core').length; return <button type="button" className="setup-pill" id="setup-pill" onClick={openSetup} aria-label={`${nm} to fix, open Setup check`} title="Setup check"><Icon n="ban" /><span className="sp-n">{nm}</span><span className="sp-l"> to fix</span></button>; })()}
           <button type="button" className={'connect-btn ' + agentState} id="connect-open" aria-haspopup="dialog" onClick={openConnect} title={agentState === 'on' ? `${a.name} connected` : 'Connect your terminal agent'}><Icon n="plug" /><span className="cb-l">{agentState === 'on' || agentState === 'busy' ? (a.name || 'Agent') : 'Connect agent'}</span></button>
+          <button type="button" className="connect-btn vault-btn" id="open-vault" aria-label="Vault" aria-haspopup="dialog" onClick={openVault} title="Everything you can show, in one place"><Icon n="grid" /><span className="cb-l">Vault</span></button>
           <span id="taskpill" role="status" aria-live="polite" className={t ? '' : 'idle'}>{t ? <Badge label={pill} variant={running ? 'cyan' : t.status === 'failed' ? 'error' : 'neutral'} /> : <span className="sr">{pill}</span>}</span>
           <button type="button" className="icon-btn theme-btn" id="theme" data-mode={theme} aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} title={theme === 'dark' ? 'Light theme' : 'Dark theme'} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}><Icon n="moon" className="tm-moon" /><Icon n="sun" className="tm-sun" /></button>
           <button className={'icon-btn fab' + (chatAway ? ' away' : '')} id="chat-open" type="button" aria-controls="chat" aria-expanded={String(chatOpen || (!chatAway && matchMedia('(min-width: 901px)').matches))} title="Open chat" aria-label="Open chat" onClick={() => setChatOpen(true)}><Icon n="chat" /><span className={'dot ' + agentState} id="fab-dot" aria-hidden="true" /></button>
@@ -227,6 +231,7 @@ export function App() {
       <NewVideo {...ctx} mode={videoMode} setMode={setVideoMode} />
       <Outputs {...ctx} open={outputsOpen} setOpen={setOutputsOpen} />
       <Wizards {...ctx} open={wizOpen} setOpen={setWizOpen} />
+      <Vault at={vault} close={() => setVault(null)} apply={apply} />
       <StudioOffline onBack={apply} prompt={V.env.restart} />
       <Toast V={V} />
     </Theme>

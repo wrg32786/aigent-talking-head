@@ -1,6 +1,7 @@
 // Settings, API keys and providers: one row per provider with set or not and where from (never a character of the
 // key), a password box to save one on this computer, Test key, Remove, and links to get a key and to the docs.
-// Below: which b-roll sources are on, Allow generating (off by default) with models, and the library folder.
+// Below: which b-roll sources are on, Allow generating (off by default) with models, and the Vault: its folder and
+// whether your agent may see its pictures (off by default: words only).
 import { useEffect, useState } from 'react';
 import { Drawer } from '@astryxdesign/core/Drawer';
 import { Button } from '@astryxdesign/core/Button';
@@ -45,11 +46,11 @@ export function KeyRow({ k, setKeys }) {
 
 export function Keys({ V, apply, open, setOpen }) {
   const [keys, setKeys] = useState(null), [f, setF] = useState(null), [msg, setMsg] = useState('');
-  useEffect(() => { if (!open) return; api('/api/keys').then(j => { setKeys(j); const b = V.env.broll || {}; setF({ generate: !!b.generate, library: b.library || '', models: { ...(b.models || {}) } }); }).catch(() => {}); setMsg(''); }, [open]);
+  useEffect(() => { if (!open) return; api('/api/keys').then(j => { setKeys(j); const b = V.env.broll || {}; setF({ generate: !!b.generate, library: b.library || '', vaultPictures: !!b.vaultPictures, models: { ...(b.models || {}) } }); }).catch(() => {}); setMsg(''); }, [open]);
   // a key change turns sources on or off: refresh the page's view too (keys are not in the session, so no live push)
   const merge = j => { setKeys(x => ({ ...x, ...j })); api('/api/state').then(apply).catch(() => {}); };
   const save = async () => {
-    const r = await fetch('/api/settings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ broll: { generate: f.generate, library: f.library.trim() || null, models: Object.fromEntries(Object.entries(f.models).map(([k, v]) => [k, (v || '').trim() || null])) } }) });
+    const r = await fetch('/api/settings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ broll: { generate: f.generate, library: f.library.trim() || null, vaultPictures: f.vaultPictures, models: Object.fromEntries(Object.entries(f.models).map(([k, v]) => [k, (v || '').trim() || null])) } }) });
     const j = await r.json(); if (!r.ok) { setMsg(j.error); return; } apply(j); toast('B-roll settings saved', true); merge(await api('/api/keys'));
   };
   const gens = keys ? keys.generate.providers.filter(p => !p.stub) : [];
@@ -67,7 +68,10 @@ export function Keys({ V, apply, open, setOpen }) {
           <input id={'model-' + p.id} spellCheck="false" autoComplete="off" placeholder={Object.values(p.defaults || {}).join(' or ') || 'owner/model'} value={f.models[p.id] || ''} onChange={e => setF(x => ({ ...x, models: { ...x.models, [p.id]: e.target.value } }))} />
           <small className="fine">{p.note}</small></label>)}
         {keys && <p className="fine">Not wired yet: {keys.generate.providers.filter(p => p.stub).map(p => p.note).join(' ')}</p>}
-        <FolderField id="broll-lib" label="B-roll library folder" value={f.library} onChange={v => setF(x => ({ ...x, library: v }))} placeholder={V.broll ? V.broll.library.dir : 'broll-library in the kit'} defaultPath={V.broll ? V.broll.library.dir : undefined} note="A full path. Reused by every job. Empty uses broll-library in the kit (git ignores it)." />
+      </fieldset>}
+      {f && <fieldset><legend>Vault</legend>
+        <FolderField id="broll-lib" label="Vault folder" value={f.library} onChange={v => setF(x => ({ ...x, library: v }))} placeholder={V.broll ? V.broll.library.dir : 'vault in the kit'} defaultPath={V.broll ? V.broll.library.dir : undefined} note="A full path. Your Vault lives here and every job uses it. Empty uses vault in the kit, which is never committed." />
+        <Switch id="vault-pictures" label="Let my agent see Vault pictures" description="Off: your agent gets words about each item. Pictures stay here unless you turn this on." value={f.vaultPictures} onChange={v => setF(x => ({ ...x, vaultPictures: v }))} />
         <p id="keys-msg" className="fine" role="status">{msg}</p>
       </fieldset>}
     </div>

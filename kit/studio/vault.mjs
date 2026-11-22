@@ -273,7 +273,7 @@ async function grab(it, capture) {
     const file = scroll || top, abs = join(dir(), file), meta = probe(abs), bytes = [top, full, scroll, og].filter(Boolean).reduce((a, f) => a + statSync(join(dir(), f)).size, 0);
     const cur = get(it.id); if (!cur) return null; // deleted while we worked
     const title = String(r.title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
-    return update(it.id, { tags: [...(cur.tags || []), ...words(title), ...frameTags(abs, meta)], patch: { status: null, file, kind: scroll ? 'video' : 'image', ...meta, bytes, capture: { og, top, full, scroll }, hash: sha(abs),
+    return update(it.id, { tags: [...(cur.tags || []), ...words(title), ...frameTags(abs, meta)], patch: { status: null, file, kind: scroll ? 'video' : 'image', ...meta, bytes, capture: { og, top, full, scroll }, hash: sha(abs), frames: scroll ? framesOf(abs, it.id) : 0,
       thumb: thumbOf(join(dir(), og || top), it.id) || thumbOf(join(dir(), top), it.id), ...(title ? { title, ...(cur.name === linkName(it.from.url) ? { name: title } : {}) } : {}), text: String(r.text || '').replace(/\s+/g, ' ').trim().slice(0, 4000), captured: new Date().toISOString(), ...(r.final ? { final: r.final } : {}) } });
   } catch (e) { try { return update(it.id, { patch: { status: null, note: 'We could not open this page, so we kept the link only.' } }); } catch { return null; } }
 }
@@ -281,12 +281,14 @@ async function grab(it, capture) {
 // ---------- what the page and an agent read ----------
 const ago = (iso, now = Date.now()) => { const d = Math.floor((now - Date.parse(iso)) / DAY); return d < 1 ? 'today' : d < 2 ? 'yesterday' : d < 14 ? `${d} days ago` : d < 60 ? `${Math.round(d / 7)} weeks ago` : `${Math.round(d / 30)} months ago`; };
 const clock = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+// a file's name without its ending, for the grid ("weekend-walk", not "weekend-walk.mp4")
+const shown = n => String(n || '').replace(/\.(mp4|mov|m4v|webm|mkv|jpe?g|png|webp)$/i, '') || String(n || '');
 const KIND_WORD = { video: 'Video', image: 'Image', page: 'Page', screen: 'Screen' };
 // one item for the grid: no file paths, no scores, no model names
 export function brief(it, now = Date.now()) {
   const kind = kindOf(it), used = (it.usedIn || []).length;
   const line = [KIND_WORD[kind], kind === 'page' ? it.from.site : it.seconds && it.kind === 'video' ? clock(it.seconds) : null, used ? `used ${used === 1 ? 'once' : used === 2 ? 'twice' : used + ' times'}` : null].filter(Boolean).join(', ');
-  return { id: it.id, name: it.name, kind, source: fromOf(it), media: it.kind, rights: it.rights, rightsLabel: RIGHTS_LABEL[it.rights] || it.rights, placeable: placeable(it), line, tags: it.tags || [], brand: it.brand || [], type: it.type || null,
+  return { id: it.id, name: shown(it.name), kind, source: fromOf(it), media: it.kind, rights: it.rights, rightsLabel: RIGHTS_LABEL[it.rights] || it.rights, placeable: placeable(it), line, tags: it.tags || [], brand: it.brand || [], type: it.type || null,
     seconds: it.seconds || null, width: it.width || null, height: it.height || null, used, usedIn: it.usedIn || [], link: it.from && it.from.type === 'link' ? it.from.url : it.sourceUrl || null, site: (it.from && it.from.site) || null,
     author: it.author || null, license: it.license ? it.license.name : null, describe: it.describe || null, added: it.addedAt, ...(it.status === 'getting' && now - Date.parse(it.addedAt) < 5 * 60e3 ? { status: 'getting' } : {}), ...(it.note ? { note: it.note } : {}),
     ...(it.captured ? { captured: ago(it.captured, now), stale: stale(it, now) } : {}), ...(it.rights === 'public-page' ? { check: 'Check that you may show it.' } : {}),
