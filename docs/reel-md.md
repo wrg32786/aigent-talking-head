@@ -116,6 +116,8 @@ Every section is optional except the card. Anything left out falls back to the p
 | title-key-color, title-partner-color | a `#rrggbb` colour, `accent` or `text` | their colours |
 | title-glow | `off`, `soft`, `strong` | a glow in the key word's colour on titles and kinetic key words |
 | title-dim | `off`, or `0.05` to `0.8` | how much darker the picture goes while a title is up |
+| title-effect | `type`, `slot-roll`, `count-up`, `stack-fade`, `decode`, `split-flap` | `--title-effect`, the effect of every title that names none |
+| title-exit | `blow-up`, `polaroid`, `glitch-slice`, `dip-black` | `--title-exit`, how every title leaves. On a cut it is the transition there |
 | title-entrance | a title entrance | the entrance of every title that names none (it may repeat). A teardown writes `blur-rise` when it could not read the entrance of an italic serif key word |
 | caption-face | `display`, `partner` | one-word captions in the pairing's key face (default) or its partner face |
 | finish | finish names, comma list, or `none` (on the whole reel) | `--finish` |
