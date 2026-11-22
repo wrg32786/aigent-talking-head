@@ -17,7 +17,7 @@ fit    your spans against the targets (one {"mean": [L, a, b], "std": [..]} or n
 
 Frames are scaled to cover 9:16 and centre cropped first, like kit/framing.py. Needs only opencv and numpy.
 """
-import argparse, json, os, sys
+import argparse, json, os, subprocess, sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -49,9 +49,33 @@ def skin_weight(rgb01):
     return soft(cr, 135, 175, 8) * soft(cb, 80, 130, 8) * np.clip((y - 35) / 25, 0, 1)
 
 
+_ASPECT = {}
+
+
+def aspect_of(video):
+    """width / height of the video as stored, None when ffprobe cannot say."""
+    if video not in _ASPECT:
+        try:
+            w, h = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', video],
+                                  stdout=subprocess.PIPE, text=True).stdout.strip().split('\n')[0].split(',')[:2]
+            _ASPECT[video] = float(w) / float(h)
+        except Exception:
+            _ASPECT[video] = None
+    return _ASPECT[video]
+
+
+def crop_box(box, aspect):
+    """A box in shares of the whole frame, as shares of the 9:16 centre crop cover_frame keeps (a card at x 0.4 to 0.6
+    of a 16:9 frame covers 0.18 to 0.82 of the crop)."""
+    x, y, w, h = box
+    kx, ky = (max(1.0, aspect * 16 / 9), max(1.0, 9 / 16 / aspect)) if aspect else (1.0, 1.0)
+    return [(x - 0.5) * kx + 0.5, (y - 0.5) * ky + 0.5, w * kx, h * ky]
+
+
 def pixels(video, a, b, samples=3, boxes=None):
     """RGB 0..1 pixels (N, 3) from a few frames of a span, the boxes left out. None for no frames."""
     out = []
+    ar = aspect_of(video) if boxes else None
     for t in sample_times(a, b, samples):
         img = cover_frame(video, t)
         if img is None:
@@ -61,8 +85,8 @@ def pixels(video, a, b, samples=3, boxes=None):
         H, W = keep.shape
         for bx in boxes or []:
             if bx.get('t0', 0) - 0.3 <= t <= bx.get('t1', 1e9) + 0.3 and bx.get('box'):
-                x, y, w, h = bx['box']
-                keep[max(0, int((y - 0.02) * H)):int((y + h + 0.02) * H) + 1, max(0, int((x - 0.02) * W)):int((x + w + 0.02) * W) + 1] = False
+                x, y, w, h = crop_box(bx['box'], ar)
+                keep[max(0, int((y - 0.02) * H)):max(0, int((y + h + 0.02) * H) + 1), max(0, int((x - 0.02) * W)):max(0, int((x + w + 0.02) * W) + 1)] = False
         px = small[keep][:, ::-1].astype(np.float64) / 255.0
         if len(px):
             out.append(px)

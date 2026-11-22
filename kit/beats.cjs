@@ -159,8 +159,9 @@ function applySync(cut, captions, grid, opts = {}) {
 
   next.segs.forEach((s, i) => {
     if (i === 0 && !s.bigPunch && !(next.punch && i % 2 === 1) && s.zoom == null) return;
-    const punched = s.bigPunch || s.zoom > 1 || (next.punch && i % 2 === 1);
-    if (!punched) return;
+    // a reframed shot's zoom is its framing, not a punch: delayed, it would open on the raw framing and snap in
+    const punched = s.bigPunch || (s.zoom > 1 && !s.reframed) || (next.punch && i % 2 === 1);
+    if (!punched) { if (s.reframed) delete s.punchDelay; return; }
     const s0 = snap(TL.segs[i].start, times, win);
     // Only delay the punch into the segment (never start it in the previous shot).
     const delay = Math.max(0, s0.t - TL.segs[i].start);

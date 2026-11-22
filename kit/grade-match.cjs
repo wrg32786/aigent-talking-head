@@ -80,14 +80,14 @@ function match({ python, build, segs, shotStart, targets, strength = STRENGTH, s
   });
   fs.rmSync(outDir, { recursive: true, force: true });
   const luts = new Set(shots.filter(Boolean).map(x => x.lut)).size;
-  return any ? { ok: true, single: single || luts === 1, luts, skin, shots } : { ok: false, why: why || 'no frames to read in your take' };
+  return any ? { ok: true, single: single || luts === 1, luts, skin, shots, ...(why ? { partial: why } : {}) } : { ok: false, why: why || 'no frames to read in your take' };
 }
 
 // the honest one line for the log
 function line(res, what = 'the reference') {
   if (!res || !res.ok) return `grade: not matched (${(res && res.why) || 'off'}); your take keeps its own colour`;
   const s = res.shots.filter(Boolean), avg = k => (s.reduce((a, x) => a + x[k], 0) / s.length).toFixed(1), low = s.filter(x => x.strength < STRENGTH - 0.01).length;
-  return `grade: matched ${what} ${res.single ? 'with one LUT for the job (the shots agree)' : res.luts && res.luts < s.length ? `with ${res.luts} LUTs (shots that agree share one)` : 'per shot'}, skin kept at ${Math.round(res.skin * 100)}% of the change; colour distance ${avg('before')} -> ${avg('after')} (Lab)${low ? `; strength lowered on ${low} shot${low === 1 ? '' : 's'} so nothing clips` : ''}`;
+  return `grade: matched ${what} ${res.single ? 'with one LUT for the job (the shots agree)' : res.luts && res.luts < s.length ? `with ${res.luts} LUTs (shots that agree share one)` : 'per shot'}, skin kept at ${Math.round(res.skin * 100)}% of the change; colour distance ${avg('before')} -> ${avg('after')} (Lab)${low ? `; strength lowered on ${low} shot${low === 1 ? '' : 's'} so nothing clips` : ''}${res.partial ? `; one clip was not matched and keeps its own colour (${res.partial})` : ''}`;
 }
 
 module.exports = { match, stats, pool, parseLab, fmtLab, line, STRENGTH, SKIN, SIZE };

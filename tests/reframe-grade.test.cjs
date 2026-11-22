@@ -26,6 +26,24 @@ const skip = name => { skipped++; console.log('skip ' + name + ' (needs Python w
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg || ''} ${a} vs ${b} (tolerance ${tol})`);
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reframe-grade-'));
 
+t('beat sync: a reframed shot\'s zoom is its framing, never a punch to delay (it would open on the raw framing and snap in)', () => {
+  const B = require('../kit/beats.cjs'), grid = { beats: [0.5, 2.06, 4.05], downbeats: [], tempo_bpm: 120 };
+  const cut = { segs: [{ file: 'a.mp4', in: 0, out: 2 }, { file: 'a.mp4', in: 2, out: 4, zoom: 1.8, reframed: true, punchDelay: 0.06 }, { file: 'a.mp4', in: 4, out: 6, zoom: 1.2 }] };
+  const r = B.applySync(cut, { flips: [] }, grid).cut || B.applySync(cut, { flips: [] }, grid);
+  assert.strictEqual(r.segs[1].punchDelay, undefined, 'no delay on the reframed shot, and an older one is cleared');
+  assert.ok(r.segs[2].punchDelay > 0, 'a real punch still lands on the beat');
+});
+t('colour reader: a graphics box on a wide reference is masked where it sits in the 9:16 crop', () => {
+  if (spawnSync(PY, ['-c', 'import numpy']).status !== 0) return;
+  const out = execFileSync(PY, ['-c', 'import json, grade_match as g; print(json.dumps([g.crop_box([0.4, 0.4, 0.2, 0.2], 16 / 9), g.crop_box([0.1, 0.2, 0.3, 0.4], None)]))'], { cwd: path.join(__dirname, '..', 'kit'), encoding: 'utf8' });
+  const [wide, same] = JSON.parse(out);
+  near(wide[0], 0.184, 0.002, 'left edge'); near(wide[2], 0.632, 0.002, 'width'); near(wide[1], 0.4, 1e-6, 'top unchanged');
+  near(same[0], 0.1, 1e-6, 'no size known: the box as given');
+});
+t('grade line: a clip that could not be matched is said, not hidden behind "matched"', () => {
+  const l = GM.line({ ok: true, single: false, luts: 2, skin: 0.5, partial: 'no frames', shots: [{ lut: 'a', strength: 0.8, before: 9, after: 3 }, { lut: 'b', strength: 0.8, before: 8, after: 3 }] });
+  assert.ok(/one clip was not matched and keeps its own colour \(no frames\)/.test(l), l);
+});
 t('cropFor: a wide take is zoomed to the reference face height, eye line and centre', () => {
   const ours = { faceH: 0.082, eyeY: 0.58, cx: 0.55, y0: 0.55, y1: 0.63, x0: 0.5, x1: 0.6 }, target = { faceH: 0.164, eyeY: 0.32, cx: 0.48 };
   const c = RF.cropFor(ours, target, { maxZoom: 2.2 });
