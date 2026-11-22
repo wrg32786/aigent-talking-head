@@ -15,6 +15,7 @@ import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
+try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); } catch { console.log('skip the fast run tests (needs ffmpeg)'); process.exit(0); }
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url))), require = createRequire(import.meta.url);
 const FR = require('../kit/fastrun.cjs'), BS = require('../kit/broll-slots.cjs'), RM = require('../kit/reelmd.cjs');
