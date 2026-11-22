@@ -97,6 +97,19 @@ try {
     assert.strictEqual(plan.motion, 'medium'); assert.deepStrictEqual(plan.moves.map(m => [m.move, m.push, m.measured]), [['push', 0.08, 0.035], ['pull', -0.112, 0.07]]);
   });
 
+  t('re-cut shots that play as one keep the long shot\'s move', () => {
+    // the reference: 1 s still, 1 s still, then an 11 s push; your take had no quiet to cut the first two on
+    const r = RM.parse(['---', 'name: m', '---', '', '# m', '', '## Shots', '', '```videomd-timeline', '#01 0-1 | story hook', '#02 1-2 | story beat', '#03 2-13 | story beat | move push | move-size 0.038', '#04 13-16 | story payoff | move pull | move-size 0.031', '```', ''].join('\n'), 'Reel.md');
+    const segs = [{ file: 'a.mp4', in: 0, out: 6 }, { file: 'a.mp4', in: 6, out: 8 }];
+    RC.applyShotPlan({ recipe: r, segs, rc: { shotStart: [0, 1], shotOf: [0, 3] }, wantPunch: false });
+    assert.deepStrictEqual([segs[0].move, segs[0].push, segs[0].moveRef], ['push', 0.08, 0.038], 'the 11 s push is on the piece that stands for shots 1 to 3');
+    assert.deepStrictEqual([segs[1].move, segs[1].push], ['pull', -0.08]);
+    // a short move inside a long still stretch is not spread over it
+    const r2 = RM.parse(['---', 'name: m', '---', '', '# m', '', '## Shots', '', '```videomd-timeline', '#01 0-9 | story hook', '#02 9-10 | story beat | move push', '#03 10-12 | story payoff', '```', ''].join('\n'), 'Reel.md');
+    const s2 = [{ file: 'a.mp4', in: 0, out: 5 }, { file: 'a.mp4', in: 5, out: 6 }]; RC.applyShotPlan({ recipe: r2, segs: s2, rc: { shotStart: [0, 1], shotOf: [0, 2] }, wantPunch: false });
+    assert.strictEqual(s2[0].push, undefined);
+  });
+
   t('a rebuild with a new strength sizes the moves again; a big punch keeps its own move', () => {
     const segs = segsOf(); RC.applyShotPlan({ recipe, segs, clipStart: [0, 1, 2, 3], wantPunch: false });
     segs[3].bigPunch = true;

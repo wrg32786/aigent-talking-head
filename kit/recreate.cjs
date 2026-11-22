@@ -80,7 +80,16 @@ function applyShotPlan({ recipe, segs, rc = null, clipStart = [], wantPunch = tr
     if (p.move && !sg.bigPunch) setMove(sg, p.move, motion, p.moveSize);
     if (p.shake && notFirst) shakeAt.push(k);
   };
-  if (rc) rc.shotStart.forEach((k, j) => put(plan[rc.shotOf[j]] || {}, k, rc.shotStart[j + 1], j));
+  // A re-cut shot can stand for several of the reference's (no quiet between your words to cut on, so they play as
+  // one). It takes the first one's settings; when that one has no camera move, the move of the one that fills most
+  // of it (40 percent or more), so a long push is not lost to a one second shot before it.
+  const moveOver = j => {
+    const a = rc.shotOf[j], b = rc.shotOf[j + 1] ?? plan.length, span = plan.slice(a, Math.max(a + 1, b)), first = span[0] || {};
+    if (first.move || span.length < 2) return first;
+    const all = span.reduce((t, x) => t + (+x.dur || 0), 0), big = span.filter(x => x.move).sort((x, y) => (+y.dur || 0) - (+x.dur || 0))[0];
+    return big && all > 0 && big.dur / all >= 0.4 ? { ...first, move: big.move, ...(big.moveSize ? { moveSize: big.moveSize } : {}) } : first;
+  };
+  if (rc) rc.shotStart.forEach((k, j) => put(moveOver(j), k, rc.shotStart[j + 1], j));
   else plan.forEach((p, i) => { const k = clipStart[i]; if (k != null) put(p, k, clipStart[i + 1], i); });
   return { plan, shakeAt };
 }

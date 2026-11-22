@@ -35,6 +35,10 @@ try {
     assert.strictEqual(PE.runOn(W([[0, 'Okay.'], [0.6, 'Like,']])), null, 'one word is not a closing sentence');
     assert.deepStrictEqual(PE.runOn(W([[0, 'Follow'], [0.3, 'for'], [0.6, 'more!'], [1.2, 'Um'], [1.5, 'yeah']])).tail.map(w => w[2]), ['Um', 'yeah']);
     assert.ok(PE.runOn(W([[0, 'He'], [0.3, 'said'], [0.6, '"go."'], [1.2, 'So,']])), 'a full stop inside a quote mark ends a sentence');
+    // a word that trails off is not the end of a sentence: "follow for the repo. Uh..." ends on "repo."
+    assert.deepStrictEqual(PE.runOn(W([[0, 'Follow'], [0.3, 'for'], [0.6, 'the'], [0.8, 'repo.'], [1.6, 'Uh...']])).tail.map(w => w[2]), ['Uh...']);
+    assert.deepStrictEqual(PE.runOn(W([[0, 'That'], [0.3, 'is'], [0.6, 'it!'], [1.4, 'so\u2026']])).tail.length, 1);
+    assert.strictEqual(PE.runOn(W([[0, 'Wait'], [0.3, 'for'], [0.6, 'it...']])), null, 'a take that only trails off has no sentence to end on');
   });
 
   // audio for those words: a tone while a word sounds, quiet between sentences

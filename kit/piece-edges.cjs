@@ -21,7 +21,9 @@ const TAIL = { maxWords: 4, maxSeconds: 2.5, minSentence: 2 };
 const LENS = { fps: 12, bodyFps: 2, minRoom: 0.2, maxLead: 4, pitch: 0.045, pitchMax: 0.08, yaw: 0.09, yawMax: 0.15, size: 0.35, hold: 2, away: 0.3, lead: CP.SNAP.leadTarget };
 
 // ---------- the end ----------
-const ENDS = w => /[.?!…]["'”’)\]]*$/.test(String(w || '').trim());
+// a word that ends a sentence: a full stop, a question mark or an exclamation mark (a quote mark or bracket may
+// follow). A word that trails off ("Uh...", "so…") does not end one.
+const ENDS = w => { const t = String(w || '').trim(); return /[.?!]["'”’)\]]*$/.test(t) && !/(\.\.|…)["'”’)\]]*$/.test(t); };
 // words: [start, end, text] in play order. The words after the last full sentence, when the take runs on: returns
 // { keep (index of the sentence's last word), tail (the words left out) } or null when the last word ends a sentence,
 // when nothing is punctuated, or when what follows is long enough to be a line of its own.

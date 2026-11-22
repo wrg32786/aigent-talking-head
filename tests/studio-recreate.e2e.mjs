@@ -119,6 +119,22 @@ try {
     for (const th of ['dark', 'light']) { await theme(pg, th); await pg.waitForSelector('#ref-card'); await shot(pg, `recreate-useall-${th}.png`); }
     assert.deepStrictEqual(errs, []);
   });
+  await t('Camera moves: one small control on Motion, Medium in a Recreate, and it goes away with the reference', async () => {
+    await pg.click('#tab-motion'); await pg.waitForSelector('#motion-size');
+    assert.strictEqual(await pg.getAttribute('#motion-size', 'data-motion'), 'medium', 'a Recreate starts at Medium');
+    assert.strictEqual((await pg.textContent('#motion-size-l')).trim(), 'Camera moves');
+    assert.deepStrictEqual(await pg.$$eval('#motion-size [role="radio"]', x => x.map(e => e.textContent.trim())), ['Subtle', 'Medium', 'Strong']);
+    assert.strictEqual(await pg.locator('#motion-extra').locator('button, [role="switch"], [role="radiogroup"]').count() <= 5, true, 'the layer keeps two small controls, no more');
+    await pg.locator('#motion-size [role="radio"]', { hasText: 'Strong' }).click();
+    await until(async () => (await api('/api/state')).state.pace.motion === 'strong'); await pg.waitForSelector('#motion-size[data-motion="strong"]');
+    const v = await api('/api/state'); assert.ok(v.compose.args.join(' ').includes('--motion strong'), 'the draft gets it: ' + v.compose.args.join(' ').slice(0, 300));
+    for (const th of ['dark', 'light']) { await theme(pg, th); await pg.click('#tab-motion'); await pg.waitForSelector('#motion-size'); await pg.$eval('#motion-extra', e => e.scrollIntoView({ block: 'center' })); if (shots) { await pg.waitForTimeout(300); await pg.screenshot({ path: join(shots, `motion-strength-${th}.png`) }); } }
+    await pg.locator('#motion-size [role="radio"]', { hasText: 'Medium' }).click(); await until(async () => (await api('/api/state')).state.pace.motion === 'medium');
+    await pg.evaluate(() => scrollTo(0, 0)); await pg.click('#ref-card-mode [data-mode="off"]'); await pg.waitForSelector('#ref-card-mode [data-mode="off"][aria-checked="true"]');
+    await pg.click('#tab-motion'); await pg.waitForSelector('#punch'); assert.strictEqual(await pg.$('#motion-size'), null, 'no reference, nothing to size: the control is not shown');
+    await pg.evaluate(() => scrollTo(0, 0)); await pg.click('#ref-card-mode [data-mode="recreate"]'); await pg.waitForSelector('#ref-card-mode [data-mode="recreate"][aria-checked="true"]');
+    assert.deepStrictEqual(errs, []);
+  });
   await t('Recreate from the first screen: the Recreate a video choice on Start takes a link, sets Recreate, and you stay on Start', async () => {
     await api('/api/settings', { downloads: join(STATE, 'dl') });
     await api('/api/reference/clear', {}); await api('/api/state', { reference: { mode: 'influence' } }); await theme(pg, 'dark');
