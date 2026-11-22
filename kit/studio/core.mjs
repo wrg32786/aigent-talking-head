@@ -133,6 +133,7 @@ export function defaultState() {
 }
 export function load() {
   try { const s = JSON.parse(readFileSync(statePath(), 'utf8')), o = refOnly(oneBed({ ...defaultState(), ...s, reference: { ...defaultState().reference, ...(s.reference || {}) } }));
+    if (SZ.EXTRA.includes(o.export)) { o.sizes = SZ.sizesOf(o); o.export = null; } // before 1.28.0 a 4:5 or 1:1 was the export: it is a size now, so its tick can be taken off
     dropRefEntrances(o); // an older session's entrance picks that are only the reference's (kit/studio/reference.mjs)
     return o; }
   catch { return defaultState(); }
@@ -263,7 +264,7 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
     if (p.pace.motion !== undefined) { if (![null, ...MOTIONS].includes(p.pace.motion)) errs.push('pace.motion: subtle, medium or strong'); else { if (p.pace.motion) s.pace.motion = p.pace.motion; else delete s.pace.motion; log.push(`camera moves ${p.pace.motion || MOTION_DEFAULT}`); } }
     if (p.pace.keepPauses !== undefined) { const k = [].concat(p.pace.keepPauses || []).map(String); if (k.some(x => !/^[\w-]+@\d+(\.\d+)?$/.test(x))) errs.push('pace.keepPauses: clip-id@seconds, from choices.json "pauses"'); else { s.pace.keepPauses = k; log.push(k.length ? `keep pauses ${k.join(', ')}` : 'cut every long pause'); } }
   }
-  if (p.export !== undefined) { if (p.export && !cat.exports.includes(p.export)) errs.push(`export: ${cat.exports.join(', ')}`); else { s.export = p.export || null; log.push(`export ${s.export}`); } }
+  if (p.export !== undefined) { if (p.export && !cat.exports.includes(p.export)) errs.push(`export: ${cat.exports.join(', ')}`); else if (SZ.EXTRA.includes(p.export)) { s.sizes = SZ.sizesOf({ sizes: s.sizes, export: p.export }); log.push(`sizes 9:16, ${s.sizes.join(', ')}`); } else { s.export = p.export || null; log.push(`export ${s.export}`); } }
   // sizes: the versions a render makes beside the 9:16 reel (kit/studio/sizes.mjs)
   if (p.sizes !== undefined) { const z = SZ.norm(p.sizes); if (z.bad.length) errs.push(`sizes: 9:16 (always made), 4:5 or 1:1 (not ${z.bad.join(', ')})`); else { s.sizes = z.sizes; log.push(`sizes 9:16${z.sizes.map(x => ', ' + SZ.SIZES.find(y => y.id === x).size).join('')}`); } }
   if (p.reference && p.reference.mode !== undefined) { if (!SLK.MODES.includes(p.reference.mode)) errs.push('reference.mode: influence, recreate, look or off'); else { const was = s.reference.mode; s.reference.mode = p.reference.mode; log.push(`reference mode ${p.reference.mode}`);

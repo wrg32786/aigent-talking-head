@@ -145,7 +145,7 @@ export function App() {
   const pickedIn = st => (STEP_LAYERS[st] || []).some(id => { const l = (CAT.layers || []).find(x => x.id === id); return !!l && l.items.some(r => CAT.items[r] && pickState(s, CAT.items[r])); });
   const refOn = !!(s.reference.extracted && s.reference.mode !== 'off'), drafted = !!(V.edit && V.edit.drafted);
   const done = { start: !!(s.footage.length || s.clips), cut: !!(V.cut && V.cut.candidates && V.cut.candidates.length), picture: !!(s.pack || refOn || s.styleLook || pickedIn('picture')), text: pickedIn('text'),
-    broll: !!(V.broll && V.broll.beats && V.broll.beats.some(b => b.slot)), music: s.music.bed !== 'auto' || s.sound.sfx === 'off' || s.pace.tighten != null || pickedIn('music'), review: drafted, render: !!(V.currentOutputs || []).length };
+    broll: !!(V.broll && V.broll.beats && V.broll.beats.some(b => b.slot)), music: s.music.bed !== 'auto' || s.sound.sfx === 'off' || pickedIn('music'), review: drafted, render: !!(V.currentOutputs || []).length };
   const looks = { on: looksList !== null, list: looksList || [], reload: reloadLooks,
     save: name => quiet('/api/style-looks/save', { name }).then(j => { if (!j) return false; if (Array.isArray(j.looks)) setLooksList(j.looks); else reloadLooks(); return true; }),
     pick: name => quiet('/api/state', { styleLook: name }).then(j => { if (j) apply(j); else toast('We could not switch the saved look.'); }) };
@@ -179,7 +179,7 @@ export function App() {
           <button type="button" className={'connect-btn ' + agentState} id="connect-open" aria-haspopup="dialog" onClick={openConnect} title={agentState === 'on' ? `${a.name} connected` : 'Connect your terminal agent'}><Icon n="plug" /><span className="cb-l">{agentState === 'on' || agentState === 'busy' ? (a.name || 'Agent') : 'Connect agent'}</span></button>
           <span id="taskpill" role="status" aria-live="polite" className={t ? '' : 'idle'}>{t ? <Badge label={pill} variant={running ? 'cyan' : t.status === 'failed' ? 'error' : 'neutral'} /> : <span className="sr">{pill}</span>}</span>
           <button type="button" className="icon-btn theme-btn" id="theme" data-mode={theme} aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} title={theme === 'dark' ? 'Light theme' : 'Dark theme'} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}><Icon n="moon" className="tm-moon" /><Icon n="sun" className="tm-sun" /></button>
-          <button className={'icon-btn fab' + (chatAway ? ' away' : '')} id="chat-open" type="button" aria-controls="chat" aria-expanded={String(chatOpen || !chatAway)} title="Open chat" aria-label="Open chat" onClick={() => setChatOpen(true)}><Icon n="chat" /><span className={'dot ' + agentState} id="fab-dot" aria-hidden="true" /></button>
+          <button className={'icon-btn fab' + (chatAway ? ' away' : '')} id="chat-open" type="button" aria-controls="chat" aria-expanded={String(chatOpen || (!chatAway && matchMedia('(min-width: 901px)').matches))} title="Open chat" aria-label="Open chat" onClick={() => setChatOpen(true)}><Icon n="chat" /><span className={'dot ' + agentState} id="fab-dot" aria-hidden="true" /></button>
           <IconBtn id="open-settings" n="sliders" label="Settings" aria-haspopup="dialog" onClick={() => setSettingsOpen(true)} />
           <MoreMenu id="more-open" label="More" items={[
             { id: 'more-open-video', label: 'Past videos', icon: 'film', onClick: () => setVideoMode('open') },

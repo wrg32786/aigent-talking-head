@@ -37,7 +37,7 @@ export const PROVIDERS = [
     test: { run: async (key, o) => (await import('./post.mjs')).testBuffer(key, o) } },
   { id: 'r2', name: 'Cloudflare R2', group: 'post', for: 'Host the video for Buffer in your R2 bucket (an R2 API token with Object Read and Write)', env: ['R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY'], pair: ['Access key ID', 'Secret access key'], base: 'https://r2.cloudflarestorage.com', get: 'https://dash.cloudflare.com/?to=/:account/r2/api-tokens', docs: 'https://developers.cloudflare.com/r2/api/s3/api/',
     test: { run: async (key, o) => (await import('./post.mjs')).testHost('r2', o) } },
-  { id: 'cloudinary', name: 'Cloudinary', group: 'post', for: 'Host the video for Buffer on Cloudinary (API key and secret; or only an unsigned upload preset in the Post step)', env: ['CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'], pair: ['API key', 'API secret'], base: 'https://api.cloudinary.com', get: 'https://console.cloudinary.com/settings/api-keys', docs: 'https://cloudinary.com/documentation/upload_images#uploading_with_a_direct_call_to_the_rest_api',
+  { id: 'cloudinary', name: 'Cloudinary', group: 'post', for: 'Host the video for Buffer on Cloudinary (API key and secret; or only an unsigned upload preset on Render, Post)', env: ['CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'], pair: ['API key', 'API secret'], base: 'https://api.cloudinary.com', get: 'https://console.cloudinary.com/settings/api-keys', docs: 'https://cloudinary.com/documentation/upload_images#uploading_with_a_direct_call_to_the_rest_api',
     test: { run: async (key, o) => (await import('./post.mjs')).testHost('cloudinary', o) } },
 ];
 export const byId = id => PROVIDERS.find(p => p.id === id);

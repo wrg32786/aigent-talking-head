@@ -294,8 +294,8 @@ function draftSteps(s) {
 // a draft starts: remember its locks, drop a saved look that is gone, and say in the task log which look it uses
 function startDraft(d, done) {
   const sl = d.styleLook;
+  const tk = runTask('draft', () => d.steps, done); // first: it refuses while something else runs, and a refused draft changes nothing
   update(st => { st.lockedAtDraft = d.lockString || ''; st.drafted = null; if (sl && sl.clear) st.styleLook = null; C.dropAutoIdeas(st); /* ideas we made for the older draft go: their search words came from its cut */ });
-  const tk = runTask('draft', () => d.steps, done);
   if (sl && sl.note) { tk.lines.push(sl.note); send('log', { id: tk.id, line: sl.note }); }
   return tk;
 }
@@ -1415,7 +1415,7 @@ async function api(req, res, u) {
     // one wizard step (or all of them at once): reel { goal, look, choose }, clips { clips, ads }, reference { url }
     const b = await readBody(req), s0 = C.load(), w = WIZ.plan(b, C.catalog().packs.map(x => x.name)); if (w.errs.length) return json(res, 400, { error: w.errs.join('; ') });
     const rel = cutSource(s0, b.path), done = []; let next = null, pending = null, note = null;
-    if ((w.wizard !== 'reference') && !rel) return json(res, 400, { error: 'add footage first, on the Footage step' });
+    if ((w.wizard !== 'reference') && !rel) return json(res, 400, { error: 'add footage first, on the Start step' });
     const setOut = o => { const r = CUT.normalize(outputOf(C.load()), o); if (r.errs.length) throw new Error(r.errs.join('; ')); update(x => { x.output = r.output; if (!x.cut || x.cut.source !== rel) x.cut = { source: rel, candidates: [], scoredBy: null }; }); };
     if (w.goal) { setOut(WIZ.GOALS[w.goal].out); done.push(`goal: ${WIZ.GOALS[w.goal].label}`); next = 'look'; }
     if (w.look) { update(x => { C.applyPatch(x, { pack: w.look }); }); done.push(`look: ${w.look}`); next = 'choose'; }

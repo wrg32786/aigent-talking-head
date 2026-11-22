@@ -227,7 +227,8 @@ const spotTitle = b => b.slot ? (b.slot.clip.source === 'agent' || b.slot.clip.s
 function Need({ b, V, after, onPick, sel, onRun }) {
   const n = b.need, [busy, setBusy] = useState('');
   const act = async action => { setBusy(action); try { const j = await api('/api/broll/need', { beat: b.n, action }); after(j); if (action === 'send') toast('Sent to your agent. Its answer shows in the chat.', true); if (action === 'stock') toast('Stock clip placed. Swap it if it does not fit.', true); } catch {} setBusy(''); };
-  const up = async files => { setBusy('up'); for (const f of files) { const r = await fetch(`/api/broll/upload?name=${encodeURIComponent(f.name)}&type=${n.kind === 'panel' ? 'screen-recording' : 'lifestyle'}&beat=${b.n}`, { method: 'POST', body: f }); const j = await r.json().catch(() => ({})); if (!r.ok) { toast(j.error || 'upload failed'); break; } after(j); } setBusy(''); };
+  const fileIn = useRef(null);
+  const up = async files => { setBusy('up'); try { for (const f of files) { const r = await fetch(`/api/broll/upload?name=${encodeURIComponent(f.name)}&type=${n.kind === 'panel' ? 'screen-recording' : 'lifestyle'}&beat=${b.n}`, { method: 'POST', body: f }); const j = await r.json().catch(() => ({})); if (!r.ok) { toast(j.error || 'upload failed'); break; } after(j); } } catch { toast('upload failed'); } finally { setBusy(''); } };
   if (n.skipped) return <li className={'need glass skipped' + (sel ? ' sel' : '')} data-beat={b.n} data-slot={n.slot}>
     <span className="need-t"><b>Skipped</b><span className="fine">{clock(b.start)} · You stay on screen here.</span></span>
     <Button className="need-undo" size="sm" variant="ghost" label="Put it back" onClick={() => act('unskip')} /></li>;
@@ -236,7 +237,8 @@ function Need({ b, V, after, onPick, sel, onRun }) {
       <span className="fine need-d">{clock(b.start)} · {t1(n.seconds)} s · {n.shape}{n.treat ? ` · ${n.treat}` : ''}</span></span>
     <span className="need-acts" onClick={e => e.stopPropagation()}>
       {n.run ? <Button className="need-run" size="sm" variant="secondary" label="Pick clips for the run" icon={<Icon n="film" />} onClick={onRun} />
-        : <label className={'need-up' + (busy === 'up' ? ' busy' : '')}><input type="file" accept="video/*,image/*" hidden onChange={e => up([...e.target.files])} /><Icon n="upload" />{busy === 'up' ? 'Adding...' : 'Upload'}</label>}
+        : <><button type="button" className={'need-up' + (busy === 'up' ? ' busy' : '')} disabled={busy === 'up'} onClick={() => fileIn.current.click()}><Icon n="upload" />{busy === 'up' ? 'Adding...' : 'Upload'}</button>
+          <input type="file" accept="video/*,image/*" hidden ref={fileIn} onChange={e => { up([...e.target.files]); e.target.value = ''; }} /></>}
       {n.stock && !n.run && <Button className="need-stock" size="sm" variant="secondary" label="Use stock" isLoading={busy === 'stock'} onClick={() => act('stock')} />}
       {agentOn(V) && <Button className="need-send" size="sm" variant="secondary" label="Send to my agent" isLoading={busy === 'send'} onClick={() => act('send')} />}
       <Button className="need-copy" size="sm" variant="ghost" label="Copy for my agent" icon={<Icon n="copy" />} onClick={() => copyText(n.ask, 'Copied. Paste it into your agent.')} />

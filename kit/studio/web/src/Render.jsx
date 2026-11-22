@@ -163,7 +163,7 @@ export function RunFoot({ V, s, log }) {
   return <div className="step run-foot" id="run-foot">
     <Fold id="details-fold" title="Details"><div className="row" id="cmd"><span className="fine grow">Your agent can make this same reel.</span>
       <Button id="cmd-copy" size="sm" variant="secondary" label="Copy for my agent" icon={<Icon n="copy" />} onClick={() => copyText(forAgent, 'Copied. Paste it into your agent.')} /></div>
-      <span className="lbl" id="log-l">What ran</span><pre id="log" className="log" aria-live="off" aria-labelledby="log-l" ref={logRef}>{log}</pre></Fold>
+      <span className="lbl" id="log-l">What ran</span><pre id="log" className="log" aria-live="off" aria-labelledby="log-l" ref={logRef}>{log.split('\n').filter(l => !l.startsWith('$ ')).join('\n')}</pre></Fold>
   </div>;
 }
 

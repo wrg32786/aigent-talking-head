@@ -205,7 +205,7 @@ const r2Endpoint = (c, env) => (env.STUDIO_API_BASE_R2 || `https://${c.account}.
 const pair = (id, env) => { const k = KEYS.get(id, env); if (!k) return null; const i = k.indexOf(':'); return [k.slice(0, i), k.slice(i + 1)]; };
 const objectName = (file, job) => `${(job || 'reel').replace(/[^\w.-]+/g, '-')}-${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}-${randomBytes(4).toString('hex')}.mp4`;
 async function uploadR2(file, { env, fetchImpl, job, st }) {
-  const c = hostStatus(env, st).r2; if (!c.ready) throw bad(`R2 needs: ${c.missing.join(', ')} (Post step, Set up).`, 400, { setup: 'r2' });
+  const c = hostStatus(env, st).r2; if (!c.ready) throw bad(`R2 needs: ${c.missing.join(', ')} (Render, Post, Set up).`, 400, { setup: 'r2' });
   const [ak, sk] = pair('r2', env), body = readFileSync(file), key = `${c.prefix.replace(/^\/|\/$/g, '')}/${objectName(file, job)}`.replace(/^\//, '');
   const url = `${r2Endpoint(c, env)}/${enc(c.bucket)}/${key.split('/').map(enc).join('/')}`;
   const headers = sigv4({ method: 'PUT', url, headers: { 'content-type': 'video/mp4', 'cache-control': 'public, max-age=31536000' }, payloadHash: sha256(body), accessKey: ak, secret: sk });
@@ -217,7 +217,7 @@ async function uploadR2(file, { env, fetchImpl, job, st }) {
 const cloudBase = env => (env.STUDIO_API_BASE_CLOUDINARY || 'https://api.cloudinary.com').replace(/\/$/, '');
 const CHUNK = 20 * 1024 * 1024;
 async function uploadCloudinary(file, { env, fetchImpl, job, st }) {
-  const c = hostStatus(env, st).cloudinary; if (!c.ready) throw bad(`Cloudinary needs: ${c.missing.join(', ')} (Post step, Set up).`, 400, { setup: 'cloudinary' });
+  const c = hostStatus(env, st).cloudinary; if (!c.ready) throw bad(`Cloudinary needs: ${c.missing.join(', ')} (Render, Post, Set up).`, 400, { setup: 'cloudinary' });
   const kp = c.preset ? null : pair('cloudinary', env), public_id = objectName(file, job).replace(/\.mp4$/, '');
   // unsigned: upload_preset (it must be an unsigned preset); signed: api_key, timestamp and a SHA-1 signature of the sorted params
   const params = { folder: c.folder, public_id, ...(c.preset ? { upload_preset: c.preset } : { timestamp: String(Math.floor(Date.now() / 1000)) }) };

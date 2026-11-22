@@ -51,6 +51,13 @@ try {
     s.export = null; assert.strictEqual(arg(s), 'feed45,square'); s.sizes = []; assert.strictEqual(arg(s), null);
     s.export = 'feed45'; assert.strictEqual(arg(s), 'feed45'); assert.deepStrictEqual(SZ.sizesOf(s), ['feed45']);
     s.export = 'tiktok'; s.sizes = ['square']; assert.strictEqual(arg(s), 'tiktok,square');
+    // a board saved before 1.28.0 with the 4:5 as its export: read as a size, so unticking it on Render takes it off
+    { const fsx = await import('fs'), f = join(process.env.STUDIO_DIR, 'state.json'), had = fsx.existsSync(f) ? fsx.readFileSync(f) : null;
+      fsx.mkdirSync(process.env.STUDIO_DIR, { recursive: true }); fsx.writeFileSync(f, JSON.stringify({ ...C.defaultState(), export: 'feed45', sizes: ['square'] }));
+      const o = C.load(); assert.deepStrictEqual([o.export, o.sizes], [null, ['feed45', 'square']]);
+      assert.deepStrictEqual(C.applyPatch(o, { sizes: ['square'] }).errs, []); assert.strictEqual(arg(o), 'square', 'the 4:5 is gone once unticked');
+      assert.deepStrictEqual(C.applyPatch(o, { export: 'feed45' }).errs, []); assert.deepStrictEqual([o.export, o.sizes], [null, ['feed45', 'square']], 'an agent that sets export to a 4:5 ticks the size');
+      if (had) fsx.writeFileSync(f, had); else fsx.rmSync(f, { force: true }); }
     assert.deepStrictEqual(X.parseList(arg(s)), { names: ['tiktok', 'square'], main: 'tiktok', extra: [], reframed: ['square'], bad: [] }, 'the engine reads the list the same way');
   });
   await t('files: plain labels for every name, the reel before its sizes, the Feed file of a version', async () => {

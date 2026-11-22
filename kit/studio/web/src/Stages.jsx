@@ -17,9 +17,9 @@ function useSince(since) {
 // is seen to be working; each finished stage keeps its time in the list.
 // A stage that stopped shows one plain line with Try again.
 export function Stages({ v, id, onRetry }) {
+  const busy = !!(v && v.stage), secs = useSince(busy ? v.since : null); // the hook runs before any return: v is not there yet while a link waits its turn
   if (!v || !Array.isArray(v.list)) return null;
-  const done = v.list.filter(x => x.state === 'done').length, busy = !!v.stage;
-  const secs = useSince(busy ? v.since : null);
+  const done = v.list.filter(x => x.state === 'done').length;
   if (!busy && !v.failed) return null;
   return <div className="stg" id={id} data-stage={v.stage || ''} data-failed={v.failed || ''}>
     {busy && <ProgressBar label={v.label} isLabelHidden value={v.percent} />}
