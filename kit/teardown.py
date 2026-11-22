@@ -199,7 +199,7 @@ def beat_grid(path, dur):
         r = subprocess.run([sys.executable, os.path.join(HERE, "beats.py"), wav, "--duration", str(dur), "--out", out], capture_output=True, text=True)
         if r.returncode or not os.path.exists(out):
             return None
-        return json.load(open(out))
+        return json.load(open(out, encoding="utf-8"))
 
 
 def cmd_analyze(a):
@@ -667,7 +667,7 @@ def detect_graphics(video, cues, seg=None, step=0.25):
 
 def cmd_extras(a):
     import cv2, numpy as np
-    b = json.load(open(a.breakdown))
+    b = json.load(open(a.breakdown, encoding="utf-8"))
     shots = b.get("shots", [])
     seg = person_mask_fn()
     out = {"shots": [], "titles": [], "mask": bool(seg)}
@@ -677,7 +677,7 @@ def cmd_extras(a):
             out["shots"].append({}); continue
         st = grade_stats(img)
         out["shots"].append({"index": s.get("index"), **st, "scan": scanline_score(img)})
-    titles = json.load(open(a.titles)) if a.titles and os.path.exists(a.titles) else []
+    titles = json.load(open(a.titles, encoding="utf-8")) if a.titles and os.path.exists(a.titles) else []
     sheet = []
     for t in titles:
         tm = (t["start"] + min(t["end"], t["start"] + 1.2)) / 2 + 0.25

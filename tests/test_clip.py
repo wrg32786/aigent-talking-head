@@ -67,7 +67,7 @@ class ClipTests(unittest.TestCase):
                            cwd=self.dir, capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.out = r.stdout
-        return json.loads((self.dir / "clips" / "clips.json").read_text())
+        return json.loads((self.dir / "clips" / "clips.json").read_text(encoding="utf-8"))
 
     def test_first_word_never_shaved(self):
         # a clip that is already cut: the first word starts at 0.00 s. The clip must start at 0, not 0.05.

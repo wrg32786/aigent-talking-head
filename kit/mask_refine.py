@@ -164,7 +164,7 @@ def avail_gb():
     """Memory the OS can hand out now, in GB (Linux MemAvailable, Windows ullAvailPhys, macOS free + inactive), or None."""
     try:
         if sys.platform.startswith('linux'):
-            for line in open('/proc/meminfo'):
+            for line in open('/proc/meminfo', encoding='utf-8'):
                 if line.startswith('MemAvailable:'):
                     return int(line.split()[1]) / 1048576
         elif sys.platform == 'win32':

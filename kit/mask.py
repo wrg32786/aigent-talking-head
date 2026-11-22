@@ -74,7 +74,7 @@ a = ap.parse_args()
 def cut_json():
     if not os.path.exists("cut.json"):
         return {}
-    return json.load(open("cut.json"))
+    return json.load(open("cut.json", encoding="utf-8"))
 
 def cut_mask(cut):
     m = cut.get("mask")
