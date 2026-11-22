@@ -103,7 +103,7 @@ try {
     await pg.setViewportSize({ width: 1440, height: 900 }); await pg.waitForSelector('#chat', { state: 'visible' });
   });
   await t('no em dash and no terminal command in the new words', async () => {
-    const txt = await pg.evaluate(() => document.body.innerText); assert.ok(!/—/.test(txt)); assert.ok(!/--no-boost/.test(txt));
+    const txt = await pg.evaluate(() => document.body.innerText); assert.ok(!/\u2014/.test(txt)); assert.ok(!/--no-boost/.test(txt));
   });
   assert.deepStrictEqual(errs, [], 'page errors: ' + errs.join(' | '));
 } finally {

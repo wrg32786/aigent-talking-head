@@ -60,7 +60,7 @@ try {
     const cs = CAP.captionStyle(phraseReel('not_configured'));
     assert.strictEqual(cs.style, 'kinetic'); assert.strictEqual(cs.was, 'one-word');
     assert.ok(/phrases, not one word at a time/.test(cs.why) && /designed titles/.test(cs.why) && /not one-word/.test(cs.why), cs.why);
-    assert.ok(!/—/.test(cs.why), 'no em dash');
+    assert.ok(!/\u2014/.test(cs.why), 'no em dash');
   });
   t('one-word captions with a few titles between them stay one-word', () => {
     const b = oneReel(); assert.strictEqual(CAP.phrasesOnScreen(b), null); const cs = CAP.captionStyle(b); assert.strictEqual(cs.style, 'one-word'); assert.strictEqual(cs.was, undefined); });
@@ -75,7 +75,7 @@ try {
     assert.ok(/^- vision: off$/m.test(res.md), 'the recipe carries vision: off');
     assert.strictEqual(RM.parse(res.md).style.vision, 'off');
     assert.ok(res.report.includes(CAP.VISION_OFF), 'teardown.md says the vision pass was off'); assert.ok(/The captions first read as one-word/.test(res.report) && /phrases, not one word at a time/.test(res.report), 'teardown.md says why the captions are not one-word');
-    assert.ok(!/—/.test(res.report) && !/—/.test(res.md), 'no em dash');
+    assert.ok(!/\u2014/.test(res.report) && !/\u2014/.test(res.md), 'no em dash');
     const d = join(TMP, 'ref'); mkdirSync(d, { recursive: true }); writeFileSync(join(d, 'Reel.md'), res.md);
     const ex = C.extract(join(d, 'Reel.md')); assert.strictEqual(ex.vision, 'off'); assert.strictEqual(ex.captionStyle, 'kinetic');
     const on = V.convert(oneReel(), {}, {}); assert.ok(!/vision:/.test(on.md) && !on.report.includes(CAP.VISION_OFF) && /^- captions: one-word$/m.test(on.md), 'a breakdown with the vision pass says nothing, and stays one-word');
