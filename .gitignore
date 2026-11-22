@@ -62,7 +62,9 @@ packs/local/
 /.claude/settings.local.json
 /.cursor/mcp.json
 
-# your b-roll library (stock, generated and your own clips; never committed)
+# your Asset Vault (your files, saved links and captures, stock and generated clips; never committed)
+/vault/
+# the b-roll library of 1.28.0 and before (it moves into the Vault the first time Studio opens it)
 broll-library/
 scenes/local/
 

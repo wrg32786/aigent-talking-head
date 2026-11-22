@@ -35,12 +35,14 @@ const CLIP = join(STATE, 'clip.mp4');
 if (spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' }).status === 0) spawnSync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=360x640:rate=24:duration=2', '-pix_fmt', 'yuv420p', CLIP]);
 else { const b = Buffer.alloc(40e3); b.writeUInt32BE(32, 0); b.write('ftypisom', 4); writeFileSync(CLIP, b); }
 const BODY = readFileSync(CLIP);
+// the stock mock serves other bytes than the user's own clip: the Vault adds the same file only once (1.29.0)
+const STOCK_BODY = Buffer.concat([BODY, Buffer.alloc(16)]);
 const PEX = 'pex-test-key-123456', PIX = 'pix-test-key-654321', HF = 'hfid0001:hfsecret0001';
 const hits = []; let mockUrl = '', hfPolls = 0;
 const jsonRes = (res, code, o) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(o)); };
 const mock = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x'); hits.push({ m: req.method, p: u.pathname, auth: req.headers.authorization || '' });
-  if (u.pathname.startsWith('/files/')) { res.writeHead(200, { 'content-type': 'video/mp4', 'content-length': BODY.length }); return res.end(BODY); }
+  if (u.pathname.startsWith('/files/')) { res.writeHead(200, { 'content-type': 'video/mp4', 'content-length': STOCK_BODY.length }); return res.end(STOCK_BODY); }
   if (u.pathname === '/v1/videos/search') {
     if (req.headers.authorization !== PEX) return jsonRes(res, 401, { error: 'bad key' });
     const v = (id, w, h, d) => ({ id, width: w, height: h, duration: d, url: `https://www.pexels.com/video/laptop-on-desk-${id}/`, image: `${mockUrl}/files/${id}.jpg`, user: { name: 'Ana Lens', url: 'https://www.pexels.com/@ana' },

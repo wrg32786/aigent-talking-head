@@ -99,7 +99,7 @@ try {
   await t('the made clip is in the library as one clip of the clips you picked, and the render plan carries them', async () => {
     const lib = (await api('/api/broll/library?q=')).clips, rc = lib.find(c => c.run); assert.ok(rc && rc.name === 'Fast run: 3 clips' && rc.width === 1080 && rc.height === 960, JSON.stringify(rc));
     assert.ok(Math.abs(rc.seconds - 0.75) < 0.06);
-    const idx = JSON.parse(readFileSync(join(LIB, 'library.json'), 'utf8')).clips.find(c => c.id === rc.id);
+    const idx = JSON.parse(readFileSync(join(LIB, 'vault.json'), 'utf8')).items.find(c => c.id === rc.id);
     assert.deepStrictEqual(idx.run.clips, [ids[2], ids[1], ids[0]]); assert.strictEqual(idx.run.beat, 'half');
     // a fast run is not offered as a thing to put inside another run
     await pg.click('#broll-more').catch(() => {}); await pg.click('#btab-run'); await pg.waitForSelector('#run-grid');

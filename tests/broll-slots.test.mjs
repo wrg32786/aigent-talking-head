@@ -168,7 +168,7 @@ try {
       const b = uj.broll.beats.find(x => x.n === needs[0].n); assert.ok(b.slot && !b.need, 'filled, the need is gone'); assert.strictEqual(b.slot.place, 'card');
       assert.ok(Math.abs(b.slot.at - slots[0].start) < 0.02 && Math.abs(b.slot.dur - (slots[0].end - slots[0].start)) < 0.05, JSON.stringify(b.slot));
       // what Render runs first (kit/studio/broll-run.mjs)
-      const LANE = await import('../kit/studio/lane.mjs'), lib = JSON.parse(readFileSync(join(LIB, 'library.json'), 'utf8')).clips, byId = Object.fromEntries(lib.map(c => [c.id, c]));
+      const LANE = await import('../kit/studio/lane.mjs'), lib = JSON.parse(readFileSync(join(LIB, 'vault.json'), 'utf8')).items, byId = Object.fromEntries(lib.map(c => [c.id, c]));
       const ins = LANE.inserts({ [b.n]: b.slot && { clip: b.slot.clip.id, place: b.slot.place, offset: b.slot.offset, dur: b.slot.dur, in: 0 } }, uj.broll.beats, id => byId[id], c => join(LIB, c.file));
       assert.deepStrictEqual([ins[0].slot, ins[0].place, ins[0].fx.motion, ins[0].border], [1, 'card', 'push', '#d87b5b']);
       const pf = join(jobDir, 'broll.json'); writeFileSync(pf, JSON.stringify({ inserts: ins, credits: 'x', skipped: [3] }));
