@@ -2,6 +2,10 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.29.0 (unreleased)
+
+Release notes: [docs/releases/v1.29.0.md](docs/releases/v1.29.0.md).
+
 ## 1.28.0 (unreleased)
 
 Release notes: [docs/releases/v1.28.0.md](docs/releases/v1.28.0.md). Recreate now matches the reference's framing and colour shot by shot and draws its starburst stickers, and a new mode, Copy the look, puts a reference's style on your own script and subject.
