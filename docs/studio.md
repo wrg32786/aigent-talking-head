@@ -614,7 +614,30 @@ The B-roll step sits between Text and graphics and Music and sounds. It needs a 
 
 **Render** puts the lane into `build/cut.json` as inserts (`kit/studio/broll-run.mjs apply`; inserts from a recipe or `--broll` stay) and writes `jobs/<job>/credits.txt`: each clip with its source, author, link and license, generated clips with the provider, model and prompt, and "Videos provided by Pexels" or "Videos from Pixabay" when used.
 
-**Library:** `broll-library/` in the kit by default (git ignores it), or **B-roll library folder** in API keys and providers, or `STUDIO_BROLL_LIBRARY`. The index is `library.json` in that folder, so the library moves with it. Stock media is never committed.
+**Library:** since 1.29.0 the library is the Vault (next section). Every clip you upload on a slot, record, take from stock, capture or generate lands there, so the next reel can use it.
+
+### The Vault (1.29.0)
+
+One place for everything you own or may show: files, pictures and saved links. It lives on your computer and every reel picks from it. Open it with **Vault** in the top bar, from any step, or with **Open the Vault** on a slot card.
+
+- **What you see.** A grid of thumbnails, each with a short name and one line ("Page, github.com", "Video, 0:12, used twice"). Four filters in one row: kind (video, image, page, screen), source (uploaded, links, stock, made), tag, and used or not used yet. Search takes plain words and looks in names, tags, brands, page titles and the text we read on a captured page.
+- **Add.** Upload files (or drop them on the Vault), or paste a link. A link to a public page is opened in a fresh browser with no cookies and no sign in, and we keep its share image and title, the top of the page, the full page, a short scrolling recording and the words on it. The item shows at once with "Getting it ready". A page that needs a sign in keeps only the link and says so.
+- **Rights.** Every item has a mark: Mine, Licensed, Public page or Reference only. A link to someone else's video or post is saved as Reference only: a still and the link, never placed in a reel. Tick **This is mine** for your own. A public page that is not yours keeps "Check that you may show it." You can change the mark on the item.
+- **Brand.** One Vault for everything, with a brand tag on each item.
+- **Duplicates.** The same file or the same link twice gives you the item you already have ("You already have this.").
+- **Delete.** Delete from Vault, with Undo for 7 days. A slot that used the item reads "Needs B-roll" again. Agents cannot delete.
+- **Limits.** 2 GB a file and 20 GB for the Vault, with a line when it is nearly full. A capture older than 30 days says when it was taken.
+- **Your old library.** The first time Studio opens the Vault, `broll-library/` moves in: same clips, same credits, nothing lost.
+
+**What each slot should show.** Every B-roll slot from a reference or a look has a brief, made from your words under it: the tools, sites, names and numbers you say, then plain nouns. The card reads "Show OmniRoute on screen. You name it in this line." What the reference showed is only a hint for the kind of shot. Your agent can rewrite a brief when it can say it better.
+
+**Where a pick comes from, in this order.** Your Vault first: we match the brief's words to each item's name, tags, brand, page title and page text, and show the best one with its reason ("From your Vault: says "OmniRoute" on screen"). **Use it** places it, **Swap** shows the next ones, **Skip** leaves you on screen, and **More** has Upload, Open the Vault and the agent buttons. A strong match is placed for you after a draft and says "Picked for you"; a weak one is only shown as a suggestion. Then free stock, only with your own key, and only fetched when you press Use it. Generating always asks first, as before. No item is picked for two slots of one reel.
+
+**For agents.** `add_to_vault` (a file or a link), `capture_link` (a public page the user confirmed; `slot` offers it on that slot), `search_vault` (words and filters; `slot` ranks for that slot's brief) and `set_broll_brief`. `list_broll` returns each slot's `brief` and `candidates` with a reason each. An agent gets words about each item; pictures stay on the computer unless you turn on **Let my agent see Vault pictures** in Settings.
+
+**Where it lives:** `vault/` in the kit by default (git ignores it), or **Vault folder** in API keys and providers, or `STUDIO_VAULT` (`STUDIO_BROLL_LIBRARY` still works). The index is `vault.json`; each item has its own folder under `items/` with `item.json` beside its files. A backup is a copy of the folder. Nothing in it is uploaded anywhere.
+
+Not in this release: search by meaning with a local picture model, matching your own face, downloading videos from social sites, watched folders, Refresh for old captures, Capture with me for signed in pages, and generation in the picking order. They are planned in [docs/specs/broll-sourcing.md](specs/broll-sourcing.md).
 
 ### Generate
 
