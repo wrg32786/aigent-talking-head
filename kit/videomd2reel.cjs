@@ -19,8 +19,9 @@ const path = require('path');
 const SC = require('./scenes.cjs');
 const SPL = require('./shotplan.cjs');
 const { r2, norm, sameWord } = require('./teardown/util.cjs');
-const { oneWordStream, captionStyle, placeOf, captionLook } = require('./teardown/captions.cjs');
+const { oneWordStream, captionStyle, placeOf, captionLook, phrasesOnScreen } = require('./teardown/captions.cjs');
 const { ENTRANCE_MAP, pickTitles, textDoubt } = require('./teardown/titles.cjs');
+const PH = require('./teardown/phrases.cjs');
 const { mapGraphics, stickerImage } = require('./teardown/graphics.cjs');
 const { finishOf, gradeChoice } = require('./teardown/grade.cjs');
 const { suggestBed, musicOf } = require('./teardown/music.cjs');
@@ -96,10 +97,22 @@ function convert(b, extras = {}, opts = {}) {
   // a title that is a graphic's own word (FIRST on a sticker, the label under an icon) belongs to that graphic
   const inBox = (bb, box) => bb && box && bb[0] + bb[2] / 2 >= box[0] && bb[0] + bb[2] / 2 <= box[0] + box[2] && bb[1] + bb[3] / 2 >= box[1] && bb[1] + bb[3] / 2 <= box[1] + box[3];
   const owned = t => graphics.find(g => t.start < g.end + 0.3 && g.start < t.end + 0.3 && (inBox(t.bbox, g.bbox) || [g.cue, g.text].filter(Boolean).some(x => { const a = norm(x), c = norm(t.text); return a && c && (sameWord(a, c) || (c.length >= 4 && a.includes(c))); })));
-  const titles = picked.filter(t => !owned(t)).slice(0, 7);
-  titles.forEach((t, i) => { t.n = i + 1; });
-  const dropped = [...(picked.dropped || []), ...picked.filter(t => owned(t)).map(t => ({ t: t.start, text: t.text, why: `part of the ${owned(t).type} at ${owned(t).start}s` }))];
   const cs = captionStyle(b);
+  // Phrase titles (1.29.0, report 4 item 16): when the text on screen is designed phrases, or the user's agent read the
+  // titles off the sheets (opts.agentTitles, titles.agent.json beside the teardown), the titles are one per phrase with
+  // its lines, key word, build, effect and exit, not one per big word; and with no running captions in the reference
+  // the draft draws none (Style "running-captions: off").
+  const phOn = cs.phrases || phrasesOnScreen(b);
+  const ocrPh = phOn || opts.agentTitles ? PH.phraseTitles(b) : [];
+  const phrases = opts.agentTitles ? PH.withAgent(ocrPh, opts.agentTitles, b.shots) : phOn && ocrPh.length >= 2 ? ocrPh : null;
+  // no running captions: what looked like one-word captions was the phrases being built, or there are no caption cues at all
+  if (phrases && phOn && (cs.was === 'one-word' || !((b.packaging || {}).text_cues || []).some(c => c.kind === 'subtitle' && (c.line_h ?? (c.bbox ? c.bbox[3] : 1)) >= 0.025))) cs.running = false;
+  let titles = phrases ? phrases.slice(0, 60).map(t => ({ ...t, seenAs: t.build ? `built by ${t.build}` : 'a phrase', layer: 'front' })) : picked.filter(t => !owned(t)).slice(0, 7);
+  titles.forEach((t, i) => { t.n = i + 1; });
+  const dropped = phrases ? [] : [...(picked.dropped || []), ...picked.filter(t => owned(t)).map(t => ({ t: t.start, text: t.text, why: `part of the ${owned(t).type} at ${owned(t).start}s` }))];
+  // a sticker or app label that is a piece of a phrase title read apart ("WASTHE", a glow read as a sticker) is that title
+  if (phrases) { const sq = x => norm(x).replace(/\s+/g, ''); for (let i = graphics.length - 1; i >= 0; i--) { const g = graphics[i]; if (!/^(app-label|ordinal-sticker)$/.test(g.type) || !g.text) continue;
+    const t = titles.find(t => t.start < g.end + 0.3 && g.start < t.end + 0.3 && sq(t.text).includes(sq(g.text))); if (t) { dropped.push({ t: g.start, text: g.text, why: `a piece of the phrase title at ${t.start}s, read apart` }); graphics.splice(i, 1); } } }
   const owc = oneWordStream(b);
   const cl2 = captionLook((extras.caption_look || {}).samples, owc ? owc.cues : null, (extras.caption_look || {}).layer_samples);
   if (cl2) Object.assign(cs, { outline: cl2.outline, shadow: cl2.shadow, lookN: cl2.n, layer: cl2.layer, layerN: cl2.layerN, layerBehind: cl2.layerBehind });
@@ -109,7 +122,7 @@ function convert(b, extras = {}, opts = {}) {
   const SPEAKER = SPL.speakerOf(b.shots || []);
   // the look of the titles (extras.json "title_look", kit/titlelook.py), and text the teardown is not sure it read right
   const tlook = titleLookFrom(extras.title_look);
-  { const sw = (b.speech || {}).words || []; for (const t of titles) { const why = textDoubt(t, sw); if (why) { t.lowConfidence = true; t.why = why; } } }
+  { const sw = (b.speech || {}).words || []; for (const t of titles) { const why = t.source === 'agent' ? null : textDoubt(t, sw); if (why) { t.lowConfidence = true; t.why = why; } } }
   // an entrance the teardown could not read: the blur entrance for an italic serif key word (report 4, item 9); the rest
   // are left to the engine. Read entrances stay as they are.
   if (tlook) tlook.entrance = tlook.key.italic && tlook.key.category === 'serif' && titles.some(t => !t.entrance) ? 'blur-rise' : null;
@@ -144,8 +157,8 @@ function convert(b, extras = {}, opts = {}) {
   const sfx = (((b.audio_plan || {}).sfx_merged) || []).filter(x => x && Number.isFinite(+x.t) && x.type && !(x.level_db < -60)).slice(0, 24)
     .map(x => ({ t: r2(x.t), dur: +x.dur || 0.2, type: String(x.type).toLowerCase().replace(/[_\s]+/g, '-').replace(/[^a-z-]/g, ''), on: x.on && x.on.type ? String(x.on.type).replace(/[^a-z_]/g, '') : null }));
   const { extraG, scenes } = placeScenes({ b, opts, src, shots, graphics, titles });
-  const ctx = { tlook, b, extras, opts, src, name, dur, engine, shots, titles, dropped, graphics, extraG, scenes, sfx, lines, speech, cs, look, font, colours, bpm, level, hasMusic, bed, beatEdit, jobFinish, ambient, layerDefault, zoomShots, jumpCuts, avgShot, big };
-  return { md: recipeMd(ctx), report: report(ctx), scenes, titles, shots, font, titleLook: tlook, captionStyle: cs.style, captionPosition: cs.position, captionColor: cs.color, graphics, dropped, jobFinish, bpm, bed };
+  const ctx = { phrases, tlook, b, extras, opts, src, name, dur, engine, shots, titles, dropped, graphics, extraG, scenes, sfx, lines, speech, cs, look, font, colours, bpm, level, hasMusic, bed, beatEdit, jobFinish, ambient, layerDefault, zoomShots, jumpCuts, avgShot, big };
+  return { md: recipeMd(ctx), report: report(ctx), phrases: !!phrases, runningCaptions: cs.running !== false, scenes, titles, shots, font, titleLook: tlook, captionStyle: cs.style, captionPosition: cs.position, captionColor: cs.color, graphics, dropped, jobFinish, bpm, bed };
 }
 
 module.exports = { convert, fontOf, titleLookFrom, textDoubt, saveScenes, stickerImage, pickTitles, mapGraphics, captionLook, gradeChoice, placeOf, captionStyle, oneWordStream, finishOf, suggestBed, loadBreakdown, ENTRANCE_MAP,
@@ -159,7 +172,8 @@ if (require.main === module) {
   const b = loadBreakdown(inp);
   const ex = opt('extras') && fs.existsSync(opt('extras')) ? JSON.parse(fs.readFileSync(opt('extras'), 'utf8')) : {};
   const out = opt('out', path.join(b._dir, 'Reel.md'));
-  const res = convert(b, ex, { name: opt('name'), recipePath: path.relative(ROOT, out) });
+  const at = PH.readAgentTitles(path.dirname(out));
+  const res = convert(b, ex, { name: opt('name'), recipePath: path.relative(ROOT, out), ...(at ? { agentTitles: at.titles } : {}) });
   fs.writeFileSync(out, res.md);
   fs.writeFileSync(opt('report', path.join(path.dirname(out), 'teardown.md')), res.report);
   const added = saveScenes(res, path.dirname(out), { library: !argv.includes('--no-scenes') });

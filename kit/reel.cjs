@@ -117,6 +117,7 @@ const RC = require('./recreate.cjs');
 const SHP = require('./shotplan.cjs');
 const SL = require('./stylelook.cjs');
 const LK = require('./lookplan.cjs');
+const PT = require('./phrase-titles.cjs');
 const RF = require('./reframe.cjs');
 const FID = require('./fidelity.cjs');
 
@@ -517,6 +518,14 @@ if (!flag('rebuild')) {
       caps.flips = (caps.flips || []).filter(f => f.mode !== 7).concat(ok.map(f => ({ ...f, end: Math.min(f.end, len) })));
       for (const f of rt.filter(f => !ok.includes(f))) console.log(`recipe title dropped: "${f.text}" at ${f.start}s is not in what you say there`);
       console.log(`recipe titles: ${ok.length} of ${rt.length} from the recipe (text and times; only text you say)`);
+    } else if (rt.some(f => f.phrase)) {
+      // the reference's titles are designed phrases: one title per phrase of what you say at the matching moments, your
+      // words in its lines, build, effect and exit (kit/phrase-titles.cjs); and where it has no running captions, none here
+      const len = RC.lengthOf(segs), refDur = +((recipe.card.source || {}).duration) || len;
+      const m = PT.mapPhrases(recipe.titles.filter((t, i) => rt[i].phrase), S.timeline(segs, build), { k: SCALE ? SCALE.k : len / refDur, len, cuts: seams });
+      console.log(m.line);
+      if (m.flips.length) { caps.flips = (caps.flips || []).filter(f => f.mode !== 7).concat(m.flips).sort((a, b) => a.start - b.start);
+        if (preset && preset.runningCaptions === false) { caps.runningCaptions = false; console.log('captions: none drawn, the reference has phrase titles and no running captions'); } }
     } else {
       const mine = (caps.flips || []).filter(f => f.mode === 7).sort((a, b) => a.start - b.start), used = new Set();
       const set = new Set();
@@ -533,8 +542,12 @@ if (!flag('rebuild')) {
   }
   // Copy the look: the look's title style on the titles drafted from your words (how many, entrances, layer)
   if (LOOK && TITLES) {
-    const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), tt = LK.titles(LOOK, caps.flips || [], RC.lengthOf(segs));
-    caps.flips = tt.flips; console.log(tt.line);
+    const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), len = RC.lengthOf(segs), shapes = (LOOK.titles || {}).phrases || [];
+    // a look whose titles are designed phrases: the same pattern on your words, spread over your length
+    const pm = shapes.length ? PT.mapPhrases(shapes, S.timeline(segs, build), { k: len / (+((LOOK.from || {}).duration) || len), len, cuts: seams }) : null;
+    if (pm && pm.flips.length) { caps.flips = (caps.flips || []).filter(f => f.mode !== 7).concat(pm.flips).sort((a, b) => a.start - b.start); console.log(pm.line);
+      if (LOOK.captions && LOOK.captions.running === false) { caps.runningCaptions = false; console.log('captions: none drawn, the look has phrase titles and no running captions'); } }
+    else { const tt = LK.titles(LOOK, caps.flips || [], len); caps.flips = tt.flips; console.log(tt.line); }
     fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
   }
   if (cut.titleLayer) {

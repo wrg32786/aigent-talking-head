@@ -54,6 +54,8 @@ function titleLookOf(st, errs = []) {
   return out;
 }
 const ENTRANCES = ['stagger-rise', 'slam', 'blur-rise', 'slide-left', 'elastic', 'flip', 'pop-zoom', 'drop', 'typewriter'];
+const { TITLE_EFFECTS, TITLE_EXITS, TITLE_BUILDS } = require('./rules.cjs');
+const PH = require('./teardown/phrases.cjs');
 const LAYERS = ['front', 'behind', 'auto'];
 // built-in glyphs for icon-badge, sticker-pop and cta-card (Tabler icons, drawn in kit/overlay.html)
 const GLYPHS = ['check', 'star', 'bolt', 'heart', 'fire', 'play', 'bell', 'spark', 'plus', 'lock', 'arrow', 'rocket', 'terminal', 'chart', 'world', 'cpu'];
@@ -190,6 +192,10 @@ function validate(r) {
   r.titles.forEach((t, i) => {
     if (t.entrance && !ENTRANCES.includes(t.entrance)) errs.push(`titles #${pad2(t.n)}: unknown entrance "${t.entrance}" (${ENTRANCES.join(', ')})`);
     if (t.layer && !LAYERS.includes(t.layer)) errs.push(`titles #${pad2(t.n)}: layer must be front, behind or auto`);
+    // phrase titles (1.29.0): one effect and one exit per title, how it builds, a count and the words a slot-roll swaps
+    for (const [k, vals] of [['effect', TITLE_EFFECTS], ['exit', TITLE_EXITS], ['build', TITLE_BUILDS], ['band', CAPTION_POSITIONS]]) if (t[k] != null && t[k] !== true && !vals.includes(String(t[k]).toLowerCase())) errs.push(`titles #${pad2(t.n)}: ${k} must be one of ${vals.join(', ')}`);
+    if (t.count != null && !PH.parseCount(t.count)) errs.push(`titles #${pad2(t.n)}: count is written "1-365 Days > 1 Year" (from-to, a unit, then the text it ends on)`);
+    if (t.key != null && t.key !== true && !String(t.text || '').toLowerCase().includes(String(t.key).toLowerCase())) errs.push(`titles #${pad2(t.n)}: key "${t.key}" is not in the text`);
     if (t.place && !PLACES.includes(t.place)) errs.push(`titles #${pad2(t.n)}: place must be ${PLACES.join(', ')}`);
     if (t.accent != null && t.accent !== true && t.accent !== 'script' && isNaN(+t.accent)) errs.push(`titles #${pad2(t.n)}: accent must be script or a word index`);
   });
@@ -257,6 +263,7 @@ function toPreset(r) {
   for (const [k, [key, vals]] of Object.entries(CAPTION_LOOK)) if (s[k] && vals.includes(String(s[k]).toLowerCase())) out[key] = String(s[k]).toLowerCase(); // none is a value here
   { const tl = titleLookOf(s); if (Object.keys(tl).length) out.titleLook = tl; else delete out.titleLook; }
   if (onOff(s.titles) !== undefined) out.titles = onOff(s.titles);
+  if (onOff(s['running-captions']) === false) out.runningCaptions = false; else delete out.runningCaptions;   // the reference has phrase titles and no running captions: the draft draws none
   if (!none(s['title-layer'])) out.titleLayer = s['title-layer'].toLowerCase();
   if (s.finish !== undefined) { const f = list(s.finish); out.finish = f.length ? f.join(',') : null; delete out.finishPool; }
   if (s['finish-pool'] !== undefined) { const f = list(s['finish-pool']); if (f.length) { out.finishPool = f; delete out.finish; } else delete out.finishPool; }
@@ -312,6 +319,17 @@ function titleFlips(r) {
     if (t.hero != null) f.hero = String(t.hero).split(',').map(Number);
     if (t.flicker != null) f.flicker = onOff(t.flicker);
     if (t.role) f.role = String(t.role);
+    // a phrase title: its lines as designed ("LINE / LINE" in the recipe, "LINE|LINE" for the overlay), the key word, the build, one effect, one exit
+    if (t.lines != null || t.key != null || t.build != null || t.effect != null || t.exit != null) {
+      f.phrase = true; f.text = f.text.split(/\s*\/\s*/).filter(Boolean).join('|');
+      if (typeof t.key === 'string') f.key = t.key;
+      for (const k of ['build', 'effect', 'exit', 'band']) if (typeof t[k] === 'string') f[k] = t[k].toLowerCase();
+      if (typeof t.swap === 'string') f.swap = t.swap.split(',').map(x => x.trim()).filter(Boolean);
+      if (t.count != null) { const c = PH.parseCount(t.count); if (c) f.count = c; }
+      if (t.glow != null && onOff(t.glow) !== undefined) f.glow = onOff(t.glow);
+      if (onOff(t['on-cut'])) f.onCut = true;
+      if (onOff(t['across-cut'])) f.acrossCut = true;
+    }
     return f;
   });
 }
@@ -417,7 +435,7 @@ function exportJob(cut, caps, opts = {}) {
   if (cut.bedStart != null) L.push(`- bed-start: ${cut.bedStart}`);
   if (cut.bedVol != null) L.push(`- bed-volume: ${cut.bedVol}`);
   L.push(`- beat-sync: ${cut.beatSync === false ? 'off' : cut.bed ? 'on' : 'off'}`, '');
-  L.push('## Style', `- look: ${opts.look || pre.look || 'kinetic'}`, `- captions: ${(caps && caps.captionStyle) || pre.captionStyle || 'kinetic'}`, `- titles: ${flips.length ? 'on' : 'off'}`,
+  L.push('## Style', `- look: ${opts.look || pre.look || 'kinetic'}`, `- captions: ${(caps && caps.captionStyle) || pre.captionStyle || 'kinetic'}`, `- titles: ${flips.length ? 'on' : 'off'}`, ...(caps && caps.runningCaptions === false ? ['- running-captions: off'] : []),
     ...(caps && caps.captionPosition ? [`- caption-position: ${caps.captionPosition}`] : []), ...(caps && caps.captionColor ? [`- caption-color: ${caps.captionColor}`] : []),
     ...Object.entries(CAPTION_LOOK).filter(([, [key]]) => caps && caps[key]).map(([k, [key]]) => `- ${k}: ${caps[key]}`),
     ...titleLookLines(caps),
@@ -441,6 +459,7 @@ function exportJob(cut, caps, opts = {}) {
       if (x.layer) f.push(`layer ${x.layer}`);
       if (x.place) f.push(`place ${x.place}`);
       if (Array.isArray(x.hero)) f.push(`hero ${x.hero.join(',')}`);
+      if (x.phrase) f.push(...PH.lineFields({ ...x, lines: String(x.text || '').split('|') }));
       f.push(`text ${String(x.text || '').replace(/\s*\|\s*/g, ' / ').replace(/\n/g, ' ')}`);
       L.push(f.join(' | '));
     });

@@ -26,6 +26,14 @@ function report(c) {
   if (titles.length) {
     const unsure = titles.filter(t => t.lowConfidence);
     if (unsure.length) R.push('## Check these titles', '', `We are not sure we read ${unsure.length === 1 ? 'this title' : 'these ' + unsure.length + ' titles'} right. Fix the text in Reel.md (the \`text\` field of each line under Titles) and take the \`check\` field off, before a draft.`, '', ...unsure.map(t => `- #${t.n} at ${t.start}s: "${t.text}" (${t.why})`), '');
+    if (c.phrases) {
+      const by = titles.some(t => t.source === 'agent');
+      R.push('## Phrase titles', '', by ? 'Read from the contact sheets by your agent. They replace what OCR read.' : 'One title per phrase, grouped from the text read every half second. The key word, the build, the effect and the exit are our nearest guess from those samples. "Read the titles with my agent" in Studio reads them off the sheets as designed.', '',
+        '| # | Time | Lines | Key word | Builds | Effect | Leaves | At the cuts |', '|---|---|---|---|---|---|---|---|');
+      titles.forEach(t => R.push(`| ${t.n} | ${t.start}-${t.end}s | ${t.lines.join(' / ')} | ${t.key || 'none read'} | ${t.build ? 'by ' + t.build : 'all at once'} | ${t.effect || 'none'} | ${t.exit || (t.endsOnCut ? 'on the cut' : 'before the cut')} | ${[t.onCut && 'starts on a cut', t.acrossCut && 'stays across a cut'].filter(Boolean).join(', ') || 'inside one shot'} |`));
+      R.push('');
+      if (cs.running === false) R.push('The reference has no running captions, so a draft from it draws none: every word on screen is one of these titles, in your own words.', '');
+    }
     R.push('## Titles', '', '| # | Time | Text | Sure of the text | Seen as | Entrance | Layer |', '|---|---|---|---|---|---|---|');
     titles.forEach(t => R.push(`| ${t.n} | ${t.start}-${t.end}s | ${t.text} | ${t.lowConfidence ? 'no: ' + t.why : 'yes'} | ${t.seenAs} | ${t.entrance || (tlook && tlook.entrance ? tlook.entrance + ' (not read; the default for an italic serif key word)' : 'engine picks')} | ${t.layer || 'front'}${t.overlap != null ? ` (person under ${Math.round(t.overlap * 100)}% of it)` : ''} |`));
     R.push('');
@@ -59,7 +67,7 @@ function report(c) {
   shots.forEach(s => R.push(`| ${s.n} | ${s.start}-${s.end}s | ${s.finish || 'none'} | ${s.finishWhy} |`));
   R.push('', '## How sure is this', '', '- Cuts, length, BPM and caption timing are measured and usually right.',
     ...(visionPass(b) === 'off' ? ['- The vision pass was off, so title text and entrances are less sure than usual.'] : []),
-    ...(cs.was ? [`- The captions first read as ${cs.was}. The text tracks show phrases, so the recipe says ${cs.style}. The titles below are still one per big word we could read, not one per phrase: add the missing lines by hand.`] : []),
+    ...(cs.was ? [`- The captions first read as ${cs.was}. The text tracks show phrases, so the recipe says ${cs.style}. ${c.phrases ? 'The titles below are one per phrase.' : 'The titles below are still one per big word we could read, not one per phrase: add the missing lines by hand.'}`] : []),
     '- Caption style, entrances and finishes are the nearest match from a short menu. A custom look maps to the closest shipped one.',
     '- Graphics are found from shape and colour plus OCR. A white tile on a white shirt, or an ordinal word OCR cannot read, is missed or guessed (marked ~).',
     '- A finish is only kept when the grade changes across shots or is strong. An even warm or cool cast on every shot is read as the room light.',

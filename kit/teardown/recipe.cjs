@@ -7,6 +7,7 @@ const GM = require('../grade-match.cjs');
 const { r2, pad2, clean, hexOK } = require('./util.cjs');
 const { themeFor, jobTransition } = require('./palette.cjs');
 const { visionPass } = require('./captions.cjs');
+const PH = require('./phrases.cjs');
 
 // brand names the breakdown read (rea-video packaging.brands or video_context.brands), for a title's role
 const colourless = b => [].concat((b.packaging && b.packaging.brands) || [], (b.video_context && b.video_context.brands) || []).map(x => typeof x === 'string' ? x : x && (x.name || x.text)).filter(Boolean);
@@ -35,7 +36,7 @@ function recipeMd(c) {
   const { tlook, b, opts, src, name, dur, engine, shots, titles, graphics, extraG, sfx, lines, cs, look, font, colours, bpm, level, hasMusic, bed, jobFinish, layerDefault, zoomShots, jumpCuts, avgShot, big } = c;
   const card = {
     videomd: 1, name,
-    description: `Recipe torn down from ${src.file || 'a reference reel'}: ${shots.length} shots in ${dur}s, ${titles.length} big titles, ${cs.style} captions${bpm ? `, music near ${Math.round(bpm)} BPM` : ''}. Measured by ${engine}; finishes, entrances and layers are best guesses.`,
+    description: `Recipe torn down from ${src.file || 'a reference reel'}: ${shots.length} shots in ${dur}s, ${titles.length} ${c.phrases ? 'phrase' : 'big'} titles, ${cs.running === false ? 'no running' : cs.style} captions${bpm ? `, music near ${Math.round(bpm)} BPM` : ''}. Measured by ${engine}; finishes, entrances and layers are best guesses.`,
     source: { file: src.file || 'reference.mp4', duration: dur }, shots: shots.length, lang: opts.lang || b.lang || 'en',
     generator: { name: 'aigent-talking-head teardown', version: require('../../package.json').version }, 'x-reel': 1,
   };
@@ -50,7 +51,7 @@ function recipeMd(c) {
     `- finish: ${jobFinish ? jobFinish.split(',').join(', ') : 'none'}`, `- transition: ${jobTransition(shots)}`, `- glitch: ${shots.some(s => s.tx && s.tx.name === 'glitch') ? 'on' : 'off'}`,
     `- punch: ${zoomShots || jumpCuts || avgShot < 3 ? 'on' : 'off'}`, '- effects: none',
     // no model looked at the frames (breakdown.json analysis.vlm): Studio says so with the reference
-    ...(visionPass(b) === 'off' ? ['- vision: off'] : []), '',
+    ...(cs.running === false ? ['- running-captions: off'] : []), ...(visionPass(b) === 'off' ? ['- vision: off'] : []), '',
     '## Shots', '', '```videomd-timeline'];
   for (const s of shots) {
     const f = [`#${pad2(s.n)} ${s.start}-${s.end}`, `story ${s.n === 1 ? 'hook' : s.n === shots.length ? 'payoff' : 'beat'}`];
@@ -76,7 +77,7 @@ function recipeMd(c) {
       const f = [`#${pad2(t.n)} ${t.start}-${t.end}`];
       if (t.entrance) f.push(`entrance ${t.entrance}`);
       if (t.lowConfidence) f.push(`check ${String(t.why || 'text').replace(/\s*\|\s*/g, ' ')}`); // text the teardown is not sure of: fix it before a draft
-      f.push(`layer ${t.layer || 'front'}`, `role ${SPL.roleOf(t.text, t.start, t.n - 1, colourless(b))}`, `text ${t.text}`);
+      f.push(`layer ${t.layer || 'front'}`, `role ${SPL.roleOf(t.text, t.start, t.n - 1, colourless(b))}`, ...(t.lines ? PH.lineFields(t) : []), `text ${t.text}`);
       L.push(f.join(' | '));
     });
     L.push('```', '');
