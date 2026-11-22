@@ -269,6 +269,8 @@ Pexels and Pixabay through their free APIs, with the user's own free key for eac
 
 ### c. Generation, third and optional
 
+The planned agent path (Comfy Cloud, local ComfyUI and official Higgsfield) is in [agent-broll-generation.md](agent-broll-generation.md), for v1.30.
+
 Off by default. Two ways to connect it:
 
 - **A key in Settings** for an image or video generation provider, through the Generate path we already have.
