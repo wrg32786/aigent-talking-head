@@ -37,11 +37,12 @@ function twoLines(ws, lineChars = 42) {
   let b = 1, d = Infinity; for (let i = 1; i < ws.length; i++) { const x = Math.abs(ws.slice(0, i).join(' ').length - s.length / 2); if (x < d) { d = x; b = i; } }
   return ws.slice(0, b).join(' ') + '\n' + ws.slice(b).join(' ');
 }
-// captions.js -> the text of an .srt: what is said (the mode 0 flips and their word times), also when the captions are
-// burned in or not drawn at all. At most 2 lines of about 42 letters, each cue up for 1 to 7 s and gone before the next.
-function toSrt(CAP, total = Infinity) {
-  const words = [];
-  for (const f of ((CAP && CAP.flips) || []).filter(f => f.mode === 0).sort((a, b) => a.start - b.start)) {
+// The text of an .srt: what is said, also when the captions are burned in or not drawn at all. said: every word on the
+// reel's clock ([{ start, end, word }], kit/spoken.cjs timeline); captions.js alone leaves out the words a title or a
+// graphic carries, so its mode 0 flips are used only when there is no transcript. At most 2 lines of about 42 letters, each cue up for 1 to 7 s and gone before the next.
+function toSrt(CAP, total = Infinity, said = null) {
+  const words = (said || []).filter(w => String(w.word || '').trim() && +w.end > 0 && +w.start < total).map(w => ({ start: Math.max(0, +w.start), end: +w.end, word: String(w.word).trim() }));
+  if (!words.length) for (const f of ((CAP && CAP.flips) || []).filter(f => f.mode === 0).sort((a, b) => a.start - b.start)) {
     const ws = Array.isArray(f.words) && f.words.length ? f.words : String(f.text || '').split(/\s+/).filter(Boolean).map((w, i, a) => [f.start + (f.end - f.start) * i / a.length, f.start + (f.end - f.start) * (i + 1) / a.length, w]);
     for (const w of ws) if (String(w[2]).trim()) words.push({ start: +w[0], end: +w[1], word: String(w[2]).trim() });
   }

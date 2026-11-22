@@ -1055,7 +1055,7 @@ sh(process.execPath, [path.join(KIT, 'assemble.cjs'), out], build, (flag('no-sfx
     if (spans.length) console.warn('note: some caption moments read under 3:1 against the picture (listed above). Move the word, change its colour or pick another shot.');
   } }
 // what is said as a subtitle file beside the reel (reel-vN.srt), also when the captions are burned in or not drawn
-try { const srt = require('./phrase-group.cjs').toSrt(R.readCaptions(path.join(build, 'captions.js')), LEN); if (srt) { fs.writeFileSync(out.replace(/\.mp4$/, '.srt'), srt); console.log(`subtitles: ${path.basename(out).replace(/\.mp4$/, '.srt')}`); } } catch (e) { console.warn('note: no subtitle file (' + e.message + ')'); }
+try { const srt = require('./phrase-group.cjs').toSrt(R.readCaptions(path.join(build, 'captions.js')), LEN, S.timeline(cut.segs, build)); if (srt) { fs.writeFileSync(out.replace(/\.mp4$/, '.srt'), srt); console.log(`subtitles: ${path.basename(out).replace(/\.mp4$/, '.srt')}`); } } catch (e) { console.warn('note: no subtitle file (' + e.message + ')'); }
 // everything this reel was made from, kept beside it (jobs/<job>/reel-vN.build/), so a later Draft cannot erase it
 // and the reel can be reopened (kit/snapshots.cjs, Studio "Edit this reel", the reopen_reel tool)
 let snapshot = null; try { snapshot = require('./snapshots.cjs').save(job, out); if (snapshot) console.log(`saved the build behind this reel: ${path.relative(job, snapshot)} (reopen: npm run reopen -- ${name} v${v})`); } catch (e) { console.warn('note: could not save the build behind this reel: ' + e.message); }

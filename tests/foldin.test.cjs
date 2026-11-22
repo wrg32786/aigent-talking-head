@@ -91,6 +91,8 @@ t('an .srt from captions.js: numbered cues, two lines of about 42 letters, 1 to 
   const sec = s => { const [h, m, r] = s.split(':'); return +h * 3600 + +m * 60 + +r.replace(',', '.'); };
   cues.forEach((c, i) => { assert.strictEqual(c[0], String(i + 1)); const [a, z] = c[1].split(' --> ').map(sec); assert.ok(z - a >= 0.2 && z - a <= 7.001, c[1]); assert.ok(c.length <= 4 && c.slice(2).every(l => l.length <= 46), c.join('|')); if (cues[i + 1]) assert.ok(z <= sec(cues[i + 1][1].split(' --> ')[0]), 'gone before the next'); });
   assert.ok(!/A TITLE/.test(srt) && /nobody cared/.test(srt.replace(/\n/g, ' ')), 'what is said, not the titles');
+  const full = G.toSrt({ flips: [{ mode: 0, start: 1, end: 2, text: 'only this' }] }, 7, [{ start: -0.18, end: 0.25, word: 'Every' }, ...W.slice(1)]);
+  assert.ok(/^1\n00:00:00,000 --> /.test(full) && /Every spent/.test(full.replace(/\n/g, ' ')) && !/only this/.test(full), 'the whole transcript when there is one, a word that starts before 0 too');
   assert.strictEqual(G.toSrt({ flips: [] }), ''); assert.strictEqual(G.stamp(3661.5), '01:01:01,500');
 });
 
