@@ -2,12 +2,14 @@
 // Cloudinary itself: it asks these routes, which run kit/studio/post.mjs in this local server.
 //   GET  /api/post            what is set up (key set or not, the host, the reels, the last sends), never a key
 //   GET  /api/post/channels   your Buffer channels (cached 2 min; ?fresh=1 to reload)
-//   POST /api/post/check      { reel, channels, caption, captions, youtubeTitle } per-channel warnings before a send
+//   POST /api/post/check      { reel, channels, caption, captions, youtubeTitle, placements } per-channel warnings before a
+//                             send; placements { <channel id>: 'feed' | 'reel' } (Instagram): the Feed gets the 4:5 file
 //   POST /api/post/host       { host, r2: {...}, cloudinary: {...} } save the host choice and its non-secret fields
 //   POST /api/post/host/test  { host } check the host
 //   POST /api/post/send       start a send (202 { id }); GET /api/post/send?id= follows it
 import * as POST from './post.mjs';
 import * as S from './settings.mjs';
+import * as SZ from './sizes.mjs';
 import { resolve } from 'path';
 
 export function mount({ ROOT, C, json, readBody }) {
@@ -21,7 +23,9 @@ export function mount({ ROOT, C, json, readBody }) {
       if (p === '/api/post/check' && M === 'POST') {
         const b = await readBody(req), s = C.load(), rel = b.reel || POST.reelsOf(s.job)[0];
         const info = rel ? POST.probe(resolve(ROOT, rel)) : null, all = (await channels()).channels, ids = [].concat(b.channels || []);
-        return json(res, 200, { info, channels: all.filter(c => ids.includes(c.id)).map(c => ({ id: c.id, ...POST.checkChannel(c, info, { text: (b.captions && b.captions[c.id] != null ? b.captions[c.id] : b.caption) || '', title: b.youtubeTitle }) })) });
+        // a channel set to the Instagram Feed is checked against the 4:5 of the same version (kit/studio/sizes.mjs)
+        const feed = rel ? SZ.fileFor(rel, 'feed', ROOT) : null, feedInfo = feed && !feed.missing ? POST.probe(resolve(ROOT, feed.file)) : null;
+        return json(res, 200, { info, feed: feed ? { file: feed.file, missing: feed.missing, info: feedInfo } : null, channels: all.filter(c => ids.includes(c.id)).map(c => { const pl = POST.placementOf(c, b.placements); return { id: c.id, placement: pl, file: pl === 'feed' ? (feed && !feed.missing ? feed.file : null) : rel, ...POST.checkChannel(c, pl === 'feed' ? feedInfo : info, { text: (b.captions && b.captions[c.id] != null ? b.captions[c.id] : b.caption) || '', title: b.youtubeTitle, placement: pl, feed }) }; }) });
       }
       if (p === '/api/post/host' && M === 'POST') {
         const b = await readBody(req), patch = {}; for (const k of ['host', 'r2', 'cloudinary', 'youtubeCategory']) if (b[k] !== undefined) patch[k] = b[k];

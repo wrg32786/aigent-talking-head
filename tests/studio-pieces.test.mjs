@@ -37,7 +37,7 @@ try {
   await t('pieces: each line gets what it does; asides and retakes sit apart; your category wins; topics come back across lines', async () => {
     const b = P.build(LINES), cat = Object.fromEntries(b.pieces.map(p => [p.id, p.category]));
     assert.deepStrictEqual([cat.l1, cat.l2, cat.l3, cat.l4, cat.l5, cat.l6, cat.l8, cat.l9], ['hook', 'story', 'aside', 'proof', 'tip', 'list', 'retake', 'cta'], JSON.stringify(cat));
-    assert.ok(b.topics.includes('agents'), 'agents is said in three lines: ' + b.topics);
+    assert.ok(b.topics.every(x => x.split(' ').length >= 2) && !b.topics.includes('agents'), 'topics are themes of two or more words, never a single word: ' + b.topics);
     assert.ok(b.pieces.every(p => typeof p.score === 'number' && p.start < p.end));
     const mine = P.build(LINES, { cats: { l7: 'proof' } }).pieces.find(p => p.id === 'l7'); assert.strictEqual(mine.category, 'proof'); assert.strictEqual(mine.rule, 'story');
     assert.strictEqual(P.CATS.length, 8); assert.deepStrictEqual(P.CAT_IDS.slice(-2), ['aside', 'retake']);
@@ -68,7 +68,7 @@ try {
     const o = await req('/api/outputs');
     assert.deepStrictEqual(o.versions.map(x => x.v), [2, 1]);
     assert.strictEqual(o.versions[0].settings.look, 'Mint Kinetic'); assert.strictEqual(o.versions[1].settings, null, 'v1 was made before settings');
-    assert.deepStrictEqual(o.versions[0].files.map(f => f.label), ['Reel', 'Export tiktok']);
+    assert.deepStrictEqual(o.versions[0].files.map(f => f.label), ['For Reels and Stories', 'For TikTok, a smaller file']);
     assert.strictEqual(o.versions[0].reopen, false, 'no snapshot, so it cannot re-open'); assert.ok(!o.jobs, 'This video only');
     const a = await req('/api/outputs?all=1'); const other = a.jobs.find(j => j.job === OTHER); assert.ok(other && other.versions === 1, JSON.stringify(a.jobs));
   });

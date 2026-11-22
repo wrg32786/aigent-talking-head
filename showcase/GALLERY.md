@@ -65,7 +65,7 @@ Stills use an AI-generated fictional presenter (Apache-2.0 with the repo). Rebui
 | ![theme](media/font/theme.jpg)<br>`theme` | ![modern](media/font/modern.jpg)<br>`modern` | ![druk](media/font/druk.jpg)<br>`druk` | ![elegant](media/font/elegant.jpg)<br>`elegant` | ![editorial](media/font/editorial.jpg)<br>`editorial` |
 | ![literata](media/font/literata.jpg)<br>`literata` | ![bricolage](media/font/bricolage.jpg)<br>`bricolage` | ![pirata](media/font/pirata.jpg)<br>`pirata` | ![michroma](media/font/michroma.jpg)<br>`michroma` | ![redhat](media/font/redhat.jpg)<br>`redhat` |
 | ![jakarta](media/font/jakarta.jpg)<br>`jakarta` | ![grotesk-times](media/font/grotesk-times.jpg)<br>`grotesk-times` | ![avantgarde](media/font/avantgarde.jpg)<br>`avantgarde` | ![recoleta](media/font/recoleta.jpg)<br>`recoleta` | ![haas](media/font/haas.jpg)<br>`haas` |
-| ![wabbit](media/font/wabbit.jpg)<br>`wabbit` | ![instrument](media/font/instrument.jpg)<br>`instrument` | ![playfair](media/font/playfair.jpg)<br>`playfair` | ![dmserif](media/font/dmserif.jpg)<br>`dmserif` |  |
+| ![wabbit](media/font/wabbit.jpg)<br>`wabbit` | ![instrument](media/font/instrument.jpg)<br>`instrument` | ![playfair](media/font/playfair.jpg)<br>`playfair` | ![dmserif](media/font/dmserif.jpg)<br>`dmserif` | ![anton](media/font/anton.jpg)<br>`anton` |
 
 ## Presets
 

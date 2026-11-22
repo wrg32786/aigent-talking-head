@@ -8,6 +8,8 @@ const RM = require('./reelmd.cjs');
 const SPL = require('./shotplan.cjs');
 const CP = require('./cutpoints.cjs');
 const SFXPLAN = require('./sfx-plan.cjs');
+const RF = require('./reframe.cjs');
+const GM = require('./grade-match.cjs');
 
 const PLAN_FILE = 'plan.json', PLAN_VERSION = 1;
 const r3 = x => +(+x).toFixed(3);
@@ -22,12 +24,18 @@ function scaleOf(recipe, segs) {
   return { len, ref, k: len / ref };
 }
 
+// quiet(i, a, b) for kit/shotplan.cjs recut(): the middle of the quiet between clip seconds a and b of segment i's
+// clip, read from its audio (kit/cutpoints.cjs), or null when there is none long enough to cut in
+function quietFn({ segClip, clipsDir }) {
+  const envs = new Map();
+  const envOf = i => { const f = path.join(clipsDir, path.basename(segClip[i].file)); if (!envs.has(f)) envs.set(f, CP.envelopeSync(f)); return envs.get(f); };
+  return (i, a, b) => { const e = envOf(i); return e ? SPL.quietFrom(CP, e)(a, b) : null; };
+}
+
 // Re-cut segs (in place) to the recipe's shots, on word boundaries. segClip[i] is the clip behind segment i.
 // manyClips: three or more clips, whose default big punches are cleared so the recipe's own can be set.
 function recut({ recipe, segs, segClip, clipsDir, manyClips = false, log = console.log }) {
-  const envs = new Map();
-  const envOf = i => { const f = path.join(clipsDir, path.basename(segClip[i].file)); if (!envs.has(f)) envs.set(f, CP.envelopeSync(f)); return envs.get(f); };
-  const quiet = (i, a, b) => { const e = envOf(i); return e ? SPL.quietFrom(CP, e)(a, b) : null; };
+  const quiet = quietFn({ segClip, clipsDir });
   const plan0 = RM.shotSettings(recipe);
   if (manyClips) segs.forEach(x => { delete x.bigPunch; });
   const rc = SPL.recut(segs, i => segClip[i].words || [], plan0, quiet);
@@ -36,22 +44,106 @@ function recut({ recipe, segs, segClip, clipsDir, manyClips = false, log = conso
   return rc;
 }
 
+// A camera move on a segment: "move" (push, pull, drift), "moveRef" (the reference's measured size, when it was
+// read) and "push" (what kit/assemble.cjs draws: the zoom gained, sized by the motion strength, kit/shotplan.cjs)
+function setMove(sg, move, motion, measured) {
+  const v = SPL.moveSize(move, motion, measured);
+  if (v == null) return;
+  Object.assign(sg, { move, push: v }); if (measured > 0) sg.moveRef = measured; else delete sg.moveRef;
+}
+// a new motion strength on segments already drafted (a rebuild): every move is sized again. Returns how many.
+function resizeMoves(segs, motion) {
+  let n = 0;
+  for (const sg of segs || []) if (sg.push != null && !sg.bigPunch) { const move = sg.move || (sg.push < 0 ? 'pull' : 'push'); setMove(sg, move, motion, sg.moveRef); n++; }
+  return n;
+}
+// one line for the build log
+function motionLine(segs, motion) {
+  const mv = (segs || []).filter(s => s.push != null && !s.bigPunch);
+  if (!mv.length) return `motion: ${motion}; the reference has no camera move to carry`;
+  const pc = v => Math.round(Math.abs(v) * 100) + '%', by = k => mv.filter(s => (s.move || (s.push < 0 ? 'pull' : 'push')) === k);
+  const part = k => { const a = by(k); if (!a.length) return null; const lo = Math.min(...a.map(s => Math.abs(s.push))), hi = Math.max(...a.map(s => Math.abs(s.push))); return `${a.length} ${k}${a.length === 1 ? '' : k === 'push' ? 'es' : 's'} of ${lo === hi ? pc(lo) : pc(lo) + ' to ' + pc(hi)}`; };
+  const read = mv.filter(s => s.moveRef > 0).length;
+  return `motion: ${motion}; ${['push', 'pull', 'drift'].map(part).filter(Boolean).join(', ')} on ${mv.length} of ${segs.length} pieces${read ? ` (${read} sized from the reference's own move)` : ''}`;
+}
+
 // The recipe's per-shot settings (finish, big punch, transition, move, shake) on the segments: on the re-cut shots
 // when rc is given, else on your clips in order (clipStart: the first segment of each clip). A finish goes on every
 // segment of the shot, the rest on its first. Returns the plan and the segments that start with a shake.
-function applyShotPlan({ recipe, segs, rc = null, clipStart = [], wantPunch = true }) {
+function applyShotPlan({ recipe, segs, rc = null, clipStart = [], wantPunch = true, motion = SPL.MOTION_DEFAULT }) {
   const plan = RM.shotSettings(recipe), shakeAt = [];
   const put = (p, k, next, notFirst) => {
     const sg = segs[k], subs = segs.slice(k, next ?? segs.length);
     if (p.finish) subs.forEach(x => { x.finish = p.finish; });
     if (p.bigPunch && wantPunch) sg.bigPunch = true;
     if (p.transition && notFirst) sg.transition = p.transition;
-    if (p.move && !sg.bigPunch) sg.push = SPL.MOVES[p.move];
+    if (p.move && !sg.bigPunch) setMove(sg, p.move, motion, p.moveSize);
     if (p.shake && notFirst) shakeAt.push(k);
   };
-  if (rc) rc.shotStart.forEach((k, j) => put(plan[rc.shotOf[j]] || {}, k, rc.shotStart[j + 1], j));
+  // A re-cut shot can stand for several of the reference's (no quiet between your words to cut on, so they play as
+  // one). It takes the first one's settings; when that one has no camera move, the move of the one that fills most
+  // of it (40 percent or more), so a long push is not lost to a one second shot before it.
+  const moveOver = j => {
+    const a = rc.shotOf[j], b = rc.shotOf[j + 1] ?? plan.length, span = plan.slice(a, Math.max(a + 1, b)), first = span[0] || {};
+    if (first.move || span.length < 2) return first;
+    const all = span.reduce((t, x) => t + (+x.dur || 0), 0), big = span.filter(x => x.move).sort((x, y) => (+y.dur || 0) - (+x.dur || 0))[0];
+    return big && all > 0 && big.dur / all >= 0.4 ? { ...first, move: big.move, ...(big.moveSize ? { moveSize: big.moveSize } : {}) } : first;
+  };
+  if (rc) rc.shotStart.forEach((k, j) => put(moveOver(j), k, rc.shotStart[j + 1], j));
   else plan.forEach((p, i) => { const k = clipStart[i]; if (k != null) put(p, k, clipStart[i + 1], i); });
   return { plan, shakeAt };
+}
+
+// the size of the footage a segment's clip was cut from (clips.json "src"), else the clip's own: what the zoom limit rests on
+function sourceSize(files) {
+  const { execFileSync } = require('child_process');
+  for (const f of files.filter(Boolean)) {
+    try { const [w, h] = execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', f], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim().split(',').map(Number); if (w > 0 && h > 0) return { w, h }; } catch {}
+  }
+  return null;
+}
+
+// Reframe every shot to a face target (kit/reframe.cjs). shotStart[j]: the first segment of shot j; targets[j]: the
+// face to match ({ faceH, eyeY, cx }) or null. A shot with no target of its own borrows the middle one. Your face is
+// measured per segment (kit/framing.py). Sets zoom, punchX and punchY on the segments; returns per shot
+// { framing (what you get), target, crop, clamped, held } or null where the old zoom stays, or null when nothing was matched.
+function reframeShots({ segs, shotStart, targets, build, python, sources = [], log = console.log, what = 'the reference' }) {
+  if (!targets.some(Boolean)) { log(`reframe: ${what} has no face measured (an older teardown, or the speaker is never on screen); framing by shot size as before`); return null; }
+  const faces = segs.map(() => null), takes = segs.map(() => null), files = [...new Set(segs.map(s => s.file))];
+  for (const file of files) {
+    const idx = segs.map((s, i) => (s.file === file ? i : -1)).filter(i => i >= 0);
+    const got = RF.measure(python, path.resolve(build, file), idx.map(i => [segs[i].in, segs[i].out]), { samples: 5 });
+    const mid = RF.medianFace(got); // the take's own framing: a close take is not pushed in where no face was found or you lean back
+    RF.steady(got).forEach((f, n) => { faces[idx[n]] = f; takes[idx[n]] = mid; });
+  }
+  if (!faces.some(Boolean)) { log('reframe: we found no face in your take (or Python with opencv is missing); framing by shot size as before'); return null; }
+  const size = sourceSize([...sources, ...files.map(f => path.resolve(build, f))]), zMax = size ? RF.maxZoom(size.w, size.h) : 2.2;
+  const res = RF.applyToSegs({ segs, shotStart, targets, faces, takes, maxZoom: zMax, fallback: RF.medianFace(targets) });
+  const done = res.shots.filter(Boolean);
+  if (!done.length) return null;
+  const avg = k => done.reduce((a, x) => a + Math.abs(x.framing[k] - x.target[k]), 0) / done.length;
+  log(`reframe: ${done.length} of ${shotStart.length} shots set to ${what}'s face size and eye line (zoom ${Math.min(...done.map(x => x.crop.zoom))} to ${Math.max(...done.map(x => x.crop.zoom))}, limit ${zMax}${size ? ` on your ${size.w}x${size.h} source` : ''}); off by ${(avg('faceH') * 100).toFixed(1)}% of the frame in face height and ${(avg('eyeY') * 100).toFixed(1)}% in eye line on average${done.some(x => x.borrowed) ? `; ${done.filter(x => x.borrowed).length} with no face in the reference use its middle framing` : ''}`);
+  res.lines.forEach(l => log(l));
+  return res.shots;
+}
+
+// Each re-cut shot reframed to a face target and graded to a colour target. Recreate: the targets are the reference
+// shot's own (its Reel.md "face" and "lab"). Copy the look: pass faceTargets and labTargets (one per shot in rc) from
+// the look. Adds face, faceTarget, crop and grade to the plan entries (rc.plan). Returns { framing, grade } for the
+// read-out (kit/fidelity.cjs).
+function matchShots({ recipe, segs, rc, build, python, sources = [], reframe = true, grade = true, log = console.log, faceTargets = null, labTargets = null, what = 'the reference' }) {
+  const shots = recipe ? RM.shotSettings(recipe) : [], out = { framing: null, grade: null };
+  if (reframe) {
+    const fr = reframeShots({ segs, shotStart: rc.shotStart, targets: faceTargets || rc.shotOf.map(k => (shots[k] || {}).face || null), build, python, sources, log, what });
+    if (fr) { out.framing = fr; fr.forEach((f, j) => { if (!f || !rc.plan[j]) return; rc.zoom[j] = f.crop.zoom; Object.assign(rc.plan[j], { zoom: f.crop.zoom, face: f.framing, faceTarget: f.target, crop: f.crop, ...(f.headTop != null ? { headTop: f.headTop } : {}), ...(f.closer ? { closer: true } : {}), ...(f.clamped ? { clamped: true, ...(f.held ? { held: f.held } : {}) } : {}) }); }); }
+  } else log('reframe: off; framing by shot size');
+  if (grade) {
+    // a cutaway's colour is not the speaker's grade
+    const g = GM.match({ python, build, segs, shotStart: rc.shotStart, targets: labTargets || rc.shotOf.map(k => (shots[k] && !shots[k].cutaway && shots[k].lab) || null) });
+    log(GM.line(g, what));
+    if (g.ok) { out.grade = g; g.shots.forEach((x, j) => { if (x && rc.plan[j]) rc.plan[j].grade = { lut: x.lut, strength: x.strength }; }); }
+  } else log('grade: match off; your take keeps its own colour under the finish');
+  return out;
 }
 
 // the reference's sound effects at its times scaled to your edit, as the kit's sounds
@@ -102,19 +194,23 @@ function writeAccent(build, accent) {
 
 // build/plan.json: what a recipe draft took from the recipe, on your edit's clock. shots is the re-cut plan (the same
 // list as cut.json refShots; empty without --recut), scale is 1 when nothing was scaled.
-function planOf({ recipe, scale = null, rc = null, cut, shakes = [], sounds = [], flips = [], theme = null, accent = null }) {
-  const segs = (cut && cut.segs) || [], moveName = v => Object.keys(SPL.MOVES).find(m => SPL.MOVES[m] === v) || null;
+function planOf({ recipe, scale = null, rc = null, cut, shakes = [], sounds = [], flips = [], theme = null, accent = null, mode = null, look = null, broll = [] }) {
+  const segs = (cut && cut.segs) || [];
   const at = segs.map((s, i) => r3(startOf(segs, i)));
   return {
     version: PLAN_VERSION,
+    mode: mode || (rc ? 'recreate' : 'recipe'), ...(look ? { look } : {}),
     recipe: recipe.file || null,
     scale: rc && scale ? scale.k : 1,
     shots: rc ? rc.plan : [],
     transitions: segs.map((s, i) => (s.transition ? { t: at[i], name: s.transition } : null)).filter(Boolean),
-    moves: segs.map((s, i) => (s.push != null ? { t: at[i], move: moveName(s.push), push: s.push } : null)).filter(Boolean),
+    moves: segs.map((s, i) => (s.push != null ? { t: at[i], move: s.move || (s.push < 0 ? 'pull' : 'push'), push: s.push, ...(s.moveRef ? { measured: s.moveRef } : {}) } : null)).filter(Boolean),
     shakes: shakes.map(h => ({ t: h[0], strength: h[1] })),
     sounds: sounds.map(h => ({ id: h.id, t: h.t })),
     scenes: flips.filter(f => f.mode === 39).map(f => ({ start: f.start, end: f.end, scene: f.scene, ...(f.sceneName ? { name: f.sceneName } : {}) })),
+    // where B-roll goes, what each slot should show and how it is treated; a slot with no clip is "needs" (kit/broll-slots.cjs)
+    broll,
+    ...(cut && cut.motion ? { motion: cut.motion } : {}),
     theme, accent,
   };
 }
@@ -131,4 +227,4 @@ function shotsOf(build, cut) {
   return cut && Array.isArray(cut.refShots) ? cut.refShots : [];
 }
 
-module.exports = { scaleOf, lengthOf, recut, applyShotPlan, refSounds, refShakes, addShakes, scaleGraphics, titleSlots, accentFor, writeAccent, planOf, writePlan, dropPlan, readPlan, shotsOf, PLAN_FILE, PLAN_VERSION };
+module.exports = { setMove, resizeMoves, motionLine, quietFn, reframeShots, matchShots, sourceSize, scaleOf, lengthOf, recut, applyShotPlan, refSounds, refShakes, addShakes, scaleGraphics, titleSlots, accentFor, writeAccent, planOf, writePlan, dropPlan, readPlan, shotsOf, PLAN_FILE, PLAN_VERSION };

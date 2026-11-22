@@ -16,7 +16,7 @@ const fs = require('fs');
 const path = require('path');
 
 const KIT = __dirname, ROOT = path.dirname(KIT);
-const SHOTS_BLOCK = 'videomd-timeline', TITLES_BLOCK = 'reel-titles', SCRIPT_BLOCK = 'reel-script', GRAPHICS_BLOCK = 'reel-graphics', CARDS_BLOCK = 'reel-cards', SFX_BLOCK = 'reel-sfx';
+const SHOTS_BLOCK = 'videomd-timeline', TITLES_BLOCK = 'reel-titles', SCRIPT_BLOCK = 'reel-script', GRAPHICS_BLOCK = 'reel-graphics', BROLL_BLOCK = 'reel-broll', CARDS_BLOCK = 'reel-cards', SFX_BLOCK = 'reel-sfx';
 const CARDS = require('./cards.cjs');
 // where a title or caption can sit around the head (kit/overlay.html placeSpec); center is the default band
 const PLACES = ['left', 'right', 'above', 'chest', 'face', 'center'];
@@ -28,6 +28,31 @@ const CAPTION_POSITIONS = ['top', 'middle', 'bottom'];
 const SRC = require('./sources.cjs');
 // the one-word caption's look: Reel.md key -> captions.js key and its values
 const CAPTION_LOOK = { 'caption-outline': ['captionOutline', ['none', 'thin', 'thick']], 'caption-shadow': ['captionShadow', ['none', 'soft']], 'caption-case': ['captionCase', ['upper', 'lower', 'as-said']], 'caption-layer': ['captionLayer', ['front', 'behind', 'auto']], 'panel-layer': ['panelLayer', ['front', 'behind', 'auto']], 'caption-entrance': ['captionEntrance', ['pop', 'unfurl', 'cascade', 'orbit', 'warp', 'crystallize', 'compute', 'levitate', 'undulate', 'typewriter']] };
+// The look of the titles (Reel.md Style; a teardown reads them from the reference, kit/titlelook.py):
+//   title-lockup two-line | one-line      two-line draws the rest of the phrase small with the key word, in every caption style
+//   title-key-case, title-partner-case    upper | lower | as-said
+//   title-key-color, title-partner-color  #rrggbb, or accent | text
+//   title-glow off | soft | strong        a glow in the key word's colour on titles and kinetic key words
+//   title-dim off | 0.1 to 0.8            the picture darker while a title is up
+//   title-entrance <entrance>             the entrance of every title that names none (it may repeat)
+//   caption-face display | partner        one-word captions in the pairing's key face (default) or its partner face
+// titleLookOf(style) -> the captions.js keys they set ({} when the Style has none), errors pushed to errs.
+const TITLE_KEYS = ['title-lockup', 'title-key-case', 'title-partner-case', 'title-key-color', 'title-partner-color', 'title-glow', 'title-dim', 'title-entrance', 'caption-face'];
+function titleLookOf(st, errs = []) {
+  const out = {}, lk = {}, low = k => (st && st[k] != null && !none(st[k]) ? String(st[k]).trim().toLowerCase() : null);
+  const col = (k, into) => { const v = low(k); if (!v) return; if (/^#[0-9a-f]{6}$/.test(v) || v === 'accent' || v === 'text') lk[into] = v; else errs.push(`style: ${k} must be a #rrggbb colour, accent or text`); };
+  const cas = k => { const v = low(k); if (!v) return null; if (!['upper', 'lower', 'as-said'].includes(v)) { errs.push(`style: ${k} must be upper, lower or as-said`); return null; } return v; };
+  const tl = low('title-lockup'); if (tl) { if (['two-line', 'one-line'].includes(tl)) { if (tl === 'two-line') { out.titleLockup = 'full'; lk.arrange = 'stack'; lk.partner = 'secondary'; } } else errs.push('style: title-lockup must be two-line or one-line'); }
+  const kc = cas('title-key-case'); if (kc) lk.heroUpper = kc === 'upper';
+  const pc = cas('title-partner-case'); if (pc) { lk.partnerUpper = pc === 'upper'; if (pc === 'upper') { lk.partnerTracking = 0.08; } }
+  col('title-key-color', 'heroColor'); col('title-partner-color', 'partnerColor');
+  const g = st && st['title-glow'] != null ? String(st['title-glow']).trim().toLowerCase() : null; if (g) { if (['soft', 'strong'].includes(g)) out.titleGlow = g; else if (!['off', 'none', 'no'].includes(g)) errs.push('style: title-glow must be off, soft or strong'); }
+  const d = st && st['title-dim'] != null ? String(st['title-dim']).trim().toLowerCase() : null; if (d) { if (/^0?\.\d+$/.test(d) && +d >= 0.05 && +d <= 0.8) out.titleDim = +d; else if (!['off', 'none', 'no', '0'].includes(d)) errs.push('style: title-dim must be off or a number from 0.05 to 0.8'); }
+  const e = low('title-entrance'); if (e) { if (ENTRANCES.includes(e)) out.titleEntrance = e; else errs.push(`style: title-entrance must be one of ${ENTRANCES.join(', ')}`); }
+  const cf = low('caption-face'); if (cf) { if (['display', 'partner'].includes(cf)) { if (cf === 'partner') out.captionFace = 'secondary'; } else errs.push('style: caption-face must be display or partner'); }
+  if (Object.keys(lk).length) out.lockup = lk;
+  return out;
+}
 const ENTRANCES = ['stagger-rise', 'slam', 'blur-rise', 'slide-left', 'elastic', 'flip', 'pop-zoom', 'drop', 'typewriter'];
 const LAYERS = ['front', 'behind', 'auto'];
 // built-in glyphs for icon-badge, sticker-pop and cta-card (Tabler icons, drawn in kit/overlay.html)
@@ -97,7 +122,7 @@ function bullets(text) {
   return o;
 }
 function fenced(body, name) {
-  const m = body.match(new RegExp('^```' + name + '[ \\t]*\\n([\\s\\S]*?)^```', 'm'));
+  const m = body.match(new RegExp('^```' + name + '[ \\t]*\\r?\\n([\\s\\S]*?)^```', 'm'));
   return m ? m[1].split(/\r?\n/).filter(l => l.trim()) : null;
 }
 // "#07 16.2-18.5 | key value | key value" (the VIDEO.md timeline line)
@@ -122,6 +147,7 @@ const list = v => none(v) ? [] : String(v).split(',').map(s => s.trim()).filter(
 
 // ---------- parse ----------
 function parse(text, file = 'Reel.md') {
+  text = String(text).replace(/\r\n?/g, '\n'); // a Reel.md saved with Windows line endings reads the same (its fenced blocks were not found before)
   if (!text.startsWith('---')) throw new Error(`${file}: must start with a --- front matter card (VIDEO.md style)`);
   const end = text.indexOf('\n---', 3);
   if (end < 0) throw new Error(`${file}: front matter is not closed with ---`);
@@ -143,8 +169,10 @@ function parse(text, file = 'Reel.md') {
   const graphics = graphicLines.map(l => parseLine(l, file + ' graphics'));
   const cards = cardLines.map(l => parseLine(l, file + ' cards'));
   const sfx = sfxLines.map(l => parseLine(l, file + ' sfx'));
+  // ## B-roll: where the reference shows B-roll and how it is treated (kit/broll-slots.cjs)
+  const broll = (fenced(body, BROLL_BLOCK) || []).map(l => parseLine(l, file + ' b-roll'));
   const title = (body.match(/^#\s+(.+)$/m) || [])[1];
-  return { file, card, title, brand, music, style, aliases, shots, titles, script, graphics, cards, sfx, notes: (S._intro || '').replace(/^#\s+.+$/m, '').trim() };
+  return { file, card, title, brand, music, style, aliases, shots, titles, script, graphics, broll, cards, sfx, notes: (S._intro || '').replace(/^#\s+.+$/m, '').trim() };
 }
 
 function validate(r) {
@@ -173,7 +201,9 @@ function validate(r) {
     if (type === 'scene' && !/^ref-[a-z0-9-]+$/.test(String(g.scene || ''))) errs.push(`graphics #${pad2(g.n)}: a scene needs scene <id> (ref-..., kit/scenes.cjs)`);
     const auto = GRAPHICS[type] >= 11;
     if (g.layer && !(auto ? ['front', 'behind', 'auto'] : ['front', 'behind']).includes(g.layer)) errs.push(`graphics #${pad2(g.n)}: layer must be front or behind${auto ? ' or auto' : ''}`);
-    if (g.shape && !['circle', 'arrow', 'underline', 'box'].includes(g.shape)) errs.push(`graphics #${pad2(g.n)}: shape must be circle, arrow, underline or box`);
+    if (type === 'ordinal-sticker') { if (g.shape && !['seal', 'starburst'].includes(g.shape)) errs.push(`graphics #${pad2(g.n)}: shape must be seal or starburst`); }
+    else if (g.shape && !['circle', 'arrow', 'underline', 'box'].includes(g.shape)) errs.push(`graphics #${pad2(g.n)}: shape must be circle, arrow, underline or box`);
+    if (g.spikes != null && g.spikes !== '' && !(+g.spikes >= 6 && +g.spikes <= 24)) errs.push(`graphics #${pad2(g.n)}: spikes must be a number from 6 to 24`);
     if (g.glyph) for (const x of String(g.glyph).split(';').map(s => s.trim()).filter(Boolean)) if (!GLYPHS.includes(x)) errs.push(`graphics #${pad2(g.n)}: glyph "${x}" must be one of ${GLYPHS.join(', ')}`);
     for (const k of ['step', 'of', 'count', 'h']) if (g[k] != null && g[k] !== '' && isNaN(+g[k])) errs.push(`graphics #${pad2(g.n)}: ${k} must be a number`);
     if (type === 'checklist' && !String(g.items || g['items~'] || '').trim()) errs.push(`graphics #${pad2(g.n)}: a checklist needs items (rows separated by ;)`);
@@ -193,6 +223,7 @@ function validate(r) {
   if (st['caption-position'] && !none(st['caption-position']) && !CAPTION_POSITIONS.includes(st['caption-position'])) errs.push(`style: caption-position must be ${CAPTION_POSITIONS.join(', ')}`);
   for (const [k, [, vals]] of Object.entries(CAPTION_LOOK)) if (st[k] && !vals.includes(String(st[k]).toLowerCase())) errs.push(`style: ${k} must be ${vals.join(', ')}`);
   if (st['caption-color'] && !none(st['caption-color']) && !/^#[0-9a-f]{6}$/i.test(st['caption-color'])) errs.push('style: caption-color must be a #rrggbb colour');
+  titleLookOf(st, errs);
   if (st['sfx-cap'] && onOff(st['sfx-cap']) !== false && !/^\d+(\.\d+)?\s*\/\s*\d+$/.test(st['sfx-cap'])) errs.push('style: sfx-cap must be off or "min gap / per 10 s", for example 0.4/4');
   if (st['title-places']) for (const pl of list(st['title-places'])) if (!PLACES.includes(pl)) errs.push(`style: title-places "${pl}" must be ${PLACES.join(', ')}`);
   const mu = r.music || {};
@@ -224,6 +255,7 @@ function toPreset(r) {
   if (!none(s['caption-position'])) out.captionPosition = String(s['caption-position']).toLowerCase();
   if (!none(s['caption-color'])) out.captionColor = String(s['caption-color']).toLowerCase();
   for (const [k, [key, vals]] of Object.entries(CAPTION_LOOK)) if (s[k] && vals.includes(String(s[k]).toLowerCase())) out[key] = String(s[k]).toLowerCase(); // none is a value here
+  { const tl = titleLookOf(s); if (Object.keys(tl).length) out.titleLook = tl; else delete out.titleLook; }
   if (onOff(s.titles) !== undefined) out.titles = onOff(s.titles);
   if (!none(s['title-layer'])) out.titleLayer = s['title-layer'].toLowerCase();
   if (s.finish !== undefined) { const f = list(s.finish); out.finish = f.length ? f.join(',') : null; delete out.finishPool; }
@@ -257,8 +289,10 @@ function shotSettings(r) {
     if (s.punch === 'big') o.bigPunch = true;
     if (s.framing && !none(s.framing)) o.framing = String(s.framing).replace(/-/g, ' ');
     if (onOff(s.cutaway)) { o.cutaway = true; if (s.broll && onOff(s.broll) === undefined) o.broll = String(s.broll).slice(0, 80); }
-    if (s.move && /^(push|pull|drift)$/.test(String(s.move).toLowerCase())) o.move = String(s.move).toLowerCase();
+    if (s.move && /^(push|pull|drift)$/.test(String(s.move).toLowerCase())) { o.move = String(s.move).toLowerCase(); const z = +s['move-size']; if (z > 0 && z <= 0.4) o.moveSize = z; }
     if (onOff(s.shake)) o.shake = true;
+    { const f = require('./reframe.cjs').parseFace(s.face); if (f) o.face = f; }
+    { const g = require('./grade-match.cjs').parseLab(s.lab); if (g) o.lab = g; }
     o.dur = +(s.end - s.start).toFixed(3);
     if (s.transition && !none(s.transition)) o.transition = s.transition;
     if (s.src) { o.file = s.src; o.in = +(s.in ?? 0); o.out = s.out != null ? +s.out : +(s.in ?? 0) + (s.end - s.start); }
@@ -292,7 +326,8 @@ function graphicFlips(r) {
     // a code card and a terminal session keep their text as written (\n for a new line); elsewhere " / " is a line break, shown as a space
     const text = v(g, 'text'); if (text != null && !none(text)) f.text = f.mode === 23 || f.mode === 28 ? String(text) : String(text).replace(/\s*\/\s*/g, ' ');
     for (const k of ['layer', 'color', 'ink', 'border', 'tile', 'sub', 'left', 'right', 'shape', 'glyph', 'title', 'values', 'labels', 'kind', 'tag', 'keyword', 'corner', 'live', 'clock', 'cues', 'cam', 'cursor', 'style', 'case', 'bg', 'scene']) { const x = v(g, k); if (x != null && !none(x)) f[k] = String(x); }
-    for (const k of ['x', 'y', 'w', 'h', 'in', 'size', 'step', 'of', 'count', 'speed', 'opacity']) { const x = v(g, k); if (x != null && x !== '' && !isNaN(+x)) f[k] = +x; }
+    for (const k of ['x', 'y', 'w', 'h', 'in', 'size', 'step', 'of', 'count', 'speed', 'opacity', 'spikes']) { const x = v(g, k); if (x != null && x !== '' && !isNaN(+x)) f[k] = +x; }
+    { const x = g.check; if (x != null && !none(x)) f.check = String(x) || 'text'; } // the teardown is not sure it read this right
     { const x = v(g, 'items'); if (x != null && !none(x)) f.items = String(x).split(';').map(s => s.trim()).filter(Boolean); }
     { const x = v(g, 'details'); if (x != null && !none(x)) f.details = String(x).split(';').map(s => s.trim()); }
     { const x = v(g, 'at'); if (x != null && !none(x)) f.at = String(x).split(/[;,]/).map(s => +s.trim()).filter(n => !isNaN(n)); }
@@ -339,6 +374,7 @@ function compile(r) {
   if (pre.captionPosition) captions.captionPosition = pre.captionPosition;
   for (const [, [key]] of Object.entries(CAPTION_LOOK)) if (pre[key]) captions[key] = pre[key];
   if (pre.captionColor) captions.captionColor = pre.captionColor;
+  if (pre.titleLook) Object.assign(captions, pre.titleLook);
   if (pre.fonts) captions.fonts = pre.fonts;
   if (pre.titleLayer) captions.titleLayer = pre.titleLayer;
   if (r.titles.length) captions.titles = titleFlips(r);
@@ -384,6 +420,7 @@ function exportJob(cut, caps, opts = {}) {
   L.push('## Style', `- look: ${opts.look || pre.look || 'kinetic'}`, `- captions: ${(caps && caps.captionStyle) || pre.captionStyle || 'kinetic'}`, `- titles: ${flips.length ? 'on' : 'off'}`,
     ...(caps && caps.captionPosition ? [`- caption-position: ${caps.captionPosition}`] : []), ...(caps && caps.captionColor ? [`- caption-color: ${caps.captionColor}`] : []),
     ...Object.entries(CAPTION_LOOK).filter(([, [key]]) => caps && caps[key]).map(([k, [key]]) => `- ${k}: ${caps[key]}`),
+    ...titleLookLines(caps),
     `- title-layer: ${(caps && caps.titleLayer) || cut.titleLayer || 'front'}`, `- finish: ${fin}`, `- transition: ${jobTrans}`, `- punch: ${cut.punch === false ? 'off' : 'on'}`, `- effects: ${(pre.effectsFavourites || []).join(', ') || 'none'}`, '');
   L.push('## Shots', '', '```' + SHOTS_BLOCK);
   for (const sh of shots) {
@@ -423,7 +460,7 @@ function exportJob(cut, caps, opts = {}) {
     gfx.forEach((g, i) => {
       const f = [`#${pad2(i + 1)} ${fmtT(g.start)}-${fmtT(g.end >= 99 ? dur : g.end)}`, `type ${TYPE[g.mode]}`];
       if (g.text) f.push(`text ${String(g.text).replace(/\n/g, ' ')}`);
-      for (const k of ['sub', 'left', 'right', 'shape', 'glyph', 'title', 'step', 'of', 'count', 'values', 'labels', 'kind', 'tag', 'keyword', 'corner', 'live', 'clock', 'cues', 'cam', 'cursor', 'style', 'case', 'bg', 'speed', 'opacity', 'layer', 'color', 'ink', 'border', 'tile', 'x', 'y', 'w', 'h', 'in', 'size']) if (g[k] != null) f.push(`${k} ${g[k]}`);
+      for (const k of ['sub', 'left', 'right', 'shape', 'spikes', 'glyph', 'title', 'step', 'of', 'count', 'values', 'labels', 'kind', 'tag', 'keyword', 'corner', 'live', 'clock', 'cues', 'cam', 'cursor', 'style', 'case', 'bg', 'speed', 'opacity', 'layer', 'color', 'ink', 'border', 'tile', 'x', 'y', 'w', 'h', 'in', 'size']) if (g[k] != null) f.push(`${k} ${g[k]}`);
       if (Array.isArray(g.details) && g.details.length) f.push(`details ${g.details.join('; ')}`);
       if (Array.isArray(g.items) && g.items.length) f.push(`items ${g.items.join('; ')}`);
       if (Array.isArray(g.at) && g.at.length) f.push(`at ${g.at.join('; ')}`);
@@ -470,7 +507,23 @@ function summary(r) {
     ...(Object.keys(r.aliases || {}).length ? [`aliases: ${Object.entries(r.aliases).map(([w, h]) => w + ' = ' + h.join(' / ')).join('; ')}`] : [])].join('\n');
 }
 
-module.exports = { parse, load, validate, compile, toPreset, shotSettings, titleFlips, graphicFlips, cardFlips, PLACES, CARDS_BLOCK, GRAPHICS, CAPTION_POSITIONS, CAPTION_LOOK, exportJob, toPackage, summary, parseYaml, dumpYaml, parseLine, ENTRANCES, LAYERS, GLYPHS };
+// the Style lines for a job's title look (the reverse of titleLookOf)
+function titleLookLines(caps) {
+  if (!caps) return [];
+  const L = [], lk = caps.lockup && typeof caps.lockup === 'object' ? caps.lockup : {}, cs = v => (v === true ? 'upper' : 'as-said');
+  if (caps.titleLockup === 'full') L.push('- title-lockup: two-line');
+  if (typeof lk.heroUpper === 'boolean') L.push(`- title-key-case: ${cs(lk.heroUpper)}`);
+  if (typeof lk.partnerUpper === 'boolean') L.push(`- title-partner-case: ${cs(lk.partnerUpper)}`);
+  if (lk.heroColor) L.push(`- title-key-color: ${lk.heroColor}`);
+  if (lk.partnerColor) L.push(`- title-partner-color: ${lk.partnerColor}`);
+  if (caps.titleGlow) L.push(`- title-glow: ${caps.titleGlow === 'strong' || +caps.titleGlow > 0.7 ? 'strong' : 'soft'}`);
+  if (+caps.titleDim > 0) L.push(`- title-dim: ${+(+caps.titleDim).toFixed(2)}`);
+  if (caps.titleEntrance) L.push(`- title-entrance: ${caps.titleEntrance}`);
+  if (caps.captionFace === 'secondary') L.push('- caption-face: partner');
+  return L;
+}
+
+module.exports = { titleLookOf, titleLookLines, TITLE_KEYS, parse, load, validate, compile, toPreset, shotSettings, titleFlips, graphicFlips, cardFlips, PLACES, CARDS_BLOCK, GRAPHICS, CAPTION_POSITIONS, CAPTION_LOOK, exportJob, toPackage, summary, parseYaml, dumpYaml, parseLine, ENTRANCES, LAYERS, GLYPHS };
 
 if (require.main === module) {
   const argv = process.argv.slice(2), cmd = argv[0];

@@ -14,6 +14,8 @@
     "x": "centre x, 0..1 (default 0.5)",
     "y": "centre y of the burst, 0..1 (default 0.27)",
     "size": "seal radius in pixels on the 1080-wide frame (default 400)",
+    "shape": "seal (default, round) or starburst (a flat spiky star behind your head, the word in white above it)",
+    "spikes": "starburst only: how many points, 6 to 24 (default 12)",
     "head": "burst width in head widths (a teardown measures it; the remake measures your head and sets size and y)",
     "head-y": "burst centre below the head centre, in head widths"
    },

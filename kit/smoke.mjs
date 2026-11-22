@@ -192,14 +192,17 @@ try {
     const b = atBack(0.6);
     if (!b.titles.n) fail('explicit behind: hero should be on the titles layer');
   });
-  step('one-word: the title is its word, every other spoken word still shows, back to back', () => {
+  step('one-word: the title is its word, nothing is in the caption bar while it is up, the words come back after it', () => {
     const at = layered(join(work, 'one-word-title'), { captionStyle: 'one-word', flips: [
       { start: 0, end: 0.9, text: 'Record one take', mode: 7, hero: [0], entrance: 'slam', flicker: false, layer: 'behind' },
-      { start: 0, end: 2, text: 'Record one take', mode: 0, words: [[0, 0.6, 'Record'], [0.6, 1.2, 'one'], [1.2, 2, 'take']] }] }, [0.3, 0.75, 1.5]);
-    const a = at(0.3), b = at(1.5), m = at(0.75);
+      { start: 0, end: 2, text: 'Record one take', mode: 0, words: [[0, 0.6, 'Record'], [0.6, 1.2, 'one'], [1.2, 2, 'take']] }] }, [0.3, 0.75, 1.0, 1.5]);
+    const a = at(0.3), b = at(1.5), m = at(0.75), n1 = at(1.0);
     if (!a.titles.n) fail('title word missing');
     if (a.front.n) fail('one-word: the spoken word the title shows should not be drawn twice');
-    if (!m.front.n) fail('one-word: a spoken word under a title that is not its word must still show');
+    // since 1.28.0 (Studio report 4, item 2): a word said under a title is not drawn while the title is up; one said in its
+    // last 0.3 s comes up when the title has left
+    if (m.front.n) fail('one-word: while a title is up the caption bar shows nothing');
+    if (n1.titles.n || !n1.front.n) fail('one-word: a word said at the end of a title should come up when the title has left');
     if (a.titles.y1 - a.titles.y0 > 330) fail('one-word title should be a single word, ink height ' + (a.titles.y1 - a.titles.y0));
     if (b.titles.n || !b.front.n) fail('one-word: after the title the caption word should be the only word');
     if (b.front.y1 - b.front.y0 > 330) fail('one-word caption should be one line, ink height ' + (b.front.y1 - b.front.y0));
@@ -1052,20 +1055,28 @@ try {
       ['Studio Connect agent, teleprompter speed and pop-out, footage from a link, in Chrome (tests/studio-connect.e2e.mjs)', 'studio-connect.e2e.mjs'],
       ['Studio Cut step in Chrome: footage player, output picker, cut timeline, batch render, pull script (tests/studio-cut.e2e.mjs)', 'studio-cut.e2e.mjs'],
       ['Studio B-roll step in Chrome: lane, placements, API keys, stock, cards, ideas, generate and screen recording against mocks, assemble placements (tests/studio-broll.e2e.mjs)', 'studio-broll.e2e.mjs'],
+      ['Studio B-roll slot cards in Chrome: one Needs B-roll card per slot with Upload, Copy for my agent and Skip, keys and tabs folded away, a clip on a slot sits as a panel (tests/studio-broll-slots.e2e.mjs)', 'studio-broll-slots.e2e.mjs'],
+      ['Studio Fast run in Chrome: the count of filled B-roll spots, a run slot card, clips picked in play order, one clip on the spot, the route refuses a run of one (tests/studio-fastrun.e2e.mjs)', 'studio-fastrun.e2e.mjs'],
       ['Studio B-roll that picks itself in Chrome: spots after a draft, the first spot too, cards with no key, Add a spot, upload kinds, a raw testimonial cut on whole words and played in the reel, MCP pick_broll, add_spot, add_testimonial (tests/studio-spots.e2e.mjs)', 'studio-spots.e2e.mjs'],
-      ['Studio Pieces and Outputs in Chrome: lines sorted by what they do, Let AI choose, Build my own, reorder and drop, the Combo drafts on whole words, the Outputs library with Edit this reel and Compare, MCP get_pieces, set_combo, choose_combo, list_outputs (tests/studio-pieces.e2e.mjs)', 'studio-pieces.e2e.mjs'],
-      ['Studio Look in Chrome: one row of Looks, the reference card, 9 layers with every option once, REF, LOOK and YOU badges, Music and SFX as one layer, Clear reference as one undo, Save as a Look (tests/studio-look.e2e.mjs)', 'studio-look.e2e.mjs'],
+      ['Studio Pieces and Outputs in Chrome: lines sorted by what they do, Use our best lines, Clear my clip, reorder and drop, your clip drafts on whole words, the Outputs library with Edit this reel and Compare, MCP get_pieces, set_combo, choose_combo, list_outputs (tests/studio-pieces.e2e.mjs)', 'studio-pieces.e2e.mjs'],
+      ['Studio saved look and title checks in Chrome: no saved look line in a Recreate, the line with one button on Picture and the breakdown after Back to my look, Undo, Check this text with Save (tests/studio-reflook.e2e.mjs)', 'studio-reflook.e2e.mjs'],
+      ['Studio Look in Chrome: one row of Looks, the reference card, 9 layers with every option once, REF, LOOK and YOU badges, Music and sounds as one layer, Clear reference as one undo, Save as a Look (tests/studio-look.e2e.mjs)', 'studio-look.e2e.mjs'],
       ['Studio settings that rule out others in Chrome: Single word captions turn off a caption entrance with one line and Undo, greyed tiles say why, one click switches, a Look with no titles, No music (tests/studio-conflicts.e2e.mjs)', 'studio-conflicts.e2e.mjs'],
       ['Studio agent and review in Chrome: drag to select on whole words, Note for my agent, Ask my agent with the step, Apply on a suggested change, a note on a stretch of the reel, the wizards, light theme and the phone (tests/studio-agent-ux.e2e.mjs)', 'studio-agent-ux.e2e.mjs'],
       ['Studio folder fields in Chrome: Browse, the folder list, New folder, Use this folder, Open folder, Reset, the one-line install in Connect agent (tests/studio-folders.e2e.mjs)', 'studio-folders.e2e.mjs'],
       ['Studio polish in Chrome: the top bar fits at five widths, the More menu by keyboard, hints, theme, reduced motion (tests/studio-polish.e2e.mjs)', 'studio-polish.e2e.mjs'],
       ['Studio Post step in Chrome: Connect (Buffer key, R2 host), channels with length limits, drafts by default, post now needs a tick, against mocks (tests/studio-post.e2e.mjs)', 'studio-post.e2e.mjs'],
-      ['Studio Finish in Chrome: six steps, Your edit, Draft from your pieces, one Render with clips and plain clips, MCP get_edit and studio_run (tests/studio-finish.e2e.mjs)', 'studio-finish.e2e.mjs'],
+      ['Studio Review and Render in Chrome: eight steps, Your edit, Draft from your pieces, one Render with clips and plain clips, MCP get_edit and studio_run (tests/studio-finish.e2e.mjs)', 'studio-finish.e2e.mjs'],
       ['Studio New video in Chrome: start fresh keeps the look, nothing deleted, open a past video restores it, More menu (tests/studio-videos.e2e.mjs)', 'studio-videos.e2e.mjs'],
       ['Studio fix buttons in Chrome: no terminal command on the page, Install, Send and Copy for my agent, the toast and Setup check (tests/studio-fixes.e2e.mjs)', 'studio-fixes.e2e.mjs'],
       ['Studio Recreate drafts from your pieces: --as-is with the reference recipe, the cut line stays out, drafted and not stale after, Render next (tests/studio-recreate-pieces.test.mjs)', 'studio-recreate-pieces.test.mjs'],
       ['Studio Recreate and Influence in Chrome: a switch per part on Influence, a part off takes its picks out, what the breakdown read with fix buttons (tests/studio-recreate.e2e.mjs)', 'studio-recreate.e2e.mjs'],
       ['Studio review tools in Chrome: what to swap, show original, comments, clean-up pass, edit receipt (tests/studio-review.e2e.mjs)', 'studio-review.e2e.mjs'],
+      ['Studio Cut layers in Chrome: Raw take, Best lines and Clips, the point of the video, topics, one Pacing control, stitched Play, the kept clips move on (tests/studio-cut-layers.e2e.mjs)', 'studio-cut-layers.e2e.mjs'],
+      ['Studio stage status in Chrome: one live line under a reference bar, the folded list with checks, a reload keeps the stage, a stopped stage with Try again (tests/studio-stages.e2e.mjs)', 'studio-stages.e2e.mjs'],
+      ['Studio steps in Chrome: the eight steps, Copy the look on Start, old links land, layers per step (tests/studio-steps.e2e.mjs)', 'studio-steps.e2e.mjs'],
+      ['Studio whose look is in use, in Chrome: a saved look with the reference Off says so with one button, the button sets the board from the reference alone, a pick after it is yours with no line (tests/studio-leak.e2e.mjs)', 'studio-leak.e2e.mjs'],
+      ['Studio small fixes in Chrome: Close on the chat at every width and the button that brings it back, the switch for hard-to-read words, the vision pass line on a reference (tests/studio-small-fixes.e2e.mjs)', 'studio-small-fixes.e2e.mjs'],
       ['Studio stopping and the wizards in Chrome: Copy a reference opens its link screen, the Studio stopped bar with Copy for my agent, the wizards say Studio is not running with Try again, both come back when Studio does (tests/studio-offline.e2e.mjs)', 'studio-offline.e2e.mjs'],
     ];
     const jobs = Math.max(1, +process.env.SMOKE_E2E_JOBS || 2), out = new Array(E2E.length);
@@ -1098,17 +1109,24 @@ try {
     if (diff(frame('plain.mp4', 0.8), frame('tx.mp4', 0.8)) > 2) fail('segment 0 should not be punched');
     writeFileSync(join(b, 'cut.json'), JSON.stringify(cut));
   });
-  step('verify.mjs: ffprobe, loudness, stills + contact sheet, mask alpha, copy lint, overlap, --json; square export', () => {
+  step('verify.mjs: ffprobe, loudness, stills + contact sheet, mask alpha, copy lint, overlap, --json; square crop and the 4:5 Feed version', () => {
     const b = join(work, 'jobs', 'muse', 'build');
     rmSync(join(b, 'captions.js')); run(node, [join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--titles', '--style', 'pill'], b);
     const o = run(node, [join(KIT, 'verify.mjs'), 'muse', '--jobs', join(work, 'jobs'), '--json'], work);
     if (!/VERIFY PASS/.test(o)) fail('verify:\n' + o);
     const vj = JSON.parse(o.trim().split('\n').pop());
     if (!vj.ok || !existsSync(vj.contact) || !/no overlap between graphics, captions and titles/.test(o)) fail('verify --json / overlap check:\n' + o);
-    // export presets: a square export of the same reel is 1080x1080 and checks against its own size
-    const ex = JSON.parse(run(node, [join(KIT, 'export.mjs'), 'muse', '--jobs', join(work, 'jobs'), '--export', 'square', '--json'], work).trim().split('\n').pop());
-    const wh = run('ffprobe', ['-v', 'error', '-select_streams', 'v', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', ex.file]).trim();
-    if (wh !== '1080,1080' || ex.laidOut) fail('square export: ' + wh + ' ' + JSON.stringify(ex));
+    // export presets: the plain square crop of the same reel is 1080x1080 and checks against its own size
+    const probe = f => run('ffprobe', ['-v', 'error', '-select_streams', 'v', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', f]).trim();
+    const ex = JSON.parse(run(node, [join(KIT, 'export.mjs'), 'muse', '--jobs', join(work, 'jobs'), '--export', 'square', '--crop', '--json'], work).trim().split('\n').pop());
+    if (probe(ex.file) !== '1080,1080' || ex.laidOut || !/reel-v\d+-square-1x1\.mp4$/.test(ex.file)) fail('square export: ' + probe(ex.file) + ' ' + JSON.stringify(ex));
+    // the Instagram Feed version (4:5): its own build, the frame on the face, laid out again, 1080x1350, and it verifies
+    const fx = JSON.parse(run(node, [join(KIT, 'export.mjs'), 'muse', '--jobs', join(work, 'jobs'), '--export', 'feed45', '--json'], work).trim().split('\n').pop());
+    if (probe(fx.file) !== '1080,1350' || !fx.reframed || !/reel-v\d+-feed-4x5\.mp4$/.test(fx.file) || fx.faceHits) fail('feed 4:5 export: ' + probe(fx.file) + ' ' + JSON.stringify(fx));
+    if (!existsSync(join(work, 'jobs', 'muse', 'build-feed45', 'window.json'))) fail('feed 4:5 export: no build-feed45/window.json');
+    const fo = run(node, [join(KIT, 'verify.mjs'), 'muse', '--jobs', join(work, 'jobs'), '--export', 'feed45'], work);
+    if (!/VERIFY PASS/.test(fo) || !/1080x1350/.test(fo)) fail('verify --export feed45:\n' + fo);
+    run(node, [join(KIT, 'verify.mjs'), 'muse', '--jobs', join(work, 'jobs'), '--json'], work); // the 9:16 stills again, for the checks below
     const v = join(work, 'jobs', 'muse', 'verify');
     if (!existsSync(join(v, 'contact.png'))) fail('no contact sheet');
     if (readdirSync(v).filter(f => /title-mid/.test(f)).length !== 4 || readdirSync(v).filter(f => /big-punch/.test(f)).length !== 2) fail('verify stills: ' + readdirSync(v));

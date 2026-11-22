@@ -48,3 +48,36 @@ Chrome's PNG encoder compresses less than the screenshot encoder, so the frame f
 ## Screen recordings
 
 A screen recording on a screen card goes to the page as data URLs (up to 96 MB in all), like logos and images. A frame from a file taints the canvas: before 1.12.0 that also kept the layout pass from moving captions clear of the card, so a caption could sit on top of the recording. Past 96 MB the frames stay files, and the capture falls back to screenshots once the card shows.
+
+## Sizes: 9:16, 4:5 for the Instagram Feed, 1:1
+
+The reel is 1080x1920 (9:16), right for Reels, Stories, TikTok and Shorts. The Instagram Feed refuses that shape ("videos must have an aspect ratio ranging from 4:5 to 1.91:1"), so one render run can make more than one size:
+
+```
+npm run reel -- --rebuild --name my-reel --export reels,feed45,square
+```
+
+| File | Size | For |
+|---|---|---|
+| `reel-v1.mp4` | 1080x1920 | Reels and Stories |
+| `reel-v1-feed-4x5.mp4` | 1080x1350 | the Instagram Feed |
+| `reel-v1-square-1x1.mp4` | 1080x1080 | square feeds |
+
+`npm run export -- my-reel --export feed45` makes the 4:5 version of a reel that is already rendered, from the build saved beside it.
+
+The 4:5 and 1:1 versions are not crops of the 9:16 one. Each is made again (`kit/export-frame.cjs`):
+
+1. **The frame follows your face.** `kit/facewindow.cjs` reads the face track of the picture (`build/facezone.json`, YuNet) and decides where the frame's top edge sits at every frame. Your face sits a little above the middle with headroom over your hair. Inside a shot the frame holds still when you do, however noisy the track; if you really move, it glides after you. Between two shots it moves with an eased slide centred on the cut, about half a second. A shot that would land within a hair of the last one does not move at all. The frame never leaves the picture and your face never leaves the frame.
+2. **Its own build.** `jobs/<job>/build-feed45/` (or `build-square/`) holds the same cut and captions with the frame added. `window.json` there says where the frame sits, shot by shot.
+3. **The layout is made again.** The overlay is drawn again for that frame: every caption, title, sticker and card moves inside its safe area and off your face, with the same layout pass and face check as the reel (`layout.json`, `facecheck.json`). A full-frame scene is drawn at the new size instead of being cropped.
+4. **The picture is put together again.** Your picture and its person masks slide under the frame, so a title behind your head stays behind your head. Full-frame b-roll is fitted to the new frame, a split halves it, and the framed cards are fitted into it. The sound is the same mix.
+
+The timing never changes, so no word is cut.
+
+### Words never overlap
+
+The layout pass in `kit/overlay.html` has four steps: inside the safe area, clear of graphics, off the face, and text clear of text. The last one looks at every frame on which two pieces of text are up (a caption's current word, a title, a sticker word), each measured where it is really drawn. The title stays, then stickers, then captions. The other one stacks above or below with a gap when there is room inside the safe area, off the face and clear of graphics, shrinking to no less than 60%. Otherwise it waits: one leaves before the next enters. A one-word caption that has been said leaves when a title comes in. A lockup (a hero word with its partner line or script tail) is one piece of text.
+
+Every render checks this on every frame and writes `build/textcheck.json` (`frames`, `clashFrames`, the pairs, and what the layout stacked or held back). `npm run verify` fails when `clashFrames` is not 0. The 4:5 and 1:1 builds get their own check. `npm run verify -- my-reel --export feed45` checks that version against its own size and safe area.
+
+What it does not do yet: the effects pass (`reel-fx-vN.mp4`) is not made in 4:5 or 1:1; those versions are made from the reel before effects. `npm run export -- <job> --export feed45 --crop` still makes the old plain crop.

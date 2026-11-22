@@ -18,8 +18,8 @@
 // Only use it on content you have the rights to, and follow Instagram's terms.
 // Writes teardown/<name>/: Reel.md, teardown.md (what was detected and how sure), contact.jpg, videomd/ (rea-video's
 // package and report.html) or fallback.json.
-import { execFileSync, spawnSync } from 'child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'fs';
+import { execFileSync, spawnSync, spawn } from 'child_process';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
 import { basename, dirname, join, resolve, relative, delimiter } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
@@ -67,7 +67,31 @@ if (!existsSync(video)) die('Not found: ' + video);
 const name = (opt('name') || basename(video).replace(/\.[^.]+$/, '')).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'reference';
 const out = resolve(opt('out', join(ROOT, 'teardown', name)));
 mkdirSync(out, { recursive: true });
+if (!process.env.PYTHONUTF8) process.env.PYTHONUTF8 = '1'; // every Python step reads, writes and prints utf-8, whatever the Windows code page
 const run = (cmd, args, o = {}) => { console.log('>', basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { stdio: 'inherit', ...o }); };
+
+// "stage <id>" lines say where the breakdown is. Studio reads them (kit/studio/stages.mjs) for its status line.
+const STAGE = { cuts: 'finding cuts', captions: 'reading captions', camera: 'reading camera moves', transcribe: 'transcribing', sound: 'reading music and sounds', graphics: 'reading graphics', recipe: 'building the recipe' };
+const stage = id => console.log(`stage ${id}: ${STAGE[id]}`);
+// rea-video prints nothing while it works, so we watch what it writes: the sound picture and the first stills land
+// once the cuts are found, then the text pass, then one sheet per shot as it reads the camera.
+async function runRea(cmd, args, pkg) {
+  console.log('>', basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' '));
+  const t0 = Date.now() - 1000, shots = join(pkg, 'shots');
+  const fresh = f => { try { return statSync(f).mtimeMs >= t0; } catch { return false; } };
+  const names = () => { try { return readdirSync(shots).filter(n => fresh(join(shots, n))); } catch { return []; } };
+  let at = 0;
+  stage('cuts');
+  const look = () => {
+    const n = names();
+    if (at < 2 && (fresh(join(pkg, 'packaging')) || n.some(x => /^shot_\d+\.jpg$/.test(x)))) { at = 2; stage('camera'); }
+    else if (at < 1 && (fresh(join(pkg, 'audio.png')) || n.some(x => /_first\.jpg$/.test(x)))) { at = 1; stage('captions'); }
+  };
+  const timer = setInterval(look, 700);
+  try {
+    await new Promise((ok, no) => { const p = spawn(cmd, args, { stdio: 'inherit' }); p.on('error', no); p.on('close', c => (c === 0 ? ok() : no(new Error(`${basename(cmd)} exited with ${c}`)))); });
+  } finally { clearInterval(timer); }
+}
 
 function findRea() {
   if (process.env.REA_VIDEO && existsSync(process.env.REA_VIDEO)) return process.env.REA_VIDEO;
@@ -100,8 +124,8 @@ if (engine === 'rea') {
     const base = ['decompose', video, '-o', pkg, '--lang', 'en', ...(flag('no-ocr') ? ['--no-ocr'] : []), ...(flag('no-asr') ? ['--no-asr'] : [])];
     // --vlm: a vision model describes each shot (the effects and transitions measurements miss). When that call fails
     // (no key, a bad key, the service is down) the breakdown runs again without it, so a teardown never fails for it
-    if (flag('vlm')) { try { run(rea, [...base, '--vlm', ...(opt('max-vlm-shots') ? ['--max-vlm-shots', String(opt('max-vlm-shots'))] : [])]); } catch (e) { console.warn('note: the descriptions (--vlm) failed; reading the reference without them'); run(rea, [...base, '--no-vlm']); } }
-    else run(rea, base);
+    if (flag('vlm')) { try { await runRea(rea, [...base, '--vlm', ...(opt('max-vlm-shots') ? ['--max-vlm-shots', String(opt('max-vlm-shots'))] : [])], pkg); } catch (e) { console.warn('note: the descriptions (--vlm) failed; reading the reference without them'); await runRea(rea, [...base, '--no-vlm'], pkg); } }
+    else await runRea(rea, base, pkg);
   }
   b = V.loadBreakdown(pkg);
 } else {
@@ -113,6 +137,7 @@ if (engine === 'rea') {
 // speech: rea-video's optional ASR is SenseVoice; when it is off, use faster-whisper (already a kit dependency)
 if (!(b.speech && b.speech.ok && (b.speech.lines || []).length) && !flag('no-asr') && engine === 'rea' && pyHas('faster_whisper')) {
   const f = join(out, 'speech.json');
+  stage('transcribe');
   if (flag('reuse') && existsSync(f)) { const sp = JSON.parse(readFileSync(f, 'utf8')); if (sp.ok) b.speech = sp; }
   else {
   const r = spawnSync(PY, ['-c', `import sys,json;sys.path.insert(0,${JSON.stringify(KIT)});import teardown as T;json.dump(T.speech_words(${JSON.stringify(video)},${JSON.stringify(opt('model', 'base.en'))}) or {},open(${JSON.stringify(f)},'w'))`], { stdio: 'inherit' });
@@ -124,6 +149,7 @@ if (!(b.speech && b.speech.ok && (b.speech.lines || []).length) && !flag('no-asr
 const cacheF = join(ROOT, 'teardown', '.bed-bpm.json');
 let bpms = {}; try { bpms = JSON.parse(readFileSync(cacheF, 'utf8')); } catch {}
 const audio = b.audio || {};
+stage('sound');
 if ((audio.tempo_bpm || (audio.music || {}).tempo_bpm) && pyHas('librosa')) {
   for (const bed of Object.keys(R.BEDS || {})) {
     if (bpms[bed]) continue;
@@ -144,13 +170,50 @@ const fxPy = join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scri
 const exPy = existsSync(fxPy) ? fxPy : PY; // the effects venv has MediaPipe for the person mask
 const bf = engine === 'rea' ? join(out, 'videomd', 'breakdown.json') : join(out, 'fallback.json');
 let extras = {};
+stage('graphics');
 const ex = spawnSync(exPy, [join(KIT, 'teardown.py'), 'extras', video, '--breakdown', bf, '--titles', join(out, 'titles.json'), '--out', join(out, 'extras.json'), '--sheet', join(out, 'contact.jpg')], { stdio: 'inherit' });
 if (!ex.status) extras = JSON.parse(readFileSync(join(out, 'extras.json'), 'utf8'));
 else console.warn('note: extras failed (no layer hints, vignette or contact sheet)');
 
+stage('recipe');
 const res = V.convert(b, extras, { name, bpms, recipePath: relative(ROOT, join(out, 'Reel.md')) });
 writeFileSync(join(out, 'Reel.md'), res.md);
 writeFileSync(join(out, 'teardown.md'), res.report);
+// B-roll: where the reference shows it (screen panels, split screens, shots with no speaker), what it showed and how
+// it is treated (kit/broll_fx.py measures the motion, shake, glitch, colour and the way in and out). kit/broll-slots.cjs
+// (a fault in this step must not lose the breakdown: the recipe is already written, so it is kept without the block)
+try {
+  const BS = require('./broll-slots.cjs');
+  const cands = [];
+  for (const g of (res.graphics || []).filter(g => g.type === 'screen-card')) {
+    const e = ((extras.graphics || []).filter(x => x.type === 'screen-card' && Array.isArray(x.bbox)).sort((a, z) => Math.abs(a.start - g.start) - Math.abs(z.start - g.start))[0]) || null;
+    cands.push({ start: g.start, end: g.end, kind: 'panel', box: e && Math.abs(e.start - g.start) < 0.5 ? e.bbox : [(1 - (g.w || 0.66)) / 2, (g.y || 0.68) - 0.11, g.w || 0.66, 0.22], border: g.border, shows: g.named || g.subject, shot: 'screen recording', source: g.sourceGuess });
+  }
+  for (const sh of (res.shots || []).filter(x => x.cutaway)) cands.push({ start: sh.start, end: sh.end, kind: 'full', shows: sh.broll || null });
+  let measured = [];
+  if (pyHas('cv2')) {
+    const spF = join(out, 'broll-splits.json');
+    if (!spawnSync(PY, [join(KIT, 'broll_fx.py'), 'splits', video, '--out', spF], { stdio: 'inherit' }).status) for (const sp of JSON.parse(readFileSync(spF, 'utf8'))) if (!cands.some(c => c.start < sp.end && c.end > sp.start)) cands.push({ start: sp.start, end: sp.end, kind: 'split', box: sp.box });
+    cands.sort((a, z) => a.start - z.start);
+    if (cands.length) {
+      const inF = join(out, 'broll-in.json'), mF = join(out, 'broll.json');
+      writeFileSync(inF, JSON.stringify(cands.map((c, i) => ({ n: i + 1, start: c.start, end: c.end, box: c.kind === 'full' ? null : c.box, border: c.border || null }))));
+      if (!spawnSync(PY, [join(KIT, 'broll_fx.py'), 'measure', video, '--slots', inF, '--out', mF], { stdio: 'inherit' }).status) measured = JSON.parse(readFileSync(mF, 'utf8'));
+      else console.warn('note: the B-roll effects were not read (the slots keep their times and shape)');
+    }
+  } else if (cands.length) console.warn('note: opencv is missing, so the B-roll effects were not read (the slots keep their times and shape)');
+  cands.sort((a, z) => a.start - z.start);
+  const faces = (res.shots || []).filter(x => x.face).map(x => ({ start: x.start, end: x.end, eyeY: x.face.eyeY, faceH: x.face.faceH }));
+  const script = ((b.speech && b.speech.lines) || []).map(l => ({ start: +l.start, end: +l.end, say: l.text }));
+  const slots = BS.detect(cands, measured, { faces, script });
+  res.md = BS.appendBlock(res.md, slots);
+  writeFileSync(join(out, 'Reel.md'), res.md);
+  console.log(`b-roll: ${slots.length} slot${slots.length === 1 ? '' : 's'} in the reference${slots.length ? ' (' + slots.map(x => `${x.kind} ${x.start}-${x.end}s${x.shows ? ' ' + x.shows : ''}, ${x.fx.motion}, in ${x.fx.in}`).join('; ') + ')' : ''}`);
+} catch (e) { console.warn('note: the B-roll slots of the reference were not read (' + String(e.message).split('\n')[0] + '); the rest of the breakdown is kept'); }
+// titles.json again, as the recipe has them: which titles' text we are not sure of (lowConfidence, why), and the look read
+writeFileSync(join(out, 'titles.json'), JSON.stringify(res.titles, null, 1));
+if (res.titleLook) writeFileSync(join(out, 'title-look.json'), JSON.stringify(res.titleLook, null, 1));
+{ const un = res.titles.filter(t => t.lowConfidence); if (un.length) console.log(`check ${un.length} title${un.length === 1 ? '' : 's'} before a draft, the text may be misread: ${un.map(t => `#${t.n} "${t.text}" (${t.why})`).join('; ')}`); }
 { const added = V.saveScenes(res, out, { library: !flag('no-scenes') }); if (res.scenes.length) console.log(`scenes: ${res.scenes.length} made from the reference (${res.scenes.map(x => x.name).join(', ')}), ${added.length} new in the menu with a REF badge`); }
 const r = RM.load(join(out, 'Reel.md'));
 const { errs } = RM.validate(r);

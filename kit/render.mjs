@@ -44,9 +44,9 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
   }
   // font lockup overrides from cut.json ("lockup" for the job, "hero" per flip start) -> lockover.js
   { let C = {}; try { C = JSON.parse(readFileSync(join(ROOT, 'cut.json'), 'utf8')); } catch {}
-    writeFileSync(join(ROOT, 'lockover.js'), 'window.LOCKOVER=' + JSON.stringify({ lockup: C.lockup || null, hero: C.hero || null, titleLayer: C.titleLayer || null, inserts: [...(C.inserts || []).filter(s => !s.place || s.place === 'full').map(s => ({ at: +s.at, dur: +s.dur, y: s.y, tint: s.tint, line: s.line, arc: s.arc })),
+    writeFileSync(join(ROOT, 'lockover.js'), 'window.LOCKOVER=' + JSON.stringify({ lockup: C.lockup || null, hero: C.hero || null, titleLayer: C.titleLayer || null, inserts: [...(C.inserts || []).filter(s => !s.skip && (!s.place || s.place === 'full')).map(s => ({ at: +s.at, dur: +s.dur, y: s.y, tint: s.tint, line: s.line, arc: s.arc })),
       // split and framed b-roll (kit/split.cjs): the captions sit on the line the layout leaves for them, off your face
-      ...(C.inserts || []).filter(s => SPL.SPLIT.includes(s.place)).map(s => ({ at: +s.at, dur: +s.dur, y: s.y || SPL.layout(s, null, { mask: !!C.mask }).capY, tint: s.tint, split: s.place, light: SPL.lightBg(s) }))] }) + ';\n'); }
+      ...(C.inserts || []).filter(s => !s.skip && SPL.SPLIT.includes(s.place)).map(s => ({ at: +s.at, dur: +s.dur, y: s.y || SPL.layout(s, null, { mask: !!C.mask, frame: C.frame || null }).capY, tint: s.tint, split: s.place, light: SPL.lightBg(s) }))] }) + ';\n'); }
   if (!existsSync(join(ROOT, 'fxzones.js'))) writeFileSync(join(ROOT, 'fxzones.js'), 'window.FXZONES=[];\n');
   // graphics (modes 10, 11, 19 and 26): icon and screen images as file URLs; a screen recording becomes a short frame list
   // (build/gfx/, 12 fps) so the card can play it frame-accurately. Fonts for the ordinal word, the label, the code
@@ -57,7 +57,10 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
     { const SC = createRequire(import.meta.url)('./scenes.cjs'), jobs = [], keys = [];
       for (const f of CAP.flips || []) {
         if (f.mode !== 39 || !f.html) continue;
-        const page = SC.page(f, f.text), w = Math.round((+f.w || 1) * 1080), h = Math.round((+f.h || 1) * 1920), secs = +f.seconds || 2;
+        // a full-frame scene on a 4:5 or 1:1 version (captions.js exportFrame, reframed) is drawn at that frame's size, so
+        // its HTML lays itself out again instead of being cropped (kit/overlay.html places it on the frame)
+        const XF = CAP.exportFrame && CAP.exportFrame.reframed ? CAP.exportFrame : null, fullScene = (+f.w || 1) >= 0.98 && (+f.h || 1) >= 0.98;
+        const page = SC.page(f, f.text), w = Math.round((+f.w || 1) * 1080), h = XF && fullScene ? Math.round(+XF.h) : Math.round((+f.h || 1) * 1920), secs = +f.seconds || 2;
         const dir = join(ROOT, 'gfx', 'scene-' + createHash('sha1').update(JSON.stringify([page, w, h, secs])).digest('hex').slice(0, 16));
         const done = existsSync(join(dir, 'done')) ? readdirSync(dir).filter(x => x.endsWith('.png')).sort().map(x => join(dir, x)) : null;
         keys.push([f.mode + '@' + f.start, dir, done]); if (!done) jobs.push({ page, w, h, seconds: secs, dir });
@@ -139,6 +142,27 @@ console.log('theme', await p.evaluate(() => window.__theme));
     writeFileSync(join(ROOT, 'boxes.json'), JSON.stringify(out, null, 1) + '\n');
     console.log('boxes', ts.length, 'moments -> boxes.json'); await b.close(); process.exit(0);
   }
+  // TITLECHECK=1: the frames round every title's start and end, with the title's box and the caption bar on each
+  // (titleframes.json, read by kit/titlecheck.mjs for npm run verify), and stop
+  if (process.env.TITLECHECK) {
+    const tf = await p.evaluate(([f, d]) => (window.__titleFrames ? window.__titleFrames(f, d) : null), [FPS, DUR]);
+    writeFileSync(join(ROOT, 'titleframes.json'), JSON.stringify(tf) + '\n');
+    console.log('title frames', tf ? tf.titles.reduce((n, t) => n + t.frames.length, 0) : 0, '-> titleframes.json'); await b.close(); process.exit(0);
+  }
+}
+// text check (overlay.html __textCheck): on every frame, every text element on screen (a caption's current word, a title,
+// a sticker word) is measured alone where it is drawn, and any two that share area are listed. textcheck.json; npm run
+// verify fails on any clash, reel.cjs prints the count. TEXTCHECK=0 skips it; TEXTCHECK=only writes it and stops.
+if ((!only || process.env.TEXTCHECK === 'only') && process.env.TEXTCHECK !== '0' && (await p.evaluate(() => !!window.__textCheck))) {
+  const r = await p.evaluate(([d, f]) => window.__textCheck(d, f), [DUR, FPS]), pairs = new Map();
+  for (const c of r.clashes) { const k = c.a + '|' + c.b, e = pairs.get(k) || { a: c.a, b: c.b, kinds: c.kinds, from: c.t, frames: 0, maxPx: 0 }; e.frames++; e.to = c.t; e.maxPx = Math.max(e.maxPx, c.px); pairs.set(k, e); }
+  const lay = await p.evaluate(() => (window.__layout ? window.__layout() : { elements: [] }));
+  const moved = lay.elements.filter(e => e.texts).flatMap(e => e.texts.map(x => ({ kind: e.kind, text: x.word || e.text, ...x })));
+  const tc = { frames: r.frames, together: r.together, clashFrames: new Set(r.clashes.map(c => c.t)).size, pairs: [...pairs.values()], moved, clashes: r.clashes.slice(0, 200) };
+  writeFileSync(join(ROOT, 'textcheck.json'), JSON.stringify(tc, null, 1) + '\n');
+  console.log(`text check: ${tc.clashFrames} of ${r.frames} frames with two words on the same spot; layout stacked ${moved.filter(m => m.move).length} and held back ${moved.filter(m => m.hide).length} to keep words apart (textcheck.json)`);
+  for (const e of tc.pairs) console.warn(`WARNING: "${e.a}" and "${e.b}" overlap from ${e.from}s for ${e.frames} frame${e.frames === 1 ? '' : 's'} (up to ${e.maxPx} px)`);
+  if (process.env.TEXTCHECK === 'only') { writeFileSync(join(ROOT, 'words.json'), JSON.stringify(await p.evaluate(() => window.__words || [])) + '\n'); await b.close(); process.exit(0); }
 }
 // face check (kit/facezone.py -> captions.js faceTrack): at 8 moments a second, every caption, title and kinetic word is
 // drawn alone with its layout and the letter pixels inside the face zone are counted. facecheck.json; npm run verify fails
@@ -170,6 +194,12 @@ if (gfx.length) { writeFileSync(join(ROOT, 'graphics.json'), JSON.stringify(gfx,
 const capLayer = await p.evaluate(() => window.__captionLayer || 'front');
 if (capLayer === 'behind') console.log('captions: behind the person (on the title layer, under the mask)');
 const words = await p.evaluate(() => window.__words || []);
+// a label that only repeats the caption is left out (overlay.html, Studio report 4 item 13)
+for (const d of await p.evaluate(() => window.__dropped || [])) console.log(`label '${d.text}' at ${(+d.start).toFixed(2)} s not drawn: ${d.why}`);
+// one-word captions under a title: nothing in the bar while a title is up (words-held.json lists what was left out)
+{ const held = await p.evaluate(() => window.__wordsHeld || []); if (held.length) { writeFileSync(join(ROOT, 'words-held.json'), JSON.stringify(held) + '\n'); console.log(`one-word captions: ${held.length} word${held.length === 1 ? '' : 's'} left out of the bar while a title is up (${held.filter(h => h.why === 'title word').length} said by the title itself)`); } else rmSync(join(ROOT, 'words-held.json'), { force: true }); }
+const gl = await p.evaluate(() => (window.__glow ? window.__glow() : null));
+if (gl && (gl.glow || gl.dim)) console.log(`titles: ${gl.glow ? 'glow ' + gl.glow : 'no glow'}, ${gl.dim ? 'picture dimmed by ' + Math.round(gl.dim * 100) + '% behind a title' : 'no dim'}`);
 if (words.length) { writeFileSync(join(ROOT, 'words.json'), JSON.stringify(words) + '\n'); const short = Math.min(...words.map(w => w.end - w.start)); console.log(`one-word captions: ${words.length} words, each up ${short.toFixed(2)} s or more`); }
 if (titles.length) console.log('titles', titles.map(t => `${t.start}s ${t.entrance}${t.flicker ? '+flicker' : ''}${t.layer && t.layer !== 'front' ? ' ' + t.layer : ''}`).join(', '));
 // Font lockups (titles and kinetic lines, two faces per phrase): written out so they can be checked without pixels

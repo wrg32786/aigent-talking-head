@@ -99,7 +99,7 @@ function resolveTitles(CAP, cut) {
   const ts = (CAP.flips || []).filter(f => f.mode === TITLE_MODE).sort((a, b) => a.start - b.start);
   const used = new Set(ts.map(t => t.entrance).filter(Boolean));
   const free = ENTRANCES.filter(e => !used.has(e));
-  const out = ts.map((t, i) => { const entrance = t.entrance || free.shift() || ENTRANCES[i % ENTRANCES.length]; return { ...t, entrance, flicker: (i === 0 || i === ts.length - 1) && entrance !== 'typewriter' ? t.flicker !== false : false, role: i === 0 ? 'hook' : i === ts.length - 1 ? 'payoff' : 'beat' }; });
+  const out = ts.map((t, i) => { const entrance = t.entrance || (ENTRANCES.includes(CAP.titleEntrance) ? CAP.titleEntrance : null) || free.shift() || ENTRANCES[i % ENTRANCES.length]; return { ...t, entrance, flicker: (i === 0 || i === ts.length - 1) && entrance !== 'typewriter' ? t.flicker !== false : false, role: i === 0 ? 'hook' : i === ts.length - 1 ? 'payoff' : 'beat' }; });
   const job = normalizeLayer((CAP && CAP.titleLayer) != null ? CAP.titleLayer : (cut && cut.titleLayer), 'front') || 'front';
   const raw = out.map(t => normalizeLayer(t.layer, job) || job);
   const behind = new Set();

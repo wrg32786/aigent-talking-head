@@ -49,7 +49,7 @@ def main():
         st["words"] = sorted(st["words"] + ws, key=lambda w: w[0])
         st["done"].append(k)
         os.remove(wav)
-        json.dump(st, open(out + ".tmp", "w"))
+        json.dump(st, open(out + ".tmp", "w", encoding="utf-8"))
         os.replace(out + ".tmp", out)
         print(f"progress {len(st['done'])} {n}", flush=True)
 

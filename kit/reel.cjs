@@ -5,7 +5,11 @@
 //          --model small.en (Whisper model for transcription; default small.en, fast on a CPU; large-v3 is the slow, most
 //            accurate opt-in, a ~3 GB download the first time)
 //          --export tiktok|reels|shorts|feed45|square  lay the reel out for that platform's safe area and write
-//            reel-vN-<name>.mp4 too (crop, length and bitrate caps: kit/exports.json)
+//            reel-vN-<name>.mp4 too (length and bitrate caps: kit/exports.json). Several at once with commas:
+//            --export reels,feed45,square makes the 9:16 reel and, in the same run, reel-vN-feed-4x5.mp4 (1080x1350,
+//            for the Instagram Feed) and reel-vN-square-1x1.mp4. The 4:5 and 1:1 versions are not crops: the frame
+//            follows your face (kit/facewindow.cjs) and the captions, titles, graphics and b-roll are laid out again
+//            inside it, off your face (kit/export-frame.cjs, jobs/<job>/build-<name>/). The timing is the same.
 //          --json  print one JSON result line at the end ({ ok, job, reel, export, layout, verify }), for agents and the MCP server
 //          After a successful render (not --draft), a one-line star reminder may print on the first
 //            render and once more after 5 renders. Skipped with --json, a non-TTY stdout, CI, or AIGENT_NO_STAR=1.
@@ -40,6 +44,21 @@
 //          --scenes id,id  place these scenes from the library (kit/scenes.cjs; effects and graphics made from a reference
 //            or by your agent) once each, spread over the reel. Recipe graphics of type scene play from its scenes.json.
 //          --scenes-off id,id  leave these scenes out, the recipe's own too (forbidden on the Look step).
+//          --recut  with --recipe (Studio's Recreate): re-cut your edit to the recipe's shots on word boundaries. Each shot
+//            is also reframed to the reference's face size and eye line (kit/reframe.cjs) and graded to its colour with a
+//            skin-protected 3D LUT (kit/grade-match.cjs). --no-reframe / --no-grade-match turn those off.
+//          --keep-ends  leave the two ends of every piece as cut: by default the last piece ends with its closing sentence
+//            (a word or two said after it is left out) and a piece starts on the first frame the speaker looks at the
+//            lens, inside the quiet before its first word (kit/piece-edges.cjs). No word is cut either way.
+//          --motion subtle|medium|strong  how big the reference's camera moves are drawn (default medium, or the recipe's
+//            Style line "motion"). A push the teardown measured (Reel.md shot "move-size") is scaled so it shows on a
+//            talking head (kit/shotplan.cjs MOTION). Works on --rebuild too: the moves are sized again.
+//          --style-look <name|path>  Copy the look: a saved style look (npm run look, kit/stylelook.cjs) on your take.
+//            Your words and timing, the look's framing, grade, captions, titles, stickers, sounds, transitions and
+//            music (kit/lookplan.cjs). Not with --recipe. Writes build/plan.json and build/match.json.
+//          --goal "<one line>"  the point of this video ("Show beginners they can build an app with AI in a weekend").
+//            Its words (kit/goalwords.cjs) are the big word of a caption or title when you say one, and with
+//            --style-look they get a sticker after your ordinals and numbers. Kept in plan.json and cut.json as goal.
 //          --clip <file>  the video to use (same as passing the path; reads well with --recipe)
 //            A recipe's graphics (ordinal stickers, app labels, screen cards) land at the recipe's times; icon and src
 //            paths are relative to the recipe, and anything left out is drawn as a neutral placeholder.
@@ -72,7 +91,7 @@
 //            (the order given); auto decides from how many sentences the files share
 //          --keep-pauses "clip-003@2.72,clip-005@1.1"  with --tighten, leave these pauses (clip id @ clip seconds, as
 //            listed in choices.json "pauses") uncut
-//          --no-boost  skip the legibility pass (on by default: a caption moment under 3:1 gets a denser halo and is drawn again)
+//          --no-boost  skip the legibility pass and take out the moments an earlier build marked (on by default: a caption moment under 3:1 gets a soft shadow behind that word, also when the style has none, and is drawn again)
 // A title behind the head moves in front when the person mask covers more than 22% of its letters (cut.json "behindMax";
 // kit/cover.py); a face title moves to the slot above the head. Left and right titles keep a 6.5% side margin and shrink to fit.
 // Writes jobs/<name>/: clips/ (clip.py output), build/ (cut.json, captions.js, theme.js, overlay frames), reel-vN.mp4.
@@ -95,19 +114,28 @@ const S = require('./spoken.cjs');
 const CARDS = require('./cards.cjs');
 const SFXMAP = require('./sfx-map.cjs');
 const RC = require('./recreate.cjs');
+const SHP = require('./shotplan.cjs');
+const SL = require('./stylelook.cjs');
+const LK = require('./lookplan.cjs');
+const RF = require('./reframe.cjs');
+const FID = require('./fidelity.cjs');
 
 const KIT = __dirname, ROOT = path.dirname(KIT);
+// every Python step we start reads, writes and prints utf-8, whatever the Windows code page (a word outside it in the
+// transcript must not stop a draft)
+if (!process.env.PYTHONUTF8) process.env.PYTHONUTF8 = '1';
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['words', 'scenes', 'scenes-off', 'pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
+const VALUED = new Set(['style-look', 'motion', 'goal', 'words', 'scenes', 'scenes-off', 'pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const JSON_OUT = flag('json');
 const die = m => { if (JSON_OUT) console.log(JSON.stringify({ ok: false, error: m })); console.error(m); process.exit(1); };
 const X = require('./exports.cjs');
-const EXPORT = opt('export') ? String(opt('export')).toLowerCase() : null;
-if (EXPORT && !X.get(EXPORT)) die('--export must be ' + X.NAMES.join(', '));
+const EXL = opt('export') ? X.parseList(opt('export')) : null;
+if (EXL && (EXL.bad.length || !EXL.names.length)) die('--export must be ' + X.NAMES.join(', ') + ' (several with commas: reels,feed45)');
+const EXPORT = EXL ? EXL.names.join(',') : null;
 const VIDEO = /\.(mov|mp4|m4v|mkv|webm|avi)$/i;
 // the kit's Python: PYTHON, else the kit's .venv (where the installer put Whisper, yt-dlp and the rest), else the system one
 const PY = process.env.PYTHON || [path.join(ROOT, '.venv', 'Scripts', 'python.exe'), path.join(ROOT, '.venv', 'bin', 'python')].find(f => fs.existsSync(f)) || (process.platform === 'win32' ? 'py' : 'python3');
@@ -188,9 +216,28 @@ if (opt('recipe')) {
   preset = preset ? { ...preset, ...rp, name: rp.name } : rp;
   console.log(RM.summary(recipe).split('\n').map(l => 'recipe ' + l).join('\n'));
 }
+// --style-look <name or path>: Copy the look. A saved style look (kit/stylelook.cjs, npm run look) acts as a recipe with
+// no timeline: its brand, music and style lines are read like a Reel.md's, and kit/lookplan.cjs plans the cuts,
+// stickers, titles and sounds from your own words. Nothing from the reference's script, text or times is used.
+let LOOK = null;
+// the B-roll slots of this draft (kit/broll-slots.cjs), kept in build/plan.json "broll"
+let BROLL = [];
+if (opt('style-look')) {
+  if (recipe) die('Use --style-look or --recipe, not both: a recipe re-cuts the reference\'s timeline, a style look keeps only its style.');
+  LOOK = SL.load(opt('style-look'));
+  if (!LOOK) die(`No style look "${opt('style-look')}". See npm run look -- list, or save one: npm run look -- save teardown/<name> --name <name>`);
+  recipe = SL.toRecipe(LOOK);
+  const rp = RM.toPreset(recipe);
+  if (rp.bed && rp.bed !== 'auto' && !R.isBed(rp.bed)) rp.bed = 'auto';
+  preset = preset ? { ...preset, ...rp, name: rp.name } : rp;
+  console.log(`style look: ${LOOK.name}${LOOK.from && LOOK.from.reference ? ` (from ${LOOK.from.reference})` : ''}; your words and your timing, its style`);
+  for (const [k, v] of Object.entries(SL.summary(LOOK))) console.log(`look ${k}: ${v}`);
+}
 setJobAliases(recipe);
 // the glossary and brand logos: the kit's list, the pack's or preset's, then --glossary / --brands (later ones win)
 let GLOSS = [], BRANDS = [];
+// --goal: the point of this video, one line. Its words lead the caption and title emphasis and the look's stickers.
+const GOAL = String(opt('goal') || '').replace(/\s+/g, ' ').trim().slice(0, 300);
 try { GLOSS = GL.merge(GL.shipped(), GL.parse(preset && preset.glossary), ...many('glossary').map(v => GL.read(v))); } catch (e) { die('--glossary: ' + e.message); }
 try { BRANDS = [...BR.parse(preset && preset.brands, (pack && pack.dir) || ROOT), ...many('brands').flatMap(v => /^\s*\[/.test(v) ? BR.parse(JSON.parse(v)) : BR.read(v))]; } catch (e) { die('--brands: ' + e.message); }
 { const bad = BRANDS.filter(b => !fs.existsSync(b.logo) || !BR.IMG.test(b.logo)); if (bad.length) die('brands: logo file missing or not an image: ' + bad.map(b => b.logo).join(', ')); }
@@ -202,7 +249,11 @@ const LOOK_STYLE = { kinetic: 'kinetic', oneword: 'oneword', muse: 'pill', class
 const STYLE = opt('style', (!lookFlag && preset && preset.captionStyle) || LOOK_STYLE[look]);
 if (STYLE && !P.STYLES.includes(STYLE)) die('--style must be ' + P.STYLES.join(', '));
 const TITLES = flag('no-titles') ? false : (flag('titles') ? true : (!lookFlag && preset && preset.titles !== undefined ? !!preset.titles : look !== 'classic'));
-const FONTS = opt('fonts') || (!lookFlag && preset && preset.fonts) || (look === 'oneword' ? 'instrument,literata,bricolage' : undefined);
+// The font a teardown read from the reference (Reel.md Style font-match, Brand kit fonts; kit/fontmatch.py) is part of what
+// Recreate and Copy the look copy, so it holds under an explicit --look too. Only --fonts, your own pick, goes over it.
+const REFFONT = recipe && recipe.style && recipe.style['font-match'] && preset && preset.fonts && preset.fonts !== 'theme' ? preset.fonts : null;
+const FONTS = opt('fonts') || REFFONT || (!lookFlag && preset && preset.fonts) || (look === 'oneword' ? 'instrument,literata,bricolage' : undefined);
+if (REFFONT) console.log(opt('fonts') ? `fonts: ${opt('fonts')} (your pick; the reference reads as ${recipe.style.font || 'unknown'}, our ${REFFONT})` : `fonts: ${REFFONT} from the reference (${recipe.style.font || 'kind not read'}, ${recipe.style['font-match']})`);
 const name = opt('name') || (src ? path.basename(src).replace(/\.[^.]+$/, '') : path.basename(path.resolve(clipsArg || '.')))
   .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'reel';
 const job = path.resolve(opt('jobs', path.join(ROOT, 'jobs')), name), build = path.join(job, 'build');
@@ -299,15 +350,48 @@ if (!flag('rebuild')) {
   const segs = [], clipStart = [], segClip = [];
   keep.forEach((c, ci) => { clipStart.push(segs.length); spansOf(c).forEach(([a, b], k) => segClip.push(c) && segs.push({ file: rel(path.join(clipsDir, path.basename(c.file))), in: a, out: b, ...(k ? { jump: true } : {}), ...(ci === 0 && k === 0 ? { fadeIn: 0.25 } : {}) })); });
   if (TIGHT) { const was = keep.reduce((a, c) => a + +c.dur, 0), now = segs.reduce((a, s) => a + s.out - s.in, 0), n = segs.filter(s => s.jump).length; console.log(`no dead air: ${n} pause${n === 1 ? '' : 's'} over ${TIGHT} s cut to jumps (${(was - now).toFixed(1)} s shorter)${TIGHTENED.some(x => x.noise) ? `, ${TIGHTENED.filter(x => x.noise).length} with a short noise inside it cut too` : ''}`); }
+  // the two ends of a piece (kit/piece-edges.cjs): the last piece ends with the sentence that holds the closing line
+  // (a word or two said after it is left out), and a piece with quiet before its first word starts on the first frame
+  // the speaker looks at the lens. No word is cut and none starts half said. --keep-ends leaves both as they are.
+  const EDGES = { end: null, starts: [] };
+  if (!flag('keep-ends') && segs.length) {
+    const PE = require('./piece-edges.cjs'), clipFile = c => path.join(clipsDir, path.basename(c.file)), envs = new Map();
+    const envOf = c => { const f = clipFile(c); if (!envs.has(f)) envs.set(f, CP.envelopeSync(f)); return envs.get(f); };
+    const li = segs.length - 1, lc = segClip[li];
+    const te = PE.trimEnd(segs[li], lc.words || [], envOf(lc), +lc.dur);
+    if (te) { segs[li].out = te.out; EDGES.end = { clip: lc.id, was: te.was, out: te.out, left: te.left };
+      console.log(`ending: the last piece ends after "${te.after}", ${(te.was - te.out).toFixed(2)} s sooner ("${te.left}" came after the closing sentence and is left out)`); }
+    const ls = PE.lensStarts({ segs, words: i => segClip[i].words || [], fileOf: i => clipFile(segClip[i]), python: PY, log: l => console.log(l),
+      firstSound: (i, F) => { const e = envOf(segClip[i]); if (!CP.isEnv(e)) return null; const A = CP.activity(e), g = A.gaps.filter(x => x.nOn <= F[0] + 0.15 && x.nOn >= segs[i].in).pop(); return g && Number.isFinite(g.nOn) ? g.nOn : null; } });
+    EDGES.starts = ls.moved.map(m => ({ clip: segClip[m.seg].id, was: m.was, in: m.in, why: m.why }));
+  }
   // big punch on the cut after the hook and the cut into the payoff (with 3+ clips); a jump inside a line keeps the toggle
   const wantPunch = flag('no-punch') ? false : (preset && preset.punch === false ? false : true);
   if (wantPunch && keep.length >= 3) { segs[clipStart[1]].bigPunch = true; segs[clipStart[keep.length - 1]].bigPunch = true; }
   // --recut (Studio's Recreate): your edit re-cut to the recipe's shot plan, on word boundaries, with the reference's
   // framing per shot (kit/shotplan.cjs). The recipe's per-shot settings then go to these shots, not to your clips.
-  let RECUT = null, SCALE = null, REFSHAKES = [], REFSOUNDS = [];
+  // motion strength: how big the reference's camera moves are drawn (kit/shotplan.cjs MOTION)
+  if (opt('motion') && !SHP.motionOf(opt('motion'))) die('--motion must be subtle, medium or strong');
+  const MOTION = SHP.motionOf(opt('motion')) || SHP.motionOf(recipe && recipe.style && recipe.style.motion) || SHP.MOTION_DEFAULT;
+  let RECUT = null, SCALE = null, REFSHAKES = [], REFSOUNDS = [], MATCH = null;
   if (flag('recut') && recipe && recipe.shots.length >= 2) {
     RECUT = RC.recut({ recipe, segs, segClip, clipsDir, manyClips: keep.length >= 3 });
     SCALE = RC.scaleOf(recipe, segs); // the edit's length against the reference's: every scaled time below uses it
+    // each shot reframed to the reference's face size and eye line and graded to its colour (kit/reframe.cjs,
+    // kit/grade-match.cjs); off with --no-reframe / --no-grade-match or the Style lines "reframe: off", "grade-match: off"
+    const off = k => /^(off|no|false|0|none)$/i.test(String((recipe.style || {})[k] || ''));
+    MATCH = RC.matchShots({ recipe, segs, rc: RECUT, build, python: PY, sources: [].concat(cjAll.src || []), reframe: !flag('no-reframe') && !off('reframe'), grade: !flag('no-grade-match') && !off('grade-match') });
+  }
+  // Copy the look: the cuts come from your own pauses at the look's pace, each shot framed from the look's mix and
+  // graded to the look's colour (kit/lookplan.cjs). The look's "recipe" has no shots, so nothing is scaled.
+  let LOOKPLAN = null;
+  if (LOOK) {
+    LOOKPLAN = LK.cut({ look: LOOK, segs, words: i => segClip[i].words || [], quiet: RC.quietFn({ segClip, clipsDir }), seed: name , motion: MOTION });
+    LOOKPLAN.lines.forEach(l => console.log(l));
+    RECUT = LOOKPLAN.rc; SCALE = { len: RC.lengthOf(segs), ref: RC.lengthOf(segs), k: 1 };
+    const shotPlan = RECUT.shotOf.map(k => LOOKPLAN.plan[k] || {});
+    MATCH = RC.matchShots({ segs, rc: RECUT, build, python: PY, sources: [].concat(cjAll.src || []), reframe: !flag('no-reframe'), grade: !flag('no-grade-match'), what: 'the look',
+      faceTargets: shotPlan.map(p => p.face || null), labTargets: shotPlan.map(() => (LOOK.grade && LOOK.grade.target) || null) });
   }
   let t = 0; const seams = [], jumpSeams = new Set();
   segs.forEach((s, i) => { if (i) { seams.push(+t.toFixed(3)); if (s.jump || s.recut) jumpSeams.add(+t.toFixed(3)); } t += s.out - s.in; });
@@ -321,7 +405,7 @@ if (!flag('rebuild')) {
     if (clipSeams.length >= 2) sfx.boom = [[last, 0.55]];
   }
   if (TIGHTENED.length) for (const x of TIGHTENED) console.log(`pause cut: ${x.clip} ${x.at}-${x.resume} s (a ${x.gap} s pause after "${x.after}"; keep it with --keep-pauses ${x.clip}@${x.at})`);
-  const cut = { note: `Drafted by kit/reel.cjs from ${keep.length} keep clips (${clips.length - keep.length} retakes skipped). Edit, then: npm run reel -- --rebuild --name ${name}`, segs, tail: 0.3, punch: wantPunch ? (typeof (preset && preset.punch) === 'number' ? preset.punch : 0.1) : false, hits: [[0.02, 14], ...seams.filter(s => !jumpSeams.has(s)).map(s => [s, 24])], sfx, overlay: 'ovl/%04d.png', ...(TIGHTENED.length ? { tightened: TIGHTENED } : {}) };
+  const cut = { note: `Drafted by kit/reel.cjs from ${keep.length} keep clips (${clips.length - keep.length} retakes skipped). Edit, then: npm run reel -- --rebuild --name ${name}`, segs, tail: 0.3, punch: wantPunch ? (typeof (preset && preset.punch) === 'number' ? preset.punch : 0.1) : false, hits: [[0.02, 14], ...seams.filter(s => !jumpSeams.has(s)).map(s => [s, 24])], sfx, overlay: 'ovl/%04d.png', ...(TIGHTENED.length ? { tightened: TIGHTENED } : {}), ...(EDGES.end || EDGES.starts.length ? { edges: EDGES } : {}) };
   if (TITLES) {
     if (flag('no-mask')) Object.assign(cut, { titles: 'ovlt/%04d.png' });
     else {
@@ -335,9 +419,12 @@ if (!flag('rebuild')) {
   // energy; auto energy reads your pace (kit/rules.cjs scriptEnergy). --bed always wins.
   // --no-bed: no music at all, even when the pack or preset names one (Studio's "No music")
   let bed = flag('no-bed') ? undefined : opt('bed') || (preset && preset.bed) || undefined, energyBed = false;
-  const energyArg = flag('no-bed') ? undefined : opt('music-energy') || (preset && preset.musicEnergy) || (bed === 'auto' ? 'auto' : undefined);
+  // --music-energy auto with a recipe or a style look means "you decide": the recipe's own bed and energy come first
+  // (Studio sends auto whenever nobody picked music, and it used to go over the reference's music)
+  const energyFlag = recipe && opt('music-energy') === 'auto' && (preset && (preset.musicEnergy || (preset.bed && preset.bed !== 'auto'))) ? undefined : opt('music-energy');
+  const energyArg = flag('no-bed') ? undefined : energyFlag || (preset && preset.musicEnergy) || (bed === 'auto' ? 'auto' : undefined);
   if (energyArg && !['auto', ...R.ENERGIES].includes(String(energyArg))) die('--music-energy must be low, mid, high or auto');
-  if (!opt('bed') && energyArg && (bed === 'auto' || !bed || opt('music-energy'))) {
+  if (!opt('bed') && energyArg && (bed === 'auto' || !bed || energyFlag)) {
     const words = []; let off = 0; for (const c of keep) { for (const w of c.words || []) words.push([w[0] + off, w[1] + off]); off += +c.dur; }
     const e = energyArg === 'auto' ? R.scriptEnergy(words) : energyArg; bed = R.pickBed(e, name) || undefined; energyBed = true;
     console.log(`music: ${e} energy${energyArg === 'auto' ? ' (from your pace)' : ''} -> bed ${bed || 'none'} (npm run music lists them by energy)`);
@@ -352,7 +439,8 @@ if (!flag('rebuild')) {
   else if (flag('beat-sync') || bed) cut.beatSync = true;
   if (recipe) {
     // per-shot settings go to the re-cut shots (Recreate), else to each clip (kit/recreate.cjs)
-    const { plan, shakeAt } = RC.applyShotPlan({ recipe, segs, rc: RECUT, clipStart, wantPunch });
+    const { plan, shakeAt } = RC.applyShotPlan({ recipe, segs, rc: RECUT, clipStart, wantPunch, motion: MOTION });
+    if (segs.some(x => x.push != null)) { cut.motion = MOTION; console.log(RC.motionLine(segs, MOTION)); }
     if (RECUT) {
       cut.refShots = RECUT.plan;
       // the reference's sound effects, scaled to your edit, as the kit's sounds (the cap still thins them)
@@ -360,11 +448,12 @@ if (!flag('rebuild')) {
       if (hits.length) { cut.sfx = {}; cut.sfxHits = (cut.sfxHits || []).concat(hits); console.log(`recut: ${hits.length} sound effects from the reference at its times, scaled (${hits.map(h => h.id + '@' + h.t).join(', ')})`); }
     }
     // the reference's handheld or shaking shots: a shake on the cut in, just after the seam (the voice runs on across it)
-    REFSHAKES = RC.refShakes(segs, shakeAt);
+    REFSHAKES = RC.refShakes(segs, LOOKPLAN ? LOOKPLAN.shakeAt : shakeAt);
     if (!RECUT && plan.length !== keep.length) console.log(`recipe: ${plan.length} shots in the recipe, ${keep.length} clips from your takes; per-shot settings applied to the first ${Math.min(plan.length, keep.length)}`);
     if (preset.bedStart != null && opt('bed-start') == null && cut.bed) cut.bedStart = preset.bedStart;
     if (preset.bedVol != null && cut.bed) cut.bedVol = preset.bedVol;
     cut.recipe = recipe.card.name;
+    if (LOOK) { cut.styleLook = LOOK.name; cut.sfx = {}; } // the look's own sounds are placed once the stickers and titles are known
   }
   const finish = opt('finish') || (preset && !preset.finishPool && preset.finish) || undefined;
   if (finish) { try { B.parseFinish(finish); } catch (e) { die(e.message); } cut.finish = finish; }
@@ -392,13 +481,17 @@ if (!flag('rebuild')) {
   if (pack) { cut.pack = pack.name; if (pack.weights) cut.weights = pack.weights; }
   if (preset) cut.packStyle = { transition: preset.transition, entranceOrder: preset.entranceOrder, finishPool: preset.finishPool };
   if (!L.isEmpty(LOCKS)) for (const l of L.applyCut(LOCKS, cut, { weights: pack && pack.weights, repick: !!(pack && pack.weights && pack.weights.transitions), defaultTransition: preset && preset.transition })) console.log(l);
+  // a reframed shot keeps its headroom under every move, and a take already as close as its target is not pushed in
+  // (kit/reframe.cjs): the last word on zoom, after the recipe's or the look's moves and big punches are set
+  if (RF.capMoves) for (const l of RF.capMoves(segs, { big: R.PUNCH.big })) console.log(l);
+  if (GOAL) cut.goal = GOAL;
   if (fs.existsSync(path.join(build, 'cut.json')) && !flag('force')) die('build/cut.json exists. Use --rebuild to render your edits, or --force to redraft.');
   fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
   console.log(`cut.json: ${segs.length} segments, seams ${JSON.stringify(seams)}`);
   // 3. captions from the clips' word times
   const logo = opt('logo');
   if (logo) fs.copyFileSync(path.resolve(logo), path.join(build, path.basename(logo)));
-  sh(process.execPath, [path.join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--force', ...(cut.hits && cut.hits.length === 0 ? ['--no-glitch'] : []), ...(TITLES ? ['--titles'] : look === 'oneword' ? [] : ['--hero']), ...(look === 'oneword' ? ['--cards'] : []), '--style', STYLE, ...(FONTS ? ['--fonts', FONTS] : []), ...(logo ? ['--logo', path.basename(logo)] : []), ...(LOCKS.titleWords ? ['--title-words', LOCKS.titleWords] : [])], build);
+  sh(process.execPath, [path.join(KIT, 'autocaption.mjs'), '--out', 'captions.js', '--force', ...(cut.hits && cut.hits.length === 0 ? ['--no-glitch'] : []), ...(TITLES ? ['--titles'] : look === 'oneword' ? [] : ['--hero']), ...(look === 'oneword' ? ['--cards'] : []), '--style', STYLE, ...(FONTS ? ['--fonts', FONTS] : []), ...(logo ? ['--logo', path.basename(logo)] : []), ...(LOCKS.titleWords ? ['--title-words', LOCKS.titleWords] : []), ...(GOAL ? ['--goal', GOAL] : [])], build);
   // captions and titles in the words you mean: the recipe's Aliases, and numbers Whisper split at the comma ("10 ,000")
   // and the glossary (kit/glossary.cjs): brand words, with their own casing kept under a caps display face
   { const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), n = S.meantFlips(caps.flips) + GL.applyFlips(caps.flips, GLOSS);
@@ -438,6 +531,12 @@ if (!flag('rebuild')) {
     }
     fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
   }
+  // Copy the look: the look's title style on the titles drafted from your words (how many, entrances, layer)
+  if (LOOK && TITLES) {
+    const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), tt = LK.titles(LOOK, caps.flips || [], RC.lengthOf(segs));
+    caps.flips = tt.flips; console.log(tt.line);
+    fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
+  }
   if (cut.titleLayer) {
     const capF = path.join(build, 'captions.js');
     const caps = R.readCaptions(capF);
@@ -456,9 +555,30 @@ if (!flag('rebuild')) {
     for (const [k, [key, vals]] of Object.entries(RM.CAPTION_LOOK)) { const v = opt(k) || (preset && preset[key]); if (v == null) continue; if (!vals.includes(String(v))) die(`--${k} must be ${vals.join(', ')}`); look[key] = String(v); }
     // --capture-sources: capture the recipe's confirmed screen-card sources (public pages) first (kit/capture.mjs)
     if (recipe && flag('capture-sources')) { try { sh(process.execPath, [path.join(KIT, 'capture.mjs'), '--recipe', recipe.file], ROOT); } catch { console.warn('note: some sources were not captured (listed above); their cards use the placeholder'); } }
-    const gfx = recipe ? RM.graphicFlips(recipe) : [];
+    const gfx = recipe && !LOOK ? RM.graphicFlips(recipe) : [];
+    // Copy the look: the look's sticker on your own key words (ordinals, numbers, the words of your --goal, then names
+    // and words you repeat), clear of your titles. Never a generic word: fewer stickers instead.
+    if (LOOK) { const st = LK.stickers(LOOK, S.timeline(segs, build), RC.lengthOf(segs), { busy: (R.readCaptions(path.join(build, 'captions.js')).flips || []).filter(f => f.mode === 7), goal: GOAL, names: GLOSS.flatMap(e => GL.tok(e.say)) }); gfx.push(...st.flips); st.lines.forEach(l => console.log(l)); }
+    // B-roll slots (kit/broll-slots.cjs): where the reference shows B-roll, on your clock. Recreate: its moments
+    // mapped to your words. Copy the look: as many a minute, the same kinds, on your lines that fit. A slot is kept
+    // in the plan whether or not there is a clip for it. Its screen cards are the slots now, so they leave the graphics.
+    const BS = require('./broll-slots.cjs');
+    const refSlots = recipe && !LOOK ? BS.fromRecipe(recipe).map(x => (x.src ? { ...x, src: path.resolve(path.dirname(path.resolve(recipe.file || 'Reel.md')), x.src) } : x)) : [];
+    if (refSlots.length) for (let i = gfx.length - 1; i >= 0; i--) if (gfx[i].mode === 11 && !gfx[i].src && BS.ownsCard(refSlots, gfx[i])) gfx.splice(i, 1);
     // Recreate: the reference's graphics at its times scaled to your edit, like its shots and sounds
     if (RECUT && gfx.length && RC.scaleGraphics(gfx, SCALE)) console.log(`recut: ${gfx.length} graphics from the reference at its times, scaled by ${SCALE.k.toFixed(2)}`);
+    {
+      const words = S.timeline(segs, build), len = RC.lengthOf(segs);
+      BROLL = LOOK ? BS.forLook(LOOK.broll, { len, words, log: console.log }) : BS.forRecreate(refSlots, { k: RECUT && SCALE ? SCALE.k : 1, len, words, refLen: SCALE ? SCALE.ref : null, log: console.log });
+      BROLL = BROLL.filter(x => !x.file || fs.existsSync(x.file) || (console.warn(`b-roll: slot ${x.n}: no file ${x.file}; the slot stays empty`), Object.assign(x, { state: 'needs' }), delete x.file, true));
+      if (BROLL.length) {
+        gfx.push(...BROLL.filter(x => x.kind === 'panel').map(BS.flipOf));
+        const ins = BROLL.filter(x => x.kind !== 'panel').map(BS.insertOf).filter(Boolean);
+        if (ins.length) { cut.inserts = [...(cut.inserts || []).filter(x => x.slot == null), ...ins.map(x => ({ ...x, file: path.relative(build, x.file).split(path.sep).join('/') }))].sort((a, b) => a.at - b.at); fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); }
+        const need = BROLL.filter(x => x.state === 'needs');
+        console.log(`b-roll: ${BROLL.length} slot${BROLL.length === 1 ? '' : 's'} ${LOOK ? 'from the look, on your lines' : RECUT ? "at the reference's moments on your edit" : 'from the recipe'} (${BROLL.map(x => `${x.kind} ${x.start}-${x.end}s`).join(', ')})${need.length ? `; ${need.length} need${need.length === 1 ? 's' : ''} a clip: ${need.map(x => `#${x.n} ${BS.brief(x).what}`).join('; ')}` : ''}`);
+      }
+    }
     // scenes (kit/scenes.cjs): what the menu had no item for, made from the reference (its scenes.json, else the
     // library) or picked from the menu (--scenes). {{text}} shows a word you say then, never the reference's words.
     {
@@ -503,15 +623,21 @@ if (!flag('rebuild')) {
       if (fs.existsSync(fxPy) && segs.length) try { hwMemo = JSON.parse(execFileSync(fxPy, [path.join(KIT, 'teardown.py'), 'headwidth', path.resolve(build, segs[0].file)], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim().split('\n').pop()); } catch {}
       return hwMemo;
     };
-    if (gfx.some(g => g.head)) {
+    // (not when the shots were reframed to the reference's face: the burst's own place and size then fit your head)
+    if (gfx.some(g => g.head) && !(MATCH && MATCH.framing)) {
       const hw = measureHead();
       if (hw && hw.head_w) {
         for (const g of gfx.filter(g => g.head)) { g.size = Math.round(Math.min(720, Math.max(200, g.head * hw.head_w * 1080 / 2))); g.y = +Math.min(0.6, Math.max(0.15, hw.head_cy + (g.headY || 0) * hw.head_w * 1080 / 1920)).toFixed(3); }
         console.log(`burst sized to your head: head ${(hw.head_w * 100).toFixed(0)}% of the frame wide, centre ${(hw.head_cy * 100).toFixed(0)}% down`);
       } else console.log('note: no person mask to measure your head (npm run effects:setup); bursts keep the recipe size');
     }
-    if (pos || col || gfx.length || Object.keys(look).length) {
+    // the look of the reference's titles (Reel.md Style title-lockup, title-key-*, title-partner-*, title-glow, title-dim,
+    // title-entrance; kit/titlelook.py reads them in a teardown): the two-line lockup, its cases and colours, glow and dim
+    const TLOOK = preset && preset.titleLook && Object.keys(preset.titleLook).length ? preset.titleLook : null;
+    if (TLOOK) console.log(`titles: ${TLOOK.titleLockup === 'full' ? 'the key word with its partner line, as the reference' : 'the key word'}${TLOOK.titleGlow ? ', glow ' + TLOOK.titleGlow : ''}${TLOOK.titleDim ? ', picture dimmed by ' + Math.round(TLOOK.titleDim * 100) + '%' : ''}${TLOOK.titleEntrance ? ', entrance ' + TLOOK.titleEntrance + ' where the reference\'s was not read' : ''}`);
+    if (pos || col || gfx.length || Object.keys(look).length || TLOOK) {
       const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF);
+      if (TLOOK) { const { lockup: lkp, ...rest } = TLOOK; Object.assign(caps, rest); if (lkp) caps.lockup = { ...(caps.lockup || {}), ...lkp }; }
       if (pos) caps.captionPosition = String(pos);
       if (col) caps.captionColor = String(col).toLowerCase();
       Object.assign(caps, look);
@@ -525,9 +651,13 @@ if (!flag('rebuild')) {
       if (gfx.length) {
         // the recipe's words never show on your clip: ordinal stickers show the ordinal you say when you say it, app
         // labels stay only if you name the app (kit/spoken.cjs); screen cards keep the recipe's times
-        const len = segs.reduce((a, sg) => a + (sg.out - sg.in), 0), sp = S.fitGraphics(gfx, S.timeline(segs, build), len);
+        const len = segs.reduce((a, sg) => a + (sg.out - sg.in), 0), sp = LOOK ? { gfx, dropped: [] } : S.fitGraphics(gfx, S.timeline(segs, build), len);
         for (const d of sp.dropped) console.log('recipe graphic dropped: ' + d.why);
         const fit = sp.gfx.filter(g => g.start < len - 0.3).map(g => ({ ...g, end: +Math.min(g.end, len).toFixed(3) }));
+        // a sticker moved to the word you say can run into one of your titles: it leaves just before the title comes in
+        { const tt = (caps.flips || []).filter(f => f.mode === 7); for (const g of fit.filter(x => x.mode === 9)) { const t = tt.find(x => x.start > g.start + 0.6 && x.start < g.end + 0.05); if (t) g.end = +(t.start - 0.05).toFixed(3); } }
+        // a sticker placed for the reference's face follows yours where the reframe could not match it (kit/lookplan.cjs)
+        if (MATCH && MATCH.framing && RECUT) { const n = LK.placeOnFace(fit, RECUT.plan); if (n) console.log(`stickers: ${n} moved and sized to where your face is in that shot`); }
         caps.flips = (caps.flips || []).filter(f => !Object.values(RM.GRAPHICS).includes(f.mode)).concat(fit);
         // a sticker behind the head, or a screen card or graphic behind the top of the head, needs the person mask, even with no titles
         if ((fit.some(g => g.mode === 9 && g.layer === 'behind') || R.panelsBehind(caps).length) && !cut.titles) Object.assign(cut, flag('no-mask') ? { titles: 'ovlt/%04d.png' } : { titles: 'ovlt/%04d.png', mask: 'mask.mkv', ...(opt('mask') ? { maskModel: opt('mask') } : {}) });
@@ -540,6 +670,14 @@ if (!flag('rebuild')) {
       if (pos || col || Object.keys(look).length) console.log(`captions: ${pos || 'default band'}${col ? ', ' + String(col).toLowerCase() : ''}${Object.entries(look).map(([k, v]) => `, ${k === 'panelLayer' ? 'screen cards' : k.replace('caption', '').toLowerCase()} ${v}`).join('')}`);
       fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
     }
+  }
+  // Copy the look: the look's sounds at its density, on your stickers, titles and cuts
+  if (LOOK) {
+    const fl = R.readCaptions(path.join(build, 'captions.js')).flips || [];
+    const sx = LK.sounds(LOOK, { stickers: fl.filter(f => f.mode === 9).map(f => f.start + 0.15), titles: fl.filter(f => f.mode === 7).map(f => f.start), cuts: RECUT.cuts.map(c => c.t), len: RC.lengthOf(segs) });
+    console.log(sx.line);
+    REFSOUNDS = sx.hits; cut.sfx = {}; if (sx.hits.length) cut.sfxHits = sx.hits.map(h => ({ id: h.id, t: h.t, look: true })); else delete cut.sfxHits;
+    fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
   }
   // Editorial pass (the magazine preset, or the matching flags and Reel.md lines): colour and chapter cards, the
   // number-pop intro on a list, titles placed around the head, a set entrance order. docs/guide.md "Editing principles built in".
@@ -659,8 +797,16 @@ if (!flag('rebuild')) {
   const accent = recipe && !opt('theme') ? RC.accentFor(preset) : null;
   if (accent) { RC.writeAccent(build, accent); console.log(`theme: ${path.basename(th, '.js')}, accent ${accent} from the reference`); }
   // build/plan.json: what this draft took from the recipe, for other tools (kit/recreate.cjs; docs/reel-md.md)
-  if (recipe) RC.writePlan(build, RC.planOf({ recipe, scale: SCALE, rc: RECUT, cut: JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8')), shakes: REFSHAKES, sounds: REFSOUNDS, flips: R.readCaptions(path.join(build, 'captions.js')).flips || [], theme: path.basename(th, '.js'), accent }));
-  else RC.dropPlan(build);
+  if (recipe) {
+    const cutNow = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8')), capsNow = R.readCaptions(path.join(build, 'captions.js'));
+    const plan0 = RC.planOf({ recipe, scale: SCALE, rc: RECUT, cut: cutNow, shakes: REFSHAKES, sounds: REFSOUNDS, flips: capsNow.flips || [], theme: path.basename(th, '.js'), accent, mode: LOOK ? 'look' : null, look: LOOK ? LOOK.name : null, goal: GOAL, broll: BROLL }); if (GOAL && !plan0.goal) plan0.goal = GOAL; const plan = RC.writePlan(build, plan0);
+    // build/match.json: how close this draft is to what it copies, per part (kit/fidelity.cjs; an estimate from the plan)
+    if (RECUT) {
+      const len = RC.lengthOf(cutNow.segs), target = LOOK ? FID.targetOfLook(LOOK, { len, skipped: RECUT.skipped.length, planned: LOOKPLAN.plan.length }) : FID.targetOfRecipe(recipe, { k: SCALE.k, len, skipped: RECUT.skipped.length });
+      const m = FID.write(build, FID.measure({ mode: plan.mode, plan, cut: cutNow, caps: { ...capsNow, fonts: capsNow.fonts || FONTS || 'theme' }, grade: MATCH && MATCH.grade, target }));
+      console.log(FID.line(m));
+    } else FID.drop(build);
+  } else { RC.dropPlan(build); FID.drop(build); }
   // what was picked, per beat, and why: jobs/<name>/choices.json to edit (kit/choices.cjs)
   try {
     const x = CH.explain(build);
@@ -674,6 +820,11 @@ if (!flag('rebuild')) {
 if (flag('rebuild') && !L.isEmpty(LOCKS)) { try { CH.lockJob(build, LOCKS).forEach(l => console.log(l)); } catch (e) { die('--lock: ' + e.message); } }
 // 5. beat-sync (optional), then render + assemble
 let cut = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8'));
+// --motion on a rebuild: the camera moves already on the pieces are sized again
+if (flag('rebuild') && opt('motion')) {
+  const m = SHP.motionOf(opt('motion')); if (!m) die('--motion must be subtle, medium or strong');
+  if (m !== cut.motion && RC.resizeMoves(cut.segs, m)) { cut.motion = m; RF.capMoves(cut.segs, { big: R.PUNCH.big }).forEach(l => console.log(l)); /* a resized move keeps the head in frame, as on a draft */ fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); console.log(RC.motionLine(cut.segs, m)); }
+}
 if (flag('no-beat-sync')) cut.beatSync = false;
 else if (flag('beat-sync')) cut.beatSync = true;
 if (B.wantBeatSync(cut) && cut.bed) {
@@ -688,6 +839,8 @@ if (B.wantBeatSync(cut) && cut.bed) {
     if (cut.glitch === false && cut.dropHits) { delete cut.dropHits; fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); }
     const nDrop = (cut.dropHits || []).length;
     console.log(`beat-sync: ${grid.tempo_bpm} BPM, ${(grid.beats || []).length} beats, ${nDrop} drop shakes (window ${B.windowOf(cut)}s); speech cuts unchanged`);
+    // every title the beat moved, one line each; "snap": false on a title in captions.js keeps it where you put it
+    B.snapLines(synced.moved).forEach(l => console.log(l));
   }
 } else if (cut.dropHits) {
   delete cut.dropHits;
@@ -707,12 +860,26 @@ if (cut.sfxMap) {
 // name stays in cut.json so a later --rebuild exports again
 { const capF = path.join(build, 'captions.js');
   if (EXPORT && fs.existsSync(capF)) {
-    const caps = R.readCaptions(capF); caps.exportFrame = X.frameOf(EXPORT); fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
+    // the reel itself is laid out for the 9:16 preset named (if any); a 4:5 or 1:1 size gets its own layout later
+    const caps = R.readCaptions(capF); if (EXL.main) caps.exportFrame = X.frameOf(EXL.main); else delete caps.exportFrame; fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
     if (cut.export !== EXPORT) { cut.export = EXPORT; fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); }
-    console.log(`export ${EXPORT}: ${X.get(EXPORT).label}, everything kept inside its safe area`);
+    if (EXL.main) console.log(`export ${EXL.main}: ${X.get(EXL.main).label}, everything kept inside its safe area`);
+    if (EXL.reframed.length) console.log(`also making ${EXL.reframed.map(n => X.get(n).label).join(' and ')}: its own framing and layout, after the reel`);
+  } else if (fs.existsSync(capF)) {
+    // a job from before 1.28.0 that was laid out inside the fixed 4:5 or 1:1 crop: the reel goes back to its own layout
+    const caps = R.readCaptions(capF);
+    if (caps.exportFrame && X.isReframed(caps.exportFrame.name)) { delete caps.exportFrame; fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); }
   } }
+// fast runs (kit/fastrun.cjs): an insert with "run": [files] becomes one clip, cut on the bed's beats or half beats
+// when there is a bed (build/beat-grid.json), and plays as one insert. Made again only when its files or times change.
+if ((cut.inserts || []).some(x => Array.isArray(x.run))) {
+  const FRUN = require('./fastrun.cjs');
+  try { const lines = FRUN.resolve(cut, build, B.wantBeatSync(cut) && cut.bed ? B.loadGrid(build) : null); lines.forEach(l => console.log(l)); fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); }
+  catch (e) { die('fast run: ' + String(e.stderr || e.message).trim().split('\n').slice(-3).join(' ')); }
+}
 // copy lint and title/sound rules: printed, not blocking (npm run check -- <name> and npm run verify fail on errors)
 try { sh(process.execPath, [path.join(KIT, 'check.mjs'), build, '--warn-only'], build); } catch {}
+
 // base.mp4 (the graded picture alone, BASEONLY) is made once per picture: the face zone and the person mask both read it,
 // and a rebuild that only changes captions, titles, sounds or layers reuses it (base.sig: the cut without those keys)
 const LAYER_KEYS = new Set(['overlay', 'titles', 'mask', 'maskModel', 'person', 'panels', 'headMask', 'sfx', 'sfxHits', 'sfxMap', 'sfxCap', 'bed', 'bedStart', 'bedVol', 'bedNoFade', 'bedFadeOut', 'export', 'behindMax', 'maskClear']);
@@ -726,7 +893,7 @@ const ensureBase = () => { const bf = path.join(build, 'base.mp4'), sf = path.jo
 // the captions keep clear of where your face is on screen; they also need the person mask over those spans to put the
 // top of your head over the panel (on by default, --no-mask keeps the head under the panel)
 const SPL = require('./split.cjs');
-const splitIns = () => (cut.inserts || []).filter(s => SPL.SPLIT.includes(s.place) && +s.dur > 0);
+const splitIns = () => (cut.inserts || []).filter(s => !s.skip && SPL.SPLIT.includes(s.place) && +s.dur > 0);
 const fxReady = () => fs.existsSync(path.join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python'));
 function splitZones(fz) {
   const ins = splitIns(); if (!ins.length) return fz.zones;
@@ -750,9 +917,20 @@ if (splitIns().length && !cut.mask && !flag('no-mask') && fxReady()) { cut.mask 
       const fz = JSON.parse(fs.readFileSync(path.join(build, 'facezone.json'), 'utf8')), caps = R.readCaptions(capF);
       caps.faceTrack = { fps: fz.fps, zones: splitZones(fz) };
       if (flag('no-face-safe')) caps.faceSafe = false;
+      // a B-roll panel never sits on your face: it moves down under your chin, smaller when the frame runs out (kit/broll-slots.cjs)
+      { const n = require('./broll-slots.cjs').clearFaces(caps.flips || [], fz); if (n) console.log(`b-roll: ${n} panel${n === 1 ? '' : 's'} moved under your chin`); }
       fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
     } catch (e) { console.warn('note: face zone skipped (' + String(e.message).split('\n')[0] + '); captions are not kept off the face this run'); }
   } }
+// no person mask this run (not set up, or --no-mask): the layout pass must know, so a starburst meant to sit behind the
+// head is kept off the face like any graphic in front (captions.js "personMask": false, kit/overlay.html)
+{ const capF = path.join(build, 'captions.js');
+  if (fs.existsSync(capF)) { const caps = R.readCaptions(capF), noMask = flag('no-mask') || !cut.mask || !fxReady();
+    if ((caps.personMask === false) !== noMask) { if (noMask) caps.personMask = false; else delete caps.personMask; fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); } } }
+// --no-boost is a choice about the look (report 4 item 19): the moments an earlier build marked for the legibility
+// shadow (captions.js "boost") go too, so a rebuild draws every word in the style as picked
+if (flag('no-boost')) { const capF = path.join(build, 'captions.js');
+  if (fs.existsSync(capF)) { const caps = R.readCaptions(capF); if (Array.isArray(caps.boost) && caps.boost.length) { console.log(`legibility: off for this reel, ${caps.boost.length} marked moment${caps.boost.length > 1 ? 's' : ''} cleared`); delete caps.boost; fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n'); } } }
 sh(process.execPath, [path.join(KIT, 'render.mjs'), LEN.toFixed(2)], build);
 // screen cards behind the head render to ovlp/; assemble.cjs needs to know (with the head mask below, else in front)
 { let lj = {}; try { lj = JSON.parse(fs.readFileSync(path.join(build, 'layers.json'), 'utf8')); } catch {}
@@ -843,7 +1021,9 @@ sh(process.execPath, [path.join(KIT, 'assemble.cjs'), out], build, (flag('no-sfx
       if (add.length) {
         caps.boost = have.concat(add).sort((x, y) => x[0] - y[0]);
         fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
-        console.log(`legibility: denser halo on ${add.length} low-contrast moment${add.length > 1 ? 's' : ''} (${add.map(x => x.join('-')).join(', ')} s), drawing again`);
+        // say which words (Studio report 4, item 14: it was reported on every build and never acted on when the style had no shadow)
+        const lowWords = add.map(([x, y]) => { const ws = (caps.flips || []).filter(f => f.mode === 0).flatMap(f => (f.words || []).filter(w => +w[0] < y - 0.25 && +w[1] > x + 0.25).map(w => String(w[2]).replace(/[^\p{L}\p{N}'$%]/gu, ''))).filter(Boolean); return `${x}-${y} s${ws.length ? ' "' + ws.slice(0, 4).join(' ') + '"' : ''}`; });
+        console.log(`legibility: soft shadow added behind ${add.length} low-contrast caption moment${add.length > 1 ? 's' : ''} (${lowWords.join(', ')})${caps.captionShadow === 'none' ? ', though the style has no shadow' : ''}; drawing again`);
         sh(process.execPath, [path.join(KIT, 'render.mjs'), LEN.toFixed(2)], build);
         sh(process.execPath, [path.join(KIT, 'assemble.cjs'), out], build, (flag('no-sfx') || opt('sfx') === 'off') ? { NOSFX: '1' } : {});
         spans = legib();
@@ -851,18 +1031,36 @@ sh(process.execPath, [path.join(KIT, 'assemble.cjs'), out], build, (flag('no-sfx
     }
     if (spans.length) console.warn('note: some caption moments read under 3:1 against the picture (listed above). Move the word, change its colour or pick another shot.');
   } }
-let exported = null;
-if (cut.export && X.get(cut.export)) {
-  exported = X.outName(out, cut.export);
-  if (LEN > X.get(cut.export).maxSec) console.warn(`note: the reel is ${LEN.toFixed(1)} s, longer than ${X.get(cut.export).label} allows (${X.get(cut.export).maxSec} s); the export is trimmed`);
-  execFileSync('ffmpeg', X.ffmpegArgs(cut.export, out, exported, LEN), { stdio: 'inherit' });
-  console.log(`export ${cut.export}: ${exported}`);
-}
 // everything this reel was made from, kept beside it (jobs/<job>/reel-vN.build/), so a later Draft cannot erase it
 // and the reel can be reopened (kit/snapshots.cjs, Studio "Edit this reel", the reopen_reel tool)
 let snapshot = null; try { snapshot = require('./snapshots.cjs').save(job, out); if (snapshot) console.log(`saved the build behind this reel: ${path.relative(job, snapshot)} (reopen: npm run reopen -- ${name} v${v})`); } catch (e) { console.warn('note: could not save the build behind this reel: ' + e.message); }
+// the sizes of this run (cut.json "export", a list): a capped copy for each 9:16 preset, and for 4:5 and 1:1 a version of
+// its own, the frame following your face and everything laid out again inside it (kit/export-frame.cjs)
+let exported = null; const exportsMade = [];
+const EXN = cut.export ? X.parseList(cut.export) : null;
+if (EXN && EXN.names.length) {
+  for (const n of [EXN.main, ...EXN.extra].filter(Boolean)) {
+    const f = X.outName(out, n);
+    if (LEN > X.get(n).maxSec) console.warn(`note: the reel is ${LEN.toFixed(1)} s, longer than ${X.get(n).label} allows (${X.get(n).maxSec} s); the export is trimmed`);
+    const words = (() => { try { return X.wordsOf(R.readCaptions(path.join(build, 'captions.js'))); } catch { return []; } })();
+    execFileSync('ffmpeg', X.ffmpegArgs(n, out, f, LEN, { words }), { stdio: 'inherit' });
+    console.log(`export ${n}: ${f}`);
+    exportsMade.push({ name: n, file: f, size: `${X.get(n).w}x${X.get(n).h}`, label: X.fileInfo(f).use });
+  }
+  if (EXN.reframed.length) {
+    ensureBase();
+    for (const n of EXN.reframed) {
+      try {
+        const r = require('./export-frame.cjs').make({ jobDir: job, src: build, name: n, reel: out, base: path.join(build, 'base.mp4'), masks: build, python: PY, env: (flag('no-sfx') || opt('sfx') === 'off') ? { NOSFX: '1' } : {} });
+        exportsMade.push({ name: n, file: r.file, size: r.size, label: r.label, window: r.window, layout: r.layout, faceHits: r.faceHits, textClashes: r.textClashes });
+      } catch (e) { die(`The reel is done (${out}), but the ${X.get(n).label} version failed: ${String(e.message || e).split('\n')[0]}`); }
+    }
+  }
+  exported = exportsMade.length ? exportsMade[0].file : null;
+}
 let LAY = null; try { LAY = JSON.parse(fs.readFileSync(path.join(build, 'layout.json'), 'utf8')); } catch {}
 const lay = LAY ? { moved: LAY.elements.filter(e => e.action === 'shift').length, hidden: LAY.elements.filter(e => e.action === 'hide').length, safeArea: LAY.elements.filter(e => e.action === 'safe-area').length } : null;
-console.log(`\nReel: ${out}${exported ? '\nExport: ' + exported : ''}\nCheck it: npm run verify -- ${name}${cut.export ? ' --export ' + cut.export : ''} (contact sheet, ffprobe, loudness, mask, overlap${cut.export ? ', safe area' : ''}), watch it, read clips/clips.md for skipped retakes, then edit build/captions.js or build/cut.json and run: npm run reel -- --rebuild --name ${name}`);
+const VEX = EXN && EXN.names.length ? (EXN.main || EXN.names[0]) : null;
+console.log(`\nReel: ${out}${exportsMade.map(x => `\n${x.label}: ${x.file}`).join('')}\nCheck it: npm run verify -- ${name}${VEX ? ' --export ' + VEX : ''} (contact sheet, ffprobe, loudness, mask, overlap${VEX ? ', safe area' : ''}), watch it, read clips/clips.md for skipped retakes, then edit build/captions.js or build/cut.json and run: npm run reel -- --rebuild --name ${name}`);
 try { require('./star.cjs').maybePrompt({ json: JSON_OUT }); } catch {}
-if (JSON_OUT) console.log(JSON.stringify({ ok: true, job: name, dir: job, reel: out, export: exported, exportPreset: cut.export || null, seconds: +LEN.toFixed(2), layout: lay, verify: `npm run verify -- ${name}${cut.export ? ' --export ' + cut.export : ''} --json`, snapshot: snapshot ? path.relative(job, snapshot) : null }));
+if (JSON_OUT) console.log(JSON.stringify({ ok: true, job: name, dir: job, reel: out, export: exported, exportPreset: cut.export || null, exports: exportsMade, seconds: +LEN.toFixed(2), layout: lay, verify: `npm run verify -- ${name}${VEX ? ' --export ' + VEX : ''} --json`, snapshot: snapshot ? path.relative(job, snapshot) : null }));

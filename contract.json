@@ -1,7 +1,7 @@
 {
   "contract": 1,
   "name": "aigent-talking-head",
-  "version": "1.27.3",
+  "version": "1.28.0",
   "summary": "Turn a phone clip into a captioned, styled 9:16 talking-head reel, locally.",
   "skill": "skills/aigent-talking-head/SKILL.md",
   "invoke": "npm run <command> -- <args>  (from the repo root; or node <script> <args>)",
@@ -32,7 +32,7 @@
     "glyphs": ["check", "star", "bolt", "heart", "fire", "play", "bell", "spark", "plus", "lock", "arrow", "rocket", "terminal", "chart", "world", "cpu"],
     "rules": ["fields under spoken must be words you say in the graphic's window (near-homophones and the recipe's Aliases count); a recipe job drops a graphic only when a field under required is not said, and otherwise leaves off just the unsaid field (kit/spoken.cjs)", "while a graphic is up, captions and titles that would sit on it move clear or hide (the layout pass in kit/overlay.html); npm run verify fails on any overlap", "layer behind puts the graphic under the crown mask: only the top of your head goes over it, never your face or chin"],
     "types": [
-      {"id": "ordinal-sticker", "mode": 9, "entrance": "burst-pop", "exit": "fade", "spoken": ["text"], "fields": ["text", "color", "ink", "layer", "x", "y", "size", "head", "head-y"], "summary": "list number sticker: an italic serif word (FIRST, SECOND, NEXT) set on a flat seal in the theme accent; the seal can sit behind your head"},
+      {"id": "ordinal-sticker", "mode": 9, "entrance": "burst-pop", "exit": "fade", "spoken": ["text"], "fields": ["text", "color", "ink", "layer", "x", "y", "size", "shape", "spikes", "head", "head-y"], "summary": "list number sticker: an italic serif word (FIRST, SECOND, NEXT) set on a flat seal in the theme accent; the seal can sit behind your head"},
       {"id": "app-label", "mode": 10, "entrance": "tile-pop", "exit": "fade", "spoken": ["text"], "fields": ["text", "icon", "tile", "x", "y", "size"], "summary": "app or logo label: a top-lit icon tile springs in and a name plate wipes out under it; your icon image, or a monogram of the name"},
       {"id": "screen-card", "mode": 11, "entrance": "card-rise", "exit": "fade", "spoken": [], "fields": ["src", "source", "subject", "border", "in", "w", "y", "cursor", "cam", "cues", "at", "layer"], "summary": "screen card: a dark window card (title bar, address pill, accent rim with a glow), inset in the lower middle, showing your screenshot or screen recording; optional pointer clicks and pan and zoom keyframes on beats you say"},
       {"id": "lower-third", "mode": 12, "entrance": "bar-wipe", "exit": "wipe-back", "spoken": ["text", "sub"], "required": ["text"], "fields": ["text", "sub", "color", "x", "y", "layer"], "summary": "lower third name tag: an accent rule springs up, a name plate wipes out from it and a small line follows on an accent tab"},
@@ -86,6 +86,11 @@
         { "name": "scenes", "type": "string", "default": null, "description": "comma list of scene ids (ref-...) from the scene library (scenes/local/, kit/scenes.cjs): each placed once, spread over the reel, an effect on a cut, a graphic on a word" },
         { "name": "scenes-off", "type": "string", "default": null, "description": "comma list of scene ids (ref-...) to leave out, the recipe's own scenes too (forbidden on the Studio Look step)" },
         { "name": "recut", "type": "boolean", "default": false, "description": "re-cut your edit to the recipe's shot plan: lengths scaled, cuts on word boundaries, the reference framing per shot, its sound effects at scaled times, titles matched by role (Studio Recreate)" },
+        { "name": "no-reframe", "type": "boolean", "default": false, "description": "with recut or style-look: do not crop each shot to the reference's face size and eye line (kit/reframe.cjs); the punch by shot size is used. With the reframe on, a take already as close as the target keeps zoom 1 and the top of the head always stays in frame" },
+        { "name": "no-grade-match", "type": "boolean", "default": false, "description": "with recut or style-look: do not match your take's colour to the reference with a skin-protected 3D LUT (kit/grade-match.cjs); the finish still applies" },
+        { "name": "motion", "type": "string", "default": "medium", "description": "subtle, medium or strong: how big the camera moves from a recipe or a style look are drawn (kit/shotplan.cjs MOTION). A push the teardown measured (the shot key move-size) is scaled so it shows on a talking head: at medium a push is 8 to 16 percent. The recipe Style line motion sets it too. With rebuild the moves on the job are sized again" },
+        { "name": "style-look", "type": "string", "default": null, "description": "Copy the look: a saved style look name (npm run look -- list) or a look.json path. Your own words and timing with the look's framing, grade, captions, titles, stickers, sounds, transitions and music (docs/reel-md.md, Copy the look). Not with recipe. Writes build/plan.json (mode look) and build/match.json" },
+        { "name": "goal", "type": "string", "default": null, "description": "the point of this video in one line (\"Show beginners they can build an app with AI in a weekend\"). Its content words (kit/goalwords.cjs: stopwords out, stemmed) are the big word of a caption or title when you say one, and with style-look they get a sticker after your ordinals and numbers and before any other keyword. Stored as goal in build/plan.json and build/cut.json" },
         { "name": "capture-sources", "type": "boolean", "default": false, "description": "capture the recipe's confirmed screen-card sources first (public pages)" },
         { "name": "theme", "type": "string", "default": "aigent", "description": "a theme in kit/themes/ (aigent, neutral, or your own)" },
         { "name": "look", "type": "enum", "values": ["kinetic", "oneword", "muse", "classic", "one-word"], "values_from": "kit/preset.cjs LOOKS", "default": "kinetic" },
@@ -108,6 +113,7 @@
         { "name": "no-face-zone", "type": "boolean", "default": false, "description": "skip face detection (kit/facezone.py): no face keep-out and no face check" },
         { "name": "no-punch", "type": "boolean", "default": false, "description": "no zoom punch on cuts" },
         { "name": "tighten", "type": "number", "default": "off (0.3 in the magazine preset)", "description": "no dead air: cut every pause inside a line longer than this many seconds to a jump (0.15 to 2)" },
+        { "name": "keep-ends", "type": "boolean", "default": false, "description": "leave the two ends of every piece as cut. Without it the last piece ends with the sentence that holds the closing line (up to 4 words said after it, like a trailing \"Like,\", are left out; the cut goes in the quiet after the sentence) and a piece with 0.2 s or more of quiet before its first word starts on the first frame the speaker looks at the lens (head pose with YuNet, kit/piece-edges.cjs). No word is cut and none starts half said. cut.json edges lists what moved" },
         { "name": "no-tighten", "type": "boolean", "default": false, "description": "keep every pause, even when the preset tightens" },
         { "name": "cleanup", "type": "path", "default": null, "description": "a clean-up file from Studio: spans to cut out of clips, retakes to keep, clips to leave out (kit/studio/review.mjs)" },
         { "name": "cards", "type": "enum", "values": ["auto", "off"], "default": "off (auto in the magazine preset)", "description": "colour cards on short lines to land, numbered chapter cards and a number-pop intro on a counted list" },
@@ -139,15 +145,15 @@
         { "name": "draft", "type": "boolean", "default": false, "description": "stop after captions.js so it can be edited" },
         { "name": "rebuild", "type": "boolean", "default": false, "description": "re-render and re-assemble an edited job (use with --name)" },
         { "name": "force", "type": "boolean", "default": false, "description": "re-clip and redraft over an existing job" },
-        { "name": "export", "type": "enum", "values": ["tiktok", "reels", "shorts", "feed45", "square"], "values_from": "kit/exports.cjs NAMES", "default": null, "description": "lay the reel out for that platform's safe area and also write reel-vN-<name>.mp4 (crop, length and bitrate caps in kit/exports.json); kept in cut.json for later --rebuild runs" },
-        { "name": "json", "type": "boolean", "default": false, "description": "print one JSON result line at the end: { ok, job, dir, reel, export, exportPreset, seconds, layout: { moved, hidden, safeArea }, verify } (or { ok: false, error })" }
+        { "name": "export", "type": "enum", "values": ["tiktok", "reels", "shorts", "feed45", "square"], "values_from": "kit/exports.cjs NAMES", "default": null, "description": "lay the reel out for that platform's safe area and also write reel-vN-<name>.mp4 (length and bitrate caps in kit/exports.json); several with commas (reels,feed45,square) make every size in one run. feed45 and square are versions of their own, reel-vN-feed-4x5.mp4 (1080x1350, the Instagram Feed) and reel-vN-square-1x1.mp4: the frame follows the face and the layout is made again inside it (kit/export-frame.cjs). Kept in cut.json for later --rebuild runs" },
+        { "name": "json", "type": "boolean", "default": false, "description": "print one JSON result line at the end: { ok, job, dir, reel, export, exportPreset, exports: [{ name, file, size, label }], seconds, layout: { moved, hidden, safeArea }, verify } (or { ok: false, error })" }
       ],
       "outputs": [
         "jobs/<name>/clips/clips.json and clips.md (best take per sentence, retakes flagged)",
         "jobs/<name>/build/cut.json, captions.js, theme.js and overlay frames",
         "jobs/<name>/build/plan.json with --recipe: what the draft took from the recipe (shots, transitions, moves, shakes, sounds, scenes, theme, accent; docs/reel-md.md)",
         "jobs/<name>/reel-vN.mp4 (a new number each run; earlier versions are kept)",
-        "jobs/<name>/reel-vN-<export>.mp4 with --export",
+        "jobs/<name>/reel-vN-<export>.mp4 with --export (reel-vN-feed-4x5.mp4 for feed45, reel-vN-square-1x1.mp4 for square, each with its own build in jobs/<name>/build-<export>/)",
         "jobs/<name>/build/layout.json: what the layout pass moved clear of a graphic, hid while one was up, or placed inside the export's safe area",
         "jobs/<name>/choices.json: every pick per beat (transition, finish, punch, title entrance, place, layer, graphics, music, sound) with its reason, to edit and apply with npm run choices"
       ],
@@ -186,7 +192,7 @@
     {
       "name": "export",
       "script": "kit/export.mjs",
-      "summary": "Export a finished reel for one platform: 9:16, 4:5 or 1:1, with its length cap, bitrate cap and faststart.",
+      "summary": "Export a finished reel for one platform: 9:16 with its length cap, bitrate cap and faststart, or its own 4:5 (Instagram Feed) or 1:1 version, the frame following the face and the layout made again inside it.",
       "positional": [
         { "name": "job", "type": "string", "required": true, "description": "job name in jobs/ (or a job folder)" }
       ],
@@ -194,9 +200,10 @@
         { "name": "export", "type": "enum", "values": ["tiktok", "reels", "shorts", "feed45", "square"], "values_from": "kit/exports.cjs NAMES", "default": null, "description": "the platform preset (kit/exports.json)" },
         { "name": "file", "type": "path", "default": "newest reel-vN.mp4 in the job", "description": "the reel to export" },
         { "name": "jobs", "type": "path", "default": "jobs/", "description": "jobs folder" },
+        { "name": "crop", "type": "boolean", "default": false, "description": "feed45 and square only: the plain crop from the middle of the reel instead of the face-tracked version" },
         { "name": "json", "type": "boolean", "default": false, "description": "print one JSON result line at the end" }
       ],
-      "outputs": ["jobs/<job>/reel-vN-<export>.mp4"],
+      "outputs": ["jobs/<job>/reel-vN-<export>.mp4 (reel-vN-feed-4x5.mp4, reel-vN-square-1x1.mp4)", "jobs/<job>/build-<export>/ for feed45 and square: the build of that version, with window.json (where the frame sits) and its own layout.json and facecheck.json"],
       "success": "prints the export path and the verify command",
       "failures": ["No reel-vN.mp4 in <job>", "--export must be ...", "a note when the reel was not laid out for that export (rebuild with --export)"]
     },
@@ -357,6 +364,22 @@
       "failures": ["No pack <name>", "ffmpeg or Chrome errors"]
     },
     {
+      "name": "look",
+      "script": "kit/stylelook.cjs",
+      "summary": "Style looks (Copy the look): save a reference teardown's style as a named, reusable look (looks/local/<name>/look.json), list, show or remove them. Use one with npm run reel -- --style-look <name>.",
+      "subcommands": [
+        { "name": "save", "positional": [{"name": "teardown", "type": "path", "required": true, "description": "a teardown folder (npm run teardown) or its Reel.md"}], "outputs": ["looks/local/<name>/look.json and a summary of each part"] },
+        { "name": "list", "positional": [], "outputs": ["the saved looks with a line per part (default when no subcommand)"] },
+        { "name": "show", "positional": [{"name": "look", "type": "string", "required": true, "description": "a saved look name or a look.json path"}], "outputs": ["the look, summarised (or the file with --json)"] },
+        { "name": "remove", "positional": [{"name": "look", "type": "string", "required": true}], "outputs": ["removes looks/local/<name>/"] }
+      ],
+      "flags": [
+        { "name": "name", "type": "string", "default": null, "description": "save: the look's name (lowercase letters, digits, hyphens); default is the teardown's name" },
+        { "name": "json", "type": "boolean", "default": false, "description": "list and show: print JSON" }
+      ],
+      "env": ["LOOKS_DIR"]
+    },
+    {
       "name": "choices",
       "script": "kit/choices.cjs",
       "summary": "See every pick in a drafted job per beat with its reason (locked, pack, recipe, you, kit default), edit jobs/<job>/choices.json and apply it, or pin locks on the job; then npm run reel -- --rebuild.",
@@ -376,7 +399,7 @@
     {
       "name": "studio",
       "script": "kit/studio/server.mjs",
-      "summary": "Studio: a local web page over the kit (footage, a reference to influence or recreate, the effects menu by category, packs, music and pace, chat, the choices table, draft, render and download). Binds to 127.0.0.1 only. docs/studio.md.",
+      "summary": "Studio: a local web page over the kit (footage, a reference to influence, recreate or copy the look of, the effects menu by category, packs, music and pace, chat, the choices table, draft, render and download). Binds to 127.0.0.1 only. docs/studio.md.",
       "positional": [],
       "flags": [
         {

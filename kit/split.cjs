@@ -6,13 +6,18 @@
 //   "frame" Framed: two rounded cards on a soft backdrop. The b-roll in a wide card up top, you smaller in a card below,
 //           with your head breaking out over its top edge (the person mask again). A thin accent border and a soft glow.
 // Your face is found per moment by kit/facezone.py (build/facezone.json); "faceY" (0..1) is the fallback.
+// A 4:5 or 1:1 version of the reel (kit/export-frame.cjs) passes its frame, { y0, h } on the 1080x1920 canvas: the
+// split then halves that frame and the framed cards are fitted into it.
 // Insert keys: "overlap" (px the head reaches into the split panel, default 72), "frameColor" (border and glow,
-// default #3d8bff), "frameBg" ([top, bottom] backdrop colours, default cream to lavender).
+// default #3d8bff), "frameBg" ([top, bottom] backdrop colours, default cream to lavender), "fit" on a "top" insert:
+// "cover" (the clip fills the panel, its sides cropped) or "whole" (the whole clip sharp, flush on the seam, over a
+// blurred copy of itself, so your head rises in front of it). A wide clip (16:9, a website) is shown whole by default.
 const W = 1080, H = 1920;
 const PLACES = ['full', 'top', 'pip', 'frame'];
 const SPLIT = ['top', 'frame'];
 const FRAME = { top: { x: 54, y: 72, w: 972, h: 760, r: 40 }, card: { x: 96, y: 1110, w: 888, h: 740, r: 40 }, scale: 0.9, breakout: 60, border: 4, capY: 912 };
 const DEF_COLOR = '#3d8bff', DEF_BG = ['#f4ede3', '#e7e2f3'];
+const SHADOW_H = 36;
 const even = n => Math.round(n / 2) * 2;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const median = a => { if (!a.length) return null; const s = [...a].sort((p, q) => p - q); return s[Math.floor(s.length / 2)]; };
@@ -28,24 +33,45 @@ function faceOver(fz, at, dur) {
 
 // geometry for one insert: where the b-roll goes, how your picture is scaled (s) and moved (dx, dy), the head band
 // drawn over the panel or card edge (output rows y0..y1) and the caption line for the span
-function layout(ins, face, { mask = true } = {}) {
+function layout(ins, face, { mask = true, frame = null } = {}) {
   const place = SPLIT.includes(ins && ins.place) ? ins.place : null;
   if (!place) return null;
-  const crown = face && face.crown != null ? face.crown : (ins.faceY != null ? +ins.faceY : 0.4) * H - 330;
+  // the frame the layout fills: the whole reel, or the 4:5 or 1:1 window on it
+  const fy = frame ? +frame.y0 || 0 : 0, fh = frame ? +frame.h || H : H, k = fh / H;
+  const crown = face && face.crown != null ? face.crown : fy + (ins.faceY != null ? +ins.faceY : 0.4) * fh - 330 * k;
   if (place === 'top') {
-    const over = mask ? clamp(ins.overlap != null ? +ins.overlap : 72, 0, 200) : -28;
+    // the head band runs past the seam by the shadow's height, so the shadow falls on the room behind you and never
+    // draws a line across your head (report 4 item 18)
+    const over = mask ? clamp(ins.overlap != null ? +ins.overlap : 72, 0, 200) : -28, half = even(fh / 2), seam = fy + half;
     // the old split (face centred in the bottom half) when there is no face track and no faceY
-    const dy = Math.round(clamp(face || ins.faceY != null ? H / 2 - over - crown : H / 2 - ((ins.faceY != null ? +ins.faceY : 0.4) * H - H / 4), 0, H / 2));
-    return { place, panel: { x: 0, y: 0, w: W, h: H / 2 }, s: 1, dx: 0, dy, band: mask && over > 0 ? { y0: Math.max(0, H / 2 - over - 150), y1: H / 2 } : null, capY: Math.round(H / 2 - Math.max(over, 0) - 110), mask };
+    const dy = Math.round(clamp(face || ins.faceY != null ? seam - over - crown : half - ((ins.faceY != null ? +ins.faceY : 0.4) * fh - fh / 4), 0, half));
+    return { place, panel: { x: 0, y: fy, w: W, h: half }, seam, s: 1, dx: 0, dy, band: mask && over > 0 ? { y0: Math.max(fy, seam - over - 150), y1: Math.min(fy + fh, seam + SHADOW_H + 4) } : null, capY: Math.round(seam - Math.max(over, 0) - 110), mask };
   }
-  const F = FRAME, s = F.scale, sw = even(W * s), sh = even(H * s), c = F.card;
+  const fit = r => (frame ? { ...r, y: Math.round(fy + r.y * k), h: even(r.h * k) } : r);
+  const F = { ...FRAME, top: fit(FRAME.top), card: fit(FRAME.card), capY: Math.round(fy + FRAME.capY * k) }, s = F.scale, sw = even(W * s), sh = even(H * s), c = F.card;
   const cx = face && face.cx != null ? face.cx : W / 2;
   const dx = Math.round(clamp(W / 2 - cx * s, c.x + c.w - sw, c.x));
   const want = mask ? c.y - F.breakout : c.y + 36;
-  const dy = Math.round(clamp(want - crown * s, c.y + c.h - sh, c.y));
-  return { place, panel: { ...F.top }, card: { ...c }, s, sw, sh, dx, dy, band: mask ? { y0: Math.max(0, c.y - F.breakout - 190), y1: c.y + F.border + 2 } : null, capY: F.capY,
+  // your picture has to cover the card: all of it on the reel, only the window's rows on a 4:5 or 1:1 version
+  const dy = Math.round(clamp(want - crown * s, c.y + c.h - (fy + fh) * s, c.y - fy * s));
+  return { place, panel: { ...F.top }, card: { ...c }, s, sw, sh, dx, dy, band: mask ? { y0: Math.max(fy, c.y - F.breakout - 190), y1: c.y + F.border + 2 } : null, capY: F.capY,
     color: /^#[0-9a-f]{6}$/i.test(ins.frameColor || '') ? ins.frameColor : DEF_COLOR,
     bg: Array.isArray(ins.frameBg) && ins.frameBg.every(x => /^#[0-9a-f]{6}$/i.test(x)) ? ins.frameBg.slice(0, 2) : DEF_BG, mask };
+}
+
+// how a clip fills the split panel (report 4 item 21): the insert's own "fit" wins; else a wide clip (16:9 and wider,
+// such as a website) is shown whole and anything squarer covers. dims is the clip's { w, h }; unknown means cover.
+const WIDE = 1.6;
+function fitOf(ins, dims) {
+  const ok = dims && dims.w > 0 && dims.h > 0;
+  if (ins && ins.fit === 'cover') return 'cover';
+  if (ins && ins.fit === 'whole') return ok ? 'whole' : 'cover';
+  return ok && dims.w / dims.h >= WIDE ? 'whole' : 'cover';
+}
+// where the whole clip sits in a panel pw x ph: as large as fits, centred, its lower edge on the seam
+function wholeBox(pw, ph, dims) {
+  const k = Math.min(pw / dims.w, ph / dims.h), w = Math.min(pw, even(dims.w * k)), h = Math.min(ph, even(dims.h * k));
+  return { x: Math.round((pw - w) / 2), y: ph - h, w, h };
 }
 
 // a face zone [x0, y0, x1, y1, crownY] in your picture to where it sits in the layout
@@ -77,4 +103,4 @@ function lightBg(ins) {
 // a soft shadow under the split panel's lower edge (1080x36 RGBA), drawn under your head
 const shadowGeq = () => `geq=r=0:g=0:b=0:a='110*pow(1-Y/H,2)'`;
 
-module.exports = { PLACES, SPLIT, FRAME, faceOver, layout, mapZone, chromeGeq, shadowGeq, lightBg };
+module.exports = { PLACES, SPLIT, FRAME, SHADOW_H, WIDE, fitOf, wholeBox, faceOver, layout, mapZone, chromeGeq, shadowGeq, lightBg };

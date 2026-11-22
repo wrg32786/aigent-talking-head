@@ -7,7 +7,7 @@ export const GOALS = {
   clean: { label: 'Full clean take', sub: 'Everything, retakes and fillers out', out: { format: 'long', kind: 'full', length: 'long', goal: 'organic' } },
 };
 export const WIZARDS = {
-  reel: { title: 'Make a reel from a long take', sub: 'Pick the goal and a Look; AI picks the lines; you check it in Finish.' },
+  reel: { title: 'Make a reel from a long take', sub: 'Pick the goal and a Look; AI picks the lines; you check it in Review.' },
   reference: { title: 'Copy a reference', sub: 'Paste a reel you like; Studio borrows its look.' },
   clips: { title: 'Clips and ads from one take', sub: 'Several short clips, plus ad cuts if you sell.' },
 };

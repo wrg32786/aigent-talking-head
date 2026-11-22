@@ -22,6 +22,10 @@
 //   "beatSync": true                     snap punches, SFX, title entrances and fx hits to the bed's beat grid
 //                                        (default on when a bed is set; --no-beat-sync / false to leave times alone)
 //   "beatWindow": 0.12                   max snap distance in seconds; speech cuts never move
+//   "frame": { "name": "feed45", "h": 1350, "y0": 285, "expr": "..." }   a 4:5 or 1:1 version (kit/export-frame.cjs, with
+//                                        BASE): the picture and its masks slide up and down so the face-tracked window
+//                                        (kit/facewindow.cjs, expr) always lands on rows y0..y0+h; full b-roll is fitted
+//                                        to that frame and the split layouts halve it. The caller crops the frame out.
 //   "finish": "grain"                    optional film look on the picture (before titles): grain, vignette, chroma,
 //                                        scan-lines, warm, cool, teal, crushed, mono, bleach. A list or {grain:0.4}
 //                                        also works. Per segment: "finish" on a seg. No LUT or light-leak files.
@@ -30,7 +34,9 @@
 // and the cut into the payoff), "punchDelay": 0.08 (start the punch this many seconds into the segment, set by beat-sync),
 // "zoom": 1.15 (fixed zoom for this segment, overrides the toggle), "push": 0.07 (a slow push-in over the segment, minus
 // for a pull-out; the reference's camera move), "punchY": 0.4
-// (zoom centre, 0 top .. 1 bottom), "transition": "crossfade" (named transition INTO this segment, see
+// (zoom centre, 0 top .. 1 bottom), "punchX": 0.5 (zoom centre, 0 left .. 1 right; kit/reframe.cjs sets zoom, punchX and
+// punchY to match a reference's face size and eye line), "lut": "grade-shot-01.cube" (a 3D LUT on this segment, the
+// base grade matched to a reference by kit/grade-match.cjs; finishes still go on top), "transition": "crossfade" (named transition INTO this segment, see
 // kit/transitions.json; default is the hard cut with the glitch seam) and "transitionDur": 0.3.
 // sfx keys: whoosh, swipe, boom, click, typing (the locked set in kit/rules.cjs), plus the legacy F and D. Each entry is a
 // time or [time, gain]. "sfxHits": [{ "id": "01-cinematic-hit-a", "t": 4.2 }] places a pack sound (kit/sfx/sfx.json) so
@@ -48,6 +54,8 @@ const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const C = JSON.parse(fs.readFileSync('cut.json', 'utf8'));
+// an insert with no file to play is left out: a fast run whose files are missing (kit/fastrun.cjs marks it "skip")
+if (C.inserts) C.inserts = C.inserts.filter(s => s && s.file && !s.skip);
 const out = process.argv[2] || 'out.mp4';
 const KIT = __dirname;
 const R = require('./rules.cjs');
@@ -67,9 +75,14 @@ const TL = R.timeline(C);
 const trans = segs.map((s, i) => { if (!i || !s.transition) return null; const m = R.xfadeMode(s.transition); if (m === undefined) { console.error(`unknown transition "${s.transition}" on seg ${i} (see kit/transitions.json)`); process.exit(1); } return m ? { m, d: +(s.transitionDur || 0.3) } : null; });
 const segLen = s => (s.out - s.in) + (s.pad || 0);
 const LEN = +(segs.reduce((a, s) => a + segLen(s), 0) + tail).toFixed(3);
+const clipDims = f => { try { const [w, h] = execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=p=0:s=x', f]).toString().trim().split('\n')[0].split('x').map(Number); return w > 0 && h > 0 ? { w, h } : null; } catch { return null; } };
 const hasAudio = f => { try { return execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'a', '-show_entries', 'stream=index', '-of', 'csv=p=0', f]).toString().trim() !== ''; } catch { return false; } };
 
 const BASE = process.env.BASE, BASEONLY = !!process.env.BASEONLY;
+// a 4:5 or 1:1 version: slide the picture (and every mask of it) so the window sits at FR.y0, black (or clear) outside
+const FR = C.frame && +C.frame.h > 0 && +C.frame.h < 1920 && C.frame.expr ? { h: Math.round(+C.frame.h), y0: Math.round(+C.frame.y0 || 0), expr: String(C.frame.expr).replace(/'/g, ''), top: +((C.frame.safe || {}).top || 0) } : null;
+if (FR && !BASE && !BASEONLY) { console.error('cut.json "frame" needs BASE=<the picture> (kit/export-frame.cjs sets it)'); process.exit(1); }
+const slide = clear => (FR && !BASEONLY ? `,crop=1080:${FR.h}:0:'${FR.expr}':exact=1,pad=1080:1920:0:${FR.y0}:color=${clear ? 'black@0' : 'black'}` : '');
 const args = ['-v', 'error', '-y'];
 const f = [];
 let idx = 0;
@@ -86,29 +99,34 @@ segs.forEach((s, i) => {
   const fadeIn = i === 0 ? (s.fadeIn ?? 0.25) : 0;
   // zoom punch: a fixed punch-in is a plain scale + crop; a big punch eases in 12% more over 0.3 s with zoompan.
   // punchDelay (from beat-sync) starts that move on a nearby beat, never before this segment (speech cuts stay put).
-  const z = zoomOf(s, i), py = s.punchY ?? R.PUNCH.y;
+  const z = zoomOf(s, i), py = s.punchY ?? R.PUNCH.y, px = s.punchX ?? 0.5;
   const delayN = Math.max(0, Math.round((+s.punchDelay || 0) * 24));
   let zf = '';
   if (s.push && !s.bigPunch) {
     // a camera move from the reference (Reel.md shot "move"): the zoom eases from z to z*(1+push) over the segment
     // (a minus push starts closer and pulls out)
     const p = +s.push, N = Math.max(1, Math.round((s.out - s.in) * 24)), za = p > 0 ? z : z * (1 - p), zb = p > 0 ? z * (1 + p) : z;
-    zf = `,scale=2160:3840,zoompan=z='${za.toFixed(4)}+${(zb - za).toFixed(4)}*min(on/${N},1)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*${py}':d=1:s=1080x1920:fps=24,setsar=1`;
+    zf = `,scale=2160:3840,zoompan=z='${za.toFixed(4)}+${(zb - za).toFixed(4)}*min(on/${N},1)':x='(iw-iw/zoom)*${px}':y='(ih-ih/zoom)*${py}':d=1:s=1080x1920:fps=24,setsar=1`;
   } else if (s.bigPunch) {
     const z1 = z * (1 + R.PUNCH.big), n = Math.round(R.PUNCH.bigDur * 24);
-    zf = `,scale=2160:3840,zoompan=z='${z}+${(z1 - z).toFixed(4)}*(1-pow(1-min(max(on-${delayN},0)/${n},1),3))':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*${py}':d=1:s=1080x1920:fps=24,setsar=1`;
+    zf = `,scale=2160:3840,zoompan=z='${z}+${(z1 - z).toFixed(4)}*(1-pow(1-min(max(on-${delayN},0)/${n},1),3))':x='(iw-iw/zoom)*${px}':y='(ih-ih/zoom)*${py}':d=1:s=1080x1920:fps=24,setsar=1`;
   } else if (z > 1.0001 && delayN > 0) {
     const nEase = 3;
-    zf = `,scale=2160:3840,zoompan=z='1+${(z - 1).toFixed(4)}*(1-pow(1-min(max(on-${delayN},0)/${nEase},1),3))':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*${py}':d=1:s=1080x1920:fps=24,setsar=1`;
+    zf = `,scale=2160:3840,zoompan=z='1+${(z - 1).toFixed(4)}*(1-pow(1-min(max(on-${delayN},0)/${nEase},1),3))':x='(iw-iw/zoom)*${px}':y='(ih-ih/zoom)*${py}':d=1:s=1080x1920:fps=24,setsar=1`;
   } else if (z > 1.0001) {
     const w = Math.round(1080 * z / 2) * 2, h = Math.round(1920 * z / 2) * 2;
-    zf = `,scale=${w}:${h},crop=1080:1920:(iw-ow)/2:(ih-oh)*${py},setsar=1`;
+    // a reframed shot (kit/reframe.cjs) zooms far closer than a punch: crop first, then scale, so the frame is never
+    // blown up to several times 1080x1920 in memory. The same picture as scale then crop.
+    const cw = Math.round(1080 / z / 2) * 2, ch = Math.round(1920 / z / 2) * 2;
+    zf = s.reframed || z > 1.4 ? `,crop=${cw}:${ch}:(iw-ow)*${px}:(ih-oh)*${py},scale=1080:1920:flags=lanczos,setsar=1` : `,scale=${w}:${h},crop=1080:1920:(iw-ow)*${px}:(ih-oh)*${py},setsar=1`;
   }
   // hold the last frame so every segment's picture is exactly out-in long (phone clips often end a frame short of
   // their audio, which left gaps and a variable frame rate after concat)
   const exact = `,tpad=stop_mode=clone:stop_duration=0.25,trim=duration=${(s.out - s.in).toFixed(4)}`;
   const segFinish = s.finish ? `,${B.finishChain(s.finish)}` : '';
-  if (!BASE) f.push(`[${n}:v]trim=${s.in}:${s.out},${V}${exact},${fit}${zf}${segFinish}${fadeIn ? `,fade=t=in:st=0:d=${fadeIn}` : ''}${tp.length ? `,tpad=${tp.join(':')}` : ''}[v${i}]`);
+  // the matched base grade (kit/grade-match.cjs): a 3D LUT on this segment, under any finish
+  const lut = s.lut && fs.existsSync(s.lut) ? `,lut3d=file='${String(s.lut).replace(/\\/g, '/').replace(/'/g, '')}':interp=tetrahedral` : '';
+  if (!BASE) f.push(`[${n}:v]trim=${s.in}:${s.out},${V}${exact},${fit}${lut}${zf}${segFinish}${fadeIn ? `,fade=t=in:st=0:d=${fadeIn}` : ''}${tp.length ? `,tpad=${tp.join(':')}` : ''}[v${i}]`);
   const d = s.out - s.in;
   const delay = s.pad ? `,adelay=${Math.round(s.pad * 1000)}|${Math.round(s.pad * 1000)}` : '';
   const apad = last && tail ? `,apad=pad_dur=${tail}` : '';
@@ -121,7 +139,7 @@ segs.forEach((s, i) => {
 if (BASE) {
   f.push(`${segs.map((_, i) => `[a${i}]`).join('')}concat=n=${segs.length}:v=0:a=1[ca]`);
   const b = inp('-i', BASE);
-  f.push(`[${b}:v]${V},scale=1080:1920,setsar=1,tpad=stop_duration=1:stop_mode=clone[g]`);
+  f.push(`[${b}:v]${V},scale=1080:1920,setsar=1${slide()},tpad=stop_duration=1:stop_mode=clone[g]`);
 } else {
   if (trans.some(Boolean)) {
     // named transitions: the outgoing shot holds its last frame for the blend, so every segment still starts on the
@@ -152,6 +170,7 @@ if (BASEONLY) {
 // split and framed b-roll (kit/split.cjs) draw the top of your head over the panel: your picture cut out by the person
 // mask, so it needs the graded picture once more before the titles go on
 const SPL = require('./split.cjs');
+const FRUN = require('./fastrun.cjs');
 const splitIns = (C.inserts || []).filter(s => SPL.SPLIT.includes(s.place));
 const pmSpec = splitIns.length ? R.maskSpec(C) : {};
 const pmPerson = pmSpec.person && fs.existsSync(pmSpec.person) ? pmSpec.person : null, pmMask = pmSpec.file && fs.existsSync(pmSpec.file) ? pmSpec.file : null;
@@ -177,12 +196,12 @@ if (C.titles) {
   if (personFile) {
     const p = inp('-i', personFile);
     f.push(`[${pic}][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gt]`,
-      `[${p}:v]format=bgra,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS[pr]`,
+      `[${p}:v]format=bgra,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS${slide(true)}[pr]`,
       `[gt][pr]overlay=format=auto:eof_action=pass[gm]`);
     vcur = 'gm';
   } else if (maskFile) {
     const m = inp('-i', maskFile);
-    f.push(`[${pic}]split[gb][gp]`, `[gb][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gt]`, `[${m}:v]format=gray,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS[mk]`,
+    f.push(`[${pic}]split[gb][gp]`, `[gb][${t}:v]overlay=format=auto:eof_action=pass${offEn}[gt]`, `[${m}:v]format=gray,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS${slide()}[mk]`,
       `[gp][mk]alphamerge[person]`, `[gt][person]overlay=format=auto:eof_action=pass[gm]`);
     vcur = 'gm';
   } else {
@@ -196,7 +215,7 @@ if (panelsOn) {
   f.push(`[${vcur}][${pp}:v]overlay=format=auto:eof_action=pass${offEn}[gpn]`); vcur = 'gpn';
   if (headFile) {
     const hm = inp('-i', headFile);
-    f.push(`[${hm}:v]format=gray,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS[hmk]`, `[gh][hmk]alphamerge[head]`, `[${vcur}][head]overlay=format=auto:eof_action=pass[gph]`);
+    f.push(`[${hm}:v]format=gray,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS${slide()}[hmk]`, `[gh][hmk]alphamerge[head]`, `[${vcur}][head]overlay=format=auto:eof_action=pass[gph]`);
     vcur = 'gph';
   }
 }
@@ -206,9 +225,14 @@ if (panelsOn) {
 // and white. Captions in the oneword look move up into the insert's open space ("y", default 640) and can take a
 // "tint" to match its light.
 // "place" (Studio's b-roll lane, kit/studio/broll-run.mjs): "full" (the default, as above), "top" (split: the insert fills the top half and you
-// fill the bottom half, your head over the panel's lower edge, see below), "frame" (framed cards, below) or "pip" (a 16:9 box "pipW" wide,
+// fill the bottom half, your head over the panel's lower edge, see below; "fit": "cover" or "whole", a wide clip is shown whole over its own blur), "frame" (framed cards, below) or "pip" (a 16:9 box "pipW" wide,
 // default 460, with a thin white edge, top right; "pipX" and "pipY" move it). A still picture ("image": true, or a
 // .jpg, .png or .webp file) holds for the span with a slow push in.
+// "fit": "whole" shows the clip whole, sharp over its own blurred copy; "fill" crops it to fill. Left out, a clip in the
+// framed panel is whole when filling would crop more than a fifth of it away, and fills otherwise; the split panel has
+// its own rule (kit/split.cjs fitOf: whole for a clip 16:10 or wider).
+// "run": ["a.png", "b.mp4", ...] is a fast run (kit/fastrun.cjs): kit/reel.cjs makes one clip of them, cut on the
+// bed's beats or half beats ("step": "beat" | "half" | seconds), and it plays here as one insert.
 // "place": "frame" (Framed, kit/split.cjs): the b-roll in a rounded card up top and you smaller in a card below, your head
 // over its top edge, on a soft backdrop. "top" now moves you so the top of your head reaches a little into the panel
 // and draws it over the panel with the person mask (the panel sits behind your head); without the mask, the head
@@ -216,8 +240,8 @@ if (panelsOn) {
 let FZ = null; try { FZ = JSON.parse(fs.readFileSync('facezone.json', 'utf8')); } catch {}
 const bands = [];
 if (splitIns.length && splitMask) {
-  if (pmPerson) { const pi = inp('-i', pmPerson); f.push(`[${pi}:v]format=bgra,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS[pq0]`); }
-  else { const mi = inp('-i', pmMask); f.push(`[${mi}:v]format=gray,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS[mq]`, '[gq][mq]alphamerge[pq0]'); }
+  if (pmPerson) { const pi = inp('-i', pmPerson); f.push(`[${pi}:v]format=bgra,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS${slide(true)}[pq0]`); }
+  else { const mi = inp('-i', pmMask); f.push(`[${mi}:v]format=gray,scale=1080:1920,setsar=1,fps=24,setpts=PTS-STARTPTS${slide()}[mq]`, '[gq][mq]alphamerge[pq0]'); }
   if (splitIns.length === 1) bands.push('pq0'); else { const ls = splitIns.map((_, j) => `pq${j + 1}`); f.push(`[pq0]split=${ls.length}${ls.map(l => `[${l}]`).join('')}`); bands.push(...ls); }
 } else if (splitIns.length && !process.env.MASK_WARNED) console.warn('note: no person mask for the split b-roll; your head stays under the panel instead of over it (kit/mask.py)');
 const chromeFile = g => {
@@ -228,15 +252,60 @@ const chromeFile = g => {
 (C.inserts || []).forEach((s, k) => {
   const a0 = +s.at, d = +s.dur, i0 = +(s.in || 0), place = SPL.PLACES.includes(s.place) ? s.place : 'full';
   const still = s.image === true || /\.(jpe?g|png|webp)$/i.test(String(s.file));
-  const g = SPL.layout({ ...s, place }, SPL.faceOver(FZ, a0, d), { mask: splitMask });
+  const g = SPL.layout({ ...s, place }, SPL.faceOver(FZ, a0, d), { mask: splitMask, frame: FR });
   const pw = Math.round((+s.pipW || 460) / 2) * 2, ph = Math.round(pw * 9 / 32) * 2;
-  const [W, H] = g ? [g.panel.w, g.panel.h] : place === 'pip' ? [pw, ph] : [1080, 1920];
+  // full b-roll fills the frame it is shown in: the whole reel, or the 4:5 or 1:1 window
+  const [W, H] = g ? [g.panel.w, g.panel.h] : place === 'pip' ? [pw, ph] : [1080, FR ? FR.h : 1920];
   const n = still ? inp('-loop', '1', '-framerate', '24', '-t', (d + 0.5).toFixed(3), '-i', s.file) : inp('-i', s.file);
   const fit = still ? `scale=${Math.round(W * 1.1 / 2) * 2}:${Math.round(H * 1.1 / 2) * 2}:force_original_aspect_ratio=increase,crop=${Math.round(W * 1.1 / 2) * 2}:${Math.round(H * 1.1 / 2) * 2},zoompan=z='1+0.08*on/${Math.max(1, Math.round(d * 24))}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=24`
     : `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`;
-  const src = still ? `[${n}:v]${V},${fit}` : `[${n}:v]trim=${i0}:${(i0 + d).toFixed(3)},${V},${fit}`;
+  const head = still ? `[${n}:v]${V}` : `[${n}:v]trim=${i0}:${(i0 + d).toFixed(3)},${V}`;
+  let src = `${head},${fit}`;
+  // a wide clip in the split panel is shown whole (kit/split.cjs fitOf): sharp and flush on the seam, over a blurred,
+  // slightly darker copy of itself that fills the rest of the panel. A still gets its slow push in from the seam.
+  const dims = place === 'top' && g ? clipDims(s.file) : null;
+  // "fit": "cover" (or "fill") crops to fill, "whole" shows it all; a fast run (kit/fastrun.cjs) is whole by default
+  const topFit = place === 'top' && g ? SPL.fitOf({ ...s, fit: s.fit === 'fill' ? 'cover' : s.fit || (s.run ? 'whole' : undefined) }, dims) : null;
+  if (topFit === 'whole') {
+    const b = SPL.wholeBox(W, H, dims), e2 = v => Math.round(v / 2) * 2;
+    const fg = still ? `scale=${e2(b.w * 1.1)}:${e2(b.h * 1.1)},zoompan=z='1+0.08*on/${Math.max(1, Math.round(d * 24))}':x='iw/2-(iw/zoom/2)':y='ih-ih/zoom':d=1:s=${b.w}x${b.h}:fps=24` : `scale=${b.w}:${b.h}`;
+    f.push(`${head},split[wa${k}][wb${k}]`, `[wa${k}]scale=${e2(W / 4)}:${e2(H / 4)}:force_original_aspect_ratio=increase,crop=${e2(W / 4)}:${e2(H / 4)},boxblur=8:2,scale=${W}:${H},eq=brightness=-0.08:saturation=0.9[wg${k}]`, `[wb${k}]${fg}[wf${k}]`);
+    src = `[wg${k}][wf${k}]overlay=${b.x}:${b.y}:shortest=1`;
+  // "fit": "whole" (kit/fastrun.cjs): the clip is shown whole, sharp over its own blurred copy, instead of cropped to
+  // fill. It is the default in the framed panel when filling would crop more than a fifth of the picture away;
+  // "fit": "fill" keeps the crop. A fast run is whole. The split panel (place top) is drawn above, by kit/split.cjs fitOf.
+  } else if (place !== 'top' && FRUN.fitFor({ ...s, place }, s.fit || place !== 'frame' ? null : FRUN.sizeOf(s.file), W, H) === 'whole') {
+    // a still keeps its slow push in: it is made a little small and grows to fill its room, never cropped
+    const [w2, h2] = still ? [Math.round(W * 1.1 / 2) * 2, Math.round(H * 1.1 / 2) * 2] : [W, H];
+    f.push(`[${n}:v]${still ? '' : `trim=${i0}:${(i0 + d).toFixed(3)},`}${V},setsar=1[wi${k}]`, ...FRUN.wholeFit(`wi${k}`, `wo${k}`, w2, h2, `i${k}`, { inset: still ? 1 / 1.08 : 1 }));
+    src = still ? `[wo${k}]zoompan=z='1+0.08*on/${Math.max(1, Math.round(d * 24))}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=24` : `[wo${k}]null`;
+  }
   const on = `enable='between(t,${a0},${(a0 + d).toFixed(3)})'`, win = `trim=start=${a0}:end=${(a0 + d + 0.05).toFixed(3)}`;
-  f.push(`${src},setsar=1${s.bw ? ',hue=s=0' : ''}${place === 'pip' ? ',pad=iw+8:ih+8:4:4:white' : ''},setpts=PTS+${a0}/TB[ins${k}]`);
+  // "fx" (a reference B-roll slot's treatment, kit/broll-slots.cjs): motion push | pull | drift with zoom, shake, a
+  // glitch on the way in, colour bw | muted | vivid | warm | cool, and in / out: fade, flash, zoom, glitch, slide-*
+  // or cut. All of it is drawn on the insert's own picture, on its own clock (0 at its first frame).
+  const X = s.fx && typeof s.fx === 'object' ? s.fx : {}, fxl = [], N = Math.max(1, Math.round(d * 24));
+  if (!still && (['push', 'pull', 'drift'].includes(X.motion) || X.in === 'zoom')) {
+    const z = Math.max(1.03, Math.min(1.4, X.motion === 'pull' ? 2 - (+X.zoom || 0.93) : X.motion === 'push' ? +X.zoom || 1.07 : 1.06)), g0 = (z - 1).toFixed(4);
+    const ze = X.motion === 'push' ? `1+${g0}*on/${N}` : X.motion === 'pull' ? `${z.toFixed(4)}-${g0}*on/${N}` : X.motion === 'drift' ? `${z.toFixed(4)}` : '1';
+    const zin = X.in === 'zoom' ? `+0.22*max(0\,1-on/8)` : '';
+    const xe = X.motion === 'drift' ? `(iw-iw/zoom)*on/${N}` : 'iw/2-(iw/zoom/2)';
+    fxl.push(`zoompan=z='${ze}${zin}':x='${xe}':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=24`);
+  }
+  if (X.shake) fxl.push(`scale=${W + 24}:${H + 24},crop=${W}:${H}:'12+7*sin(n*12.9898)':'12+7*cos(n*78.233)'`);
+  const tone = { bw: 'hue=s=0', muted: 'eq=saturation=0.55', vivid: 'eq=saturation=1.45:contrast=1.06', warm: 'colorbalance=rs=0.08:gs=0.02:bs=-0.08', cool: 'colorbalance=rs=-0.07:bs=0.09' }[X.colour];
+  if (tone) fxl.push(tone);
+  if (X.glitch || X.in === 'glitch') fxl.push(`rgbashift=rh=14:bh=-14:gv=4:enable='lt(t,0.25)'`, `noise=alls=28:allf=t:enable='lt(t,0.2)'`);
+  if (X.in === 'flash') fxl.push(`fade=t=in:st=0:d=0.18:color=white`);
+  if (X.out === 'flash') fxl.push(`fade=t=out:st=${Math.max(0, d - 0.18).toFixed(3)}:d=0.18:color=white`);
+  const alphaIn = X.in === 'fade' || X.in === 'pop', alphaOut = X.out === 'fade' || X.out === 'pop';
+  if (alphaIn || alphaOut) fxl.push('format=yuva420p', ...(alphaIn ? [`fade=t=in:st=0:d=${X.in === 'pop' ? 0.12 : 0.3}:alpha=1`] : []), ...(alphaOut ? [`fade=t=out:st=${Math.max(0, d - 0.3).toFixed(3)}:d=0.3:alpha=1`] : []));
+  // slides move the whole insert: its place on your picture is worked out per frame (t on the reel's clock)
+  const sl = (v, axis) => { const span = axis === 'x' ? 1080 : (FR ? FR.h : 1920), tin = `max(0\,1-(t-${a0})/0.3)`, tout = `max(0\,(t-${(a0 + d - 0.3).toFixed(3)})/0.3)`, sq = e => `${e}*${e}`;
+    const m = { x: { 'slide-left': 1, 'slide-right': -1 }, y: { 'slide-up': 1, 'slide-down': -1 } }[axis], i = m[X.in] || 0, o = m[X.out] || 0;
+    return `${v}${i ? `${i > 0 ? '+' : '-'}${span}*${sq(tin)}` : ''}${o ? `${o > 0 ? '-' : '+'}${span}*${sq(tout)}` : ''}`; };
+  const slides = /^slide-/.test(X.in || '') || /^slide-/.test(X.out || '');
+  f.push(`${src},setsar=1${s.bw ? ',hue=s=0' : ''}${fxl.length ? ',' + fxl.join(',') : ''}${place === 'pip' ? ',pad=iw+8:ih+8:4:4:white' : ''},setpts=PTS+${a0}/TB[ins${k}]`);
   // the top of your head over the panel (or the card's top edge): rows y0..y1 of your picture, moved like it
   const band = (cur, scale) => {
     if (!g.band || !bands.length) return cur;
@@ -247,8 +316,8 @@ const chromeFile = g => {
     return `hv${k}`;
   };
   if (g && place === 'top') {
-    const y = 960 - g.dy, sh = `color=c=black:s=1080x36:r=24:d=${(d + 0.1).toFixed(3)},format=rgba,${SPL.shadowGeq()},setpts=PTS+${a0}/TB[shd${k}]`;
-    f.push(`[${vcur}]split[vs${k}a][vs${k}b]`, `[vs${k}b]crop=1080:960:0:${y}[spk${k}]`, `[vs${k}a][spk${k}]overlay=0:960:${on}[vt${k}]`, `[vt${k}][ins${k}]overlay=0:0:eof_action=pass:${on}[vp${k}]`, sh, `[vp${k}][shd${k}]overlay=0:960:format=auto:eof_action=pass:${on}[vq${k}]`);
+    const seam = g.seam, y = seam - g.dy, sh = `color=c=black:s=1080x${SPL.SHADOW_H}:r=24:d=${(d + 0.1).toFixed(3)},format=rgba,${SPL.shadowGeq()},setpts=PTS+${a0}/TB[shd${k}]`;
+    f.push(`[${vcur}]split[vs${k}a][vs${k}b]`, `[vs${k}b]crop=1080:${g.panel.h}:0:${y}[spk${k}]`, `[vs${k}a][spk${k}]overlay=0:${seam}:${on}[vt${k}]`, `[vt${k}][ins${k}]overlay=0:${g.panel.y}:eof_action=pass:${on}[vp${k}]`, sh, `[vp${k}][shd${k}]overlay=0:${seam}:format=auto:eof_action=pass:${on}[vq${k}]`);
     vcur = band(`vq${k}`, false);
   } else if (g && place === 'frame') {
     const ch = inp('-loop', '1', '-framerate', '24', '-t', (d + 0.1).toFixed(3), '-i', chromeFile(g));
@@ -256,9 +325,9 @@ const chromeFile = g => {
       `[vt${k}][ins${k}]overlay=${g.panel.x}:${g.panel.y}:eof_action=pass:${on}[vp${k}]`, `[${ch}:v]format=rgba,setpts=PTS+${a0}/TB[chr${k}]`, `[vp${k}][chr${k}]overlay=0:0:format=auto:eof_action=pass:${on}[vq${k}]`);
     vcur = band(`vq${k}`, true);
   } else if (place === 'pip') {
-    const x = s.pipX != null ? Math.round(+s.pipX) : 1080 - pw - 8 - 44, y = s.pipY != null ? Math.round(+s.pipY) : 170;
+    const x = s.pipX != null ? Math.round(+s.pipX) : 1080 - pw - 8 - 44, y = FR ? Math.round(FR.y0 + (s.pipY != null ? +s.pipY * FR.h / 1920 : FR.top + 30)) : s.pipY != null ? Math.round(+s.pipY) : 170;
     f.push(`[${vcur}][ins${k}]overlay=${x}:${y}:eof_action=pass:${on}[vi${k}]`); vcur = `vi${k}`;
-  } else { f.push(`[${vcur}][ins${k}]overlay=eof_action=pass:${on}[vi${k}]`); vcur = `vi${k}`; }
+  } else { f.push(`[${vcur}][ins${k}]overlay=${slides ? `x='${sl('0', 'x')}':y='${sl(String(FR ? FR.y0 : 0), 'y')}':eval=frame` : `0:${FR ? FR.y0 : 0}`}:eof_action=pass:${on}[vi${k}]`); vcur = `vi${k}`; }
 });
 for (const l of bands) f.push(`[${l}]nullsink`);
 // The caption layer and the glitch shake go on in a second pass when there are captions. In one graph, the caption

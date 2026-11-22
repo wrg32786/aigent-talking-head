@@ -202,9 +202,16 @@ def beat_grid(path, dur):
         return json.load(open(out, encoding="utf-8"))
 
 
+def stage(name, words):
+    # where the breakdown is, for Studio's status line (kit/studio/stages.mjs). Flushed so it shows up as it happens
+    sys.stdout.flush()
+    print(f"stage {name}: {words}", flush=True)
+
+
 def cmd_analyze(a):
     src = probe(a.video)
     dur = src["duration"]
+    stage("cuts", "finding cuts")
     cuts = scene_cuts(a.video)
     bounds = [0.0] + cuts + [dur]
     shots = []
@@ -217,24 +224,27 @@ def cmd_analyze(a):
     out = {"x_engine": "talking-head fallback (frame-difference cuts + pixel stats)", "source": src, "shots": shots,
            "packaging": {"text_cues": []}, "audio": {}, "speech": {"ok": False, "reason": "skipped"}}
     if not a.no_ocr:
+        stage("captions", "reading captions")
         cues = ocr_frames(a.video, dur)
         if cues is None:
             out["packaging"]["note"] = "OCR not installed (pip install rapidocr-onnxruntime); no on-screen text read"
         else:
             out["packaging"]["text_cues"] = cues
     if has_audio(a.video):
+        if not a.no_asr:
+            stage("transcribe", "transcribing")
+            sp = speech_words(a.video, a.model)
+            if sp:
+                out["speech"] = sp
+        stage("sound", "reading music and sounds")
         grid = beat_grid(a.video, dur)
         if grid:
             out["audio"]["music"] = {"present": True, "tempo_bpm": grid.get("tempo_bpm"), "beats": grid.get("beats", []), "drops": grid.get("drops", [])}
             out["audio"]["tempo_bpm"] = grid.get("tempo_bpm")
-        if not a.no_asr:
-            sp = speech_words(a.video, a.model)
-            if sp:
-                out["speech"] = sp
     imgs = [x for x in (frame_at(a.video, (s["start"] + s["end"]) / 2, 160) for s in shots[:12]) if x is not None]
     if imgs:
         out["x_palette"] = dominant_colours(imgs)
-    json.dump(out, open(a.out, "w"), indent=1)
+    json.dump(out, open(a.out, "w", encoding="utf-8"), indent=1)
     print(f"fallback teardown: {len(shots)} shots, {len(out['packaging']['text_cues'])} text cues, speech {'yes' if out['speech'].get('ok') else 'no'}, "
           f"bpm {out['audio'].get('tempo_bpm')}")
 
@@ -317,8 +327,77 @@ def _hex(bgr):
     return "#%02x%02x%02x" % (int(bgr[2]), int(bgr[1]), int(bgr[0]))
 
 
+YUNET = os.path.join(ROOT, "effects", "vendor", "claude-video-effects", "models", "yunet.onnx")
+_YN = {}
+
+
+def _face_box(img):
+    """The biggest face YuNet finds (x, y, w, h in pixels), or None. OpenCV only, no person mask needed."""
+    import cv2
+    h, w = img.shape[:2]
+    try:
+        if (w, h) not in _YN:
+            _YN[(w, h)] = cv2.FaceDetectorYN.create(YUNET, "", (w, h), 0.6, 0.3, 20) if os.path.exists(YUNET) else None
+        det = _YN[(w, h)]
+        faces = det.detect(img)[1] if det is not None else None
+    except Exception:
+        return None
+    if faces is None or not len(faces):
+        return None
+    f = max(faces, key=lambda r: r[2] * r[3])
+    return [int(v) for v in f[:4]]
+
+
+def _spikes(y, pts):
+    """Shape and spike count of a yellow region that the person may cover in part. The outline's radius is read
+    around the centre of the circle that encloses it: a starburst has clear peaks (its points), a seal is round.
+    The count comes from the usual gap between neighbouring points, so a covered arc does not lower it."""
+    import cv2, numpy as np
+    (cx, cy), R = cv2.minEnclosingCircle(pts)
+    if R < 8:
+        return "seal", None
+    ys, xs = np.nonzero(y)
+    dx, dy = xs - cx, ys - cy
+    rad = np.hypot(dx, dy)
+    ok = rad <= R * 1.03  # other yellow things in the frame (a caption box, a shirt) are left out
+    dx, dy, rad = dx[ok], dy[ok], rad[ok]
+    N = 180  # 2 degree bins
+    ang = (np.floor(np.degrees(np.arctan2(dy, dx)) / (360 / N)).astype(int)) % N
+    prof = np.zeros(N)
+    np.maximum.at(prof, ang, rad)
+    seen = prof > 0.3 * R
+    if seen.sum() < N // 6:
+        return "seal", None
+    sm = np.where(seen, (np.roll(prof, 1) + prof + np.roll(prof, -1)) / 3, 0)
+    peaks = []
+    for i in np.nonzero(seen)[0]:
+        if sm[i] < 0.6 * R:
+            continue
+        near = [sm[(i + k) % N] for k in range(-3, 4)]
+        if sm[i] < max(near) or (sm[i] == sm[(i - 1) % N] and seen[(i - 1) % N]):
+            continue
+        # a point dips on each side within 30 degrees, or runs into the part the person covers
+        sides = []
+        for sgn in (-1, 1):
+            got = False
+            for k in range(1, 16):
+                j = (i + sgn * k) % N
+                if not seen[j] or sm[i] - sm[j] > 0.1 * R:
+                    got = True
+                    break
+            sides.append(got)
+        if all(sides):
+            peaks.append(i)
+    if len(peaks) < 3:
+        return "seal", None
+    gaps = sorted(((b - a) % N) * (360 / N) for a, b in zip(peaks, peaks[1:] + peaks[:1]))[:len(peaks) - 1]
+    med = float(np.median(gaps))
+    gap = float(np.mean([g for g in gaps if 0.6 * med <= g <= 1.5 * med] or [med]))
+    return "starburst", int(min(24, max(6, round(360 / max(gap, 1)))))
+
+
 def _bursts(img, hsv, mask):
-    """Spiky warm-yellow shapes (a starburst), split or whole. Returns bbox, colour, layer hint."""
+    """Spiky warm-yellow shapes (a starburst), split or whole. Returns bbox, colour, shape, spike count, layer hint."""
     import cv2, numpy as np
     h, w = hsv.shape[:2]
     y = ((hsv[..., 0] >= 15) & (hsv[..., 0] <= 38) & (hsv[..., 1] >= 60) & (hsv[..., 2] >= 185)).astype(np.uint8)
@@ -334,6 +413,11 @@ def _bursts(img, hsv, mask):
             keep.append(c); area += a
     if area < 0.012 * h * w:
         return None
+    # pieces of one burst sit side by side around the head: a yellow patch far above or below the biggest piece is not part of it
+    _, by, _, bh0 = cv2.boundingRect(max(keep, key=cv2.contourArea))
+    near = [c for c in keep if cv2.boundingRect(c)[1] < by + bh0 * 1.5 and cv2.boundingRect(c)[1] + cv2.boundingRect(c)[3] > by - bh0 * 0.5]
+    if sum(cv2.contourArea(c) for c in near) >= 0.012 * h * w:
+        keep = near
     pts = np.concatenate(keep)
     x, yy, bw, bh = cv2.boundingRect(pts)
     hull = np.zeros((h, w), np.uint8); cv2.fillPoly(hull, [cv2.convexHull(pts)], 1); hull = hull.astype(bool)
@@ -345,7 +429,17 @@ def _bursts(img, hsv, mask):
         on_p = float(yb[hull & mask].mean()) if (hull & mask).any() else 0.0
         on_bg = float(yb[hull & ~mask].mean()) if (hull & ~mask).any() else 0.0
         layer = "behind" if over > 0.12 and on_bg > 0.2 and on_p < 0.25 * on_bg else "front"
-    return {"bbox": [round(x / w, 3), round(yy / h, 3), round(bw / w, 3), round(bh / h, 3)], "color": col, "layer": layer}
+    else:
+        # no person mask: a face found inside the burst's outline that is not yellow means the burst is behind the head
+        fb = _face_box(img)
+        if fb:
+            fx, fy, fw, fh = fb
+            mx, my = min(w - 1, max(0, fx + fw // 2)), min(h - 1, max(0, fy + fh // 2))
+            face = y[max(0, fy):fy + fh, max(0, fx):fx + fw]
+            if hull[my, mx] and face.size and float(face.mean()) < 0.15:
+                layer = "behind"
+    shape, spikes = _spikes(y, pts)
+    return {"bbox": [round(x / w, 3), round(yy / h, 3), round(bw / w, 3), round(bh / h, 3)], "color": col, "layer": layer, "shape": shape, "spikes": spikes}
 
 
 def _rects(g):
@@ -603,7 +697,14 @@ def detect_graphics(video, cues, seg=None, step=0.25):
         face_w = round(float(np.median(fw)), 3) if fw else None
         hc = [d["head_cy"] for d in e["d"] if d.get("head_cy")]
         head_cy = round(float(np.median(hc)), 3) if hc else None
+        # shape and spikes from the fully grown samples: the majority shape, the median spike count
+        grown = [d for d in e["d"] if d["bbox"][2] >= 0.85 * full_w] or e["d"]
+        shapes = [d.get("shape") for d in grown if d.get("shape")]
+        shape = max(set(shapes), key=shapes.count) if shapes else "seal"
+        sp = [d["spikes"] for d in grown if d.get("shape") == "starburst" and d.get("spikes")]
+        spikes = int(round(float(np.median(sp)))) if shape == "starburst" and sp else None
         out.append({"type": "ordinal-sticker", "start": a, "end": round(z, 2), "text": words[0][0] if words else None, "cue": words[0][1]["text"] if words else None,
+                    "shape": shape, "spikes": spikes,
                     "bbox": bb, "width": full_w, "face_w": face_w, "head_cy": head_cy, "head_ratio": round(full_w / face_w, 2) if face_w else None,
                     "color": e["d"][len(e["d"]) // 2]["color"], "layer": max(set(layers), key=layers.count) if layers else None, "samples": len(e["d"])})
     # screen cards: a dark rectangle for 1 s or more with small UI text read inside it
@@ -660,9 +761,45 @@ def detect_graphics(video, cues, seg=None, step=0.25):
             continue
         tl = e["d"][len(e["d"]) // 2]["tile"]
         out.append({"type": "app-label", "start": a, "end": round(max(z, labels[0].get("t1", z)), 2), "text": re.sub(r"\s+", " ", str(labels[0]["text"])).strip(), "cue": labels[0]["text"],
-                    "bbox": bb, "tile": tl, "samples": len(e["d"])})
+                    "bbox": bb, "tile": tl, "samples": len(e["d"]),
+                    **({"conf": labels[0]["conf"]} if labels[0].get("conf") is not None else {})})
     out.sort(key=lambda x: x["start"])
     return out
+
+
+def shot_looks(video, shots, rows, graphics):
+    """Per shot, for a remake to match: where the face sits (kit/framing.py: height, eye line, centre) when the
+    speaker is on screen, and the shot's colour in Lab (kit/grade_match.py), its own graphics left out."""
+    spans = [(float(s["start"]), float(s["end"])) for s in shots]
+    stage("framing", "reading framing")
+    try:
+        import framing
+        for row, f in zip(rows, framing.measure_spans(video, spans)):
+            if f:
+                row["face"] = f
+        print(f"framing: a face in {sum(1 for r in rows if r.get('face'))} of {len(rows)} shots (height, eye line, centre)")
+    except Exception as e:  # a bonus: the remake falls back to the framing words
+        print(f"note: face framing not measured: {e}")
+    # how far the camera moves inside each shot (kit/camera_move.py): rea-video names a move and gives no size
+    try:
+        import camera_move
+        for row, mv in zip(rows, camera_move.measure_spans(video, spans)):
+            if mv:
+                row["move"] = mv
+        big = [r["move"]["scale"] for r in rows if r.get("move") and abs(r["move"]["scale"]) >= 0.02]
+        print(f"camera: move size read on {sum(1 for r in rows if r.get('move'))} of {len(rows)} shots ({len(big)} with a push or a pull" + (f", {min(abs(x) for x in big) * 100:.0f}% to {max(abs(x) for x in big) * 100:.0f}%" if big else "") + ")")
+    except Exception as e:
+        print(f"note: camera move size not measured: {e}")
+    stage("colours", "reading colours")
+    try:
+        import grade_match
+        boxes = [{"t0": g["start"], "t1": g["end"], "box": g["bbox"]} for g in graphics or [] if g.get("bbox")]
+        for row, st in zip(rows, grade_match.span_stats(video, spans, boxes=boxes)):
+            if st:
+                row["lab"] = st
+        print(f"grade: colour read on {sum(1 for r in rows if r.get('lab'))} of {len(rows)} shots (black and short shots skipped)")
+    except Exception as e:
+        print(f"note: shot colour not measured: {e}")
 
 
 def cmd_extras(a):
@@ -704,12 +841,38 @@ def cmd_extras(a):
         print(f"note: graphics detection failed: {e}")
         out["graphics"] = []
     gx = out["graphics"]
+    shot_looks(a.video, shots, out["shots"], gx)
     try:
         out["caption_look"] = caption_look(a.video, cues)
         out["caption_look"]["layer_samples"] = caption_layer(a.video, cues, seg)
     except Exception as e:
         print(f"note: caption outline check failed: {e}")
-    json.dump(out, open(a.out, "w"), indent=1)
+    # the type on screen against our own font library (kit/fontmatch.py): kind of face, weight, case, colour, nearest pairing
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import fontmatch
+        fm = fontmatch.match_video(a.video, cues, frame_at)
+        if fm:
+            out["font"] = fm
+            print(f"font: {fm['category']}, {fm['weight'] or 'weight not read'}, {fm['case']} case; nearest of ours {fm['face']} (pairing {fm['pairing']}, {fm['match']}, {fm['samples']} words read)")
+        else:
+            print("font: no big words on screen to read a font from")
+    except Exception as e:
+        print(f"note: font match failed: {e}")
+    # the look of the big titles (kit/titlelook.py): one line or two, serif or sans, italic, case, colours, glow, dim
+    try:
+        import titlelook
+        tl = titlelook.read_video(a.video, titles, shots, frame_at, cues)
+        out["title_look"] = tl
+        lk = tl.get("look")
+        if lk:
+            k, p = lk["key"], lk.get("partner")
+            print(f"titles: {lk['lockup']} ({lk['two_line']} of {lk['titles']} read as two lines); key word {'italic ' if k['italic'] else ''}{k['category'] or 'kind not read'}, {k['color']}"
+                  + (f"; partner line {p['category'] or 'kind not read'}, {p['case'] or 'case not read'}, {p['color']}, {p['place']}" if p else "")
+                  + f"; glow {lk['glow'] or 'none'}, picture dim {lk['dim'] or 'none'}")
+    except Exception as e:
+        print(f"note: title look not read: {e}")
+    json.dump(out, open(a.out, "w", encoding="utf-8"), indent=1)
     sys.stdout.flush()
     print(f"graphics: {sum(g['type'] == 'ordinal-sticker' for g in gx)} ordinal stickers, {sum(g['type'] == 'app-label' for g in gx)} app labels, {sum(g['type'] == 'screen-card' for g in gx)} screen cards")
     print(f"extras: {len(out['shots'])} shots measured, {len(out['titles'])} title layers ({'MediaPipe mask' if seg else 'no person mask; layers not estimated'})")

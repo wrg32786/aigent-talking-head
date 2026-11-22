@@ -181,14 +181,27 @@ function musicLevel(levels) {
 }
 
 // a reference shot that is a cutaway (B-roll, a screen, a graphic): talk_share under 0.35 when the breakdown has it,
-// else no face on screen, else material that is not real camera footage with no face count
-function isCutaway(s) {
+// else no face on screen, else material that is not real camera footage with no face count.
+// speaker ({ faceH, eyeY, cx }, the middle face of the shots where someone talks): a shot whose face is on screen
+// all through it, the same size and in the same place, is the speaker pausing or hidden behind a microphone, never a
+// cutaway. (Live reference, 2026-11-21: three such shots were marked as cutaways and its real B-roll was not.)
+function isCutaway(s, speaker = null) {
   const ts = s.talk_share ?? (s.aspects && s.aspects.talk && s.aspects.talk.share);
-  if (ts != null && Number.isFinite(+ts)) return +ts < 0.35;
   const f = Array.isArray(s.faces) ? s.faces.length : s.faces;
+  if (speaker && f != null && +f >= 0.6) {
+    const m = (s.aspects && s.aspects.framing && s.aspects.framing.measured) || {}, h = +m.face_h, cy = +m.center_y, cx = +m.center_x;
+    if (h > 0 && Math.abs(h - speaker.faceH) <= 0.35 * speaker.faceH && (!Number.isFinite(cy) || speaker.cy == null || Math.abs(cy - speaker.cy) <= 0.12) && (!Number.isFinite(cx) || speaker.cx == null || Math.abs(cx - speaker.cx) <= 0.15)) return false;
+  }
+  if (ts != null && Number.isFinite(+ts)) return +ts < 0.35;
   if (f != null && Number.isFinite(+f)) return +f === 0;
   const o = s.material && s.material.origin;
   return !!o && o !== 'real' && o !== 'unknown' && s.material.has_real_material === false && f == null;
+}
+// the speaker's face over a reference: the middle size and place of the faces in the shots where someone talks
+function speakerOf(shots) {
+  const med = a => { const v = a.filter(Number.isFinite).sort((p, q) => p - q); return v.length ? v[Math.floor(v.length / 2)] : null; };
+  const ms = (shots || []).filter(s => { const ts = s.talk_share ?? (s.aspects && s.aspects.talk && s.aspects.talk.share); return ts != null && +ts >= 0.5; }).map(s => (s.aspects && s.aspects.framing && s.aspects.framing.measured) || {}).filter(m => +m.face_h > 0);
+  return ms.length >= 2 ? { faceH: med(ms.map(m => +m.face_h)), cy: med(ms.map(m => +m.center_y)), cx: med(ms.map(m => +m.center_x)) } : null;
 }
 
 // the reference's transition into a shot (rea-video: cut, jump, flash, fade, dissolve, wipe, slide, whip, zoom, spin, blur,
@@ -218,17 +231,53 @@ function transitionFor(type, tr = {}) {
 }
 // the reference's camera inside a shot (rea-video aspects.camera) as a move the kit makes: push (a slow push-in over the
 // shot), pull (a slow pull-out), drift (a gentle push for a pan or a track) and shake (handheld: a shake on the cut in)
-function moveFor(cam = {}) {
+function moveFor(cam = {}, measured = null) {
   const mv = String(cam.move || '').toLowerCase(), sup = String(cam.support || '').toLowerCase(), mo = String(cam.motion || '').toLowerCase();
   const out = [];
   if (/push|dolly in|zoom in|推/.test(mv)) out.push('push');
   else if (/pull|dolly out|zoom out|拉/.test(mv)) out.push('pull');
   else if (/pan|track|follow|orbit|摇|移|跟|环绕/.test(mv)) out.push('drift');
+  // no move named: the one we measured (kit/camera_move.py), when it is big enough to be a move and not a wobble
+  else { const m = measuredMove(measured); if (m) out.push(m); }
   if (/handheld/.test(sup) || /handheld/.test(mo) || /handheld|shake|手持/.test(mv)) out.push('shake');
   return out;
 }
-// a move as the cut.json keys: push is the zoom gained over the segment (minus: a pull-out)
+// a measured move ({ scale, dx, dy } from kit/camera_move.py) as a name: a zoom of 2 percent or more is a push or a
+// pull, a pan of 4 percent of the frame or more a drift
+const SEEN = { zoom: 0.02, pan: 0.04 };
+function measuredMove(m) {
+  if (!m || !Number.isFinite(+m.scale)) return null;
+  if (+m.scale >= SEEN.zoom) return 'push';
+  if (+m.scale <= -SEEN.zoom) return 'pull';
+  return Math.hypot(+m.dx || 0, +m.dy || 0) >= SEEN.pan ? 'drift' : null;
+}
+// how big the reference's move was, for the recipe's "move-size": the zoom gained (a share, always plus), or null
+// when it was not measured or is a drift (a pan has no zoom to carry)
+function measuredSize(move, m) {
+  if (!m || !Number.isFinite(+m.scale) || !/^(push|pull)$/.test(move)) return null;
+  const v = Math.abs(+m.scale);
+  return v >= 0.005 ? Math.min(0.4, +v.toFixed(3)) : null;
+}
+// a move as the cut.json keys: push is the zoom gained over the segment (minus: a pull-out). These are the sizes at
+// motion strength "subtle", and the names every move has.
 const MOVES = { push: 0.07, pull: -0.07, drift: 0.035 };
+// Motion strength: how big a camera move is drawn. A reference's push is often 3 to 5 percent on a wide shot; on a
+// talking head that cannot be seen, so the measured size is scaled up (gain) and held between a size that shows (lo)
+// and one that still looks like a camera (hi). size: what a move with no measured size gets.
+const MOTION = {
+  subtle: { gain: 1, lo: 0.04, hi: 0.1, size: { push: 0.07, pull: 0.07, drift: 0.035 } },
+  medium: { gain: 1.6, lo: 0.08, hi: 0.16, size: { push: 0.12, pull: 0.11, drift: 0.08 } },
+  strong: { gain: 2.2, lo: 0.12, hi: 0.24, size: { push: 0.18, pull: 0.16, drift: 0.12 } },
+};
+const MOTION_DEFAULT = 'medium';
+const motionOf = v => (MOTION[String(v || '').toLowerCase()] ? String(v).toLowerCase() : null);
+// the push value for a move at a strength; measured: the reference's own size for this shot (a share), if it was read
+function moveSize(move, strength = MOTION_DEFAULT, measured = null) {
+  const M = MOTION[motionOf(strength) || MOTION_DEFAULT];
+  if (!(move in MOVES)) return null;
+  const m = +measured, v = move !== 'drift' && m > 0 ? Math.min(M.hi, Math.max(M.lo, m * M.gain)) : M.size[move];
+  return +(move === 'pull' ? -v : v).toFixed(3);
+}
 
 // what a reference cutaway shows, in a few words, for the B-roll spot it becomes: the shot's description (rea-video
 // VLM), else its kind (a screen recording, a still, an animation) and the name on screen (a label OCR read)
@@ -243,4 +292,4 @@ function brollOf(s, textOf = v => (typeof v === 'string' ? v : '')) {
   return out ? out.replace(/\|/g, ' ') : null;
 }
 
-module.exports = { brollOf, transitionFor, moveFor, MOVES, recut, zooms, zoomFor, quietFrom, sfxId, SFX, roleOf, matchRoles, slotPhrase, fillSlots, musicLevel, isCutaway, MIN_SHOT, MIN_QUIET };
+module.exports = { brollOf, transitionFor, moveFor, measuredMove, measuredSize, moveSize, motionOf, MOVES, MOTION, MOTION_DEFAULT, recut, zooms, zoomFor, quietFrom, sfxId, SFX, roleOf, matchRoles, slotPhrase, fillSlots, musicLevel, isCutaway, speakerOf, MIN_SHOT, MIN_QUIET };

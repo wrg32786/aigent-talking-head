@@ -31,10 +31,16 @@ import { capture as capturePage } from '../capture.mjs';
 import { findChrome } from '../chrome.mjs';
 import { mount as mountBroll } from './broll-api.mjs';
 import * as PIECES from './pieces.mjs';
+import * as TOPICS from './topics.mjs';
+import * as PACING from './pacing.mjs';
+import { pointLine } from './point.mjs';
 import * as WIZ from './wizards.mjs';
+import * as STG from './stages.mjs';
+import * as SLK from './stylelooks.mjs';
 import { mount as mountFolders } from './folders.mjs';
 import { mountScenes } from './scene-routes.mjs';
 import { mount as mountPost } from './post-api.mjs';
+import * as SIZES from './sizes.mjs';
 
 const require = createRequire(import.meta.url);
 const SNAP = require('../snapshots.cjs');
@@ -129,19 +135,27 @@ function env() {
 // every view carries a rising seq (and this run's boot id) so the page can drop a reply that is older than an event it
 // already applied, e.g. a POST answer that lands after the SSE state for a download that failed right away
 const BOOT = Date.now().toString(36); let viewSeq = 0;
+// natural, tight or very: an ad with no pacing chosen is Very tight, as its draft is
+function pacingFor(cut, comp) { const ad = cut.output && cut.output.goal === 'ad' && !comp.args.includes('--tighten') && !comp.args.includes('--no-tighten'); return PACING.pacingOf(ad ? [...comp.args, '--tighten', '0.25'] : comp.args).id; }
 function view(s) {
   let comp; try { comp = C.compose(s, { refPack: refPackName(s) }); } catch (e) { comp = { args: [], errs: [e.message], notes: [] }; }
   let scripts = []; try { scripts = SC.list(s.job); } catch {}
   let cut = null; try { cut = cutView(s); } catch (e) { cut = { error: e.message, candidates: [] }; }
+  // the Pacing choice on the Cut step (kit/studio/pacing.mjs), read from the flags the next draft gets
+  if (cut && !cut.error) { cut.pacing = pacingFor(cut, comp); cut.pacings = PACING.PACING.map(({ id, label, says }) => ({ id, label, says })); cut.point = s.point || ''; }
   let broll = null; try { broll = BRL.view(s); } catch (e) { broll = { error: e.message, beats: [] }; }
   let reopenable = []; try { reopenable = s.job ? SNAP.list(join(ROOT, 'jobs', s.job)).filter(x => x.snapshot).map(x => `jobs/${s.job}/${x.reel}`) : []; } catch {}
   let combo = { pieces: [], seconds: 0, key: '' }; try { combo = comboOf(s); } catch {}
   let edit = null; try { edit = editOf(s, { combo, cut, broll }); } catch (e) { edit = { error: e.message }; }
   let look = null; try { look = lookSources(s); } catch {}
   const outputs = C.outputsOf(s), currentOutputs = currentOutputsOf(s);
-  return { seq: ++viewSeq, boot: BOOT, scenes: C.catalog().scenesSig || '', state: s, look, compose: comp, outputs, currentOutputs, draftPreview: draftPreviewOf(s), reopenable, scripts, cut, broll, pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
+  return { seq: ++viewSeq, boot: BOOT, scenes: C.catalog().scenesSig || '', state: s, look, compose: comp, outputs, currentOutputs, sizes: SIZES.viewOf(s, outputs), refFont: C.refFontOf(s, SLK.fontOf(s.styleLook)), boost: C.boostOf(s), motion: C.motionOf(s), savedLook: (() => { try { return C.savedLookOf(s); } catch { return null; } })(), draftPreview: draftPreviewOf(s), match: matchOf(s), styleLooks: SLK.list(), reopenable, scripts, cut, broll, pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: noTimeline(s) ? null : swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
 }
 
+// Copy the look (kit/studio/stylelooks.mjs): the reference's timeline is not used, so no "what to swap" and no spots from it
+const noTimeline = s => !!(s.reference && s.reference.mode === 'look');
+// how close the current draft is to what it copies (build/match.json), or null
+const matchOf = s => (s && s.job && C.draftIsCurrent(s) ? SLK.matchOf(join(ROOT, 'jobs', s.job, 'build')) : null);
 // what a finished draft says (a draft is a plan: no video until Render)
 const DRAFT_DONE = 'Plan ready, no video yet. Press Render.';
 // ---------- tasks (one at a time) ----------
@@ -155,7 +169,9 @@ function runTask(kind, steps, done, hooks = {}) {
   if (cur && cur.status === 'running') throw Object.assign(new Error(`busy: ${cur.kind} is running`), { code: 409 });
   const me = { id: ++seq, kind, status: 'running', startedAt: Date.now(), lines: [], proc: null };
   if (lane) refTask = me; else task = me;
-  const log = l => { for (const x of String(l).split(/\r?\n/)) if (x.trim()) { me.lines.push(x.slice(0, 400)); if (me.lines.length > 400) me.lines.shift(); if (!lane) send('log', { id: me.id, line: x.slice(0, 400) }); if (hooks.line) try { hooks.line(x); } catch {} } };
+  // an engine note that names a command (for someone at a terminal) stays out of the page's "What ran": we never show
+  // users commands. Hooks still see every line.
+  const log = l => { for (const x of String(l).split(/\r?\n/)) if (x.trim()) { if (TERMINAL_LINE.test(x)) { if (hooks.line) try { hooks.line(x); } catch {} continue; } me.lines.push(x.slice(0, 400)); if (me.lines.length > 400) me.lines.shift(); if (!lane) send('log', { id: me.id, line: x.slice(0, 400) }); if (hooks.line) try { hooks.line(x); } catch {} } };
   if (!lane) update(s => { s.task = { id: me.id, kind, status: 'running' }; });
   (async () => {
     let out = '';
@@ -209,7 +225,7 @@ const refPackName = s => s.reference && s.reference.mode === 'influence' && s.re
 // force: write it whatever the mode (Save as a Look from a reference used whole, or off)
 function writeRefPack(s, { force = false } = {}) {
   const name = force ? (s.reference && s.reference.extracted && s.job ? `ref-${s.job}`.slice(0, 48) : null) : refPackName(s); if (!name) return null;
-  const pack = C.fitStyle(C.influencePack(s.reference.extracted, s.job, s.pack));
+  const pack = C.fitStyle(C.influencePack(s.reference.extracted, s.job, s.pack, force ? null : C.refParts(s.reference)));
   const errs = K.validate(pack);
   if (errs.length) throw new Error('reference pack: ' + errs.join('; '));
   const dir = join(K.LOCAL, name); mkdirSync(dir, { recursive: true });
@@ -226,19 +242,19 @@ function lookSources(s, cat = C.catalog()) {
     add(pack, 'transition', l.transitions); add(pack, 'entrance', l.titles); add(pack, 'graphic', l.graphics && l.graphics.allow); add(pack, 'finish', l.finishes); add(pack, 'captionEntrance', l.captionEntrance);
     add(pack, 'transition', st.transition); add(pack, 'entrance', st.entranceOrder); add(pack, 'finish', st.finishPool); add(pack, 'effect', st.effectsFavourites); add(pack, 'look', st.look); add(pack, 'captionStyle', st.captionStyle); }
   const ex = s.reference && s.reference.mode !== 'off' ? s.reference.extracted : null;
-  if (ex) { for (const r of Object.keys(C.referencePicks(ex, null, cat))) ref.add(r); add(ref, 'look', ex.look); }
+  if (ex) { for (const r of Object.keys(C.referencePicks(ex, null, cat))) ref.add(r); add(ref, 'look', ex.look); add(ref, 'entrance', ex.entrances); }
   const added = new Set((s.reference && s.reference.added) || []);
   for (const r of added) ref.add(r);
   // why the reference picked each one (its teardown's reasons, kit/studio/reference.mjs summarize), for the Look step
   const why = Object.fromEntries(((ex && ex.summary && ex.summary.suggestions) || []).filter(x => ref.has(x.ref) && x.why).map(x => [x.ref, x.why]));
   return { pack: [...pack], ref: [...ref], added: [...added], why, packName: s.pack || null, refName: ex ? (ex.name || null) : null };
 }
-// Recreate needs the reference's recipe: while it is still being read, Draft says so plainly (never a generic busy)
+// Recreate and Copy the look need the reference's recipe: while it is still being read, Draft says so plainly (never a generic busy)
 function refWait(s) {
-  const r = s.reference || {}; if (r.mode !== 'recreate' || C.recreateRecipe(s, ROOT)) return null;
+  const r = s.reference || {}; if (!['recreate', 'look'].includes(r.mode) || (r.mode === 'look' ? SLK.refDir(s, ROOT) : C.recreateRecipe(s, ROOT))) return null;
   const it = (r.queue || []).find(x => C.REF_READING.includes(x.status));
   const what = it ? (it.status === 'tearing' ? 'being broken down' : 'downloading') : r.status === 'running' ? 'being broken down' : null;
-  return what ? `The reference is still ${what}. Recreate needs it: draft again when it is ready, or set the reference to Off to draft without it.` : null;
+  return what ? `The reference is still ${what}. ${r.mode === 'look' ? 'Copy the look' : 'Recreate'} needs it: draft again when it is ready, or set the reference to Off to draft without it.` : null;
 }
 function draftSteps(s) {
   if (!s.job) throw Object.assign(new Error('name the job first'), { code: 400 });
@@ -250,13 +266,15 @@ function draftSteps(s) {
   if (comp.errs.length) throw Object.assign(new Error(comp.errs.join('; ')), { code: 400 });
   let args = comp.args.slice();
   if (recreate) C.recreateArgs(args, recreate);
+  // Copy the look, or a saved style look with no reference in use: --style-look, never --recipe or --recut
+  const styleLook = recreate ? null : SLK.forDraft(s, ROOT, args);
   // your pieces (the Combo) when you kept any: cut once, here, and handed to the reel as they are (--as-is). Recreate
   // runs on them too, with the reference's Reel.md as the recipe, so the draft is what Your edit says it is (it used
   // to switch to the whole take, so the draft's key never matched and Render could not come on)
   const combo = comboOf(s), fromPieces = draftFrom(s, combo) === 'pieces';
   if (fromPieces) {
     const cf = comboFiles(s, combo);
-    return { steps: [...cf.steps, [process.env.STUDIO_REEL || 'kit/reel.cjs', [...cf.files, '--as-is', '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])]]], lockString: comp.lockString, txPrompt: null, key: draftKey(s, combo), from: 'pieces', pieces: combo.pieces.length };
+    return { steps: [...cf.steps, [process.env.STUDIO_REEL || 'kit/reel.cjs', [...cf.files, '--as-is', '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])]]], lockString: comp.lockString, txPrompt: null, key: draftKey(s, combo), from: 'pieces', pieces: combo.pieces.length, styleLook };
   }
   const cl = cleanupFor(s), src = cl ? ['--clips', relOf(clipsDirOf(s)), '--cleanup', cl] : s.clips ? ['--clips', s.clips] : s.footage;
   // takes filmed from a script: hand the script to Whisper as a hint (TX_PROMPT, kit/tx.py and kit/clip.py), so captions spell its words
@@ -273,14 +291,23 @@ function draftSteps(s) {
       wordsArg = ['--words', wf];
     }
   }
-  return { steps: [[process.env.STUDIO_REEL || 'kit/reel.cjs', [...src, ...wordsArg, '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])], stepEnv]], lockString: comp.lockString, txPrompt: stepEnv.TX_PROMPT || null, key: 'take:' + C.footageKey(s), from: 'take' };
+  return { steps: [[process.env.STUDIO_REEL || 'kit/reel.cjs', [...src, ...wordsArg, '--name', s.job, '--force', '--draft', '--json', ...args, ...(process.env.STUDIO_REEL_ARGS ? process.env.STUDIO_REEL_ARGS.split(' ') : [])], stepEnv]], lockString: comp.lockString, txPrompt: stepEnv.TX_PROMPT || null, key: 'take:' + C.footageKey(s), from: 'take', styleLook };
+}
+// a draft starts: remember its locks, drop a saved look that is gone, and say in the task log which look it uses
+function startDraft(d, done) {
+  const sl = d.styleLook;
+  const tk = runTask('draft', () => d.steps, done); // first: it refuses while something else runs, and a refused draft changes nothing
+  update(st => { st.lockedAtDraft = d.lockString || ''; st.drafted = null; if (sl && sl.clear) st.styleLook = null; C.dropAutoIdeas(st); /* ideas we made for the older draft go: their search words came from its cut */ });
+  if (sl && sl.note) { tk.lines.push(sl.note); send('log', { id: tk.id, line: sl.note }); }
+  return tk;
 }
 function renderSteps(s) {
   if (!s.job || !existsSync(join(ROOT, 'jobs', s.job, 'build', 'cut.json'))) throw Object.assign(new Error('make a draft first'), { code: 400 });
   const comp = C.compose(s, { refPack: refPackName(s) });
   const args = ['--rebuild', '--name', s.job, '--json'];
   if (comp.lockString && comp.lockString !== s.lockedAtDraft) args.push('--lock', comp.lockString);
-  if (s.export) args.push('--export', s.export);
+  if (C.MOTIONS.includes(s.pace && s.pace.motion)) args.push('--motion', s.pace.motion);
+  { const ex = SIZES.exportArg(s); if (ex) args.push('--export', ex); }
   // the b-roll lane goes into cut.json first (kit/studio/broll-run.mjs), with credits.txt for the clips it uses
   const bp = BRL.plan(s), steps = [];
   if (bp) { const f = join('jobs', s.job, 'broll.json'); writeFileSync(join(ROOT, f), JSON.stringify(bp, null, 1)); steps.push(['kit/studio/broll-run.mjs', ['apply', '--name', s.job, '--plan', f]]); }
@@ -363,26 +390,47 @@ const wordsOf = rel => { const t = MEDIA.transcript(rel); return t ? t.words : n
 const energyOf = rel => MEDIA.energy(rel).catch(() => null);
 const snapOne = (c, words, env, dur) => (env ? CUT.snapCandidate(c, words || [], env, dur) : c);
 const CTA_LINE = 'Pick the cuts';
-async function findCuts(rel, scorer = 'auto') {
+async function findCuts(rel, scorer = 'auto', { keepPicks = false } = {}) {
   const s = C.load(), o = outputOf(s), words = wordsOf(rel); if (!words) throw Object.assign(new Error('transcribe the footage first'), { code: 400 });
-  const env = await energyOf(rel), cands = CUT.candidates(words, o, { duration: durOf(rel) }).map(c => snapOne(c, words, env, durOf(rel)));
+  const env = await energyOf(rel), cands = CUT.candidates(words, o, { duration: durOf(rel), point: s.point }).map(c => snapOne(c, words, env, durOf(rel)));
+  // finding again after the point changed (keepPicks): what you kept or dropped stays, and so do the clips you added
+  if (keepPicks && s.cut && s.cut.source === rel) { const was = Object.fromEntries((s.cut.candidates || []).map(c => [c.id, c]));
+    // (the ids are positions, so a pick is carried only onto a clip that still covers the same stretch of the take)
+    const len = c => (c.ranges || []).reduce((n, [x, y]) => n + (y - x), 0), shared = (p, q) => (p.ranges || []).reduce((n, [a, b]) => n + (q.ranges || []).reduce((m, [x, y]) => m + Math.max(0, Math.min(b, y) - Math.max(a, x)), 0), 0);
+    for (const c of cands) { const w = was[c.id]; if (w && w.by !== 'you' && shared(c, w) >= 0.5 * Math.min(len(c), len(w))) c.keep = w.keep; }
+    for (const c of (s.cut.candidates || []).filter(c => c.by === 'you')) cands.push({ ...c, order: cands.length }); }
   const summary = CUT.summary(o, durOf(rel)), st = S.load(), a = CH.presence();
   const who = scorer !== 'auto' ? scorer : st.chat.backend === 'agent' && a.connected ? 'agent' : LLM.provider(KEYS.envWithKeys(), st.chat) ? 'model' : 'rules';
   update(x => { x.cut = { source: rel, summary, candidates: cands, scoredBy: 'rules', pending: who === 'rules' ? null : who, at: Date.now() }; });
   if (who === 'agent') {
-    const line = `${CTA_LINE} for "${summary}": ${cands.length} candidates from the rules are on the Cut step. Read them and the transcript with get_cuts, then send your picks with set_cuts (time ranges in seconds, a 0 to 100 score and a short reason each). ${o.goal === 'ad' ? 'It is an ad: hook in the first 1 to 2 s, tight pacing, a clear call to action at the end, no long intro.' : 'It is organic: story pacing, a strong first line, short clips that loop back to the start.'}`;
+    const line = `${CTA_LINE} for "${summary}": ${cands.length} candidates from the rules are on the Cut step. Read them and the transcript with get_cuts, then send your picks with set_cuts (time ranges in seconds, a 0 to 100 score and a short reason each). ${o.goal === 'ad' ? 'It is an ad: hook in the first 1 to 2 s, tight pacing, a clear call to action at the end, no long intro.' : 'It is organic: story pacing, a strong first line, short clips that loop back to the start.'}${s.point ? ' ' + pointLine(s.point) : ''}`;
     update(x => { C.applyPatch(x, { say: line, from: 'ui', toAgent: true, attach: { kind: 'cut', source: rel } }); });
   } else if (who === 'model') {
-    LLM.complete('You score cuts of a talking-head video. Reply with JSON only.', CUT.scorePrompt(cands, o), KEYS.envWithKeys(), st.chat, { maxTokens: 1500 })
+    LLM.complete('You score cuts of a talking-head video. Reply with JSON only.', CUT.scorePrompt(cands, o, s.point), KEYS.envWithKeys(), st.chat, { maxTokens: 1500 })
       .then(r => { const re = CUT.applyScores(cands, r.text); update(x => { if (!x.cut || x.cut.source !== rel) return; if (re) { x.cut.candidates = re.map(c => ({ ...c, keep: (x.cut.candidates.find(y => y.id === c.id) || c).keep })); x.cut.scoredBy = r.model || r.provider; } x.cut.pending = null; if (!re) x.cut.note = 'The model reply had no scores, so the rules scores stay.'; }); })
       .catch(e => update(x => { if (x.cut && x.cut.source === rel) { x.cut.pending = null; x.cut.note = `The model failed (${e.message}), so the rules scores stay.`; } }));
   }
   return who;
 }
+async function previewOf(s, rel) {
+  let comp = { args: [] }; try { comp = C.compose(s, { refPack: refPackName(s) }); } catch {}
+  const o = outputOf(s), pace = PACING.pacingOf(o.goal === 'ad' && !comp.args.includes('--tighten') && !comp.args.includes('--no-tighten') ? [...comp.args, '--tighten', '0.25'] : comp.args);
+  const words = wordsOf(rel) || [], dur = durOf(rel), env = words.length ? await energyOf(rel) : null, clips = {};
+  const put = (id, ranges) => { const R = CUT.renderRanges({ ranges }); if (R.length) clips[id] = PACING.playSpans(R, words, env, pace.maxPause, dur); };
+  const c = s.cut && s.cut.source === rel ? s.cut : null;
+  for (const x of (c && c.candidates) || []) put(x.id, x.ranges);
+  const L = words.length ? await linesOf(rel) : null;
+  if (L) {
+    const ps = piecesState(s, rel), P = ps.ids && ps.ids.length ? piecesOf(s, rel) : null;
+    if (P && P.combo.ids.length) put('own', PIECES.comboRanges(P.combo.ids, P.pieces).flatMap(x => x.ranges));
+    for (const b of linesState(s, rel).bites) put(b.id, CUT.biteRanges(b.lines, L));
+  }
+  return { source: rel, pacing: pace.id, maxPause: pace.maxPause, options: PACING.PACING.map(({ id, label, says }) => ({ id, label, says })), audio: !!env, clips };
+}
 async function editCut(b) {
   const c0 = C.load().cut, env = c0 && b.snap !== false && (b.add || b.ranges) ? await energyOf(c0.source) : null;
   return update(x => {
-    const c = x.cut; if (!c) throw Object.assign(new Error('find cuts first'), { code: 400 });
+    const c = x.cut; if (!c) throw Object.assign(new Error('find the clips first (Clips on the Cut step, or get_cuts find true)'), { code: 400 });
     const dur = durOf(c.source), list = c.candidates;
     if (b.add) {
       const ranges = CUT.cleanRanges(b.add.ranges, dur), kind = ['full', 'part', 'clip', 'ad'].includes(b.add.kind) ? b.add.kind : 'clip';
@@ -415,7 +463,7 @@ async function setCuts(b) {
       score: x.score == null ? null : Math.max(0, Math.min(100, Math.round(+x.score))), reason: String(x.reason || '').replace(/\u2014/g, ', ').slice(0, 200), text: CUT.textIn(words, ranges), keep: x.keep !== false, order: k };
   }).map(c => snapOne(c, words, env, dur));
   const by = CH.prettyName(String(b.by || CH.presence().client || 'your agent'));
-  return update(x => { x.cut = { source: rel, summary: CUT.summary(outputOf(x), dur), candidates: list, scoredBy: by, pending: null, at: Date.now() }; C.applyPatch(x, { reply: `${by} picked ${list.length} cut${list.length > 1 ? 's' : ''} on the Cut step.`, from: 'assistant', kind: 'action' }); });
+  return update(x => { x.cut = { source: rel, summary: CUT.summary(outputOf(x), dur), candidates: list, scoredBy: by, pending: null, at: Date.now() }; C.applyPatch(x, { reply: `${by} picked ${list.length} clip${list.length > 1 ? 's' : ''} on the Cut step.`, from: 'assistant', kind: 'action' }); });
 }
 // ---------- the Lines view: a long take as lines, keep or retake, grouped into named bites (kit/studio/cut.mjs lines) ----------
 const LINES = new Map(); // source -> { key, lines }, the snapped lines of a transcript
@@ -440,7 +488,7 @@ const bad = m => Object.assign(new Error(m), { code: 400 });
 // keep or retake per line, and the bites: add, update (name, lines in order), remove, move, the clean take, or set them all (the agent)
 async function editLines(b) {
   const s0 = C.load(), rel = cutSource(s0, b.path || b.source); if (!rel) throw bad('add footage first');
-  const L = await linesOf(rel); if (!L) throw bad('transcribe the footage first (Find cuts or Transcribe on the Cut step)');
+  const L = await linesOf(rel); if (!L) throw bad('we need the words of the take first (open the Cut step, or get_cuts find true)');
   const ids = new Set(L.map(l => l.id)), idOf = v => (typeof v === 'number' || /^\d+$/.test(String(v)) ? 'l' + (+v) : String(v));
   const lineList = v => { if (!Array.isArray(v) || !v.length) throw bad('lines: [line ids or numbers], in the order you want them'); const out = v.map(idOf); const miss = out.filter(x => !ids.has(x)); if (miss.length) throw bad(`no line ${miss.join(', ')}`); return [...new Set(out)]; };
   const by = b.by ? CH.prettyName(String(b.by)) : null;
@@ -449,15 +497,15 @@ async function editLines(b) {
     x.lines = x.lines || {}; const ls = x.lines[rel] = linesState(x, rel);
     if (b.keep && typeof b.keep === 'object') for (const [k, v] of Object.entries(b.keep)) { const id = idOf(k); if (!ids.has(id)) throw bad(`no line ${k}`); ls.keep[id] = !!v; }
     const name = (v, d) => String(v || d).replace(/\u2014/g, ', ').slice(0, 60);
-    if (b.action === 'add') { ls.seq++; ls.bites.push({ id: 'b' + ls.seq, name: name(b.name, `Bite ${ls.seq}`), lines: lineList(b.lines), by: by || 'you', kind: 'clip' }); }
+    if (b.action === 'add') { ls.seq++; ls.bites.push({ id: 'b' + ls.seq, name: name(b.name, `Clip ${ls.seq}`), lines: lineList(b.lines), by: by || 'you', kind: 'clip' }); }
     else if (b.action === 'clean') { const take = CUT.cleanTake(L, ls.keep); if (!take.length) throw bad('keep at least one line');
       const it = { id: 'take', name: 'Clean take', lines: take, by: by || 'you', kind: 'full' }, k = ls.bites.findIndex(y => y.id === 'take'); if (k >= 0) ls.bites[k] = it; else ls.bites.unshift(it); }
     else if (b.action === 'set') { if (!Array.isArray(b.bites)) throw bad('bites: [{ name, lines: [line numbers in order] }]');
       const keepTake = ls.bites.filter(y => y.id === 'take' && b.replace === false);
-      const fresh = b.bites.slice(0, 30).map(y => { ls.seq++; return { id: 'b' + ls.seq, name: name(y.name, `Bite ${ls.seq}`), lines: lineList(y.lines), by: by || 'your agent', kind: 'clip', reason: y.reason ? String(y.reason).replace(/\u2014/g, ', ').slice(0, 160) : null }; });
+      const fresh = b.bites.slice(0, 30).map(y => { ls.seq++; return { id: 'b' + ls.seq, name: name(y.name, `Clip ${ls.seq}`), lines: lineList(y.lines), by: by || 'your agent', kind: 'clip', reason: y.reason ? String(y.reason).replace(/\u2014/g, ', ').slice(0, 160) : null }; });
       ls.bites = b.replace === false ? ls.bites.concat(fresh) : keepTake.concat(fresh); ls.by = by;
       if (b.clean) { const take = CUT.cleanTake(L, ls.keep); if (take.length) { ls.bites = ls.bites.filter(y => y.id !== 'take'); ls.bites.unshift({ id: 'take', name: 'Clean take', lines: take, by: by || 'your agent', kind: 'full' }); } }
-      note = `${by || 'Your agent'} picked ${fresh.length} bite${fresh.length === 1 ? '' : 's'} on the Cut step${b.clean ? ', plus the clean take' : ''}.`; }
+      note = `${by || 'Your agent'} made ${fresh.length} clip${fresh.length === 1 ? '' : 's'} from your lines on the Cut step${b.clean ? ', plus the clean take' : ''}.`; }
     else if (b.action) {
       const k = ls.bites.findIndex(y => y.id === b.id); if (k < 0) throw Object.assign(new Error(`no bite ${b.id}`), { code: 404 }); const it = ls.bites[k];
       if (b.action === 'update') { if (b.name != null) it.name = name(b.name, it.name); if (b.lines) it.lines = lineList(b.lines); }
@@ -480,12 +528,17 @@ async function biteSteps(s, ids, path) {
 
 function cutSteps(s, ids, over) {
   const c = over || s.cut; if (!s.job) throw Object.assign(new Error('name the job first'), { code: 400 });
-  if (!c || !c.candidates.length) throw Object.assign(new Error('find cuts first'), { code: 400 });
+  if (!c || !c.candidates.length) throw Object.assign(new Error('find the clips first (Clips on the Cut step, or get_cuts find true)'), { code: 400 });
   const o = outputOf(s), src = c.source;
   const keep = c.candidates.filter(x => (ids ? ids.includes(x.id) : x.keep)).sort((a, b) => a.order - b.order);
-  if (!keep.length) throw Object.assign(new Error('keep at least one cut'), { code: 400 });
+  if (!keep.length) throw Object.assign(new Error('keep at least one clip'), { code: 400 });
   const comp = C.compose(s, { refPack: refPackName(s) }); if (comp.errs.length) throw Object.assign(new Error(comp.errs.join('; ')), { code: 400 });
   const base = comp.args.slice(); const e = base.indexOf('--export'); if (e >= 0) base.splice(e, 2);
+  // a clip made on its own takes the same style as the reel: the reference's look in Recreate and Copy the look (a clip
+  // cannot be re-cut to the reference's timeline, so Recreate gives it the look), or your saved look with no reference
+  try { const rd = C.recreateRecipe(s, ROOT) ? SLK.refDir(s, ROOT) : null;
+    if (rd) { const nm = SLK.saveFrom(rd, SLK.jobLookName(s.job)).name; const i = base.indexOf('--pack'); if (i >= 0) base.splice(i, 2); base.push('--style-look', nm); }
+    else SLK.forDraft(s, ROOT, base); } catch (err) { console.error('clips: the reference look could not be used: ' + err.message); }
   const tight = o.goal === 'ad' && !base.includes('--tighten') && !base.includes('--no-tighten') ? ['--tighten', '0.25'] : [];
   const REEL = process.env.STUDIO_REEL || 'kit/reel.cjs', steps = [], plan = [];
   // every piece is extracted on its snapped ranges, then handed to the reel as already cut: a clips.json beside the
@@ -528,16 +581,37 @@ function linesCached(rel) {
 const piecesState = (s, rel) => ((s.pieces || {})[rel]) || { ids: [], reasons: {}, by: null, cats: {} };
 function piecesOf(s, rel = cutSource(s)) {
   const L = rel ? linesCached(rel) : null; if (!L) return null;
-  const st = piecesState(s, rel), b = PIECES.build(L, { goal: outputOf(s).goal, cats: st.cats || {} }), by = Object.fromEntries(b.pieces.map(p => [p.id, p]));
+  const st = piecesState(s, rel), named = topicsFor(s, rel, L);
+  const b = PIECES.build(L, { goal: outputOf(s).goal, cats: st.cats || {}, point: s.point, topics: named && named.list }), by = Object.fromEntries(b.pieces.map(p => [p.id, p]));
   const ids = (st.ids || []).filter(id => by[id]);
-  return { source: rel, cats: PIECES.CATS, topics: b.topics, pieces: b.pieces, combo: { ids, reasons: st.reasons || {}, by: st.by, seconds: +ids.reduce((a, id) => a + by[id].seconds, 0).toFixed(2) } };
+  // best: the lines we would pick for the length you asked for (what Let AI choose takes), each with its reason
+  const r = CUT.range(outputOf(s)), ch = PIECES.choose(b.pieces, { min: r[0], max: r[1] == null ? r[0] * 1.33 : r[1] });
+  return { source: rel, cats: PIECES.CATS, topics: b.topics, topicsBy: b.topics.length ? (named ? named.by : 'rules') : null, point: s.point || '', pieces: b.pieces, best: { ids: ch.ids, reasons: ch.reasons, seconds: ch.seconds },
+    combo: { ids, reasons: st.reasons || {}, by: st.by, off: !!st.off, seconds: +ids.reduce((a, id) => a + by[id].seconds, 0).toFixed(2) } };
+}
+// the themes of a take, named by a model or your agent when there is one (kept with the session, per transcript);
+// null means the local rules name them (kit/studio/topics.mjs). The model is asked once per transcript, in the
+// background, through the same local key path as every other model call (kit/studio/llm.mjs)
+const txKey = L => `${L.length}:${L.length ? L[L.length - 1].end : 0}`;
+const TOPICS_ASKED = new Set();
+function topicsFor(s, rel, L) {
+  const key = txKey(L), saved = (s.topics || {})[rel];
+  if (saved && saved.key === key && Array.isArray(saved.list) && saved.list.length) return saved;
+  if (L.length >= 6 && !TOPICS_ASKED.has(rel + key) && !process.env.STUDIO_NO_TOPIC_MODEL) {
+    const st = S.load(), prov = st.chat.backend === 'agent' || st.chat.backend === 'keywords' ? null : LLM.provider(KEYS.envWithKeys(), st.chat);
+    if (prov) { TOPICS_ASKED.add(rel + key);
+      LLM.complete('You name the themes of a talking-head take. Reply with JSON only.', TOPICS.topicsPrompt(L, s.point), KEYS.envWithKeys(), st.chat, { maxTokens: 600 })
+        .then(r => { const list = TOPICS.readTopics(r.text, L); if (list) update(x => { x.topics = x.topics || {}; x.topics[rel] = { key, by: r.model || r.provider || 'a model', list }; }); })
+        .catch(e => console.error('topics: ' + e.message)); }
+  }
+  return null;
 }
 function comboOf(s) {
   const src = cutSource(s); if (!src) return { source: null, pieces: [], seconds: 0, key: '' };
   const pieces = [], c = s.cut && s.cut.source === src ? s.cut : null, ps = piecesState(s, src);
   // your Combo, when you made one (Let AI choose or Build my own on the Cut step), wins: its pieces in your order,
   // neighbours in the take joined into one range. Otherwise the kept cuts in order, then your bites.
-  const P = ps.ids && ps.ids.length ? piecesOf(s, src) : null;
+  const P = ps.ids && ps.ids.length && !ps.off ? piecesOf(s, src) : null;
   if (P && P.combo.ids.length) for (const x of PIECES.comboRanges(P.combo.ids, P.pieces)) pieces.push({ kind: 'piece', id: 'pc-' + x.ids.join('-').slice(0, 40), label: x.text.length > 48 ? x.text.slice(0, 46) + '...' : x.text, ranges: x.ranges, cutKind: 'clip', category: x.category, lines: x.ids });
   else if (c) for (const x of (c.candidates || []).filter(y => y.keep).sort((a, b) => a.order - b.order)) {
     const ranges = CUT.renderRanges(x); if (ranges.length) pieces.push({ kind: 'cut', id: x.id, label: x.label || x.id, ranges, cutKind: x.kind || 'clip' });
@@ -586,21 +660,31 @@ function exportSteps(s, combo0, { clips, plain }) {
 // shows it; MCP get_edit reads it)
 // how many pieces the user sees: a Combo's back to back lines play as one range but count one each
 const pieceN = combo => combo.pieces.reduce((a, x) => a + (x.kind === 'piece' && x.lines ? x.lines.length : 1), 0);
+// the From part of Your edit, said one way: "our 4 best lines, 11 s" when they are our pick, "your 4 lines, 11 s"
+// when you chose or changed them, "4 lines, 11 s, picked by <agent>" when an agent did
+function fromText(s, combo) {
+  const own = combo.pieces.some(x => x.kind === 'piece'), n = own ? pieceN(combo) : combo.pieces.length, secs = `${Math.round(combo.seconds)} s`;
+  if (!own) return `${n} clip${n === 1 ? '' : 's'}, ${secs}`;
+  const by = piecesState(s, combo.source).by, lines = `line${n === 1 ? '' : 's'}`;
+  return by === 'ai' ? `our ${n} best ${lines}, ${secs}` : !by || by === 'you' || by === 'ai, changed by you' ? `your ${n} ${lines}, ${secs}` : `${n} ${lines}, ${secs}, picked by ${by}`;
+}
+const TERMINAL_LINE = /\b(npm run|npx|pip install|python -m)\b/;
 function editOf(s, v) {
   const combo = v.combo, o = outputOf(s), cut = v.cut || {}, from = draftFrom(s, combo), fin = { ...C.defaultState().finish, ...(s.finish || {}) };
   const fmt = (CUT.FORMATS[o.format] || {}).label || o.format, aspect = CUT.aspectOf(o);
   const takes = s.footage.length, src = combo.source ? basename(combo.source) : null;
   const making = [fin.reel ? `1 ${o.format === 'long' ? 'long form video' : 'reel'}` : null, fin.clips && combo.pieces.length ? `${combo.pieces.length} clip${combo.pieces.length === 1 ? '' : 's'}` : null, fin.plain && combo.pieces.length ? 'plain clips' : null].filter(Boolean).join(' and ') || 'nothing yet';
   const picks = Object.values(s.picks || {}).reduce((a, p) => a + (p.allow || []).length + (p.deny || []).length, 0);
-  const ref = s.reference && s.reference.extracted && s.reference.mode !== 'off' ? (s.reference.mode === 'recreate' ? 'recreate' : 'influence') : null;
+  const ref = s.reference && s.reference.extracted && s.reference.mode !== 'off' ? (['recreate', 'look'].includes(s.reference.mode) ? s.reference.mode : 'influence') : null;
+  const styleLook = SLK.inUse(s, ROOT); // the style look the next draft uses (kit/studio/stylelooks.mjs)
   const spots = ((v.broll && v.broll.beats) || []).filter(b => b.slot).length;
   const drafted = s.drafted && s.drafted.key === draftKey(s, combo);
   const next = !takes && !s.clips ? { step: 'footage', label: 'Add footage' } : !s.job ? { step: 'footage', label: 'Name the reel' } : !drafted && fin.reel ? { step: 'finish', label: 'Draft it' } : { step: 'finish', label: 'Render' };
   return {
     making: { text: making, format: fmt, aspect, goal: o.goal, length: (cut.summary && cut.summary.length) || null },
-    from: { takes, source: src, seconds: from === 'pieces' ? combo.seconds : (cut.seconds || null), mode: from, pieces: combo.pieces.length, text: from === 'pieces' ? `${pieceN(combo)} piece${pieceN(combo) === 1 ? '' : 's'}, ${Math.round(combo.seconds)} s, in your order${(() => { const by = piecesState(s, combo.source).by; return by && combo.pieces.some(x => x.kind === 'piece') ? (by === 'ai' ? ', picked by AI' : by === 'you' ? ', built by you' : `, ${by === 'ai, changed by you' ? 'picked by AI, changed by you' : 'set by ' + by}`) : ''; })()}` : takes ? `the whole take${takes > 1 ? ` (${takes} files)` : ''}` : 'no footage yet' },
-    look: { pack: s.pack || null, reference: ref, picks, text: [s.pack || 'Studio picks', ref ? `reference (${ref})` : null, picks ? `${picks} change${picks === 1 ? '' : 's'} by you` : null].filter(Boolean).join(', ') },
-    broll: { spots, ideas: ((v.broll && v.broll.beats) || []).filter(b => b.idea && !b.slot).length, cutins: combo.pieces.filter(x => x.kind === 'testimonial').length, text: [spots ? `${spots} spot${spots === 1 ? '' : 's'}` : 'none yet', combo.pieces.some(x => x.kind === 'testimonial') ? `${combo.pieces.filter(x => x.kind === 'testimonial').length} testimonial` : null].filter(Boolean).join(', ') },
+    from: { takes, source: src, seconds: from === 'pieces' ? combo.seconds : (cut.seconds || null), mode: from, pieces: combo.pieces.length, text: from === 'pieces' ? fromText(s, combo) : takes ? `the whole take${takes > 1 ? ` (${takes} files)` : ''}` : 'no footage yet' },
+    look: { pack: s.pack || null, reference: ref, styleLook, picks, text: [styleLook ? `style look ${styleLook}` : s.pack || 'No Look', ref ? `reference (${ref === 'look' ? 'copy the look' : ref})` : null, picks ? `${picks} change${picks === 1 ? '' : 's'} by you` : null].filter(Boolean).join(', ') },
+    broll: { spots, ideas: ((v.broll && v.broll.beats) || []).filter(b => b.idea && !b.slot).length, cutins: combo.pieces.filter(x => x.kind === 'testimonial').length, needs: brollNeeds(v), text: [spots ? `${spots} spot${spots === 1 ? '' : 's'}` : brollNeeds(v) ? null : 'none yet', brollNeeds(v) ? `${brollNeeds(v)} need${brollNeeds(v) === 1 ? 's' : ''} a clip` : null, combo.pieces.some(x => x.kind === 'testimonial') ? `${combo.pieces.filter(x => x.kind === 'testimonial').length} testimonial` : null].filter(Boolean).join(', ') },
     sound: { bed: s.music.bed, sfx: s.sound.sfx, text: `${s.music.bed === 'auto' ? 'Music picked for you' : s.music.bed === 'none' ? 'No music' : s.music.bed}, sounds ${s.sound.sfx}` },
     drafted: !!drafted, stale: !!(s.drafted && !drafted && fin.reel), next,
   };
@@ -611,10 +695,10 @@ function editOf(s, v) {
 // Combo's pieces and the files), so a version can say how it was made long after the session moved on.
 function saveSettings(s) {
   const dir = join(ROOT, 'jobs', s.job || '-'); let v = 0; try { v = Math.max(0, ...readdirSync(dir).map(f => +(f.match(/^reel-v(\d+)\.mp4$/) || [0, 0])[1])); } catch {} if (!v) return null;
-  const vw = view(s), e = vw.edit, combo = vw.combo, files = C.outputsOf(s).filter(f => new RegExp(`reel(-fx)?-v${v}(-[a-z0-9]+)?\\.mp4$`).test(f));
+  const vw = view(s), e = vw.edit, combo = vw.combo, files = C.outputsOf(s).filter(f => (SIZES.info(f) || {}).v === v);
   const key = draftKey(s), footage = C.footageKey(s), takes = C.takeNames(s);
   const out = { version: v, at: new Date().toISOString(), job: s.job, key, footage, takes, making: e.making.text, format: e.making.format, look: e.look.text, pack: s.pack || null, reference: e.look.reference, from: e.from.text, pieces: combo.pieces.map(x => ({ id: x.id, kind: x.kind, label: x.label, seconds: x.seconds, lines: x.lines || null })), count: pieceN(combo), seconds: combo.seconds,
-    broll: e.broll.text, sound: e.sound.text, export: s.export || null, files };
+    broll: e.broll.text, sound: e.sound.text, export: s.export || null, sizes: SIZES.sizesOf(s), files };
   try { writeFileSync(join(dir, `reel-v${v}.settings.json`), JSON.stringify(out, null, 1)); } catch {}
   const metaF = join(dir, `reel-v${v}.build`, 'meta.json');
   if (existsSync(metaF)) { try { const meta = JSON.parse(readFileSync(metaF, 'utf8')); writeFileSync(metaF, JSON.stringify({ ...meta, key, footage, takes, from: out.from }, null, 1) + '\n'); } catch {} }
@@ -669,9 +753,9 @@ function versionsOf(job, s = null) {
   const vs = [...new Set(files.map(f => +(f.match(/reel(?:-fx)?-v(\d+)[^/]*$/) || [0, 0])[1]).filter(Boolean))].sort((a, b) => b - a);
   return vs.map(v => { const ident = C.outputIdentity(job, v); let st = ident.settings;
 
-    const fs_ = files.filter(f => new RegExp(`/reel(-fx)?-v${v}(-[a-z0-9]+)?\\.mp4$`).test(f)), main = fs_.find(f => new RegExp(`/reel-v${v}\\.mp4$`).test(f)) || fs_[0];
+    const fs_ = files.filter(f => (SIZES.info(f) || {}).v === v), main = fs_.find(f => new RegExp(`/reel-v${v}\\.mp4$`).test(f)) || fs_[0];
     let at = null; try { at = statSync(join(ROOT, main)).mtime.toISOString(); } catch {}
-    return { v, reel: main, files: fs_.map(f => ({ path: f, label: /-fx-/.test(f) ? 'With effects' : new RegExp(`-v${v}\\.mp4$`).test(f) ? 'Reel' : 'Export ' + (f.match(/-v\d+-([a-z0-9]+)\.mp4$/) || [0, ''])[1] })).sort((a, b) => (a.label === 'Reel' ? 0 : a.label === 'With effects' ? 1 : 2) - (b.label === 'Reel' ? 0 : b.label === 'With effects' ? 1 : 2) || a.path.localeCompare(b.path)), at: (st && st.at) || at, seconds: main ? +(durOf(main) || 0).toFixed(1) || null : null,
+    return { v, reel: main, files: fs_.map(f => ({ path: f, label: SIZES.labelOf(f), size: (SIZES.info(f) || {}).size || null })).sort((a, b) => (r => r(a) - r(b))(x => x.path === main ? 0 : x.label === 'With effects' ? 1 : 2) || a.path.localeCompare(b.path)), at: (st && st.at) || at, seconds: main ? +(durOf(main) || 0).toFixed(1) || null : null,
       settings: st, reopen: !!(snaps[v] && snaps[v].snapshot),
       take: (ident.takes && ident.takes.length ? ident.takes.join(', ') : null), draft: ident.from || (st && st.from) || null, key: ident.key || null,
       current: !!(s && s.job === job && C.outputMatchesDraft(s, ident, draftKey(s))) }; });
@@ -736,7 +820,7 @@ const relOf = p => (p.startsWith(ROOT + sep) ? p.slice(ROOT.length + 1) : p).spl
 function refDir(s) { const st = S.load(); return st.downloads ? join(st.downloads, s.job) : join(ROOT, 'teardown-in', 'studio', s.job); }
 const setItem = (id, fn) => update(st => { const it = (st.reference.queue || []).find(x => x.id === id); if (it) fn(it, st); });
 function useItem(st, it) {
-  st.reference = { ...st.reference, active: it.id, file: it.file, url: it.url, status: 'ready', out: it.out, extracted: it.extracted, contact: it.contact || null, applied: false, auto: null };
+  st.reference = { ...st.reference, active: it.id, file: it.file, url: it.url, status: 'ready', out: it.out, extracted: it.extracted, contact: it.contact || null, applied: false, auto: null, stages: it.stages || null };
   C.setReferenceLook(st); // Recreate or Influence: the Look is set from it now, so nobody has to pick it again
 }
 function addLinks(urls) {
@@ -753,6 +837,7 @@ function addLinks(urls) {
       q.push(it); added.push(it);
     }
     if (q.length > 30) st.reference.queue = q.slice(-30);
+    C.syncRefFont(st); // Recreate or Copy the look with a link on its way: the older look is set aside now, so what you pick while it is read is yours
   });
   setImmediate(pump);
   return added;
@@ -764,24 +849,28 @@ function pump() {
   const dir = refDir(s), file = join(dir, `ref-${it.id}.mp4`), out = join('teardown', `studio-${s.job}-r${it.id}`);
   const max = String(+(process.env.STUDIO_REF_MAX_SECONDS || F.DEFAULT_MAX_SECONDS));
   let lastP = -1, title = null;
-  setItem(it.id, x => { x.status = 'downloading'; x.progress = 0; x.error = null; x.file = file; x.out = out.split(sep).join('/'); });
+  // where the breakdown is (kit/studio/stages.mjs): kept on the item in the saved state, so a reload shows the same line
+  const run = STG.newRun(), stages = part => STG.view(run, { part });
+  setItem(it.id, x => { x.status = 'downloading'; x.progress = 0; x.error = null; x.file = file; x.out = out.split(sep).join('/'); x.stages = stages(0); });
   try {
     runTask('reference', () => [['kit/studio/fetch.mjs', [it.url, '--out', file, '--max-seconds', max, '--json']],
       (v => [TEARDOWN, [file, '--out', out, '--name', `studio-${s.job}-r${it.id}`, ...(process.env.STUDIO_TEARDOWN_ARGS ? process.env.STUDIO_TEARDOWN_ARGS.split(' ') : []), ...(v ? v.args : [])], v && v.env])(vlmOf())], () => {
       const recipe = join(ROOT, out, 'Reel.md');
       if (!existsSync(recipe)) throw new Error('teardown wrote no Reel.md');
       const ex = C.extract(recipe);
-      setItem(it.id, (x, st) => { x.status = 'ready'; x.progress = 100; x.extracted = ex; x.contact = existsSync(join(ROOT, out, 'contact.jpg')) ? `${out}/contact.jpg`.split(sep).join('/') : null; if (title) x.title = title;
+      STG.finish(run, Date.now());
+      setItem(it.id, (x, st) => { x.status = 'ready'; x.progress = 100; x.stages = stages(); x.extracted = ex; x.contact = existsSync(join(ROOT, out, 'contact.jpg')) ? `${out}/contact.jpg`.split(sep).join('/') : null; if (title) x.title = title;
         if (!st.reference.active || st.reference.active === x.id || !(st.reference.queue || []).some(q => q.id === st.reference.active && q.status === 'ready')) useItem(st, x); });
       return { extracted: ex };
     }, {
-      step: i => { if (i === 1) setItem(it.id, x => { x.status = 'tearing'; x.progress = 100; }); },
+      step: i => { if (i === 1) { STG.feed(run, 'stage cuts', Date.now()); setItem(it.id, x => { x.status = 'tearing'; x.progress = 100; x.stages = stages(); }); } },
       line: l => {
-        const m = /^progress (\d+)%/.exec(l); if (m && +m[1] !== lastP && (+m[1] - lastP >= 5 || +m[1] === 100)) { lastP = +m[1]; setItem(it.id, x => { if (x.status === 'downloading') x.progress = lastP; }); }
+        const m = /^progress (\d+)%/.exec(l); if (m && +m[1] !== lastP && (+m[1] - lastP >= 5 || +m[1] === 100)) { lastP = +m[1]; STG.feed(run, l, Date.now()); setItem(it.id, x => { if (x.status === 'downloading') { x.progress = lastP; x.stages = stages(lastP / 100); } }); }
+        else if (!m && STG.feed(run, l, Date.now())) setItem(it.id, x => { x.stages = stages(run.stage === 'download' ? Math.max(0, lastP) / 100 : undefined); });
         if (l.startsWith('{"file"')) { try { const j = JSON.parse(l); title = j.title; setItem(it.id, x => { x.title = j.title; x.seconds = j.seconds; x.trimmed = j.trimmed; }); } catch {} }
       },
       lane: 'reference',
-      end: (status, lines) => { if (status !== 'done') setItem(it.id, x => { if (x.status !== 'ready') { x.status = status === 'cancelled' ? 'cancelled' : 'failed'; const e = lines.filter(l => /download failed|error|Error|failed|not found/i.test(l) && !l.startsWith('$')).pop(); x.fix = F.fixOf(e); x.error = (e || lines[lines.length - 1] || 'failed').replace(/^download failed: /, '').slice(0, 300); } }); },
+      end: (status, lines) => { if (status !== 'done') setItem(it.id, x => { if (x.status !== 'ready') { x.status = status === 'cancelled' ? 'cancelled' : 'failed'; if (status === 'cancelled') delete x.stages; else { STG.fail(run, Date.now()); x.stages = stages(); } const e = lines.filter(l => /download failed|error|Error|failed|not found/i.test(l) && !l.startsWith('$')).pop(); x.fix = F.fixOf(e); x.error = (e || lines[lines.length - 1] || 'failed').replace(/^download failed: /, '').slice(0, 300); } }); },
     });
   } catch (e) { setItem(it.id, x => { x.status = 'failed'; x.error = e.message; }); }
 }
@@ -837,16 +926,27 @@ const sceneApi = mountScenes({ json, readBody, update, chromeOk });
 const FOLDERS = mountFolders({ ROOT, json, readBody, extraFolders: () => { const st = S.load(); return [st.downloads, st.renders, st.broll && st.broll.library, join(ROOT, 'teardown-in', 'studio'), join(ROOT, 'jobs')]; },
   ensure: [join(ROOT, 'teardown-in', 'studio'), join(ROOT, 'jobs')] });
 const POSTR = mountPost({ ROOT, C, json, readBody });
+// sizes: make the 4:5 or 1:1 of a finished reel (kit/studio/sizes.mjs)
+const SIZER = SIZES.mount({ ROOT, C, json, readBody, runTask: (...a) => runTask(...a), needFor: k => needFor(k) });
 // the reference's b-roll parts, on its own clock as a fraction of its length, become spots (kit/studio/lane.mjs spots)
 // A Recreate draft re-cut to the reference's shots gives its cutaways on the draft's own clock: build/plan.json
 // shots first, else cut.json refShots (kit/recreate.cjs shotsOf).
 // Each carries the cutaway's length and what it showed (Reel.md shot broll), so the spot matches it.
-const refBroll = (s, cut, job = s.job) => { if (!s.reference || s.reference.mode === 'off') return [];
+// the plan's B-roll slots with no clip yet, not skipped (Your edit says how many)
+const brollNeeds = v => ((v.broll && v.broll.beats) || []).filter(b => b.need && !b.need.skipped && !b.slot).length;
+// 1.28.0: a draft from a reference or a look plans its B-roll slots itself (build/plan.json "broll", kit/broll-slots.cjs):
+// each slot is a spot, with what it should show and how it is treated, in Recreate and in Copy the look.
+const planSlots = job => { const p = job ? RC.readPlan(join(ROOT, 'jobs', String(job), 'build')) : null; return p && Array.isArray(p.broll) ? p.broll : []; };
+const refBroll = (s, cut, job = s.job) => {
+  const ps = planSlots(job);
+  if (ps.length) return ps.map(x => ({ at: +x.start + 0.05, seconds: +(+x.end - +x.start).toFixed(2), label: 'B-roll', detail: x.what ? `it shows ${x.what}` : x.ref ? 'the reference shows B-roll here' : 'the look has B-roll here', ...(x.what ? { what: x.what } : {}), slot: x }));
+  if (!s.reference || s.reference.mode === 'off' || noTimeline(s)) return [];
   const rs = RC.shotsOf(job ? join(ROOT, 'jobs', String(job), 'build') : null, cut).filter(x => x.cutaway);
   if (rs.length) return rs.map(x => ({ at: +x.start + 0.05, seconds: +(+x.end - +x.start).toFixed(2), label: 'B-roll', detail: x.broll ? `it shows ${x.broll}` : 'the reference cuts away here', ...(x.broll ? { what: x.broll } : {}) }));
   const sw = swapOf(s); if (!sw || !sw.seconds) return [];
   return (sw.parts || []).filter(p => p.kind === 'broll').map(p => ({ frac: p.at / sw.seconds, ...(p.end != null && p.end > p.at ? { fracLen: (p.end - p.at) / sw.seconds } : {}), label: p.label, detail: p.detail, ...(p.what ? { what: p.what } : {}) })); };
 const BRL = mountBroll({ ROOT, C, update, json, readBody, serveFile: (...a) => serveFile(...a), CH, capturePage, chromeOk, refParts: refBroll,
+  askAgent: (text, attach) => (S.load().chat.backend === 'agent' ? chatTurn(text, false, attach) : null),
   transcribe: (rel, done) => { startTranscribe(rel, () => done(null)); if (MEDIA.transcribing(rel)) watchTx(rel, done); }, wordsOf, energyOf });
 // startTranscribe calls back only on success; a raw upload also wants to hear a failure
 function watchTx(rel, done) { const t = setInterval(() => { const x = (C.load().tx || {})[rel]; if (x && x.status === 'failed') { clearInterval(t); done(Object.assign(new Error(x.error || 'transcription failed'), { fix: x.fix })); } else if (!MEDIA.transcribing(rel)) clearInterval(t); }, 500); }
@@ -876,7 +976,14 @@ async function api(req, res, u) {
     const patch = await readBody(req);
     const s = C.load(), r = C.applyPatch(s, { ...patch, from: patch.from || 'ui' });
     if (r.errs.length) return json(res, 400, { error: r.errs.join('; '), errs: r.errs });
-    C.save(s); pushState(); return json(res, 200, { ...view(s), log: r.log });
+    C.save(s); pushState();
+    // a new point changes what we recommend: the lines rescore by themselves, the suggested clips are found again
+    // (only the rules' own clips: clips your agent or a model picked stay, they read the new point from get_cuts)
+    if (patch.point !== undefined && r.log.some(l => /^(point:|no point set)/.test(l)) && s.cut && s.cut.source && s.cut.scoredBy === 'rules' && !s.cut.pending && (s.cut.candidates || []).length && MEDIA.transcript(s.cut.source)) {
+      try { await findCuts(s.cut.source, 'rules', { keepPicks: true }); } catch (e) { console.error(e.message); }
+      return json(res, 200, { ...view(C.load()), log: r.log });
+    }
+    return json(res, 200, { ...view(s), log: r.log });
   }
   if (p === '/api/upload' && M === 'POST') {
     const kind = u.searchParams.get('kind'), name = safeName(u.searchParams.get('name')), ext = extname(name).toLowerCase();
@@ -900,7 +1007,7 @@ async function api(req, res, u) {
     let radd = null;
     const s = update(st => {
       if (kind === 'footage') radd = C.addFootage(st, relp);
-      if (kind === 'reference') { st.reference = { ...st.reference, file: relp, url: null, status: 'uploaded', extracted: null, out: null, applied: false }; }
+      if (kind === 'reference') { st.reference = { ...st.reference, file: relp, url: null, status: 'uploaded', extracted: null, out: null, applied: false, stages: null }; C.undoReferenceLook(st); st.reference.lookFor = null; st.reference.fontFor = null; /* another file is another reference: what you picked under the last one does not ride into it */ } // an earlier breakdown's "We stopped while" is not this file's
       if (kind === 'music') { st.music.upload = relp; st.music.bed = 'upload'; }
     });
     if (radd && radd.reset) { C.applyPatch(s, { reply: radd.note, from: 'studio', kind: 'action' }); C.save(s); pushState(); }
@@ -973,7 +1080,16 @@ async function api(req, res, u) {
   }
   if (p === '/api/cut' && M === 'GET') {
     const s = C.load(), v = cutView(s), t = v.source && MEDIA.transcript(v.source);
+    v.point = s.point || '';
+    // the Pacing choice, as the state view gives it (get_cuts returns it as pacing)
+    if (!v.error) { let comp = { args: [] }; try { comp = C.compose(s, { refPack: refPackName(s) }); } catch {} v.pacing = pacingFor(v, comp); }
     return json(res, 200, { ...v, lengthSeconds: Object.fromEntries(Object.entries(CUT.FORMATS).map(([k, f]) => [k, f.lengths])), sentences: t ? CUT.sentences(t.words).map(x => ({ i: x.i, start: x.start, end: x.end, text: x.text })) : null });
+  }
+  // the stitched previews of the Cut step: for every clip, the stretches of the take it plays, in order, with the
+  // quiet the Pacing choice takes out (kit/studio/pacing.mjs). The page plays them back to back on the take itself
+  if (p === '/api/cut/preview' && M === 'GET') {
+    const s = C.load(), rel = cutSource(s, u.searchParams.get('path')); if (!rel) return json(res, 400, { error: 'add footage first' });
+    return json(res, 200, await previewOf(s, rel));
   }
   if (p === '/api/cut/output' && M === 'POST') {
     const b = await readBody(req), s = C.load();
@@ -1000,6 +1116,7 @@ async function api(req, res, u) {
   if (await FOLDERS(p, M, u, req, res)) return;
   if (await BRL.route(p, M, u, req, res)) return;
   if (await POSTR.route(p, M, u, req, res)) return;
+  if (await SIZER.route(p, M, u, req, res)) return;
   if (p === '/api/lines' && M === 'GET') return json(res, 200, await linesView(C.load(), u.searchParams.get('path')));
   if (p === '/api/lines' && M === 'POST') { const b = await readBody(req); const r = await editLines(b); return json(res, 200, { lines: r.view, ...view(r.s) }); }
   if (p === '/api/lines/render' && M === 'POST') {
@@ -1055,14 +1172,18 @@ async function api(req, res, u) {
     const b = await readBody(req), s = C.load();
     if (b.url || b.urls) { const added = addLinks([].concat(b.urls || [], b.url || [])); return json(res, 202, { added, ...view(C.load()) }); }
     const t = teardownSteps(s, null);
-    update(st => { st.reference.status = 'running'; st.reference.url = b.url || null; st.reference.out = t.out; });
+    const run = STG.newRun(), stages = () => STG.view(run, { skip: ['download'] });
+    STG.feed(run, 'stage cuts', Date.now());
+    update(st => { st.reference.status = 'running'; st.reference.url = b.url || null; st.reference.out = t.out; st.reference.stages = stages(); C.syncRefFont(st); /* as a link does when it is added: what you pick while the file is read is yours */ });
     runTask('teardown', () => t.steps, () => {
       const recipe = join(ROOT, t.out, 'Reel.md');
       if (!existsSync(recipe)) throw new Error('teardown wrote no Reel.md');
       const ex = C.extract(recipe);
-      update(st => { st.reference.status = 'ready'; st.reference.extracted = ex; st.reference.out = t.out; st.reference.contact = existsSync(join(ROOT, t.out, 'contact.jpg')) ? `${t.out}/contact.jpg`.split(sep).join('/') : null; st.reference.auto = null; C.setReferenceLook(st); });
+      STG.finish(run, Date.now());
+      update(st => { st.reference.status = 'ready'; st.reference.stages = stages(); st.reference.extracted = ex; st.reference.out = t.out; st.reference.contact = existsSync(join(ROOT, t.out, 'contact.jpg')) ? `${t.out}/contact.jpg`.split(sep).join('/') : null; st.reference.auto = null; C.setReferenceLook(st); });
       return { extracted: ex };
-    }, { end: status => { if (status !== 'done') update(st => { C.settleReference(st); }); } }); // failed or cancelled: not "running" forever
+    }, { line: l => { if (STG.feed(run, l, Date.now())) update(st => { st.reference.stages = stages(); }); },
+      end: status => { if (status !== 'done') update(st => { C.settleReference(st); if (status === 'cancelled') delete st.reference.stages; else { STG.fail(run, Date.now()); st.reference.stages = stages(); } }); } }); // failed or cancelled: not "running" forever
     return json(res, 202, view(C.load()));
   }
   if (p === '/api/reference/url' && M === 'POST') {
@@ -1075,11 +1196,11 @@ async function api(req, res, u) {
     const b = await readBody(req), id = +b.id, s = C.load(), it = (s.reference.queue || []).find(x => x.id === id);
     if (!it) return json(res, 404, { error: `no reference ${id}` });
     if (b.action === 'use') { if (it.status !== 'ready') return json(res, 400, { error: 'that reference is not broken down yet' }); update(st => useItem(st, st.reference.queue.find(x => x.id === id))); }
-    else if (b.action === 'retry') { if (['downloading', 'tearing'].includes(it.status)) return json(res, 409, { error: 'it is running' }); setItem(id, x => { x.status = 'queued'; x.error = null; x.progress = 0; const c = F.classify(x.url); const miss = c.ok ? F.missingFor(c, F.tools({ fresh: true })) : c.error; if (miss) { x.status = 'failed'; x.error = miss; } }); setImmediate(pump); }
+    else if (b.action === 'retry') { if (['downloading', 'tearing'].includes(it.status)) return json(res, 409, { error: 'it is running' }); setItem(id, x => { x.status = 'queued'; x.error = null; x.progress = 0; delete x.stages; const c = F.classify(x.url); const miss = c.ok ? F.missingFor(c, F.tools({ fresh: true })) : c.error; if (miss) { x.status = 'failed'; x.error = miss; } }); setImmediate(pump); }
     else if (b.action === 'remove') {
       if (['downloading', 'tearing'].includes(it.status) && refTask && refTask.status === 'running') { refTask.cancel = true; refTask.proc && refTask.proc.kill('SIGTERM'); }
       if (it.file && b.deleteFile !== false) rmSync(it.file, { force: true });
-      update(st => { st.reference.queue = st.reference.queue.filter(x => x.id !== id); if (st.reference.active === id) { C.undoReferenceLook(st); } if (st.reference.active === id) st.reference = { ...st.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null }; });
+      update(st => { st.reference.queue = st.reference.queue.filter(x => x.id !== id); if (st.reference.active === id) { C.undoReferenceLook(st); } if (st.reference.active === id) { st.reference = { ...st.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null, stages: null }; } C.syncRefFont(st); });
     } else return json(res, 400, { error: 'action: use, retry or remove' });
     return json(res, 200, view(C.load()));
   }
@@ -1087,13 +1208,30 @@ async function api(req, res, u) {
     // Clear reference: the reference and every pick it added go, as one undo ({ undo: true } puts it all back)
     const b = await readBody(req).catch(() => ({}));
     if (b.undo) { const s0 = C.load(); if (!s0.undoRef) return json(res, 400, { error: 'nothing to undo' });
-      const st = update(x => { const u = x.undoRef; x.reference = u.reference; x.picks = u.picks; x.pack = u.pack; x.music = u.music; delete x.undoRef; }); return json(res, 200, { ...view(st), note: 'The reference is back, with its picks.' }); }
+      const st = update(x => { const u = x.undoRef; x.reference = u.reference; x.picks = u.picks; x.pack = u.pack; x.music = u.music; if (u.sound) x.sound = u.sound; if (u.pace) x.pace = u.pace; if (u.fontLock !== undefined) x.fontLock = u.fontLock; if ('boost' in u) x.boost = u.boost; if ('entranceLock' in u) x.entranceLock = u.entranceLock; delete x.undoRef; }); return json(res, 200, { ...view(st), note: 'The reference is back, with its picks.' }); }
     const s0 = C.load(); if (!s0.reference.extracted && !s0.reference.file && !s0.reference.url) return json(res, 400, { error: 'no reference to clear' });
     let n = 0;
-    const st = update(x => { x.undoRef = JSON.parse(JSON.stringify({ reference: x.reference, picks: x.picks, pack: x.pack || null, music: x.music }));
+    const st = update(x => { x.undoRef = JSON.parse(JSON.stringify({ reference: x.reference, picks: x.picks, pack: x.pack || null, music: x.music, sound: x.sound, pace: x.pace, fontLock: !!x.fontLock, boost: x.boost ?? null, entranceLock: !!x.entranceLock }));
       n = C.undoReferenceLook(x);
-      x.reference = { ...x.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null, added: [], prev: null, auto: null }; });
+      x.reference = { ...x.reference, active: null, file: null, url: null, status: 'none', out: null, extracted: null, applied: false, contact: null, added: [], prev: null, auto: null, stages: null }; C.syncRefFont(x); });
     return json(res, 200, { ...view(st), note: `Cleared the reference${n ? ` and the ${n} pick${n === 1 ? '' : 's'} it added` : ''}. Undo puts it back.` });
+  }
+  // the one button under "Your saved look is in use, not the reference's": the board is set from the reference alone
+  // (kit/studio/reference.mjs useReferenceLook). Undo on the page puts the earlier look back.
+  if (p === '/api/reference/use-look' && M === 'POST') {
+    let r; const st = update(x => { r = C.applyPatch(x, { useReferenceLook: true }); });
+    return json(res, 200, { ...view(st), log: r.log, note: r.noop ? "The reference's look is already in use." : "Switched to the reference's look. Undo brings your saved look back." });
+  }
+  // fix the text of a title the breakdown may have misread, before a draft: { n, text } rewrites that title in the
+  // reference's Reel.md (kit/studio/reference.mjs fixTitleText) and reads the recipe again
+  if (p === '/api/reference/title' && M === 'POST') {
+    const b = await readBody(req), s0 = C.load(), out = s0.reference && s0.reference.out, recipe = out ? join(ROOT, out, 'Reel.md') : null;
+    if (!recipe || !existsSync(recipe) || !s0.reference.extracted) return json(res, 400, { error: 'Add a reference and let us break it down first.' });
+    try {
+      const fx = C.fixTitleText(recipe, +b.n, b.text), ex = C.extract(recipe);
+      const st = update(x => { x.reference.extracted = ex; const it = (x.reference.queue || []).find(q => q.id === x.reference.active && q.out === out); if (it) it.extracted = ex; });
+      return json(res, 200, { ...view(st), title: fx, note: `Title ${fx.n} saved.` });
+    } catch (e) { return json(res, e.code || 500, { error: e.message }); }
   }
   if (p === '/api/reference/apply' && M === 'POST') {
     const s = C.load(), ex = s.reference.extracted; if (!ex) return json(res, 400, { error: 'tear down a reference first' });
@@ -1113,8 +1251,7 @@ async function api(req, res, u) {
   if (p === '/api/draft' && M === 'POST') {
     const s = C.load(); const d = draftSteps(s); // checks the footage first, so an empty job says that before a missing tool
     const miss = needFor('draft'); if (miss) return json(res, 400, miss);
-    update(st => { st.lockedAtDraft = d.lockString || ''; st.drafted = null; });
-    runTask('draft', () => d.steps, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; delete st.draftStale; }); BRL.autoPick(s.job); return { choices: !!readChoices(C.load()), note: DRAFT_DONE, from: d.from }; });
+    startDraft(d, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; delete st.draftStale; }); BRL.autoPick(s.job); return { choices: !!readChoices(C.load()), note: DRAFT_DONE, from: d.from }; });
     return json(res, 202, { ...view(C.load()), from: d.from });
   }
   // ---------- pieces and the Combo (kit/studio/pieces.mjs) ----------
@@ -1125,7 +1262,7 @@ async function api(req, res, u) {
     // { choose: true } Let AI choose; { ids, reasons, by } your Combo; { add, remove, move: { id, to } } one piece;
     // { clear: true }; { cats: { <piece id>: category } } move pieces to another category (null puts the rules' back)
     const b = await readBody(req), s0 = C.load(), rel = cutSource(s0, b.path); if (!rel) return json(res, 400, { error: 'add footage first' });
-    if (!(await linesOf(rel))) return json(res, 400, { error: 'transcribe the footage first (Find cuts or Transcribe on the Cut step)' });
+    if (!(await linesOf(rel))) return json(res, 400, { error: 'we need the words of the take first (open the Cut step, or get_cuts find true)' });
     const P = piecesOf(s0, rel), by = Object.fromEntries(P.pieces.map(x => [x.id, x])), who = b.by ? CH.prettyName(String(b.by)) : 'you';
     for (const id of [...(Array.isArray(b.ids) ? b.ids : []), b.add, b.remove, b.move && b.move.id].filter(x => x != null)) if (!by[id]) return json(res, 400, { error: `no piece ${id} (get_pieces lists them)` });
     if (b.cats) for (const [id, c] of Object.entries(b.cats)) { if (!by[id]) return json(res, 400, { error: `no piece ${id}` }); if (c !== null && !PIECES.CAT_IDS.includes(c)) return json(res, 400, { error: `category: ${PIECES.CAT_IDS.join(', ')}` }); }
@@ -1133,19 +1270,25 @@ async function api(req, res, u) {
     update(st => { st.pieces = st.pieces || {}; const x = st.pieces[rel] = { ...piecesState(st, rel) }; x.ids = [...(x.ids || [])]; x.reasons = { ...(x.reasons || {}) }; x.cats = { ...(x.cats || {}) };
       if (b.cats) for (const [id, c] of Object.entries(b.cats)) { if (c === null) delete x.cats[id]; else x.cats[id] = c; }
       if (b.choose) { const r = CUT.range(outputOf(st)), mn = r[0], mx = r[1] == null ? r[0] * 1.33 : r[1];
-        const ch = PIECES.choose(piecesOf(st, rel).pieces, { min: mn, max: mx }); x.ids = ch.ids; x.reasons = ch.reasons; x.by = 'ai'; note = `Picked ${ch.ids.length} pieces, ${Math.round(ch.seconds)} s, for your Combo. Drag to reorder, click x to drop.`; }
+        const ch = PIECES.choose(piecesOf(st, rel).pieces, { min: mn, max: mx }); x.ids = ch.ids; x.reasons = ch.reasons; x.by = 'ai'; note = `Picked ${ch.ids.length} lines, ${Math.round(ch.seconds)} s, for your clip. Drag to reorder, click x to drop.`; }
       if (Array.isArray(b.ids)) { x.ids = [...new Set(b.ids.map(String))]; x.reasons = b.reasons && typeof b.reasons === 'object' ? Object.fromEntries(Object.entries(b.reasons).filter(([k]) => x.ids.includes(k)).map(([k, v]) => [k, String(v).replace(/\u2014/g, ', ').slice(0, 160)])) : {}; x.by = who === 'you' ? 'you' : who;
-        if (who !== 'you') C.applyPatch(st, { reply: `${who} set your Combo: ${x.ids.length} piece${x.ids.length === 1 ? '' : 's'}.`, from: 'assistant', kind: 'action' }); }
+        if (who !== 'you') C.applyPatch(st, { reply: `${who} picked the lines for your clip: ${x.ids.length} line${x.ids.length === 1 ? '' : 's'}.`, from: 'assistant', kind: 'action' }); }
       if (b.add != null && !x.ids.includes(b.add)) { x.ids.push(String(b.add)); x.by = x.by === 'ai' ? 'ai, changed by you' : x.by || 'you'; }
       if (b.remove != null) { x.ids = x.ids.filter(i => i !== b.remove); delete x.reasons[b.remove]; }
       if (b.move) { const k = x.ids.indexOf(b.move.id); if (k >= 0) { x.ids.splice(k, 1); x.ids.splice(Math.max(0, Math.min(x.ids.length, +b.move.to || 0)), 0, b.move.id); } }
       if (b.clear) { x.ids = []; x.reasons = {}; x.by = null; }
+      // your own clip moves on unless you untick it on the Cut step (off: true); picking lines again turns it back on
+      if (b.off !== undefined) x.off = !!b.off; else if (b.choose || Array.isArray(b.ids) || b.add != null) delete x.off;
+      if (!x.off) delete x.off;
+      // themes your agent named for this take ([{ label, lines: [line numbers or ids] }]); [] goes back to the local rules
+      if (Array.isArray(b.topics)) { const L = LINES.get(rel).lines, list = b.topics.length ? TOPICS.readTopics(b.topics, L) : null; st.topics = st.topics || {};
+        if (list) st.topics[rel] = { key: txKey(L), by: who === 'you' ? 'you' : who, list }; else { delete st.topics[rel]; if (b.topics.length) throw Object.assign(new Error('topics: 2 to 5 themes, each { label: 2 to 5 words, lines: [line numbers] }'), { code: 400 }); } }
       if ((b.add != null || b.remove != null || b.move) && x.by === 'ai') x.by = 'ai, changed by you';
     });
     const s1 = C.load(); return json(res, 200, { ...view(s1), pieces: piecesOf(s1, rel), note });
   }
   if (p === '/api/outputs' && M === 'GET') return json(res, 200, outputsLib(C.load(), u.searchParams.get('all') === '1'));
-  if (p === '/api/edit' && M === 'GET') { const v = view(C.load()); return json(res, 200, { edit: v.edit, combo: v.combo, finish: v.state.finish }); }
+  if (p === '/api/edit' && M === 'GET') { const v = view(C.load()); return json(res, 200, { edit: v.edit, combo: v.combo, point: v.state.point || '', finish: v.state.finish, sizes: v.sizes.list.filter(z => z.on).map(z => ({ size: z.size, for: z.use, file: SIZES.nameOf(z.id) })), referenceMode: v.state.reference.mode, styleLook: v.state.styleLook || null, styleLooks: v.styleLooks, match: v.match }); }
   if (p === '/api/render' && M === 'POST') {
     // the one Render: the reel (from the draft), and in the same run the exports you ticked in Finish: each piece as its
     // own reel (clips) or as a plain clip (plain). Body { exports: { reel, clips, plain } } overrides finish for this run.
@@ -1153,7 +1296,7 @@ async function api(req, res, u) {
     const fin = { ...C.defaultState().finish, ...(s0.finish || {}), ...(b.exports && typeof b.exports === 'object' ? Object.fromEntries(['reel', 'clips', 'plain'].filter(k => b.exports[k] !== undefined).map(k => [k, !!b.exports[k]])) : {}) };
     if (!fin.reel && !fin.clips && !fin.plain) return json(res, 400, { error: 'pick something to make: the reel, clips or plain clips' });
     const combo = comboOf(s0);
-    if (!fin.reel && !combo.pieces.length) return json(res, 400, { error: 'keep a piece on the Cut step first, or turn the reel back on' });
+    if (!fin.reel && !combo.pieces.length) return json(res, 400, { error: 'keep a clip on the Cut step first, or turn the reel back on' });
     if (!fin.reel) {
       const miss = needFor('render'); if (miss) return json(res, 400, miss);
       const x = exportSteps(s0, combo, fin);
@@ -1222,7 +1365,7 @@ async function api(req, res, u) {
     const note = `Clean-up: ${removed.filter(x => x.type === 'silence').length} pauses, ${removed.filter(x => x.type === 'filler').length} filler words and ${items.filter(x => x.type === 'take').length - pl.keep.length} retakes left out, ${pl.saved} s shorter. ${b.redraft === false ? 'Used on the next draft.' : 'Redrafting.'}`;
     update(st => { st.cleanup = { on: true, silence: sil || (st.cleanup && st.cleanup.silence) || 0.7, decisions: dec, footage: C.footageKey(st), at: new Date().toISOString(), saved: pl.saved };
       if (S.load().actionNotes !== false) C.applyPatch(st, { reply: note, from: 'Studio', kind: 'action' }); });
-    if (b.redraft !== false) { const s = C.load(), d = draftSteps(s); update(st => { st.lockedAtDraft = d.lockString || ''; st.drafted = null; }); runTask('draft', () => d.steps, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; delete st.draftStale; }); return { choices: !!readChoices(C.load()), cleanup: pl, note: DRAFT_DONE }; }); }
+    if (b.redraft !== false) { const s = C.load(), d = draftSteps(s); startDraft(d, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; delete st.draftStale; }); return { choices: !!readChoices(C.load()), cleanup: pl, note: DRAFT_DONE }; }); }
     return json(res, 202, { ...cleanupView(C.load()), plan: pl, ...view(C.load()) });
   }
   // comment on the preview: a click or a box on a frame, sent to whoever answers the chat, with the frame saved in the job
@@ -1244,6 +1387,13 @@ async function api(req, res, u) {
     const end = b.end != null && +b.end > t + 0.05 ? +(+b.end).toFixed(2) : null, source = typeof b.source === 'string' && okFootage(s, b.source) ? b.source : null;
     const line = RV.commentLine({ text, t, end, region: rg, video: video || source, frame });
     return json(res, 200, await chatTurn(line, false, { kind: 'comment', t: +t.toFixed(2), ...(end != null ? { end } : {}), region: rg, video: video || source, frame, note: text }));
+  }
+  // saved style looks (kit/studio/stylelooks.mjs): the list, and Save this look from the current reference
+  if (p === '/api/style-looks' && M === 'GET') return json(res, 200, { looks: SLK.list() });
+  if (p === '/api/style-looks/save' && M === 'POST') {
+    const b = await readBody(req).catch(() => ({})); let r;
+    try { r = SLK.saveCurrent(C.load(), ROOT, b.name); } catch (e) { return json(res, e.code || 500, { error: e.message }); }
+    pushState(true); return json(res, 200, { ok: true, name: r.name, looks: SLK.list() });
   }
   if (p === '/api/pack/save' && M === 'POST') {
     const b = await readBody(req), s = C.load(), name = String(b.name || '').toLowerCase();
@@ -1268,14 +1418,14 @@ async function api(req, res, u) {
     // one wizard step (or all of them at once): reel { goal, look, choose }, clips { clips, ads }, reference { url }
     const b = await readBody(req), s0 = C.load(), w = WIZ.plan(b, C.catalog().packs.map(x => x.name)); if (w.errs.length) return json(res, 400, { error: w.errs.join('; ') });
     const rel = cutSource(s0, b.path), done = []; let next = null, pending = null, note = null;
-    if ((w.wizard !== 'reference') && !rel) return json(res, 400, { error: 'add footage first, on the Footage step' });
+    if ((w.wizard !== 'reference') && !rel) return json(res, 400, { error: 'add footage first, on the Start step' });
     const setOut = o => { const r = CUT.normalize(outputOf(C.load()), o); if (r.errs.length) throw new Error(r.errs.join('; ')); update(x => { x.output = r.output; if (!x.cut || x.cut.source !== rel) x.cut = { source: rel, candidates: [], scoredBy: null }; }); };
     if (w.goal) { setOut(WIZ.GOALS[w.goal].out); done.push(`goal: ${WIZ.GOALS[w.goal].label}`); next = 'look'; }
     if (w.look) { update(x => { C.applyPatch(x, { pack: w.look }); }); done.push(`look: ${w.look}`); next = 'choose'; }
     if (w.choose) {
-      if (!(await linesOf(rel))) { if (!MEDIA.transcript(rel)) startTranscribe(rel, () => findCuts(rel, 'auto').catch(e => console.error(e.message))); pending = 'transcript'; next = 'cut'; note = 'Transcribing the take first. Let AI choose on Cut when it is ready.'; }
+      if (!(await linesOf(rel))) { if (!MEDIA.transcript(rel)) startTranscribe(rel, () => findCuts(rel, 'auto').catch(e => console.error(e.message))); pending = 'transcript'; next = 'cut'; note = 'Reading the words of the take first. Use our best lines on Cut when it is ready.'; }
       else { update(st => { const r = CUT.range(outputOf(st)), mn = r[0], mx = r[1] == null ? r[0] * 1.33 : r[1], ch = PIECES.choose(piecesOf(st, rel).pieces, { min: mn, max: mx });
-        st.pieces = st.pieces || {}; st.pieces[rel] = { ...piecesState(st, rel), ids: ch.ids, reasons: ch.reasons, by: 'ai' }; note = `Picked ${ch.ids.length} pieces, ${Math.round(ch.seconds)} s, for your Combo. Draft it in Finish.`; });
+        st.pieces = st.pieces || {}; st.pieces[rel] = { ...piecesState(st, rel), ids: ch.ids, reasons: ch.reasons, by: 'ai' }; note = `Picked ${ch.ids.length} lines, ${Math.round(ch.seconds)} s, for your clip. Draft it on Review.`; });
         done.push('combo: AI chose'); next = 'finish'; }
     }
     if (w.wizard === 'clips') { setOut(WIZ.clipsOutput(w.clips, w.ads)); done.push(`clips: ${w.clips}${w.ads ? ' with ad cuts' : ''}`); next = 'cut';
@@ -1305,7 +1455,7 @@ async function api(req, res, u) {
     const b = await readBody(req), text = String(b.text || '').trim();
     if (!text) return json(res, 400, { error: 'say something' });
     // Ask my agent: the step it was asked from rides along, so the agent knows what "this" is
-    const STEP = { footage: 'Footage', cut: 'Cut', look: 'Look', broll: 'B-roll', finish: 'Finish', post: 'Post' };
+    const STEP = { start: 'Start', footage: 'Start', cut: 'Cut', picture: 'Picture', look: 'Picture', text: 'Text and graphics', broll: 'B-roll', music: 'Music and sounds', review: 'Review', finish: 'Review', render: 'Render', post: 'Post' };
     const said = b.step && STEP[b.step] ? `(On the ${STEP[b.step]} step) ${text}` : text;
     return json(res, 200, await chatTurn(said, b.offline));
   }

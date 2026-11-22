@@ -151,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(grid, indent=2) + "\n")
+    out.write_text(json.dumps(grid, indent=2) + "\n", encoding="utf-8")
     print(
         f"beat-grid: {grid['tempo_bpm']} BPM, {len(grid['beats'])} beats, "
         f"{len(grid['onsets'])} onsets, {len(grid['drops'])} drops, "

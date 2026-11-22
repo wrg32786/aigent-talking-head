@@ -17,13 +17,14 @@ import * as KEYS from './keys.mjs';
 import * as S from './settings.mjs';
 
 const ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
-export const SOURCES = ['upload', 'library', 'pexels', 'pixabay', 'agent', 'screen', 'capture', 'generate'];
+export const SOURCES = ['upload', 'library', 'pexels', 'pixabay', 'agent', 'screen', 'capture', 'generate', 'run'];
 export const LICENSES = {
   pexels: { name: 'Pexels License (free to use, no attribution required; credit appreciated)', url: 'https://www.pexels.com/license/' },
   pixabay: { name: 'Pixabay Content License (free to use, no attribution required)', url: 'https://pixabay.com/service/license-summary/' },
   own: { name: 'Your own footage', url: null },
   agent: { name: 'Made in Studio from your words (yours to use)', url: null },
   capture: { name: 'Capture of a public web page: check that you may show it', url: null },
+  run: { name: 'A fast run made from your library clips (each clip keeps its own license)', url: null },
 };
 // what an upload is (the B-roll step's Upload asks): Suggest puts testimonials and product demos on proof spots and
 // screen recordings on tips, and testimonial pieces from a raw upload can play with their own sound in the Combo
@@ -86,9 +87,11 @@ export function add(src, m = {}) {
   if (m.move) { try { renameSync(src, file); } catch { copyFileSync(src, file); rmSync(src, { force: true }); } } else copyFileSync(src, file);
   const meta = probe(file), tags = [...new Set([...(m.tags || []).map(x => String(x).toLowerCase().trim()).filter(Boolean), ...words(basename(name, extname(name))), ...words(m.title), ...frameTags(file, meta), source])].slice(0, 30);
   const c = { id, file: relative(libDir(), file).split('\\').join('/'), name: m.title ? String(m.title).slice(0, 80) : name, source, kind: IMAGE.test(name) ? 'image' : 'video',
-    license: m.license || (source === 'upload' || source === 'screen' ? LICENSES.own : source === 'agent' ? LICENSES.agent : source === 'capture' ? LICENSES.capture : { name: 'unknown', url: null }),
+    license: m.license || (source === 'upload' || source === 'screen' ? LICENSES.own : source === 'agent' ? LICENSES.agent : source === 'capture' ? LICENSES.capture : source === 'run' ? LICENSES.run : { name: 'unknown', url: null }),
     author: m.author || null, sourceUrl: m.sourceUrl || null, tags, ...meta, bytes: statSync(file).size, thumb: thumb(file, id), addedAt: new Date().toISOString(),
-    ...(m.prompt ? { prompt: String(m.prompt).slice(0, 500) } : {}), ...(m.provider ? { provider: m.provider, model: m.model || null } : {}), ...(m.extId ? { extId: String(m.extId) } : {}), ...(m.type && TYPES.includes(m.type) ? { type: m.type } : {}), ...(m.raw ? { raw: m.raw } : {}), usedIn: [] };
+    ...(m.prompt ? { prompt: String(m.prompt).slice(0, 500) } : {}), ...(m.provider ? { provider: m.provider, model: m.model || null } : {}), ...(m.extId ? { extId: String(m.extId) } : {}), ...(m.type && TYPES.includes(m.type) ? { type: m.type } : {}), ...(m.raw ? { raw: m.raw } : {}),
+    // a fast run (kit/fastrun.cjs): the clips it was cut from, in order, and the seconds each one plays
+    ...(m.run ? { run: m.run } : {}), usedIn: [] };
   const lib = load(); lib.clips.unshift(c); save(lib); return c;
 }
 export function update(id, p) {

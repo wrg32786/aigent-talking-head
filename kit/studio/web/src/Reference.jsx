@@ -6,7 +6,8 @@ import { api, file, toast, grow, pickState, Icon, IconBtn, SITE, STATUS, KIND_NA
 import { upload } from './upload.js';
 import { canWrite, NO_WRITER } from './Scripts.jsx';
 import { FixActions } from './Fix.jsx';
-import { RefMode, RefNotice, RefParts, RefPlan } from './RefCard.jsx';
+import { Stages } from './Stages.jsx';
+import { RefMode, RefNotice, RefParts, RefPlan, SavedLookNote } from './RefCard.jsx';
 
 export function Reference({ CAT, V, s, apply, patch }) {
   const r = s.reference, env = V.env, q = r.queue || [], t = env.tools || {};
@@ -21,7 +22,7 @@ export function Reference({ CAT, V, s, apply, patch }) {
   };
   const item = (id, action) => api('/api/reference/item', { id, action }).then(apply);
   return <section className="step" id="s-ref" data-step="reference" aria-labelledby="h-ref">
-    <header className="sh"><h2 id="h-ref">Reference</h2><Badge label="Optional" variant="neutral" /><p className="sub">A reel you like. Studio breaks it down for you and your agent.</p></header>
+    <header className="sh"><h2 id="h-ref">Reference</h2><Badge label="Optional" variant="neutral" /><p className="sub">A reel you like. We break it down for you and your agent.</p></header>
     <div className="urlbar glass-card">
       <Icon n="link" className="ui" />
       <label className="sr" htmlFor="ref-urls">Reference links, one per line</label>
@@ -48,7 +49,7 @@ export function Reference({ CAT, V, s, apply, patch }) {
             {['failed', 'cancelled'].includes(it.status) && <IconBtn n="retry" label="Try again" onClick={() => item(it.id, 'retry')} />}
             <IconBtn n="x" label={(busy ? 'Stop ' : 'Remove ') + (it.title || it.url)} onClick={() => item(it.id, 'remove')} />
           </span>
-          {busy && <div className="qbar"><ProgressBar label={STATUS[it.status]} isLabelHidden value={it.status === 'downloading' && it.progress ? it.progress : undefined} isIndeterminate={it.status === 'tearing' || !it.progress} /></div>}
+          {it.stages && (busy || it.status === 'failed') ? <div className="qbar"><Stages v={it.stages} id={`ref-stages-${it.id}`} onRetry={() => item(it.id, 'retry')} /></div> : busy && <div className="qbar"><ProgressBar label={STATUS[it.status]} isLabelHidden value={it.status === 'downloading' && it.progress ? it.progress : undefined} isIndeterminate={it.status === 'tearing' || !it.progress} /></div>}
           {it.error && <p className="err">{it.error}</p>}
           {it.fix && it.status === 'failed' && <FixActions V={V} id={it.fix} apply={apply} />}
           {it.trimmed && <p className="fine">Kept the first part of a longer video.</p>}
@@ -56,6 +57,7 @@ export function Reference({ CAT, V, s, apply, patch }) {
       })}
     </ol>
     {r.status === 'uploaded' && <Button id="ref-go" variant="secondary" label="Break down the file" isDisabled={running} onClick={() => api('/api/reference', {}).then(apply).catch(() => {})} />}
+    {r.stages && (r.status === 'running' || r.stages.failed) && !r.extracted && <Stages v={r.stages} id="ref-stages-file" onRetry={running ? null : () => api('/api/reference', {}).then(apply).catch(() => {})} />}
     <span id="ref-status" className="sr" role="status">{r.status === 'running' ? 'Breaking it down' : r.status === 'ready' ? 'Reference ready' : ''}</span>
     {(r.file || r.out) && <PullScript V={V} s={s} apply={apply} />}
     {r.extracted ? <Breakdown CAT={CAT} V={V} s={s} apply={apply} patch={patch} /> : !q.length && <div id="ref-empty" className="empty-art"><Icon n="film" /><p>Add a link to see its shots, beats and effects.</p></div>}
@@ -83,9 +85,13 @@ function Breakdown({ CAT, V, s, apply, patch }) {
       <RefMode id="ref-mode" mode={r.mode} patch={patch} />
     </div>
     <RefRan V={V} s={s} apply={apply} ran={Array.isArray(ex.ran) ? ex.ran : []} fallback={/fallback/.test(engine || '')} />
+    {/* your saved look in use (the reference Off, or Influence), then what the reference set (nothing when it is Off) */}
+    <SavedLookNote V={V} apply={apply} id="saved-look-td" />
+    {ex.vision === 'off' && <p className="fine ref-vision" id="ref-vision" role="note">We read this reference without the vision pass, so titles may be misread.</p>}
     <RefNotice s={s} patch={patch} id="ref-notice-td" />
     {r.mode === 'influence' && <RefParts V={V} s={s} patch={patch} />}
     <RefPlan ex={ex} mode={r.mode} id="ref-plan-td" />
+    <TitleChecks list={ex.checks || []} apply={apply} />
     <div className="row ref-script"><Button id="ref-script" variant="secondary" size="sm" label="Write script from this reference" icon={<Icon n="script" />} isDisabled={!canWrite(V.env)}
       onClick={() => api('/api/scripts/from-reference', {}).then(j => { apply(j); toast(V.env.backend === 'agent' ? 'Sent to your agent with the breakdown' : 'Writing the script', true); }).catch(() => {})} />
       {!canWrite(V.env) && <span className="fine">{NO_WRITER}</span>}</div>
@@ -110,12 +116,40 @@ function Breakdown({ CAT, V, s, apply, patch }) {
   </div>;
 }
 
+// Titles whose text the breakdown is not sure it read right (the recipe's check field): each with the reason and a field
+// to fix the words before a draft. Save writes the text into the reference's recipe; saving it as it is says it was right.
+const tcAt = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`, cap = t => (t ? t.charAt(0).toUpperCase() + t.slice(1) : '');
+function TitleChecks({ list, apply }) {
+  if (!list.length) return null;
+  return <div className="title-checks" id="title-checks" role="group" aria-labelledby="title-checks-h">
+    <div className="tc-h"><span className="lbl" id="title-checks-h"><Icon n="info" />Check this text</span><span className="fine">{list.length === 1 ? 'We may have misread this title.' : `We may have misread these ${list.length} titles.`} Fix the words, or save them as they are.</span></div>
+    <ul className="tc-list">{list.map(c => <TitleCheck key={c.n} c={c} apply={apply} />)}</ul>
+  </div>;
+}
+function TitleCheck({ c, apply }) {
+  const [text, setText] = useState(c.text), [busy, setBusy] = useState(false), id = 'tc-' + c.n;
+  const save = e => { e.preventDefault(); if (!text.trim()) return; setBusy(true);
+    api('/api/reference/title', { n: c.n, text }).then(j => { apply(j); toast(j.note, true); }).catch(() => {}).finally(() => setBusy(false)); };
+  return <li className="tc" data-title={c.n}><form className="tc-row" onSubmit={save}>
+    <span className="tc-at mono" aria-hidden="true">{tcAt(c.at)}</span>
+    <label className="sr" htmlFor={id}>Text of the title at {tcAt(c.at)}</label>
+    <input id={id} className="grow" value={text} spellCheck="false" autoComplete="off" aria-describedby={id + '-why'} onChange={e => setText(e.target.value)} />
+    <Button id={id + '-save'} type="submit" size="sm" variant="secondary" label="Save" isLoading={busy} isDisabled={!text.trim()} /></form>
+    <p className="fine tc-why" id={id + '-why'}>{cap(c.why)}.</p></li>;
+}
+
 // One row, only when something was not read: which parts ran, a fix for each that did not (never a command), and the
 // built-in analyzer's warning when it did the reading
 function RefRan({ V, s, apply, ran, fallback }) {
-  const miss = ran.filter(x => !x.ok), fixes = [...new Set(miss.map(x => x.fix).filter(Boolean))], r = s.reference;
+  // a fix is offered only for something that is really missing here: never "install" what is already installed
+  const env = V.env || {}, here = id => (id === 'effects' && env.effectsReady) || !!(env.setup && !env.setup.missing[id]);
+  const miss = ran.filter(x => !x.ok), fixes = [...new Set(miss.map(x => x.fix).filter(id => id && !here(id)))], r = s.reference;
+  // the parts that stopped with nothing to install: reading it again is the fix
+  const stopped = miss.filter(x => !x.fix || !fixes.includes(x.fix)).filter(x => x.id === 'layers' || x.id === 'sheet').map(x => x.label);
   if (!miss.length && !fallback) return null;
-  const again = () => api('/api/reference/item', { id: r.active, action: 'retry' }).then(v => { apply(v); toast('Reading the reference again', true); }).catch(() => {});
+  // read it again: the link in the queue, or the file you uploaded
+  const canAgain = r.active != null || !!r.file;
+  const again = () => (r.active != null ? api('/api/reference/item', { id: r.active, action: 'retry' }) : api('/api/reference', {})).then(v => { apply(v); toast('Reading the reference again', true); }).catch(() => {});
   return <div className="ref-ran" id="ref-ran" role="note">
     <div className="ran-top">{fallback && <span id="ref-engine" title="It is rougher and can miss shots, titles and the grade."><Badge label="Read by the built-in analyzer" variant="warning" /></span>}
       {ran.length > 0 && <ul className="ran" aria-label="What we read from the reference">{ran.map(x => <li key={x.id} className={x.ok ? 'ok' : 'miss'} title={x.why} data-part={x.id}><i aria-hidden="true" />{x.label}<span className="sr">{x.ok ? ', read' : ', not read: ' + x.why}</span></li>)}</ul>}</div>
@@ -123,7 +157,8 @@ function RefRan({ V, s, apply, ran, fallback }) {
       {fallback && !fixes.includes('rea') && <div className="ran-row" data-fix="rea"><span>It can miss shots, titles and the grade. <b>{(V.env && V.env.fixes && V.env.fixes.rea && V.env.fixes.rea.label) || 'rea-video'}</b> reads it in full.</span><FixActions V={V} id="rea" apply={apply} /></div>}
       {fixes.map(id => { const ls = miss.filter(x => x.fix === id).map(x => x.label), parts = ls.length > 1 ? ls.slice(0, -1).join(', ') + ' and ' + ls[ls.length - 1].toLowerCase() : ls[0], f = V.env && V.env.fixes && V.env.fixes[id];
         return <div className="ran-row" key={id} data-fix={id}><span>{parts} did not run. <b>{f ? f.label : id}</b> reads {ls.length > 1 ? 'them' : 'it'}.</span><FixActions V={V} id={id} apply={apply} /></div>; })}
-      {r.active != null && <span><Button id="ref-again" variant="secondary" size="sm" label="Read it again" onClick={again} /> after a fix.</span>}</div>
+      {stopped.length > 0 && <div className="ran-row" id="ran-stopped" data-fix=""><span>{stopped.length > 1 ? stopped.slice(0, -1).join(', ') + ' and ' + stopped[stopped.length - 1].toLowerCase() : stopped[0]} did not finish. Nothing is missing on this computer{canAgain ? ', so read it again.' : '.'}</span></div>}
+      {canAgain && <span><Button id="ref-again" variant="secondary" size="sm" label="Read it again" onClick={again} />{fixes.length > 0 ? ' after a fix.' : ''}</span>}</div>
   </div>;
 }
 

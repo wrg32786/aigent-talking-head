@@ -1,4 +1,4 @@
-// B-roll that picks itself (1.13.0) in a real Chrome, on synthetic media only (no keys, no network):
+// B-roll that picks itself (1.13.0), on the B-roll step (#step=broll), in a real Chrome, on synthetic media only (no keys, no network):
 // - after a draft, b-roll picks itself: the first spot too (after the hook), a number said becomes a counter card
 //   placed by Studio, the rest wait with why; the chat says what was placed
 // - Use it with no Pexels key and nothing in the library: a card made from the spot's words goes on
@@ -45,13 +45,18 @@ const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), 
 const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out))); });
 const port = +url.split(':').pop();
 const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json();
+// Studio keeps a live connection, so the page never goes network idle: wait for the stepper, and for the step a link names
+const STEP_OF = { reference: 'picture', post: 'render' };
+const ready = async (pg, hash = '') => { await pg.waitForSelector('#stepper'); const st = (hash.match(/step=([a-z]+)/) || [])[1]; if (st) await pg.waitForSelector(`#stepper [aria-current="step"][data-step="${STEP_OF[st] || st}"]`); };
+const open = async (pg, hash) => { await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await ready(pg, hash); };
+const reload = async pg => { await pg.reload({ waitUntil: 'domcontentloaded' }); await ready(pg); };
 const upload = async (kind, f, name) => (await fetch(`${url}/api/upload?kind=${kind}&name=${encodeURIComponent(name)}`, { method: 'POST', body: readFileSync(f) })).json();
 const until = async (fn, ms = 20000) => { const end = Date.now() + ms; for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) throw new Error('timed out'); await wait(150); } };
 const waitTask = async (ms = 3 * 60e3) => { await wait(400); return until(async () => { const v = await api('/api/state'); return v.task && v.task.status !== 'running' ? v : null; }, ms); };
 const log = job => { try { return readFileSync(join(ROOT, 'jobs', job, 'fake-reel.log'), 'utf8'); } catch { return ''; } };
 const spot = async k => (await api('/api/broll')).beats[k - 1];
 const cleanJobs = () => { rmSync(join(ROOT, 'jobs', JOB), { recursive: true, force: true }); rmSync(join(ROOT, 'inbox', 'studio', JOB), { recursive: true, force: true }); };
-const theme = async (pg, th) => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); await pg.reload({ waitUntil: 'networkidle' }); await pg.waitForSelector('#broll-lane'); };
+const theme = async (pg, th) => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); await reload(pg); await pg.waitForSelector('#broll-lane'); };
 const shot = async (pg, sel, name) => {
   if (!shots) return;
   await pg.evaluate(q => { const e = document.querySelector(q); e.scrollIntoView({ block: 'start' }); const h = document.querySelector('header.top'); scrollBy(0, -((h ? h.offsetHeight : 0) + 12)); }, sel);
@@ -60,6 +65,9 @@ const shot = async (pg, sel, name) => {
   await pg.screenshot({ path: join(shots, name), clip: { x: Math.max(0, b.x - 8), y: Math.max(0, top - 8), width: Math.min(vp.width - Math.max(0, b.x - 8), b.width + 16), height: Math.min(vp.height - top, b.height + 16) } });
 };
 
+// 1.28.0: the other sources sit behind "Choose something else" while a spot has an idea or a clip, and Add a spot is in More
+const tab = async (pg, sel) => { if (!(await pg.$(sel))) await pg.click('#broll-more'); await pg.click(sel); };
+const more = async pg => { if (!(await pg.$('#broll-more-fold[open]'))) await pg.click('#broll-more-fold > summary'); };
 const browser = patient(await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox'] }));
 let client;
 try {
@@ -73,19 +81,19 @@ try {
   pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
 
   await t('after a draft b-roll picks itself: the first spot too, a counter card for "doubled", the rest wait with why', async () => {
-    await pg.goto(url + '/#step=broll', { waitUntil: 'networkidle' }); await pg.waitForSelector('#broll-empty');
+    await open(pg, '#step=broll'); await pg.waitForSelector('#broll-empty');
     assert.ok(/picks itself/.test(await pg.textContent('#broll-empty')));
     const d = await api('/api/draft', {}); assert.ok(!d.error, d.error); assert.strictEqual((await waitTask()).task.status, 'done');
     await pg.waitForSelector('#broll-lane .spot[data-beat="3"]');
     const s3 = await until(async () => { const b = await spot(3); return b.slot ? b : null; }, 60000);
     assert.strictEqual(s3.slot.clip.source, 'agent'); assert.strictEqual(s3.slot.by, 'Studio'); assert.ok(/doubled/.test(s3.slot.why), s3.slot.why);
     const s1 = await spot(1); assert.ok(s1.idea && !s1.slot, 'the first spot waits: a search with no key and nothing in the library'); assert.ok(s1.idea.offset >= 1.2 && s1.idea.why);
-    await until(async () => (await api('/api/state')).state.chat.some(m => /B-roll picked itself: 1 of 2 spots/.test(m.text || '')));
+    await until(async () => (await api('/api/state')).state.chat.some(m => /B-roll picked itself: 1 placed from what you said, 1 idea waits for you/.test(m.text || '')));
     await pg.waitForSelector('#broll-lane .spot[data-beat="3"].filled');
     assert.ok(/picked/.test(await pg.textContent('#broll-lane .spot[data-beat="3"] .sp-by')));
     await pg.click('#broll-lane .spot[data-beat="1"]'); await pg.waitForSelector('#beat-idea');
-    assert.ok(/Picked from your words/.test(await pg.textContent('#beat-idea'))); assert.ok((await pg.textContent('#idea-why')).length > 10);
-    assert.strictEqual(await pg.textContent('#ye-next') !== null, true);
+    assert.ok(/^Idea: /.test(await pg.textContent('#beat-idea')), 'a waiting idea reads as an idea'); { const tx = await pg.textContent('#beat-idea'); assert.ok(!/Stock:|\(full cutaway\)|You talk about/.test(tx) && /covers the whole screen|panel|top half|small box|card above/.test(tx), 'plain words, no search term as a title: ' + tx); }
+    assert.strictEqual(await pg.$('#ye-next'), null, 'no second Next button on B-roll');
     assert.ok(/1 spot/.test(await pg.textContent('#your-edit [data-part="broll"]')));
   });
   await t('Use it with no key and nothing in the library: a card made from the spot words goes on', async () => {
@@ -94,7 +102,7 @@ try {
     await pg.waitForSelector('#slot-why'); await pg.waitForSelector('#broll-lane .spot[data-beat="1"].filled');
   });
   await t('Add a spot: the spot splits and the placed b-roll stays on its words', async () => {
-    await pg.click('#broll-lane .spot[data-beat="2"]'); await pg.click('#broll-add-spot'); await pg.waitForSelector('#add-spot');
+    await pg.click('#broll-lane .spot[data-beat="2"]'); await more(pg); await pg.click('#broll-add-spot'); await pg.waitForSelector('#add-spot');
     await pg.fill('#add-spot-at', '6'); await pg.click('#add-spot-go');
     await pg.waitForSelector('#broll-lane .spot[data-beat="4"]'); const b = (await api('/api/broll')).beats;
     assert.strictEqual(b.length, 4); assert.ok(b[3].slot && /doubled/.test(b[3].slot.why), 'the counter moved with its words to spot 4');
@@ -103,12 +111,15 @@ try {
     await theme(pg, 'dark');
   });
   await t('Upload asks what it is: a screen recording keeps its kind', async () => {
-    await pg.click('#broll-lane .spot[data-beat="2"]'); await pg.click('#btab-upload'); await pg.waitForSelector('#up-type');
+    await pg.click('#broll-lane .spot[data-beat="2"]'); await tab(pg, '#btab-upload'); await pg.waitForSelector('#up-type');
     await pg.selectOption('#up-type', 'screen-recording'); await pg.setInputFiles('#broll-file', DESK);
     const s2 = await until(async () => { const b = await spot(2); return b.slot ? b : null; }); assert.strictEqual(s2.slot.clip.type, 'screen-recording');
   });
   let piece;
   await t('a raw testimonial is cut into pieces on whole words, then plays in the reel with its own sound', async () => {
+    // the panel redraws once the upload above lands on its spot; wait for that, then open Upload again if it closed
+    await pg.waitForTimeout(1500); if (!(await pg.$('#up-type'))) await tab(pg, '#btab-upload');
+    await pg.waitForSelector('#up-type');
     await pg.selectOption('#up-type', 'testimonial'); assert.ok(await pg.isChecked('#up-raw'), 'a testimonial is raw by default');
     await pg.setInputFiles('#broll-file', TESTI);
     await pg.waitForSelector('#up-raws .raw.done', { timeout: 60000 });
@@ -139,7 +150,7 @@ try {
     const lb = await call('list_broll', {}); assert.strictEqual(lb.testimonials.length, 2); assert.ok(lb.raws.some(r => r.status === 'done'));
   });
   await t('the phone layout fits', async () => {
-    await pg.setViewportSize({ width: 390, height: 844 }); await pg.goto(url + '/#step=broll', { waitUntil: 'networkidle' }); await pg.waitForSelector('#broll-lane');
+    await pg.setViewportSize({ width: 390, height: 844 }); await open(pg, '#step=broll'); await pg.waitForSelector('#broll-lane');
     const over = await pg.evaluate(() => [...document.querySelectorAll('#s-broll *')].filter(e => !e.closest('#broll-lane')).map(e => e.getBoundingClientRect().right).reduce((a, b) => Math.max(a, b), 0) - innerWidth); assert.ok(over <= 1, 'no sideways scroll: ' + over);
     await shot(pg, '#s-broll', 'redesign-broll-phone-dark.png');
     await theme(pg, 'light'); await shot(pg, '#s-broll', 'redesign-broll-phone-light.png'); await theme(pg, 'dark');

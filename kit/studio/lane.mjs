@@ -4,8 +4,11 @@
 // and becomes a cut.json insert at render (kit/studio/broll-run.mjs, kit/assemble.cjs).
 // top: the split, its panel behind the top of your head; frame: two rounded cards, you in the smaller one with your head
 // over its top edge (kit/split.cjs)
-export const PLACES = ['full', 'top', 'pip', 'frame'];
-export const PLACE_LABEL = { full: 'Full cutaway', top: 'Split top panel', pip: 'Picture in picture', frame: 'Framed cards' };
+// card (1.28.0): a framed panel under your face, drawn as a screen card in the overlay (kit/broll-slots.cjs flipOf)
+export const PLACES = ['full', 'top', 'pip', 'frame', 'card'];
+export const PLACE_LABEL = { full: 'Full cutaway', top: 'Split top panel', pip: 'Picture in picture', frame: 'Framed cards', card: 'Panel under you' };
+// how a reference B-roll slot sits, by its kind (kit/broll-slots.cjs)
+export const KIND_PLACE = { full: 'full', panel: 'card', split: 'top', pip: 'pip' };
 const r2 = x => +(+x).toFixed(2);
 
 export function beats(cut, caps) {
@@ -20,10 +23,11 @@ export function beats(cut, caps) {
 }
 // where a slot sits in its beat: a small lead in, then up to 3.5 s (the clip's length and the beat's room allowing)
 export function timing(slot, beat, clip) {
-  const lead = Math.min(0.2, beat.seconds * 0.1);
+  const lead = beat.ref && beat.ref.slot ? Math.max(0, +beat.ref.slot.start - beat.start) : Math.min(0.2, beat.seconds * 0.1);
   const offset = Math.max(0, Math.min(slot.offset != null ? +slot.offset : lead, Math.max(0, beat.seconds - 0.4)));
-  const room = beat.seconds - offset, cl = clip && clip.kind === 'video' && clip.seconds ? Math.max(0.4, clip.seconds - (+slot.in || 0)) : Infinity;
-  const dur = Math.max(0.4, Math.min(slot.dur != null ? +slot.dur : 3.5, room, cl));
+  // a plan slot can run past its spot (a spot ends at a cut, the slot at a word): it keeps its own length
+  const room = beat.ref && beat.ref.slot ? Math.max(beat.seconds - offset, +beat.ref.slot.end - (beat.start + offset)) : beat.seconds - offset, cl = clip && clip.kind === 'video' && clip.seconds ? Math.max(0.4, clip.seconds - (+slot.in || 0)) : Infinity;
+  const dur = Math.max(0.4, Math.min(slot.dur != null ? +slot.dur : beat.ref && beat.ref.slot ? Math.max(0.8, +beat.ref.slot.end - (beat.start + offset)) : 3.5, room, cl));
   return { offset: r2(offset), dur: r2(dur), at: r2(beat.start + offset), in: r2(+slot.in || 0) };
 }
 // cut.json inserts for every filled slot (absolute paths; broll-run.mjs makes them relative to build/)
@@ -33,7 +37,14 @@ export function inserts(slots, bts, clipOf, pathOf) {
     const sl = slots && slots[b.n]; if (!sl || !sl.clip) continue;
     const c = clipOf(sl.clip); if (!c) continue;
     const t = timing(sl, b, c);
-    out.push({ file: pathOf(c), at: t.at, dur: t.dur, in: c.kind === 'image' ? 0 : t.in, place: PLACES.includes(sl.place) ? sl.place : 'full', ...(c.kind === 'image' ? { image: true } : {}), beat: b.n, clip: c.id, studio: true });
+    // a spot that is a reference B-roll slot keeps the slot's treatment (kit/broll-slots.cjs): its effects, border and place
+    const rs = b.ref && b.ref.slot ? b.ref.slot : null;
+    out.push({ file: pathOf(c), at: t.at, dur: t.dur, in: c.kind === 'image' ? 0 : t.in, place: PLACES.includes(sl.place) ? sl.place : 'full', ...(c.kind === 'image' ? { image: true } : {}), beat: b.n, clip: c.id, studio: true,
+      // a fast run goes to the render as its own clips: kit/reel.cjs cuts them again on the real beats of the bed
+      // (kit/fastrun.cjs), starting on the beat nearest this spot. The library clip is the preview, and what plays if
+      // one of its clips is gone. It is shown whole.
+      ...(c.run ? { fit: 'whole', ...(() => { const m = (c.run.clips || []).map(clipOf); return m.length >= 2 && m.every(Boolean) ? { run: m.map(pathOf), step: c.run.beat === 'beat' ? 'beat' : 'half', max: +(t.dur + 0.08).toFixed(3) } : {}; })() } : {}),
+      ...(rs ? { slot: rs.n, fx: rs.fx, ...(rs.border ? { border: rs.border } : {}), ...(rs.y != null ? { y: rs.y } : {}), ...(rs.w != null ? { w: rs.w } : {}), ...(rs.layer ? { layer: rs.layer } : {}) } : {}) });
   }
   return out;
 }
@@ -62,11 +73,14 @@ export function spots(cut, caps, { marks = [], refs = [] } = {}) {
     const cuts = [];
     if (b.seconds > SPOT_MAX) { let last = b.start; for (const e of flips.map(f => f.end).filter(x => x > b.start && x < b.end)) if (e - last >= SPOT_AIM - 1 && b.end - e >= 2.5) { cuts.push(e); last = e; } }
     for (const t of extra) { if (!(t > b.start + 1.5 && t < b.end - 1.5)) continue; const x = snap(t, b.start, b.end); if (cuts.every(c => Math.abs(c - x) >= 1.5)) cuts.push(x); }
+    // a B-roll slot from the plan is its own spot: a cut where it starts and where it ends, so no two slots share one
+    for (const r of refs) { if (!r.slot) continue; for (const t of [+r.slot.start, +r.slot.end]) if (t > b.start + 0.4 && t < b.end - 0.4 && cuts.every(c => Math.abs(c - t) >= 0.4)) cuts.push(t); }
     const edges = [b.start, ...cuts.sort((p, q) => p - q), b.end];
     for (let k = 0; k + 1 < edges.length; k++) { const a = edges[k], z = edges[k + 1]; out.push({ start: r2(a), end: r2(z), seconds: r2(z - a), text: flips.length ? textIn(flips, a, z) : b.text, seg: b.n }); }
   }
   out.forEach((s, i) => { s.n = i + 1; });
-  for (const r of refs) { const s = out.find(x => +r.at >= x.start - 0.05 && +r.at < x.end) || out[out.length - 1]; if (s && !s.ref) s.ref = { label: r.label || 'B-roll', detail: r.detail || '', ...(r.seconds > 0 ? { seconds: +(+r.seconds).toFixed(2) } : {}), ...(r.what ? { what: String(r.what) } : {}) }; }
+  for (const r of refs) { const s = (r.slot && out.find(x => !x.ref && x.start < +r.slot.end - 0.3 && x.end > +r.slot.start + 0.3 && +r.at >= x.start - 0.45)) || out.find(x => +r.at >= x.start - 0.05 && +r.at < x.end) || out[out.length - 1];
+    if (s && !s.ref) s.ref = { label: r.label || 'B-roll', detail: r.detail || '', ...(r.seconds > 0 ? { seconds: +(+r.seconds).toFixed(2) } : {}), ...(r.what ? { what: String(r.what) } : {}), ...(r.slot ? { slot: r.slot } : {}) }; }
   for (const t of marks) { const s = out.find(x => Math.abs(x.start - t) < 1.6); if (s) s.mark = true; }
   return out.map(s => ({ n: s.n, start: s.start, end: s.end, seconds: s.seconds, text: s.text, seg: s.seg, ...(s.ref ? { ref: s.ref } : {}), ...(s.mark ? { mark: true } : {}) }));
 }

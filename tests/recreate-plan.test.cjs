@@ -31,7 +31,7 @@ t('applyShotPlan: on clips, a finish covers every segment of the clip, the rest 
   assert.strictEqual(plan.length, 4);
   assert.ok(!segs[0].transition && !segs[0].bigPunch);
   assert.ok(segs[2].bigPunch && segs[2].transition === 'flash');
-  assert.ok(segs[3].finish === 'grain' && segs[3].push === 0.07);
+  assert.ok(segs[3].finish === 'grain' && segs[3].push === 0.12 && segs[3].move === 'push');
   assert.deepStrictEqual(shakeAt, [2]);
   const quiet = mkSegs(); RC.applyShotPlan({ recipe, segs: quiet, clipStart: [0, 2, 3], wantPunch: false });
   assert.ok(!quiet[2].bigPunch);
@@ -40,8 +40,8 @@ t('applyShotPlan: on clips, a finish covers every segment of the clip, the rest 
 t('applyShotPlan: on re-cut shots, by the recipe shot each one came from', () => {
   const segs = mkSegs(), rc = { shotStart: [0, 2, 3], shotOf: [0, 2, 3] };
   const { shakeAt } = RC.applyShotPlan({ recipe, segs, rc });
-  assert.ok(segs[2].finish === 'grain' && segs[2].push === 0.07 && !segs[2].bigPunch);
-  assert.ok(segs[3].push === 0.035);
+  assert.ok(segs[2].finish === 'grain' && segs[2].push === 0.12 && !segs[2].bigPunch);
+  assert.ok(segs[3].push === 0.08 && segs[3].move === 'drift');
   assert.deepStrictEqual(shakeAt, [3]);
 });
 
@@ -74,12 +74,12 @@ t('plan.json: written, read back, shots first and cut.json refShots as the fallb
   assert.deepStrictEqual(RC.shotsOf(build, {}), []);
   const plan = RC.writePlan(build, RC.planOf({ recipe, scale: { len: 6, ref: 12, k: 0.5 }, rc: { plan: shots }, cut: { segs }, shakes: [[3.08, 18]], sounds: [{ id: '11-pop-sticker', t: 1.5, ref: true }],
     flips: [{ mode: 0, start: 0, end: 1 }, { mode: 39, start: 2, end: 3, scene: 'ref-spin', sceneName: 'Spin' }], theme: 'neutral', accent: '#ff5a1f' }));
-  assert.deepStrictEqual(Object.keys(plan), ['version', 'recipe', 'scale', 'shots', 'transitions', 'moves', 'shakes', 'sounds', 'scenes', 'theme', 'accent']);
+  assert.deepStrictEqual(Object.keys(plan), ['version', 'mode', 'recipe', 'scale', 'shots', 'transitions', 'moves', 'shakes', 'sounds', 'scenes', 'broll', 'theme', 'accent']);
   const back = RC.readPlan(build);
   assert.deepStrictEqual(back, plan);
   assert.ok(back.version === 1 && back.recipe === rp && back.scale === 0.5);
   assert.deepStrictEqual(back.transitions, [{ t: 3, name: 'flash' }]);
-  assert.deepStrictEqual(back.moves, [{ t: 4.5, move: 'push', push: 0.07 }]);
+  assert.deepStrictEqual(back.moves, [{ t: 4.5, move: 'push', push: 0.12 }]);
   assert.deepStrictEqual(back.shakes, [{ t: 3.08, strength: 18 }]);
   assert.deepStrictEqual(back.sounds, [{ id: '11-pop-sticker', t: 1.5 }]);
   assert.deepStrictEqual(back.scenes, [{ start: 2, end: 3, scene: 'ref-spin', name: 'Spin' }]);

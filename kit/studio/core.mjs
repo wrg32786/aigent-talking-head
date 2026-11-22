@@ -8,6 +8,10 @@ import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { loadMenu } from '../menu.mjs';
 import * as CF from './conflicts.mjs';
+import * as SLK from './stylelooks.mjs';
+import { cleanPoint } from './point.mjs';
+import { failView } from './stages.mjs';
+import * as SZ from './sizes.mjs';
 
 const require = createRequire(import.meta.url);
 export const STUDIO = dirname(fileURLToPath(import.meta.url));
@@ -124,15 +128,25 @@ export function defaultState() {
   return { format: 'aigent-studio', version: 1, rev: 0, job: null, footage: [], clips: null,
     reference: { file: null, url: null, mode: 'influence', status: 'none', out: null, extracted: null, applied: false, queue: [], active: null },
     pack: null, picks: {}, music: { bed: 'auto', energy: 'auto', upload: null }, sound: { sfx: 'on', cap: 'on' }, pace: { tighten: null, punch: 'on' },
-    export: 'reels', chat: [], task: null, outputs: [], takes: [], output: null, cut: null, tx: {}, lines: {}, broll: {},
-    finish: { from: 'auto', reel: true, clips: false, plain: false }, drafted: null };
+    export: 'reels', sizes: [], chat: [], task: null, outputs: [], takes: [], output: null, cut: null, tx: {}, lines: {}, broll: {},
+    finish: { from: 'auto', reel: true, clips: false, plain: false }, drafted: null, styleLook: null, point: '', fontLock: false, boost: null };
 }
 export function load() {
-  try { const s = JSON.parse(readFileSync(statePath(), 'utf8')); return oneBed({ ...defaultState(), ...s, reference: { ...defaultState().reference, ...(s.reference || {}) } }); }
+  try { const s = JSON.parse(readFileSync(statePath(), 'utf8')), o = refOnly(oneBed({ ...defaultState(), ...s, reference: { ...defaultState().reference, ...(s.reference || {}) } }));
+    if (SZ.EXTRA.includes(o.export)) { o.sizes = SZ.sizesOf(o); o.export = null; } // before 1.28.0 a 4:5 or 1:1 was the export: it is a size now, so its tick can be taken off
+    dropRefEntrances(o); // an older session's entrance picks that are only the reference's (kit/studio/reference.mjs)
+    return o; }
   catch { return defaultState(); }
 }
 // one place decides the music bed: music.bed. An older session kept a bed pick in picks.bed as well (a reference's bed),
 // which the draft used while the music panel showed music.bed; the pick (what the draft used) moves into music.bed.
+// a board saved before 1.28.0 with a reference in Recreate or Copy the look still has the last video's picks mixed in
+// with the reference's (nothing recorded whose they were): the first read sets the board from the reference alone
+function refOnly(s) {
+  const r = s.reference;
+  if (r && r.extracted && r.lookFor === undefined && styleKey(r)) { try { setReferenceLook(s); } catch {} if (r.lookFor === undefined) r.lookFor = null; }
+  return s;
+}
 function oneBed(s) {
   const pb = s.picks && s.picks.bed;
   if (pb) { if (pb.allow && pb.allow[0]) s.music = { ...s.music, bed: pb.allow[0] }; delete s.picks.bed; }
@@ -150,6 +164,8 @@ const JOB_RE = /^[a-z0-9][a-z0-9-]{0,48}$/;
 const ENERGY = ['auto', 'low', 'mid', 'high'];
 // a change from the page, the chat or an assistant. Refuses names the engine does not have.
 //   { job, pack, picks: { "transition:whip": "allow" | "deny" | "clear" }, clearPicks: true, music: { bed, energy },
+//     styleLook: "<a saved style look>" | null (Copy the look, kit/studio/stylelooks.mjs),
+//     point: "what the video is for, one line" | "" (kit/studio/point.mjs),
 //     sound: { sfx: on|off, cap: on|off }, pace: { tighten: null|number, punch: on|off }, export, reference: { mode },
 //     say: "user chat line", reply: "assistant chat line", from: "ui" | "assistant" | "chat",
 //     footage: [paths from state.footage, in the order to use; leave one out to drop it], clips: "<clip.py folder>" | null,
@@ -165,19 +181,32 @@ export const KIT_BRANDS = ['kit/example/skool-logo.svg'];
 // s.lastChange says so ("Single word captions turned off the Typewriter caption entrance.") with { undoChange: true }
 // to put it back; a ruled out pick the same patch asked for is refused with the reason. switchFor: "kind:id" picks it
 // and makes the one change it needs (the page's one click switch on a greyed option).
+//   useReferenceLook: true sets the board from the reference alone (kit/studio/reference.mjs useReferenceLook): an
+//   earlier look that was in use is set aside, your picks since the reference go. The same one Undo puts it back.
 const SETTLE_KEYS = ['pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'reference', 'switchFor'];
 const lookSnap = s => JSON.parse(JSON.stringify({ pack: s.pack || null, picks: s.picks || {}, music: s.music, sound: s.sound, pace: s.pace,
-  reference: s.reference ? { mode: s.reference.mode, added: s.reference.added, prev: s.reference.prev, auto: s.reference.auto, applied: s.reference.applied } : null }));
+  reference: s.reference ? { mode: s.reference.mode, added: s.reference.added, prev: s.reference.prev, auto: s.reference.auto, applied: s.reference.applied, lookFor: s.reference.lookFor || null, prevLook: s.reference.prevLook || null, fontFor: s.reference.fontFor || null, prevFont: s.reference.prevFont || null, copyMode: s.reference.copyMode || null } : null, entranceLock: !!s.entranceLock, fontLock: !!s.fontLock, boost: s.boost ?? null }));
 export const effectsReady = () => existsSync(join(ROOT, 'effects', '.venv'));
 export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
   const errs = [], log = [];
   if (!p || typeof p !== 'object') return { errs: ['patch must be an object'], log, noop: false };
-  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands', 'finish', 'switchFor', 'undoChange'];
+  const known = ['job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands', 'finish', 'switchFor', 'undoChange', 'useReferenceLook', 'styleLook', 'point', 'sizes', 'boost'];
   for (const k of Object.keys(p)) if (!known.includes(k)) errs.push(`unknown field "${k}" (${known.join(', ')})`);
   if (p.undoChange) {
     const u = s.lastChange && s.lastChange.undo; if (!u) { errs.push('undoChange: nothing to undo'); return { errs, log, noop: false }; }
     Object.assign(s, { pack: u.pack, picks: u.picks, music: u.music, sound: u.sound, pace: u.pace }); if (u.reference && s.reference) Object.assign(s.reference, u.reference);
+    if (u.entranceLock !== undefined) s.entranceLock = u.entranceLock;
+    if (u.fontLock !== undefined) s.fontLock = u.fontLock;
+    if ('boost' in u) s.boost = u.boost;
     delete s.lastChange; log.push('undid the last change'); return { errs, log, noop: false };
+  }
+  if (p.useReferenceLook) {
+    if (!s.reference || !s.reference.extracted) return { errs, log, noop: true };
+    const snap = lookSnap(s); useReferenceLook(s, cat);
+    if (JSON.stringify(lookSnap(s), (k, v) => (k === 'at' ? undefined : v)) === JSON.stringify(snap, (k, v) => (k === 'at' ? undefined : v))) { Object.assign(s.reference, snap.reference); return { errs, log, noop: true }; }
+    s.lastChange = { text: "Switched to the reference's look.", off: [], undo: snap, at: Date.now() };
+    log.push(`the reference's look is in use (${s.reference.mode === 'recreate' ? 'Recreate' : 'Copy the look'})`);
+    return { errs, log, off: [], noop: false };
   }
   const touches = !nested && SETTLE_KEYS.some(k => p[k] !== undefined), before = touches ? lookSnap(s) : null;
   let switched = '';
@@ -193,7 +222,7 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
     if (p.pack && !cat.packs.some(x => x.name === p.pack)) errs.push(`pack: no pack named "${p.pack}" (${cat.packs.map(x => x.name).join(', ')})`);
     else { s.pack = p.pack || null; log.push(s.pack ? `pack ${s.pack}` : 'no pack'); }
   }
-  if (p.clearPicks) { s.picks = {}; log.push('cleared every pick'); }
+  if (p.clearPicks) { s.picks = {}; s.fontLock = false; s.entranceLock = false; log.push('cleared every pick'); }
   for (const [ref, how] of Object.entries(p.picks || {})) {
     const it = cat.items[ref];
     if (!it) { errs.push(`no such effect "${ref}" (use kind:id from the catalog, e.g. transition:whip)`); continue; }
@@ -214,6 +243,11 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
     if (how === 'allow') { if (it.mode === 'one') slot.allow = []; slot.allow.push(it.id); }
     if (how === 'deny') { if (it.mode === 'one') { errs.push(`${ref}: pick another one instead of forbidding this`); continue; } slot.deny.push(it.id); }
     log.push(`${how === 'clear' ? 'cleared' : how === 'allow' ? 'picked' : 'forbade'} ${it.kind} ${it.id}`);
+    // a font you pick yourself holds over a reference's font from here on (the lock); taking your last one back hands it back
+    if (it.kind === 'font' && !nested) s.fontLock = slot.allow.length > 0;
+    // an entrance you pick yourself is a lock; the ones a reference read never are (kit/studio/reference.mjs)
+    if (it.kind === 'entrance' && !nested) s.entranceLock = slot.allow.length > 0 || slot.deny.length > 0;
+    // and any pick you change while a reference's style is copied is yours for this video, not your saved look
     // you took back or forbade a pick the reference set: it is yours now, and Back to my look leaves it alone
     if (how !== 'allow' && s.reference && s.reference.added) s.reference.added = s.reference.added.filter(x => x !== ref);
   }
@@ -226,10 +260,14 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
   if (p.pace) {
     if (p.pace.tighten !== undefined) { const t = p.pace.tighten; if (t !== null && t !== 'off' && !(+t >= 0.1 && +t <= 2)) errs.push('pace.tighten: null (preset decides), off, or 0.1 to 2 seconds'); else { s.pace.tighten = t === null ? null : t === 'off' ? 'off' : +t; log.push(`tighten ${s.pace.tighten ?? 'preset'}`); } }
     if (p.pace.punch !== undefined) { if (!['on', 'off'].includes(p.pace.punch)) errs.push('pace.punch: on or off'); else { s.pace.punch = p.pace.punch; log.push(`punch ${p.pace.punch}`); } }
+    // how big the reference's camera moves are drawn (kit/shotplan.cjs MOTION); null: Medium
+    if (p.pace.motion !== undefined) { if (![null, ...MOTIONS].includes(p.pace.motion)) errs.push('pace.motion: subtle, medium or strong'); else { if (p.pace.motion) s.pace.motion = p.pace.motion; else delete s.pace.motion; log.push(`camera moves ${p.pace.motion || MOTION_DEFAULT}`); } }
     if (p.pace.keepPauses !== undefined) { const k = [].concat(p.pace.keepPauses || []).map(String); if (k.some(x => !/^[\w-]+@\d+(\.\d+)?$/.test(x))) errs.push('pace.keepPauses: clip-id@seconds, from choices.json "pauses"'); else { s.pace.keepPauses = k; log.push(k.length ? `keep pauses ${k.join(', ')}` : 'cut every long pause'); } }
   }
-  if (p.export !== undefined) { if (p.export && !cat.exports.includes(p.export)) errs.push(`export: ${cat.exports.join(', ')}`); else { s.export = p.export || null; log.push(`export ${s.export}`); } }
-  if (p.reference && p.reference.mode !== undefined) { if (!['influence', 'recreate', 'off'].includes(p.reference.mode)) errs.push('reference.mode: influence, recreate or off'); else { const was = s.reference.mode; s.reference.mode = p.reference.mode; log.push(`reference mode ${p.reference.mode}`);
+  if (p.export !== undefined) { if (p.export && !cat.exports.includes(p.export)) errs.push(`export: ${cat.exports.join(', ')}`); else if (SZ.EXTRA.includes(p.export)) { s.sizes = SZ.sizesOf({ sizes: s.sizes, export: p.export }); log.push(`sizes 9:16, ${s.sizes.join(', ')}`); } else { s.export = p.export || null; log.push(`export ${s.export}`); } }
+  // sizes: the versions a render makes beside the 9:16 reel (kit/studio/sizes.mjs)
+  if (p.sizes !== undefined) { const z = SZ.norm(p.sizes); if (z.bad.length) errs.push(`sizes: 9:16 (always made), 4:5 or 1:1 (not ${z.bad.join(', ')})`); else { s.sizes = z.sizes; log.push(`sizes 9:16${z.sizes.map(x => ', ' + SZ.SIZES.find(y => y.id === x).size).join('')}`); } }
+  if (p.reference && p.reference.mode !== undefined) { if (!SLK.MODES.includes(p.reference.mode)) errs.push('reference.mode: influence, recreate, look or off'); else { const was = s.reference.mode; s.reference.mode = p.reference.mode; log.push(`reference mode ${p.reference.mode}`);
     // Recreate or Influence sets the Look from the reference; Off takes it back out (your own picks stay)
     if (was !== s.reference.mode || (s.reference.mode !== 'off' && s.reference.extracted && !s.reference.auto)) { const a = setReferenceLook(s, cat); if (a) log.push(`set the look from the reference (${a.n} change${a.n === 1 ? '' : 's'})`); else if (was !== 'off' && s.reference.mode === 'off') log.push('back to your own look'); } } }
   if (p.reference && p.reference.parts !== undefined) {
@@ -237,6 +275,16 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
     if (bad.length) errs.push(`reference.parts: { ${REF_PARTS.map(x => x.id).join(', ')} } each true or false`);
     else { s.reference.parts = { ...refParts(s.reference), ...q }; log.push('reference parts: ' + Object.entries(q).map(([k, v]) => `${k} ${v ? 'on' : 'off'}`).join(', '));
       if (s.reference.mode === 'influence' && s.reference.extracted) { const a = setReferenceLook(s, cat); if (a) log.push(`set the look from the reference (${a.n} change${a.n === 1 ? '' : 's'})`); } }
+  }
+  // a saved style look for drafts with no reference in use; null clears it
+  // the point of the video, one optional line (kit/studio/point.mjs): it steers what we pick on the Cut step
+  // the legibility shadow behind hard-to-read words: on, off, or null (we decide: on, unless the reference's captions have no outline or no shadow)
+  if (p.boost !== undefined) { if (![null, 'on', 'off'].includes(p.boost)) errs.push('boost: on, off or null'); else if (p.boost !== (s.boost ?? null)) { s.boost = p.boost; log.push(p.boost === 'off' ? 'hard-to-read words are left as they are' : p.boost === 'on' ? 'hard-to-read words get a soft shadow' : 'hard-to-read words: we decide'); } }
+  if (p.point !== undefined) { const v = cleanPoint(p.point); if (v !== (s.point || '')) { s.point = v; log.push(v ? `point: ${v}` : 'no point set'); } }
+  if (p.styleLook !== undefined) {
+    const n = p.styleLook === null || p.styleLook === '' ? null : p.styleLook;
+    if (n !== null && !SLK.exists(n)) errs.push(`styleLook: no saved look named "${n}"${SLK.list().length ? ` (${SLK.list().map(x => x.name).join(', ')})` : ''}`);
+    else if (n !== (s.styleLook || null)) { s.styleLook = n; if (n) clearFontPick(s); /* a saved look brings its own font */ log.push(n ? `style look ${n}` : 'no style look'); }
   }
   if (p.clips !== undefined) { const c = p.clips ? slash(p.clips) : null; if (c && (c.includes('..') || !existsSync(join(resolve(ROOT, c), 'clips.json')))) errs.push(`clips: no clips.json in ${c}`); else if (c !== s.clips) { s.clips = c; log.push(c ? `clips folder ${c}` : 'clips folder cleared'); } }
   // footage: reorder or drop files the job already has (state.footage), or add a file already in the job's inbox
@@ -323,7 +371,9 @@ export function compose(s, { refPack = null } = {}) {
   const pack = refPack || s.pack;
   if (pack) args.push('--pack', pack);
   const tr = allowed(s, 'transition'); if (tr && tr.length) locks.transitions = tr;
-  const ti = allowed(s, 'entrance'); if (ti && ti.length) locks.titles = ti;
+  // title entrances: only the ones you picked yourself are a lock. A reference's are a preference (its recipe, or the
+  // reference pack's entranceOrder), so a rebuild can use any entrance.
+  const ti = refEntrancesOnly(s) ? null : allowed(s, 'entrance'); if (ti && ti.length) locks.titles = ti;
   // graphics: the kit's in the lock; scenes (ref-..., made from a reference or by your agent) placed by --scenes
   const g0 = s.picks.graphic, isScene = id => /^ref-/.test(id), g = g0 && { allow: g0.allow.filter(id => !isScene(id)), deny: g0.deny.filter(id => !isScene(id)) };
   if (g && (g.allow.length || g.deny.length)) locks.graphics = { ...(g.allow.length ? { allow: g.allow.slice() } : {}), ...(g.deny.length ? { deny: g.deny.slice() } : {}) };
@@ -338,12 +388,21 @@ export function compose(s, { refPack = null } = {}) {
   if (one('look')) args.push('--look', one('look'));
   if (one('theme')) args.push('--theme', one('theme'));
   if (one('titleLayer')) args.push('--title-layer', one('titleLayer'));
-  const fonts = s.picks.font && s.picks.font.allow.filter(f => f !== 'theme'); if (fonts && fonts.length) args.push('--fonts', fonts.join(','));
+  // fonts: yours, unless a reference's style is being copied (Recreate, Copy the look, a saved look) and you have not
+  // picked a font since. Then the font the teardown matched is used and an older pick is never sent.
+  { const mine = (s.picks.font && s.picks.font.allow) || [], fonts = mine.filter(f => f !== 'theme'), copied = copiesStyle(s.reference) || (!!s.styleLook && !(s.reference && s.reference.mode !== 'off' && s.reference.extracted));
+    if (copied && !s.fontLock) { if (mine.length) notes.push('fonts: the reference sets them; pick a font on Text and graphics to use yours instead'); }
+    else if (fonts.length) args.push('--fonts', fonts.join(','));
+    else if (copied && mine.includes('theme')) args.push('--fonts', 'theme'); }
   if (one('beatSync') === 'no-beat-sync') args.push('--no-beat-sync');
+  if (!boostOf(s).on) args.push('--no-boost');
   const ed = s.picks.editing || { allow: [], deny: [] }, on = id => ed.allow.includes(id), off = id => ed.deny.includes(id);
   if (on('cards-auto') || on('colour-card') || on('chapter-card')) args.push('--cards', 'auto');
   if (off('cards-auto') || (off('colour-card') && off('chapter-card'))) { args.push('--cards', 'off'); locks.cards = false; }
   if (s.pace.punch === 'off' || off('punch')) { args.push('--no-punch'); locks.punch = false; }
+  if (MOTIONS.includes(s.pace.motion)) args.push('--motion', s.pace.motion);
+  // the point of the video (kit/studio/point.mjs): the engine leans its big caption word and a look's stickers on it
+  if (s.point) args.push('--goal', s.point);
   if (s.pace.tighten === 'off' || off('tighten')) args.push('--no-tighten');
   else if (typeof s.pace.tighten === 'number') args.push('--tighten', String(s.pace.tighten));
   else if (on('tighten')) args.push('--tighten', '0.3');
@@ -361,7 +420,7 @@ export function compose(s, { refPack = null } = {}) {
   // your words and brand logos (kit/glossary.cjs, kit/brands.cjs), short enough for any command line
   if (Array.isArray(s.glossary) && s.glossary.length) args.push('--glossary', s.glossary.map(e => `${e.heard.join(' | ')} = ${e.say}${e.after && e.after.length ? ' after ' + e.after.join(', ') : ''}`).join('; '));
   if (Array.isArray(s.brands) && s.brands.length) args.push('--brands', JSON.stringify(s.brands.map(b => ({ word: b.word, logo: KIT_BRANDS.includes(b.logo) ? join(ROOT, b.logo) : join(brandsDir(), b.logo) }))));
-  if (s.export) args.push('--export', s.export);
+  { const ex = SZ.exportArg(s); if (ex) args.push('--export', ex); }
   const fx = s.picks.effect ? s.picks.effect.allow.filter(x => !s.picks.effect.deny.includes(x)) : [];
   if (fx.length) notes.push(`effects for the effects pass: ${fx.join(', ')} (run after the reel; needs the effects pass set up)`);
   if ((s.picks.effect || {}).deny?.length) notes.push(`forbidden effects: ${s.picks.effect.deny.join(', ')}`);
@@ -383,7 +442,15 @@ export function lockStringOf(l) {
 // ---------- reference ----------
 // kit/studio/reference.mjs: extract, referenceLook, influencePack and the rest of what a reference gives Studio
 export * from './reference.mjs';
-import { REF_PARTS, refParts, referencePicks, setReferenceLook } from './reference.mjs';
+// Motion strength, the one control on the Motion layer. It sizes the camera moves a reference or a saved look
+// brings, so it is shown only when one is in use. Medium unless you pick another.
+export const MOTIONS = ['subtle', 'medium', 'strong'], MOTION_DEFAULT = 'medium';
+export function motionOf(s) {
+  const ref = s.reference && s.reference.mode && s.reference.mode !== 'off' && (s.reference.extracted || s.reference.file || s.reference.url);
+  return { value: MOTIONS.includes(s.pace && s.pace.motion) ? s.pace.motion : MOTION_DEFAULT, on: !!(ref || s.styleLook),
+    options: [{ id: 'subtle', label: 'Subtle' }, { id: 'medium', label: 'Medium' }, { id: 'strong', label: 'Strong' }] };
+}
+import { REF_PARTS, refParts, referencePicks, setReferenceLook, copiesStyle, clearFontPick, syncRefFont, refEntrancesOnly, dropRefEntrances, useReferenceLook, styleKey, boostOf } from './reference.mjs';
 
 // a pack whose style must sit inside its locks (pack validate refuses a style transition outside them)
 export function fitStyle(pack) {
@@ -476,16 +543,16 @@ export function vibes(text, s, cat = catalog()) {
 export function jobDir(s) { return s.job ? join(ROOT, 'jobs', s.job) : null; }
 export function outputsOf(s) {
   const d = jobDir(s); if (!d || !existsSync(d)) return [];
-  return readdirSync(d).filter(f => /^reel(-fx)?-v\d+(-[a-z0-9]+)?\.mp4$/.test(f)).sort((a, b) => (+(b.match(/v(\d+)/) || [0, 0])[1]) - (+(a.match(/v(\d+)/) || [0, 0])[1]) || a.localeCompare(b)).map(f => `jobs/${s.job}/${f}`);
+  return SZ.sortFiles(readdirSync(d).filter(SZ.isReel)).map(f => `jobs/${s.job}/${f}`);
 }
 
 // ---------- videos: start fresh, open a past one ----------
 // A "video" is a job. Starting fresh never deletes a file: the old job's footage (inbox/studio/<job>), renders and
 // reel-vN.build snapshots stay where they are, and its session is saved to jobs/.studio/videos/<job>.json so opening
 // it again puts you back where you were. What carries over: your words (glossary) and the counters; with
-// keepLook, the look too (pack, picks, music, sound, pace, export, brand logos). Keys, settings and the agent
+// keepLook, the look too (pack, picks, music, sound, pace, export, brand logos, the saved style look). Keys, settings and the agent
 // connection live in other files and are never touched here.
-export const LOOK_KEYS = ['pack', 'picks', 'music', 'sound', 'pace', 'export', 'brands'];
+export const LOOK_KEYS = ['pack', 'picks', 'music', 'sound', 'pace', 'export', 'sizes', 'brands', 'styleLook', 'boost'];
 const KEEP_KEYS = ['format', 'version', 'rev', 'updated', 'chatSeq', 'refSeq', 'importSeq', 'commentSeq', 'videoSeq', 'glossary'];
 const VIDEO_EXT = /\.(mp4|mov|m4v|webm|mkv)$/i;
 export const videosDir = () => join(stateDir(), 'videos');
@@ -508,6 +575,7 @@ export function freshSession(s, { job = null, keepLook = true } = {}) {
   const look = {}; if (keepLook) for (const k of LOOK_KEYS) if (s[k] !== undefined) look[k] = clone(s[k]);
   for (const k of Object.keys(s)) delete s[k];
   Object.assign(s, d, keep, look, { job: job || null, keepLook: !!keepLook });
+  clearFontPick(s); // a font pick belongs to the video it was made for: it never rides into the next one
   // Clip-specific pause exceptions are edit decisions, not a reusable pace setting.
   if (s.pace.keepPauses) delete s.pace.keepPauses;
   return s;
@@ -601,10 +669,13 @@ export function resetEdit(s, { keepLook = s.keepLook === true } = {}) {
   s.cut = null;
   s.lines = {};
   delete s.pieces;
+  delete s.topics;
+  s.point = ''; // the point belongs to the video that was on the board
   clearBrollTimeline(s);
   delete s.cleanup;
   s.output = null;
   s.reference = clone(d.reference);
+  clearFontPick(s); // and so does the font picked for it
   delete s.undoRef;
   delete s.lastChange; // its Undo belongs to the old video
   s.finish = clone(d.finish);
@@ -617,7 +688,10 @@ export function resetEdit(s, { keepLook = s.keepLook === true } = {}) {
     s.sound = clone(d.sound);
     s.pace = clone(d.pace);
     s.export = d.export;
+    s.sizes = [];
     delete s.brands;
+    s.styleLook = null;
+    s.boost = null;
   }
   return s;
 }
@@ -712,14 +786,14 @@ export function videoBusy(s) {
 // "running" it would refuse every Recreate draft (kit/studio/server.mjs refWait). True when it changed something.
 export function settleReference(s) {
   const r = s.reference; if (!r || r.status !== 'running') return false;
-  r.status = r.extracted ? 'ready' : r.file ? 'uploaded' : 'none'; return true;
+  r.status = r.extracted ? 'ready' : r.file ? 'uploaded' : 'none'; if (r.stages) r.stages = failView(r.stages); return true;
 }
 export function settleStale(s) {
   let n = 0; const stop = (x, status, error) => { Object.assign(x, { status, ...(error ? { error } : {}) }); n++; };
   if (settleReference(s)) n++;
   if (s.task && s.task.status === 'running') stop(s.task, 'cancelled');
   for (const x of s.imports || []) if (x.status === 'downloading') stop(x, 'failed', 'Studio stopped during this download');
-  for (const x of refRunning(s)) stop(x, 'failed', 'Studio stopped while reading this reference');
+  for (const x of refRunning(s)) { stop(x, 'failed', 'Studio stopped while reading this reference'); if (x.stages) x.stages = failView(x.stages); }
   for (const x of Object.values(s.tx || {})) if (x && x.status === 'running') stop(x, 'failed', 'Studio stopped during this transcript');
   for (const b of Object.values(s.broll || {})) for (const g of (b && b.gens) || []) if (g.status === 'running') stop(g, 'failed', 'Studio stopped while this was generating');
   return n;

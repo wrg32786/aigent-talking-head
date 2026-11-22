@@ -19,7 +19,7 @@ export function mountScenes({ json, readBody, update, chromeOk }) {
     if (p === '/api/scenes' && M === 'GET') return json(res, 200, { scenes: SCN.list().map(({ html, css, ...x }) => ({ ...x, still: C.sceneStillUrl(x.id) })) });
     if (p === '/api/scenes' && M === 'POST') {
       const b = await readBody(req, 6e6), r = SCN.save({ ...(b.scene || b), by: (b.scene || b).by === 'reference' ? 'reference' : 'agent' });
-      update(st => C.applyPatch(st, { reply: `${r.added ? 'Added' : 'Already in the menu'}: ${r.scene.name} (${r.scene.kind}), on the Look step with a REF badge.`, from: 'assistant', kind: 'action' }));
+      update(st => C.applyPatch(st, { reply: `${r.added ? 'Added' : 'Already in the menu'}: ${r.scene.name} (${r.scene.kind}), on the Text and graphics step with a REF badge.`, from: 'assistant', kind: 'action' }));
       return json(res, 200, { scene: { ...r.scene, still: C.sceneStillUrl(r.scene.id) }, added: r.added });
     }
     const m = p.match(/^\/api\/scenes\/(ref-[a-z0-9-]+)(\/still\.png)?$/); if (!m) return false;

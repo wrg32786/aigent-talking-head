@@ -44,7 +44,20 @@ t('what the breakdown read: each part, and a fix id for the missing ones', () =>
   const d = mkdtempSync(join(tmpdir(), 'ran-')); mkdirSync(join(d, 'videomd')); writeFileSync(join(d, 'videomd', 'breakdown.json'), '{}'); writeFileSync(join(d, 'contact.jpg'), 'x');
   const ran = Object.fromEntries(C.ranOf(d, { script: [], sfx: [{}], music: { bpm: '120' } }).map(x => [x.id, x]));
   assert.ok(ran.reader.ok && ran.sheet.ok && ran.sounds.ok && ran.music.ok);
-  assert.strictEqual(ran.speech.fix, 'model'); assert.strictEqual(ran.layers.fix, 'effects');
+  assert.strictEqual(ran.speech.fix, 'model');
+  // report 4, item 15: the layers step stopped (no extras.json) and the page asked to install the Effects pass, which
+  // was installed. A step that stopped is read again; the Effects pass is the fix only for a read with no person mask
+  // on a computer that does not have it.
+  for (const effects of [true, false]) { const x = Object.fromEntries(C.ranOf(d, {}, { effects }).map(y => [y.id, y])).layers; assert.ok(!x.ok && x.fix === null && x.again, 'no extras.json is never the Effects pass: ' + JSON.stringify(x)); }
+  writeFileSync(join(d, 'extras.json'), JSON.stringify({ shots: [], mask: false }));
+  const lay = effects => Object.fromEntries(C.ranOf(d, {}, { effects }).map(y => [y.id, y])).layers;
+  assert.deepStrictEqual([lay(false).ok, lay(false).fix], [false, 'effects'], 'no person mask and no Effects pass: that is the fix');
+  assert.deepStrictEqual([lay(true).ok, lay(true).fix], [true, null], 'the Effects pass is installed: never ask for it');
+  writeFileSync(join(d, 'extras.json'), JSON.stringify({ shots: [], mask: true })); assert.deepStrictEqual([lay(false).ok, lay(false).fix], [true, null]);
+  writeFileSync(join(d, 'extras.json'), '{ not json'); assert.deepStrictEqual([lay(true).ok, lay(true).fix], [false, null], 'a file that cannot be read is a step that stopped');
+  // a state saved by an older Studio still names the fix: the page drops it when the thing is installed
+  const old = [{ id: 'layers', ok: false, fix: 'effects' }, { id: 'sheet', ok: false, fix: 'effects' }, { id: 'reader', ok: false, fix: 'rea' }];
+  assert.deepStrictEqual(C.ranFixes(old, { effects: true }), ['rea']); assert.deepStrictEqual(C.ranFixes(old, {}), ['effects', 'rea']); assert.deepStrictEqual(C.ranFixes(old, { effects: true, rea: true }), []);
   const bare = Object.fromEntries(C.ranOf(mkdtempSync(join(tmpdir(), 'ran-')), {}).map(x => [x.id, x]));
   assert.strictEqual(bare.reader.fix, 'rea'); assert.strictEqual(bare.sounds.ok, false);
   for (const x of Object.values(bare)) assert.ok(!/npm |pip |python3? /.test(x.why), 'no command: ' + x.why);

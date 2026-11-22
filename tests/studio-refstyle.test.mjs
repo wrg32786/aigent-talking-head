@@ -55,7 +55,9 @@ try {
     const s = v.state;
     assert.strictEqual(s.pack, 'cinematic', 'its Look');
     for (const tr of Object.keys(EX.transitions)) assert.ok(allow(s, 'transition').includes(tr), 'transition ' + tr);
-    for (const e of EX.entrances) assert.ok(allow(s, 'entrance').includes(e), 'title entrance ' + e);
+    // its title entrances are a preference, never a pick or a lock (report 4 item 9): a rebuild can use any entrance
+    assert.ok(EX.entrances.length > 0, 'the fixture reads entrances'); assert.deepStrictEqual(allow(s, 'entrance'), [], 'no entrance pick from the reference');
+    assert.ok(!/titles=/.test(v.compose.lockString || ''), 'and no titles lock: ' + v.compose.lockString);
     for (const f of EX.finishes) assert.ok(allow(s, 'finish').includes(f), 'grade ' + f);
     assert.deepStrictEqual(allow(s, 'captionStyle'), [EX.captionStyle], 'its caption style, one per reel');
     assert.strictEqual(s.music.bed, EX.music.bed, 'its music'); assert.ok(allow(s, 'beatSync').includes('beat-sync'), 'beat sync'); assert.ok(allow(s, 'editing').includes('punch'), 'pace: punch-ins');
@@ -96,7 +98,7 @@ try {
     const a = await req('/api/reference/url', { urls: [`${MEDIA}/ref.mp4`] }); assert.ok([200, 202].includes(a.status), JSON.stringify(a).slice(0, 300));
     const mid = (await req('/api/state')).state;
     assert.ok(!mid.reference.extracted && ['queued', 'downloading'].includes(mid.reference.queue[0].status), 'still being read: ' + mid.reference.queue[0].status);
-    assert.strictEqual(mid.pack, 'magazine', 'nothing set yet');
+    assert.strictEqual(mid.pack, null, 'the Look from before is set aside as soon as you choose to copy the reference, so what you pick while it is read is yours'); assert.strictEqual(mid.reference.auto || null, null, 'nothing set from the reference yet');
     release();
     const s = await until(async () => { const x = (await req('/api/state')).state; return x.reference.extracted && x.reference.auto ? x : null; });
     assert.strictEqual(s.pack, 'cinematic'); assert.deepStrictEqual(allow(s, 'captionStyle'), [EX.captionStyle]); assert.strictEqual(s.reference.auto.mode, 'recreate');

@@ -12,6 +12,8 @@
 //   caption or title that sits on another one fails (the layout pass in overlay.html moves or hides captions and titles).
 //   ffprobe: 1080x1920, the frame rate, H.264 + AAC at 48 kHz, duration = the cut's length.
 //   Loudness: integrated LUFS and true peak (target -14 LUFS, peak <= -1 dBTP).
+//   Titles: every frame from two before a title's start to five after, and the same at its end, read from the drawn text
+//   layer (build/ovl): no caption word in the bar while a title is up, none of its own words in the bar outside it.
 //   Mask (when cut.json has one): alpha measured from the mask file at each title, never judged by eye.
 //   Copy lint: the same check as `npm run check`.
 // Exit 1 on any failure. Then READ every still: titles readable and behind the head only, pills legible, punch frames
@@ -23,6 +25,7 @@ import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 const R = createRequire(import.meta.url)('./rules.cjs');
 const X = createRequire(import.meta.url)('./exports.cjs');
+import { titleCheck } from './titlecheck.mjs';
 const KIT = dirname(fileURLToPath(import.meta.url)), ROOT = dirname(KIT);
 const argv = process.argv.slice(2);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
@@ -34,15 +37,18 @@ const name = argv.find((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i
 if (!name) { console.error('Usage: npm run verify -- <job> [--file reel.mp4]'); process.exit(1); }
 let job = resolve(opt('jobs', join(ROOT, 'jobs')), name);
 if (!existsSync(job) && existsSync(resolve(name))) job = resolve(name);
-const build = join(job, 'build');
+// a 4:5 or 1:1 version is its own build (jobs/<job>/build-<name>/, kit/export-frame.cjs): its layout, face check and
+// window are checked there, against its own file (reel-vN-feed-4x5.mp4, reel-vN-square-1x1.mp4)
+const XBUILD = EXN && X.isReframed(EXN) && existsSync(join(job, 'build-' + EXN, 'cut.json'));
+const build = XBUILD ? join(job, 'build-' + EXN) : join(job, 'build');
 if (!existsSync(join(build, 'cut.json'))) { console.error('No ' + join(build, 'cut.json')); process.exit(1); }
 const sh = (c, a) => execFileSync(c, a, { stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 << 20 }).toString();
 const stderrOf = (c, a) => String(spawnSync(c, a, { encoding: 'utf8', maxBuffer: 64 << 20 }).stderr || '');
 
 let file = opt('file');
 if (!file) {
-  const reels = readdirSync(job).filter(f => (EXN ? new RegExp(`^reel(-fx)?-v\\d+-${EXN}\\.mp4$`) : /^reel(-fx)?-v\d+\.mp4$/).test(f)).map(f => join(job, f)).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
-  if (!reels.length) { console.error(EXN ? `No reel-vN-${EXN}.mp4 in ${job} (npm run export -- ${name} --export ${EXN})` : 'No reel-vN.mp4 in ' + job); process.exit(1); }
+  const reels = readdirSync(job).filter(f => (EXN ? new RegExp(`^reel(-fx)?-v\\d+-(${EXN}|${X.suffixOf(EXN)})\\.mp4$`) : /^reel(-fx)?-v\d+\.mp4$/).test(f)).map(f => join(job, f)).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+  if (!reels.length) { console.error(EXN ? `No reel-vN-${X.suffixOf(EXN)}.mp4 in ${job} (npm run export -- ${name} --export ${EXN})` : 'No reel-vN.mp4 in ' + job); process.exit(1); }
   file = reels[0];
 }
 file = resolve(file);
@@ -56,7 +62,7 @@ const ok = (cond, msg) => { lines.push((cond ? 'ok    ' : 'FAIL  ') + msg); retu
 const j = JSON.parse(sh('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,codec_name,width,height,r_frame_rate,sample_rate,channels:format=duration', '-of', 'json', file]));
 const v = j.streams.find(s => s.codec_type === 'video'), a = j.streams.find(s => s.codec_type === 'audio');
 const fr = v ? v.r_frame_rate.split('/').reduce((x, y) => x / y) : 0, dur = +j.format.duration;
-const WANT = EXP ? [EXP.w, EXP.h] : [1080, 1920], TOTAL = EXP ? Math.min(TL.total, EXP.maxSec) : TL.total;
+const WANT = EXP ? [EXP.w, EXP.h] : [1080, 1920], TOTAL = EXP ? X.endOf(EXN, TL.total, X.wordsOf(CAP)) : TL.total;
 ok(v && v.width === WANT[0] && v.height === WANT[1], `video ${v ? v.width + 'x' + v.height : 'missing'} (${WANT.join('x')}${EXP ? ', ' + EXP.label : ''})`);
 ok(v && Math.abs(fr - FPS) < 0.01, `frame rate ${fr.toFixed(3)} (${FPS})`);
 ok(v && v.codec_name === 'h264', `video codec ${v && v.codec_name} (h264)`);
@@ -167,6 +173,19 @@ if (stills.length) {
     ok(!fc.overlapMoments, `no text on the face zone at ${fc.withFace} moments with a face${fc.overlapMoments ? `: ${fc.overlapMoments} moments` : ''}${fc.moved && fc.moved.length ? ` (layout moved ${fc.moved.length} off the face)` : ''}`);
     for (const e of fc.elements || []) lines.push(`      ${e.kind} "${e.text}" at ${e.start}s: ${e.moments} moment${e.moments === 1 ? '' : 's'}, up to ${e.maxPx} px on the face`);
   } }
+// 3d. text clear of text (render.mjs -> textcheck.json): no two words on the same spot on any frame
+{ let tc = null; try { tc = JSON.parse(readFileSync(join(build, 'textcheck.json'), 'utf8')); } catch {}
+  if (!tc) notes.push('no textcheck.json: the text overlap check did not run (rebuild with the current kit)');
+  else {
+    const mv = (tc.moved || []).length;
+    ok(!tc.clashFrames, `no two words on the same spot on ${tc.frames} frames${tc.clashFrames ? `: ${tc.clashFrames} frames` : ''}${mv ? ` (layout stacked or held back ${mv} to keep them apart)` : ''}`);
+    for (const e of tc.pairs || []) lines.push(`      "${e.a}" and "${e.b}" overlap from ${e.from}s for ${e.frames} frame${e.frames === 1 ? '' : 's'}, up to ${e.maxPx} px`);
+  } }
+// 3e. round every title, on the drawn frames (kit/titlecheck.mjs): from two frames before a title's start to five after,
+// and the same at its end, no caption word in the bar while the title is up and none of its own words in the bar outside it
+if (!EXN || XBUILD || !X.isReframed(EXN)) { const tc = titleCheck(build, { dur: TL.total, fps: FPS });
+  tc.notes.forEach(n => notes.push(n));
+  if (tc.ran) { ok(!tc.fails.length, `no caption word under or beside a title on ${tc.frames} frames round ${tc.titles} title${tc.titles === 1 ? '' : 's'} (${tc.pixelFrames} read from the drawn text layer)${tc.fails.length ? ':' : ''}`); tc.fails.forEach(c => lines.push('      ' + c)); } }
 // 4. mask, measured
 const mask = R.maskSpec(C);
 if (C.titles && mask.file) {
@@ -185,7 +204,10 @@ if (C.titles && mask.file) {
     lines.push(`${good ? 'ok    ' : 'note  '}mask at title ${tm.toFixed(2)}s: alpha coverage ${(cov * 100).toFixed(1)}%, mean ${(sum / buf.length / 255).toFixed(3)}, title band ${bandA.toFixed(3)}`);
   }
   if (existsSync(mf)) {
-    const off = TL.total > 0.5 ? [0.05].filter(x => !titles.some(t => x >= t.start - 0.1 && x <= t.end + 0.1)) : [];
+    // the mask is also made for captions behind the person, stickers behind the head and screen cards behind its top
+    // (kit/reel.cjs), so a moment inside one of those is not "outside"
+    const alsoMasked = [...(R.captionLayer(CAP) === 'behind' ? (CAP.flips || []).filter(f => f.mode === 0).map(f => ({ start: f.start, end: f.end + 1.5 })) : []), ...(CAP.flips || []).filter(f => f.mode === 9 && f.layer === 'behind'), ...R.panelsBehind(CAP)];
+    const off = TL.total > 0.5 ? [0.05].filter(x => !titles.some(t => x >= t.start - 0.1 && x <= t.end + 0.1) && !alsoMasked.some(t => x >= t.start - 0.15 && x <= t.end + 0.15)) : []; // a window opens 0.1 s early, and the probe lands on the next frame
     for (const tm of off) { const b = execFileSync('ffmpeg', ['-v', 'error', '-ss', String(tm), '-i', mf, '-frames:v', '1', '-vf', 'scale=90:160', '-f', 'rawvideo', '-pix_fmt', 'gray', '-']); ok(b.every(x => x <= 8), `mask is empty outside the title windows (t=${tm}s, max alpha ${Math.max(...b)})`); }
     }
   }

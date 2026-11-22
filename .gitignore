@@ -65,3 +65,6 @@ packs/local/
 # your b-roll library (stock, generated and your own clips; never committed)
 broll-library/
 scenes/local/
+
+# your saved style looks (npm run look; Copy the look)
+looks/local/

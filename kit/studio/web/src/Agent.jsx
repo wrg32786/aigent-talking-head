@@ -6,11 +6,14 @@ import { Button } from '@astryxdesign/core/Button';
 import { api, file, toast, onOffline, Icon, IconBtn } from './lib.jsx';
 
 export const ASKS = {
-  footage: ['Which take is best?', 'Is my audio clean enough?'],
+  start: ['Which take is best?', 'Is my audio clean enough?'],
   cut: ['Pick the strongest hook', 'Drop the weak lines', 'Make a 15 s ad from this too'],
-  look: ['Make it calmer', 'Make it punchier', 'Match my brand colors'],
+  picture: ['Make it calmer', 'Make it punchier', 'Match my brand colors'],
+  text: ['Make the captions easier to read', 'Use fewer graphics'],
   broll: ['Suggest b-roll for the proof lines', 'Use fewer cards'],
-  finish: ['Check the draft for me', 'Why was this line cut?'],
+  music: ['Pick music that fits my voice', 'Use fewer sounds'],
+  review: ['Check the draft for me', 'Why was this line cut?'],
+  render: ['Is this ready to post?', 'What would you change in the next version?'],
   post: ['Write the caption', 'Which channels fit this one?'],
 };
 
@@ -59,8 +62,8 @@ export function Wizards({ CAT, V, s, apply, patch, go, open, setOpen, openChat }
   const looks = CAT.packs.filter(p => !/^ref-/.test(p.name)).slice(0, 8);
   // one wizard step on the server; the last one closes the wizard and opens the step it says comes next
   const step = (body, last) => run(async () => { const j = await api('/api/wizard', body); apply(j); const z = j.wizard || {};
-    if (last || z.pending) { close(); if (z.next && z.next !== 'choose' && z.next !== 'look') go(z.next, true); if (z.note) toast(z.note, true); } return j; });
-  const deciders = { reel: ['Pick the goal for this take and set the output.', 'Pick a Look that fits this take.', 'Choose the pieces for the Combo.'], reference: ['Find a reference reel that fits what I am making.'], clips: ['Pick the best clips from this take, and say if ad cuts make sense.'] };
+    if (last || z.pending) { close(); if (z.next && z.next !== 'choose' && z.next !== 'look' && z.next !== 'picture') go(z.next, true); if (z.note) toast(z.note, true); } return j; });
+  const deciders = { reel: ['Pick the goal for this take and set the output.', 'Pick a Look that fits this take.', 'Choose the lines for my clip.'], reference: ['Find a reference reel that fits what I am making.'], clips: ['Pick the best clips from this take, and say if ad cuts make sense.'] };
   const Decide = ({ k }) => <Button className="wz-agent" variant="ghost" size="sm" label="Let my agent decide" icon={<Icon n="spark" />} isDisabled={busy} onClick={() => agent(deciders[w][k] || deciders[w][0])} />;
   const body = () => {
     if (!W) return err ? <div className="row"><Button id="wz-retry" variant="ghost" size="sm" label="Try again" onClick={() => { setErr(''); setTries(k => k + 1); }} /></div> : <p className="fine">Loading</p>;
@@ -73,13 +76,13 @@ export function Wizards({ CAT, V, s, apply, patch, go, open, setOpen, openChat }
         <div className="wz-looks" role="radiogroup" aria-label="Look">{looks.map(p => <button key={p.name} type="button" role="radio" className="wz-look" data-look={p.name} aria-checked={s.pack === p.name ? 'true' : 'false'} disabled={busy}
           onClick={() => step({ wizard: 'reel', look: p.name }).then(j => j && setN(2))}>{p.preview ? <img src={file(p.preview)} alt="" width={64} height={114} loading="lazy" /> : <span className="ph" />}<b>{p.name}</b></button>)}</div>
         <div className="row"><Button variant="ghost" size="sm" label="Keep my Look" onClick={() => setN(2)} /><Decide k={1} /></div></>;
-      return <><h3 className="wz-q">Let AI choose the lines</h3><p className="fine">It picks a hook first and the call to action last, on whole words, to fit the length. You check the draft in Finish.</p>
-        <div className="row"><Button id="wz-choose" variant="primary" label="Let AI choose" isLoading={busy} onClick={() => step({ wizard: 'reel', choose: true }, true)} /><Decide k={2} /></div></>;
+      return <><h3 className="wz-q">Use our best lines</h3><p className="fine">It picks a hook first and the call to action last, on whole words, to fit the length. You check the draft on Review.</p>
+        <div className="row"><Button id="wz-choose" variant="primary" label="Use our best lines" isLoading={busy} onClick={() => step({ wizard: 'reel', choose: true }, true)} /><Decide k={2} /></div></>;
     }
     if (w === 'reference') return <><h3 className="wz-q">Paste a reel you like</h3><p className="fine">A link from Instagram, TikTok, YouTube or a file link. Studio reads its titles, colors, cuts and sound.</p>
       <form className="wz-url" onSubmit={e => { e.preventDefault(); if (!url.trim()) { setErr('Paste a link first.'); return; } step({ wizard: 'reference', url: url.trim() }, true); }}>
         <label className="sr" htmlFor="wz-url-in">Reference link</label><input id="wz-url-in" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://www.instagram.com/reel/..." />
-        <Button id="wz-ref-go" type="submit" variant="primary" size="sm" label="Copy its look" isLoading={busy} /></form><Decide k={0} /></>;
+        <Button id="wz-ref-go" type="submit" variant="primary" size="sm" label="Add this video" isLoading={busy} /></form><Decide k={0} /></>;
     return <><h3 className="wz-q">How many clips?</h3>
       <div className="seg" role="radiogroup" aria-label="Clips">{W.clipCounts.map(k => <button key={k} type="button" role="radio" aria-checked={clips === k ? 'true' : 'false'} onClick={() => setClips(k)}>{k}</button>)}</div>
       <label className="lbl-in"><input type="checkbox" id="wz-ads" checked={ads} onChange={e => setAds(e.target.checked)} /> Add 15 s and 30 s ad cuts</label>

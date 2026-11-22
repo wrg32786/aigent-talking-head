@@ -20,12 +20,12 @@
 .stepper { flex: 1 1 auto; min-width: 0; display: flex; justify-content: center; }
 .stepper ol { flex-wrap: nowrap; }
 .stepper button { white-space: nowrap; }
-.stepper li + li::before { width: 18px; }
+.stepper li + li::before { width: 12px; }
 .topr { flex: none; gap: 2px; }
 .setup-pill, .connect-btn, #taskpill { white-space: nowrap; flex: none; }
 #taskpill.idle { display: none; }
 .setup-pill .sp-n { font-variant-numeric: tabular-nums; }
-@media (max-width: 1500px) { .stepper li:not(:has([aria-current="step"])) .sl { display: none; } .stepper li:not(:has([aria-current="step"])) button { padding: 6px; } }
+@media (max-width: 1279px) { .stepper li:not(:has([aria-current="step"])) .sl { display: none; } .stepper li:not(:has([aria-current="step"])) button { padding: 6px; } }
 @media (max-width: 1320px) { .connect-btn .cb-l, .setup-pill .sp-l { display: none; } .connect-btn { padding: 0 10px; } .setup-pill { padding: 0 9px; } }
 @media (max-width: 1180px) { .stepper [aria-current="step"] .sl { display: inline; } }
 @media (max-width: 760px) { .stepper .sl { display: none !important; } }
@@ -104,13 +104,19 @@ main[data-step] .step[data-step] { animation: none; }
 @keyframes step-in-5 { from { opacity: 0; transform: translateY(10px); } }
 @keyframes step-in-6 { from { opacity: 0; transform: translateY(10px); } }
 @keyframes step-in-7 { from { opacity: 0; transform: translateY(10px); } }
-main[data-step="footage"] { animation: step-in-1 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+@keyframes step-in-8 { from { opacity: 0; transform: translateY(10px); } }
+@keyframes step-in-9 { from { opacity: 0; transform: translateY(10px); } }
+@keyframes step-in-10 { from { opacity: 0; transform: translateY(10px); } }
+main[data-step="start"] { animation: step-in-1 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
 main[data-step="cut"] { animation: step-in-2 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
-main[data-step="look"][data-look="reference"] { animation: step-in-3 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
-main[data-step="look"][data-look="style"] { animation: step-in-4 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+main[data-step="picture"][data-view="reference"] { animation: step-in-3 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+main[data-step="picture"][data-view="main"] { animation: step-in-4 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
 main[data-step="broll"] { animation: step-in-5 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
-main[data-step="finish"] { animation: step-in-6 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
-main[data-step="post"] { animation: step-in-7 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+main[data-step="review"] { animation: step-in-6 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+main[data-step="render"][data-view="post"] { animation: step-in-7 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+main[data-step="text"] { animation: step-in-8 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+main[data-step="music"] { animation: step-in-9 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
+main[data-step="render"][data-view="main"] { animation: step-in-10 var(--motion-slow) var(--ease-carve, ease-out) backwards; }
 .glass-card { transition: box-shadow var(--motion) var(--ease-ui), border-color var(--motion) var(--ease-ui), transform var(--motion) var(--ease-ui); }
 .pack, .tile, .agent-grid > * { transition: box-shadow var(--motion) var(--ease-ui), border-color var(--motion) var(--ease-ui); }
 /* brand: nothing moves on hover, only light and colour change */
@@ -186,3 +192,77 @@ main[data-step="post"] { animation: step-in-7 var(--motion-slow) var(--ease-carv
 .post-nav { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
 #post-empty { padding: 28px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 @media (max-width: 640px) { .post-card { padding: 12px; } .post-res-list li { grid-template-columns: 18px 1fr; } .post-res-list li .fine { grid-column: 2; } }
+/* sizes: one calm row of checkboxes under Render; the file labels on each output; where each file goes on Post */
+.sizes-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; padding: 10px 16px; margin: 10px 0 14px; border-radius: var(--card-radius, var(--radius-lg)); }
+.outputs { align-items: start; }
+.outputs figure[data-size="4:5"] video { aspect-ratio: 4 / 5; }
+.outputs figure[data-size="1:1"] video { aspect-ratio: 1; }
+.outputs figcaption .out-name { white-space: normal; }
+.sizes-row .lbl { margin: 0; }
+.size-opt { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; cursor: pointer; min-height: 32px; }
+.size-opt input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--primary); margin: 0; }
+.size-opt.locked { cursor: default; }
+.size-opt.locked input { opacity: .75; }
+.size-opt:has(input:disabled):not(.locked) { opacity: .6; cursor: default; }
+.out-name { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.out-name .out-use { font-weight: 600; font-size: 13.5px; }
+.out-name small { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.post-where { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 10px; padding: 8px 12px; border-radius: var(--radius); background: color-mix(in srgb, var(--primary) 8%, transparent); border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent); }
+.post-where > svg { width: 16px; height: 16px; flex: none; color: var(--primary); }
+.post-where p { margin: 0; flex: 1; min-width: 220px; color: var(--foreground); }
+.post-ch-list .pc-place { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 8px; padding-left: 28px; }
+.post-ch-list .pc-place .seg button { min-height: 28px; padding: 2px 12px; font-size: 12.5px; }
+@media (pointer: coarse) { .size-opt { min-height: 44px; } .post-ch-list .pc-place .seg button { min-height: 44px; } }
+
+/* 1.28 polish pass (the screenshot review). Kept in one block at the end so it merges cleanly. */
+/* The step bar names every step from 1280 px up: short names, tighter pills. Below that only the current step has its word. */
+@media (min-width: 1280px) {
+  .stepper ol { gap: 0; } .stepper li + li::before { width: 6px; margin-right: 0; }
+  .stepper button { gap: 6px; padding: 6px 8px 6px 5px; font-size: 13px; }
+  .stepper .sn { width: 22px; height: 22px; font-size: 12px; }
+  .setup-pill .sp-l { display: inline; } .setup-pill { padding: 0 10px; }
+}
+@media (min-width: 1280px) and (max-width: 1439px) { .job input { width: 132px; } .top { gap: 8px; } .bname { display: none; } }
+/* Your edit is one slim line (it wraps only when the window is narrow) */
+.your-edit { padding: 6px 14px; }
+/* The bottom bar is solid enough that nothing behind it reads through */
+.stepnav.glass { background: color-mix(in srgb, var(--background) 90%, var(--glass)); }
+/* Cut. What to make sits at the end of Clips; a row that is not used while Your clip is kept is dimmed with an empty tick */
+.cut-clips .cut-sum { margin-top: 4px; } .cut-clips .cut-sum .cs-t { font-size: 14px; font-weight: 550; flex: 1 1 200px; }
+.clip-row.muted { background: transparent; } .clip-row.muted .clip-keep { cursor: not-allowed; opacity: .6; }
+.pl-note { margin-left: auto; font-size: 12px; font-weight: 650; color: var(--primary); white-space: nowrap; }
+/* Best lines: the lines are the content, so the player steps back and the groups get the room */
+@media (min-width: 901px) { .cut-body.v-lines { grid-template-columns: 184px minmax(0, 1fr); } .cut-body.v-lines .pl-top { flex-wrap: wrap; } }
+.pz-grid { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+.pz .pz-more { opacity: 0; transition: opacity .12s; } .pz:hover .pz-more, .pz:focus-within .pz-more, .pz .pz-more[aria-expanded="true"] { opacity: 1; }
+@media (hover: none) { .pz .pz-more { opacity: 1; } }
+[data-theme="light"] .pz-best { color: #fff; background: var(--primary); }
+.cut-body.v-raw .cut-side:empty { display: none; }
+.pz-fits { color: #7dd3fc; background: rgba(56, 189, 248, .16); } [data-theme="light"] .pz-fits { color: #075985; background: rgba(56, 189, 248, .2); }
+/* Picture and Text tiles: the name sits under the picture, never on the sample caption */
+.tile { aspect-ratio: auto; overflow: visible; background: transparent; padding-bottom: 26px; }
+.tile::before { content: ""; display: block; aspect-ratio: 3 / 4; }
+.tile .pick { border-radius: var(--radius); }
+.tile .media { inset: 0 0 26px; border-radius: var(--radius); overflow: hidden; background: var(--muted); }
+.tile::after { inset: 0 0 26px; border-radius: var(--radius); }
+.tile .nm { padding: 0 2px; height: 22px; line-height: 22px; font-size: 12.5px; font-weight: 600; color: var(--foreground); background: none; }
+.tile .flag { text-transform: none; letter-spacing: 0; font-size: 10.5px; }
+@media (hover: hover) { .tile:hover { box-shadow: none; } }
+@media (max-width: 640px) { .tile .nm { padding: 0 2px; font-size: 12px; } }
+.pause-btn { white-space: nowrap; gap: 6px; } .pause-btn .ic { width: 14px; height: 14px; }
+/* The Looks row: room for the selected ring, and Save as a new Look at its end */
+.packs.looks { padding-top: 4px; padding-left: 4px; margin-left: -4px; }
+.looks-wrap > .pop { margin-top: 8px; }
+.cut-body.v-lines .pl-bar { flex-wrap: wrap; } .cut-body.v-lines .pl-bar .scrub { flex: 1 1 100%; min-width: 0; }
+/* The stage list: the step that stopped stands out, and the fold wears our chevron, not the browser's triangle */
+.stg-list li[data-state="failed"] { color: var(--foreground); font-weight: 600; } .stg-list li[data-state="failed"] .stg-mark { background: color-mix(in srgb, var(--destructive, #d9534f) 22%, transparent); }
+.stg-stop { margin-left: -6px; color: var(--destructive, #d9534f); }
+.stg-fold > summary { list-style: none; display: flex; align-items: center; gap: 6px; } .stg-fold > summary::-webkit-details-marker { display: none; }
+.stg-fold > summary::after { content: ""; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translateY(-2px); transition: transform .15s; }
+.stg-fold[open] > summary::after { transform: rotate(-135deg) translate(-2px, 0); }
+/* Post: the same rounded glass as every other card */
+.post-card { border-radius: 18px; } .pc-place .btn, .pc-place button[id="post-make-feed"] { flex: none; }
+/* a tick you cannot change (the 9:16 size is always made) still reads as ticked in the light theme */
+.size-opt.locked input:disabled { opacity: 1; accent-color: var(--primary); filter: saturate(.7) opacity(.75); }
+/* Start: smaller footage thumbnails, so the choice under them is on screen at first load */
+@media (min-width: 901px) { #footage.clips { grid-template-columns: repeat(auto-fill, minmax(92px, 104px)); margin-top: 12px; } }

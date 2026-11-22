@@ -137,7 +137,7 @@ def run(src, out, fps=8.0, margin=0.18):
     dec.wait()
     zones = smooth(raw, fps)
     res = {'fps': fps, 'size': [OW, OH], 'zones': zones, 'faces': found, 'samples': len(raw), 'margin': margin, 'sig': sig}
-    with open(out, 'w') as fh:
+    with open(out, 'w', encoding="utf-8") as fh:
         json.dump(res, fh)
     print(f"face zone: a face in {found} of {len(raw)} samples ({fps:g} a second) -> {out}")
     return res

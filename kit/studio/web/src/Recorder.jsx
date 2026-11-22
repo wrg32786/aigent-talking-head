@@ -1,4 +1,4 @@
-// Record now: film takes with this computer's camera and mic, right in the Footage step.
+// Record now: film takes with this computer's camera and mic, right in the Start step.
 // The preview is the camera as it is; the recording is cropped to the chosen frame (9:16 by default) on a canvas,
 // recorded with MediaRecorder and sent to the server in numbered one-second chunks while you film.
 import { useEffect, useMemo, useRef, useState } from 'react';

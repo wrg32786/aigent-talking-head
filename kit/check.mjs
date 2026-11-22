@@ -31,12 +31,12 @@ function checkJob(captionsFile, cutFile, label) {
   }
   for (const k of ['card', 'cta']) if (CAP[k]) for (const v of Object.values(CAP[k])) if (typeof v === 'string') R.lintCopy(v).errs.forEach(x => errs.push(`${k}: ${x}`));
   const raw = flips.filter(f => f.mode === R.TITLE_MODE);
-  if (raw.length > R.ENTRANCES.length && !CAP.entranceRepeat) errs.push(`${raw.length} titles; there are ${R.ENTRANCES.length} entrances and none repeats in one video`);
+  if (raw.length > R.ENTRANCES.length && !CAP.entranceRepeat && !CAP.titleEntrance) errs.push(`${raw.length} titles; there are ${R.ENTRANCES.length} entrances and none repeats in one video`);
   const seen = {};
   for (const t of raw) if (t.entrance) {
     if (!R.ENTRANCES.includes(t.entrance)) errs.push(`title ${t.start}s: unknown entrance "${t.entrance}" (${R.ENTRANCES.join(', ')})`);
     // a repeat is allowed when you chose it (a titles lock with fewer entrances than titles, or npm run choices --apply)
-    if (seen[t.entrance] && !CAP.entranceRepeat) errs.push(`title ${t.start}s: entrance "${t.entrance}" already used at ${seen[t.entrance]}s`);
+    if (seen[t.entrance] && !CAP.entranceRepeat && !CAP.titleEntrance) errs.push(`title ${t.start}s: entrance "${t.entrance}" already used at ${seen[t.entrance]}s`);
     seen[t.entrance] = t.start;
   }
   const sorted = raw.slice().sort((a, b) => a.start - b.start);
@@ -67,6 +67,7 @@ function checkJob(captionsFile, cutFile, label) {
     const file = f.mode === 10 || f.mode === 19 ? f.icon : f.mode === 11 ? f.src : null;
     if (file && !existsSync(resolve(dirname(captionsFile), file))) errs.push(`graphic ${f.start}s: no file at ${file}`);
     if (f.mode === 9 && f.layer && !['front', 'behind'].includes(f.layer)) errs.push(`graphic ${f.start}s: layer "${f.layer}" (front, behind)`);
+    if (f.mode === 9 && f.shape && !['seal', 'starburst'].includes(f.shape)) errs.push(`graphic ${f.start}s: shape "${f.shape}" (seal, starburst)`);
     if (f.mode === 11 && f.layer && !R.PANEL_LAYERS.includes(f.layer)) errs.push(`screen card ${f.start}s: layer "${f.layer}" (front, behind, auto)`);
     if (f.mode >= 12 && f.layer && !R.PANEL_LAYERS.includes(f.layer)) errs.push(`graphic ${f.start}s: layer "${f.layer}" (front, behind, auto)`);
     for (const [m, nm] of [[14, 'checklist'], [30, 'ticker'], [32, 'feature cards']]) if (f.mode === m && !(Array.isArray(f.items) ? f.items.length : String(f.items || '').trim())) errs.push(`${nm} ${f.start}s: no items`);
@@ -84,7 +85,7 @@ function checkJob(captionsFile, cutFile, label) {
     for (const k of Object.keys(C.sfx || {})) if (!R.SFX[k] && !(C.sounds || {})[k]) errs.push(`sfx "${k}": use ${Object.keys(R.SFX).join(', ')}, or add it to "sounds" in cut.json`);
     for (const h of C.sfxHits || []) if (!SFXPLAN.lookup(h.id)) errs.push(`sfxHits "${h.id}" is not in kit/sfx/sfx.json`);
     for (const [k, s] of Object.entries(C.sounds || {})) if (!s.file || !existsSync(resolve(dirname(cutFile), s.file))) errs.push(`sounds.${k}: no file at ${s.file}`);
-    for (const [k, s] of (C.inserts || []).entries()) { if (s.place != null && !SPLITL.PLACES.includes(s.place)) errs.push(`inserts[${k}]: place "${s.place}" (${SPLITL.PLACES.join(', ')})`); if (!s.file || !existsSync(resolve(dirname(cutFile), s.file))) errs.push(`inserts[${k}]: no file at ${s.file}`); if (!(+s.dur > 0) || +s.at < 0 || +s.at + +s.dur > TL.total + 0.01) errs.push(`inserts[${k}]: at ${s.at} + dur ${s.dur} is outside the ${TL.total} s cut`); }
+    for (const [k, s] of (C.inserts || []).entries()) { if (s.place != null && !SPLITL.PLACES.includes(s.place)) errs.push(`inserts[${k}]: place "${s.place}" (${SPLITL.PLACES.join(', ')})`); if (Array.isArray(s.run) && !s.file) continue; /* a fast run before its first build: kit/reel.cjs makes its clip and sets file and dur */ if (!s.file || !existsSync(resolve(dirname(cutFile), s.file))) errs.push(`inserts[${k}]: no file at ${s.file}`); if (!(+s.dur > 0) || +s.at < 0 || +s.at + +s.dur > TL.total + 0.01) errs.push(`inserts[${k}]: at ${s.at} + dur ${s.dur} is outside the ${TL.total} s cut`); }
     if (C.bed) { const lib = R.isBed(C.bed);
       if (!existsSync(lib ? R.bedFile(C.bed) : resolve(dirname(cutFile), String(C.bed)))) errs.push(lib ? `bed "${C.bed}": kit/music/${R.BEDS[C.bed].file} is missing (beds.json lists it)` : `bed "${C.bed}": not a library bed (npm run music) and no such file`); }
     const seams = TL.seams.map(x => x.toFixed(2));
@@ -205,6 +206,18 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'recreate-plan.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
     catch (e) { rperrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Recreate module and plan.json tests (tests/recreate-plan.test.cjs: one scale, per-shot settings, sounds, shakes, graphics, accent, a recipe draft writes build/plan.json, read first with cut.json refShots as the fallback)', errs: rperrs, warns: [] });
+    const rgerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'reframe-grade.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
+    catch (e) { rgerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'reframe and grade match tests (tests/reframe-grade.test.cjs: the crop that puts your face on the reference face, the zoom limit of the source, the face box kept inside, the Reel.md face and lab keys, YuNet end to end, the skin-protected LUT, one LUT when the shots agree, the assembler applying both)', errs: rgerrs, warns: [] });
+    const fwerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'facewindow.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
+    catch (e) { fwerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Instagram Feed 4:5 and square 1:1 tests (tests/facewindow.test.cjs: the face-tracked window stays inside the picture, follows the face, holds still on a still shot, eases at a cut; the ffmpeg formula matches; file names and plain labels; split and framed b-roll fitted to the frame; a short reel rendered to 1080x1350 with everything inside the safe area and off the face)', errs: fwerrs, warns: [] });
+    const slerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'stylelook.test.cjs')], { cwd: ROOT, stdio: 'pipe' }); }
+    catch (e) { slerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Copy the look tests (tests/stylelook.test.cjs: a style look from a teardown with none of its words or times, save, load and list, cuts only in your own pauses, stickers on your own words, the look\'s titles and sounds, build/match.json, --style-look refused with --recipe)', errs: slerrs, warns: [] });
     const scerrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'ref-scenes.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { scerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
@@ -261,6 +274,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-post.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { posterrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio post tests (tests/studio-post.test.mjs: Buffer, R2 and Cloudinary against a mock, links refused, per-channel limits, drafts by default, post now needs a confirm, H.264, MCP Buffer tools)', errs: posterrs, warns: [] });
+    const szerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-sizes.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { szerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio sizes tests (tests/studio-sizes.test.mjs: 9:16 always, the Feed 4:5 and square as sizes, one --export list, plain file labels, the Feed file of a version, make a size, MCP sizes)', errs: szerrs, warns: [] });
     const ses = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-session.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { ses.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
@@ -276,11 +293,34 @@ if (target) {
     const fierrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-finish.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { fierrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
-    results.push({ label: 'Studio finish tests (tests/studio-finish.test.mjs: what the one Render makes, six steps and their old names, one render path, Your edit, MCP get_edit and studio_run from and exports)', errs: fierrs, warns: [] });
+    results.push({ label: 'Studio finish tests (tests/studio-finish.test.mjs: what the one Render makes, eight steps and their old names, one render path, Your edit, MCP get_edit and studio_run from and exports)', errs: fierrs, warns: [] });
+    const sterrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-steps.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { sterrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio step map tests (tests/studio-steps.test.mjs: the 8 steps, old step names land, one step per layer, menu links, match chips)', errs: sterrs, warns: [] });
+    for (const [f, what] of [
+      ['studio-cut-server.test.mjs', 'Studio Cut server tests (tests/studio-cut-server.test.mjs: the Cut routes, the point, topics, Pacing and the stitched previews over HTTP)'],
+      ['studio-stages.test.mjs', 'Studio stage status tests (tests/studio-stages.test.mjs: teardown log lines to the stage line, the list and the bar)'],
+      ['studio-ref-clear.test.mjs', 'Studio reference clear tests (tests/studio-ref-clear.test.mjs: a stopped breakdown\'s line goes when the reference is cleared or replaced)'],
+      ['py-utf8.test.mjs', 'Python reads and writes utf-8 (tests/py-utf8.test.mjs: every text open() names the encoding, so a breakdown works on Windows)'],
+      ['label-check.test.cjs', 'app labels and check (tests/label-check.test.cjs: an app label carries its OCR confidence, a low one is a doubt, "check" in a Reel.md graphics line reaches the flip)'],
+      ['split-panel.test.mjs', 'the split panel (tests/split-panel.test.mjs: the head band covers the shadow under the seam in 9:16, 4:5 and 1:1; a wide clip is shown whole on its own blur, flush on the seam; with ffmpeg, a render with no shadow on the head)'],
+      ['title-outline-boost.test.mjs', 'title partners follow the caption outline, and the legibility shadow is a choice (tests/title-outline-boost.test.mjs: no stroke with captionOutline none, the Studio switch and its default, --no-boost)'],
+      ['teardown-phrases.test.mjs', 'phrases on screen are not one-word captions (tests/teardown-phrases.test.mjs: a fixture breakdown whose text tracks show phrases gives kinetic with the reason, a one-word reel stays one-word, the vision pass off is said in the recipe, teardown.md and on the page)']]) {
+      const e2 = [];
+      try { execFileSync(process.execPath, [join(ROOT, 'tests', f)], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+      catch (e) { e2.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+      results.push({ label: what, errs: e2, warns: [] });
+    }
     const sperrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-spots.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { sperrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio b-roll spots tests (tests/studio-spots.test.mjs: spots of 6 to 10 s from the captions, Add a spot, reference spots, counters, quotes and noun searches from the words, the first spot too, upload kinds, Approve with no key, MCP pick_broll, add_spot, add_testimonial)', errs: sperrs, warns: [] });
+    // B-roll slots (1.28.0): detection, the planner keeps slots with no assets, effects into the plan, Studio's needs
+    { const be = [];
+      try { execFileSync(process.execPath, [join(ROOT, 'tests', 'broll-slots.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+      catch (e) { be.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+      results.push({ label: 'B-roll slots tests (tests/broll-slots.test.mjs: a speaker shot is not a cutaway, panels merge and keep their effects, the Reel.md B-roll block, Recreate and Copy the look keep every slot with no assets and land it on your words, effects in plan.json, a panel under the chin, Studio needs, Skip, a clip as a panel, slot states at render)', errs: be, warns: [] }); }
     const rparts = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-recreate-parts.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { rparts.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
@@ -297,6 +337,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-refstyle.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { rserrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio reference sets the Look (tests/studio-refstyle.test.mjs: Recreate sets every layer, Influence keeps your Look and sound, your changes stay, Back to my look gives your own picks back, a reference still being read sets it when ready, MCP studio_set_selections)', errs: rserrs, warns: [] });
+    const slkerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-stylelook.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { slkerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio Copy the look (tests/studio-stylelook.test.mjs: reference mode look, a draft with --style-look and no recipe or re-cut, the look saved as look-<job>, a saved style look with no reference, Recreate wins, the list and save API, match passed through, MCP get_edit, studio_set_selections and save_look)', errs: slkerrs, warns: [] });
     const auerrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-agent-ux.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { auerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
@@ -305,10 +349,44 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-pieces.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { pcerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio pieces and outputs tests (tests/studio-pieces.test.mjs: a category for every line, your category wins, topics, Let AI choose hook first and CTA last with reasons, neighbours join into one range, the Outputs library with each version\'s settings, MCP get_pieces, set_combo, choose_combo, list_outputs)', errs: pcerrs, warns: [] });
+    const pterrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-point.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { pterrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio Cut step tests (tests/studio-point.test.mjs: the point of the video steers lines, Let AI choose, clips and the model prompt; topics are 3 to 5 themes of two or more words, never the old single words; pacing only removes quiet, never part of a word; the stitched previews; your own clip; MCP fields)', errs: pterrs, warns: [] });
     const ferrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'face-matte.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { ferrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'face and mask tests (tests/face-matte.test.mjs: BiRefNet tiers, memory check, Studio 409 when memory is short)', errs: ferrs, warns: [] });
+    const toerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'text-overlap.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { toerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'words never overlap (tests/text-overlap.test.mjs: every text box on every frame for 9:16, 4:5 and 1:1; a said word leaves when a title enters, a title over a word, two titles, caption lines, an ordinal word)', errs: toerrs, warns: [] });
+    for (const [f, what] of [['title-rules.test.mjs', 'titles and the caption bar (tests/title-rules.test.mjs: nothing in the bar while a title is up, the minimum never carries a word past a title, the title check fails on a word drawn under a title and passes with the rule on, beat snap lines and a title\'s own caption word, the partner line, glow and dim, a label that repeats the caption, the shadow on a low-contrast word)'],
+      ['title-look.test.mjs', 'the look of a reference\'s titles (tests/title-look.test.mjs: two lines, an italic serif key word and a sans partner in capitals, their colours, glow and dim read from drawn frames; the pairing, the Style lines and blur-rise for an unread entrance in the recipe; title text we are not sure of is marked)'],
+      ['fontmatch.test.mjs', 'font match tests (tests/fontmatch.test.mjs: words drawn in blackletter, sans, serif and condensed faces come back as their own kind and pairing; weight, case, colour; faces we do not ship land in the right kind)'],
+      ['studio-reflook.test.mjs', 'Studio reference look tests (tests/studio-reflook.test.mjs: a reference\'s entrances are a preference and never a lock, the saved look in use with a reference Off or on Influence is found and one switch sets the board from the reference, titles to check are listed and fixed in the reference\'s Reel.md)'],
+      ['studio-fonts.test.mjs', 'Studio font tests (tests/studio-fonts.test.mjs: a reference clears an older font pick and its own font is used, a font picked after it holds, a new reference, a new video and new footage clear it, Font: Matched, Close or Guess)'],
+      ['studio-leak.test.mjs', 'nothing from the last video in a draft that copies a reference (tests/studio-leak.test.mjs: a board with a previous video\'s Look, font, caption style, title entrances, effects, music and B-roll search words; none reaches a Recreate or Copy the look draft, a pick after the reference does, the page says when a saved look is in use)']]) {
+      const e = [];
+      try { execFileSync(process.execPath, [join(ROOT, 'tests', f)], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+      catch (x) { e.push(String(x.stderr || x.stdout || x.message).trim().split('\n').slice(0, 8).join(' | ')); }
+      results.push({ label: what, errs: e, warns: [] });
+    }
+    const sberrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'starburst.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { sberrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'starburst sticker tests (tests/starburst.test.mjs: a spiky star read as a starburst with its point count, a disc as a seal, shape and spikes through the teardown mapping, Reel.md and the flips, the overlay drawing path)', errs: sberrs, warns: [] });
+    // Studio report 4 (camera moves, B-roll runs, the last piece, the breakdown's progress)
+    for (const [f, what] of [
+      ['motion.test.mjs', 'camera moves you can see (tests/motion.test.mjs: the move size measured per shot, carried in the recipe as move-size, sized by Subtle, Medium or Strong with Medium the default, sized again on a rebuild, the Studio control)'],
+      ['fastrun.test.mjs', 'fast run and the whole fit (tests/fastrun.test.mjs: a run cuts on the beats or half beats of the bed, each picture whole and sharp over its own blur, a cut.json run made by the build as one insert, a wide clip whole in the split panel, a run of fast cuts in a reference as one B-roll slot, Studio run clips and their credits)'],
+      ['piece-edges.test.mjs', 'the two ends of a piece (tests/piece-edges.test.mjs: the last piece ends with its closing sentence and a word said after it is left out, the cut clear of both words; a piece starts on the first frame at the lens inside the quiet before its first word, read with YuNet; a draft does both and --keep-ends does neither)'],
+    ]) {
+      const e2 = [];
+      try { execFileSync(process.execPath, [join(ROOT, 'tests', f)], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+      catch (e) { e2.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+      results.push({ label: what, errs: e2, warns: [] });
+    }
   }
   {
     const star = createRequire(import.meta.url)('./star.cjs');

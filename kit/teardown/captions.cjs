@@ -15,8 +15,54 @@ function oneWordStream(b) {
   return { cues: new Set(hit), band, n: hit.length, of: words.length };
 }
 
-// Running captions -> one of our caption styles.
+// Phrases on screen (Studio report 4 item 16): the breakdown's text tracks (shots[].text.items, sampled every half
+// second) show what was on screen at each moment. Big text of two or more words at a moment, in one line or in lines
+// stacked on each other, is a designed phrase title ("IF WE MADE / $30K"), also when it is built word by word and so
+// matches the speech one word at a time. Tiny text (a screen recording, a UI) and unsure reads are left out. Returns
+// { n, of, share, examples } when phrases are the rule: 4 or more different ones, on a third or more of the moments
+// that show big text. One-word captions with a few titles between them stay one-word.
+function phrasesOnScreen(b) {
+  const seen = new Map(); let multi = 0, single = 0;
+  for (const s of b.shots || []) {
+    const byT = new Map();
+    for (const it of ((s.text || {}).items) || []) {
+      const h = it.bbox ? +it.bbox[3] : 0, txt = String(it.text || '').trim();
+      if (!(h >= 0.03) || (it.conf ?? 1) < 0.6 || !/[\p{L}\p{N}]{2}/u.test(txt)) continue;
+      if (!byT.has(it.t)) byT.set(it.t, []);
+      byT.get(it.t).push({ y0: +it.bbox[1], y1: +it.bbox[1] + h, h, txt });
+    }
+    for (const items of byT.values()) {
+      items.sort((p, q) => p.y0 - q.y0);
+      // lines stacked on each other (the gap under a line is at most its own height) are one block
+      const blocks = []; for (const it of items) { const last = blocks[blocks.length - 1]; if (last && it.y0 - last.y1 <= Math.max(last.h, it.h)) { last.lines.push(it.txt); last.y1 = Math.max(last.y1, it.y1); last.h = Math.max(last.h, it.h); } else blocks.push({ y1: it.y1, h: it.h, lines: [it.txt] }); }
+      const best = blocks.map(k => ({ lines: k.lines, words: k.lines.join(' ').split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length })).sort((p, q) => q.words - p.words)[0];
+      if (!best) continue;
+      if (best.words >= 2) { multi++; const key = norm(best.lines.join(' ')); if (key && !seen.has(key)) seen.set(key, best.lines.join(' / ')); } else single++;
+    }
+  }
+  // a phrase that grows word by word ("IF", "IF WE", "IF WE MADE") counts once: keep the longest
+  const keys = [...seen.keys()].sort((p, q) => q.length - p.length), kept = [];
+  for (const k of keys) if (!kept.some(x => x.startsWith(k) || x.includes(k))) kept.push(k);
+  const of = multi + single, share = of ? multi / of : 0;
+  if (kept.length < 4 || share < 1 / 3) return null;
+  return { n: kept.length, moments: multi, of, share: r2(share), examples: kept.slice(0, 3).map(k => seen.get(k)) };
+}
+// Did a vision model look at the frames (breakdown.json analysis.vlm)? null when the breakdown does not say.
+function visionPass(b) {
+  const v = (b && b.analysis || {}).vlm; if (v == null) return null;
+  if (typeof v === 'string') return /^(ok|on|used|done)$/i.test(v) ? 'on' : 'off';
+  return v.used === true || /^(ok|on|used|done)$/i.test(String(v.status || '')) ? 'on' : 'off';
+}
+const VISION_OFF = 'We read this reference without the vision pass, so titles may be misread';
+
+// Running captions -> one of our caption styles. One-word is never said when the text on screen is phrases.
 function captionStyle(b) {
+  const cs = captionStyle0(b), ph = cs.style === 'one-word' ? phrasesOnScreen(b) : null;
+  if (!ph) return cs;
+  return { ...cs, style: 'kinetic', was: 'one-word', phrases: ph,
+    why: `the text on screen is phrases, not one word at a time: ${ph.moments} of ${ph.of} moments with big text show two or more words, ${ph.n} different phrases (${ph.examples.map(x => `"${x}"`).join(', ')}). They are designed titles, so the captions are kinetic (a key word with the rest of its phrase) and not one-word. What looked like one-word captions: ${cs.why}` };
+}
+function captionStyle0(b) {
   const ow = oneWordStream(b);
   if (ow) return { style: 'one-word', why: `${ow.n} big single words on screen match the speech (${ow.of} words spoken), mostly in the ${ow.band} band`, band: ow.band, ...placeOf([...ow.cues]) };
   // tiny text (a screen recording, a UI) is not a caption
@@ -80,4 +126,4 @@ function captionLook(samples, cues, layerSamples) {
     shadow: vs.filter(v => v === 'shadow').length >= 0.4 * vs.length ? 'soft' : 'none', n: vs.length };
 }
 
-module.exports = { oneWordStream, captionStyle, placeOf, captionLook };
+module.exports = { oneWordStream, captionStyle, phrasesOnScreen, visionPass, VISION_OFF, placeOf, captionLook };

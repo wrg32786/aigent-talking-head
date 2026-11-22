@@ -29,6 +29,8 @@ Before any render, show the user:
 
 Say plainly which parts are guesses: caption style and finishes are the nearest match on a short menu, subtle grades are often missed, front or behind is a colour test (for titles) or a check that the letters stop at the hairline (for captions, `caption-layer`), and OCR misreads stylised type. A finish is only assigned when the grade is strong or changes across shots; an even warm cast is read as room light. Graphics (ordinal stickers, app labels, screen cards) are drawn as generic placeholders until real assets are given.
 
+Titles: when the report starts with "Check these titles", we are not sure we read that text right (a low-confidence read, a word that does not read as a word, or not what is said at that moment). Read each one out, fix its `text` in the Reel.md and take the `check` field off its line before a draft. The report's "Title look" table says what was read of the titles: one line or two, the key word's face and the partner line's, their colours, glow and dim. They are in the Reel.md Style as `title-lockup`, `title-key-case`, `title-partner-case`, `title-key-color`, `title-partner-color`, `title-glow`, `title-dim` and `title-entrance`; change any of them when the user sees it differently.
+
 Screen cards: read "Screen cards: what was shown" in the report. For each card, propose a public page for the tool or repo named (the address read in the card, or the repo or site of the tool named before it; search for it if needed). Show the list and ask the user to confirm or change it before capturing anything. Then write `source <url>` on those cards (a file of their own works too) and run `npm run capture -- --recipe teardown/<name>/Reel.md`. Capture only public pages; never log in or capture a page behind a login.
 
 ## 4. Let them adjust
@@ -40,6 +42,13 @@ Ask what to change, and edit `teardown/<name>/Reel.md`: their preset and colours
 ```
 npm run reel -- --recipe teardown/<name>/Reel.md --clip inbox/<their-clip>.mp4 --draft
 ```
+
+Ask which of the two they want:
+
+- **Recreate** (the same edit): add `--recut`. Their take is re-cut to the reference's shots on word boundaries, each shot cropped to the reference's face size and eye line and graded to its colour (skin kept), with its stickers and sounds at its times.
+- **Copy the look** (the same style, their own script and subject): `npm run look -- save teardown/<name> --name <look>`, then `npm run reel -- --style-look <look> --clip inbox/<their-clip>.mp4 --draft`. The cuts land in their own pauses at the look's pace; nothing from the reference's script, text or times is used. The saved look works on any later take (`npm run look -- list`).
+
+Both write `jobs/<job>/build/match.json`: tell the user, in plain words, how close each part is and why a part is low (for example a take that was too wide to zoom all the way).
 
 Their own words stay; the recipe's title entrances and layers apply in order (`--recipe-titles` uses the reference's title text instead, only if the user wants that and the text is theirs to use; a title they do not say is dropped). Review, offer the menu again, `npm run reel -- --rebuild --name <job>`, then `npm run verify -- <job>` must print `VERIFY PASS`.
 

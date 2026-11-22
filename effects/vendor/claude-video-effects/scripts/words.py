@@ -24,6 +24,6 @@ except ImportError:
     segs, _ = model.transcribe(src, word_timestamps=True, vad_filter=True)
     words = [{'w': w.word.strip(), 's': round(w.start, 2), 'e': round(w.end, 2)} for s in segs for w in (s.words or [])]
 
-json.dump(words, open(out, 'w'), indent=0)
+json.dump(words, open(out, 'w', encoding="utf-8"), indent=0)
 for w in words: print(f"{w['s']:7.2f}  {w['w']}")
 print(f'\nSaved {len(words)} words to {out}')
