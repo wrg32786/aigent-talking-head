@@ -88,9 +88,13 @@ try {
     assert.deepStrictEqual(await pg.evaluate(() => [document.querySelector('main').dataset.step, document.querySelector('main').dataset.view]), ['picture', 'reference'], 'the Breakdown is a view of Picture');
     const st = await pg.$$eval('#ref-ran .ran li', x => x.map(e => [e.dataset.part, e.className]));
     assert.deepStrictEqual(Object.fromEntries(st), { reader: 'ok', speech: 'miss', layers: 'miss', sheet: 'miss', sounds: 'ok', music: 'ok' });
-    const txt = await pg.textContent('#ref-ran'); assert.match(txt, /did not run/);
+    const txt = await pg.textContent('#ref-ran');
+    // layers and the contact sheet stopped (no extras.json): that is never the Effects pass, so no install button for
+    // it; the row says to read it again (report 4, item 15: the page asked to install what was installed)
+    assert.match(await pg.textContent('#ran-stopped'), /Layers and grade and contact sheet did not finish\. Nothing is missing on this computer\./);
+    assert.strictEqual(await pg.$('#ref-ran [data-fix="effects"]'), null, 'no Effects pass prompt'); assert.ok(!/Effects pass/.test(txt), txt);
     assert.ok(!/npm |pip |python3? |\$ /.test(txt), 'no terminal command: ' + txt);
-    assert.ok(await pg.$('#ref-ran .ran-fix button'), 'a fix button');
+    assert.strictEqual(await pg.$('#ref-again'), null, 'this reference came with no link or file to read again, so no button that would do nothing');
     for (const th of ['dark', 'light']) { await theme(pg, th, '#step=reference'); await pg.waitForSelector('#ref-ran'); await pg.$eval('#ref-ran', e => e.scrollIntoView({ block: 'center' })); if (shots) { await pg.waitForTimeout(300); await (await pg.$('#ref-out')).screenshot({ path: join(shots, `recreate-ran-${th}.png`) }); } }
   });
   await t('the Breakdown is calm: the same mode control, parts switches in Influence, the rest behind Details', async () => {
@@ -113,6 +117,22 @@ try {
     assert.ok(pos[0] <= pos[1], 'the card is above the Looks row: ' + pos); assert.ok(pos[2] < 1, 'the Looks row is dimmed');
     assert.ok(await pg.$eval('#ref-card #ref-plan', e => /shots/.test(e.textContent)), 'plan chips in Recreate');
     for (const th of ['dark', 'light']) { await theme(pg, th); await pg.waitForSelector('#ref-card'); await shot(pg, `recreate-useall-${th}.png`); }
+    assert.deepStrictEqual(errs, []);
+  });
+  await t('Camera moves: one small control on Motion, Medium in a Recreate, and it goes away with the reference', async () => {
+    await pg.click('#tab-motion'); await pg.waitForSelector('#motion-size');
+    assert.strictEqual(await pg.getAttribute('#motion-size', 'data-motion'), 'medium', 'a Recreate starts at Medium');
+    assert.strictEqual((await pg.textContent('#motion-size-l')).trim(), 'Camera moves');
+    assert.deepStrictEqual(await pg.$$eval('#motion-size [role="radio"]', x => x.map(e => e.textContent.trim())), ['Subtle', 'Medium', 'Strong']);
+    assert.strictEqual(await pg.locator('#motion-extra').locator('button, [role="switch"], [role="radiogroup"]').count() <= 5, true, 'the layer keeps two small controls, no more');
+    await pg.locator('#motion-size [role="radio"]', { hasText: 'Strong' }).click();
+    await until(async () => (await api('/api/state')).state.pace.motion === 'strong'); await pg.waitForSelector('#motion-size[data-motion="strong"]');
+    const v = await api('/api/state'); assert.ok(v.compose.args.join(' ').includes('--motion strong'), 'the draft gets it: ' + v.compose.args.join(' ').slice(0, 300));
+    for (const th of ['dark', 'light']) { await theme(pg, th); await pg.click('#tab-motion'); await pg.waitForSelector('#motion-size'); await pg.$eval('#motion-extra', e => e.scrollIntoView({ block: 'center' })); if (shots) { await pg.waitForTimeout(300); await pg.screenshot({ path: join(shots, `motion-strength-${th}.png`) }); } }
+    await pg.locator('#motion-size [role="radio"]', { hasText: 'Medium' }).click(); await until(async () => (await api('/api/state')).state.pace.motion === 'medium');
+    await pg.evaluate(() => scrollTo(0, 0)); await pg.click('#ref-card-mode [data-mode="off"]'); await pg.waitForSelector('#ref-card-mode [data-mode="off"][aria-checked="true"]');
+    await pg.click('#tab-motion'); await pg.waitForSelector('#punch'); assert.strictEqual(await pg.$('#motion-size'), null, 'no reference, nothing to size: the control is not shown');
+    await pg.evaluate(() => scrollTo(0, 0)); await pg.click('#ref-card-mode [data-mode="recreate"]'); await pg.waitForSelector('#ref-card-mode [data-mode="recreate"][aria-checked="true"]');
     assert.deepStrictEqual(errs, []);
   });
   await t('Recreate from the first screen: the Recreate a video choice on Start takes a link, sets Recreate, and you stay on Start', async () => {

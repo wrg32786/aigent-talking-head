@@ -779,6 +779,16 @@ def shot_looks(video, shots, rows, graphics):
         print(f"framing: a face in {sum(1 for r in rows if r.get('face'))} of {len(rows)} shots (height, eye line, centre)")
     except Exception as e:  # a bonus: the remake falls back to the framing words
         print(f"note: face framing not measured: {e}")
+    # how far the camera moves inside each shot (kit/camera_move.py): rea-video names a move and gives no size
+    try:
+        import camera_move
+        for row, mv in zip(rows, camera_move.measure_spans(video, spans)):
+            if mv:
+                row["move"] = mv
+        big = [r["move"]["scale"] for r in rows if r.get("move") and abs(r["move"]["scale"]) >= 0.02]
+        print(f"camera: move size read on {sum(1 for r in rows if r.get('move'))} of {len(rows)} shots ({len(big)} with a push or a pull" + (f", {min(abs(x) for x in big) * 100:.0f}% to {max(abs(x) for x in big) * 100:.0f}%" if big else "") + ")")
+    except Exception as e:
+        print(f"note: camera move size not measured: {e}")
     stage("colours", "reading colours")
     try:
         import grade_match

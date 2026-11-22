@@ -21,6 +21,7 @@ import { spawn } from 'child_process';
 import { mkdirSync } from 'fs';
 import { createRequire } from 'module';
 const BS = createRequire(import.meta.url)('../broll-slots.cjs');
+const FRUN = createRequire(import.meta.url)('../fastrun.cjs');
 
 const bad = (m, code = 400, extra) => Object.assign(new Error(m), { code }, extra || {});
 const clean = t => String(t == null ? '' : t).replace(/\u2014/g, ', ').slice(0, 300);
@@ -44,7 +45,7 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     return { cut, caps, beats: LANE.spots(cut, caps, { marks: j.marks, refs }), len };
   }
   const clipBrief = c => c && { id: c.id, name: c.name, source: c.source, kind: c.kind, type: c.type || null, raw: c.raw ? { text: c.raw.text, seconds: c.raw.seconds } : null, seconds: c.seconds, width: c.width, height: c.height, tags: c.tags, license: c.license, author: c.author, sourceUrl: c.sourceUrl,
-    thumb: c.thumb ? `/api/broll/file?id=${c.id}&thumb=1` : null, url: `/api/broll/file?id=${c.id}`, provider: c.provider || null, prompt: c.prompt || null };
+    ...(c.run ? { run: { n: (c.run.clips || []).length, step: c.run.step, beat: c.run.beat } } : {}), thumb: c.thumb ? `/api/broll/file?id=${c.id}&thumb=1` : null, url: `/api/broll/file?id=${c.id}`, provider: c.provider || null, prompt: c.prompt || null };
   function sources(env = process.env) {
     const st = S.load(), k = Object.fromEntries(KEYS.status(env).map(x => [x.id, x.set])), gen = GEN.PROVIDERS.filter(id => k[id]);
     return [
@@ -61,7 +62,9 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     const beats = d ? d.beats.map(bt => { const sl = b.slots[bt.n], c = sl && byId[sl.clip]; return { ...bt, slot: sl && c ? { ...sl, ...LANE.timing(sl, bt, c), clip: clipBrief(c) } : null, idea: b.ideas[bt.n] ? { ...b.ideas[bt.n], clip: b.ideas[bt.n].clip ? clipBrief(byId[b.ideas[bt.n].clip]) : null } : null,
       ...(needOf(bt, sl && c, b, job, stockOn) || {}), ...(underOf(bt, d.beats) ? { under: underOf(bt, d.beats) } : {}) }; }) : [];
     const st = S.load();
-    return { job, draft: !!d, beats, length: d ? d.len : 0, asks: b.asks, gens: b.gens.slice(-8), sources: sources(), library: { dir: BR.libDir(), count: lib.length },
+    // the B-roll slots the plan keeps (from the reference or the look) and how many have a clip: "6 of 19 filled"
+    const planned = beats.filter(x => x.ref && x.ref.slot), slotsDone = planned.filter(x => x.slot || (x.ref.slot.by === 'recipe' && x.ref.slot.file)).length;
+    return { job, draft: !!d, beats, slots: { total: planned.length, filled: slotsDone, skipped: planned.filter(x => x.need && x.need.skipped).length, from: planned.some(x => x.ref.slot.ref) ? 'reference' : 'look' }, run: runPace(job), length: d ? d.len : 0, asks: b.asks, gens: b.gens.slice(-8), sources: sources(), library: { dir: BR.libDir(), count: lib.length },
       generate: { on: !!st.broll.generate, providers: GEN.list(st) }, places: LANE.PLACE_LABEL, auto: autoOn(), types: TYPES, card: chromeOk(),
       raws: b.raws.slice(-6), cutins: b.cutins.map(x => ({ ...x, clip: clipBrief(byId[x.clip]) })).filter(x => x.clip), testimonials: lib.filter(c => c.type === 'testimonial' && c.raw).slice(0, 24).map(clipBrief),
       undo: !!(b.undo && b.undo.slots) };
@@ -73,14 +76,15 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
   function needOf(bt, filled, b, job, stockOn) {
     const sl = bt.ref && bt.ref.slot; if (!sl || filled || (sl.by === 'recipe' && sl.file)) return null; // a slot the recipe gave its own file is already filled
     const slot = { ...sl, line: sl.line || bt.text }, br = BS.brief(slot);
-    return { need: { slot: sl.n, kind: sl.kind, what: br.what, line: br.line, seconds: br.seconds, shape: br.shape, treat: br.treat, frame: br.frame, like: !!sl.ref, skipped: !!b.skips[sl.n],
+    return { need: { slot: sl.n, kind: sl.kind, ...(sl.run ? { run: sl.run } : {}), what: br.what, line: br.line, seconds: br.seconds, shape: br.shape, treat: br.treat, frame: br.frame, like: !!sl.ref, skipped: !!b.skips[sl.n],
       stock: stockOn ? (LANE.nounQuery(sl.what || '') || sl.what || LANE.nounQuery(slot.line) || null) : null, ask: BS.agentAsk(slot, { job, spot: bt.n }) } };
   }
   // the render step's plan: every filled slot as an insert, and the credits
   function plan(s) {
     const d = draftOf(s.job, s); if (!d) return null; const b = peek(s), lib = BR.load().clips, byId = Object.fromEntries(lib.map(c => [c.id, c]));
     const ins = LANE.inserts(b.slots, d.beats, id => byId[id], c => BR.pathOf(c));
-    const used = [...new Set(ins.map(x => x.clip))].map(id => byId[id]);
+    // a fast run credits the clips it was cut from too
+    const used = [...new Set(ins.flatMap(x => [x.clip, ...(((byId[x.clip] || {}).run || {}).clips || [])]))].map(id => byId[id]).filter(Boolean);
     for (const c of used) BR.update(c.id, { usedIn: s.job });
     // skipped: the plan's slots you chose to leave empty (kit/studio/broll-run.mjs keeps them out of the render)
     return { inserts: ins, credits: used.length ? BR.credits(used, s.job) : '', skipped: Object.keys(b.skips || {}).filter(k => b.skips[k]).map(Number) };
@@ -167,6 +171,32 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     if (!MAKE.KINDS.includes(spec.kind)) throw bad(`kind: ${MAKE.KINDS.join(', ')}`);
     const r = await MAKE.make(spec);
     return BR.add(r.file, { move: true, name: `${spec.kind}-${randomBytes(2).toString('hex')}.mp4`, title: spec.title && spec.kind !== 'chart' ? String(spec.title) : MAKE.titleOf(spec), source: 'agent', tags: [spec.kind, ...(extra.tags || [])], ...extra });
+  }
+  // ---------- fast run: N library clips cut on the beat, as one clip ----------
+  // the pace the job's bed gives: seconds for a beat and half a beat (build/beat-grid.json after a render with a bed,
+  // else the recipe's BPM in the draft's plan), or null when there is no music to follow
+  function runPace(job) {
+    const b = join(ROOT, 'jobs', String(job || '-'), 'build'); let bpm = null;
+    try { const g = JSON.parse(readFileSync(join(b, 'beat-grid.json'), 'utf8')); bpm = +g.tempo_bpm || null; } catch {}
+    if (!bpm) { try { const c = JSON.parse(readFileSync(join(b, 'cut.json'), 'utf8')); bpm = +c.bpm || +((c.bedInfo || {}).bpm) || null; } catch {} }
+    if (!(bpm >= 50 && bpm <= 220)) return { bpm: null, beat: FRUN.STEP_FALLBACK.beat, half: FRUN.STEP_FALLBACK.half };
+    return { bpm: Math.round(bpm), beat: +(60 / bpm).toFixed(3), half: +(30 / bpm).toFixed(3) };
+  }
+  // ids: library clips in play order (videos or pictures). beat: 'half' (default) or 'beat'. Returns the new library clip.
+  function makeRun(job, ids, { beat = 'half', place = null } = {}) {
+    const list = [].concat(ids || []).map(String);
+    if (list.length < 2) throw bad('A fast run needs 2 or more clips or pictures.');
+    if (list.length > FRUN.MAX_ITEMS) throw bad(`A fast run takes up to ${FRUN.MAX_ITEMS} clips.`);
+    const clips = list.map(id => { const c = BR.get(id); if (!c) throw bad(`no b-roll ${id}`, 404); if (c.run) throw bad('A fast run cannot hold another fast run. Pick the clips themselves.'); return c; });
+    const pace = runPace(job), step = beat === 'beat' ? pace.beat : pace.half;
+    // wide pictures (sites, screens) read best in the top half with you below; upright ones cover the frame
+    const wide = clips.filter(c => (c.width || 16) >= (c.height || 9)).length * 2 >= clips.length, where = LANE.PLACES.includes(place) && place !== 'card' ? place : wide ? 'top' : 'full';
+    const sc = FRUN.schedule({ n: clips.length, at: 0, step }), out = join(tmpdir(), `run-${randomBytes(4).toString('hex')}.mp4`);
+    let made; try { made = FRUN.make({ items: clips.map(c => BR.pathOf(c)), durs: sc.durs, out, size: FRUN.SIZE_FOR[where] || FRUN.SIZE_FOR.full }); }
+    catch (e) { throw bad('The fast run could not be made: ' + String(e.stderr || e.message).trim().split('\n').pop().slice(0, 160)); }
+    const c = BR.add(made.file, { move: true, name: `fast-run-${clips.length}.mp4`, title: `Fast run: ${clips.length} clips`, source: 'run', tags: ['run', 'fast'],
+      run: { clips: clips.map(x => x.id), step: sc.durs[0], beat: beat === 'beat' ? 'beat' : 'half', bpm: pace.bpm, seconds: made.seconds } });
+    return { clip: c, place: where, seconds: made.seconds, pace };
   }
   async function captureClip(url) {
     if (!chromeOk()) throw bad('Web capture needs Chrome');
@@ -277,6 +307,15 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     if (p === '/api/broll/stock/add' && M === 'POST') { const b = await readBody(req); const c = await BR.downloadStock(b.provider, b.item); const v = b.beat != null ? fill(C.load(), b.beat, c.id, { place: b.place, by: b.by }) : C.load(); return json(res, 200, { clip: clipBrief(c), broll: view(v) }); }
     if (p === '/api/broll/make' && M === 'POST') { const b = await readBody(req); const c = await makeCard(b.spec || {}); const v = b.beat != null ? fill(C.load(), b.beat, c.id, { place: b.place, by: b.by }) : C.load(); return json(res, 200, { clip: clipBrief(c), broll: view(v) }); }
     if (p === '/api/broll/capture' && M === 'POST') { const b = await readBody(req); const c = await captureClip(String(b.url || '')); const v = b.beat != null ? fill(C.load(), b.beat, c.id, { place: b.place || 'pip', by: b.by }) : C.load(); return json(res, 200, { clip: clipBrief(c), broll: view(v) }); }
+    // Fast run: clips (library ids, in order) and urls (public pages, captured first) become one clip cut on the beat,
+    // placed on the spot as one insert
+    if (p === '/api/broll/run' && M === 'POST') {
+      const b = await readBody(req), ids = [].concat(b.clips || []).map(String);
+      for (const u of [].concat(b.urls || []).slice(0, FRUN.MAX_ITEMS)) ids.push((await captureClip(String(u))).id);
+      const r = makeRun(s.job, ids, { beat: b.step === 'beat' ? 'beat' : 'half', place: b.place });
+      const v = b.beat != null ? fill(C.load(), b.beat, r.clip.id, { place: r.place, dur: r.seconds, in: 0, by: b.by, why: `${ids.length} clips, one every ${r.clip.run.step} s${r.pace.bpm ? `, on the ${r.clip.run.beat === 'beat' ? 'beats' : 'half beats'} of your music (${r.pace.bpm} BPM)` : ''}` }) : C.load();
+      return json(res, 200, { clip: clipBrief(r.clip), place: r.place, seconds: r.seconds, broll: view(v) });
+    }
     if (p === '/api/broll/clear' && M === 'POST') {
       const b = await readBody(req).catch(() => ({}));
       const v = update(st => {

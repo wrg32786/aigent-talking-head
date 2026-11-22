@@ -21,3 +21,11 @@
 .idea.waiting b { font-weight: 600; }
 #broll-more-fold .broll-bar { margin-bottom: 10px; }
 @media (max-width: 640px) { .need-acts { width: 100%; } }
+
+/* Fast run: pick clips in play order; the number on a thumb is its place in the run */
+.run-opts { align-items: center; gap: 8px 12px; flex-wrap: wrap; } .run-opts .lbl { margin: 0; }
+.run-pick { position: relative; cursor: pointer; }
+.run-pick.on { box-shadow: 0 0 0 2px var(--primary); }
+.run-n { position: absolute; top: 6px; left: 6px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center; font: 600 12px/1 var(--font-sans, inherit); font-style: normal; color: var(--primary-foreground, #fff); background: var(--primary); }
+.run-grid .bthumb img, .run-grid .bt-ph { aspect-ratio: 16 / 10; }
+.run-site { margin-top: 10px; }

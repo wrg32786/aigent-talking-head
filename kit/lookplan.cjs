@@ -70,7 +70,7 @@ function shots(look, len, seed = '') {
 
 // Re-cut segs (in place) to the look's shot list on your own pauses and set each shot's transition, move and shake.
 // quiet(i, a, b) as kit/shotplan.cjs wants it. Returns { rc, plan (the shot list), shakeAt, lines }.
-function cut({ look, segs, words, quiet, seed = '', wantPunch = true }) {
+function cut({ look, segs, words, quiet, seed = '', wantPunch = true, motion = SPL.MOTION_DEFAULT }) {
   const len = segs.reduce((a, s) => a + s.out - s.in, 0), plan = shots(look, len, seed);
   const rc = SPL.recut(segs, words, plan, quiet);
   segs.splice(0, segs.length, ...rc.segs);
@@ -80,7 +80,7 @@ function cut({ look, segs, words, quiet, seed = '', wantPunch = true }) {
     if (rc.plan[j]) Object.assign(rc.plan[j], { cls: p.cls });
     if (!j) return;
     if (p.transition) sg.transition = p.transition;
-    if (p.move && !sg.bigPunch) sg.push = SPL.MOVES[p.move];
+    if (p.move && !sg.bigPunch) require('./recreate.cjs').setMove(sg, p.move, motion, +((look.moves || {}).size || {})[p.move] || null);
     if (p.shake) shakeAt.push(k);
   });
   const lines = [`look: ${rc.plan.length || 1} shots on your ${len.toFixed(1)} s from the look's pace (a cut about every ${look.pace.shotMean} s), cuts at ${rc.cuts.map(c => c.t + ' s (' + c.on + ')').join(', ') || 'none'}${rc.skipped.length ? `; no quiet between your words near ${rc.skipped.map(x => x.at + ' s').join(', ')}, so no cut there` : ''}`];

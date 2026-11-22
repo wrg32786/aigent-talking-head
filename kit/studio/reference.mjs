@@ -5,7 +5,7 @@
 import { existsSync, readFileSync, writeFileSync, renameSync } from 'fs';
 import { dirname, join, basename } from 'path';
 import { createRequire } from 'module';
-import { catalog, applyPatch } from './core.mjs';
+import { catalog, applyPatch, ROOT } from './core.mjs';
 
 const require = createRequire(import.meta.url);
 const L = require('../locks.cjs');
@@ -93,18 +93,34 @@ export function fixTitleText(recipePath, n, text) {
 // which parts of the breakdown ran, from what the teardown left beside its Reel.md, each with the fix when one did not:
 // the full reader (rea-video), the speech, the layers and grade (extras.json, the person mask), the contact sheet, the
 // sound effects and the music. The page shows them as one row with fix buttons, never a command.
-export function ranOf(dir, r = {}) {
+// A fix is named only when installing it would help. extras.json and the contact sheet are written with or without
+// the Effects pass, so when they are missing that step stopped (on 1.27.1, a Windows text encoding fault did it) and
+// the answer is to read the reference again, not to install something that is already there. The Effects pass is
+// the fix for one thing only: the breakdown ran with no person mask, so front or behind was not read.
+const FX_PY = () => join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+export const effectsInstalled = () => existsSync(FX_PY());
+export function ranOf(dir, r = {}, { effects = effectsInstalled() } = {}) {
   const has = f => existsSync(join(dir, f)), rea = has(join('videomd', 'breakdown.json'));
   let speech = (r.script || []).length > 0; if (!speech) { try { speech = !!JSON.parse(readFileSync(join(dir, 'speech.json'), 'utf8')).ok; } catch {} }
   const mu = r.music || {};
+  let extras = null; try { extras = JSON.parse(readFileSync(join(dir, 'extras.json'), 'utf8')); } catch {}
+  const STOPPED = 'this part stopped before it finished';
+  const layers = !extras ? { ok: false, why: has('extras.json') ? 'what it wrote could not be read' : STOPPED, fix: null, again: true }
+    : extras.mask === false && !effects ? { ok: false, why: 'front or behind was not read: there is no person mask yet', fix: 'effects' }
+    : { ok: true, why: extras.mask === false ? 'vignette and grain; front or behind was not read' : 'front or behind, vignette, grain', fix: null };
   return [
     { id: 'reader', label: 'Full read', ok: rea, why: rea ? 'rea-video read it' : 'the built-in reader was used, it can miss shots and titles', fix: rea ? null : 'rea' },
     { id: 'speech', label: 'Speech', ok: speech, why: speech ? 'its words and timing' : 'no words were read', fix: speech ? null : 'model' },
-    { id: 'layers', label: 'Layers and grade', ok: has('extras.json'), why: has('extras.json') ? 'front or behind, vignette, grain' : 'no layer hints or grade per shot', fix: has('extras.json') ? null : 'effects' },
-    { id: 'sheet', label: 'Contact sheet', ok: has('contact.jpg'), why: has('contact.jpg') ? 'one frame per shot' : 'no frames to show', fix: has('contact.jpg') ? null : 'effects' },
+    { id: 'layers', label: 'Layers and grade', ...layers },
+    { id: 'sheet', label: 'Contact sheet', ok: has('contact.jpg'), why: has('contact.jpg') ? 'one frame per shot' : extras ? 'no frames to show' : STOPPED, fix: null, ...(has('contact.jpg') ? {} : { again: true }) },
     { id: 'sounds', label: 'Sound effects', ok: rea, why: (r.sfx || []).length ? `${r.sfx.length} found` : rea ? 'none in it' : 'needs the full read', fix: rea ? null : 'rea' },
     { id: 'music', label: 'Music', ok: !!(mu.bpm || mu.bed) || rea, why: mu.bpm ? `${mu.bpm} BPM` : mu.bed && mu.bed !== 'none' ? mu.bed : 'no music', fix: null },
   ];
+}
+// The fixes the page may offer for the parts that did not run: only things that are really missing here. A state
+// saved by an older Studio can still name a fix for something that is installed; it is dropped. installed: { id: true }.
+export function ranFixes(ran, installed = {}) {
+  return [...new Set((ran || []).filter(x => !x.ok && x.fix && !installed[x.fix]).map(x => x.fix))];
 }
 // the teardown as facts a person or a model can act on: cuts and pacing, beats and music energy, caption style, what
 // was detected, and suggestions mapped onto the Studio menu (kind:id refs that exist, each with the reason)

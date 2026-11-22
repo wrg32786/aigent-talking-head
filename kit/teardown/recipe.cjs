@@ -64,6 +64,8 @@ function recipeMd(c) {
     if (s.face) f.push(`face ${RF.fmtFace(s.face)}`);
     if (s.lab) f.push(`lab ${GM.fmtLab(s.lab)}`);
     const mv = (s.moves || []).find(x => SPL.MOVES[x]); if (mv) f.push(`move ${mv}`);
+    // how big the reference's move was (the zoom gained, kit/camera_move.py); the draft scales it by the motion strength
+    if (mv && s.moveSize) f.push(`move-size ${s.moveSize}`);
     if (s.n > 1 && ((s.moves || []).includes('shake') || (s.tx && s.tx.shake))) f.push('shake on');
     L.push(f.join(' | '));
   }

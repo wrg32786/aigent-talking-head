@@ -134,6 +134,8 @@ function fromTeardown(dir, opts = {}) {
     stickers: stickersOf(recipe.graphics || [], dur),
     transitions: { default: none(st.transition) ? 'cut' : st.transition, glitch: /^(on|yes|true)$/i.test(String(st.glitch || '')), mix: shares(shots.slice(1).map(s => (s.transition && !none(s.transition) ? s.transition : 'cut'))) },
     moves: { push: r2(shots.filter(s => s.move === 'push').length / (shots.length || 1)), pull: r2(shots.filter(s => s.move === 'pull').length / (shots.length || 1)), drift: r2(shots.filter(s => s.move === 'drift').length / (shots.length || 1)),
+      // the middle measured size of the reference's pushes and pulls (the zoom gained), when the teardown read one
+      size: Object.fromEntries(['push', 'pull'].map(k => [k, median(shots.filter(s => s.move === k && s.moveSize > 0).map(s => s.moveSize))]).filter(([, v]) => v > 0)),
       shake: r2(shots.filter(s => s.shake).length / (shots.length || 1)), bigPunch: r2(shots.filter(s => s.bigPunch).length / (shots.length || 1)), punch: !/^(off|no|false)$/i.test(String(st.punch || 'on')) },
     pace: paceOf(shots, dur, words),
     // slots: how often the reference shows B-roll, the kinds and how each is treated (kit/broll-slots.cjs lookSummary)

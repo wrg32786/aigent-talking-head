@@ -289,7 +289,7 @@ function shotSettings(r) {
     if (s.punch === 'big') o.bigPunch = true;
     if (s.framing && !none(s.framing)) o.framing = String(s.framing).replace(/-/g, ' ');
     if (onOff(s.cutaway)) { o.cutaway = true; if (s.broll && onOff(s.broll) === undefined) o.broll = String(s.broll).slice(0, 80); }
-    if (s.move && /^(push|pull|drift)$/.test(String(s.move).toLowerCase())) o.move = String(s.move).toLowerCase();
+    if (s.move && /^(push|pull|drift)$/.test(String(s.move).toLowerCase())) { o.move = String(s.move).toLowerCase(); const z = +s['move-size']; if (z > 0 && z <= 0.4) o.moveSize = z; }
     if (onOff(s.shake)) o.shake = true;
     { const f = require('./reframe.cjs').parseFace(s.face); if (f) o.face = f; }
     { const g = require('./grade-match.cjs').parseLab(s.lab); if (g) o.lab = g; }

@@ -2,6 +2,7 @@
 """Where the face sits in a shot: its height, eye line and centre, with YuNet.
 
     python kit/framing.py measure <video> --spans 0-2.3,2.3-3.3 [--samples 3] [--json out.json]
+    python kit/framing.py pose <video> --spans 0-1.4@12,1.4-20@2 [--json out.json]     where the head points, frame by frame
 
 Both sides of a Recreate are measured here the same way: the reference's shots (kit/teardown.py extras) and your
 take's segments (kit/reel.cjs, through kit/reframe.cjs). Every frame is first scaled to cover 9:16 and centre cropped,
@@ -85,6 +86,51 @@ def measure_spans(video, spans, samples=3, cropx=0.5, det=None):
     return out
 
 
+def pose_of(det, img):
+    """Where the head points in one frame, from YuNet's five points (eyes, nose tip, mouth corners). pitch: how far
+    down the nose tip sits between the eye line and the mouth line (it grows when the head tips down); yaw: how far
+    the nose tip sits to one side of the middle of the eyes, in eye distances. None with no face. The numbers mean
+    something only against the same speaker's own middle values (kit/piece-edges.cjs)."""
+    _, faces = det.detect(img)
+    if faces is None or len(faces) == 0:
+        return None
+    f = max(faces, key=lambda r: r[2] * r[3] * float(r[14]))
+    rx, ry, lx, ly, nx, ny, mrx, mry, mlx, mly = [float(v) for v in f[4:14]]
+    ey, ex, my, ed = (ry + ly) / 2, (rx + lx) / 2, (mry + mly) / 2, abs(lx - rx)
+    if my - ey < 2 or ed < 2:
+        return None
+    return {'pitch': round((ny - ey) / (my - ey), 4), 'yaw': round((nx - ex) / ed, 4), 'h': round(float(f[3]) / AH, 4)}
+
+
+def cover_frames(video, a, b, fps, cropx=0.5):
+    """Every frame from a to b seconds at fps, as (seconds, image), scaled and cropped like cover_frame."""
+    vf = f'fps={fps},scale={AW}:{AH}:force_original_aspect_ratio=increase,crop={AW}:{AH}:(iw-{AW})*{cropx}:(ih-{AH})*0.5'
+    p = subprocess.Popen(['ffmpeg', '-v', 'error', '-ss', f'{max(0.0, a):.3f}', '-t', f'{max(0.05, b - a):.3f}', '-i', video, '-vf', vf,
+                          '-f', 'rawvideo', '-pix_fmt', 'bgr24', '-'], stdout=subprocess.PIPE)
+    n = 0
+    while True:
+        raw = p.stdout.read(AW * AH * 3)
+        if len(raw) < AW * AH * 3:
+            break
+        yield a + n / fps, np.frombuffer(raw, np.uint8).reshape(AH, AW, 3)
+        n += 1
+    p.stdout.close()
+    p.wait()
+
+
+def pose_spans(video, spans, cropx=0.5, det=None):
+    """Per span (a, b, fps): a list of [seconds, pitch, yaw, face height], pitch None where no face was found."""
+    det = det or detector()
+    out = []
+    for a, b, fps in spans:
+        rows = []
+        for t, img in cover_frames(video, a, b, fps, cropx):
+            p = pose_of(det, img)
+            rows.append([round(t, 3), p['pitch'], p['yaw'], p['h']] if p else [round(t, 3), None, None, None])
+        out.append(rows)
+    return out
+
+
 def parse_spans(s):
     out = []
     for part in str(s or '').split(','):
@@ -103,8 +149,15 @@ if __name__ == '__main__':
     p.add_argument('video'); p.add_argument('--spans', required=True)
     p.add_argument('--samples', type=int, default=3); p.add_argument('--cropx', type=float, default=0.5)
     p.add_argument('--json')
+    q = sub.add_parser('pose')
+    q.add_argument('video'); q.add_argument('--spans', required=True, help='a-b@fps,a-b@fps')
+    q.add_argument('--cropx', type=float, default=0.5); q.add_argument('--json')
     a = ap.parse_args()
-    res = {'video': os.path.abspath(a.video), 'spans': measure_spans(a.video, parse_spans(a.spans), a.samples, a.cropx)}
+    if a.cmd == 'pose':
+        sp = [(float(x.split('@')[0].split('-')[0]), float(x.split('@')[0].split('-')[1]), float(x.split('@')[1]) if '@' in x else 12.0) for x in a.spans.split(',') if x.strip()]
+        res = {'video': os.path.abspath(a.video), 'spans': pose_spans(a.video, sp, a.cropx)}
+    else:
+        res = {'video': os.path.abspath(a.video), 'spans': measure_spans(a.video, parse_spans(a.spans), a.samples, a.cropx)}
     if a.json:
         json.dump(res, open(a.json, 'w', encoding="utf-8"))
     print(json.dumps(res))

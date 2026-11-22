@@ -40,6 +40,10 @@ export function inserts(slots, bts, clipOf, pathOf) {
     // a spot that is a reference B-roll slot keeps the slot's treatment (kit/broll-slots.cjs): its effects, border and place
     const rs = b.ref && b.ref.slot ? b.ref.slot : null;
     out.push({ file: pathOf(c), at: t.at, dur: t.dur, in: c.kind === 'image' ? 0 : t.in, place: PLACES.includes(sl.place) ? sl.place : 'full', ...(c.kind === 'image' ? { image: true } : {}), beat: b.n, clip: c.id, studio: true,
+      // a fast run goes to the render as its own clips: kit/reel.cjs cuts them again on the real beats of the bed
+      // (kit/fastrun.cjs), starting on the beat nearest this spot. The library clip is the preview, and what plays if
+      // one of its clips is gone. It is shown whole.
+      ...(c.run ? { fit: 'whole', ...(() => { const m = (c.run.clips || []).map(clipOf); return m.length >= 2 && m.every(Boolean) ? { run: m.map(pathOf), step: c.run.beat === 'beat' ? 'beat' : 'half', max: +(t.dur + 0.08).toFixed(3) } : {}; })() } : {}),
       ...(rs ? { slot: rs.n, fx: rs.fx, ...(rs.border ? { border: rs.border } : {}), ...(rs.y != null ? { y: rs.y } : {}), ...(rs.w != null ? { w: rs.w } : {}), ...(rs.layer ? { layer: rs.layer } : {}) } : {}) });
   }
   return out;

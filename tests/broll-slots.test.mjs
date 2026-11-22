@@ -21,7 +21,7 @@ const BS = require('../kit/broll-slots.cjs'), SPL = require('../kit/shotplan.cjs
 const STATE = mkdtempSync(join(tmpdir(), 'broll-slots-test-')), LIB = join(STATE, 'lib'), JOB = 'broll-slots-test-' + process.pid;
 process.env.STUDIO_DIR = join(STATE, 'studio'); process.env.STUDIO_BROLL_LIBRARY = LIB;
 let n = 0; const t = async (name, fn) => { await fn(); n++; console.log('ok ' + name); };
-const NO_DASH = s => assert.ok(!/—/.test(String(s)), 'no em dash: ' + s);
+const NO_DASH = s => assert.ok(!/\u2014/.test(String(s)), 'no em dash: ' + s);
 
 // your words: 12 lines of 2 s
 const LINES = ['Editing ate my weekends.', 'I tried every app.', 'Then I found one prompt.', 'It plans the whole edit.', 'Here is how to set it up.', 'Open the dashboard.', 'Type your topic.', 'And press go.', 'Leads went up 312 percent.', 'In three months.', 'Follow the repo for more.', 'Tell me how it went.'];

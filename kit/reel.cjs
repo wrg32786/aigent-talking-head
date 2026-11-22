@@ -47,6 +47,12 @@
 //          --recut  with --recipe (Studio's Recreate): re-cut your edit to the recipe's shots on word boundaries. Each shot
 //            is also reframed to the reference's face size and eye line (kit/reframe.cjs) and graded to its colour with a
 //            skin-protected 3D LUT (kit/grade-match.cjs). --no-reframe / --no-grade-match turn those off.
+//          --keep-ends  leave the two ends of every piece as cut: by default the last piece ends with its closing sentence
+//            (a word or two said after it is left out) and a piece starts on the first frame the speaker looks at the
+//            lens, inside the quiet before its first word (kit/piece-edges.cjs). No word is cut either way.
+//          --motion subtle|medium|strong  how big the reference's camera moves are drawn (default medium, or the recipe's
+//            Style line "motion"). A push the teardown measured (Reel.md shot "move-size") is scaled so it shows on a
+//            talking head (kit/shotplan.cjs MOTION). Works on --rebuild too: the moves are sized again.
 //          --style-look <name|path>  Copy the look: a saved style look (npm run look, kit/stylelook.cjs) on your take.
 //            Your words and timing, the look's framing, grade, captions, titles, stickers, sounds, transitions and
 //            music (kit/lookplan.cjs). Not with --recipe. Writes build/plan.json and build/match.json.
@@ -108,6 +114,7 @@ const S = require('./spoken.cjs');
 const CARDS = require('./cards.cjs');
 const SFXMAP = require('./sfx-map.cjs');
 const RC = require('./recreate.cjs');
+const SHP = require('./shotplan.cjs');
 const SL = require('./stylelook.cjs');
 const LK = require('./lookplan.cjs');
 const RF = require('./reframe.cjs');
@@ -120,7 +127,7 @@ if (!process.env.PYTHONUTF8) process.env.PYTHONUTF8 = '1';
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['style-look', 'goal', 'words', 'scenes', 'scenes-off', 'pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
+const VALUED = new Set(['style-look', 'motion', 'goal', 'words', 'scenes', 'scenes-off', 'pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const JSON_OUT = flag('json');
@@ -343,11 +350,29 @@ if (!flag('rebuild')) {
   const segs = [], clipStart = [], segClip = [];
   keep.forEach((c, ci) => { clipStart.push(segs.length); spansOf(c).forEach(([a, b], k) => segClip.push(c) && segs.push({ file: rel(path.join(clipsDir, path.basename(c.file))), in: a, out: b, ...(k ? { jump: true } : {}), ...(ci === 0 && k === 0 ? { fadeIn: 0.25 } : {}) })); });
   if (TIGHT) { const was = keep.reduce((a, c) => a + +c.dur, 0), now = segs.reduce((a, s) => a + s.out - s.in, 0), n = segs.filter(s => s.jump).length; console.log(`no dead air: ${n} pause${n === 1 ? '' : 's'} over ${TIGHT} s cut to jumps (${(was - now).toFixed(1)} s shorter)${TIGHTENED.some(x => x.noise) ? `, ${TIGHTENED.filter(x => x.noise).length} with a short noise inside it cut too` : ''}`); }
+  // the two ends of a piece (kit/piece-edges.cjs): the last piece ends with the sentence that holds the closing line
+  // (a word or two said after it is left out), and a piece with quiet before its first word starts on the first frame
+  // the speaker looks at the lens. No word is cut and none starts half said. --keep-ends leaves both as they are.
+  const EDGES = { end: null, starts: [] };
+  if (!flag('keep-ends') && segs.length) {
+    const PE = require('./piece-edges.cjs'), clipFile = c => path.join(clipsDir, path.basename(c.file)), envs = new Map();
+    const envOf = c => { const f = clipFile(c); if (!envs.has(f)) envs.set(f, CP.envelopeSync(f)); return envs.get(f); };
+    const li = segs.length - 1, lc = segClip[li];
+    const te = PE.trimEnd(segs[li], lc.words || [], envOf(lc), +lc.dur);
+    if (te) { segs[li].out = te.out; EDGES.end = { clip: lc.id, was: te.was, out: te.out, left: te.left };
+      console.log(`ending: the last piece ends after "${te.after}", ${(te.was - te.out).toFixed(2)} s sooner ("${te.left}" came after the closing sentence and is left out)`); }
+    const ls = PE.lensStarts({ segs, words: i => segClip[i].words || [], fileOf: i => clipFile(segClip[i]), python: PY, log: l => console.log(l),
+      firstSound: (i, F) => { const e = envOf(segClip[i]); if (!CP.isEnv(e)) return null; const A = CP.activity(e), g = A.gaps.filter(x => x.nOn <= F[0] + 0.15 && x.nOn >= segs[i].in).pop(); return g && Number.isFinite(g.nOn) ? g.nOn : null; } });
+    EDGES.starts = ls.moved.map(m => ({ clip: segClip[m.seg].id, was: m.was, in: m.in, why: m.why }));
+  }
   // big punch on the cut after the hook and the cut into the payoff (with 3+ clips); a jump inside a line keeps the toggle
   const wantPunch = flag('no-punch') ? false : (preset && preset.punch === false ? false : true);
   if (wantPunch && keep.length >= 3) { segs[clipStart[1]].bigPunch = true; segs[clipStart[keep.length - 1]].bigPunch = true; }
   // --recut (Studio's Recreate): your edit re-cut to the recipe's shot plan, on word boundaries, with the reference's
   // framing per shot (kit/shotplan.cjs). The recipe's per-shot settings then go to these shots, not to your clips.
+  // motion strength: how big the reference's camera moves are drawn (kit/shotplan.cjs MOTION)
+  if (opt('motion') && !SHP.motionOf(opt('motion'))) die('--motion must be subtle, medium or strong');
+  const MOTION = SHP.motionOf(opt('motion')) || SHP.motionOf(recipe && recipe.style && recipe.style.motion) || SHP.MOTION_DEFAULT;
   let RECUT = null, SCALE = null, REFSHAKES = [], REFSOUNDS = [], MATCH = null;
   if (flag('recut') && recipe && recipe.shots.length >= 2) {
     RECUT = RC.recut({ recipe, segs, segClip, clipsDir, manyClips: keep.length >= 3 });
@@ -361,7 +386,7 @@ if (!flag('rebuild')) {
   // graded to the look's colour (kit/lookplan.cjs). The look's "recipe" has no shots, so nothing is scaled.
   let LOOKPLAN = null;
   if (LOOK) {
-    LOOKPLAN = LK.cut({ look: LOOK, segs, words: i => segClip[i].words || [], quiet: RC.quietFn({ segClip, clipsDir }), seed: name });
+    LOOKPLAN = LK.cut({ look: LOOK, segs, words: i => segClip[i].words || [], quiet: RC.quietFn({ segClip, clipsDir }), seed: name , motion: MOTION });
     LOOKPLAN.lines.forEach(l => console.log(l));
     RECUT = LOOKPLAN.rc; SCALE = { len: RC.lengthOf(segs), ref: RC.lengthOf(segs), k: 1 };
     const shotPlan = RECUT.shotOf.map(k => LOOKPLAN.plan[k] || {});
@@ -380,7 +405,7 @@ if (!flag('rebuild')) {
     if (clipSeams.length >= 2) sfx.boom = [[last, 0.55]];
   }
   if (TIGHTENED.length) for (const x of TIGHTENED) console.log(`pause cut: ${x.clip} ${x.at}-${x.resume} s (a ${x.gap} s pause after "${x.after}"; keep it with --keep-pauses ${x.clip}@${x.at})`);
-  const cut = { note: `Drafted by kit/reel.cjs from ${keep.length} keep clips (${clips.length - keep.length} retakes skipped). Edit, then: npm run reel -- --rebuild --name ${name}`, segs, tail: 0.3, punch: wantPunch ? (typeof (preset && preset.punch) === 'number' ? preset.punch : 0.1) : false, hits: [[0.02, 14], ...seams.filter(s => !jumpSeams.has(s)).map(s => [s, 24])], sfx, overlay: 'ovl/%04d.png', ...(TIGHTENED.length ? { tightened: TIGHTENED } : {}) };
+  const cut = { note: `Drafted by kit/reel.cjs from ${keep.length} keep clips (${clips.length - keep.length} retakes skipped). Edit, then: npm run reel -- --rebuild --name ${name}`, segs, tail: 0.3, punch: wantPunch ? (typeof (preset && preset.punch) === 'number' ? preset.punch : 0.1) : false, hits: [[0.02, 14], ...seams.filter(s => !jumpSeams.has(s)).map(s => [s, 24])], sfx, overlay: 'ovl/%04d.png', ...(TIGHTENED.length ? { tightened: TIGHTENED } : {}), ...(EDGES.end || EDGES.starts.length ? { edges: EDGES } : {}) };
   if (TITLES) {
     if (flag('no-mask')) Object.assign(cut, { titles: 'ovlt/%04d.png' });
     else {
@@ -414,7 +439,8 @@ if (!flag('rebuild')) {
   else if (flag('beat-sync') || bed) cut.beatSync = true;
   if (recipe) {
     // per-shot settings go to the re-cut shots (Recreate), else to each clip (kit/recreate.cjs)
-    const { plan, shakeAt } = RC.applyShotPlan({ recipe, segs, rc: RECUT, clipStart, wantPunch });
+    const { plan, shakeAt } = RC.applyShotPlan({ recipe, segs, rc: RECUT, clipStart, wantPunch, motion: MOTION });
+    if (segs.some(x => x.push != null)) { cut.motion = MOTION; console.log(RC.motionLine(segs, MOTION)); }
     if (RECUT) {
       cut.refShots = RECUT.plan;
       // the reference's sound effects, scaled to your edit, as the kit's sounds (the cap still thins them)
@@ -794,6 +820,11 @@ if (!flag('rebuild')) {
 if (flag('rebuild') && !L.isEmpty(LOCKS)) { try { CH.lockJob(build, LOCKS).forEach(l => console.log(l)); } catch (e) { die('--lock: ' + e.message); } }
 // 5. beat-sync (optional), then render + assemble
 let cut = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8'));
+// --motion on a rebuild: the camera moves already on the pieces are sized again
+if (flag('rebuild') && opt('motion')) {
+  const m = SHP.motionOf(opt('motion')); if (!m) die('--motion must be subtle, medium or strong');
+  if (m !== cut.motion && RC.resizeMoves(cut.segs, m)) { cut.motion = m; fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); console.log(RC.motionLine(cut.segs, m)); }
+}
 if (flag('no-beat-sync')) cut.beatSync = false;
 else if (flag('beat-sync')) cut.beatSync = true;
 if (B.wantBeatSync(cut) && cut.bed) {
@@ -841,6 +872,14 @@ if (cut.sfxMap) {
   } }
 // copy lint and title/sound rules: printed, not blocking (npm run check -- <name> and npm run verify fail on errors)
 try { sh(process.execPath, [path.join(KIT, 'check.mjs'), build, '--warn-only'], build); } catch {}
+// fast runs (kit/fastrun.cjs): an insert with "run": [files] becomes one clip, cut on the bed's beats or half beats
+// when there is a bed (build/beat-grid.json), and plays as one insert. Made again only when its files or times change.
+if ((cut.inserts || []).some(x => Array.isArray(x.run))) {
+  const FRUN = require('./fastrun.cjs');
+  try { const lines = FRUN.resolve(cut, build, B.wantBeatSync(cut) && cut.bed ? B.loadGrid(build) : null); lines.forEach(l => console.log(l)); fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); }
+  catch (e) { die('fast run: ' + String(e.stderr || e.message).trim().split('\n').slice(-3).join(' ')); }
+}
+
 // base.mp4 (the graded picture alone, BASEONLY) is made once per picture: the face zone and the person mask both read it,
 // and a rebuild that only changes captions, titles, sounds or layers reuses it (base.sig: the cut without those keys)
 const LAYER_KEYS = new Set(['overlay', 'titles', 'mask', 'maskModel', 'person', 'panels', 'headMask', 'sfx', 'sfxHits', 'sfxMap', 'sfxCap', 'bed', 'bedStart', 'bedVol', 'bedNoFade', 'bedFadeOut', 'export', 'behindMax', 'maskClear']);

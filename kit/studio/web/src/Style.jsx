@@ -201,7 +201,10 @@ function Layers({ step, bare, CAT, V, s, apply, patch, tab, setTab }) {
       <label className="tabselect"><span className="sr">Layer</span><select id="tabselect" value={cur} onChange={e => setTab(e.target.value)}>{layers.map(x => <option key={x.id} value={x.id}>{x.label} ({x.count})</option>)}</select></label>
       <p id="tabhint" className="fine">{ql ? `Every step, matching "${q.trim()}".` : L.hint || ''}{!ql && refIn(L) > 0 && <span className="layer-ref" id="layer-ref" data-n={refIn(L)}>{refLine(L)}</span>}{!ql && cur === 'fonts' && fontLine && <span className="layer-ref" id="font-ref" data-locked={String(!!(V.refFont && V.refFont.locked))}>{fontLine}</span>}</p>
       <ChangeNote s={s} patch={patch} />
-      {!ql && cur === 'motion' && <div className="layer-extra" id="motion-extra"><Switch id="punch" size="sm" label="Zoom punch on the cuts" value={s.pace.punch !== 'off'} onChange={on => patch({ pace: { punch: on ? 'on' : 'off' } })} /></div>}
+      {!ql && cur === 'motion' && <div className="layer-extra" id="motion-extra"><Switch id="punch" size="sm" label="Zoom punch on the cuts" value={s.pace.punch !== 'off'} onChange={on => patch({ pace: { punch: on ? 'on' : 'off' } })} />
+        {V.motion && V.motion.on && <div className="motion-size" id="motion-size" data-motion={V.motion.value}><span className="lbl" id="motion-size-l">Camera moves</span>
+          <SegmentedControl label="Camera moves" size="sm" value={V.motion.value} onChange={v => patch({ pace: { motion: v } })}>
+            {V.motion.options.map(x => <SegmentedControlItem key={x.id} value={x.id} label={x.label} />)}</SegmentedControl></div>}</div>}
       {!ql && cur === 'text' && <div className="layer-extra" id="text-extra"><Switch id="boost" size="sm" label="Make hard-to-read words easier to read" value={V && V.boost ? V.boost.on : s.boost !== 'off'} onChange={on => patch({ boost: on ? 'on' : 'off' })} /></div>}
       {grid}
     </div>

@@ -258,6 +258,8 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
   if (p.pace) {
     if (p.pace.tighten !== undefined) { const t = p.pace.tighten; if (t !== null && t !== 'off' && !(+t >= 0.1 && +t <= 2)) errs.push('pace.tighten: null (preset decides), off, or 0.1 to 2 seconds'); else { s.pace.tighten = t === null ? null : t === 'off' ? 'off' : +t; log.push(`tighten ${s.pace.tighten ?? 'preset'}`); } }
     if (p.pace.punch !== undefined) { if (!['on', 'off'].includes(p.pace.punch)) errs.push('pace.punch: on or off'); else { s.pace.punch = p.pace.punch; log.push(`punch ${p.pace.punch}`); } }
+    // how big the reference's camera moves are drawn (kit/shotplan.cjs MOTION); null: Medium
+    if (p.pace.motion !== undefined) { if (![null, ...MOTIONS].includes(p.pace.motion)) errs.push('pace.motion: subtle, medium or strong'); else { if (p.pace.motion) s.pace.motion = p.pace.motion; else delete s.pace.motion; log.push(`camera moves ${p.pace.motion || MOTION_DEFAULT}`); } }
     if (p.pace.keepPauses !== undefined) { const k = [].concat(p.pace.keepPauses || []).map(String); if (k.some(x => !/^[\w-]+@\d+(\.\d+)?$/.test(x))) errs.push('pace.keepPauses: clip-id@seconds, from choices.json "pauses"'); else { s.pace.keepPauses = k; log.push(k.length ? `keep pauses ${k.join(', ')}` : 'cut every long pause'); } }
   }
   if (p.export !== undefined) { if (p.export && !cat.exports.includes(p.export)) errs.push(`export: ${cat.exports.join(', ')}`); else { s.export = p.export || null; log.push(`export ${s.export}`); } }
@@ -396,6 +398,7 @@ export function compose(s, { refPack = null } = {}) {
   if (on('cards-auto') || on('colour-card') || on('chapter-card')) args.push('--cards', 'auto');
   if (off('cards-auto') || (off('colour-card') && off('chapter-card'))) { args.push('--cards', 'off'); locks.cards = false; }
   if (s.pace.punch === 'off' || off('punch')) { args.push('--no-punch'); locks.punch = false; }
+  if (MOTIONS.includes(s.pace.motion)) args.push('--motion', s.pace.motion);
   // the point of the video (kit/studio/point.mjs): the engine leans its big caption word and a look's stickers on it
   if (s.point) args.push('--goal', s.point);
   if (s.pace.tighten === 'off' || off('tighten')) args.push('--no-tighten');
@@ -437,6 +440,14 @@ export function lockStringOf(l) {
 // ---------- reference ----------
 // kit/studio/reference.mjs: extract, referenceLook, influencePack and the rest of what a reference gives Studio
 export * from './reference.mjs';
+// Motion strength, the one control on the Motion layer. It sizes the camera moves a reference or a saved look
+// brings, so it is shown only when one is in use. Medium unless you pick another.
+export const MOTIONS = ['subtle', 'medium', 'strong'], MOTION_DEFAULT = 'medium';
+export function motionOf(s) {
+  const ref = s.reference && s.reference.mode && s.reference.mode !== 'off' && (s.reference.extracted || s.reference.file || s.reference.url);
+  return { value: MOTIONS.includes(s.pace && s.pace.motion) ? s.pace.motion : MOTION_DEFAULT, on: !!(ref || s.styleLook),
+    options: [{ id: 'subtle', label: 'Subtle' }, { id: 'medium', label: 'Medium' }, { id: 'strong', label: 'Strong' }] };
+}
 import { REF_PARTS, refParts, referencePicks, setReferenceLook, copiesStyle, clearFontPick, syncRefFont, refEntrancesOnly, dropRefEntrances, useReferenceLook, styleKey, boostOf } from './reference.mjs';
 
 // a pack whose style must sit inside its locks (pack validate refuses a style transition outside them)

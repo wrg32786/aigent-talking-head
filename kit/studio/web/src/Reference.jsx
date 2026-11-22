@@ -141,9 +141,15 @@ function TitleCheck({ c, apply }) {
 // One row, only when something was not read: which parts ran, a fix for each that did not (never a command), and the
 // built-in analyzer's warning when it did the reading
 function RefRan({ V, s, apply, ran, fallback }) {
-  const miss = ran.filter(x => !x.ok), fixes = [...new Set(miss.map(x => x.fix).filter(Boolean))], r = s.reference;
+  // a fix is offered only for something that is really missing here: never "install" what is already installed
+  const env = V.env || {}, here = id => (id === 'effects' && env.effectsReady) || !!(env.setup && !env.setup.missing[id]);
+  const miss = ran.filter(x => !x.ok), fixes = [...new Set(miss.map(x => x.fix).filter(id => id && !here(id)))], r = s.reference;
+  // the parts that stopped with nothing to install: reading it again is the fix
+  const stopped = miss.filter(x => !x.fix || !fixes.includes(x.fix)).filter(x => x.id === 'layers' || x.id === 'sheet').map(x => x.label);
   if (!miss.length && !fallback) return null;
-  const again = () => api('/api/reference/item', { id: r.active, action: 'retry' }).then(v => { apply(v); toast('Reading the reference again', true); }).catch(() => {});
+  // read it again: the link in the queue, or the file you uploaded
+  const canAgain = r.active != null || !!r.file;
+  const again = () => (r.active != null ? api('/api/reference/item', { id: r.active, action: 'retry' }) : api('/api/reference', {})).then(v => { apply(v); toast('Reading the reference again', true); }).catch(() => {});
   return <div className="ref-ran" id="ref-ran" role="note">
     <div className="ran-top">{fallback && <span id="ref-engine" title="It is rougher and can miss shots, titles and the grade."><Badge label="Read by the built-in analyzer" variant="warning" /></span>}
       {ran.length > 0 && <ul className="ran" aria-label="What we read from the reference">{ran.map(x => <li key={x.id} className={x.ok ? 'ok' : 'miss'} title={x.why} data-part={x.id}><i aria-hidden="true" />{x.label}<span className="sr">{x.ok ? ', read' : ', not read: ' + x.why}</span></li>)}</ul>}</div>
@@ -151,7 +157,8 @@ function RefRan({ V, s, apply, ran, fallback }) {
       {fallback && !fixes.includes('rea') && <div className="ran-row" data-fix="rea"><span>It can miss shots, titles and the grade. <b>{(V.env && V.env.fixes && V.env.fixes.rea && V.env.fixes.rea.label) || 'rea-video'}</b> reads it in full.</span><FixActions V={V} id="rea" apply={apply} /></div>}
       {fixes.map(id => { const ls = miss.filter(x => x.fix === id).map(x => x.label), parts = ls.length > 1 ? ls.slice(0, -1).join(', ') + ' and ' + ls[ls.length - 1].toLowerCase() : ls[0], f = V.env && V.env.fixes && V.env.fixes[id];
         return <div className="ran-row" key={id} data-fix={id}><span>{parts} did not run. <b>{f ? f.label : id}</b> reads {ls.length > 1 ? 'them' : 'it'}.</span><FixActions V={V} id={id} apply={apply} /></div>; })}
-      {r.active != null && <span><Button id="ref-again" variant="secondary" size="sm" label="Read it again" onClick={again} /> after a fix.</span>}</div>
+      {stopped.length > 0 && <div className="ran-row" id="ran-stopped" data-fix=""><span>{stopped.length > 1 ? stopped.slice(0, -1).join(', ') + ' and ' + stopped[stopped.length - 1].toLowerCase() : stopped[0]} did not finish. Nothing is missing on this computer{canAgain ? ', so read it again.' : '.'}</span></div>}
+      {canAgain && <span><Button id="ref-again" variant="secondary" size="sm" label="Read it again" onClick={again} />{fixes.length > 0 ? ' after a fix.' : ''}</span>}</div>
   </div>;
 }
 

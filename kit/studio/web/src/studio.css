@@ -1368,6 +1368,7 @@ button.rp-made { cursor: pointer; } button.rp-made:hover { background: color-mix
 /* layers: this step's tabs on the left, search on the right */
 .bh .tabs { margin: 0; padding-bottom: 3px; }
 .layer-extra { margin: 4px 0 14px; }
+.layer-extra .motion-size { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; } .motion-size .lbl { margin: 0; }
 .lg-jump { margin-left: 10px; font-weight: 500; }
 .layer-bare > #tabhint { margin: 0 0 12px; }
 .fold2.step { margin-top: 0; }
@@ -1413,6 +1414,7 @@ button.rp-made { cursor: pointer; } button.rp-made:hover { background: color-mix
 .stg { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .stg-line { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; margin: 0; font-size: 13px; line-height: 1.4; }
 .stg-now { font-weight: 600; }
+.stg-time, .stg-took { color: var(--muted, inherit); opacity: .75; font-variant-numeric: tabular-nums; } .stg-took { margin-left: -6px; }
 .stg-failed { color: var(--foreground); }
 .stg-fold > summary { cursor: pointer; font-size: 12px; color: var(--muted-foreground); width: fit-content; padding: 2px 0; border-radius: 6px; }
 .stg-fold > summary:hover { color: var(--foreground); }

@@ -45,7 +45,7 @@ Both write `build/match.json`, an estimate of how close the draft is, part by pa
 | The speaker's face per shot (1.28.0) | each shot's `face` (`height@eye line`, shares of the frame, YuNet): a Recreate crops every shot of your take to the same face size and eye line (`kit/reframe.cjs`), where the framing word alone gave one of four punches |
 | Colour per shot (1.28.0) | each shot's `lab` (mean and spread in Lab, from a few frames, the reference's own graphics left out; black shots and shots under 2 s are skipped): a Recreate matches your take's colour to it with a 3D LUT and keeps skin natural (`kit/grade-match.cjs`). This is separate from the finish below |
 | Transitions between shots (1.24.0) | each shot's `transition` on the kit's names: flash, a fade through black or white, crossfade, whip and push with their direction, swipe up or down, wipe, zoom, blur, glitch, warp for a morph, slice for a layout change. The job transition is the one used on a third or more of the cuts, else `none`. A spin, which the kit has no transition for, is made as a REF scene on that cut |
-| Camera inside a shot (1.24.0) | `move push` (push-in), `move pull` (pull-out), `move drift` (pan or track): a slow zoom over the segment. Handheld or a shake transition: `shake on`, a shake just after the cut in |
+| Camera inside a shot (1.24.0) | `move push` (push-in), `move pull` (pull-out), `move drift` (pan or track): a slow zoom over the segment. From 1.28.0 the size of a push or a pull is measured too (`move-size 0.035`, the zoom gained over the shot; corners followed frame to frame, so the speaker moving does not count), a move rea-video did not name is named from it (2 percent or more), and a draft scales it by the motion strength (`--motion subtle|medium|strong`, default medium) so it shows on a talking head. Handheld or a shake transition: `shake on`, a shake just after the cut in |
 | Effects its descriptions name (1.24.0) | with `--vlm`: light leaks, flashes, confetti, speed lines and the rest of `kit/scenes.cjs` EFFECTS, made as scenes (Made for you) on the shot the description names. Studio passes `--vlm` itself when a Gemini or OpenAI key is set (`STUDIO_VLM=off` turns it off); a failed model call falls back to the measured read |
 | Music and BPM | beat sync on, and the library bed with the closest tempo |
 | Text and frame colours | brand kit colours and the closest theme (`neutral`, `magazine` or `aigent`, by accent and darkest colour). A remake puts the reference's accent on hero words, stickers, number tiles and cards unless you pass `--theme` |
@@ -92,6 +92,21 @@ npm run capture -- https://github.com/owner/repo --scroll 8  # or one page
 ```
 
 Each page becomes `assets/web/<page>/shot.png` (the top of the page, or of the README on a repo) and `scroll.mp4` (a short smooth scroll), in dark mode, cached per URL (`--force` to redo). Only public pages: http and https only, no localhost or private network addresses (checked before loading, and for every request the page makes), a fresh browser profile with no cookies and no login.
+
+### B-roll
+
+Since 1.28.0 a teardown also says where the reference shows B-roll, in a `## B-roll` block (`reel-broll`, see [reel-md.md](reel-md.md)). Three things count:
+
+| What | How it is found | In the block |
+| --- | --- | --- |
+| A framed panel over the speaker | the screen cards above; one that touches the next in the same place is one slot, and a panel the detector loses for a moment is followed by its border | `kind panel`, its place, size and border |
+| A run of fast cuts | three or more full-frame cutaways in a row, each under 0.6 s with no gap, are one slot: `run 5 | step 0.21` (how many cuts, and the middle length of one). A remake fills it with a fast run of your own clips or pictures, cut on the beat |
+| A full cutaway | a shot with no face, or a face that is not the speaker's. A shot with the speaker on screen is never a cutaway, even when they are quiet or behind a microphone | `kind full` |
+| A split screen | a hard edge from side to side near the middle that is there for only part of the reel | `kind split` |
+
+For each one `kit/broll_fx.py` reads the picture (OpenCV, on your computer): whether it pushes in, pulls out or drifts and by how much, whether it shakes, whether single frames flash or tear (a glitch), black and white or a colour shift on a full cutaway, and how it arrives and leaves (a cut, a fade, a pop, a slide, a flash). `shows~` is the name read in it or the tool named just before it, and `says~` is what the reference said then. These are guesses: read them with the user and fix what is wrong.
+
+What it does not find yet: a light panel with no dark window, a small picture in a corner, and B-roll that sits behind the whole speaker.
 
 ## Install rea-video
 
