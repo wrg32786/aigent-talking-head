@@ -9,7 +9,7 @@ authors:
     alias: wrg32786
     affiliation: "The AIgent"
 version: 1.29.0
-date-released: 2026-11-20
+date-released: 2026-11-22
 license: Apache-2.0
 repository-code: "https://github.com/wrg32786/aigent-talking-head"
 url: "https://github.com/wrg32786/aigent-talking-head"
