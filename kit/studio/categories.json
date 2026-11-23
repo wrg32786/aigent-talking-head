@@ -1,7 +1,7 @@
 {
   "about": "How Studio groups the engine's menu (npm run menu) into tabs. This file only regroups: every entry must name a menu section or an item id the engine already has, and npm run check fails on an unknown one. An item can sit in more than one tab. A tab with no items is hidden in Studio and listed in docs/studio.md as a candidate to build next. Studio shows the tabs as 9 layers (layers, each a list of tab groups): every option lives in exactly one layer. layerOrder says which layer claims an option first when tabs share it, owners moves one to a named layer, hidden drops a duplicate name. npm run check fails when an option lands in no layer.",
   "layers": [
-    {"id": "text", "label": "Text", "hint": "Captions (the running words), kinetic words and big titles. Fonts live in Fonts, stickers in Graphics.", "groups": [{"cat": "captions"}, {"cat": "kinetic-text", "notKinds": ["font"], "label": "Titles and kinetic words"}, {"cat": "person", "kinds": ["titleLayer"], "label": "Title layer"}]},
+    {"id": "text", "label": "Text", "hint": "Captions (the running words), kinetic words and big titles. Fonts live in Fonts, stickers in Graphics.", "groups": [{"cat": "captions"}, {"cat": "kinetic-text", "notKinds": ["font", "titleEffect", "titleExit"], "label": "Titles and kinetic words"}, {"cat": "kinetic-text", "kinds": ["titleEffect", "titleExit"], "label": "Title effect and exit (one each)"}, {"cat": "person", "kinds": ["titleLayer"], "label": "Title layer"}]},
     {"id": "fonts", "label": "Fonts", "hint": "The type pairs for titles and captions.", "groups": [{"cat": "kinetic-text", "kinds": ["font"], "label": "Font pairs"}]},
     {"id": "graphics", "label": "Graphics", "hint": "Not text: lower thirds and name tags, stickers and callouts, data cards, logos, CTAs.", "groups": [{"cat": "lower-thirds"}, {"cat": "stickers"}, {"cat": "data"}, {"cat": "intros-ctas"}, {"cat": "motion-graphics", "label": "More graphics"}]},
     {"id": "transitions", "label": "Transitions", "hint": "The seam between two shots.", "groups": [{"cat": "transitions"}]},
@@ -17,7 +17,7 @@
   "categories": [
     { "id": "transitions", "label": "Transitions", "hint": "The seam between two shots.", "include": [{ "section": "transitions" }] },
     { "id": "kinetic-text", "label": "Kinetic text and title entrances", "hint": "How big titles arrive, where they sit, and the type they use.",
-      "include": [{ "section": "title-entrances" }, { "section": "fonts" }, { "section": "editing", "ids": ["accent-script", "place-left", "place-right", "place-above", "place-chest", "place-face", "title-places"] },
+      "include": [{ "section": "title-entrances" }, { "section": "title-effects" }, { "section": "fonts" }, { "section": "editing", "ids": ["accent-script", "place-left", "place-right", "place-above", "place-chest", "place-face", "title-places"] },
         { "section": "graphics", "ids": ["flash-card", "keyword-caption", "split-flap"] }, { "section": "effects", "ids": ["backdrop-word", "huge-strike", "crayon-write", "led-sign"] }] },
     { "id": "captions", "label": "Captions", "hint": "The running words: their style and how each word enters.", "include": [{ "section": "caption-styles" }, { "section": "caption-entrances" }, { "section": "looks" }] },
     { "id": "motion-graphics", "label": "Motion graphics", "hint": "Every animated graphic the overlay draws (the engine's Graphics section).", "include": [{ "section": "graphics" }] },

@@ -36,6 +36,8 @@
 //          Every draft writes jobs/<name>/choices.json and prints each pick per beat with its reason; edit it and run
 //            npm run choices -- <name> --apply, then --rebuild (kit/choices.cjs).
 //          --title-layer front|behind|auto  job default for whether titles sit in front or behind the head (default front)
+//          --title-effect type|slot-roll|count-up|stack-fade|decode|split-flap  the effect of every title that names none
+//          --title-exit blow-up|polaroid|glitch-slice|dip-black  how every title leaves; on a cut it is the transition there
 //          --recipe Reel.md  make it from a Reel.md recipe (docs/reel-md.md): brand kit, music, style, per-shot finishes and
 //            punches, title entrances and layers in order. Flags win over the recipe; the recipe wins over the preset it names.
 //            --recipe-titles also uses the recipe's title text and times instead of titles drafted from your words, only
@@ -117,6 +119,7 @@ const RC = require('./recreate.cjs');
 const SHP = require('./shotplan.cjs');
 const SL = require('./stylelook.cjs');
 const LK = require('./lookplan.cjs');
+const PT = require('./phrase-titles.cjs');
 const RF = require('./reframe.cjs');
 const FID = require('./fidelity.cjs');
 
@@ -127,7 +130,7 @@ if (!process.env.PYTHONUTF8) process.env.PYTHONUTF8 = '1';
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['style-look', 'motion', 'goal', 'words', 'scenes', 'scenes-off', 'pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
+const VALUED = new Set(['style-look', 'motion', 'goal', 'words', 'scenes', 'scenes-off', 'pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'title-effect', 'title-exit', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const JSON_OUT = flag('json');
@@ -517,6 +520,14 @@ if (!flag('rebuild')) {
       caps.flips = (caps.flips || []).filter(f => f.mode !== 7).concat(ok.map(f => ({ ...f, end: Math.min(f.end, len) })));
       for (const f of rt.filter(f => !ok.includes(f))) console.log(`recipe title dropped: "${f.text}" at ${f.start}s is not in what you say there`);
       console.log(`recipe titles: ${ok.length} of ${rt.length} from the recipe (text and times; only text you say)`);
+    } else if (rt.some(f => f.phrase)) {
+      // the reference's titles are designed phrases: one title per phrase of what you say at the matching moments, your
+      // words in its lines, build, effect and exit (kit/phrase-titles.cjs); and where it has no running captions, none here
+      const len = RC.lengthOf(segs), refDur = +((recipe.card.source || {}).duration) || len;
+      const m = PT.mapPhrases(recipe.titles.filter((t, i) => rt[i].phrase), S.timeline(segs, build), { k: SCALE ? SCALE.k : len / refDur, len, cuts: seams });
+      console.log(m.line); m.fallbacks.forEach(l => console.log('  ' + l));
+      if (m.flips.length) { caps.flips = (caps.flips || []).filter(f => f.mode !== 7).concat(m.flips).sort((a, b) => a.start - b.start);
+        if (preset && preset.runningCaptions === false) { caps.runningCaptions = false; console.log('captions: none drawn, the reference has phrase titles and no running captions'); } }
     } else {
       const mine = (caps.flips || []).filter(f => f.mode === 7).sort((a, b) => a.start - b.start), used = new Set();
       const set = new Set();
@@ -533,8 +544,20 @@ if (!flag('rebuild')) {
   }
   // Copy the look: the look's title style on the titles drafted from your words (how many, entrances, layer)
   if (LOOK && TITLES) {
-    const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), tt = LK.titles(LOOK, caps.flips || [], RC.lengthOf(segs));
-    caps.flips = tt.flips; console.log(tt.line);
+    const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF), len = RC.lengthOf(segs), shapes = (LOOK.titles || {}).phrases || [];
+    // a look whose titles are designed phrases: the same pattern on your words, spread over your length
+    const pm = shapes.length ? PT.mapPhrases(shapes, S.timeline(segs, build), { k: len / (+((LOOK.from || {}).duration) || len), len, cuts: seams }) : null;
+    if (pm && pm.flips.length) { caps.flips = (caps.flips || []).filter(f => f.mode !== 7).concat(pm.flips).sort((a, b) => a.start - b.start); console.log(pm.line); pm.fallbacks.forEach(l => console.log('  ' + l));
+      if (LOOK.captions && LOOK.captions.running === false) { caps.runningCaptions = false; console.log('captions: none drawn, the look has phrase titles and no running captions'); } }
+    else { const tt = LK.titles(LOOK, caps.flips || [], len); caps.flips = tt.flips; console.log(tt.line); }
+    fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
+  }
+  // --title-effect and --title-exit: one effect and one exit for every title that names none (captions.js titleEffect,
+  // titleExit; a title's own "effect" or "exit" wins). Flags win over the recipe's Style lines.
+  for (const [k, into, list] of [['title-effect', 'titleEffect', R.TITLE_EFFECTS], ['title-exit', 'titleExit', R.TITLE_EXITS]]) {
+    if (!opt(k)) continue;
+    const v = String(opt(k)).toLowerCase(); if (!list.includes(v)) die(`--${k} must be one of ${list.join(', ')}`);
+    const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF); caps[into] = v;
     fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
   }
   if (cut.titleLayer) {
@@ -637,7 +660,7 @@ if (!flag('rebuild')) {
     if (TLOOK) console.log(`titles: ${TLOOK.titleLockup === 'full' ? 'the key word with its partner line, as the reference' : 'the key word'}${TLOOK.titleGlow ? ', glow ' + TLOOK.titleGlow : ''}${TLOOK.titleDim ? ', picture dimmed by ' + Math.round(TLOOK.titleDim * 100) + '%' : ''}${TLOOK.titleEntrance ? ', entrance ' + TLOOK.titleEntrance + ' where the reference\'s was not read' : ''}`);
     if (pos || col || gfx.length || Object.keys(look).length || TLOOK) {
       const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF);
-      if (TLOOK) { const { lockup: lkp, ...rest } = TLOOK; Object.assign(caps, rest); if (lkp) caps.lockup = { ...(caps.lockup || {}), ...lkp }; }
+      if (TLOOK) { const { lockup: lkp, ...rest } = TLOOK; if (opt('title-effect')) delete rest.titleEffect; if (opt('title-exit')) delete rest.titleExit; Object.assign(caps, rest); if (lkp) caps.lockup = { ...(caps.lockup || {}), ...lkp }; }
       if (pos) caps.captionPosition = String(pos);
       if (col) caps.captionColor = String(col).toLowerCase();
       Object.assign(caps, look);
@@ -850,8 +873,8 @@ const LEN = cut.segs.reduce((a, s) => a + (s.out - s.in) + (s.pad || 0), 0) + (c
 // sounds mapped to the moves (cut.json "sfxMap": true, the magazine preset): the auto ones are replaced on every run,
 // the ones you placed stay; the density cap in kit/assemble.cjs thins them out
 if (cut.sfxMap) {
-  const capF = path.join(build, 'captions.js'), fl = fs.existsSync(capF) ? (R.readCaptions(capF).flips || []) : [];
-  const auto = SFXMAP.autoHits(cut, fl);
+  const capF = path.join(build, 'captions.js'), cp = fs.existsSync(capF) ? R.readCaptions(capF) : {}, fl = cp.flips || [];
+  const auto = SFXMAP.autoHits(cut, fl, cp);
   cut.sfxHits = (cut.sfxHits || []).filter(h => !h.auto).concat(auto);
   fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
   console.log(`sfx map: ${auto.length} sounds on the moves (${[...new Set(auto.map(h => h.why.split(' ')[0]))].join(', ')})`);
@@ -1031,6 +1054,8 @@ sh(process.execPath, [path.join(KIT, 'assemble.cjs'), out], build, (flag('no-sfx
     }
     if (spans.length) console.warn('note: some caption moments read under 3:1 against the picture (listed above). Move the word, change its colour or pick another shot.');
   } }
+// what is said as a subtitle file beside the reel (reel-vN.srt), also when the captions are burned in or not drawn
+try { const srt = require('./phrase-group.cjs').toSrt(R.readCaptions(path.join(build, 'captions.js')), LEN, S.timeline(cut.segs, build)); if (srt) { fs.writeFileSync(out.replace(/\.mp4$/, '.srt'), srt); console.log(`subtitles: ${path.basename(out).replace(/\.mp4$/, '.srt')}`); } } catch (e) { console.warn('note: no subtitle file (' + e.message + ')'); }
 // everything this reel was made from, kept beside it (jobs/<job>/reel-vN.build/), so a later Draft cannot erase it
 // and the reel can be reopened (kit/snapshots.cjs, Studio "Edit this reel", the reopen_reel tool)
 let snapshot = null; try { snapshot = require('./snapshots.cjs').save(job, out); if (snapshot) console.log(`saved the build behind this reel: ${path.relative(job, snapshot)} (reopen: npm run reopen -- ${name} v${v})`); } catch (e) { console.warn('note: could not save the build behind this reel: ' + e.message); }

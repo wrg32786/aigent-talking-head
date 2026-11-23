@@ -66,7 +66,9 @@ const Y=CAP.captionY||1300; // caption band: chest, below the face box. Measure 
 window.__dropped=[];
 const flips=(()=>{const all=CAP.flips.map(f=>[f.start,f.end,f.text,f.mode,f]),nw=w=>String(w).toLowerCase().replace(/[^a-z0-9]/g,'');
  const said=[];for(const c of all)if(c[3]===0){const o=c[4],ws=o.words&&o.words.length?o.words:String(c[2]||'').split(/\s+/).filter(Boolean).map(w=>[c[0],c[1],w]);for(const w of ws)said.push([+w[0],+w[1],nw(w[2])])}
- return all.filter(c=>{if(c[3]!==10||c[4].keep===true||c[4].icon||c[4].src)return true;const ws=String(c[2]||'').split(/[\s|]+/).map(nw).filter(Boolean),e=c[1]>90?c[0]+4:c[1];
+ // "runningCaptions": false (kit/reel.cjs sets it when the reference has phrase titles and no running captions): no
+ // mode 0 caption is drawn, measured or counted, in any style. The flips stay in captions.js for verify and the planner.
+ return all.filter(c=>{if(c[3]===0&&CAP.runningCaptions===false)return false;if(c[3]!==10||c[4].keep===true||c[4].icon||c[4].src)return true;const ws=String(c[2]||'').split(/[\s|]+/).map(nw).filter(Boolean),e=c[1]>90?c[0]+4:c[1];
   if(!ws.length||!ws.every(w=>said.some(q=>q[2]===w&&q[0]<e+.2&&q[1]>c[0]-.2)))return true;
   window.__dropped.push({start:c[0],end:c[1],mode:c[3],text:String(c[2]),why:'the caption says the same word at that moment'});return false})})();
 // mode 7 = kinetic title (one per beat). Seven entrances, each used once per video, resolved in time order; flicker only
@@ -75,8 +77,16 @@ const flips=(()=>{const all=CAP.flips.map(f=>[f.start,f.end,f.text,f.mode,f]),nw
 // Same rules as kit/rules.cjs resolveTitles().
 const ENTR=['stagger-rise','slam','blur-rise','slide-left','elastic','flip','pop-zoom','drop','typewriter'];
 const TITLES=flips.filter(c=>c[3]===7).sort((a,b)=>a[0]-b[0]);
+// Title effects and exits (1.29.0; the names and rules are kit/rules.cjs TITLE_EFFECTS, TITLE_EXITS and resolveTitles()).
+// "effect" on a title, else "swap" (slot-roll) or "count" (count-up), else the job's "titleEffect"; "exit" on a title,
+// else the job's "titleExit" (false on a title leaves it out). TEX is each exit's length in seconds before the title's
+// end. An effect is the title's entrance (it is reported as one), so such a title takes none from the pool and has no flicker. A title with
+// "phrase", "build", an effect or an exit is drawn by phrase() below; every other title keeps title() as it was.
+const TFX=['type','slot-roll','count-up','stack-fade','decode','split-flap'],TEX={'blow-up':.3,polaroid:.45,'glitch-slice':.3,'dip-black':.2};
+for(const c of TITLES){const o=c[4];c.fx=TFX.includes(o.effect)?o.effect:o.swap?'slot-roll':o.count?'count-up':o.effect==null&&TFX.includes(CAP.titleEffect)?CAP.titleEffect:null;
+ c.exit=TEX[o.exit]?o.exit:o.exit==null&&TEX[CAP.titleExit]?CAP.titleExit:null;c.ph=!!(o.phrase||o.build||c.fx||c.exit)}
 {const used=new Set(TITLES.map(c=>c[4].entrance).filter(Boolean)),free=ENTR.filter(e=>!used.has(e));const dflt=ENTR.includes(CAP.titleEntrance)?CAP.titleEntrance:null; // "titleEntrance": the entrance of every title that names none (it may repeat)
- TITLES.forEach((c,i)=>{c.entr=c[4].entrance||dflt||free.shift()||ENTR[i%ENTR.length];c.flick=(i===0||i===TITLES.length-1)&&c[4].flicker!==false&&c.entr!=='typewriter'})} // a typewriter title has its caret instead of the flicker
+ TITLES.forEach((c,i)=>{c.entr=c[4].entrance||c.fx||dflt||free.shift()||ENTR[i%ENTR.length];c.flick=(i===0||i===TITLES.length-1)&&c[4].flicker!==false&&!c.fx&&c.entr!=='typewriter'})} // a typewriter title has its caret instead of the flicker
 // Title layer: front (default, whole title in front of the person), behind (hero word behind the head), or auto
 // (at most two punch titles behind, never consecutive). Same as kit/rules.cjs resolveTitles(). cut.json titleLayer
 // can arrive via LOCKOVER.titleLayer. Partner words of a behind title still draw in front of the person.
@@ -331,21 +341,145 @@ window.__placeFit=(pl,box)=>{const H=HEADB(),bw=box[2]-box[0],pad=bw*.03,w=bw+2*
 // colour (the accent when the key word is in the plain text colour; "glowColor" sets another) behind every title's key word and every
 // kinetic key word. "titleDim": 0 to 0.8 darkens the picture while a title is up (it fades in and out with the title).
 // "glow": false or "dim": false on a title leaves that one out. A Recreate turns them on when the reference has them.
-const GLOWV=(v=>v==='soft'?.5:v==='strong'?1:v===true?.5:Math.max(0,Math.min(1,+v||0)))(CAP.titleGlow),DIMV=Math.max(0,Math.min(.8,CAP.titleDim===true?.35:+CAP.titleDim||0));
-const glowing=o=>GLOWV>0&&!FLAT&&(!o||o.glow!==false)&&ctx!==MSX;
-function glowSet(col,size){const m=/^#([0-9a-f]{6})$/i.exec(String(CAP.glowColor||(col&&col!==IV?col:CY))),n=m?parseInt(m[1],16):0xffd400;ctx.shadowColor=`rgba(${n>>16},${(n>>8)&255},${n&255},${(.55+.4*GLOWV).toFixed(2)})`;ctx.shadowBlur=size*(.14+.3*GLOWV);ctx.shadowOffsetX=0;ctx.shadowOffsetY=0}
-function dimDraw(t,layer){if(!DIMV||layer==='panels'||cardAt(t)||zoneAt(t)==='hide')return;let a=0;for(const c of TITLES){if(c[4].dim===false||t<c[0]||t>=c[1])continue;const beh=(c.layer||'front')==='behind';if(layer==='titles'?!beh:layer==='front'?beh:false)continue;
-  a=Math.max(a,cl((t-c[0])/.18)*(c[1]>90?1:cl((c[1]-t)/.14)))}
- if(a>0){ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.fillStyle=`rgba(0,0,0,${(DIMV*a).toFixed(3)})`;ctx.fillRect(0,0,1080,1920);ctx.restore()}}
+// "glow" ("soft", "strong", true or 0 to 1) and "dim" (0 to 0.8 or true) on a title win over the job's setting, so one
+// title can glow or dim the picture in a job that has them off (1.29.0). GV is the glow of the title being drawn.
+const GNORM=v=>v==='soft'?.5:v==='strong'?1:v===true?.5:Math.max(0,Math.min(1,+v||0)),DNORM=v=>Math.max(0,Math.min(.8,v===true?.35:+v||0));
+const GLOWV=GNORM(CAP.titleGlow),DIMV=DNORM(CAP.titleDim);let GV=GLOWV;
+const glowOf=o=>!o||o.glow==null?GLOWV:o.glow===false?0:GNORM(o.glow),dimOf=o=>o.dim==null?DIMV:o.dim===false?0:DNORM(o.dim);
+const glowing=o=>(GV=glowOf(o))>0&&!FLAT&&ctx!==MSX;
+function glowSet(col,size){const m=/^#([0-9a-f]{6})$/i.exec(String(CAP.glowColor||(col&&col!==IV?col:CY))),n=m?parseInt(m[1],16):0xffd400;ctx.shadowColor=`rgba(${n>>16},${(n>>8)&255},${n&255},${(.55+.4*GV).toFixed(2)})`;ctx.shadowBlur=size*(.14+.3*GV);ctx.shadowOffsetX=0;ctx.shadowOffsetY=0}
+function dimDraw(t,layer){if(layer==='panels'||cardAt(t)||zoneAt(t)==='hide')return;let a=0;for(const c of TITLES){const dv=dimOf(c[4]);if(!dv||t<c[0]||t>=c[1])continue;const beh=(c.layer||'front')==='behind';if(layer==='titles'?!beh:layer==='front'?beh:false)continue;
+  a=Math.max(a,dv*cl((t-c[0])/.18)*(c[1]>90?1:cl((c[1]-t)/.14)))}
+ if(a>0){ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.fillStyle=`rgba(0,0,0,${a.toFixed(3)})`;ctx.fillRect(0,0,1080,1920);ctx.restore()}}
 window.__glow=()=>({glow:GLOWV,dim:DIMV});
-function title(c,t,part='all'){const o=c[4];if(o.lockup===false)return part==='partner'?null:titleSolo(c,t);const dt=t-c[0];if(c.flick&&dt<.55){const fr=Math.floor(dt*24);if([2,4,5,9,11].includes(fr))return}
+function title(c,t,part='all'){const o=c[4];if(o.lockup===false&&!c.ph)return part==='partner'?null:titleSolo(c,t);const dt=t-c[0];if(c.flick&&dt<.55){const fr=Math.floor(dt*24);if([2,4,5,9,11].includes(fr))return}
+ if(c.ph)return phrase(c,t,part);
  let ws=c[2].replace(/\|/g,' ').split(/\s+/).filter(Boolean).map(w=>[0,0,w]),oo=o;
  if(!titleFull(c)&&ws.length){ws=[ws[heroOf(ws,o)[0]]];oo={...o,hero:[0]}} // one-word style with no partner line: the key word alone
  const cd=cardAt(t),pl=cd?null:placeOf(o),P0=o.size?{...LKP.T,target:1e4,max:o.size}:LKP.T,ps=pl?placeSpec(pl,P0,'T'):null;
  const R=lockup(ws,oo,o.y||(ps&&ps.y)||TY,ps?ps.P:P0),hc=cd?cd.ink:R.hc,pc=cd?cd.ink:R.pc;
  const ex=c[1]>90?1:cl((c[1]-t)/.08),dy=riseOff(c,dt),late=riseEnd(c);ctx.save();ctx.globalAlpha*=ex;ctx.textBaseline='alphabetic';if(pl)placeXf(pl,R.box);FLAT=!!cd;
- if(part!=='partner'){ctx.save();ctx.translate(0,dy);R.heroes.forEach((h,li)=>{if(glowing(o))for(let g=GLOWV>.7?2:1;g>0;g--){ctx.save();ctx.font=h.font;ctx.letterSpacing=h.track+'px';ctx.fillStyle=hc;glowSet(hc,h.size);heroEnter(c.entr,h,li,dt);ctx.restore()}ctx.save();ctx.font=h.font;ctx.letterSpacing=h.track+'px';ctx.fillStyle=hc;shadow(ctx,h.size);heroEnter(c.entr,h,li,dt);ctx.restore()});ctx.restore()}
+ if(part!=='partner'){ctx.save();ctx.translate(0,dy);R.heroes.forEach((h,li)=>{if(glowing(o))for(let g=GV>.7?2:1;g>0;g--){ctx.save();ctx.font=h.font;ctx.letterSpacing=h.track+'px';ctx.fillStyle=hc;glowSet(hc,h.size);heroEnter(c.entr,h,li,dt);ctx.restore()}ctx.save();ctx.font=h.font;ctx.letterSpacing=h.track+'px';ctx.fillStyle=hc;shadow(ctx,h.size);heroEnter(c.entr,h,li,dt);ctx.restore()});ctx.restore()}
  if(part!=='hero')R.parts.forEach((p,pi)=>partnerDraw(cd||COUT==='none'?{...p,outline:false}:COUT==='thin'?{...p,outline:true,thin:true}:{...p,outline:true},pc,(k,i)=>dt-late-.24-pi*.06-i*.07));FLAT=false;ctx.restore()}
+// Phrase titles and title effects (1.29.0, from the frame by frame teardown of reference 5: every piece of text in it
+// is a designed phrase, one to three lines, small white partner words and one larger key word in the accent).
+// A title with "phrase", "build", an effect or an exit is drawn here: the lines as given ("|" between them), the key
+// word(s) ("key", else the usual hero pick) in the pairing's display face and accent colour with the glow, the rest in
+// its partner face. "words" [[start,end,word],...] times each word on the output clock, and no word is ever drawn
+// before its start, whatever the effect. With no effect the words come in as said ("build": "word"), typed
+// ("letter") or a line at a time ("line"), the key word with the title's entrance. Effects (TFX):
+//   type        letter by letter with a caret, about 12 letters a second, line after line
+//   slot-roll   the key word's digits (its letters when it has none) roll with motion blur and lock left to right; with
+//               "swap": [...] its last word rolls through the list while the rest of the line stays where it is
+//   count-up    "count": {from,to,unit,final}: an eased count on the key word, then a roll up to "final"
+//   stack-fade  lines arrive one at a time; older lines go grey, blur and fade under the newest
+//   decode      random glyphs settle into the key word, left to right
+//   split-flap  the whole title on a flap board, tiles flipping through characters and settling line by line
+// Exits (TEX, the last 0.2 to 0.45 s of the title; kit/assemble.cjs makes the same move in the picture when the title
+// ends on a cut, kit/rules.cjs titleExitSeams): blow-up (the key word scales past the lens into a flash of its colour),
+// polaroid (the title shrinks, tilts and slides off with the picture; same numbers as kit/xfx.cjs), glitch-slice
+// (14 bands tear out sideways, the same bands as the picture's), dip-black (the title fades as the picture dips).
+// Every frame is drawn from t alone: seeded glyphs (hsh), no state kept between frames. While the layout pass measures
+// (RAW) the title is drawn settled, and exits are never measured: an exit is a move across the frame, not a place.
+const hsh=(a,b=0)=>{const r=rng(1+Math.abs(Math.round(a*7919+b*104729))%2147483646);r();r();return r()}; // the first draws of a small seed sit near 0
+const mixc=(a,b,q)=>{const p=x=>/^#[0-9a-f]{6}$/i.test(x)?parseInt(x.slice(1),16):null,A=p(a),B=p(b);if(A==null||B==null)return q>.5?b:a;return'#'+[16,8,0].map(s=>Math.round(((A>>s)&255)*(1-q)+((B>>s)&255)*q).toString(16).padStart(2,'0')).join('')};
+function phLay(c,pl){const o=c[4],ck=(pl||'')+'|'+PN;if((c.PL=c.PL||{})[ck])return c.PL[ck];
+ const L={...LK,...(o.lockup&&typeof o.lockup==='object'?o.lockup:{})},script=L.partner==='script'&&!!SCF,pf=script?SCF:S,P0=o.size?{...LKP.T,max:o.size}:LKP.T,sp=pl?placeSpec(pl,P0,'T'):null,P=sp?sp.P:P0;
+ const rows=String(c[2]).split('|').map(l=>l.split(/\s+/).filter(Boolean)).filter(l=>l.length),flat=rows.flat(),[h0,h1]=heroOf(flat.map(w=>[0,0,w]),{...o,hero:o.key!==undefined?o.key:o.hero});
+ const W=Array.isArray(o.words)&&o.words.length===flat.length?o.words:null,end=c[1]>90?c[0]+4:c[1],dur=Math.max(.2,end-c[0]-(TEX[c.exit]||0)),fx=c.fx||(o.build==='letter'?'type':null);
+ // a phrase is set as written; any other title follows the pairing's rule for capitals
+ const tx=(w,k)=>{if(!o.phrase)w=cleanW(w);return(k?DF.upper||(!o.phrase&&L.heroUpper):!o.phrase&&L.partnerUpper)?w.toUpperCase():w};
+ let n=0;const toks=[];rows.forEach((r,li)=>r.forEach(w=>{const i=n++,key=i>=h0&&i<=h1,last=toks[toks.length-1];
+  if(fx==='count-up'&&key&&last&&last.key&&last.li===li){last.txt+=' '+tx(w,true);return} // the count takes the whole key ("365 Days")
+  toks.push({i,li,key,txt:tx(w,key),a:W?+W[i][0]:null})}));
+ // the word that changes: the count's key, or for a swap the last key word (the last word of the title when no key is named)
+ const tg=fx==='count-up'?toks.find(k=>k.key):fx==='slot-roll'&&Array.isArray(o.swap)&&o.swap.length?(o.key!==undefined||o.hero!==undefined?[...toks].reverse().find(k=>k.key):toks[toks.length-1]):null;
+ if(tg&&fx==='slot-roll'){const sw=o.swap.map(s=>tx(String(s),tg.key));tg.seq=normW(sw[0])===normW(tg.txt)?sw:[tg.txt,...sw]}
+ if(tg&&fx==='count-up'){const q=o.count&&typeof o.count==='object'?o.count:null,m=/^(\D*)(\d+)(.*)$/.exec(tg.txt); // no "count": 0 up to the number in the key word
+  if(q||m){const C=q?{from:Math.round(+q.from||0),to:Math.round(+q.to||0),unit:q.unit?String(q.unit):'',pre:'',suf:''}:{from:0,to:+m[2],unit:'',pre:m[1],suf:m[3]};
+   tg.fmt=v=>C.pre+v+(C.unit?' '+(v===1?C.unit.replace(/s$/,''):C.unit):'')+C.suf;tg.cnt=C;tg.fin=q&&q.final?String(q.final):null;tg.seq=[tg.fmt(C.from),tg.fmt(C.to),tg.fmt(String(C.to).replace(/\d/g,'8')),...(tg.fin?[tg.fin]:[])]}}
+ // sizes: a line that is all key word is the big one (fitted like a lockup hero, smaller, as up to three lines stack);
+ // partner lines sit at the pairing's scale of it, and a key word inside a partner line is half as big again. A changing
+ // word keeps the room of its widest text, so the rest of the line never moves.
+ const LT=rows.map((_,li)=>toks.filter(k=>k.li===li)),kl=LT.map(r=>r.every(k=>k.key)),alts=k=>k.seq||[k.txt],tw=(k,f,s,tr)=>Math.max(...alts(k).map(x=>meas(f,s,tr,x).w));
+ const kmax=Math.min(P.max,300),ks=kl.some(Boolean)?Math.max(60,Math.min(kmax,...LT.filter((_,li)=>kl[li]).map(r=>Math.floor(kmax*P.target*.9/Math.max(1,r.reduce((a,k)=>a+tw(k,G,kmax,TRK*kmax),0)+(r.length-1)*kmax*.24))))):kmax;
+ const p0=kl.some(Boolean)?Math.min(96,Math.max(62,P.pmin,Math.round(ks*L.scale*(script?L.scriptBoost||1:1)))):92; // partner lines stay one readable size from title to title
+ const build=f=>{const pz=Math.round(p0*f),tr=script?0:L.partnerTracking*pz,gap=meas(pf,pz,tr,' ').w+tr;let wmax=0;
+  const ls=LT.map((r,li)=>{let x=0,asc=0,desc=0;r.forEach((k,j)=>{const s=k.key?Math.round((kl[li]?ks:p0*1.5)*f):pz,fn=k.key?G:pf,t=k.key?TRK*s:tr,m=meas(fn,s,t,alts(k).join(''));
+    Object.assign(k,{f:fn,size:s,track:t,w:tw(k,fn,s,t),dx:x,asc:m.asc,cells:null});asc=Math.max(asc,m.asc);desc=Math.max(desc,m.desc);x+=k.w+(j<r.length-1?(k.key&&r[j+1].key?s*.24:gap):0)});
+   wmax=Math.max(wmax,x);return{w:x,asc,desc}});return{ls,wmax,pz}};
+ let f=1,B;for(let i=0;i<6;i++){B=build(f);if(B.wmax<=P.maxW)break;f*=P.maxW/B.wmax*.985}
+ const g=B.pz*.4,Ht=B.ls.reduce((a,l)=>a+l.asc+l.desc,0)+g*(B.ls.length-1);let y=Math.max(70,(o.y||(sp&&sp.y)||TY)-Ht/2),x0=1e9,x1=-1e9;const top=y;
+ B.ls.forEach((l,li)=>{l.x=540-l.w/2;l.top=y;l.y=y+l.asc;LT[li].forEach(k=>{k.x=l.x+k.dx;k.y=l.y;k.al=LT[li].length===1});x0=Math.min(x0,l.x);x1=Math.max(x1,l.x+l.w);y+=l.asc+l.desc+g});
+ // times: the words' own, else spread over the first half of the title (a line at a time for the line effects)
+ const byLine=fx==='stack-fade'||fx==='split-flap'||o.build==='line';
+ toks.forEach((k,j)=>{if(k.a==null)k.a=byLine?c[0]+k.li*Math.min(.5,dur*.6/LT.length):c[0]+j*Math.min(.2,dur*.5/toks.length)});B.ls.forEach((l,li)=>{l.a=Math.min(...LT[li].map(k=>k.a))});
+ // typing: 12 letters a second, one word after another; a word said later waits for its start
+ const per=W?.083:Math.min(.083,dur*.8/toks.reduce((a,k)=>a+k.txt.length+1,0));let tt=c[0];for(const k of toks){k.ta=Math.max(tt,W?k.a:c[0]);tt=k.ta+(k.txt.length+1)*per}
+ const kt=toks.filter(k=>k.key),kx0=Math.min(...kt.map(k=>k.x)),kx1=Math.max(...kt.map(k=>k.x+k.w));
+ return c.PL[ck]={toks,LT,ls:B.ls,box:[x0,top,x1,y-g],kc:o.color||colOf(o.accent===false?'text':L.heroColor),pc:colOf(L.partnerColor),per,tend:tt-per,tg,dur,P,kcx:(kx0+kx1)/2,kcy:kt.reduce((a,k)=>a+k.y-k.asc/2,0)/Math.max(1,kt.length)}}
+let PHX=null; // scratch canvas for the glitch-slice exit
+// the polaroid move at q (0 to 1): scale, tilt in radians, slide right and up as fractions of the frame. kit/xfx.cjs
+// "polaroid" moves the picture by the same numbers, so the title stays on the picture as it shrinks and leaves.
+const polaroidAt=q=>{const a=Math.min(1,q/.55),e=a*a*(3-2*a),b=Math.max(0,(q-.45)/.55);return{s:1-.42*e,th:-.1*e,dx:1.25*b*b,dy:-.06*b}};
+// the band shift of the glitch-slice exit, as a fraction of the width (kit/xfx.cjs "glitch-slice" uses the same)
+const sliceAt=(b,q)=>{const r=Math.abs(Math.sin((b+1)*12.9898)*43758.5453)%1,k=cl((q-r*.35)/.65);return(b%2?-1.1:1.1)*k*k};
+function phrase(c,t,part){const o=c[4],cd=cardAt(t),pl=cd?null:placeOf(o),R=phLay(c,pl),end=c[1]>90?1e9:c[1],meas=ctx===MSX,set=RAW,tt=set?1e6:t,fx=c.fx||(o.build==='letter'?'type':null),sd=Math.round(c[0]*100)+17;
+ const xd=c.exit&&!meas&&!set?TEX[c.exit]:0,xe=xd?cl((t-(end-xd))/xd):0,kc=cd?cd.ink:R.kc,pc=cd?cd.ink:R.pc;
+ // key words take the glow, partner words the caption outline, as in title()
+ const ink=(k,s,x,y,col)=>{ctx.fillStyle=col;if(k.key&&glowing(o))for(let g=GV>.7?2:1;g>0;g--){ctx.save();glowSet(col,k.size);ctx.fillText(s,x,y);ctx.restore()}
+  if(!k.key&&COUT!=='none'&&!cd){ctx.save();ctx.shadowColor='transparent';ctx.lineJoin='round';ctx.strokeStyle='rgba(0,0,0,.55)';ctx.lineWidth=Math.max(COUT==='thin'?2:3,k.size*.07*(COUT==='thin'?.5:1));ctx.strokeText(s,x,y);ctx.restore()}
+  shadow(ctx,k.key?k.size:k.size*1.4);ctx.fillText(s,x,y)};
+ const wd=(k,s)=>ctx.measureText(s).width-(s.length?k.track:0),xo=(k,s)=>k.al?k.x+(k.w-wd(k,s))/2:k.x;
+ // one text rolls up and out as the next rolls in from below, inside the word's own line, with a smear while it moves
+ const roll=(k,a,b,pr,col)=>{if(pr>=1)return ink(k,b,xo(k,b),k.y,col);const e=pr<.5?4*pr*pr*pr:1-Math.pow(-2*pr+2,3)/2,l=R.ls[k.li],H=(l.asc+l.desc)*1.15,sm=Math.sin(Math.PI*pr)*H*.1;
+  ctx.save();ctx.beginPath();ctx.rect(k.x-k.size*.5,l.top-k.size*.1,k.w+k.size,l.asc+l.desc+k.size*.2);ctx.clip();
+  for(const [s,off] of[[a,-e*H],[b,(1-e)*H]])for(let q=-1;q<=1;q++){ctx.save();ctx.globalAlpha*=q?.3:1;ink(k,s,xo(k,s),k.y+off+q*sm,col);ctx.restore()}ctx.restore()};
+ const body=()=>{ctx.textBaseline='alphabetic';
+  if(fx==='split-flap'){if(part==='hero')return; // the board is one object in front of the person
+   // ', serif' on the font: a mono I has its serifs, so the capital I bars (top of the file) must leave it alone
+   // shortcut: the board is centred on the phrase's own box, so "place" left or right fits it by that box, not the board's
+   const rows=R.LT.map(r=>r.flatMap((k,q)=>[...(q?[[' ',k]]:[]),...[...k.txt.toUpperCase()].map(ch=>[ch,k])])),len=Math.max(...rows.map(r=>r.length)),gap=6,tw=Math.min(76,(R.P.maxW-gap*(len-1))/len),th=Math.round(tw*1.42),rg=12;
+   const y0=Math.max(70,(R.box[1]+R.box[3])/2-(rows.length*th+(rows.length-1)*rg)/2),font=CODE(Math.round(th*.7),700)+', serif';ctx.globalAlpha*=cl((tt-c[0])/.12);
+   rows.forEach((row,ri)=>{const x0=540-(row.length*tw+(row.length-1)*gap)/2;row.forEach(([ch,k],i)=>{const x=x0+i*(tw+gap),y=y0+ri*(th+rg),cc=k.key?kc:pc,nf=4+Math.floor(hsh(sd+ri*31+i,7)*5),q=(tt-Math.max(R.ls[ri].a,k.a)-.1-i*.045)/.075,qi=Math.floor(q);
+     const seq=v=>v>=nf?ch:v<=0?' ':FLAPCH[(FLAPCH.indexOf(ch)+v*7+i*3+37)%FLAPCH.length];
+     if(q<=0||ch===' ')flapTile(x,y,tw,th,' ',' ',1,font,cc);else if(qi>=nf)flapTile(x,y,tw,th,ch,ch,1,font,cc);else flapTile(x,y,tw,th,seq(qi),seq(qi+1),q-qi,font,cc)})});return}
+  let caret=null;
+  for(const k of R.toks){if(part==='hero'?!k.key:part==='partner'&&k.key)continue;const dt=tt-k.a;if(dt<0)continue;const l=R.ls[k.li];let col=k.key?kc:pc;
+   ctx.save();ctx.font=fnt(k.f,k.size);ctx.letterSpacing=k.track+'px';ctx.textAlign='left';
+   if(xe>0&&c.exit==='blow-up'){if(k.key){const s=1+Math.pow(xe,3)*30;ctx.translate(R.kcx,R.kcy);ctx.scale(s,s);ctx.translate(-R.kcx,-R.kcy)}else ctx.globalAlpha*=1-cl(xe*2.5)}
+   const rise=()=>{const q=expo(cl(dt/.26));ctx.globalAlpha*=q;ink(k,k.txt,k.x,k.y+(1-q)*k.size*.5,col)};
+   if(fx==='type'){if(tt>=k.ta){const nv=Math.min(k.txt.length,Math.floor((tt-k.ta)/R.per)+1);ink(k,k.txt.slice(0,nv),k.x,k.y,col);caret=[k,nv,col]}}
+   else if(fx==='stack-fade'){let age=0;if(!set)R.ls.forEach((m,j)=>{if(j>k.li)age+=cl((tt-m.a)/.3)});
+    ctx.globalAlpha*=Math.max(.3,1-.34*age);if(age>.01&&!meas)ctx.filter=`blur(${(age*2.4).toFixed(1)}px)`;col=mixc(col,MU,Math.min(1,age));rise()}
+   else if(k===R.tg&&k.seq){const z=c[0]+R.dur-.15;
+    if(k.cnt){const C=k.cnt,cdur=Math.max(.3,Math.min(1.4,(z-k.a)*.6)),p=cl(dt/cdur),e=p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2,pr=k.fin?cl((dt-cdur-.18)/.32):0,s=k.fmt(Math.round(C.from+(C.to-C.from)*e));
+     if(pr>0)roll(k,k.fmt(C.to),k.fin,pr,col);else ink(k,s,xo(k,s),k.y,col)}
+    else{const sp=Math.max(.2,(z-k.a)/k.seq.length),ix=Math.min(k.seq.length-1,Math.floor(dt/sp));roll(k,k.seq[Math.max(0,ix-1)],k.seq[ix],ix?cl((dt-ix*sp)/Math.min(.3,sp*.5)):1,col)}}
+   else if((fx==='decode'||fx==='slot-roll')&&k.key&&!R.tg){const n=k.txt.length,dec=fx==='decode',st=dec?Math.min(.07,.9/n):Math.min(.14,1.1/n),lock=j=>k.a+(dec?.3:.35)+j*st,dig=/\d/.test(k.txt);
+    if(tt>=lock(n-1))ink(k,k.txt,k.x,k.y,col);
+    else(k.cells||(k.cells=[...k.txt].map((_,j)=>{const a=ctx.measureText(k.txt.slice(0,j)).width;return[k.x+a,ctx.measureText(k.txt.slice(0,j+1)).width-a-k.track]}))).forEach(([cx,cw],j)=>{const ch=k.txt[j],ring=/\d/.test(ch)?'0123456789':/[A-Z]/.test(ch)?'ABCDEFGHIJKLMNOPQRSTUVWXYZ':/[a-z]/.test(ch)?'abcdefghijklmnopqrstuvwxyz':null;
+     const put=(g,dy,a)=>{ctx.save();ctx.globalAlpha*=a;ink(k,g,cx+(cw-wd(k,g))/2,k.y+dy,col);ctx.restore()};
+     if(!ring||(!dec&&dig&&!/\d/.test(ch))||tt>=lock(j))return put(ch,0,1); // "$", "." and "M" stand still while the digits roll
+     if(dec)return put(ring[Math.floor(hsh(sd+k.i*131+j*17,Math.floor(tt*20))*ring.length)],0,.8);
+     const p=cl(dt/(lock(j)-k.a)),N=6+2*j,pos=N*(1-Math.pow(1-p,3)),j0=Math.floor(pos),fr=pos-j0,H=k.size*1.05,gl=q=>q>=N?ch:ring[((ring.indexOf(ch)-(N-q))%ring.length+ring.length)%ring.length],sm=Math.min(.5,(1-p)*(1-p)*1.2)*H;
+     ctx.save();ctx.beginPath();ctx.rect(cx-cw,l.top-k.size*.06,cw*3,l.asc+l.desc+k.size*.12);ctx.clip();for(const [g,off] of[[gl(j0),-fr*H],[gl(j0+1),(1-fr)*H]])for(let b=-1;b<=1;b++)put(g,off+b*sm*.5,b?.3:1);ctx.restore()})}
+   else if(!fx&&k.key&&dt<1&&!set){const h={txt:k.txt,size:k.size,x:k.x+k.w/2,y:k.y,w:k.w,asc:k.asc};ctx.fillStyle=col; // the key word comes in with the title's entrance
+    if(glowing(o))for(let g=GV>.7?2:1;g>0;g--){ctx.save();glowSet(col,k.size);heroEnter(c.entr,h,0,dt);ctx.restore()}shadow(ctx,k.size);heroEnter(c.entr,h,0,dt)}
+   else rise();
+   ctx.restore()}
+  if(caret&&tt<R.tend+TYPE.hold&&(tt<R.tend||Math.floor((tt-R.tend)/.18)%2===0)){const [k,nv,col]=caret,h=k.size*.78;ctx.save();ctx.font=fnt(k.f,k.size);ctx.letterSpacing=k.track+'px';ctx.fillStyle=col;ctx.globalAlpha*=.9;ctx.fillRect(k.x+ctx.measureText(k.txt.slice(0,nv)).width+k.size*.05,k.y-h,Math.max(4,k.size*.07),h);ctx.restore()}};
+ ctx.save();if(pl)placeXf(pl,R.box);FLAT=!!cd;
+ if(xe>0&&c.exit==='glitch-slice'){const keep=ctx,X=PHX||(PHX=mk().getContext('2d'));X.setTransform(1,0,0,1,0,0);X.clearRect(0,0,1080,1920);X.setTransform(ctx.getTransform());X.globalAlpha=1;X.save();ctx=X;try{body()}finally{ctx=keep;X.restore()}
+  ctx.setTransform(1,0,0,1,0,0);for(let b=0;b<14;b++){const y=Math.round(b*1920/14),h=Math.round((b+1)*1920/14)-y;ctx.drawImage(X.canvas,0,y,1080,h,sliceAt(b,xe)*1080,y,1080,h)}}
+ else{if(xe>0&&c.exit==='dip-black')ctx.globalAlpha*=1-xe;
+  if(xe>0&&c.exit==='polaroid'){const m=ctx.getTransform(),p=polaroidAt(xe);ctx.setTransform(1,0,0,1,0,0);ctx.translate(540+p.dx*1080,960+p.dy*1920);ctx.rotate(p.th);ctx.scale(p.s,p.s);ctx.translate(-540,-960);ctx.transform(m.a,m.b,m.c,m.d,m.e,m.f)}
+  body()}
+ FLAT=false;ctx.restore()}
+// blow-up: the frame fills with the key word's colour as the word passes the lens, and the flash fades over the first
+// six frames after the title's end (the cut). Drawn by seek(), over everything, since the title itself has left by then.
+function exitFlash(t){for(const c of TITLES){if(c.exit!=='blow-up'||c[1]>90||zoneAt(t)==='hide')continue;const a=t<c[1]?Math.pow(cl((t-(c[1]-TEX['blow-up']))/TEX['blow-up']),4):1-cl((t-c[1])/.25);if(a<=0)continue;
+  use(c.ps);ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=a;ctx.fillStyle=c[4].color||colOf(c[4].accent===false?'text':LK.heroColor);ctx.fillRect(0,0,1080,1920);ctx.restore()}}
 // Caption entrances for kinetic hero words (captionEntrance for the job, or "entrance" on a caption flip). Letter by
 // letter motions rewritten for canvas from the SwiftUI Agent Thinking Text Animations catalog (MIT, amosgyamfi;
 // THIRD_PARTY.md): unfurl, cascade, orbit, warp, crystallize, compute, levitate, undulate. pop is the default pop-in.
@@ -517,7 +651,7 @@ function oneWord(c,t,yo){const ws=wordsOf(c);let cur=null;for(const w of ws){if(
 // "titleClear": false in captions.js is the old rule (a word holds on until the next one), kept for the verify test.
 const wnorm=w=>String(w).toLowerCase().replace(/[^a-z0-9]/g,'');
 // the words a title shows: its key word alone in the one-word style, the whole phrase with a partner line
-const titleFull=c=>!ONEW||c[4].partner===true||(c[4].partner!==false&&CAP.titleLockup==='full');
+const titleFull=c=>c.ph||!ONEW||c[4].partner===true||(c[4].partner!==false&&CAP.titleLockup==='full');
 const titleShows=c=>{let ws=String(c[2]).replace(/\|/g,' ').split(/\s+/).filter(Boolean);if(c[3]===7&&!titleFull(c)&&ws.length&&c[4].lockup!==false)ws=[ws[heroOf(ws.map(w=>[0,0,w]),c[4])[0]]];else if(c[3]===7&&!titleFull(c)&&ws.length)ws=[ws[0]];return ws.map(wnorm)};
 const TCLEAR=CAP.titleClear!==false;
 const OWSEQ=(()=>{const ws=[];for(const c of flips)if(c[3]===0&&(c[4].style||CSTYLE)==='one-word')for(const w of wordsOf(c))if(String(w[2]).replace(/[^\p{L}\p{N}]/gu,''))ws.push({a:+w[0],z:+w[1],w:w[2],c});
@@ -1420,7 +1554,7 @@ window.__textBoxesAt=t=>{const out=[];for(const c of flips){if(!textUp(c,t))cont
 // check can look for a caption word in the bar on the drawn frames (build/ovl). One-word captions only.
 window.__titleFrames=(fps=24,dur=1e9)=>{if(!OWSEQ)return null;let band=null;for(const e of REPORT)if(e.kind==='caption'&&e.final)band=uni(band,e.final);
  for(const w of OWSEQ)if(w.adj&&band){const b=xfBox(band,w.adj);band=uni(band,b)}
- return{fps,band:band&&{x0:0,x1:1080,y0:Math.max(0,Math.floor(band.y0-24)),y1:Math.min(1920,Math.ceil(band.y1+24))},captionLayer:CAPBEH?'behind':'front',pad:GLOWV>0?150:16,words:window.__words,
+ return{fps,band:band&&{x0:0,x1:1080,y0:Math.max(0,Math.floor(band.y0-24)),y1:Math.min(1920,Math.ceil(band.y1+24))},captionLayer:CAPBEH?'behind':'front',pad:GLOWV>0||TITLES.some(c=>glowOf(c[4])>0)?150:16,words:window.__words,
   titles:TITLES.map(c=>{const F=new Set(),a=Math.round(c[0]*fps),z=c[1]>90?null:Math.round(c[1]*fps);for(let k=a-2;k<=a+5;k++)F.add(k);if(z!=null)for(let k=z-2;k<=z+5;k++)F.add(k);
    return{text:String(c[2]).replace(/\|/g,' '),start:c[0],end:c[1],layer:c.layer||'front',words:titleShows(c),frames:[...F].filter(k=>k>=0&&k/fps<dur-1e-6).sort((p,q)=>p-q).map(k=>{const t=k/fps;
     return{f:k,t:+t.toFixed(4),up:t>=c[0]&&t<c[1]&&zoneAt(t)!=='hide',box:boxNow([c],t,false,true),others:flips.filter(x=>x!==c&&x[3]!==0&&x[3]!==8&&t>=x[0]&&t<x[1]).map(x=>boxNow([x],t,false,STARBEH(x))).filter(Boolean)}})}})}};
@@ -1451,8 +1585,8 @@ function burst(dt,seed){if(dt<-.1||dt>.42)return;const r=rng(seed),p=(dt+.1)/.52
 function glitch(t){glitchAt.forEach((h,i)=>{const dt=t-h;if(dt<-.05||dt>.2)return;const r=rng(Math.floor(t*24)*97+i*13+5),a=1-Math.max(0,dt)/.2;ctx.save();for(let k=0;k<16;k++){const y=r()*1920,hh=4+r()*r()*90;ctx.globalAlpha=a*(.12+r()*.5);ctx.fillStyle=k%3===0?CY:IV;ctx.fillRect(r()*200-100,y,r()>.4?1300:200+r()*700,hh)}ctx.fillStyle=IV;for(let k=0;k<2600;k++){ctx.globalAlpha=a*r()*.55;ctx.fillRect(r()*1080,r()*1920,2+r()*3,2)}ctx.restore()})}
 // layer: 'all' (default), 'front' (captions, plus front titles and partner words), 'titles' (behind-head hero words only)
 // or 'panels' (screen cards and graphics 12 to 38 behind the top of the head)
-window.seek=(t,layer)=>{LAYER=layer||'all';BOOST=(CAP.boost||[]).some(b=>t>=b[0]&&t<=b[1]);ctx.clearRect(0,0,1080,1920);dimDraw(t,LAYER);flip(t);if(LAYER==='titles'||LAYER==='panels')return;(CAP.bursts||[]).forEach((h,i)=>burst(t-h,7919*(i+3)));glitch(t)};
-window.__titles=TITLES.map(c=>({start:c[0],end:c[1],text:c[2],entrance:c.entr,flicker:c.flick,layer:c.layer||'front'}));
+window.seek=(t,layer)=>{LAYER=layer||'all';BOOST=(CAP.boost||[]).some(b=>t>=b[0]&&t<=b[1]);ctx.clearRect(0,0,1080,1920);dimDraw(t,LAYER);flip(t);if(LAYER==='titles'||LAYER==='panels')return;exitFlash(t);(CAP.bursts||[]).forEach((h,i)=>burst(t-h,7919*(i+3)));glitch(t)};
+window.__titles=TITLES.map(c=>({start:c[0],end:c[1],text:c[2],entrance:c.entr,flicker:c.flick,layer:c.layer||'front',effect:c.fx,exit:c.exit}));
 // Fonts: optional web-font stylesheet from the theme, then wait for every face we draw with, then the logo.
 const css=TH.fontCss?new Promise(r=>{const l=document.createElement('link');l.rel='stylesheet';l.href=TH.fontCss;l.onload=r;l.onerror=r;document.head.appendChild(l)}):Promise.resolve();
 css.then(()=>Promise.all(FACES)).then(()=>Promise.all([...Object.values(SETS).flatMap(s=>[...(s.SCF?[document.fonts.load(fnt(s.SCF,90))]:[]),document.fonts.load(fnt(s.S,CSZ)),document.fonts.load(fnt(s.G,160)),document.fonts.load(fnt(s.F,150)),document.fonts.load(fnt(s.K,46))]),document.fonts.ready,new Promise(r=>{if(!LOGO||SK.complete)return r();SK.onload=r;SK.onerror=r}),...IMGP])).finally(()=>{window.__logo=LOGO?SK.naturalWidth>0:null;window.__skool=window.__logo;window.__theme=TH.name||'custom';window.__fonts=CYC.length>1?CYC.map(s=>s.name).join(','):BASE.name;try{if(CAP.layout!==false)layoutPass()}catch(e){console.warn('layout pass failed',e);LAYOUT.clear()}window.seek(0);window.__ready=true});

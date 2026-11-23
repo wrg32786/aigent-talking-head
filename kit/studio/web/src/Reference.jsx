@@ -8,6 +8,7 @@ import { canWrite, NO_WRITER } from './Scripts.jsx';
 import { FixActions } from './Fix.jsx';
 import { Stages } from './Stages.jsx';
 import { RefMode, RefNotice, RefParts, RefPlan, SavedLookNote } from './RefCard.jsx';
+import { RefTitles } from './RefTitles.jsx';
 
 export function Reference({ CAT, V, s, apply, patch }) {
   const r = s.reference, env = V.env, q = r.queue || [], t = env.tools || {};
@@ -88,6 +89,7 @@ function Breakdown({ CAT, V, s, apply, patch }) {
     {/* your saved look in use (the reference Off, or Influence), then what the reference set (nothing when it is Off) */}
     <SavedLookNote V={V} apply={apply} id="saved-look-td" />
     {ex.vision === 'off' && <p className="fine ref-vision" id="ref-vision" role="note">We read this reference without the vision pass, so titles may be misread.</p>}
+    <RefTitles V={V} apply={apply} />
     <RefNotice s={s} patch={patch} id="ref-notice-td" />
     {r.mode === 'influence' && <RefParts V={V} s={s} patch={patch} />}
     <RefPlan ex={ex} mode={r.mode} id="ref-plan-td" />

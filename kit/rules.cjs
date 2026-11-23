@@ -24,8 +24,23 @@ const CUT_SOUNDS = ['whoosh', 'swipe', 'boom', 'F', 'D'];
 const sfxHits = list => (list || []).map(h => (Array.isArray(h) ? { t: +h[0], g: h[1] == null ? null : +h[1] } : { t: +h, g: null }));
 
 // Nine title entrances, each used at most once per video. Flicker only on the hook (first title) and payoff (last).
-const ENTRANCES = ['stagger-rise', 'slam', 'blur-rise', 'slide-left', 'elastic', 'flip', 'pop-zoom', 'drop', 'typewriter'];
+// The names live in kit/title-effects.json, one row per entrance, effect and exit with what it needs and what is drawn
+// when it cannot be (idea from mojomast/open-higgsfield-skills skills/video-director references/routing.md (MIT)).
+const TITLE_TABLE = JSON.parse(fs.readFileSync(path.join(__dirname, 'title-effects.json'), 'utf8')).rows;
+const titleRow = id => TITLE_TABLE.find(r => r.id === id) || null;
+const tableIds = kind => TITLE_TABLE.filter(r => r.kind === kind).map(r => r.id);
+const ENTRANCES = tableIds('entrance');
 const TITLE_ENTER = 0.45; // seconds until a title has settled
+// Title effects (1.29.0), one per title: "effect" on a mode 7 flip, Reel.md "| effect type". Drawn by kit/overlay.html
+// (the phrase title renderer), documented in docs/effects.md. type: letter by letter with a caret. slot-roll: digits or
+// one word swap by a vertical roll. count-up: an eased number count that can roll to a final text. stack-fade: new
+// lines stack and older ones go grey, blur and fade. decode: random glyphs settle into the word. split-flap: the same
+// on a flap board.
+const TITLE_EFFECTS = tableIds('effect');
+// A title's exit that is also the transition at the cut it ends on: "exit" on a flip, Reel.md "| exit polaroid".
+const TITLE_EXITS = tableIds('exit');
+// How a phrase title builds when it has no effect: word by word as said, letter by letter, or line by line.
+const TITLE_BUILDS = ['word', 'letter', 'line'];
 const TITLE_MODE = 7;
 // front (default): the whole title sits in front of the person.
 // behind: the hero word goes behind the head (partner words stay in front).
@@ -99,7 +114,10 @@ function resolveTitles(CAP, cut) {
   const ts = (CAP.flips || []).filter(f => f.mode === TITLE_MODE).sort((a, b) => a.start - b.start);
   const used = new Set(ts.map(t => t.entrance).filter(Boolean));
   const free = ENTRANCES.filter(e => !used.has(e));
-  const out = ts.map((t, i) => { const entrance = t.entrance || (ENTRANCES.includes(CAP.titleEntrance) ? CAP.titleEntrance : null) || free.shift() || ENTRANCES[i % ENTRANCES.length]; return { ...t, entrance, flicker: (i === 0 || i === ts.length - 1) && entrance !== 'typewriter' ? t.flicker !== false : false, role: i === 0 ? 'hook' : i === ts.length - 1 ? 'payoff' : 'beat' }; });
+  // An effect ("effect", else "swap" or "count", else the job's titleEffect) is the title's entrance: it is reported as
+  // the entrance, takes none from the pool and has no flicker. "exit": false on a title leaves the job's titleExit out.
+  const out = ts.map((t, i) => { const effect = TITLE_EFFECTS.includes(t.effect) ? t.effect : t.swap ? 'slot-roll' : t.count ? 'count-up' : t.effect == null && TITLE_EFFECTS.includes(CAP.titleEffect) ? CAP.titleEffect : null, exit = TITLE_EXITS.includes(t.exit) ? t.exit : t.exit == null && TITLE_EXITS.includes(CAP.titleExit) ? CAP.titleExit : null;
+    const entrance = t.entrance || effect || (ENTRANCES.includes(CAP.titleEntrance) ? CAP.titleEntrance : null) || free.shift() || ENTRANCES[i % ENTRANCES.length]; return { ...t, entrance, effect, exit, flicker: (i === 0 || i === ts.length - 1) && !effect && entrance !== 'typewriter' ? t.flicker !== false : false, role: i === 0 ? 'hook' : i === ts.length - 1 ? 'payoff' : 'beat' }; });
   const job = normalizeLayer((CAP && CAP.titleLayer) != null ? CAP.titleLayer : (cut && cut.titleLayer), 'front') || 'front';
   const raw = out.map(t => normalizeLayer(t.layer, job) || job);
   const behind = new Set();
@@ -121,6 +139,27 @@ function resolveTitles(CAP, cut) {
     }
   }
   return out.map((t, i) => ({ ...t, layer: behind.has(i) ? 'behind' : 'front' }));
+}
+
+// A title's exit is the transition at the cut it ends on. For each seam (the index of the segment that starts there) with
+// a title whose exit ends within 0.2 s of it: the picture's move. m is the xfade mode (a drawn one from kit/xfx.cjs, a
+// stock one, or null for a hard cut under the blow-up flash), d its length and lead how much of it plays before the
+// cut, while the title is still up (kit/overlay.html TEX is the same lead, so text and picture move together).
+// kit/assemble.cjs uses it in place of the segment's own transition.
+// The moves are the exit rows of kit/title-effects.json (xfade, dur, lead, sound), so an exit owns its seam: the picture's
+// move, its length and its sound come from one row (preset shape from mojomast/open-higgsfield-skills skills/shot-transitions
+// references/seam-presets.py.txt (MIT; Seam)).
+const TITLE_EXIT_MOVES = Object.fromEntries(TITLE_TABLE.filter(r => r.kind === 'exit').map(r => [r.id, { m: r.xfade, d: r.dur, lead: r.lead, sound: r.sound || null }]));
+function titleExitSeams(CAP, cut) {
+  const out = {}, segs = timeline(cut || {}).segs;
+  for (const t of resolveTitles(CAP || {}, cut)) {
+    if (!t.exit || !(t.end < 90)) continue;
+    let best = null;
+    for (const g of segs) { const gap = Math.abs(g.start - t.end); if (g.i && gap <= 0.2 && (!best || gap < best.gap)) best = { i: g.i, gap }; }
+    const mv = TITLE_EXIT_MOVES[t.exit];
+    if (best && segs[best.i - 1].end - segs[best.i - 1].start > mv.lead) out[best.i] = { exit: t.exit, text: String(t.text || '').replace(/\|/g, ' '), ...mv };
+  }
+  return out;
 }
 
 // Where the captions sit relative to the person: captionLayer front | behind | auto. auto (the default for captions at
@@ -229,4 +268,4 @@ const dupWords = (plan, caps, hidden = []) => {
   }
   return out;
 };
-module.exports = { BEDS, isBed, bedFile, ENERGIES, bedsByEnergy, scriptEnergy, pickBed, SFX, CUT_SOUNDS, sfxHits, ENTRANCES, TITLE_ENTER, TITLE_MODE, TITLE_LAYERS, normalizeLayer, PUNCH, TRANSITIONS, xfadeMode, timeline, lintCopy, scriptShape, readCaptions, resolveTitles, maskSpec, MASK_MODELS, captionLayer, PANEL_LAYERS, PANEL_MODES, panelLayer, panelsBehind, dupWords };
+module.exports = { BEDS, isBed, bedFile, ENERGIES, bedsByEnergy, scriptEnergy, pickBed, SFX, CUT_SOUNDS, sfxHits, ENTRANCES, TITLE_ENTER, TITLE_EFFECTS, TITLE_EXITS, TITLE_BUILDS, TITLE_EXIT_MOVES, TITLE_TABLE, titleRow, titleExitSeams, TITLE_MODE, TITLE_LAYERS, normalizeLayer, PUNCH, TRANSITIONS, xfadeMode, timeline, lintCopy, scriptShape, readCaptions, resolveTitles, maskSpec, MASK_MODELS, captionLayer, PANEL_LAYERS, PANEL_MODES, panelLayer, panelsBehind, dupWords };

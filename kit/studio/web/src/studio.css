@@ -1178,6 +1178,11 @@ dialog.wizards .fb-h > div:first-child { flex: 1; } dialog.wizards .fb-h p { mar
 .title-check-line svg, .tc-h .lbl svg { width: 14px; height: 14px; flex: none; color: #e0a33a; }
 [data-theme="light"] .title-check-line svg, [data-theme="light"] .tc-h .lbl svg { color: #9a6408; }
 #draft-title-check { margin: 0 0 10px; }
+/* Read the titles with my agent: one small card in the breakdown (RefTitles.jsx) */
+.ref-titles { margin: 12px 16px 0; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: color-mix(in srgb, var(--foreground) 3%, transparent); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.rt-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 260px; } .rt-t .fine { margin: 0; overflow: hidden; text-overflow: ellipsis; }
+.rt-t .lbl { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--foreground); } .rt-t .lbl svg { width: 14px; height: 14px; flex: none; }
+.rt-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; } .rt-acts .fine { margin: 0; }
 .title-checks { margin: 12px 16px 0; padding: 10px 12px; border-radius: 12px; border: 1px solid color-mix(in srgb, #e0a33a 40%, transparent); background: color-mix(in srgb, #e0a33a 7%, transparent); }
 .tc-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
 .tc-h .lbl { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--foreground); }

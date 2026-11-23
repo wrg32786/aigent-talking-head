@@ -16,7 +16,7 @@ const img = (rel, alt, w = 120) => existsSync(join(ROOT, 'docs', rel)) ? `<img s
 export function effectsDoc(menu = loadMenu()) {
   const sec = id => menu.sections.find(s => s.id === id);
   const trans = JSON.parse(readFileSync(join(KIT, 'transitions.json'), 'utf8'));
-  const T = sec('transitions').items, TE = sec('title-entrances').items, CE = sec('caption-entrances').items;
+  const T = sec('transitions').items, TE = sec('title-entrances').items, TX = sec('title-effects').items, CE = sec('caption-entrances').items;
   const CS = sec('caption-styles').items, G = sec('graphics').items, E = sec('effects').items, ED = sec('editing').items;
   // aliases: names that map to the same engine mode as an earlier name
   const firstOf = {};
@@ -25,8 +25,8 @@ export function effectsDoc(menu = loadMenu()) {
   const L = [];
   L.push('# Effects menu', '');
   L.push('Every transition, title entrance, caption entrance and caption style in aigent-talking-head, with a looping preview rendered by the kit itself, the exact name to use, and where to put it. Graphics and video effects are listed at the end.', '');
-  L.push(`**${T.length} transitions · ${TE.length} title entrances · ${CE.length} caption entrances · ${CS.length} caption styles · ${G.length} graphics · ${E.length} effects**`, '');
-  L.push('Jump to: [Transitions](#transitions) · [Title entrances](#title-entrances) · [Caption entrances](#caption-entrances) · [Caption styles](#caption-styles) · [Graphics](#graphics) · [Effects](#effects) · [Editing principles](#editing-principles) · [For agents](#for-agents)', '');
+  L.push(`**${T.length} transitions · ${TE.length} title entrances · ${TX.length} title effects and exits · ${CE.length} caption entrances · ${CS.length} caption styles · ${G.length} graphics · ${E.length} effects**`, '');
+  L.push('Jump to: [Transitions](#transitions) · [Title entrances](#title-entrances) · [Title effects and exits](#title-effects-and-exits) · [Caption entrances](#caption-entrances) · [Caption styles](#caption-styles) · [Graphics](#graphics) · [Effects](#effects) · [Editing principles](#editing-principles) · [For agents](#for-agents)', '');
   L.push('## How to pick', '');
   L.push('- Browse the previews below. Each one loops: the effect plays, holds for a moment, then starts again. The name is burned into the bottom of every preview.');
   L.push('- Copy the name into your `cut.json`, `captions.js`, Reel.md or command line, as shown in the **Use** column.');
@@ -46,6 +46,17 @@ export function effectsDoc(menu = loadMenu()) {
   L.push('<img src="menu/sheets/titles.webp" width="720" alt="Animated grid of the title entrances, each labelled with its name">', '');
   L.push('| Preview | Name | What it does | Use |', '|---|---|---|---|');
   for (const it of TE) L.push(`| ${img(`menu/titles/${it.id}.webp`, `${it.id} title entrance`, 160)} | ${code(it.id)} | ${cell(cap(it.label))}. | ${code(`{ "mode": 7, "text": "Record one take", "entrance": "${it.id}" }`)}<br>Reel.md ${code(`#01 0.3-1.8 | entrance ${it.id} | text Record one take`)} |`);
+  L.push('');
+
+  L.push('## Title effects and exits', '');
+  L.push('A title can be set as a designed phrase: one to three lines split by `|`, small partner words in the text colour and one larger key word (`"key"`) in the accent. Add `"phrase": true` to draw the lines as written. `"words": [[start, end, word], ...]` times each word, and a word is never drawn before its start. With no effect the words come in as you say them (`"build": "word"`), typed (`"letter"`) or a line at a time (`"line"`).', '');
+  L.push('An effect is how the title arrives, one per title: `"effect"` on the title, or `"titleEffect"` in `captions.js` for every title that names none. An exit is how it leaves, over its last 0.2 to 0.45 s: `"exit"` on the title, or `"titleExit"` for the job. When the title ends within 0.2 s of a cut, the exit is the transition at that cut: the picture makes the same move, in place of the segment\'s own transition, and the build log says so. The previews show the title only. `"glow": "soft"` or `"strong"` and `"dim": 0.4` work on one title, also when the job has `titleGlow` and `titleDim` off.', '');
+  L.push('For the whole reel: `--title-effect <name>` and `--title-exit <name>`, or `- title-effect:` and `- title-exit:` under Style in a Reel.md. In Studio they are one Effect and one Exit pick on Text and graphics. Some effects need something from the title: `slot-roll` a number in the key word or a `"swap"` list, `count-up` a number, `stack-fade` two lines or more, and `polaroid`, `glitch-slice` and `dip-black` a cut where the title ends. When a draft from a reference cannot give an effect what it needs, the title comes in by its plain build (an exit just ends) and the build log says which effect was not drawn and why. The table behind this is `kit/title-effects.json`.', '');
+  L.push('<img src="menu/sheets/title-effects.webp" width="720" alt="Animated grid of the title effects and exits, each labelled with its name">', '');
+  L.push('| Preview | Name | What it does | Use |', '|---|---|---|---|');
+  const TXU = { 'slot-roll': '{ "mode": 7, "text": "$3.9M\\|WAS THE LOWEST", "key": "$3.9M", "effect": "slot-roll" }<br>{ "mode": 7, "text": "I DON\'T KNOW\\|How to pitch", "key": "How to pitch", "swap": ["pitch", "market", "do sales"] }', 'count-up': '{ "mode": 7, "text": "THAT\'D KEEP ME GOING FOR\\|365 Days", "key": "365 Days", "count": { "from": 1, "to": 365, "unit": "Days", "final": "1 Year" } }' };
+  for (const it of TX) { const exit = it.kind === 'titleExit', use = TXU[it.id] || `{ "mode": 7, "text": "THE ONLY\\|Question\\|YOU NEED", "phrase": true, "key": "Question", "${exit ? 'exit' : 'effect'}": "${it.id}" }`;
+    L.push(`| ${img(`menu/title-effects/${it.id}.webp`, `${it.id} title ${exit ? 'exit' : 'effect'}`, 160)} | ${code(it.id)} | ${cell(cap(it.label))}. | ${use.split('<br>').map(u => '`' + u + '`').join('<br>')} |`); }
   L.push('');
 
   L.push('## Caption entrances', '');

@@ -176,7 +176,9 @@ if (!ex.status) extras = JSON.parse(readFileSync(join(out, 'extras.json'), 'utf8
 else console.warn('note: extras failed (no layer hints, vignette or contact sheet)');
 
 stage('recipe');
-const res = V.convert(b, extras, { name, bpms, recipePath: relative(ROOT, join(out, 'Reel.md')) });
+// titles your agent read off the sheets (titles.agent.json, kept across re-runs) win over the OCR read
+const agentTitles = require('./teardown/phrases.cjs').readAgentTitles(out);
+const res = V.convert(b, extras, { name, bpms, recipePath: relative(ROOT, join(out, 'Reel.md')), ...(agentTitles ? { agentTitles: agentTitles.titles, agentUnread: agentTitles.unread } : {}) });
 writeFileSync(join(out, 'Reel.md'), res.md);
 writeFileSync(join(out, 'teardown.md'), res.report);
 // B-roll: where the reference shows it (screen panels, split screens, shots with no speaker), what it showed and how
@@ -215,6 +217,13 @@ writeFileSync(join(out, 'titles.json'), JSON.stringify(res.titles, null, 1));
 if (res.titleLook) writeFileSync(join(out, 'title-look.json'), JSON.stringify(res.titleLook, null, 1));
 { const un = res.titles.filter(t => t.lowConfidence); if (un.length) console.log(`check ${un.length} title${un.length === 1 ? '' : 's'} before a draft, the text may be misread: ${un.map(t => `#${t.n} "${t.text}" (${t.why})`).join('; ')}`); }
 { const added = V.saveScenes(res, out, { library: !flag('no-scenes') }); if (res.scenes.length) console.log(`scenes: ${res.scenes.length} made from the reference (${res.scenes.map(x => x.name).join(', ')}), ${added.length} new in the menu with a REF badge`); }
+// title sheets (1.29.0): the stretches with big text as labelled contact sheets, and the instruction for an agent to
+// read the designed titles from them (kit/sheets.mjs). ffmpeg and Pillow only; a re-run with --reuse keeps the ones it has.
+try {
+  const TS = await import('./sheets.mjs');
+  const sh = flag('reuse') && TS.readTitleSheets(out).length ? TS.readTitleSheets(out) : TS.writeTitleSheets(video, out, { py: PY });
+  if (sh.length) console.log(`title sheets: ${sh.length} in ${join(out, TS.TITLE_SHEETS.dir)} (ask.txt there is the instruction for an agent to read the titles)`);
+} catch (e) { console.warn('note: the title sheets were not made (' + String(e.message).split('\n')[0] + ')'); }
 const r = RM.load(join(out, 'Reel.md'));
 const { errs } = RM.validate(r);
 if (errs.length) console.warn('note: the Reel.md needs a fix before a remake:\n- ' + errs.join('\n- '));

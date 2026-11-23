@@ -105,6 +105,23 @@ Not used: animate.css (Hippocratic License 2.1, not on this repo's list). The en
 - **Reel.md** (`docs/reel-md.md`, `kit/reelmd.cjs`): the idea of a shareable Markdown recipe an agent reads and remakes came from [OpenMotion](https://github.com/nexu-io/openmotion)'s Motion.md, and the one-line agent installs (`INSTALL.md`, `docs/install.md`) and `npx skills add` packaging follow its quick start. OpenMotion is Apache-2.0. No OpenMotion text or code was copied; the format, parser and docs here are new.
 - **VIDEO.md compatibility**: a Reel.md uses the card fields and the `videomd-timeline` line syntax of [VIDEO.md](https://github.com/videomd/videomd) (spec and reference validator, Apache-2.0, Copyright the VIDEO.md authors), and `npm run reelmd -- package` writes a VIDEO.md package. The syntax was implemented from the spec; no VIDEO.md code is included.
 
+## Ideas from (1.29.0, no code copied)
+
+Ideas and starting numbers only, read from three skill packs. No file of theirs is in this kit; each place that uses an idea carries the credit in a comment.
+
+- **[mojomast/open-higgsfield-skills](https://github.com/mojomast/open-higgsfield-skills)** (MIT, Copyright (c) 2026 Kyle Durepos):
+  - `skills/shot-qc`: the measured picture checks in `kit/picturecheck.cjs` (freeze, black, flicker, clipping, soft) and their starting thresholds. The cut count rule is from HyperKut-Studio's export QC (MIT), bundled there.
+  - `skills/continuity-check` (method from fagemx/ZeroField, MIT): the join check in `kit/joins.cjs`: every cut as a pair, evidence with each finding, notes and never a gate, a "not checked" list.
+  - `skills/video-director` `references/routing.md`: one table row per title effect with what it needs and what it falls back to, and never swapping a named choice in silence (`kit/title-effects.json`, `kit/rules.cjs`, `kit/phrase-titles.cjs`).
+  - `skills/shot-transitions` `references/seam-presets.py.txt` (Seam): a transition as one row of move, length and sound, which is how a title exit owns its seam (`kit/title-effects.json`, `kit/sfx-map.cjs`).
+  - `skills/effect-recipe-read` (forkfield design by marciano71, MIT): reading a title as how it is set apart from how it moves (`kit/sheets.mjs`, `kit/teardown/phrases.cjs`).
+  - `skills/subtitles-captions`: the rules for the `.srt` beside every reel (2 lines, about 42 letters, 1 to 7 s; `kit/phrase-group.cjs`). Its `scripts/captions.py` is Apache-2.0, from the upstream project [hodgemann/mondo-music-video](https://github.com/hodgemann/mondo-music-video); we read the skill text only and use none of that script.
+  - `skills/camera-lens-lut`: read for the grade by tonal zone and the lens looks, not built in 1.29.0. Its Backlot looks and lens kit (`assets/comfyui-backlot/`) are Apache-2.0, from the upstream project [Trenchplanet/mogfield](https://github.com/Trenchplanet/mogfield); nothing of them is used.
+- **[higgsfield-ai/skills](https://github.com/higgsfield-ai/skills)** (MIT, Copyright (c) 2026 Higgsfield AI):
+  - `higgsfield-faceless-video/scripts/audio_to_captions.py`: the look-ahead phrase grouping rule (spans at sentence ends and pauses, the fewest phrases that each last long enough and read slowly enough, say so when nothing fits; `kit/phrase-group.cjs`).
+  - `higgsfield-brandkit/references/brand-lock.md`: lock states and evidence labels (`from` and `state` on every phrase title, `kit/teardown/phrases.cjs`).
+- **[Comfy-Org/comfy-skills](https://github.com/Comfy-Org/comfy-skills)** (MIT, Copyright (c) 2026 Comfy-Org): `technique-consistent-characters`: stating the exact count in an instruction so items are not merged or doubled (`kit/sheets.mjs` `titlesInstruction`).
+
 ## Installed at setup, not vendored
 
 These are fetched by `npm run effects:setup` (and the BiRefNet weights on first `kit/mask.py --model birefnet`, or `npm run effects:setup -- --birefnet`). They are not in git. Licences were checked from the primary sources on Nov 10, 2026.

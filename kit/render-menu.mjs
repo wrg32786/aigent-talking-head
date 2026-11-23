@@ -26,7 +26,7 @@ const W = 240, H = 426, FPS = 15, ACCENT = '#5cf9e2';
 const argv = process.argv.slice(2);
 const opt = n => { const i = argv.lastIndexOf('--' + n); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : null; };
 const ONLY = opt('only');
-const SECTIONS = ['transitions', 'titles', 'caption-entrances', 'caption-styles'];
+const SECTIONS = ['transitions', 'titles', 'title-effects', 'caption-entrances', 'caption-styles'];
 if (ONLY && !SECTIONS.includes(ONLY)) { console.error(`--only takes one of ${SECTIONS.join(', ')}`); process.exit(1); }
 const want = s => !ONLY || ONLY === s;
 
@@ -126,6 +126,18 @@ function titles() {
   made.titles = clips.length;
 }
 
+// title effects and exits: one phrase title per slot, each with the fields its effect needs; an exit shows the title
+// leaving (the picture's half of an exit needs a cut, so it is not in the preview)
+function titleEffects() {
+  const items = sec('title-effects'), S2 = 3.0;
+  const demo = { 'slot-roll': { text: '$3.9M|WAS THE LOWEST', key: '$3.9M' }, 'count-up': { text: 'IT KEPT ME GOING FOR|365 Days', key: '365 Days', count: { from: 1, to: 365, unit: 'Days', final: '1 Year' } }, 'stack-fade': { text: 'AND IT ONLY|HAPPENED BECAUSE|We tried', key: 'We tried' }, 'split-flap': { text: 'RECORD|ONE TAKE|ON YOUR PHONE', key: 'ONE TAKE' } };
+  const flips = items.map((it, i) => { const exit = it.kind === 'titleExit'; return { start: +(i * S2 + LEAD).toFixed(2), end: +((i + 1) * S2 - (exit ? 0.9 : 0.1)).toFixed(2), mode: 7, phrase: true, text: 'RECORD|One take|ON YOUR PHONE', key: 'One take', glow: 'soft', flicker: false, layer: 'front', ...(exit ? { exit: it.id, entrance: 'blur-rise' } : { effect: it.id }), ...(demo[it.id] || {}) }; });
+  const src = renderJob('title-effects', { captionStyle: 'kinetic', layout: false, theme: { colors: { accent: '#ffd400' } }, lockup: { heroColor: 'accent' }, flips }, items.length * S2, { FONTS: 'instrument' });
+  const clips = items.map((it, i) => { const c = join(work, 'tx-' + it.id + '.mp4'); ff(['-ss', String(i * S2), '-t', String(S2), '-i', src, '-vf', `setpts=PTS-STARTPTS,${label(it.id)}`, ...lossless, c]); anim(c, join(OUT, 'title-effects', it.id + '.webp')); return c; });
+  grid(clips, 5, 180, 320, join(OUT, 'sheets', 'title-effects.webp'), join(OUT, 'sheets', 'title-effects.png'), 1.9);
+  made['title-effects'] = clips.length;
+}
+
 function captionEntrances() {
   const items = sec('caption-entrances');
   const flips = items.map((it, i) => ({ start: +(i * SLOT + LEAD).toFixed(2), end: +((i + 1) * SLOT - 0.1).toFixed(2), text: WORDS.join(' '), mode: 0, words: words(i * SLOT + LEAD), hero: 'record', entrance: it.id }));
@@ -159,6 +171,7 @@ if (!argv.includes('--docs-only')) {
   mkdirSync(join(OUT, 'sheets'), { recursive: true });
   if (want('transitions')) { console.log('transitions'); transitions(); }
   if (want('titles')) { console.log('title entrances'); titles(); }
+  if (want('title-effects')) { console.log('title effects and exits'); titleEffects(); }
   if (want('caption-entrances')) { console.log('caption entrances'); captionEntrances(); }
   if (want('caption-styles')) { console.log('caption styles'); captionStyles(); }
   console.log('rendered', JSON.stringify(made), `docs/menu is ${(size(OUT) / 1048576).toFixed(1)} MB`);

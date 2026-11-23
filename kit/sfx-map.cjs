@@ -26,12 +26,16 @@ function kindOf(id) {
   return s.category === 'ui' ? 'click' : s.category;
 }
 
-function autoHits(cut, flips = []) {
+// caps (the job's captions.js, for titleExit): a title exit that ends on a cut owns that seam, so its sound comes from
+// its row in kit/title-effects.json, at the start of the move, and the transition it replaced makes none
+function autoHits(cut, flips = [], caps = null) {
   const out = [], add = (key, t, why) => { if (t >= 0) out.push({ id: MAP[key], t: +(+t).toFixed(3), auto: true, why }); };
-  const TL = R.timeline(cut);
+  const TL = R.timeline(cut), exits = R.titleExitSeams({ ...(caps || {}), flips }, cut);
   TL.segs.forEach(({ s, start }, i) => {
     if (!i) return;
-    if (s.transition && R.xfadeMode(s.transition)) add('transition', start, `transition ${s.transition}`);
+    const x = exits[i];
+    if (x) { if (x.sound) out.push({ id: x.sound, t: +Math.max(0, start - x.lead).toFixed(3), auto: true, why: `title exit ${x.exit}` }); }
+    else if (s.transition && R.xfadeMode(s.transition)) add('transition', start, `transition ${s.transition}`);
     else if (s.bigPunch) add('key', start, 'big punch-in');
   });
   for (const f of flips) {
