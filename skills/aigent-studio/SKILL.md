@@ -65,6 +65,8 @@ After a draft, the reel has spots (one per cut segment, a long one split every 6
 
 ## Post (a view on the Render step)
 
+After a render, make a publish kit with `make_publish_kit` (a cover still with the title off the face, post copy for each platform, and a ZIP of the reel, the .srt, the cover and the copy). Read it with `get_publish_kit` and save edited copy with `set_post_copy`. Do not post anything from these tools.
+
 After a render, `buffer_channels` lists the user's Buffer channels with each network's limits, and `buffer_post_reel` sends the reel there: one post per channel, saved as Buffer drafts by default. Queue and schedule are fine when the user asks for them. Post now publishes immediately, so use `mode: "now"` with `confirmNow: true` only when the user clearly said to publish now. Channels the reel is too long for (Facebook Reels 90 s, YouTube Shorts 3 min) are skipped with the reason; tell the user. Instagram: Reels and Stories get the 9:16 reel, and the Feed takes 4:5 to 1.91:1 only. For a Feed post pass `placements: { "instagram": "feed" }`; it is sent the 4:5 file of the same version (`reel-vN-feed-4x5.mp4`). If the channel comes back skipped with `needs: "feed45"`, make that size first (`studio_run` with `action: "render"` and `sizes: ["4:5"]`, or the Make the 4:5 version for the Feed button on Post) and send again. Never send a 9:16 as a Feed post. The Buffer key and the video host (Cloudflare R2, Cloudinary or their own public link) are set up by the user in Studio, never pasted in chat.
 ## Recorded takes
 

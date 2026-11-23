@@ -41,6 +41,7 @@ import { mount as mountFolders } from './folders.mjs';
 import { mountScenes } from './scene-routes.mjs';
 import { mount as mountPost } from './post-api.mjs';
 import { mount as mountHighlights } from './highlights-api.mjs';
+import { mount as mountPublish } from './publish-api.mjs';
 import * as SIZES from './sizes.mjs';
 import { mount as mountRefTitles } from './ref-titles.mjs';
 
@@ -140,7 +141,9 @@ function env() {
 const BOOT = Date.now().toString(36); let viewSeq = 0;
 // natural, tight or very: an ad with no pacing chosen is Very tight, as its draft is
 function pacingFor(cut, comp) { const ad = cut.output && cut.output.goal === 'ad' && !comp.args.includes('--tighten') && !comp.args.includes('--no-tighten'); return PACING.pacingOf(ad ? [...comp.args, '--tighten', '0.25'] : comp.args).id; }
+let PUB = null;
 function view(s) {
+
   let comp; try { comp = C.compose(s, { refPack: refPackName(s) }); } catch (e) { comp = { args: [], errs: [e.message], notes: [] }; }
   let scripts = []; try { scripts = SC.list(s.job); } catch {}
   let cut = null; try { cut = cutView(s); } catch (e) { cut = { error: e.message, candidates: [] }; }
@@ -152,7 +155,7 @@ function view(s) {
   let edit = null; try { edit = editOf(s, { combo, cut, broll }); } catch (e) { edit = { error: e.message }; }
   let look = null; try { look = lookSources(s); } catch {}
   const outputs = C.outputsOf(s), currentOutputs = currentOutputsOf(s);
-  return { seq: ++viewSeq, boot: BOOT, scenes: C.catalog().scenesSig || '', state: s, look, compose: comp, outputs, currentOutputs, sizes: SIZES.viewOf(s, outputs), refFont: C.refFontOf(s, SLK.fontOf(s.styleLook)), boost: C.boostOf(s), motion: C.motionOf(s), savedLook: (() => { try { return C.savedLookOf(s); } catch { return null; } })(), draftPreview: draftPreviewOf(s), match: matchOf(s), styleLooks: SLK.list(), reopenable, scripts, cut, broll, highlights: HL ? HL.view(s) : null, refTitles: RTI.view(s), pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: noTimeline(s) ? null : swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
+  return { seq: ++viewSeq, boot: BOOT, scenes: C.catalog().scenesSig || '', state: s, look, compose: comp, outputs, currentOutputs, sizes: SIZES.viewOf(s, outputs), refFont: C.refFontOf(s, SLK.fontOf(s.styleLook)), boost: C.boostOf(s), motion: C.motionOf(s), savedLook: (() => { try { return C.savedLookOf(s); } catch { return null; } })(), draftPreview: draftPreviewOf(s), match: matchOf(s), styleLooks: SLK.list(), reopenable, scripts, cut, broll, highlights: HL ? HL.view(s) : null, publish: (() => { try { return PUB ? PUB.view(s) : null; } catch { return null; } })(), refTitles: RTI.view(s), pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: noTimeline(s) ? null : swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
 }
 
 // Copy the look (kit/studio/stylelooks.mjs): the reference's timeline is not used, so no "what to swap" and no spots from it
@@ -930,6 +933,7 @@ const FOLDERS = mountFolders({ ROOT, json, readBody, extraFolders: () => { const
   ensure: [join(ROOT, 'teardown-in', 'studio'), join(ROOT, 'jobs')] });
 const POSTR = mountPost({ ROOT, C, json, readBody });
 HL = mountHighlights({ ROOT, C, update, json, readBody, view, startTranscribe, okFootage, durOf, runTask, pushState });
+PUB = mountPublish({ ROOT, C, json, readBody, view });
 // sizes: make the 4:5 or 1:1 of a finished reel (kit/studio/sizes.mjs)
 const SIZER = SIZES.mount({ ROOT, C, json, readBody, runTask: (...a) => runTask(...a), needFor: k => needFor(k) });
 // the reference's b-roll parts, on its own clock as a fraction of its length, become spots (kit/studio/lane.mjs spots)
@@ -1126,6 +1130,7 @@ async function api(req, res, u) {
   if (await BRL.route(p, M, u, req, res)) return;
   if (await POSTR.route(p, M, u, req, res)) return;
   if (await HL.route(p, M, u, req, res)) return;
+  if (PUB && await PUB.route(p, M, u, req, res)) return;
   if (await SIZER.route(p, M, u, req, res)) return;
   if (await RTI.route(p, M, u, req, res)) return;
   if (p === '/api/lines' && M === 'GET') return json(res, 200, await linesView(C.load(), u.searchParams.get('path')));
