@@ -19,6 +19,7 @@ const t = (name, fn) => { try { fn(); n++; } catch (e) { console.error('FAIL ' +
 const say = (s, t0 = 0, step = 0.3) => s.split(' ').map((w, i) => ({ start: +(t0 + i * step).toFixed(2), end: +(t0 + i * step + step - 0.05).toFixed(2), word: w }));
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'foldin-'));
 const ff = a => execFileSync('ffmpeg', ['-v', 'error', '-y', ...a], { cwd: tmp });
+let HAS_FF = true; try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); } catch { HAS_FF = false; } // CI's check job has no ffmpeg
 
 // ---- the table
 t('one table: rules, the recipe reader and the overlay name the same entrances, effects and exits', () => {
@@ -97,6 +98,7 @@ t('an .srt from captions.js: numbered cues, two lines of about 42 letters, 1 to 
 });
 
 // ---- picture checks
+if (HAS_FF) {
 ff(['-f', 'lavfi', '-i', 'testsrc2=size=270x480:rate=24:duration=3', '-vf', 'tpad=stop_mode=clone:stop_duration=1,tpad=stop_duration=0.5:color=black', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', 'frozen.mp4']);
 t('picture: a frozen stretch and black frames fail, and what the edit does on purpose does not', () => {
   const M = P.measure(path.join(tmp, 'frozen.mp4'), 4.5);
@@ -115,6 +117,7 @@ t('picture: a frozen stretch and black frames fail, and what the edit does on pu
   assert.ok(/fxPass: \/\^reel-fx-\//.test(fs.readFileSync(path.join(KIT, 'verify.mjs'), 'utf8')), 'verify tells the picture check when the file is an effects reel');
   assert.ok(/did not run/.test(P.judge({ error: 'x' }, {}).notes[0]));
 });
+} else console.log('skip the frozen and black picture tests (needs ffmpeg)');
 t('picture: exemptions come from the cut (fade in, dips, seams, hits, pads, inserts) and the rest are notes', () => {
   const X = P.exempt({ segs: [{ in: 0, out: 2, fadeIn: 0.25 }, { in: 0, out: 2, transition: 'dip' }, { in: 0, out: 1, pad: 0.6 }], hits: [1], inserts: [{ at: 0.5, dur: 0.5 }], tail: 0.3 }, { flips: [{ mode: 7, start: 3, end: 4, text: 'A|B', exit: 'dip-black' }] });
   assert.ok(X.dark.some(([a, z]) => a < 2 && z > 2) && X.still.some(([a, z]) => a <= 4 && z >= 5) && X.noisy.some(([a, z]) => a < 1 && z > 1));
@@ -127,6 +130,7 @@ t('picture: exemptions come from the cut (fade in, dips, seams, hits, pads, inse
 });
 
 // ---- joins
+if (HAS_FF) {
 ff(['-f', 'lavfi', '-i', 'smptebars=size=270x480:rate=24:duration=3', '-f', 'lavfi', '-i', 'color=c=0xc04020:size=270x480:rate=24:duration=1', '-filter_complex', '[0:v][1:v]concat=n=2:v=1[v]', '-map', '[v]', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', 'joins.mp4']);
 t('joins: an invisible cut is a break, a colour jump a drift, a declared one is neither, and nothing gates', () => {
   const C = { segs: [{ file: 'a', in: 0, out: 1.5 }, { file: 'a', in: 1.5, out: 3 }, { file: 'b', in: 0, out: 1 }], tail: 0 };
@@ -138,6 +142,7 @@ t('joins: an invisible cut is a break, a colour jump a drift, a declared one is 
   assert.deepStrictEqual(r2.findings, [], 'a transition and a change of finish are declared'); assert.notStrictEqual(r2.hash, r.hash, 'an edit makes the old result stale');
   assert.ok(!('ok' in r) && !('fails' in r));
 });
+} else console.log('skip the join check tests (needs ffmpeg)');
 
 (async () => {
   // Studio: the picks are one each, sit in a group of their own, become flags, and need titles on
