@@ -12,7 +12,7 @@ Setup check: `npm install`, `pip install -r requirements.txt`, then `npm run smo
 
 ## A ready-made editor agent
 
-`agents/video-editor.md` is a Claude Code subagent that knows the whole kit: which command fits the job (reel, split, Studio, teardown, clip-raw-footage), the draft, plan, review, render and verify loop, and fixes learned on real reels (captions off a low face, cutaways in the pause after a word, numbered versions). Install it with `mkdir -p .claude/agents && cp agents/video-editor.md .claude/agents/` (or `~/.claude/agents/` for every project), then ask Claude Code to use the video-editor agent.
+`agents/video-editor.md` is a Claude Code subagent that knows the whole kit: which command fits the job (reel, Studio, teardown, clip-raw-footage), the draft, plan, review, render and verify loop, and fixes learned on real reels (captions off a low face, cutaways in the pause after a word, numbered versions). Install it by copying `agents/video-editor.md` into `.claude/agents/` in the kit folder (or into `.claude/agents/` in your home folder for every project), then ask Claude Code to use the video-editor agent.
 
 ## Studio: set it up and be the agent in it
 
