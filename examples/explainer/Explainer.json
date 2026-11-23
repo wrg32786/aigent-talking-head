@@ -1,0 +1,16 @@
+{
+  "hook": ["One phone clip,", "a finished reel"],
+  "accent": ["free", "captions", "graphics", "repo", "reel"],
+  "aliases": { "Agent": "AIgent", "agent": "AIgent" },
+  "frame": { "top": 560, "bottom": 1560 },
+  "music": "vinyl-sunrise",
+  "cutaways": [],
+  "beats": [
+    { "at": "this repo", "type": "browser", "url": "github.com/wrg32786/aigent-talking-head", "image": "kit/example/demo-reel/before-after.gif" },
+    { "at": "one command", "type": "terminal", "lines": ["$ npm run reel -- inbox/my-take.mov --name my-reel", "✓ captions", "✓ titles", "✓ graphics"] },
+    { "at": "twenty-nine", "type": "stat", "value": "29", "label": "motion graphics" },
+    { "at": "free", "type": "keyword", "word": "free", "sub": "and open source" },
+    { "at": "for example", "type": "image", "image": "showcase/sheets/graphics.jpg", "pan": "down" }
+  ],
+  "cta": { "at": "comment", "word": "REEL", "sub": "I'll send you the link" }
+}

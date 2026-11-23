@@ -4,6 +4,8 @@ Each version below is one GitHub release. `npm run release:notes -- --version X.
 
 ## 1.29.0 (unreleased)
 
+- **Explainer.** `npm run explainer -- <job>` turns a drafted job into a split-screen reel built with HyperFrames: proof panels on top (browser screenshot, image, terminal, progress card, equation, big number), the presenter in a rounded frame below over grid paper, 1 to 3 word captions between them with accent words in blue italic, full-frame cutaways placed in the pause after a phrase you say, a keyword punch-in and a full-face call to action. A `Explainer.json` keys every beat to your words ([docs/explainer.md](docs/explainer.md), `examples/explainer/Explainer.json`, skill `talking-head-explainer`). The project stays editable in `jobs/<job>/explainer/`. Words are kept beside the talk track so a preview and the render use the same times; HyperFrames runs with its telemetry off and GSAP and fonts load from the project, not a CDN.
+
 Release notes: [docs/releases/v1.29.0.md](docs/releases/v1.29.0.md).
 
 Titles like the reference (Studio report 4, items 16 and 17; the reference 5 text teardown).

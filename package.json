@@ -50,7 +50,8 @@
     "studio:connect": "node kit/studio/connect.mjs",
     "setup:all": "node kit/setup.mjs",
     "release:notes": "node kit/release-notes.mjs",
-    "look": "node kit/stylelook.cjs"
+    "look": "node kit/stylelook.cjs",
+    "explainer": "node kit/explainer.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
