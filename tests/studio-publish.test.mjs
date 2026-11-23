@@ -21,9 +21,10 @@ ok('wrapTitle never splits a word, and stays on two lines', () => {
   const lines = P.wrapTitle('Building an app with AI in a weekend', { max: 18, lines: 2 });
   assert.ok(lines.length <= 2);
   const words = 'Building an app with AI in a weekend'.split(' ');
-  const out = lines.join(' ').split(' ');
+  const out = lines.join(' ').split(' ').map(w => w.replace(/…$/, ''));
   assert.ok(out.every(w => words.includes(w)), 'every token is a whole word: ' + lines.join(' | '));
   assert.ok(lines[0].startsWith('Building'));
+  if (lines.join(' ').includes('weekend') === false) assert.ok(lines[lines.length - 1].endsWith('…'));
 });
 
 ok('titleBox stays in the safe area and off a face in the lower half', () => {
@@ -101,6 +102,33 @@ ok('writeCopy and zipKit pack the reel, srt, cover and copy', () => {
 
 ok('no em dashes in the cover script', () => {
   assert.ok(!/\u2014/.test(readFileSync(new URL('../kit/publish-cover.py', import.meta.url), 'utf8')));
+});
+
+
+ok('a tight face band is clamped, never grown into the face', () => {
+  const zone = [80, 250, 1000, 1450, 200];
+  const box = P.titleBox(zone);
+  assert.ok(box.h <= 30 + 1e-6, 'height stays in the 30 px band, was ' + box.h);
+  assert.equal(P.overlapsFace(box, zone), false);
+});
+
+ok('titleFromJob keeps an apostrophe in the title', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pub-title-'));
+  writeFileSync(join(dir, 'captions.js'), 'module.exports = { titles: [{ text: "Don\'t stop now", start: 0, end: 2 }] };\n');
+  assert.equal(P.titleFromJob(dir), "Don't stop now");
+});
+
+ok('publish-cover.py places the title off a given face zone', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pub-cover-'));
+  const src = join(dir, 'frame.jpg'), out = join(dir, 'cover.jpg');
+  const py = process.env.PYTHON || 'python3';
+  execFileSync(py, ['-c', 'from PIL import Image; Image.new("RGB", (1080, 1920), (20, 40, 50)).save("' + src.replace(/\\/g, '/') + '")']);
+  const r = execFileSync(py, [join(KIT, '..', 'kit', 'publish-cover.py'), '--in', src, '--out', out, '--title', 'Hello there', '--zone', '200,800,880,1500,600'], { encoding: 'utf8' });
+  const j = JSON.parse(r.trim().split('\n').pop());
+  assert.equal(j.onFace, false);
+  assert.ok(j.box.y + j.box.h <= 800 + 1e-6, JSON.stringify(j.box));
+  assert.ok(existsSync(out));
+  assert.equal(j.detector, 'given');
 });
 
 console.log('\n' + n + ' checks passed');

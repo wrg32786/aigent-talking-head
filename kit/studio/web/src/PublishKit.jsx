@@ -39,6 +39,8 @@ export function PublishKit({ V, s, apply, hidden }) {
         <div className="row">
           <Button id="pub-make" variant={kit && kit.ready ? 'secondary' : 'primary'} label={busy ? 'Making' : kit && kit.ready ? 'Make again' : 'Make the kit'} isDisabled={busy || running || !s.job} isLoading={busy} onClick={make} />
           {kit && kit.zip && <a className="btn primary sm" id="pub-zip" href={file(kit.zip) + '?download'} download={kit.zip.split('/').pop()}>Download ZIP</a>}
+        {kit && kit.coverMeta && kit.coverMeta.onFace && <p className="fine" id="pub-face-note" role="status">The title may be close to the face on this frame. Try another title or make the kit again.</p>}
+        {kit && kit.coverMeta && kit.coverMeta.detector === 'off' && <p className="fine" id="pub-det-note" role="status">We could not read the face on this computer, so the title sits in the safe area at the top.</p>}
         </div>
       </div>
     </div>

@@ -1,8 +1,9 @@
 // A publish kit for a finished reel: a cover still with the title off the face, post copy per platform, and a ZIP
 // with the reel, the .srt, the cover and the copy. No auto-post, no outbound analytics, no new npm dependencies.
-//   node kit/publish-kit.mjs <reel.mp4> [--title "..."] [--t 1.2] [--out dir]
+//   node kit/publish-kit.mjs <reel.mp4> [--title "..."] [--t 1.2] [--out cover.jpg]
 import { execFileSync } from 'child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
+import { tmpdir } from 'os';
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { python } from './setup.mjs';
@@ -48,7 +49,7 @@ export function wrapTitle(text, { max = 32, lines = 2 } = {}) {
   for (const w of words) {
     const next = line ? line + ' ' + w : w;
     if (line && next.length > max) {
-      if (out.length + 1 >= lines) { out.push(line); return out; }
+      if (out.length + 1 >= lines) { out.push(line.replace(/\.?$/, '…')); return out; }
       out.push(line); line = w;
     } else line = next;
   }
@@ -63,10 +64,9 @@ export function titleBox(zone, safe = SAFE) {
   const z0 = zone[1], z1 = zone[3];
   const topH = Math.max(0, Math.min(z0, y1) - y0);
   const botH = Math.max(0, y1 - Math.max(z1, y0));
-  if (topH >= botH && topH >= minH) return { x: x0, y: y0, w, h: Math.min(360, topH) };
-  if (botH >= minH) return { x: x0, y: Math.max(z1, y0), w, h: Math.min(360, botH) };
-  // almost no room: use the larger band anyway, still clipped to the safe area
-  return topH >= botH ? { x: x0, y: y0, w, h: Math.max(80, topH) } : { x: x0, y: Math.max(z1, y0), w, h: Math.max(80, botH) };
+  if (topH >= botH && topH >= 40) return { x: x0, y: y0, w, h: Math.min(360, topH) };
+  if (botH >= 40) return { x: x0, y: Math.max(z1, y0), w, h: Math.min(360, botH) };
+  return topH >= botH ? { x: x0, y: y0, w, h: topH } : { x: x0, y: Math.max(z1, y0), w, h: botH };
 }
 
 export function overlapsFace(box, zone) {
@@ -119,6 +119,7 @@ export function pathsOf(reel) {
     cover: join(dir, base + '-cover.jpg'),
     copyJson: join(dir, base + '-copy.json'),
     copyTxt: join(dir, base + '-copy.txt'),
+    coverMeta: join(dir, base + '-cover.json'),
     zip: join(dir, base + '-kit.zip')
   };
 }
@@ -157,10 +158,14 @@ export function makeCover(reel, { title, t, out } = {}) {
   const dest = out || files.cover;
   const len = durationOf(files.reel);
   const at = Math.min(Math.max(0, t == null ? COVER_T : +t), Math.max(0, len - 0.05));
-  const frame = dest.replace(/(\.[^.]+)?$/, '-frame.jpg');
-  extractFrame(files.reel, at, frame);
-  const drawn = drawCover({ frame, out: dest, title: title || basename(files.reel, extname(files.reel)) });
-  return { cover: dest, t: at, duration: len, ...drawn };
+  const frame = join(tmpdir(), 'th-cover-' + process.pid + '-' + Date.now() + '.jpg');
+  try {
+    extractFrame(files.reel, at, frame);
+    const drawn = drawCover({ frame, out: dest, title: title || basename(files.reel, extname(files.reel)) });
+    return { cover: dest, t: at, duration: len, ...drawn };
+  } finally {
+    try { unlinkSync(frame); } catch {}
+  }
 }
 
 export function writeCopy(reel, copy) {
@@ -183,6 +188,7 @@ export function makeKit(reel, opts = {}) {
   const files = pathsOf(reel);
   if (!existsSync(files.reel)) throw Object.assign(new Error('no such reel'), { code: 400 });
   const cover = makeCover(files.reel, opts);
+  writeFileSync(files.coverMeta, JSON.stringify({ t: cover.t, box: cover.box, zone: cover.zone, onFace: !!cover.onFace, detector: cover.detector || null, lines: cover.lines || [] }, null, 2) + '\n');
   const copy = opts.copy || copyOf({ title: opts.title, description: opts.description, hashtags: opts.hashtags, point: opts.point, text: opts.text });
   writeCopy(files.reel, copy);
   const z = zipKit(files.reel);
@@ -194,8 +200,8 @@ export function titleFromJob(dir) {
   const cap = tryRead(join(dir, 'captions.js')) || tryRead(join(dir, 'build', 'captions.js'));
   const m = cap && cap.match(/titles["']?\s*[:=]\s*\[([\s\S]*?)\]/);
   if (m) {
-    const first = m[1].match(/text["']?\s*:\s*["']([^"']+)["']/);
-    if (first) return first[1].trim();
+    const first = m[1].match(/text["']?\s*:\s*(["'])((?:(?!\1).)+)\1/);
+    if (first) return first[2].trim();
   }
   return '';
 }

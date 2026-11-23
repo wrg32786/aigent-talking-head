@@ -36,7 +36,7 @@ def wrap(text, max_len=32, lines=2):
         nxt = (line + " " + w).strip()
         if line and len(nxt) > max_len:
             if len(out) + 1 >= lines:
-                out.append(line)
+                out.append(line[:-1] + "…" if line.endswith(".") else line + "…")
                 return out
             out.append(line)
             line = w
@@ -55,13 +55,13 @@ def title_box(zone, safe=SAFE):
     z0, z1 = zone[1], zone[3]
     top = max(0, min(z0, y1) - y0)
     bot = max(0, y1 - max(z1, y0))
-    if top >= bot and top >= min_h:
+    if top >= bot and top >= 40:
         return dict(x=x0, y=y0, w=w, h=min(360, top))
-    if bot >= min_h:
+    if bot >= 40:
         return dict(x=x0, y=max(z1, y0), w=w, h=min(360, bot))
     if top >= bot:
-        return dict(x=x0, y=y0, w=w, h=max(80, top))
-    return dict(x=x0, y=max(z1, y0), w=w, h=max(80, bot))
+        return dict(x=x0, y=y0, w=w, h=top)
+    return dict(x=x0, y=max(z1, y0), w=w, h=bot)
 
 
 def overlaps(box, zone):
@@ -71,14 +71,17 @@ def overlaps(box, zone):
 
 
 def detect_zone(im):
-    """Return a face keep-out zone in 1080x1920, or None. Needs OpenCV and the YuNet weights."""
+    """Return (zone or None, "yunet" or "off"). Needs OpenCV and the YuNet weights."""
     try:
-        import cv2, numpy as np
         from facezone import zone_of, pick
     except Exception:
-        return None
+        return None, "off"
     if not YUNET.is_file():
-        return None
+        return None, "off"
+    try:
+        import cv2
+    except Exception:
+        return None, "off"
     img = im.convert("RGB")
     arr = __import__("numpy").array(img)[:, :, ::-1].copy()  # RGB -> BGR
     h, w = arr.shape[:2]
@@ -91,8 +94,8 @@ def detect_zone(im):
     _, faces = det.detect(small)
     f = pick(faces, None)
     if f is None:
-        return None
-    return zone_of(f)
+        return None, "yunet"
+    return zone_of(f), "yunet"
 
 
 def font(size):
@@ -148,7 +151,11 @@ def main():
     a = ap.parse_args()
     from PIL import Image
     im = Image.open(a.src).convert("RGB")
-    zone = parse_nums(a.zone, 5) if a.zone else detect_zone(im)
+    detector = "given"
+    if a.zone:
+        zone = parse_nums(a.zone, 5)
+    else:
+        zone, detector = detect_zone(im)
     box = None
     if a.box:
         x, y, w, h = parse_nums(a.box, 4)
@@ -170,6 +177,7 @@ def main():
         "zone": zone,
         "lines": lines,
         "onFace": overlaps(box, zone) if zone else False,
+        "detector": detector,
     }))
 
 

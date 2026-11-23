@@ -39,21 +39,35 @@ export function view(s, ROOT) {
 }
 
 export function mount({ ROOT, C, json, readBody, view: pageView }) {
-  const pick = (s, path) => okReel(ROOT, s.job, path) || POST.reelsOf(s.job)[0] || null;
+  const pick = (s, path) => {
+    if (path) {
+      const rel = okReel(ROOT, s.job, path);
+      if (!rel) throw Object.assign(new Error('no such reel in this job'), { code: 400 });
+      return rel;
+    }
+    return POST.reelsOf(s.job)[0] || null;
+  };
 
   async function handle(p, M, u, req, res) {
     const s = C.load();
     if (p === '/api/publish' && M === 'GET') {
-      const rel = pick(s, u.searchParams.get('reel'));
+      let rel;
+      try { rel = pick(s, u.searchParams.get('reel')); } catch (e) { return json(res, e.code || 400, { error: e.message }); }
       if (!rel) return json(res, 400, { error: 'render a reel first' });
       return json(res, 200, kitOf(ROOT, rel));
     }
     if (p === '/api/publish' && M === 'POST') {
-      const b = await readBody(req), rel = pick(s, b.reel);
+      const b = await readBody(req);
+      let rel;
+      try { rel = pick(s, b.reel); } catch (e) { return json(res, e.code || 400, { error: e.message }); }
       if (!rel) return json(res, 400, { error: 'render a reel first' });
       const buildDir = join(ROOT, rel.replace(/\.mp4$/, '.build'));
-      const title = (b.title && String(b.title).trim()) || P.titleFromJob(buildDir) || s.job;
-      const copy = P.copyOf({ title, description: b.description, hashtags: b.hashtags, point: s.point, text: b.text });
+      const saved = kitOf(ROOT, rel).copy;
+      const given = !!(b.title || b.description || b.hashtags || b.text);
+      const title = (b.title && String(b.title).trim()) || (saved && saved.title) || P.titleFromJob(buildDir) || s.job;
+      const copy = given || !saved
+        ? P.copyOf({ title, description: b.description, hashtags: b.hashtags, point: s.point, text: b.text })
+        : saved;
       try {
         P.makeKit(join(ROOT, rel), { title, t: b.t, copy, point: s.point });
       } catch (e) {
@@ -62,17 +76,20 @@ export function mount({ ROOT, C, json, readBody, view: pageView }) {
       return json(res, 200, { ...pageView(C.load()), publish: kitOf(ROOT, rel) });
     }
     if (p === '/api/publish/copy' && M === 'POST') {
-      const b = await readBody(req), rel = pick(s, b.reel);
+      const b = await readBody(req);
+      let rel;
+      try { rel = pick(s, b.reel); } catch (e) { return json(res, e.code || 400, { error: e.message }); }
       if (!rel) return json(res, 400, { error: 'render a reel first' });
       const cur = kitOf(ROOT, rel).copy || P.copyOf({ title: s.job });
+      const c = b.copy || {};
       const next = P.copyOf({
-        title: (b.copy && b.copy.title) || cur.title,
-        description: (b.copy && (b.copy.description || b.copy.caption)) || cur.description,
-        hashtags: (b.copy && b.copy.hashtags) || cur.hashtags,
+        title: c.title ?? cur.title,
+        description: c.description ?? c.caption ?? cur.description,
+        hashtags: c.hashtags ?? cur.hashtags,
         point: s.point
       });
-      P.writeCopy(join(ROOT, rel), next);
-      try { P.zipKit(join(ROOT, rel)); } catch (e) { return json(res, 500, { error: e.message }); }
+      try { P.writeCopy(join(ROOT, rel), next); P.zipKit(join(ROOT, rel)); }
+      catch (e) { return json(res, 500, { error: e.message }); }
       return json(res, 200, { ...pageView(C.load()), publish: kitOf(ROOT, rel) });
     }
     return false;
