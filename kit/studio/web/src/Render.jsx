@@ -3,7 +3,7 @@ import { Button } from '@astryxdesign/core/Button';
 import { ProgressBar } from '@astryxdesign/core/ProgressBar';
 import { NeedFix } from './Fix.jsx';
 import { copyText } from './Connect.jsx';
-import { api, file, toast, fmtS, cap1, Icon, matchChips } from './lib.jsx';
+import { api, file, toast, fmtS, cap1, Icon, matchChips, CopyButton } from './lib.jsx';
 import { Compare, Cleanup, Receipt } from './Review.jsx';
 import { Fold, Hint } from './ui.jsx';
 import { TitleCheckLine } from './RefCard.jsx';
@@ -162,7 +162,7 @@ export function RunFoot({ V, s, log }) {
   const forAgent = `In my aigent-talking-head folder, make this reel by running npm run reel -- ${src} --name ${s.job || '<job>'} --draft ${(c.args || []).map(a => /[\s;]/.test(a) ? JSON.stringify(a) : a).join(' ')} and tell me when it is done.`;
   return <div className="step run-foot" id="run-foot">
     <Fold id="details-fold" title="Details"><div className="row" id="cmd"><span className="fine grow">Your agent can make this same reel.</span>
-      <Button id="cmd-copy" size="sm" variant="secondary" label="Copy for my agent" icon={<Icon n="copy" />} onClick={() => copyText(forAgent, 'Copied. Paste it into your agent.')} /></div>
+      <CopyButton id="cmd-copy" size="sm" variant="secondary" label="Copy for my agent" text={forAgent} said="Copied. Paste it into your agent." /></div>
       <span className="lbl" id="log-l">What ran</span><pre id="log" className="log" aria-live="off" aria-labelledby="log-l" ref={logRef}>{log.split('\n').filter(l => !l.startsWith('$ ')).join('\n')}</pre></Fold>
   </div>;
 }

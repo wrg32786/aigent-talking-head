@@ -2,7 +2,7 @@
 // (the Studio chat channel, when a terminal agent is connected) and Copy for my agent. The steps for an agent live only
 // in the copied or sent instruction (env.fixes[id].prompt from kit/studio/fixes.mjs); the page never shows a command.
 import { Button } from '@astryxdesign/core/Button';
-import { api, toast, Icon } from './lib.jsx';
+import { api, toast, Icon, CopyButton } from './lib.jsx';
 import { copyText } from './Connect.jsx';
 
 export const fixOf = (V, id) => (V && V.env && V.env.fixes && V.env.fixes[id]) || null;
@@ -21,7 +21,7 @@ export function FixActions({ V, id, apply }) {
     {f.install && <Button size="sm" variant="secondary" label={mine && running ? 'Installing' : failed ? 'Try again' : 'Install'} isLoading={mine && running} isDisabled={running && !mine} onClick={install} />}
     {f.link && <a className="fix-link" href={f.link} target="_blank" rel="noreferrer">{f.linkLabel}</a>}
     {agentOn(V) && <Button size="sm" variant="ghost" label="Send to my agent" onClick={send} />}
-    <Button size="sm" variant="ghost" label="Copy for my agent" icon={<Icon n="copy" />} onClick={copy} />
+    <CopyButton size="sm" variant="ghost" label="Copy for my agent" text={f.prompt} said="Copied. Paste it into your agent." />
     {failed && <span className="fine fix-note" role="status">That did not finish. Your agent can take it from here.</span>}
   </span>;
 }

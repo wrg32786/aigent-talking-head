@@ -271,7 +271,7 @@ function Sound({ CAT, s, apply, patch, ctx }) {
   const b = CAT.beds.find(x => x.id === s.music.bed), src = b ? file(b.file) : s.music.bed === 'upload' && s.music.upload ? file(s.music.upload) : '';
   useEffect(() => { const a = audio.current; if (!a) return; a.pause(); if (src) a.src = src; else a.removeAttribute('src'); }, [src]);
   // Pacing is one control, on the Cut step (kit/studio/pacing.mjs). Here we only say what it is set to
-  const tg = s.pace.tighten, paceName = tg == null ? 'set by your Look' : tg === 'off' ? 'Natural' : +tg <= 0.3 ? 'Very tight' : 'Tight';
+  const tg = s.pace.tighten, paceName = tg == null ? 'Studio default, pauses over 0.3 s cut' : tg === 'off' ? 'Natural' : +tg <= 0.3 ? 'Very tight' : 'Tight';
   const noBed = s.music.bed === 'none', sync = !((s.picks.beatSync || { allow: [] }).allow || []).includes('no-beat-sync');
   return <div id="s-music" className="sound-cards">
     <div className="block glass-card sound-card" role="group" aria-labelledby="h-music">

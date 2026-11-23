@@ -36,7 +36,8 @@ export function useRoll({ lines, rolling, reset, still, win }) {
   };
   useEffect(() => { pos.current = 0; setLine(0); place(); }, [reset]);
   useEffect(() => {
-    if (!rolling || !lines.length) { place(); return; }
+    if (!rolling || !lines.length) { if (roll.current) roll.current.style.transition = ''; place(); return; }
+    if (roll.current) roll.current.style.transition = 'none';
     const w = win || window; let raf, last = performance.now();
     const loop = now => {
       const dt = Math.min(0.25, (now - last) / 1000); last = now;
@@ -47,7 +48,7 @@ export function useRoll({ lines, rolling, reset, still, win }) {
       raf = w.requestAnimationFrame(loop);
     };
     raf = w.requestAnimationFrame(loop);
-    return () => { try { w.cancelAnimationFrame(raf); } catch {} };
+    return () => { try { w.cancelAnimationFrame(raf); } catch {} if (roll.current) roll.current.style.transition = ''; };
   }, [rolling, lines, win, still]);
   const nudge = k => { pos.current = Math.max(0, Math.min(lines.length - 0.001, Math.floor(pos.current) + k)); setLine(Math.floor(pos.current)); place(); };
   return { roll, line, nudge, place };
@@ -77,8 +78,8 @@ export function usePopout(onKey) {
   const open = async () => {
     if (st.win && !st.win.closed) { st.win.focus(); return; }
     let win = null, kind = 'popup';
-    try { if (canPip()) { win = await window.documentPictureInPicture.requestWindow({ width: 520, height: 380 }); kind = 'pip'; } } catch { win = null; }
-    if (!win) win = window.open('', 'studio-prompter', 'popup,width=560,height=420');
+    try { if (canPip()) { win = await window.documentPictureInPicture.requestWindow({ width: 420, height: 760 }); kind = 'pip'; } } catch { win = null; }
+    if (!win) win = window.open('', 'studio-prompter', 'popup,width=440,height=800');
     if (!win) return false;
     const doc = win.document; doc.title = 'Teleprompter'; doc.body.innerHTML = ''; doc.body.className = 'rp-window-body'; copyStyles(doc);
     const el = doc.createElement('div'); el.id = 'rp-window-root'; doc.body.appendChild(el);
@@ -98,11 +99,14 @@ export function usePopout(onKey) {
 
 const clock = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 // the pop-out window's content: status, the text, speed, and the record and rehearse controls
-export function PopoutPanel({ pop, text, wpm, setWpm, phase, secs, count, rehearse, onRecord, onStop, onPause, onRehearse, onRehearsePause, onRehearseStop, flip, setFlip, fontPx, setFontPx }) {
+export function PopoutPanel({ pop, stream, mirror, text, wpm, setWpm, phase, secs, count, rehearse, onRecord, onStop, onPause, onRehearse, onRehearsePause, onRehearseStop, flip, setFlip, fontPx, setFontPx }) {
   if (!pop.el) return null;
   const rec = phase === 'recording' || phase === 'paused', status = phase === 'countdown' ? `Starting in ${count}` : phase === 'recording' ? `Recording ${clock(secs)}` : phase === 'paused' ? `Paused ${clock(secs)}` : phase === 'saving' ? 'Saving the take'
     : rehearse === 'running' ? 'Rehearsing' : rehearse === 'paused' ? 'Rehearsal paused' : phase === 'ready' ? 'Camera ready' : 'Camera off';
-  return createPortal(<div className="rp-window" id="rp-window">
+  // the same camera stream as the page (same origin): you see yourself under the script, nothing is opened twice
+  const cam = v => { if (v && stream && v.srcObject !== stream) { v.srcObject = stream; v.play().catch(() => {}); } };
+  return createPortal(<div className={'rp-window' + (stream ? ' with-cam' : '')} id="rp-window">
+    {stream && <video ref={cam} className={'rp-cam' + (mirror ? ' mirror' : '')} id="rp-cam" muted playsInline aria-label="Camera preview" />}
     <div className="rp-wtop"><span className={'rp-state ' + (rec ? 'rec' : rehearse !== 'off' ? 'reh' : '')} id="rp-state" role="status">{rec && <i aria-hidden="true" />}{status}</span>
       <span className="rp-wtools">
         <IconBtn n="minus" label="Smaller text" onClick={() => setFontPx(Math.max(14, fontPx - 2))} /><span className="rp-size">{fontPx}</span><IconBtn n="plus" label="Bigger text" onClick={() => setFontPx(Math.min(64, fontPx + 2))} />

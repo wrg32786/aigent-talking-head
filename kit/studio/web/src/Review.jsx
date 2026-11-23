@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
-import { api, file, toast, Icon, IconBtn } from './lib.jsx';
+import { api, file, toast, Icon, IconBtn, copyText, CopyButton } from './lib.jsx';
 
 export const clock = t => { const s = Math.max(0, +t || 0), m = Math.floor(s / 60), r = s - m * 60; return `${m}:${r < 10 ? '0' : ''}${r.toFixed(1)}`; };
 
@@ -43,7 +43,13 @@ export function Compare({ V, s, apply, outputs }) {
     try { return c.toDataURL('image/jpeg', 0.85); } catch { return null; }
   };
   const send = async e => {
-    e.preventDefault(); if (!note.trim()) { toast('Say what should change'); return; }
+    e.preventDefault();
+    const at = end != null ? from : bv.current ? bv.current.currentTime : t;
+    const where = box ? (box.w > 0.02 || box.h > 0.02 ? ', box' : ', spot') : ', whole frame';
+    window.dispatchEvent(new CustomEvent('studio-attach', { detail: { t: at, ...(end != null ? { end } : {}), region: box, video: pick, image: frame(), label: (end != null ? clock(from) + ' to ' + clock(end) : clock(at)) + where } }));
+    toast('Added to the chat. Say what should change there.', true); setDraw(false); setBox(null); setEnd(null); return;
+    // eslint-disable-next-line no-unreachable
+    if (!note.trim()) { toast('Say what should change'); return; }
     setSending(true);
     try { const j = await api('/api/comment', { text: note.trim(), t: end != null ? from : bv.current ? bv.current.currentTime : t, ...(end != null ? { end } : {}), region: box, video: pick, image: frame() }); apply(j); toast(j.via === 'agent' ? 'Sent to your agent with the frame' : 'Sent to the chat', true); setDraw(false); setBox(null); setNote(''); setEnd(null); }
     catch {} finally { setSending(false); }
@@ -82,9 +88,7 @@ export function Compare({ V, s, apply, outputs }) {
       {!draw ? <Button id="comment-start" variant="secondary" size="sm" label="Comment on this frame" icon={<Icon n="chat" />} onClick={startComment} />
         : <form className="cm-form" onSubmit={send}>
           <p className="fine" id="cm-hint">{end != null ? `From ${clock(from)} to ${clock(end)}. ` : ''}{box ? `At ${clock(end != null ? from : bv.current ? bv.current.currentTime : t)}. ${box.w > 0.02 || box.h > 0.02 ? 'Box drawn.' : 'Spot marked.'} Drag again to change it.` : `At ${clock(bv.current ? bv.current.currentTime : t)}. Click a spot or drag a box on your reel, or send it for the whole frame.`}</p>
-          <label className="sr" htmlFor="comment-text">What should change here</label>
-          <textarea id="comment-text" rows={2} value={note} placeholder="Make this title smaller" onChange={e => setNote(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.form.requestSubmit(); } if (e.key === 'Escape') setDraw(false); }} />
-          <div className="row"><Button id="comment-send" type="submit" variant="primary" size="sm" label="Send to chat" isLoading={sending} />
+          <div className="row"><Button id="comment-send" type="submit" variant="primary" size="sm" label="Add to chat" />
             {end == null ? <Button id="comment-end" variant="ghost" size="sm" label="Mark the end here" onClick={markEnd} /> : <Button id="comment-end-clear" variant="ghost" size="sm" label="Just this frame" onClick={() => setEnd(null)} />}<Button variant="ghost" size="sm" label="Cancel" onClick={() => { setDraw(false); setBox(null); }} /></div>
         </form>}
     </div>
@@ -140,7 +144,7 @@ export function Receipt({ r }) {
   if (!r) return <div className="review glass-card" id="receipt"><h3>Edit receipt</h3><p className="fine">Draft first. The receipt then says what we picked for each beat, title and graphic, and why.</p></div>;
   return <div className="review glass-card" id="receipt">
     <div className="rv-head"><h3>Edit receipt</h3><span className="fine grow">{r.summary}</span>
-      <Button variant="ghost" size="sm" label="Copy" icon={<Icon n="copy" />} onClick={() => navigator.clipboard && navigator.clipboard.writeText(r.text).then(() => toast('Receipt copied', true))} /></div>
+      <CopyButton variant="ghost" size="sm" text={r.text} said="Receipt copied" /></div>
     {r.sections.map(sec => <section key={sec.h} className="rc-sec" aria-label={sec.h}><h4>{sec.h}</h4><ul>{sec.rows.map((x, i) => <li key={i} className={x.at != null ? '' : 'nt'}>
       {x.at != null && <span className="mono rc-t">{clock(x.at)}</span>}<span><b>{x.what}.</b>{x.why && <span className="why"> {x.why}.</span>}</span></li>)}</ul></section>)}
   </div>;

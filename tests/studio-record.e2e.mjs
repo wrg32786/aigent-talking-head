@@ -86,6 +86,14 @@ try {
     await pg.waitForFunction(() => { const v = document.querySelector('#recorder video'); return v && v.videoWidth > 0; }, null, { timeout: 15000 });
     await pg.waitForSelector('.rec-prompter p.now');
     assert.strictEqual(await pg.$eval('#rec-src', e => e.value), 'morning-reels');
+    // focus view: the camera fills the window with the script over it and the controls docked; Esc leaves
+    await pg.click('#rec-focus'); await pg.waitForSelector('.rec-main.focus .rec-prompter.focus p.now');
+    const fv = await pg.evaluate(() => { const m = document.querySelector('.rec-main.focus').getBoundingClientRect(), v = document.querySelector('.rec-main.focus video').getBoundingClientRect(); return { w: m.width, h: m.height, vw: v.width, iw: innerWidth, ih: innerHeight }; });
+    assert.ok(fv.w >= fv.iw - 1 && fv.h >= fv.ih - 1 && fv.vw >= fv.iw - 1, 'focus view fills the window: ' + JSON.stringify(fv));
+    assert.match(await pg.textContent('#rp-time'), /E \d+:\d{2}\s*R \d+:\d{2}/);
+    if (shots) await pg.screenshot({ path: join(shots, 'teleprompter-focus.png') });
+    await pg.evaluate(() => document.activeElement && document.activeElement.blur());
+    await pg.keyboard.press('Escape'); await pg.waitForFunction(() => !document.querySelector('.rec-main.focus'));
     await pg.getByRole('switch', { name: '3, 2, 1 countdown' }).click();
     await pg.locator('#recorder').scrollIntoViewIfNeeded();
     await pg.evaluate(() => document.activeElement && document.activeElement.blur());

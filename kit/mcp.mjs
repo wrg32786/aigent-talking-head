@@ -409,7 +409,7 @@ TOOLS.push(
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     direct: async () => { const s = Setup.status(); try { const P = await import('./studio/post.mjs'); const p = P.status({}); s.posting = { optional: true, tool: 'buffer_post_reel', buffer: p.buffer.set, host: p.host.pick, hostReady: p.host.pick ? p.host[p.host.pick].ready : false, fix: p.buffer.set ? (p.host.pick ? null : 'The user picks a video host (R2, Cloudinary or their own link) in Studio on Render, Post.') : 'The user adds their own Buffer API key in Studio: Settings, API keys, Posting.' }; } catch {} return s; } }
 );
-for (const t of TOOLS) if (t.name.startsWith('studio_') && t.direct && !t._wrapped) { const d = t.direct; t.direct = a => { seen(); return d(a); }; t._wrapped = true; }
+for (const t of TOOLS) if (t.direct && !t._wrapped) { const d = t.direct; t.direct = a => { seen(); return d(a); }; t._wrapped = true; }
 
 for (const c of [REEL, PLAN, VERIFY, MENU, RMD, CHECK, PACK, CHOICES]) if (!existsSync(join(ROOT, c.script))) throw new Error(`${c.name}: ${c.script} is missing`);
 

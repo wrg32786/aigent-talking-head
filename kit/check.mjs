@@ -240,6 +240,14 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-agent.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { aerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio agent tests (tests/studio-agent.test.mjs: reference links, settings, local model, agent channel over MCP, hook)', errs: aerrs, warns: [] });
+    const presenceErrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-presence.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { presenceErrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio presence tests (tests/studio-presence.test.mjs: listening, connected, between replies, no agent)', errs: presenceErrs, warns: [] });
+    const workerErrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-worker.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { workerErrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Always-on Studio agent tests (tests/studio-worker.test.mjs: wake, restart when it exits, stop, resume)', errs: workerErrs, warns: [] });
     const fxerrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-fixes.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { fxerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }

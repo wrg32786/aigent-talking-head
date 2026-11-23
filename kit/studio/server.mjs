@@ -16,6 +16,7 @@ import * as LLM from './llm.mjs';
 import * as S from './settings.mjs';
 import * as F from './fetch.mjs';
 import * as CH from './channel.mjs';
+import * as W from './worker.mjs';
 import * as AG from './agui.mjs';
 import * as RV from './review.mjs';
 import * as REC from './record.mjs';
@@ -128,7 +129,7 @@ function addFootageLink(raw) {
 function env() {
   const st = S.load(), backend = st.chat.backend, p = backend === 'agent' || backend === 'keywords' ? null : LLM.provider(KEYS.envWithKeys(), st.chat);
   const t = F.tools();
-  return { llm: p ? `${p.name}${p.model ? ' (' + p.model + ')' : ''}` : null, backend, agent: CH.presence(), effectsReady: existsSync(join(ROOT, 'effects', '.venv')), port: PORT,
+  return { llm: p ? `${p.name}${p.model ? ' (' + p.model + ')' : ''}` : null, backend, agent: CH.presence(), worker: W.status(), effectsReady: existsSync(join(ROOT, 'effects', '.venv')), port: PORT,
     settings: { downloads: st.downloads, renders: st.renders, actionNotes: st.actionNotes, agent: st.agent, chat: st.chat, from: st.from, defaultDownloads: 'teardown-in/studio/<job>/ (in the kit, not shared)', defaultRenders: 'jobs/<job>/ (in the kit)', defaultDownloadsPath: join(ROOT, 'teardown-in', 'studio'), defaultRendersPath: join(ROOT, 'jobs') },
     keys: { anthropic: KEYS.isSet('anthropic'), openai: KEYS.isSet('openai') }, broll: st.broll, localPresets: S.LOCAL_PRESETS,
     tools: { ytdlp: t.ytdlp ? t.ytdlp.version : null, instaloader: t.instaloader, ffmpeg: t.ffmpeg }, install: F.INSTALL, setup: setupBrief(), fixes: FX.all(), restart: FX.restartPrompt(), refParts: C.REF_PARTS.map(({ id, label }) => ({ id, label })), influenceParts: C.INFLUENCE_PARTS };
@@ -540,6 +541,9 @@ function cutSteps(s, ids, over) {
   try { const rd = C.recreateRecipe(s, ROOT) ? SLK.refDir(s, ROOT) : null;
     if (rd) { const nm = SLK.saveFrom(rd, SLK.jobLookName(s.job)).name; const i = base.indexOf('--pack'); if (i >= 0) base.splice(i, 2); base.push('--style-look', nm); }
     else SLK.forDraft(s, ROOT, base); } catch (err) { console.error('clips: the reference look could not be used: ' + err.message); }
+  // the Ad goal cuts tighter (0.25) unless the person chose a pace; Studio's own default does not block it
+  const ti = base.indexOf('--tighten'), studioDefault = ti >= 0 && s.pace.tighten == null && base[ti + 1] === String(C.STUDIO_TIGHTEN);
+  if (o.goal === 'ad' && studioDefault) base.splice(ti, 2);
   const tight = o.goal === 'ad' && !base.includes('--tighten') && !base.includes('--no-tighten') ? ['--tighten', '0.25'] : [];
   const REEL = process.env.STUDIO_REEL || 'kit/reel.cjs', steps = [], plan = [];
   // every piece is extracted on its snapped ranges, then handed to the reel as already cut: a clips.json beside the
@@ -1478,7 +1482,10 @@ async function api(req, res, u) {
     try { return json(res, 200, { base, models: await LLM.models(base, process.env.LOCAL_LLM_API_KEY) }); }
     catch (e) { return json(res, 502, { error: `no answer from ${base} (${e.cause ? e.cause.code || e.cause.message : e.message}). Is Ollama, LM Studio or your llama.cpp server running?` }); }
   }
-  if (p === '/api/agent' && M === 'GET') return json(res, 200, { agent: CH.presence(), ...CH.peek() });
+  if (p === '/api/agent' && M === 'GET') return json(res, 200, { agent: CH.presence(), worker: W.status(), ...CH.peek() });
+  // the always-on Studio agent (kit/studio/worker.mjs): Studio runs and supervises its own background agent
+  if (p === '/api/agent/wake' && M === 'POST') { const w = W.start({ url: `http://${HOST}:${server.address().port}` }); pushState(true); return json(res, w.enabled ? 200 : 409, { ...view(C.load()), worker: w, ...(w.enabled ? {} : { error: w.error }) }); }
+  if (p === '/api/agent/sleep' && M === 'POST') { const w = W.stop(); pushState(true); return json(res, 200, { ...view(C.load()), worker: w }); }
   // for the Claude Code hook (kit/studio/hooks/studio-pending.mjs): a cheap peek, nothing is marked seen
   if (p === '/api/agent/pending' && M === 'GET') { const q = CH.peek(); return json(res, 200, { ...q, notice: CH.notice(q) }); }
   // New video and Open a past video (kit/studio/core.mjs: freshSession, openSession). Nothing on disk is deleted.
@@ -1556,7 +1563,7 @@ const server = http.createServer(async (req, res) => {
 watchFile(C.statePath(), { interval: 400 }, pushState);
 // the agent's presence: push when it connects, starts or stops waiting, and when it goes quiet
 let lastAgent = '';
-const agentTick = () => { const a = CH.presence(), k = `${a.name}|${a.connected}|${a.listening}`; if (k !== lastAgent) { lastAgent = k; pushState(true); } };
+const agentTick = () => { const a = CH.presence(), w = W.status(), k = `${a.name}|${a.connected}|${a.listening}|${a.recent}|${w.phase}`; if (k !== lastAgent) { lastAgent = k; pushState(true); } };
 watchFile(CH.presencePath(), { interval: 700 }, agentTick);
 setInterval(agentTick, 5000).unref();
 function openBrowser(url) {
@@ -1587,6 +1594,9 @@ if (C.settleStale(C.load())) update(st => { C.settleStale(st); });
 server.listen(PORT, HOST, () => {
   setImmediate(pump); // a reference link still queued from the last run
   const url = `http://${HOST}:${server.address().port}`;
+  W.resume({ url }); // the always-on agent comes back if it was on
+  for (const sig of ['SIGINT', 'SIGTERM']) process.once(sig, () => { W.shutdown(); process.exit(0); });
+  process.once('exit', () => W.shutdown());
   const e = env();
   console.log(`Studio: ${url}\nSession: ${C.statePath()}\nChat: ${e.backend === 'agent' ? 'your terminal agent (tell it: Run the Studio chat loop; setup in AGENTS.md)' : e.llm ? e.llm : e.backend}\nReference links: ${e.tools.ytdlp ? 'yt-dlp ' + e.tools.ytdlp : 'direct video links and Instagram only (pip install yt-dlp for YouTube, TikTok, X, Vimeo)'}\nStop with Ctrl+C.`);
   openBrowser(url);

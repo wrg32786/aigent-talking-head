@@ -160,7 +160,7 @@ export function App() {
   const openOutputs = () => setOutputsOpen(true), openNewVideo = () => setVideoMode('new'), openVault = beat => setVault({ beat: typeof beat === 'number' ? beat : null });
   const ctx = { CAT, V, s, apply, patch, go, reloadCat, setLog, log, openConnect, openSetup, openKeys, openChat, openOutputs, openNewVideo, openVault, looks };
   const refAny = !!(s.reference.extracted || s.reference.file || (s.reference.status && s.reference.status !== 'none') || (s.reference.queue || []).length), post = step === 'render' && outView === 'post', breakdown = step === 'picture' && picView === 'reference';
-  const env = V.env, a = env.agent || {}, agentState = env.backend !== 'agent' ? 'alt' : a.listening ? 'on' : a.connected ? 'busy' : 'off';
+  const env = V.env, a = env.agent || {}, agentState = env.backend !== 'agent' ? 'alt' : a.listening ? 'on' : a.connected ? 'busy' : a.recent ? 'recent' : 'off';
   const pill = !t ? 'Ready' : running ? `${cap1(t.kind)} running` : t.status === 'failed' ? `${cap1(t.kind)} failed` : `${cap1(t.kind)} ${t.status}`;
 
   return (
@@ -222,7 +222,7 @@ export function App() {
             {i < STEPS.length - 1 ? <Button id="next" variant={step === 'review' && !drafted ? 'secondary' : 'primary'} label={stepName(STEPS[i + 1])} endContent={<Icon n="right" />} onClick={() => go(STEPS[i + 1], true)} /> : <span className="nextpad" />}
           </footer>
         </main>
-        <Chat key={s.videoSeq || 0} {...ctx} open={chatOpen} setOpen={setChatOpen} close={closeChat} agentState={agentState} />
+        <Chat key={s.videoSeq || 0} {...ctx} step={step} open={chatOpen} setOpen={setChatOpen} close={closeChat} agentState={agentState} />
       </div>
       <Settings {...ctx} open={settingsOpen} setOpen={setSettingsOpen} theme={theme} setTheme={setTheme} glass={glass} setGlass={setGlass} />
       <Connect {...ctx} open={connectOpen} setOpen={setConnectOpen} />

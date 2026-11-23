@@ -164,10 +164,10 @@ try {
     const box = await pg.locator('#compare .cm-layer').boundingBox();
     await pg.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.25); await pg.mouse.down();
     await pg.mouse.move(box.x + box.width * 0.8, box.y + box.height * 0.4, { steps: 6 }); await pg.mouse.up();
-    await pg.fill('#comment-text', 'Move this title up a little');
     if (shots) await shot(pg, '#compare', 'comment-desktop.png');
-    await pg.click('#comment-send');
-    await pg.waitForFunction(() => !document.querySelector('#comment-text'), null, { timeout: 8000 });
+    await pg.click('#comment-send'); await pg.waitForSelector('#chat-attach');
+    await pg.fill('#chatin', 'Move this title up a little'); await pg.press('#chatin', 'Enter');
+    await pg.waitForFunction(() => !document.querySelector('#chat-attach'), null, { timeout: 8000 });
     const m = (await api('/api/state')).state.chat.filter(x => x.role === 'user').pop();
     assert.strictEqual(m.attach.kind, 'comment'); assert.ok(m.attach.region.w > 0.5 && m.attach.region.h > 0.1, JSON.stringify(m.attach.region));
     assert.ok(existsSync(join(ROOT, m.attach.frame)) && readFileSync(join(ROOT, m.attach.frame)).length > 2000, 'frame saved');

@@ -10,14 +10,15 @@ import { join } from 'path';
 import * as C from './core.mjs';
 
 export const presencePath = () => join(C.stateDir(), 'agent.json');
-export const CONNECTED_MS = 120e3, LISTENING_MS = 20e3;
+// RECENT_MS: an agent that answered within this window is "between replies" (its turn ended; Studio messages still queue for it)
+export const CONNECTED_MS = 120e3, LISTENING_MS = 20e3, RECENT_MS = 600e3;
 const NAMES = { 'claude-code': 'Claude Code', 'claude-ai': 'Claude', codex: 'Codex', 'codex-mcp-client': 'Codex', cursor: 'Cursor', 'cursor-vscode': 'Cursor', 'cursor-agent': 'Cursor CLI', 'gemini-cli': 'Gemini CLI', windsurf: 'Windsurf', vscode: 'VS Code', 'visual-studio-code': 'VS Code' };
 export const prettyName = n => !n ? 'Your agent' : NAMES[n] || NAMES[String(n).toLowerCase()] || String(n).replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).slice(0, 40);
 
 export function readPresence() { try { return JSON.parse(readFileSync(presencePath(), 'utf8')); } catch { return {}; } }
 export function presence(now = Date.now()) {
   const p = readPresence(), seen = p.lastSeen ? now - p.lastSeen : Infinity;
-  return { name: p.name ? prettyName(p.name) : null, client: p.name || null, connected: seen < CONNECTED_MS, listening: !!p.waiting && seen < LISTENING_MS, lastSeen: p.lastSeen || null };
+  return { name: p.name ? prettyName(p.name) : null, client: p.name || null, connected: seen < CONNECTED_MS, listening: !!p.waiting && seen < LISTENING_MS, recent: seen < RECENT_MS, lastSeen: p.lastSeen || null };
 }
 export function touch(info = {}) {
   const p = { ...readPresence(), ...info, lastSeen: Date.now() };

@@ -19,6 +19,10 @@ export const KIT = dirname(STUDIO), ROOT = dirname(KIT);
 const L = require('../locks.cjs');
 const K = require('../packs.cjs');
 const R = require('../rules.cjs');
+// Studio cuts pauses inside a line longer than this by default (the CLI keeps every pause unless asked)
+export const STUDIO_TIGHTEN = 0.3;
+// does this pack set its own pace? Then its tighten wins over Studio's default
+function packTighten(name) { try { const p = name && K.load(name); return !!(p && K.resolved(p).style.tighten != null); } catch { return false; } }
 const SCN = require('../scenes.cjs');
 
 // ---------- catalog ----------
@@ -409,6 +413,9 @@ export function compose(s, { refPack = null } = {}) {
   if (s.pace.tighten === 'off' || off('tighten')) args.push('--no-tighten');
   else if (typeof s.pace.tighten === 'number') args.push('--tighten', String(s.pace.tighten));
   else if (on('tighten')) args.push('--tighten', '0.3');
+  // Studio default: dead air inside a line is cut unless the person chose Keep pauses or a Look sets its own pace
+  // (magazine does). The CLI keeps its own default; this is only what a Studio reel starts with.
+  else if (!packTighten(pack) && !(s.reference && (s.reference.mode === 'recreate' || s.reference.mode === 'look'))) args.push('--tighten', String(STUDIO_TIGHTEN)); // a reference's look (Recreate, Copy the look) brings its own pace
   if (s.sound.sfx === 'off') { args.push('--no-sfx'); locks.sfx = false; }
   if (s.sound.cap === 'off' || off('sfx-cap')) args.push('--no-sfx-cap');
   if (s.sound.sfx !== 'off' && on('sfx-map')) args.push('--sfx-map'); else if (off('sfx-map')) args.push('--no-sfx-map');
