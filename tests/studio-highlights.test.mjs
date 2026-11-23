@@ -1,7 +1,8 @@
 // Highlight moments from a long talk: sentence-safe windows, local scores, agent rescores, keep and brief.
 // Run: node tests/studio-highlights.test.mjs   (npm run check runs it). No ffmpeg and no Whisper needed.
 import assert from 'assert';
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync, mkdtempSync, statSync } from 'fs';
+import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { sentences } from '../kit/studio/cut.mjs';
@@ -138,6 +139,40 @@ t('setKeep and keptOf, and the brief names the tools with no em dash', () => {
 
 t('fromWords refuses a bad window', () => {
   assert.throws(() => H.fromWords([], { n: 99 }), /n: 1 to 20/);
+});
+
+t('snapToSentences returns null outside the talk, so a bad time is not the whole take', () => {
+  const S = sentences(wordsOf()), last = S[S.length - 1].end;
+  assert.strictEqual(H.snapToSentences(1000, 1200, S, last), null);
+  assert.strictEqual(H.snapToSentences(-9, -1, S, last), null);
+  assert.strictEqual(H.snapToSentences(2, 2, S, last), null);
+});
+
+t('applyScores skips out-of-range times and keeps a tick the agent left out', () => {
+  const words = wordsOf(), found = H.fromWords(words, { n: 3, min: 15, max: 50, duration: words[words.length - 1][1] });
+  const kept = H.setKeep(found, [found.candidates[0].id], true);
+  const next = H.applyScores(kept, [
+    { start: 1000, end: 1200, score: 99, reason: 'Way past the end' },
+    { start: -9, end: -1, score: 80, reason: 'Before the start' },
+    { start: kept.candidates[1].start, end: kept.candidates[1].end, score: 70, reason: 'A real moment' },
+  ], { words, duration: found.duration });
+  assert.ok(next.skipped >= 2);
+  assert.ok(next.candidates.every(c => c.seconds < found.duration - 1), 'no talk-sized clip');
+  assert.ok(next.candidates.some(c => c.id === found.candidates[0].id && c.keep), 'the ticked clip stays');
+  assert.ok(next.candidates.some(c => c.reason === 'A real moment'));
+});
+
+t('cacheFile includes the file size and mtime, not only the name', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'hl-cache-'));
+  const a = join(dir, 'take.mp4'), b = join(dir, 'take.mp4');
+  writeFileSync(a, 'aaa');
+  const one = H.cacheFile(a);
+  writeFileSync(a, 'aaaaaa');
+  const two = H.cacheFile(a);
+  assert.ok(one !== two);
+  assert.ok(one.includes('take-') && one.endsWith('.tx.json'));
+  const st = statSync(a);
+  assert.ok(two.includes(String(st.size)));
 });
 
 t('no em dashes in the module', () => {

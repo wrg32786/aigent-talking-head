@@ -3,7 +3,7 @@
 // Transcribes locally with the kit's Whisper (.venv), splits on sentence ends (never mid-word or mid-sentence),
 // and scores up to N complete moments with a reason and start time. An agent can replace those scores (applyScores);
 // the local rules are the fallback. Studio and the MCP tools share this file.
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs';
 import { dirname, join, resolve, basename, isAbsolute } from 'path';
 import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
@@ -36,16 +36,23 @@ export function options(p = {}) {
   return { n: Math.max(1, Math.min(MAX_N, n || DEFAULT_N)), min: min || DEFAULT_MIN, max: max || DEFAULT_MAX, goal: p.goal === 'ad' ? 'ad' : 'organic', point: p.point || '', errs };
 }
 
-// snap a [start, end] onto whole sentences: never start or end mid-sentence or mid-word
+// snap a [start, end] onto whole sentences: never start or end mid-sentence or mid-word.
+// null when the range is entirely outside the talk, or is not a real interval (so a bad time is not the whole take)
 export function snapToSentences(start, end, S, dur) {
-  if (!S || !S.length) return [+Math.max(0, start).toFixed(2), +Math.min(dur || end, end).toFixed(2)];
   const a = +start, b = +end;
-  let i = 0, j = S.length - 1;
+  if (!isFinite(a) || !isFinite(b) || b <= a) return null;
+  if (!S || !S.length) {
+    const from = +Math.max(0, a).toFixed(2), to = +Math.min(dur == null ? b : dur, b).toFixed(2);
+    return to > from ? [from, to] : null;
+  }
+  const first = S[0].start, last = S[S.length - 1].end;
+  if (b <= first + 0.05 || a >= last - 0.05) return null;
+  let i = -1, j = -1;
   for (let k = 0; k < S.length; k++) { if (S[k].end > a + 0.05) { i = k; break; } }
   for (let k = S.length - 1; k >= 0; k--) { if (S[k].start < b - 0.05) { j = k; break; } }
-  if (j < i) j = i;
-  const from = +Math.max(0, S[i].start).toFixed(2), to = +Math.min(dur || Infinity, S[j].end).toFixed(2);
-  return [from, to];
+  if (i < 0 || j < 0 || j < i) return null;
+  const from = +Math.max(0, S[i].start).toFixed(2), to = +Math.min(dur == null ? Infinity : dur, S[j].end).toFixed(2);
+  return to > from ? [from, to] : null;
 }
 
 // from Whisper word times [[start, end, word], ...]: up to n highlight clips, each a complete thought
@@ -93,31 +100,41 @@ export function applyScores(current, scores, { duration, words } = {}) {
   const S = current.sentences || sentences(words);
   const dur = duration || current.duration;
   const byId = Object.fromEntries((current.candidates || []).map(c => [c.id, c]));
+  const maxSec = (current.max || DEFAULT_MAX) * 1.1, minSec = (current.min || DEFAULT_MIN) * 0.9;
   const out = [];
+  let skipped = 0;
   for (const raw of scores) {
-    if (!raw || typeof raw !== 'object') continue;
+    if (!raw || typeof raw !== 'object') { skipped++; continue; }
     let start, end, id = raw.id ? String(raw.id) : null, base = id && byId[id];
     if (base) { start = base.start; end = base.end; }
-    else if (raw.start != null && raw.end != null) { [start, end] = snapToSentences(raw.start, raw.end, S, dur); }
-    else continue;
+    else if (raw.start != null && raw.end != null) {
+      const snap = snapToSentences(raw.start, raw.end, S, dur);
+      if (!snap) { skipped++; continue; }
+      [start, end] = snap;
+    } else { skipped++; continue; }
     const score = Math.max(0, Math.min(100, Math.round(+raw.score || 0)));
     const reason = String(raw.reason || (base && base.reason) || 'Scored by your agent').replace(/\u2014/g, ', ').slice(0, 200);
     const text = (base && base.text) || textIn(words, [[start, end]]);
     const seconds = +(end - start).toFixed(2);
-    if (seconds < 0.5) continue;
+    if (seconds < 0.5) { skipped++; continue; }
+    if (!base && (seconds < minSec || seconds > maxSec)) { skipped++; continue; }
     out.push({ id: id && byId[id] ? id : null, kind: 'highlight', label: null, start, end, ranges: [[start, end]], seconds, score, reason, text, keep: base ? !!base.keep : false, from: base && base.from, to: base && base.to });
   }
+  // ticks the user already made stay if the agent did not mention those clips
+  for (const c of current.candidates || []) {
+    if (!c.keep) continue;
+    if (out.some(x => x.id === c.id || (x.start === c.start && x.end === c.end))) continue;
+    out.push({ ...c });
+  }
   out.sort((a, b) => b.score - a.score || a.start - b.start);
-  const named = out.map((c, k) => ({ ...c, id: c.id || ('h' + (k + 1)), label: c.label || ('Highlight ' + (k + 1)) }));
-  // stable unique ids if collisions
-  const seen = new Set();
-  const candidates = named.map((c, k) => {
-    let id = c.id;
-    if (seen.has(id)) id = 'h' + (k + 1);
-    seen.add(id);
+  const used = new Set();
+  const candidates = out.map((c, k) => {
+    let id = c.id && !used.has(c.id) ? c.id : null;
+    if (!id) { let n = 1; while (used.has('h' + n)) n++; id = 'h' + n; }
+    used.add(id);
     return { ...c, id, label: 'Highlight ' + (k + 1) };
   });
-  return { ...current, candidates, scoredBy: 'agent' };
+  return { ...current, candidates, scoredBy: 'agent', skipped };
 }
 
 export function setKeep(current, ids, keep = true) {
@@ -147,6 +164,13 @@ export function wordsFrom(file) {
   const vals = Object.values(j).filter(Array.isArray);
   if (vals.length) return vals[0];
   throw new Error('no word times in ' + file);
+}
+
+// CLI transcript cache: the file name, size and mtime, so two talks called take.mp4 do not share a transcript
+export function cacheFile(video) {
+  const st = statSync(video);
+  const stem = basename(video).replace(/\.[^.]+$/, '');
+  return join(ROOT, 'jobs', '.highlights', `${stem}-${st.size}-${Math.round(st.mtimeMs)}.tx.json`);
 }
 
 function durationOf(video) {
@@ -188,7 +212,7 @@ if (isCli) {
   if (opt('words')) { words = wordsFrom(resolve(opt('words'))); duration = words.length ? words[words.length - 1][1] : 0; }
   else {
     duration = durationOf(video);
-    const cache = join(ROOT, 'jobs', '.highlights', basename(video).replace(/\.[^.]+$/, '') + '.tx.json');
+    const cache = cacheFile(video);
     if (existsSync(cache)) { try { const t = JSON.parse(readFileSync(cache, 'utf8')); if (t && t.words) words = t.words; } catch {} }
     if (!words) {
       if (!JSON_OUT) console.error('transcribing ' + basename(video) + ' locally with Whisper...');

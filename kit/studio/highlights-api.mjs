@@ -56,11 +56,13 @@ export function mount({ ROOT, C: Core, update, json, readBody, view: pageView, s
       const opt = H.options({ n: b.n, min: b.min, max: b.max, goal: b.goal, point: s.point });
       if (opt.errs.length) return json(res, 400, { error: opt.errs.join('; ') });
       update(x => save(x, { source: rel, n: opt.n, min: opt.min, max: opt.max, goal: opt.goal, pending: 'transcript', candidates: (x.highlights && x.highlights.source === rel) ? x.highlights.candidates : [] }));
+      const fail = e => update(x => { if (x.highlights && x.highlights.source === rel) { x.highlights.pending = null; x.highlights.error = e.message; } });
       if (!MEDIA.transcript(rel)) {
-        startTranscribe(rel, () => { try { findOn(rel, opt); } catch (e) { update(x => { if (x.highlights && x.highlights.source === rel) { x.highlights.pending = null; x.highlights.error = e.message; } }); } });
+        startTranscribe(rel, () => { try { findOn(rel, opt); } catch (e) { fail(e); } }, fail);
         return json(res, 202, { transcribing: true, ...pageView(Core.load()) });
       }
-      findOn(rel, opt);
+      try { findOn(rel, opt); }
+      catch (e) { fail(e); return json(res, e.code || 500, { error: e.message, ...pageView(Core.load()) }); }
       return json(res, 200, { scorer: 'rules', ...pageView(Core.load()) });
     }
 

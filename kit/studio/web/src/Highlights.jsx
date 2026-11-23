@@ -51,7 +51,7 @@ export function Highlights({ V, s, apply, go, hidden }) {
     {(finding || extracting) && <div id="hl-progress"><ProgressBar label={finding ? 'Transcribing' : 'Cutting highlights'} isLabelHidden isIndeterminate={txPct == null || extracting} value={finding && txPct != null ? txPct : undefined} /></div>}
     {src && <p className="fine" id="hl-src">Source: <b>{src.split('/').pop()}</b>{h.duration ? `, ${clock(h.duration)}` : ''}</p>}
     {playing && src && <div className="hl-now glass-card" id="hl-now">
-      <video src={file(src)} controls autoPlay playsInline preload="auto" aria-label={playing.label || 'Highlight preview'}
+      <video key={playing.id} src={file(src)} controls autoPlay playsInline preload="auto" aria-label={playing.label || 'Highlight preview'}
         onLoadedMetadata={e => { e.currentTarget.currentTime = playing.start; }}
         onTimeUpdate={e => { if (playing.end && e.currentTarget.currentTime >= playing.end) { e.currentTarget.pause(); } }} />
       <IconBtn n="x" label="Close preview" onClick={() => setPlaying(null)} />

@@ -380,12 +380,12 @@ function cutView(s) {
   return { formats, footage: s.footage.filter(f => existsSync(join(ROOT, f))).map(f => ({ path: f, seconds: durOf(f) })), source: src, seconds: secs, output: o, summary: CUT.summary(o, secs), candidates: cands, scoredBy: c ? c.scoredBy : null, pending: c ? c.pending || null : null, outputOf: c ? c.summary : null, tx };
 }
 function txProgress(rel, st) { update(x => { x.tx = x.tx || {}; x.tx[rel] = { ...(x.tx[rel] || {}), ...st }; }); }
-function startTranscribe(rel, then) {
+function startTranscribe(rel, then, fail) {
   if (MEDIA.transcript(rel)) { if (then) then(); return { status: 'ready' }; }
   txProgress(rel, { status: 'running', done: 0, total: null, error: null, startedAt: Date.now() });
   return MEDIA.transcribe(rel, {
     onProgress: (done, total) => txProgress(rel, { status: 'running', done, total }),
-    onDone: err => { txProgress(rel, err ? { status: 'failed', error: err.message, fix: err.fix || null } : { status: 'ready', error: null }); if (!err && then) try { then(); } catch (e) { console.error(e.message); } },
+    onDone: err => { txProgress(rel, err ? { status: 'failed', error: err.message, fix: err.fix || null } : { status: 'ready', error: null }); if (err) { if (fail) try { fail(err); } catch (e) { console.error(e.message); } } else if (then) try { then(); } catch (e) { console.error(e.message); } },
   });
 }
 const wordsOf = rel => { const t = MEDIA.transcript(rel); return t ? t.words : null; };
