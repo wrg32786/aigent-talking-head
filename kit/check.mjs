@@ -300,6 +300,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-finish.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { fierrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio finish tests (tests/studio-finish.test.mjs: what the one Render makes, eight steps and their old names, one render path, Your edit, MCP get_edit and studio_run from and exports)', errs: fierrs, warns: [] });
+    const puberrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-publish.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { puberrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio publish kit tests (tests/studio-publish.test.mjs: cover title off the face, post copy per platform, ZIP of the reel)', errs: puberrs, warns: [] });
     const sterrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-steps.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { sterrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }

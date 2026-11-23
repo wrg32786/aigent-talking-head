@@ -739,6 +739,24 @@
       "outputs": ["jobs/.highlights/<video>.tx.json (the local transcript, reused on the next run)"],
       "success": "prints each highlight's id, time range, score, reason and a text snippet, or one JSON object with --json",
       "failures": ["no such file", "n: 1 to 20", "max must be at least min", "Python is missing, so we cannot transcribe yet", "The Python tools for transcribing (faster-whisper) are missing"]
+    },
+    {
+      "name": "publish-kit",
+      "script": "kit/publish-kit.mjs",
+      "summary": "Make a publish kit for a finished reel: a cover still with the title off the face, post copy for each platform (title, description, hashtags), and a ZIP with the reel, the .srt, the cover and the copy. Nothing is posted.",
+      "positional": [
+        { "name": "reel", "type": "path", "required": true, "description": "the rendered reel (reel-vN.mp4)" }
+      ],
+      "flags": [
+        { "name": "title", "type": "string", "default": null, "description": "the title on the cover and in the copy" },
+        { "name": "t", "type": "number", "default": 1.2, "description": "seconds into the reel for the still" },
+        { "name": "point", "type": "string", "default": null, "description": "one line on what the video is for, used in the copy" },
+        { "name": "out", "type": "path", "default": null, "description": "write the cover still to this file" },
+        { "name": "json", "type": "boolean", "default": false, "description": "print one JSON result" }
+      ],
+      "outputs": ["<reel>-cover.jpg", "<reel>-copy.json", "<reel>-copy.txt", "<reel>-kit.zip"],
+      "success": "writes the cover, the copy and the ZIP beside the reel",
+      "failures": ["no such reel", "Python is missing, so we cannot make the cover yet", "could not take a still from the reel"]
     }
   ]
 }

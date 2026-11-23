@@ -7,6 +7,7 @@ import { api, file, toast, fmtS, cap1, Icon, matchChips } from './lib.jsx';
 import { Compare, Cleanup, Receipt } from './Review.jsx';
 import { Fold, Hint } from './ui.jsx';
 import { TitleCheckLine } from './RefCard.jsx';
+import { PublishKit } from './PublishKit.jsx';
 
 // What Review and Render share (both stay mounted): the last draft's choices and receipt, the task log and a clock
 // while something runs. One copy, held by the App, so a redraft on Review is what Render sees.
@@ -135,6 +136,7 @@ export function Render({ CAT, V, s, apply, patch, hidden, go, run, openOutputs, 
         : <div className="empty-art" id="render-empty"><Icon n="film" /><p>{mine ? 'Rendering. Your reel shows up here when it is done.' : 'Your finished reel shows up here.'}</p></div>}
     </div>
     {outputs.length > 0 && !running && <div className="row render-next"><Button id="to-post" variant="secondary" label="Post it" icon={<Icon n="send" />} onClick={toPost} /><span className="fine">Each channel gets the size it needs, saved as drafts in Buffer.</span></div>}
+    {outputs.length > 0 && !running && <PublishKit V={V} s={s} apply={apply} />}
     {earlier > 0 && <p className="fine" id="fin-library-note">{earlier} earlier reel{earlier === 1 ? '' : 's'} {earlier === 1 ? 'is' : 'are'} in <button type="button" className="linkish" id="fin-open-outputs" onClick={() => openOutputs && openOutputs()}>Outputs</button>. <button type="button" className="linkish" id="fin-open-new" onClick={() => openNewVideo && openNewVideo()}>New video</button> starts a new job if you want them kept apart.</p>}
     <CutOutputs V={V} s={s} bites={bites} />
     <Fold id="make-fold" title={<>What to make<span className="fine fold-sum" id="make-sum">{[fin.reel ? 'The reel' : null, ...extra].filter(Boolean).join(', ') || 'Nothing yet'}</span></>}>
