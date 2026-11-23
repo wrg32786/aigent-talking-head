@@ -248,7 +248,7 @@ It holds no shot list, no script, no title text and no times from the reference.
 | layer | `front`, `behind`, `auto` | the title's `layer` |
 | hero | word indexes, comma list | the title's `hero` |
 | role | `hook`, `number`, `timer`, `brand` or `line` (a teardown writes it) | with `--recut`, your titles take the entrance, layer and place of the recipe title with the same role (the hook claim up front, a number, a time, a brand name), then the rest in order |
-| text | the words | the title's `text`. In a phrase title, `/` breaks the lines: `THE ONLY/Question/YOU NEED` |
+| text | the words | the title's `text`. In a phrase title, a slash with a space on each side breaks the lines: `THE ONLY / Question / YOU NEED`. A slash inside a word stays as written (`OPEN 24/7`) |
 | lines | `1`, `2` or `3` | a phrase title: a designed title of that many lines, drawn as written, with the connective words small and one key word larger in the accent colour |
 | key | the key word, as written in the text | the title's `key` |
 | build | `word`, `letter`, `line` | how a phrase title arrives when it has no effect: each word as it is said, typed letter by letter, or a line at a time |
