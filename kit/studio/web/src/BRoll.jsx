@@ -7,6 +7,9 @@
 // never dropped: it shows one card, "Needs B-roll: <what it should show>", with Upload, Use stock (only with a key),
 // Send to my agent or Copy for my agent (a ready instruction to capture it) and Skip. A waiting idea looks like an
 // idea, and the other sources sit behind "Choose something else".
+// 1.29.0: a plan slot has a brief ("Show OmniRoute on screen. You name it in this line.") and, when your Vault or
+// free stock has something for it, one suggestion with its reason: Use it, Swap (the next three from your Vault) and
+// Skip, with the other ways behind More. "Open the Vault" opens the Vault panel for that spot.
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { Badge } from '@astryxdesign/core/Badge';
@@ -17,6 +20,7 @@ import { Hint } from './ui.jsx';
 import { FixActions, agentOn } from './Fix.jsx';
 import { copyText } from './Connect.jsx';
 import './broll.css';
+import './vault.css';
 import { PLACE_NEEDS } from '../../conflicts.mjs';
 
 const TAB_ICON = { library: 'grid', run: 'film', upload: 'upload', stock: 'search', make: 'spark', record: 'camera', generate: 'film' };
@@ -224,25 +228,48 @@ const spotTitle = b => b.slot ? (b.slot.clip.source === 'agent' || b.slot.clip.s
 
 // One card for a slot that needs B-roll: what it should show, then the ways to get it. Upload puts your file straight
 // on the slot; Use stock shows only when a key is set; the agent buttons carry a ready instruction to capture it.
-function Need({ b, V, after, onPick, sel, onRun }) {
-  const n = b.need, [busy, setBusy] = useState('');
+// what Swap offers: the next items from your Vault, each with its own reason. One click places one.
+function Cands({ list, place, openVault }) {
+  return <span className="need-cands" onClick={e => e.stopPropagation()}>
+    {list.length ? list.map(c => <button key={c.id} type="button" className="need-cand" data-id={c.id} onClick={() => place(c.id, c.reason)}>
+      {c.clip.thumb ? <img src={c.clip.thumb} alt="" /> : <span className="bt-ph"><Icon n="film" /></span>}<span><b>{c.clip.name}</b><small className="fine">{c.reason}</small>{c.check && <small className="fine">{c.check}</small>}</span></button>)
+      : <span className="fine">Nothing else in your Vault fits yet. <button type="button" className="linkish need-vault" onClick={openVault}>Open the Vault</button></span>}
+  </span>;
+}
+
+function Need({ b, V, after, onPick, sel, onRun, openVault }) {
+  const n = b.need, sg = n.suggest, [busy, setBusy] = useState(''), [open, setOpen] = useState('');
+  const place = async (id, why) => { setBusy('use'); try { after(await api('/api/broll/slot', { beat: b.n, clip: id, why })); } catch {} setBusy(''); };
   const act = async action => { setBusy(action); try { const j = await api('/api/broll/need', { beat: b.n, action }); after(j); if (action === 'send') toast('Sent to your agent. Its answer shows in the chat.', true); if (action === 'stock') toast('Stock clip placed. Swap it if it does not fit.', true); } catch {} setBusy(''); };
   const fileIn = useRef(null);
   const up = async files => { setBusy('up'); try { for (const f of files) { const r = await fetch(`/api/broll/upload?name=${encodeURIComponent(f.name)}&type=${n.kind === 'panel' ? 'screen-recording' : 'lifestyle'}&beat=${b.n}`, { method: 'POST', body: f }); const j = await r.json().catch(() => ({})); if (!r.ok) { toast(j.error || 'upload failed'); break; } after(j); } } catch { toast('upload failed'); } finally { setBusy(''); } };
   if (n.skipped) return <li className={'need glass skipped' + (sel ? ' sel' : '')} data-beat={b.n} data-slot={n.slot}>
     <span className="need-t"><b>Skipped</b><span className="fine">{clock(b.start)} · You stay on screen here.</span></span>
     <Button className="need-undo" size="sm" variant="ghost" label="Put it back" onClick={() => act('unskip')} /></li>;
-  return <li className={'need glass' + (sel ? ' sel' : '')} data-beat={b.n} data-slot={n.slot} onClick={onPick}>
-    <span className="need-t"><b className="need-h">Needs B-roll: {n.what}</b>
-      <span className="fine need-d">{clock(b.start)} · {t1(n.seconds)} s · {n.shape}{n.treat ? ` · ${n.treat}` : ''}</span></span>
-    <span className="need-acts" onClick={e => e.stopPropagation()}>
-      {n.run ? <Button className="need-run" size="sm" variant="secondary" label="Pick clips for the run" icon={<Icon n="film" />} onClick={onRun} />
-        : <><button type="button" className={'need-up' + (busy === 'up' ? ' busy' : '')} disabled={busy === 'up'} onClick={() => fileIn.current.click()}><Icon n="upload" />{busy === 'up' ? 'Adding...' : 'Upload'}</button>
-          <input type="file" accept="video/*,image/*" hidden ref={fileIn} onChange={e => { up([...e.target.files]); e.target.value = ''; }} /></>}
-      {n.stock && !n.run && <Button className="need-stock" size="sm" variant="secondary" label="Use stock" isLoading={busy === 'stock'} onClick={() => act('stock')} />}
-      {agentOn(V) && <Button className="need-send" size="sm" variant="secondary" label="Send to my agent" isLoading={busy === 'send'} onClick={() => act('send')} />}
-      <Button className="need-copy" size="sm" variant="ghost" label="Copy for my agent" icon={<Icon n="copy" />} onClick={() => copyText(n.ask, 'Copied. Paste it into your agent.')} />
-      <Button className="need-skip" size="sm" variant="ghost" label="Skip" onClick={() => act('skip')} /></span>
+  const skip = <Button className="need-skip" size="sm" variant="ghost" label="Skip" onClick={() => act('skip')} />;
+  const ways = <>
+    {n.run ? <Button className="need-run" size="sm" variant="secondary" label="Pick clips for the run" icon={<Icon n="film" />} onClick={onRun} />
+      : <><button type="button" className={'need-up' + (busy === 'up' ? ' busy' : '')} disabled={busy === 'up'} onClick={() => fileIn.current.click()}><Icon n="upload" />{busy === 'up' ? 'Adding...' : 'Upload'}</button>
+        <input type="file" accept="video/*,image/*" hidden ref={fileIn} onChange={e => { up([...e.target.files]); e.target.value = ''; }} /></>}
+    {n.stock && !n.run && <Button className="need-stock" size="sm" variant="secondary" label="Use stock" isLoading={busy === 'stock'} onClick={() => act('stock')} />}
+    {agentOn(V) && <Button className="need-send" size="sm" variant="secondary" label="Send to my agent" isLoading={busy === 'send'} onClick={() => act('send')} />}
+    <Button className="need-copy" size="sm" variant="ghost" label="Copy for my agent" icon={<Icon n="copy" />} onClick={() => copyText(n.ask, 'Copied. Paste it into your agent.')} /></>;
+  return <li className={'need glass' + (sel ? ' sel' : '') + (sg ? ' has-pick' : '')} data-beat={b.n} data-slot={n.slot} onClick={onPick}>
+    {sg && sg.clip && sg.clip.thumb && <img className="need-th" src={sg.clip.thumb} alt="" />}
+    <span className="need-t"><b className="need-h">{n.show || `Needs B-roll: ${n.what}`}</b>
+      <span className="fine need-d">{clock(b.start)} · {t1(n.seconds)} s · {n.shape}{n.treat ? ` · ${n.treat}` : ''}</span>
+      {sg && <span className="need-why">{sg.reason}</span>}
+      {sg && sg.check && <span className="fine need-check">{sg.check}</span>}
+      {!sg && n.none && <span className="fine need-none" onClick={e => e.stopPropagation()}>{n.none} <button type="button" className="linkish need-vault" onClick={() => openVault(b.n)}>Open the Vault</button></span>}</span>
+    {sg ? <>
+      <span className="need-acts" onClick={e => e.stopPropagation()}>
+        <Button className="need-use" size="sm" variant="primary" label="Use it" isLoading={busy === 'use' || busy === 'stock'} onClick={() => (sg.from === 'vault' ? place(sg.id, sg.reason) : act('stock'))} />
+        <Button className="need-swap" size="sm" variant="secondary" label="Swap" aria-expanded={open === 'swap'} onClick={() => setOpen(open === 'swap' ? '' : 'swap')} />
+        {skip}
+        <Button className="need-more" size="sm" variant="ghost" label="More" aria-expanded={open === 'more'} onClick={() => setOpen(open === 'more' ? '' : 'more')} /></span>
+      {open === 'swap' && <Cands list={(b.candidates || []).filter(c => c.id !== sg.id).slice(0, 3)} place={place} openVault={() => openVault(b.n)} />}
+      {open === 'more' && <span className="need-acts need-extra" onClick={e => e.stopPropagation()}>{ways}<Button className="need-vault" size="sm" variant="ghost" label="Open the Vault" icon={<Icon n="grid" />} onClick={() => openVault(b.n)} /></span>}
+    </> : <span className="need-acts" onClick={e => e.stopPropagation()}>{ways}{skip}</span>}
   </li>;
 }
 
@@ -263,10 +290,10 @@ function Testimonials({ B, V, after }) {
   </div>;
 }
 
-export function BRoll({ V, apply, go, openKeys }) {
+export function BRoll({ V, apply, go, openKeys, openVault }) {
   const noMask = !!(V && V.env && V.env.effectsReady === false);
   const B = V.broll || { beats: [], sources: [], asks: [], gens: [], generate: { providers: [] }, library: {} };
-  const [sel, setSel] = useState(null), [tab, setTab] = useState('library'), [busy, setBusy] = useState(''), [addAt, setAddAt] = useState(null), [confirmClear, setConfirmClear] = useState(false), [more, setMore] = useState(null);
+  const [sel, setSel] = useState(null), [tab, setTab] = useState('library'), [busy, setBusy] = useState(''), [addAt, setAddAt] = useState(null), [confirmClear, setConfirmClear] = useState(false), [more, setMore] = useState(null), [swapAt, setSwapAt] = useState(null);
   const beat = B.beats.find(b => b.n === sel) || null;
   useEffect(() => { if (!beat && B.beats.length) setSel((B.beats.find(b => b.need && !b.need.skipped) || B.beats.find(b => b.idea) || B.beats.find(b => b.slot) || B.beats[0]).n); }, [B.beats.length]);
   // a reply can land after a newer live update (an agent's idea, a clear from the API). Merging it into this render's V
@@ -300,7 +327,7 @@ export function BRoll({ V, apply, go, openKeys }) {
     {B.gens.filter(g => g.status !== 'done').map(g => <p key={g.id} className={'gen-st ' + g.status} data-id={g.id}>{g.status === 'running' ? `Generating with ${g.provider}${g.phase ? ' (' + g.phase.replace('_', ' ') + ')' : ''}: "${g.prompt.slice(0, 60)}"` : `Generate failed: ${g.error}`}</p>)}
     {!B.draft ? <div className="empty-art" id="broll-empty"><Icon n="film" /><p>The spots come from a draft. Draft on the Review step and b-roll picks itself from what you said.</p><Button id="broll-to-render" variant="secondary" size="sm" label="Go to Review" onClick={() => go('review', true)} /></div>
       : <>
-        {needs.length > 0 && <ul className="need-list" id="broll-needs" aria-label="Slots that need B-roll">{needs.map(b => <Need key={b.need.slot} b={b} V={V} after={after} sel={b.n === sel} onPick={() => setSel(b.n)} onRun={() => openRun(b.n)} />)}</ul>}
+        {needs.length > 0 && <ul className="need-list" id="broll-needs" aria-label="Slots that need B-roll">{needs.map(b => <Need key={b.need.slot} b={b} V={V} after={after} sel={b.n === sel} onPick={() => setSel(b.n)} onRun={() => openRun(b.n)} openVault={openVault} />)}</ul>}
         <div className="blane spots" id="broll-lane" role="list" aria-label="Spots">
           {B.beats.map(b => <button key={b.n} type="button" role="listitem" className={'beat spot' + (b.n === sel ? ' sel' : '') + (b.slot ? ' filled' : '') + (b.idea ? ' has-idea' : '') + (b.ref ? ' ref' : '') + (b.need && !b.slot ? (b.need.skipped ? ' skipped' : ' needs') : '')} data-beat={b.n} style={{ flexGrow: Math.max(1, b.seconds) }} onClick={() => setSel(b.n)} aria-pressed={String(b.n === sel)}>
             <span className="sp-top"><span className="bt">{clock(b.slot ? b.slot.at : b.start)}</span>{b.ref && !b.need && <em className="sp-ref" title={b.ref.detail}>REF</em>}{b.slot && b.slot.by && b.slot.by !== 'you' && <em className="sp-by">{b.slot.by === 'Studio' ? 'picked' : b.slot.by}</em>}</span>
@@ -324,7 +351,7 @@ export function BRoll({ V, apply, go, openKeys }) {
           {beat.slot && <div className="slot-set" id="slot-set">
             <div className={'slot-prev lay-' + (beat.slot.place || 'full')} id="slot-prev">{beat.slot.clip.kind === 'video' ? <video src={beat.slot.clip.url + '#t=' + beat.slot.in} muted playsInline preload="metadata" controls={beat.slot.place === 'full' || !beat.slot.place} /> : <img src={beat.slot.clip.url} alt="" />}{LAYOUT_PREVIEW.has(beat.slot.place) && <span className="lay-you" aria-hidden="true"><i className="bd" /><i className="hd" /></span>}</div>
             <div className="col">
-              <span className="fine">{beat.slot.clip.name} · {beat.slot.clip.run ? `${plural(beat.slot.clip.run.n, 'cut')}, one every ${beat.slot.clip.run.step} s, on the beat` : beat.slot.clip.source}{beat.slot.by && beat.slot.by !== 'you' ? ` · ${beat.slot.by === 'Studio' ? 'picked from your words' : 'placed by ' + beat.slot.by}` : ''}</span>
+              <span className="fine">{beat.slot.clip.name} · {beat.slot.clip.run ? `${plural(beat.slot.clip.run.n, 'cut')}, one every ${beat.slot.clip.run.step} s, on the beat` : beat.slot.clip.source}{beat.slot.by && beat.slot.by !== 'you' ? ` · ${beat.slot.by === 'Studio' ? (beat.brief ? 'Picked for you' : 'picked from your words') : 'placed by ' + beat.slot.by}` : ''}</span>
               <span className="lbl">How it sits</span>
               <div className="seg-row" role="radiogroup" aria-label="Placement">{Object.entries(B.places).map(([k, l]) => <button key={k} type="button" role="radio" id={'place-' + k} aria-checked={String(beat.slot.place === k)} className={'chip place plc-' + k + (beat.slot.place === k ? ' on' : '')} title={PLACE_TIP[k] + (noMask && PLACE_NEEDS[k] ? '. ' + PLACE_NEEDS[k] : '')} onClick={() => fill({ clip: beat.slot.clip.id, place: k })}><i aria-hidden="true" />{l}</button>)}</div>
               {noMask && PLACE_NEEDS[beat.slot.place] && <p className="fine ctl-off" id="place-need">{PLACE_NEEDS[beat.slot.place]}</p>}
@@ -335,7 +362,10 @@ export function BRoll({ V, apply, go, openKeys }) {
                 {beat.slot.clip.kind === 'video' && <label className="inl"><span className="fine">From</span><input id="slot-in" type="number" step={0.1} min={0} defaultValue={beat.slot.in} key={'i' + beat.n + beat.slot.in} onBlur={e => fill({ clip: beat.slot.clip.id, in: +e.target.value })} /><span className="fine">s of the clip</span></label>}
               </div>
               {beat.slot.why && <><span className="lbl">Why this</span><p className="fine why" id="slot-why">{beat.slot.why}</p></>}
-              <div className="row"><Button id="slot-clear" size="sm" variant="secondary" label="Remove" icon={<Icon n="trash" />} onClick={() => fill({ clear: true })} /></div>
+              {beat.slot.clip.check && <p className="fine" id="slot-check">{beat.slot.clip.check}</p>}
+              <div className="row"><Button id="slot-clear" size="sm" variant="secondary" label="Remove" icon={<Icon n="trash" />} onClick={() => fill({ clear: true })} />
+                {beat.candidates && <Button id="slot-swap" size="sm" variant="ghost" label="Swap" aria-expanded={swapAt === beat.n} onClick={() => setSwapAt(swapAt === beat.n ? null : beat.n)} />}</div>
+              {beat.candidates && swapAt === beat.n && <Cands list={beat.candidates.filter(c => c.id !== beat.slot.clip.id).slice(0, 3)} place={(id, why) => { setSwapAt(null); fill({ clip: id, why }); }} openVault={() => openVault(beat.n)} />}
               {beat.slot.clip.license && <span className="fine">{beat.slot.clip.author && beat.slot.clip.author.name ? `By ${beat.slot.clip.author.name}. ` : ''}{beat.slot.clip.license.name}</span>}
             </div></div>}
           {!showTabs && <div className="row"><Button id="broll-more" size="sm" variant="ghost" label="Choose something else" icon={<Icon n="grid" />} onClick={() => setMore(beat.n)} /></div>}

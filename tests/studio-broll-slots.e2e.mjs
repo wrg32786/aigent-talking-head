@@ -61,7 +61,7 @@ try {
     await open(pg, '#step=broll'); await pg.waitForSelector('#broll-needs .need');
     assert.strictEqual(await pg.locator('#broll-needs .need').count(), 3);
     const c1 = pg.locator('#broll-needs .need[data-slot="1"]');
-    assert.strictEqual((await c1.locator('.need-h').textContent()).trim(), 'Needs B-roll: a screen recording (the reference showed Dashboard)');
+    assert.strictEqual((await c1.locator('.need-h').textContent()).trim(), 'Show the dashboard on screen. It fits what you say here.'); // 1.29.0: the card leads with the brief (your words), the reference is only a hint
     const d = await c1.locator('.need-d').textContent(); assert.ok(/s · a framed panel under your face · slow push in, pops in/.test(d), d);
     assert.ok(/covers the whole frame/.test(await pg.locator('#broll-needs .need[data-slot="3"] .need-d').textContent()));
     assert.deepStrictEqual((await c1.locator('.need-acts').innerText()).split('\n').map(x => x.trim()).filter(Boolean), ['Upload', 'Copy for my agent', 'Skip']);

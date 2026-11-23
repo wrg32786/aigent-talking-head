@@ -325,6 +325,11 @@ if (target) {
       try { execFileSync(process.execPath, [join(ROOT, 'tests', 'broll-slots.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
       catch (e) { be.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
       results.push({ label: 'B-roll slots tests (tests/broll-slots.test.mjs: a speaker shot is not a cutaway, panels merge and keep their effects, the Reel.md B-roll block, Recreate and Copy the look keep every slot with no assets and land it on your words, effects in plan.json, a panel under the chin, Studio needs, Skip, a clip as a panel, slot states at render)', errs: be, warns: [] }); }
+    // The Asset Vault and the brief (1.29.0): what a slot should show, the Vault index, matching with reasons, the tools
+    { const ve = [];
+      try { execFileSync(process.execPath, [join(ROOT, 'tests', 'vault.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+      catch (e) { ve.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+      results.push({ label: 'Asset Vault tests (tests/vault.test.mjs: the brief rules and an agent rewrite, the old library moves in with its credits, add, the same file once, delete with Undo, rights and reference only never placed, links and captures, search and filters, limits, matching and ranking with reasons, the tool schemas, the Vault routes, MCP add_to_vault, capture_link, search_vault, set_broll_brief)', errs: ve, warns: [] }); }
     const rparts = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-recreate-parts.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { rparts.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }

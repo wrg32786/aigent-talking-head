@@ -91,6 +91,19 @@ export async function capture(url, o = {}) {
     }
     const title = await page.title().catch(() => '');
     writeFileSync(join(dir, 'meta.json'), JSON.stringify({ url: u, final, title, captured: new Date().toISOString(), viewport: [W, Hh], scroll: o.imageOnly ? 0 : secs }, null, 1) + '\n');
+    // extras (the Asset Vault, kit/studio/vault.mjs): the full page, the share image, the words on the page, and
+    // whether the page is a sign in wall (then the Vault keeps only the link)
+    if (o.extras) {
+      await page.evaluate(() => scrollTo(0, 0)); await page.waitForTimeout(200);
+      await page.screenshot({ path: join(dir, 'full.png'), fullPage: true }).catch(() => {});
+      const info = await page.evaluate(() => { const m = q => (document.querySelector(q) || {}).content || null;
+        return { og: m('meta[property="og:image"]') || m('meta[name="twitter:image"]'), about: m('meta[property="og:description"]') || m('meta[name="description"]'), text: (document.body ? document.body.innerText : '').slice(0, 6000), pass: !!document.querySelector('input[type="password"]') }; }).catch(() => ({}));
+      let og = null;
+      if (info.og) { try { const ou = new URL(info.og, final).toString(); if (!(await publicUrl(ou))) { const r = await ctx.request.get(ou, { timeout: 15000 }), ct = String(r.headers()['content-type'] || '');
+        const ext = /png/.test(ct) ? '.png' : /webp/.test(ct) ? '.webp' : /jpe?g/.test(ct) ? '.jpg' : null; if (r.ok() && ext) { og = 'og' + ext; writeFileSync(join(dir, og), await r.body()); } } } catch {} }
+      const signin = !!info.pass || /\/(login|log-in|signin|sign-in|sign_in|accounts\/login|checkpoint|auth)(\/|$)/i.test(new URL(final).pathname);
+      return { dir, cached: false, title, final, og, text: [info.about, info.text].filter(Boolean).join(' '), signin };
+    }
     return { dir, cached: false, title };
   } finally { await browser.close(); }
 }

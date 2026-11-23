@@ -822,7 +822,7 @@ if (!flag('rebuild')) {
   // build/plan.json: what this draft took from the recipe, for other tools (kit/recreate.cjs; docs/reel-md.md)
   if (recipe) {
     const cutNow = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8')), capsNow = R.readCaptions(path.join(build, 'captions.js'));
-    const plan0 = RC.planOf({ recipe, scale: SCALE, rc: RECUT, cut: cutNow, shakes: REFSHAKES, sounds: REFSOUNDS, flips: capsNow.flips || [], theme: path.basename(th, '.js'), accent, mode: LOOK ? 'look' : null, look: LOOK ? LOOK.name : null, goal: GOAL, broll: BROLL }); if (GOAL && !plan0.goal) plan0.goal = GOAL; const plan = RC.writePlan(build, plan0);
+    const plan0 = RC.planOf({ recipe, scale: SCALE, rc: RECUT, cut: cutNow, shakes: REFSHAKES, sounds: REFSOUNDS, flips: capsNow.flips || [], theme: path.basename(th, '.js'), accent, mode: LOOK ? 'look' : null, look: LOOK ? LOOK.name : null, goal: GOAL, broll: BROLL.map(x => ({ ...x, brief: require('./broll-brief.cjs').rules(x, { glossary: GLOSS, brands: BRANDS, point: GOAL }) })) }); if (GOAL && !plan0.goal) plan0.goal = GOAL; const plan = RC.writePlan(build, plan0);
     // build/match.json: how close this draft is to what it copies, per part (kit/fidelity.cjs; an estimate from the plan)
     if (RECUT) {
       const len = RC.lengthOf(cutNow.segs), target = LOOK ? FID.targetOfLook(LOOK, { len, skipped: RECUT.skipped.length, planned: LOOKPLAN.plan.length }) : FID.targetOfRecipe(recipe, { k: SCALE.k, len, skipped: RECUT.skipped.length });
