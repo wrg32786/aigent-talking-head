@@ -119,9 +119,11 @@ ok('titleFromJob keeps an apostrophe in the title', () => {
 });
 
 ok('publish-cover.py places the title off a given face zone', () => {
+  const py = process.env.PYTHON || 'python3';
+  try { execFileSync(py, ['-c', 'from PIL import Image'], { stdio: 'pipe' }); }
+  catch { console.log('  note: skipped (Pillow is not installed on this Python)'); return; }
   const dir = mkdtempSync(join(tmpdir(), 'pub-cover-'));
   const src = join(dir, 'frame.jpg'), out = join(dir, 'cover.jpg');
-  const py = process.env.PYTHON || 'python3';
   execFileSync(py, ['-c', 'from PIL import Image; Image.new("RGB", (1080, 1920), (20, 40, 50)).save("' + src.replace(/\\/g, '/') + '")']);
   const r = execFileSync(py, [join(KIT, '..', 'kit', 'publish-cover.py'), '--in', src, '--out', out, '--title', 'Hello there', '--zone', '200,800,880,1500,600'], { encoding: 'utf8' });
   const j = JSON.parse(r.trim().split('\n').pop());
