@@ -8,6 +8,7 @@ import { YourEdit } from './Edit.jsx';
 import { BRoll } from './BRoll.jsx';
 import { Keys } from './Keys.jsx';
 import { Footage } from './Footage.jsx';
+import { Highlights } from './Highlights.jsx';
 import { Reference } from './Reference.jsx';
 import { Cut } from './Cut.jsx';
 import { Outputs } from './Outputs.jsx';
@@ -36,10 +37,11 @@ function firstStep() {
   const m = hashMenu(), s = m ? menuStep(m) : stepOf(hashStep() || localStorage.getItem('studio.step') || 'start');
   return STEPS.includes(s) ? s : 'start';
 }
-// Picture and Render each hold a second view: how the reference was made, and Post. A link names it (#step=reference,
-// #step=post); otherwise the view you left
+// Start, Picture and Render each hold a second view: Highlights, how the reference was made, and Post. A link names it
+// (#step=highlights, #step=reference, #step=post); otherwise the view you left
 const firstPicView = () => { const h = hashStep(); return hashMenu() ? 'main' : h ? (h === 'reference' ? 'reference' : 'main') : localStorage.getItem('studio.picture') === 'reference' ? 'reference' : 'main'; };
 const firstOutView = () => { const h = hashStep(); return h ? (h === 'post' ? 'post' : 'main') : localStorage.getItem('studio.render') === 'post' ? 'post' : 'main'; };
+const firstStartView = () => { const h = hashStep(); return h === 'highlights' ? 'highlights' : 'main'; };
 
 export function App() {
   const [CAT, setCat] = useState(null);
@@ -48,6 +50,7 @@ export function App() {
   const [tab, setTab] = useState(hashMenu() || null);
   const [picView, setPicViewState] = useState(firstPicView);
   const [outView, setOutViewState] = useState(firstOutView);
+  const [startView, setStartView] = useState(firstStartView);
   const setPicView = useCallback(v => { setPicViewState(v); localStorage.setItem('studio.picture', v); }, []);
   const setOutView = useCallback(v => { setOutViewState(v); localStorage.setItem('studio.render', v); }, []);
   const [looksList, setLooksList] = useState(null);
@@ -82,7 +85,7 @@ export function App() {
     if (v.seq && v.boot === k.boot && v.seq < k.seq) return v; // an older reply than what is on screen
     const video = v.state.videoSeq || 0;
     if (k.video !== null && video !== k.video) {
-      setStep('start'); localStorage.setItem('studio.step', 'start'); history.replaceState(null, '', '#step=start');
+      setStep('start'); setStartView('main'); localStorage.setItem('studio.step', 'start'); history.replaceState(null, '', '#step=start');
       setLog(''); setRecLive(null); // a task log and a recorder status belong to the previous board
     }
     if (v.seq) seen.current = { boot: v.boot, seq: v.seq, video };
@@ -99,10 +102,10 @@ export function App() {
   const catRef = useRef(null); catRef.current = CAT;
   const go = useCallback((s0, focus) => {
     const s = stepOf(s0), v = viewOf(s0);
-    if (s === 'picture' && v) setPicView(v); if (s === 'render' && v) setOutView(v);
+    if (s === 'picture' && v) setPicView(v); if (s === 'render' && v) setOutView(v); if (s === 'start' && v) setStartView(v);
     setStep(s); localStorage.setItem('studio.step', s);
     // a #menu= link stays while you are on the step that owns its layer
-    const m = hashMenu(); if (!m || menuStep(m, catRef.current && catRef.current.layers) !== s) history.replaceState(null, '', '#step=' + (v === 'reference' || v === 'post' ? v : s));
+    const m = hashMenu(); if (!m || menuStep(m, catRef.current && catRef.current.layers) !== s) history.replaceState(null, '', '#step=' + (v === 'reference' || v === 'post' || v === 'highlights' ? v : s));
     if (focus) requestAnimationFrame(() => { window.scrollTo({ top: 0 }); const h = document.querySelector('main .step:not([hidden]) h2'); if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); } });
   }, [setPicView, setOutView]);
   // open a layer: the step that owns it comes up with that layer showing
@@ -196,13 +199,15 @@ export function App() {
         </div>
       </header>
       <div className={'layout' + (chatAway ? ' nochat' : '')}>
-        <main id="main" data-step={step} data-view={step === 'picture' ? picView : step === 'render' ? outView : 'main'} ref={mainRef}>
+        <main id="main" data-step={step} data-view={step === 'picture' ? picView : step === 'render' ? outView : step === 'start' ? startView : 'main'} ref={mainRef}>
           {!post && step !== 'start' && <YourEdit V={V} s={s} go={go} step={step} />}
           {step === 'picture' && (refAny || breakdown) && <ViewSwitch id="look-switch" label="Picture" value={picView} set={v => { setPicView(v); history.replaceState(null, '', '#step=' + (v === 'reference' ? 'reference' : 'picture')); }} views={[['main', 'Your picture', 'look-sub-style'], ['reference', 'How the reference was made', 'look-sub-reference', refOn]]} />}
           {step === 'render' && <ViewSwitch id="render-switch" label="Render" value={outView} set={v => { setOutView(v); history.replaceState(null, '', '#step=' + (v === 'post' ? 'post' : 'render')); }} views={[['main', 'Render', 'render-sub-main'], ['post', 'Post', 'render-sub-post']]} />}
           {/* a new or opened video remounts the steps, so no step keeps the last board's local picks */}
           <Fragment key={'v' + (s.videoSeq || 0)}>
-          <Footage {...ctx} hidden={step !== 'start'} onLive={setRecLive} />
+          {step === 'start' && V.highlights && V.highlights.offer && <ViewSwitch id="start-switch" label="Start" value={startView} set={v => { setStartView(v); history.replaceState(null, '', '#step=' + (v === 'highlights' ? 'highlights' : 'start')); }} views={[['main', 'Start', 'start-sub-main'], ['highlights', 'Highlights', 'start-sub-highlights', !!(V.highlights.candidates && V.highlights.candidates.length)]]} />}
+          <Footage {...ctx} hidden={step !== 'start' || startView === 'highlights'} onLive={setRecLive} />
+          <Highlights {...ctx} hidden={step !== 'start' || startView !== 'highlights'} />
           {step === 'cut' && <Cut {...ctx} />}
           {breakdown && <Reference {...ctx} />}
           {step === 'picture' && !breakdown && <Picture {...ctx} tab={tab} setTab={pickTab} />}

@@ -16,17 +16,17 @@ t('8 steps: the visual steps first, sound on its own, then Review and Render', (
 });
 
 t('every old step name lands on a step that exists', () => {
-  assert.deepStrictEqual(S.STEP_ALIAS, { footage: 'start', look: 'picture', style: 'picture', reference: 'picture', finish: 'review', post: 'render' });
+  assert.deepStrictEqual(S.STEP_ALIAS, { footage: 'start', highlights: 'start', look: 'picture', style: 'picture', reference: 'picture', finish: 'review', post: 'render' });
   for (const [old, now] of Object.entries(S.STEP_ALIAS)) { assert.strictEqual(S.stepOf(old), now); assert.ok(S.STEPS.includes(now), old); assert.ok(!S.STEPS.includes(old), old + ' is only an old name'); }
   for (const st of S.STEPS) assert.strictEqual(S.stepOf(st), st);
   assert.strictEqual(S.stepOf('render'), 'render', 'render is its own step again, not Finish');
   assert.strictEqual(S.stepName('finish'), 'Review'); assert.strictEqual(S.stepName('footage'), 'Start');
 });
 
-t('the second views: the reference inside Picture, Post inside Render', () => {
-  assert.strictEqual(S.viewOf('reference'), 'reference'); assert.strictEqual(S.viewOf('post'), 'post');
-  for (const st of ['style', 'look', 'picture', 'render']) assert.strictEqual(S.viewOf(st), 'main', st);
-  for (const st of ['start', 'cut', 'text', 'broll', 'music', 'review', 'finish', 'footage']) assert.strictEqual(S.viewOf(st), null, st);
+t('the second views: Highlights inside Start, the reference inside Picture, Post inside Render', () => {
+  assert.strictEqual(S.viewOf('highlights'), 'highlights'); assert.strictEqual(S.viewOf('reference'), 'reference'); assert.strictEqual(S.viewOf('post'), 'post');
+  for (const st of ['style', 'look', 'picture', 'render', 'start', 'footage']) assert.strictEqual(S.viewOf(st), 'main', st);
+  for (const st of ['cut', 'text', 'broll', 'music', 'review', 'finish']) assert.strictEqual(S.viewOf(st), null, st);
 });
 
 t('each of the 9 layers is shown by exactly one step', () => {

@@ -43,6 +43,7 @@
     "choices": "node kit/choices.cjs",
     "reopen": "node kit/snapshots.cjs reopen",
     "cut": "node kit/manual-cuts.cjs",
+    "highlights": "node kit/highlights.mjs",
     "reels": "node kit/snapshots.cjs",
     "studio": "node kit/studio/server.mjs",
     "studio:build": "node kit/studio/build.mjs",

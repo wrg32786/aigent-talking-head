@@ -264,6 +264,10 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-cut.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { uerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio cut tests (tests/studio-cut.test.mjs: output choice, candidates, chunked transcription, cut edits, MCP cut tools, model scoring, pull and adapt a script)', errs: uerrs, warns: [] });
+    const hlerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-highlights.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { hlerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio highlight tests (tests/studio-highlights.test.mjs: sentence-safe windows, local scores, agent rescores, keep and the agent brief)', errs: hlerrs, warns: [] });
     const fderrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-folders.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { fderrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }

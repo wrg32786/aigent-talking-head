@@ -34,7 +34,7 @@ try {
   await t('the page: eight steps, old step names land, one render path, Your edit on every step', async () => {
     const steps = src('steps.js');
     assert.ok(steps.includes("export const STEPS = ['start', 'cut', 'picture', 'text', 'broll', 'music', 'review', 'render'];"));
-    assert.ok(steps.includes("STEP_ALIAS = { footage: 'start', look: 'picture', style: 'picture', reference: 'picture', finish: 'review', post: 'render' }"));
+    assert.ok(steps.includes("STEP_ALIAS = { footage: 'start', highlights: 'start', look: 'picture', style: 'picture', reference: 'picture', finish: 'review', post: 'render' }"));
     const render = src('Render.jsx'), app = src('App.jsx');
     assert.ok(!/Render my|kept-cuts|More ways to save|Draft whole take/.test(render), 'no second render card');
     assert.strictEqual((render.match(/<Button id="render"/g) || []).length, 1, 'one Render button');

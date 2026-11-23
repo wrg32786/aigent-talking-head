@@ -226,7 +226,7 @@ Optional: a HeyGen account with Cinematic Avatar if you generate takes, and `FRE
 | Export presets: TikTok, Reels, Shorts, 4:5, 1:1 | 5 | [Quick start](#quick-start) |
 | Studio: a local page for reference links and teardowns, the Cut step (raw take, best lines and clips, what to make, one Pacing control), the visual effects menu, a B-roll step (library, Pexels and Pixabay, cards, screen recording, generate with your own keys), a chat your agent answers, draft and render | 1 | [docs/studio.md](docs/studio.md) |
 | Agent skills, installed with `npx skills add wrg32786/aigent-talking-head` | 8 | [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) |
-| MCP tools: menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify, and twenty-seven for Studio, scripts, cuts, bites and b-roll | 38 | [MCP setup](docs/mcp.md) |
+| MCP tools: menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify, and tools for Studio, scripts, cuts, highlights, bites and b-roll | 68 | [MCP setup](docs/mcp.md) |
 
 Also: a `plan` step that proposes graphics from your transcript, a layout pass that stops overlaps, `verify` with a contact sheet, [Reel.md recipes](#reelmd-recipes) you can share, and [teardowns](#remake-a-reel-you-like) that turn a reel you like into a recipe. `npm run menu` prints every option.
 
@@ -385,7 +385,7 @@ Yes. Transcription, rendering and checks all run on your computer, and nothing i
 
 ### Is it an open-source alternative to CapCut, Submagic or Opus Clip?
 
-For talking-head reels, yes: it covers captions, titles, graphics, music and platform exports in a free, local pipeline. It is a command-line tool rather than a timeline editor, it does not find clips in long videos, and captions are English only. See [How it compares](#how-it-compares).
+For talking-head reels, yes: it covers captions, titles, graphics, music and platform exports in a free, local pipeline. It is a command-line tool rather than a timeline editor, it finds highlight moments in a long talk on the Start step, and captions are English only. See [How it compares](#how-it-compares).
 
 ### Will the captions and graphics cover my face?
 

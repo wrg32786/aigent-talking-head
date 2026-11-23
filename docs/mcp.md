@@ -35,6 +35,10 @@
 | `write_script` | writes one script | creates or replaces a script; the page shows it at once. Run a humanizer skill on the draft first (`skills/humanizer`) |
 | `set_output` | changes the Cut step's choice | what to make from the take: format (short, long, square), length (short, medium, long), kind (full, clips, both), split, clips, goal (organic, ad), adCuts, cta, and under More aspect, seconds, clipSeconds, max; returns the one-line summary |
 | `get_cuts` | reads the Cut step | the take, its length, the choice and summary, the transcript as numbered sentences with times, and the candidates with ranges, score, reason and keep; `find: true` runs the rules first |
+| `find_highlights` | finds moments in a long talk | transcribes locally if needed, then up to `n` complete moments (default 10, `min` to `max` seconds) with a score, reason and start time; poll `get_highlights` while it transcribes |
+| `get_highlights` | reads the Highlights view | the source talk, transcript status, the brief, and the candidates |
+| `score_highlights` | sends your scores | `{ scores: [{ id, or start and end, score, reason }] }`; times snap to sentence ends |
+| `pick_highlights` | uses moments as the take | extracts the ticked ids (or `ids`) as trimmed files and moves on to Cut; the original talk stays on disk |
 | `set_cuts` | replaces the candidates | your picks, `[{ kind, ranges: [[start, end]], score, reason, label }]`, labelled as scored by you |
 | `render_cuts` | renders | every kept candidate (or `ids`) as its own video, one after another; `file: true` only saves each as a plain clip |
 | `get_lines` | reads the Lines view | every line of the take with its number, times on the audio, length, text, keep and hint (retake or fragment, and why), the bites so far and the clean take |

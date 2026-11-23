@@ -32,6 +32,7 @@ Two steps have a second view, behind a small switch above the step. **Picture** 
 | Old link | Opens |
 | --- | --- |
 | `#step=footage` | Start |
+| `#step=highlights` | Start, Highlights view |
 | `#step=look`, `#step=style` | Picture |
 | `#step=reference` | Picture, on How the reference was made |
 | `#step=finish` | Review |
@@ -47,6 +48,7 @@ Two steps have a second view, behind a small switch above the step. **Picture** 
 
 1. **Start.** Drag clips onto the page or pick files (mp4, mov, m4v, webm, mkv), or paste a public Dropbox or Google Drive share link or a plain video URL (see [Footage from a link](#footage-from-a-link)). They go to `inbox/studio/<job>/`. An assistant can also point the session at a clips folder (`clips` in `studio_set_selections`, refused when it has no clips.json), reorder or drop files (`footage`: the paths from the session in the order to use; an unknown or repeated file is refused), and mark the files as already cut (`asIs`: each file is one clip, in order, never re-cut). Several different files keep the order you gave them; best-take picking only runs when the files are takes of the same lines. Or film it now with **Record now** (see [Record now](#record-now)).
    - **What should guide the edit?** One row of three choices under the footage: **Just my footage**, **Recreate a video** and **Copy the look**. See [Start: what guides the edit](#start-what-guides-the-edit-1280).
+   - **Find highlights** appears when a clip is about 3 minutes or longer, and opens the Highlights view of Start (`#step=highlights`). We transcribe the talk on your computer, suggest up to 10 complete moments with a reason and a start time, and the ones you tick become the take for the reel (already cut, never mid-word or mid-sentence). Copy the brief for your agent, or use `find_highlights`, `get_highlights`, `score_highlights` and `pick_highlights`. The local scores are the fallback when no agent scores them.
    - **Scripts** are folded on Start until the job has a script. Click **Scripts** to open them (see [Scripts](#scripts)).
 2. **Reference.** Pick **Recreate a video** or **Copy the look** on Start and paste a link or upload a file. To add more, open Picture and switch to **How the reference was made**: paste one or more links (Enter adds them, Shift+Enter starts another line) or upload a file. Links can be YouTube (and Shorts), TikTok, X, Vimeo, a direct video file (.mp4, .mov, .m4v, .webm), or one public Instagram post. Studio downloads each into your download folder, breaks it down, and shows what it found: length, cut times and pace, music BPM, beats and energy, caption style, titles, transitions, finishes, graphics and effects, plus suggestions mapped to the effects menu that you can click to pick. The chat gets the same teardown. See [Reference links](#reference-links). One control says how the reference is used, with the same four words everywhere:
    - **Recreate:** same edit, your take. The draft uses the reference's Reel.md as the recipe (`--recipe --recut`). Your kept pieces (or your one take) are re-cut to the reference's shot plan, scaled to your length, every cut on a word boundary in the quiet between words, and each shot gets the reference's framing as a punch in or out. Its sound effects play at its times (scaled), a quiet music stem means no bed, the boxes and stickers it drew become graphics slots, and your titles take the style of the reference title doing the same job (hook, number, timer, brand).
@@ -321,6 +323,7 @@ The page changed its words; the tools, the API and the saved state kept their na
 | Line | piece (`get_pieces`), line (`get_lines`) | `get_pieces`, `get_lines` |
 | Your clip | the Combo | `set_combo`, `choose_combo` |
 | Clips (our suggestions) | candidates, cuts | `get_cuts`, `set_cuts`, `render_cuts` |
+| Highlights (Start) | candidates | `find_highlights`, `get_highlights`, `score_highlights`, `pick_highlights` |
 | A clip your agent stitched from lines | a bite | `set_bites`, `render_bites` |
 | The point | `point` | read in `get_edit`, `get_cuts`, `get_pieces` and `studio_get_state`; set with `studio_set_selections` |
 | Pacing | `pace.tighten` (`off`, 0.45, 0.25) | `get_cuts` returns `pacing`; set with `studio_set_selections` |
