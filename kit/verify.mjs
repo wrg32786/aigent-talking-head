@@ -12,6 +12,11 @@
 //   caption or title that sits on another one fails (the layout pass in overlay.html moves or hides captions and titles).
 //   ffprobe: 1080x1920, the frame rate, H.264 + AAC at 48 kHz, duration = the cut's length.
 //   Loudness: integrated LUFS and true peak (target -14 LUFS, peak <= -1 dBTP).
+//   Picture, measured (kit/picturecheck.cjs): a frozen picture or black frames outside what the edit does on purpose FAIL;
+//   flicker, clipping, a soft picture and the cut count are notes. When these numbers and a read of the stills disagree
+//   about motion, a freeze or black, the numbers win.
+//   Joins (kit/joins.cjs): every cut as a pair of frames; a cut that hardly changes the picture or a colour jump the plan
+//   does not declare is a note with both stills (verify/join-*.png, joins.json), never a FAIL.
 //   Titles: every frame from two before a title's start to five after, and the same at its end, read from the drawn text
 //   layer (build/ovl): no caption word in the bar while a title is up, none of its own words in the bar outside it.
 //   Mask (when cut.json has one): alpha measured from the mask file at each title, never judged by eye.
@@ -25,6 +30,8 @@ import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 const R = createRequire(import.meta.url)('./rules.cjs');
 const X = createRequire(import.meta.url)('./exports.cjs');
+const PIC = createRequire(import.meta.url)('./picturecheck.cjs');
+const JOINS = createRequire(import.meta.url)('./joins.cjs');
 import { titleCheck } from './titlecheck.mjs';
 const KIT = dirname(fileURLToPath(import.meta.url)), ROOT = dirname(KIT);
 const argv = process.argv.slice(2);
@@ -79,6 +86,10 @@ else {
   ok(I > -15.5 && I < -12.5, `loudness ${I.toFixed(1)} LUFS integrated (target -14)`);
   ok(Number.isNaN(TP) || TP <= -0.5, `true peak ${Number.isNaN(TP) ? '?' : TP.toFixed(1)} dBTP (<= -1 target)`);
 }
+
+// 2b. picture, measured: freeze and black FAIL outside what the edit does on purpose; the rest are notes
+{ const pj = PIC.judge(PIC.measure(file, dur), PIC.exempt(C, CAP), { fxPass: /^reel-fx-/.test(basename(file)) });
+  pj.fails.forEach(m => ok(false, m)); pj.oks.forEach(m => ok(true, m)); pj.notes.forEach(m => notes.push(m)); }
 
 // 3. check points -> stills + contact sheet
 const pts = [];
@@ -212,6 +223,13 @@ if (C.titles && mask.file) {
     }
   }
 }
+
+// 4b. joins: every cut as a pair, notes only (the 9:16 reel; a reframed version has the same cuts)
+if (!EXN) try { const jn = JOINS.check(file, C, CAP, { fps: FPS, outDir: vdir });
+  lines.push(`ok    ${jn.joins.length} cut${jn.joins.length === 1 ? '' : 's'} looked at as pairs: ${jn.findings.length ? jn.findings.length + ' to look at (notes below, never a fail)' : 'nothing to look at'} (joins.json, cut ${jn.hash})`);
+  jn.findings.forEach(f => notes.push(`join, ${f.kind}: ${f.why}${f.stills ? ' (' + basename(f.stills) + ')' : ''}`));
+  notes.push('joins not checked: ' + jn.notChecked.join('; '));
+} catch (e) { notes.push('joins: not checked (' + String(e.message).split('\n')[0] + ')'); }
 
 // 5. copy lint
 try { const o = sh(process.execPath, [join(KIT, 'check.mjs'), build]); lines.push('ok    copy and plan check'); o.split('\n').filter(l => /note:/.test(l)).forEach(l => notes.push(l.trim().replace(/^note:\s*/, ''))); }

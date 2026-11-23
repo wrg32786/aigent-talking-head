@@ -26,6 +26,7 @@
 //   brand        theme, colours and fonts; style and musicKeys keep the Reel.md lines the draft reads
 'use strict';
 const fs = require('fs');
+const isPhrase = t => t.lines != null || t.key != null || t.build != null || t.effect != null || t.exit != null;   // a phrase title line of a Reel.md
 const path = require('path');
 const RM = require('./reelmd.cjs');
 const RF = require('./reframe.cjs');
@@ -129,8 +130,10 @@ function fromTeardown(dir, opts = {}) {
     framing: framingOf(shots),
     grade: { target: GM.pool(labs, shots.map(s => s.dur)), shots: labs.filter(Boolean), finish: none(st.finish) ? null : st.finish, skin: GM.SKIN },
     captions: { style: captionStyle, look: none(st.look) ? null : st.look, font, size: subs.length ? r3(median(subs.map(c => c.line_h))) : null, position: st['caption-position'] || null, color: st['caption-color'] || null,
-      outline: st['caption-outline'] || null, shadow: st['caption-shadow'] || null, case: st['caption-case'] || null, layer: st['caption-layer'] || null, entrance: st['caption-entrance'] || null, wordsPerCue, accent: require('./recreate.cjs').accentFor({ colors }) },
-    titles: { on: !/^(off|no|false)$/i.test(String(st.titles || 'on')), font, size: null, entrances: [...new Set(tl.map(t => t.entrance).filter(Boolean))], layer: st['title-layer'] || 'front', colors, count: tl.length, perMin: dur ? r2(tl.length / dur * 60) : 0, seconds: tl.length ? r2(median(tl.map(t => t.end - t.start))) : null },
+      outline: st['caption-outline'] || null, shadow: st['caption-shadow'] || null, case: st['caption-case'] || null, layer: st['caption-layer'] || null, entrance: st['caption-entrance'] || null, wordsPerCue, ...(/^(off|no|false)$/i.test(String(st['running-captions'] || '')) ? { running: false } : {}), accent: require('./recreate.cjs').accentFor({ colors }) },
+    titles: { on: !/^(off|no|false)$/i.test(String(st.titles || 'on')), font, size: null, entrances: [...new Set(tl.map(t => t.entrance).filter(Boolean))], layer: st['title-layer'] || 'front', colors, count: tl.length, perMin: dur ? r2(tl.length / dur * 60) : 0, seconds: tl.length ? r2(median(tl.map(t => t.end - t.start))) : null,
+      // designed phrase titles (1.29.0): the pattern only (when, how many lines, where the key word sits, build, effect, exit), never the reference's words
+      ...(tl.some(isPhrase) ? { phrases: tl.filter(isPhrase).map(t => require('./phrase-titles.cjs').shapeOf(t)) } : {}) },
     stickers: stickersOf(recipe.graphics || [], dur),
     transitions: { default: none(st.transition) ? 'cut' : st.transition, glitch: /^(on|yes|true)$/i.test(String(st.glitch || '')), mix: shares(shots.slice(1).map(s => (s.transition && !none(s.transition) ? s.transition : 'cut'))) },
     moves: { push: r2(shots.filter(s => s.move === 'push').length / (shots.length || 1)), pull: r2(shots.filter(s => s.move === 'pull').length / (shots.length || 1)), drift: r2(shots.filter(s => s.move === 'drift').length / (shots.length || 1)),

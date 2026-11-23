@@ -27,9 +27,10 @@ const SCN = require('../scenes.cjs');
 export const KIND_MODE = {
   transition: 'multi', entrance: 'multi', graphic: 'multi', finish: 'multi', effect: 'multi', font: 'multi',
   captionEntrance: 'one', captionStyle: 'one', look: 'one', theme: 'one', titleLayer: 'one', bed: 'one', beatSync: 'one',
+  titleEffect: 'one', titleExit: 'one', // one Effect and one Exit for the titles of the reel (1.29.0)
 };
 const EDIT_TOGGLES = ['punch', 'tighten', 'cards-auto', 'colour-card', 'chapter-card', 'sfx-cap', 'sfx-map'];
-const ANIMATED = { transition: 'transitions', entrance: 'titles', captionEntrance: 'caption-entrances', captionStyle: 'caption-styles' };
+const ANIMATED = { transition: 'transitions', entrance: 'titles', titleEffect: 'title-effects', titleExit: 'title-effects', captionEntrance: 'caption-entrances', captionStyle: 'caption-styles' };
 const STILL = { transition: 'transition', effect: 'effect', graphic: 'graphic', finish: 'finish', entrance: 'entrance', captionStyle: 'caption', look: 'look', titleLayer: 'titleLayer', theme: 'theme', beatSync: 'beatSync', bed: 'bed', sfx: 'sfx', font: 'font', preset: 'preset' };
 const rel = p => relative(ROOT, p).split('\\').join('/');
 
@@ -388,6 +389,8 @@ export function compose(s, { refPack = null } = {}) {
   if (one('look')) args.push('--look', one('look'));
   if (one('theme')) args.push('--theme', one('theme'));
   if (one('titleLayer')) args.push('--title-layer', one('titleLayer'));
+  if (one('titleEffect')) args.push('--title-effect', one('titleEffect'));
+  if (one('titleExit')) args.push('--title-exit', one('titleExit'));
   // fonts: yours, unless a reference's style is being copied (Recreate, Copy the look, a saved look) and you have not
   // picked a font since. Then the font the teardown matched is used and an older pick is never sent.
   { const mine = (s.picks.font && s.picks.font.allow) || [], fonts = mine.filter(f => f !== 'theme'), copied = copiesStyle(s.reference) || (!!s.styleLook && !(s.reference && s.reference.mode !== 'off' && s.reference.extracted));
@@ -450,7 +453,7 @@ export function motionOf(s) {
   return { value: MOTIONS.includes(s.pace && s.pace.motion) ? s.pace.motion : MOTION_DEFAULT, on: !!(ref || s.styleLook),
     options: [{ id: 'subtle', label: 'Subtle' }, { id: 'medium', label: 'Medium' }, { id: 'strong', label: 'Strong' }] };
 }
-import { REF_PARTS, refParts, referencePicks, setReferenceLook, copiesStyle, clearFontPick, syncRefFont, refEntrancesOnly, dropRefEntrances, useReferenceLook, styleKey, boostOf } from './reference.mjs';
+import { REF_PARTS, refParts, referencePicks, setReferenceLook, copiesStyle, clearFontPick, syncRefFont, refEntrancesOnly, dropRefEntrances, useReferenceLook, styleKey, boostOf, ownLook } from './reference.mjs';
 
 // a pack whose style must sit inside its locks (pack validate refuses a style transition outside them)
 export function fitStyle(pack) {
@@ -572,7 +575,8 @@ export function savedVideo(job) { try { return JOB_RE.test(job) ? JSON.parse(rea
 export function freshSession(s, { job = null, keepLook = true } = {}) {
   const d = defaultState(), keep = {};
   for (const k of KEEP_KEYS) if (s[k] !== undefined) keep[k] = s[k];
-  const look = {}; if (keepLook) for (const k of LOOK_KEYS) if (s[k] !== undefined) look[k] = clone(s[k]);
+  const mine = keepLook ? ownLook(s) : null; // after a Recreate or Copy the look, your own look, not the reference's
+  const look = {}; if (keepLook) for (const k of LOOK_KEYS) if (mine[k] !== undefined) look[k] = clone(mine[k]);
   for (const k of Object.keys(s)) delete s[k];
   Object.assign(s, d, keep, look, { job: job || null, keepLook: !!keepLook });
   clearFontPick(s); // a font pick belongs to the video it was made for: it never rides into the next one
@@ -666,6 +670,7 @@ export function clearBrollTimeline(s) {
 // the job name, your words, chat, takes, transcripts and files on disk stay.
 export function resetEdit(s, { keepLook = s.keepLook === true } = {}) {
   const d = defaultState();
+  if (keepLook) { const mine = ownLook(s); if (mine !== s) for (const k of LOOK_KEYS) { if (mine[k] !== undefined) s[k] = clone(mine[k]); else delete s[k]; } } // your look, not the reference's
   s.cut = null;
   s.lines = {};
   delete s.pieces;

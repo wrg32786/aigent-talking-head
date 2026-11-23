@@ -100,6 +100,7 @@ Every section is optional except the card. Anything left out falls back to the p
 |---|---|---|
 | look | `kinetic`, `oneword`, `muse`, `classic`, `one-word` | `--look` |
 | captions | `kinetic`, `oneword`, `pill`, `hormozi`, `karaoke`, `classic`, `one-word` | `--style` |
+| running-captions | `off` | no running captions are drawn: the phrase titles carry the words. A teardown writes it when the reference has phrase titles and no captions |
 | caption-position | `top`, `middle`, `bottom` | `--caption-position`, the captions' band |
 | caption-color | `#rrggbb` | `--caption-color`, the caption word colour (the one-word word, classic and pill text, the hormozi highlight) |
 | caption-outline | `none`, `thin`, `thick` (default thick) | `--caption-outline`, the one-word caption's outline |
@@ -115,6 +116,8 @@ Every section is optional except the card. Anything left out falls back to the p
 | title-key-color, title-partner-color | a `#rrggbb` colour, `accent` or `text` | their colours |
 | title-glow | `off`, `soft`, `strong` | a glow in the key word's colour on titles and kinetic key words |
 | title-dim | `off`, or `0.05` to `0.8` | how much darker the picture goes while a title is up |
+| title-effect | `type`, `slot-roll`, `count-up`, `stack-fade`, `decode`, `split-flap` | `--title-effect`, the effect of every title that names none |
+| title-exit | `blow-up`, `polaroid`, `glitch-slice`, `dip-black` | `--title-exit`, how every title leaves. On a cut it is the transition there |
 | title-entrance | a title entrance | the entrance of every title that names none (it may repeat). A teardown writes `blur-rise` when it could not read the entrance of an italic serif key word |
 | caption-face | `display`, `partner` | one-word captions in the pairing's key face (default) or its partner face |
 | finish | finish names, comma list, or `none` (on the whole reel) | `--finish` |
@@ -213,7 +216,7 @@ It holds no shot list, no script, no title text and no times from the reference.
 - **Framing**: each shot takes a shot size from the look's mix and is reframed to that size's face height and eye line (Reframe above). Where two shots in a row share a size, its wider and closer framings take turns as often as the reference's framing changed, a short shot taking the closer one.
 - **Grade**: refitted on your take against the look's `grade.target` (Grade match above).
 - **Stickers**: the look's sticker (shape, spikes, colour, layer, place, size) on your own key words, ranked: ordinals you say (first, second, third) first, then numbers and stats (3, 10x, 50%, $100), then the words of your goal (`--goal`, below), then other strong keywords (a brand name from the glossary, a word written with a capital inside a sentence, or a word you say more than once; six letters or more). Stopwords and generic words (`kit/goalwords.cjs`: time, people, idea, video, post, headline, carousel and the like) never get a sticker, and neither does a plain long word said once. The look's density is the most we place, never two within 2.5 s and never on a title; with too few good words we place fewer and the log says so. "The second I say it" is read as a length of time, not as the second point. A sticker follows your face where the reframe could not reach the target. App labels and screen cards keep their style in the look but are not placed: they need your own icons and screens.
-- **Titles**: drafted from your hook and key claims as on any draft, then cut to the look's count per minute, with its entrances (each once) and layer.
+- **Titles**: drafted from your hook and key claims as on any draft, then cut to the look's count per minute, with its entrances (each once) and layer. A look whose reference has phrase titles keeps their pattern (`titles.phrases`: when, how many lines, where the key word sits, build, effect, exit, and none of its words) and puts it on the phrases you say; `captions.running: false` draws no captions under them.
 - **Sounds**: as many as the look's density asks for, shared between your stickers, titles and cuts the way the look shared them, each as the kit sound the look used for that job.
 - **Transitions, moves, shakes, cutaways**: the look's share of each, spread evenly over your cuts. A shot marked as a cutaway becomes a B-roll spot in Studio.
 - **Music**: the look's bed by tempo, else a library bed by its energy; none when the look has none.
@@ -245,7 +248,19 @@ It holds no shot list, no script, no title text and no times from the reference.
 | layer | `front`, `behind`, `auto` | the title's `layer` |
 | hero | word indexes, comma list | the title's `hero` |
 | role | `hook`, `number`, `timer`, `brand` or `line` (a teardown writes it) | with `--recut`, your titles take the entrance, layer and place of the recipe title with the same role (the hook claim up front, a number, a time, a brand name), then the rest in order |
-| text | the words | the title's `text` |
+| text | the words | the title's `text`. In a phrase title, a slash with a space on each side breaks the lines: `THE ONLY / Question / YOU NEED`. A slash inside a word stays as written (`OPEN 24/7`) |
+| lines | `1`, `2` or `3` | a phrase title: a designed title of that many lines, drawn as written, with the connective words small and one key word larger in the accent colour |
+| key | the key word, as written in the text | the title's `key` |
+| build | `word`, `letter`, `line` | how a phrase title arrives when it has no effect: each word as it is said, typed letter by letter, or a line at a time |
+| effect | `type`, `slot-roll`, `count-up`, `stack-fade`, `decode`, `split-flap` | one title effect ([docs/effects.md](effects.md)) |
+| exit | `blow-up`, `polaroid`, `glitch-slice`, `dip-black` | how the title leaves. When it ends on a cut, the exit is the transition at that cut |
+| swap | words, comma list | `slot-roll`: the key word rolls through these while the rest of the line stays |
+| count | `1-365 Days > 1 Year` | `count-up`: from, to, a unit, and after `>` the text it rolls to at the end |
+| band | `top`, `middle`, `bottom` | where the reference set it. A draft puts a top title above your head and the others across your chest, never on your face |
+| glow | `on`, `off` | a glow on this title's key word, whatever the Style says |
+| on-cut, across-cut | `on` | a teardown writes them: the title starts on a cut, or stays up across one |
+
+A teardown writes phrase titles when the reference's text is designed phrases (one to three lines, one key word each) and not running captions. A draft from that recipe does not reuse the reference's words: it puts one title on each matching phrase of what you say, in the reference's lines, build, effect and exit (`kit/phrase-titles.cjs`). A title starts on its first word and no word shows before you say it. With the Style line `running-captions: off` (written when the reference has no running captions) the draft draws no captions under them.
 
 **Cards** (fenced `reel-cards`, optional): one line per colour card, times on the reel clock. The frame cuts to one flat colour while your voice runs on, and the caption words you are saying sit on it in the card's ink. With `chapter N` it is a numbered chapter card: a big serif numeral with your words under it, one per list item.
 

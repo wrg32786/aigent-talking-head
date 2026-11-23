@@ -147,7 +147,53 @@ def render_pair(spec: dict, dest: Path) -> None:
     print(f"wrote {dest} {sheet.size[0]}x{sheet.size[1]} {dest.stat().st_size / 1024:.0f} KB")
 
 
+def title_sheets(plan: dict) -> int:
+    """Sheets of the stretches where big text is on screen (kit/sheets.mjs titleStretches picks them), every tile
+    labelled with its time in seconds, for an agent or a vision model to read the designed titles from.
+    plan: { video, outDir, stretches: [{from, to}], fps, cols, rows, tile_w }. Writes sheet-NN.jpg and sheets.json."""
+    import subprocess, tempfile
+    out_dir = Path(plan["outDir"])
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fps, cols, rows, tw = int(plan["fps"]), int(plan.get("cols") or 6), int(plan.get("rows") or 4), int(plan.get("tile_w") or 244)
+    per, label_h, gap = cols * rows, 26, 6
+    try:
+        f = ImageFont.truetype(str(Path(__file__).parent / "fonts" / "InterTight-VF.ttf"), 18)
+    except Exception:
+        f = ImageFont.load_default()
+    tiles = []  # (seconds, picture)
+    with tempfile.TemporaryDirectory() as tmp:
+        for i, st in enumerate(plan["stretches"]):
+            a, b = float(st["from"]), float(st["to"])
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{a:.3f}", "-t", f"{max(0.05, b - a):.3f}", "-i", plan["video"], "-vf", f"fps={fps},scale={tw}:-2",
+                            "-q:v", "3", str(Path(tmp) / f"s{i:03d}-%05d.jpg")], check=True, stdin=subprocess.DEVNULL)
+            for n, src in enumerate(sorted(Path(tmp).glob(f"s{i:03d}-*.jpg"))):
+                with Image.open(src) as im:  # closed before the folder goes (Windows keeps open files)
+                    tiles.append((round(a + n / fps, 2), im.convert("RGB")))
+    sheets = []
+    for k in range(0, len(tiles), per):
+        part = tiles[k:k + per]
+        th = max(im.size[1] for _, im in part)
+        nrows = (len(part) + cols - 1) // cols
+        sheet = Image.new("RGB", (gap + cols * (tw + gap), gap + nrows * (th + label_h + gap)), BG)
+        draw = ImageDraw.Draw(sheet)
+        for j, (t, im) in enumerate(part):
+            r, c = divmod(j, cols)
+            x, y = gap + c * (tw + gap), gap + r * (th + label_h + gap)
+            sheet.paste(im, (x, y))
+            draw.rectangle((x, y + th, x + tw, y + th + label_h), fill=BAR)
+            draw.text((x + 8, y + th + 3), f"{t:.2f} s", font=f, fill=INK)
+        name = f"sheet-{len(sheets) + 1:02d}.jpg"
+        sheet.save(out_dir / name, format="JPEG", quality=88)
+        sheets.append({"file": name, "from": part[0][0], "to": part[-1][0], "fps": fps})
+    with open(out_dir / "sheets.json", "w", encoding="utf-8") as fh:
+        json.dump({"sheets": sheets}, fh, indent=1)
+    print(f"title sheets: {len(sheets)} in {out_dir} ({len(tiles)} frames at {fps} a second)")
+    return 0
+
+
 def main() -> int:
+    if len(sys.argv) > 2 and sys.argv[1] == "titles":
+        return title_sheets(json.loads(Path(sys.argv[2]).read_text(encoding="utf-8")))
     plan = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8") if len(sys.argv) > 1 else sys.stdin.read())
     out_dir = Path(plan["outDir"])
     for spec in plan["sheets"]:

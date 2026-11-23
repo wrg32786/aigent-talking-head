@@ -36,12 +36,12 @@ const EX = C.extract(join(A, 'Reel.md'));
 assert.strictEqual(EX.captionStyle, 'kinetic'); assert.deepStrictEqual(EX.entrances, ['blur-rise', 'slide-left', 'stagger-rise']); assert.strictEqual(EX.music.bed, 'cinematic-build');
 
 // what the video before left on the board. None of it is in the reference above.
-const OLD = { pack: 'hormozi-bold', picks: { 'font:pirata': 'allow', 'captionStyle:one-word': 'allow', 'look:one-word': 'allow', 'theme:magazine': 'allow', 'titleLayer:behind': 'allow',
+const OLD = { pack: 'hormozi-bold', picks: { 'font:pirata': 'allow', 'captionStyle:one-word': 'allow', 'look:one-word': 'allow', 'theme:magazine': 'allow', 'titleLayer:behind': 'allow', 'titleEffect:decode': 'allow', 'titleExit:polaroid': 'allow',
   'entrance:pop-zoom': 'allow', 'entrance:slam': 'allow', 'entrance:elastic': 'allow', 'transition:glitch': 'allow', 'transition:dip': 'allow', 'finish:bleach': 'allow', 'finish:cool': 'allow',
   'effect:led-sign': 'allow', 'effect:scribble': 'allow', 'graphic:split-flap': 'allow', 'transition:dissolve': 'deny' },
   music: { bed: 'houston-drumline', energy: 'high' }, sound: { sfx: 'off', cap: 'off' }, pace: { tighten: 0.25, punch: 'off' } };
 // every word of the old look that must not show up in a draft's arguments
-const OLD_WORDS = ['hormozi-bold', 'pirata', 'one-word', 'magazine', 'behind', 'pop-zoom', 'slam', 'elastic', 'glitch', 'dip', 'dissolve', 'bleach', 'cool', 'led-sign', 'scribble', 'split-flap', 'houston-drumline', 'high', '--no-sfx', '--no-sfx-cap', '--no-punch', '--tighten', '--theme', '--title-layer', '--fonts'];
+const OLD_WORDS = ['hormozi-bold', 'pirata', 'one-word', 'magazine', 'behind', 'pop-zoom', 'slam', 'elastic', 'glitch', 'dip', 'dissolve', 'bleach', 'cool', 'led-sign', 'scribble', 'split-flap', 'houston-drumline', 'high', '--no-sfx', '--no-sfx-cap', '--no-punch', '--tighten', '--theme', '--title-layer', '--fonts', 'decode', 'polaroid', '--title-effect', '--title-exit'];
 const OLD_IDEAS = () => ({ 1: { idea: 'Stock: sourdough starter', why: 'old', query: 'sourdough starter', by: 'Studio', source: 'rules' }, 2: { idea: 'Like the reference: a bakery counter', why: 'old', query: 'bakery counter', by: 'Studio', source: 'reference' },
   3: { idea: 'Stock: oven timer', why: 'old', query: 'oven timer', by: 'the rules' }, 4: { idea: 'A chart of rising dough', why: 'from the agent', query: 'dough chart', by: 'Claude Code' } });
 const oldBoard = () => { const s = C.defaultState(); s.job = 'from-the-heart'; ok(s, OLD); s.footage = ['inbox/studio/from-the-heart/a.mp4']; s.broll = { 'from-the-heart': { slots: {}, ideas: OLD_IDEAS(), marks: [], cutins: [] } }; return s; };
@@ -170,5 +170,30 @@ try {
     const s = C.defaultState(); s.job = 'waiting'; s.styleLook = 'old-look'; s.reference = { ...s.reference, mode: 'recreate', status: 'running', url: 'https://example.com/v' };
     assert.strictEqual(SLK.plan(s, ROOT), null); s.reference.mode = 'off'; assert.strictEqual(SLK.plan(s, ROOT).name, 'old-look'); });
 
+  t('Keep my look after a Recreate or Copy the look takes your own look into the new video, not the reference\'s', () => {
+    for (const mode of ['recreate', 'look', 'influence']) {
+      const s = useRef(oldBoard(), A, mode);
+      if (mode !== 'influence') assert.notStrictEqual(s.pack, 'hormozi-bold', 'the reference is in use on the board');
+      ok(s, { picks: { 'finish:chroma': 'allow' } }); // a pick made after the reference is yours
+      const refAdded = (s.reference.added || []).slice();
+      C.freshSession(s, { job: 'next-one', keepLook: true });
+      assert.strictEqual(s.pack, 'hormozi-bold', mode + ': your Look comes along');
+      assert.deepStrictEqual(s.music && [s.music.bed, s.music.energy], ['houston-drumline', 'high'], mode + ': your music');
+      assert.ok(s.picks.transition && s.picks.transition.allow.includes('glitch'), mode + ': your transitions');
+      assert.ok(s.picks.finish && s.picks.finish.allow.includes('chroma'), mode + ': a pick you made after the reference stays');
+      for (const ref of refAdded) { const [k, id] = [ref.slice(0, ref.indexOf(':')), ref.slice(ref.indexOf(':') + 1)]; if (k === 'bed') continue;
+        assert.ok(!(s.picks[k] && s.picks[k].allow.includes(id)) || OLD.picks[ref], `${mode}: the reference's ${ref} does not ride into the new video`); }
+      assert.ok(!s.reference || !s.reference.out, 'the new video has no reference');
+      assert.ok(Object.values(s.picks).every(v => (v.allow || []).length + (v.deny || []).length > 0), mode + ': no empty slots');
+    }
+    for (const mode of ['recreate', 'look']) { // new footage with Keep my look on goes the same way
+      const s = useRef(oldBoard(), A, mode); ok(s, { picks: { 'finish:chroma': 'allow' } });
+      C.resetEdit(s, { keepLook: true });
+      assert.strictEqual(s.pack, 'hormozi-bold', mode + ': new footage keeps your Look');
+      assert.ok(s.picks.finish.allow.includes('chroma') && s.picks.transition.allow.includes('glitch'), mode + ': and your picks');
+    }
+    const off = C.freshSession(useRef(oldBoard(), A, 'recreate'), { job: 'clean', keepLook: false });
+    assert.ok(!off.pack && !Object.keys(off.picks).filter(k => k !== 'font').length, 'without Keep my look the board is clean');
+  });
   console.log(`\n${n} studio leak tests passed`);
 } finally { rmSync(TMP, { recursive: true, force: true }); }

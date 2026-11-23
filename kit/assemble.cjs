@@ -72,7 +72,13 @@ const segs = C.segs, tail = C.tail ?? 0.3, hits = [...(C.hits || []), ...(C.drop
 const PZ = C.punch === true ? R.PUNCH.zoom : (+C.punch || 0);
 const zoomOf = (s, i) => s.zoom != null ? +s.zoom : 1 + (PZ && i % 2 === 1 ? PZ : 0);
 const TL = R.timeline(C);
-const trans = segs.map((s, i) => { if (!i || !s.transition) return null; const m = R.xfadeMode(s.transition); if (m === undefined) { console.error(`unknown transition "${s.transition}" on seg ${i} (see kit/transitions.json)`); process.exit(1); } return m ? { m, d: +(s.transitionDur || 0.3) } : null; });
+// a title's exit is the transition at the cut it ends on (captions.js "exit" on a title, kit/rules.cjs titleExitSeams):
+// it wins over the segment's own transition, and most of it plays before the cut, under the title as it leaves
+const EXITS = fs.existsSync('captions.js') ? R.titleExitSeams(R.readCaptions('captions.js'), C) : {};
+const trans = segs.map((s, i) => {
+  const x = EXITS[i];
+  if (x) { console.log(`cut at ${TL.segs[i].start.toFixed(2)} s: the title "${x.text}" leaves by ${x.exit}, which is the transition there${s.transition ? ` (in place of ${s.transition})` : ''}`); return x.m ? { m: x.m, d: x.d, lead: x.lead } : null; }
+  if (!i || !s.transition) return null; const m = R.xfadeMode(s.transition); if (m === undefined) { console.error(`unknown transition "${s.transition}" on seg ${i} (see kit/transitions.json)`); process.exit(1); } return m ? { m, d: +(s.transitionDur || 0.3), lead: 0 } : null; });
 const segLen = s => (s.out - s.in) + (s.pad || 0);
 const LEN = +(segs.reduce((a, s) => a + segLen(s), 0) + tail).toFixed(3);
 const clipDims = f => { try { const [w, h] = execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=p=0:s=x', f]).toString().trim().split('\n')[0].split('x').map(Number); return w > 0 && h > 0 ? { w, h } : null; } catch { return null; } };
@@ -149,7 +155,9 @@ if (BASE) {
     segs.forEach((s, i) => {
       if (!i) return;
       const tr = trans[i], o = `x${i}`;
-      if (tr) f.push(`[${cur}]tpad=stop_duration=${tr.d}:stop_mode=clone,fps=24,settb=AVTB[p${i}]`, `[v${i}]fps=24,settb=AVTB[q${i}]`, `[p${i}][q${i}]xfade=${XFX.xfadeOpts(tr.m)}:duration=${tr.d}:offset=${TL.segs[i].start.toFixed(3)}[${o}]`);
+      // lead (a title's exit): that much of the blend plays before the cut, into the incoming shot's first frame held
+      // for as long, so the next segment still starts on its own output time
+      if (tr) { const hold = +(tr.d - tr.lead).toFixed(3); f.push(`[${cur}]${hold > 0 ? `tpad=stop_duration=${hold}:stop_mode=clone,` : ''}fps=24,settb=AVTB[p${i}]`, `[v${i}]${tr.lead > 0 ? `tpad=start_duration=${tr.lead}:start_mode=clone,` : ''}fps=24,settb=AVTB[q${i}]`, `[p${i}][q${i}]xfade=${XFX.xfadeOpts(tr.m)}:duration=${tr.d}:offset=${(TL.segs[i].start - tr.lead).toFixed(3)}[${o}]`); }
       else f.push(`[${cur}][v${i}]concat=n=2:v=1:a=0,fps=24,settb=AVTB[${o}]`);
       cur = o;
     });

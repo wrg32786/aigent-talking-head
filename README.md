@@ -75,7 +75,7 @@ Your agent installs everything up front (Python, the downloaders, the Whisper mo
 
 **No agent yet?** Tell any agent that runs commands to "install Talking Head Studio and put the icon on my desktop", and it runs our one-line installer for your OS ([docs/install.md](docs/install.md)). Then click the "Talking Head Studio" icon. Without an agent connected, the chat works on keywords, a local model or an API key.
 
-<img src="docs/studio/desktop.png" width="720" alt="Studio in dark: the AIgent wordmark, the six step dots with Cut open, Wizards, Outputs and Claude Code in the top bar, Your edit across the top, the Pieces sorted into Hook, Story, Tip, Proof, List and CTA, Ask my agent next to Look at the bottom, and the chat with Claude Code on the right">
+<img src="docs/studio/desktop.png" width="720" alt="Studio in dark: the AIgent wordmark, the step dots (six in this older picture, eight now) with Cut open, Wizards, Outputs and Claude Code in the top bar, Your edit across the top, the Pieces sorted into Hook, Story, Tip, Proof, List and CTA, Ask my agent next to Look at the bottom, and the chat with Claude Code on the right">
 
 <img src="docs/studio/light.png" width="720" alt="The same Cut step in the light theme">
 
@@ -83,7 +83,7 @@ Your agent installs everything up front (Python, the downloaders, the Whisper mo
 
 **Reference links.** Paste one or more links (YouTube and Shorts, TikTok, X, Vimeo, a direct .mp4, or one public Instagram post) and Studio downloads each to a folder on your computer, shows the progress, and breaks it down: length, shots and cut times, pace, music BPM and energy, caption style, transitions, finishes and graphics. It then suggests matching items from the effects menu. The breakdown goes into the chat, so "use the transitions from the reference but calmer" works. Use it as an influence (soft defaults) or recreate its structure with your clip. Link downloads need [yt-dlp](https://github.com/yt-dlp/yt-dlp), which the installer adds; Instagram uses [instaloader](https://github.com/instaloader/instaloader) anonymously, with no login. Only use videos you have the rights to use as a reference.
 
-<img src="docs/studio/ref-url-desktop.png" width="720" alt="Studio Look step, Reference view: a pasted YouTube link broken down into 90 seconds, 17 shots, 123 BPM and a 5.29 second average shot, a shot timeline with a beat grid, tags for what was found, suggested picks as chips, and a contact sheet">
+<img src="docs/studio/ref-url-desktop.png" width="720" alt="Studio Look step (now Picture), Reference view: a pasted YouTube link broken down into 90 seconds, 17 shots, 123 BPM and a 5.29 second average shot, a shot timeline with a beat grid, tags for what was found, suggested picks as chips, and a contact sheet">
 
 **Cut.** The Cut step has three layers. **Raw take** is your take in full, ready to play. **Best lines** is every line of the take sorted by what it does (Hook, Story, Tip, Proof or quote, List, CTA; asides and retakes tucked away), each one playable, with the lines we recommend marked Best. **Clips** is those lines stitched into the full edit and the short clips with the quiet trimmed: Play plays the stitched result, and a tick keeps a clip. The kept clips move on to the next steps. Our picks are a smart start, so you can just hit Next. [More](docs/studio.md#cut).
 
@@ -107,7 +107,7 @@ Your agent installs everything up front (Python, the downloaders, the Whisper mo
 
 **Footage from a link.** Paste a public Dropbox or Google Drive share link, or a plain video URL, and it downloads into your footage with its size and progress, past Drive's virus-scan page for big files. Private links say they need a login.
 
-<img src="docs/studio/footage-link.png" width="520" alt="The Footage step with a link box: a Google Drive file downloaded into the footage, and a private link with the line This link needs a login">
+<img src="docs/studio/footage-link.png" width="520" alt="The Footage step (now Start) with a link box: a Google Drive file downloaded into the footage, and a private link with the line This link needs a login">
 
 **Teleprompter you can steer.** It scrolls at your speed, and you change it while it scrolls with plus and minus, a slider or the arrow keys, shown as WPM with slow, normal or fast. Rehearse scrolls with nothing recorded, and **Pop out** puts it in its own small window you can drag next to your camera (on top of other apps in Chrome and Edge), in sync with the page.
 
@@ -127,9 +127,9 @@ Your agent installs everything up front (Python, the downloaders, the Whisper mo
 
 **A Look, in layers.** A Look sets every layer at once: on Picture, pick one of the built-in Looks (aigent, cinematic, hormozi-bold, magazine, minimal-clean, neutral) from previews of your own face, or save your picks as a new Look. The layers sit on the step they belong to: Color and finish, Motion, Transitions and Layout on Picture; Text, Fonts and Graphics on Text and graphics; B-roll on B-roll; music, sound effects and pace on Music and sounds. Each choice is a looping preview, with one search over every layer. Each choice carries a badge for where it came from (the Look, the reference or you), your own picks always win, and the forbid button keeps out what you never want. A reference can become its own Look.
 
-<img src="docs/studio/look-layers.png" width="720" alt="The Look step in dark: Your edit at the top, the seven Looks as face previews with magazine picked, Save as a new Look, and the Layers panel on Text with caption previews">
+<img src="docs/studio/look-layers.png" width="720" alt="The Look step (now Picture) in dark: Your edit at the top, the seven Looks as face previews with magazine picked, Save as a new Look, and the Layers panel on Text with caption previews">
 
-<img src="docs/studio/look-layers-light.png" width="720" alt="The same Look step in the light theme">
+<img src="docs/studio/look-layers-light.png" width="720" alt="The same Look step (now Picture) in the light theme">
 
 **Two separate chats.** The Studio chat and your terminal conversation are separate channels. Studio shows only what you type on the page, your agent's replies to it and its Studio actions, never the terminal conversation. Each message shows whether it is queued, seen by your agent or answered. Edits from either place update the page live, and when the agent changes the edit from the terminal, Studio can show a one-line note such as "picked caption style kinetic (from the terminal)" (a setting, on by default). An agent can't be interrupted in the middle of a step: messages wait until its next step, and a Claude Code hook tells it how many Studio messages are waiting.
 
@@ -158,11 +158,11 @@ Your agent installs everything up front (Python, the downloaders, the Whisper mo
 
 **Post to Buffer.** The Post view on the Render step sends the finished reel to your Buffer account, one post per channel: Instagram Reels, TikTok, YouTube Shorts, LinkedIn, X, Facebook Reels and Threads. Posts are saved as Buffer drafts unless you pick queue, a time, or post now (which asks you to tick a box first). Buffer fetches the video from a public link, so Studio uploads it to your Cloudflare R2 bucket or your Cloudinary account, or you paste your own link. It re-encodes to H.264 when needed and skips channels the reel is too long for, with the reason. Your Buffer key stays on your computer and your agent can do the same with the `buffer_post_reel` tool. Details: [docs/posting.md](docs/posting.md).
 
-<img src="docs/studio/post-channels.png" width="420" alt="The Post step, Channels: the reel, four Buffer channels with Facebook Reels marked Will be skipped for a 1 min 40 s reel, and the caption"> <img src="docs/studio/post-send.png" width="420" alt="The Post step, Send: Drafts picked, Send to Buffer as drafts, and the result for each channel">
+<img src="docs/studio/post-channels.png" width="420" alt="The Post step (now the Post view of Render), Channels: the reel, four Buffer channels with Facebook Reels marked Will be skipped for a 1 min 40 s reel, and the caption"> <img src="docs/studio/post-send.png" width="420" alt="The Post step (now the Post view of Render), Send: Drafts picked, Send to Buffer as drafts, and the result for each channel">
 
 **Review, then Render.** Picture's reference view lists the reference's parts with times (hook, cuts, titles, b-roll, CTA), each with the matching Studio picks one click away. On the Review step, Draft makes a quick plan with no video, and you check the picks and the clean-up. On the Render step, Render runs once at full quality and saves the version to Outputs. You can watch your reel beside the reference or under it with an opacity slider, on one clock; click or drag a box on a frame to send your agent a comment with the frame and the time; run a clean-up pass that lists long pauses, filler words and retakes from the Whisper word timings to keep or remove before a redraft; and read the edit receipt, every pick and its reason in plain words. Details: [docs/studio.md](docs/studio.md#review-your-edit).
 
-<img src="docs/studio/finish.png" width="420" alt="The Finish step in dark: Draft, Check and Render, Make with Your 7 pieces or The whole take, the reel or clips, and Show original"> <img src="docs/studio/finish-light.png" width="420" alt="The same Finish step in the light theme">
+<img src="docs/studio/finish.png" width="420" alt="The Finish step (now Review and Render) in dark: Draft, Check and Render, Make with Your 7 pieces or The whole take, the reel or clips, and Show original"> <img src="docs/studio/finish-light.png" width="420" alt="The same Finish step (now Review and Render) in the light theme">
 
 **Notes on a stretch.** On Render, open **Compare with the original, or comment on a frame**, press **Comment on this frame**, scrub to where the problem ends and press **Mark the end here**, then write the note ("This stretch drags"). It goes to your agent's chat with the frame, the start and end times and any box you drew; **Just this frame** turns it back into a note on one moment.
 
@@ -176,7 +176,7 @@ Your agent installs everything up front (Python, the downloaders, the Whisper mo
 
 **On a phone** each step stacks into one column, Your edit wraps to fit, the step bar turns into numbered dots, and the chat opens as a sheet. Ask my agent is shortened to Ask.
 
-<img src="docs/studio/phone.png" width="200" alt="Studio on a phone in dark: the Cut step with Your edit wrapped on four lines, the step dots and the Back, Ask and Look buttons"> <img src="docs/studio/look-phone-light.png" width="200" alt="The Look step on a phone in the light theme, Your edit wrapped above the Looks"> <img src="docs/studio/phone-light.png" width="200" alt="Studio on a phone in the light theme">
+<img src="docs/studio/phone.png" width="200" alt="Studio on a phone in dark: the Cut step with Your edit wrapped on four lines, the step dots and the Back, Ask and Look buttons"> <img src="docs/studio/look-phone-light.png" width="200" alt="The Look step (now Picture) on a phone in the light theme, Your edit wrapped above the Looks"> <img src="docs/studio/phone-light.png" width="200" alt="Studio on a phone in the light theme">
 
 More phone views: [reference](docs/studio/ref-url-phone.png), [settings](docs/studio/settings-phone.png). Studio also speaks [AG-UI](docs/studio.md#ag-ui), so AG-UI clients can watch it or send it messages. The page is built with React and [Astryx](https://github.com/meta/astryx) and ships prebuilt, so nothing extra installs. Reference screenshots show Big Buck Bunny (c) Blender Foundation, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), blender.org.
 

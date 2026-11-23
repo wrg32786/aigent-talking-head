@@ -45,6 +45,23 @@ const CUSTOM = {
     const R = plane(yuv(o.ribbon || '#e10600')), Wt = plane(yuv('#ffffff')), D = plane(yuv('#111111'));
     const d = `((1-Y/H+(X/W)*0.32)/1.32-((1-P)*1.7-0.25))`, s = `mod((X/W)*9+(Y/H)*5,1)`;
     return `if(lt(${d},-0.3),B,if(lt(${d},-0.285),${Wt},if(lt(${d},-0.02),if(lt(${s},0.5),${R},${Wt}),if(lt(${d},0),${D},A))))`;
+  },
+  // Title exits (kit/rules.cjs TITLE_EXIT_MOVES; not in kit/transitions.json: a title's "exit" asks for them).
+  // polaroid: the outgoing picture shrinks into a tilted print with a white border (deeper at the foot) and slides off
+  // to the right, the new shot under it. The same numbers as polaroidAt() in kit/overlay.html, which moves the title.
+  polaroid: () => {
+    const q = '(1-P)', a = `min(1,${q}/0.55)`, e = smooth(a), b = `max(0,(${q}-0.45)/0.55)`, s = `(1-0.42*${e})`, th = `(-0.1*${e})`;
+    const px = `(X-W/2-1.25*W*${b}*${b})`, py = `(Y-H/2+0.06*H*${b})`;
+    const u = `((${px}*cos(${th})+${py}*sin(${th}))/${s}+W/2)`, v = `((${py}*cos(${th})-${px}*sin(${th}))/${s}+H/2)`, bw = '(0.035*W)';
+    return `if(between(${u},0,W-1)*between(${v},0,H-1),${at('a', u, v)},if(between(${u},-${bw},W+${bw})*between(${v},-${bw},H+3*${bw}),${plane(yuv('#f7f5ee'))},B))`;
+  },
+  // glitch-slice: 14 horizontal bands of the outgoing picture tear out sideways, odd and even bands opposite ways, each
+  // starting at its own moment, with the colour planes a little apart; the new shot is under them. The same bands and
+  // shifts as sliceAt() in kit/overlay.html, which tears the title.
+  'glitch-slice': () => {
+    const q = '(1-P)', b = 'floor(Y*14/H)', r = `mod(abs(sin((${b}+1)*12.9898)*43758.5453),1)`, k = `clip((${q}-${r}*0.35)/0.65,0,1)`;
+    const x = `(X-if(mod(${b},2),-1.1,1.1)*W*${k}*${k}+if(eq(PLANE,0),0,0.012*W*sin(PI*${q})))`;
+    return `if(between(${x},0,W-1),${at('a', x, 'Y')},B)`;
   }
 };
 
