@@ -1,8 +1,8 @@
 # Posting to Buffer
 
-The Post step is the last step in Studio. It sends a rendered reel to your [Buffer](https://buffer.com) account, one post per channel, and saves each one as a Buffer draft unless you pick otherwise. Your terminal agent can do the same with the `buffer_post_reel` MCP tool.
+Post is the last view in Studio, inside the Render step (it was the Post step before 1.28.0). It sends a rendered reel to your [Buffer](https://buffer.com) account, one post per channel, and saves each one as a Buffer draft unless you pick otherwise. Your terminal agent can do the same with the `buffer_post_reel` MCP tool.
 
-![The Post step, Channels: the reel, your Buffer channels with their limits, and one caption](studio/post-channels.png)
+![Post (in Render), Channels: the reel, your Buffer channels with their limits, and one caption](studio/post-channels.png)
 
 ## What you need
 
@@ -36,7 +36,7 @@ Instagram only takes a 9:16 video as a Reel or a Story. A Feed post has to be be
 
 Nothing about how posts go out changes: they are still saved as Buffer drafts unless you pick something else.
 
-![The Post step, Send: Drafts picked and the result for each channel](studio/post-send.png)
+![Post (in Render), Send: Drafts picked and the result for each channel](studio/post-send.png)
 
 ## Checks before anything is sent
 
