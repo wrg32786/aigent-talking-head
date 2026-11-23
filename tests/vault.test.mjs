@@ -76,6 +76,15 @@ try {
     const cr = BR.credits([BR.get('brold00001')], 'my-reel'); assert.ok(/by Ada https:\/\/pexels\.com\/@ada/.test(cr) && /Pexels License/.test(cr) && /Videos provided by Pexels/.test(cr), cr);
     assert.ok(BR.search('laptop').some(c => c.id === 'brold00001'), 'the reel still finds it');
   });
+  await t('the move is saved clip by clip and carries on after a stop: a clip whose file already moved keeps its credits', () => {
+    const mf = join(STATE, 'old'), mt = join(STATE, 'new'); mkdirSync(join(mf, 'upload', 'dir.mp4'), { recursive: true }); mkdirSync(join(mt, 'items', 'brhalf0001'), { recursive: true });
+    writeFileSync(join(mt, 'items', 'brhalf0001', 'a.mp4'), 'clip a'); writeFileSync(join(mf, 'upload', 'b.mp4'), 'clip b'); // a.mp4 moved before Studio was stopped, b.mp4 had not yet
+    const clip = (id, f, who) => ({ id, file: 'upload/' + f, name: f, source: 'upload', kind: 'video', author: { name: who }, tags: ['walk'], usedIn: ['reel-1'] });
+    writeFileSync(join(mf, 'library.json'), JSON.stringify({ clips: [clip('brhalf0001', 'a.mp4', 'Bo'), clip('brwait0002', 'b.mp4', 'Cy'), clip('brbad00003', 'dir.mp4', 'Di')] }));
+    assert.throws(() => V.migrate(mf, mt), 'the third clip cannot be read, as if Studio stopped there');
+    const got = V.load(mt).items; assert.deepStrictEqual(got.map(x => [x.id, x.author.name, x.usedIn[0], x.file]), [['brhalf0001', 'Bo', 'reel-1', 'items/brhalf0001/a.mp4'], ['brwait0002', 'Cy', 'reel-1', 'items/brwait0002/b.mp4']], 'what moved before the stop is in the index');
+    assert.ok(existsSync(join(mf, 'library.json')), 'the old index stays until the move is whole');
+  });
   await t('add: the file keeps its name beside item.json, is yours by default, and the same file is added once', () => {
     own = V.add(file('My Pricing Page.png', 'png one'), { title: 'Pricing page', tags: ['Pricing'], brand: ['Acme'] });
     assert.deepStrictEqual([own.file, own.name, own.kind, own.rights, own.source, own.brand, own.from.type], [`items/${own.id}/My-Pricing-Page.png`, 'Pricing page', 'image', 'mine', 'upload', ['Acme'], 'file']);
@@ -85,6 +94,9 @@ try {
     const made = V.add(file('card.png', 'png one'), { source: 'agent' }); assert.notStrictEqual(made.id, own.id); assert.strictEqual(made.rights, 'mine');
     assert.throws(() => V.add(file('notes.txt', 'x')), /video .* or a picture/); assert.throws(() => V.add(join(STATE, 'nope.png')), /no such file/);
     pic = V.add(file('desk-photo.jpg', 'jpg two'), { rights: 'licensed' }); assert.strictEqual(pic.rights, 'licensed');
+    // a refused upload does not leave its temp file behind; a copy (your own file) is never touched
+    const tmpUp = file('upload-temp.txt', 'x'), mineF = file('mine.txt', 'x'); assert.throws(() => V.add(tmpUp, { move: true }), /video .* or a picture/); assert.ok(!existsSync(tmpUp));
+    assert.throws(() => V.add(mineF), /video .* or a picture/); assert.ok(existsSync(mineF));
   });
   await t('delete waits 7 days with Undo; after that it is gone', () => {
     const tmp = V.add(file('old-logo.png', 'png three')), f = V.pathOf(tmp);
@@ -119,6 +131,15 @@ try {
     const wall = await V.addLink('https://app.acme.com/dashboard', {}, { capture: async () => ({ dir: cap, title: 'Sign in', signin: true }) }).ready;
     assert.deepStrictEqual([wall.file, V.placeable(wall)], [null, false]); assert.ok(/needs you signed in/.test(wall.note));
     const dead = await V.addLink('https://gone.acme.com/x', {}, { capture: async () => { throw new Error('host not found'); } }).ready; assert.ok(/kept the link/.test(dead.note) && dead.file === null);
+    // pasting a link that has no picture tries the capture again; one that has its picture is left alone
+    let tries = 0; const good = async () => { tries++; return { dir: cap, title: 'Back again', signin: false }; };
+    const retry = V.addLink('gone.acme.com/x', {}, { capture: good }); assert.deepStrictEqual([retry.duplicate, retry.item.id, retry.item.status], [true, dead.id, 'getting']);
+    const back = await retry.ready; assert.deepStrictEqual([back.id, back.file, back.note, V.placeable(back)], [dead.id, `items/${dead.id}/capture/scroll.mp4`, null, true]);
+    await V.addLink('gone.acme.com/x', {}, { capture: good }).ready; assert.strictEqual(tries, 1); V.remove(dead.id);
+    // deleted while it was being captured: nothing is written back, and Undo still works (even over a leftover folder)
+    const slow = V.addLink('https://acme.com/slow', {}, { capture: async () => { await null; V.remove(slow.item.id); return { dir: cap, title: 'Slow', signin: false }; } });
+    assert.strictEqual(await slow.ready, null); assert.ok(!existsSync(join(LIB, 'items', slow.item.id)), 'no files come back after the delete');
+    mkdirSync(join(LIB, 'items', slow.item.id, 'capture'), { recursive: true }); assert.strictEqual(V.restore(slow.item.id).id, slow.item.id); assert.ok(existsSync(join(LIB, 'items', slow.item.id, 'item.json'))); V.remove(slow.item.id);
   });
   await t('search by names, tags, brand and page text, with the four filters; rights can be changed and decide what may be placed', () => {
     const ids = (q, f) => V.search(q, f).map(x => x.id);
@@ -161,6 +182,12 @@ try {
     // the reference cutaway is the second voice: it counts when our own words find nothing
     const hint = VM.score({ ...BB.rules({ start: 0, end: 3, kind: 'panel', line: 'and that is it', what: 'Pricing', ref: { n: 1 } }), subject: 'something else' }, own); assert.ok(hint && /matches "pricing"/.test(hint.reason));
     for (const x of c) NO_DASH(x.reason);
+    // whole words only: "car" is not in "postcard" and the name Rob is not in "problem"; a short name and a site still match
+    const clipOf = name => ({ id: 'w', file: 'items/w/' + name, name, kind: 'video', rights: 'mine', tags: V.words(name), usedIn: [] }), named = (n, extra) => ({ ...b, named: [n], subject: n, ...extra });
+    assert.strictEqual(VM.score(BB.rules({ start: 0, end: 3, kind: 'full', line: 'my car is parked outside' }), clipOf('scarf-and-postcard.mp4')), null);
+    assert.strictEqual(VM.score(named('Rob'), clipOf('problem-solving.mp4')), null); assert.ok(VM.score(named('Rob'), clipOf('rob-on-stage.mp4')).score >= VM.BAR);
+    assert.ok(VM.score(named('AI'), clipOf('ai tools.mp4')), 'a two letter name'); assert.ok(VM.score(named('omniroute.dev'), { ...clipOf('home.mp4'), text: 'welcome to omniroute.dev today' }), 'a site in the page text');
+    assert.ok(VM.score(BB.rules({ start: 0, end: 3, kind: 'full', line: 'my cars are parked outside' }), clipOf('red-car.mp4')), 'a stem still matches');
   });
   await t('matching: the same item is never the pick of two slots, and the slot that serves the point chooses first', () => {
     const items = V.load().items, b1 = BB.rules(slotA), b2 = BB.rules({ ...slotA, start: 10, end: 14, line: 'OmniRoute routes every model.' }, { point: 'route every model' });
@@ -210,6 +237,15 @@ try {
     assert.deepStrictEqual(s1.brief.reference.showed, 'Kilo Code'); assert.ok(!/Kilo/.test(s1.brief.subject), 'the reference subject is a hint, not ours');
     assert.deepStrictEqual([s1.candidates, s1.need.suggest, s1.need.none], [[], null, 'Nothing in your Vault fits yet.'], 'a screen slot gets no stock suggestion');
     assert.ok(s2.need.suggest && s2.need.suggest.from === 'stock' && /^From Pexels: "/.test(s2.need.suggest.reason), JSON.stringify(s2.need)); assert.strictEqual(stockCalls, 0, 'no network call for a suggestion'); NO_DASH(JSON.stringify(v));
+  });
+  await t('Studio: a clip only a looser search would find is not picked for a plan slot and Suggest still answers; the old library route cannot delete for an agent', async () => {
+    // the reference showed "Kilo Code": "kilometers" holds those letters and is not that
+    const r = await fetch(`${url}/api/vault/upload?name=kilometers.png`, { method: 'POST', body: 'png km' }), km = (await r.json()).item;
+    assert.deepStrictEqual((await req('/api/broll')).j.beats.find(b => b.n === s1.n).candidates, []);
+    const sg = await req('/api/broll/suggest', {}); assert.strictEqual(sg.status, 200, sg.text); assert.strictEqual(sg.j.broll.beats.find(b => b.n === s1.n).idea, null);
+    assert.strictEqual((await req('/api/broll/library', { id: km.id, action: 'remove' })).status, 403); assert.ok(V.get(km.id));
+    assert.strictEqual((await req('/api/broll/library', { id: km.id, action: 'remove' }, { 'x-studio-page': '1' })).status, 200); assert.strictEqual(V.get(km.id), null);
+    await req('/api/broll/clear', {}).catch(() => {});
   });
   await t('Studio: the Vault routes: upload, the same file once, a link saved as reference only, filters, delete only from the page, Undo', async () => {
     const up = async (name, body, q = '') => { const r = await fetch(`${url}/api/vault/upload?name=${encodeURIComponent(name)}${q}`, { method: 'POST', body }); return { status: r.status, j: await r.json() }; };
