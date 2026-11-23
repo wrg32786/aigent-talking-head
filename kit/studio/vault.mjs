@@ -15,7 +15,7 @@
 // Reference only items (links to other people's videos and posts) are never placed in a reel.
 // shortcut: tags are one flat list and search is by words, until the local picture model lands (phase 3 of the spec).
 import { spawnSync } from 'child_process';
-import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmSync, rmdirSync, statSync, writeFileSync } from 'fs';
+import { closeSync, copyFileSync, cpSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmSync, rmdirSync, statSync, writeFileSync } from 'fs';
 import { basename, dirname, extname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { createHash, randomBytes } from 'crypto';
@@ -60,8 +60,9 @@ export function load(d) {
 function save(v, d) { const f = idxPath(d), tmp = f + '.tmp'; writeFileSync(tmp, JSON.stringify(v, null, 1) + '\n'); renameSync(tmp, f); }
 // the record beside its files, so the index can be rebuilt from the folder
 function keep(it, d = dir()) { try { mkdirSync(join(d, 'items', it.id), { recursive: true }); writeFileSync(join(d, 'items', it.id, 'item.json'), JSON.stringify(it, null, 1) + '\n'); } catch {} return it; }
-const move = (a, b) => { mkdirSync(dirname(b), { recursive: true }); try { renameSync(a, b); } catch { copyFileSync(a, b); rmSync(a, { force: true }); } };
-const posix = p => p.split('\\').join('/');
+// a file or a folder. When a rename is refused (another drive, or Windows with a file of the folder still open in a
+// player) it is copied, and the old one is cleared as far as it lets us.
+const move = (a, b) => { mkdirSync(dirname(b), { recursive: true }); try { renameSync(a, b); } catch { cpSync(a, b, { recursive: true }); try { rmSync(a, { recursive: true, force: true, maxRetries: 3 }); } catch {} } };
 export const rightsOf = source => (source === 'pexels' || source === 'pixabay' ? 'licensed' : source === 'capture' ? 'public-page' : 'mine');
 const siteOf = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return null; } };
 export function sha(f) {
@@ -71,18 +72,19 @@ export function sha(f) {
 }
 // broll-library/library.json (1.28.0 and before) into the Vault: every clip keeps its id, name, tags, license, author,
 // source link and where it was used, so old reels and credits.txt still read the same. The old index is kept beside
-// it as library.migrated.json. Returns how many moved.
+// it as library.migrated.json. Returns how many moved. The index is saved after every clip and a clip whose file already
+// moved is picked up again, so stopping Studio half way loses nothing: the next start carries on.
 export function migrate(from, to) {
   const f = join(from, 'library.json'); if (!existsSync(f)) return 0;
   let clips = []; try { clips = JSON.parse(readFileSync(f, 'utf8')).clips || []; } catch { return 0; }
   const v = load(to), have = new Set(v.items.map(x => x.id)); let n = 0;
   for (const c of clips) {
     if (!c || !c.id || have.has(c.id) || !c.file) continue;
-    const src = join(from, c.file); if (!existsSync(src)) continue;
-    const rel = `items/${c.id}/${basename(c.file)}`; move(src, join(to, rel));
-    let thumb = null; if (c.thumb && existsSync(join(from, c.thumb))) { thumb = `items/${c.id}/thumb.jpg`; move(join(from, c.thumb), join(to, thumb)); }
+    const src = join(from, c.file), rel = `items/${c.id}/${basename(c.file)}`;
+    if (existsSync(src)) move(src, join(to, rel)); else if (!existsSync(join(to, rel))) continue;
+    let thumb = `items/${c.id}/thumb.jpg`; if (c.thumb && existsSync(join(from, c.thumb))) move(join(from, c.thumb), join(to, thumb)); else if (!existsSync(join(to, thumb))) thumb = null;
     const it = { ...c, file: rel, thumb, rights: rightsOf(c.source), from: c.source === 'capture' && c.sourceUrl ? { type: 'link', url: c.sourceUrl, site: siteOf(c.sourceUrl), what: 'page' } : { type: 'file' }, hash: sha(join(to, rel)), brand: [] };
-    v.items.push(keep(it, to)); n++;
+    v.items.push(keep(it, to)); save(v, to); n++;
   }
   save(v, to); renameSync(f, join(from, 'library.migrated.json'));
   for (const d of ['.thumbs', ...SOURCES]) { try { rmdirSync(join(from, d)); } catch {} } // only the folders the move left empty
@@ -166,7 +168,9 @@ const brandList = a => [...new Map([].concat(a || []).map(x => String(x).trim().
 // Copied in (or moved with move: true) with where it came from, its license and its rights mark. The same file twice
 // is added once: you get the item you already have, with duplicate: true (uploads and screen recordings; stock is
 // checked by its own id, and pieces cut from a raw upload, made cards and fast runs are always their own items).
-export function add(src, m = {}) {
+// a file given to us to move (an upload's temp file) is cleared when it is refused, so a full Vault does not fill the disk
+export function add(src, m = {}) { try { return addFile(src, m); } catch (e) { if (m.move) rmSync(src, { force: true }); throw e; } }
+function addFile(src, m) {
   if (!existsSync(src)) throw bad('no such file');
   const name = safe(m.name || basename(src)); if (!VIDEO.test(name) && !IMAGE.test(name)) throw bad('b-roll is a video (mp4, mov, webm, m4v, mkv) or a picture (jpg, png, webp)');
   const bytes = statSync(src).size, u = usage();
@@ -213,7 +217,7 @@ export function remove(id) {
 export function restore(id) {
   const v = load(), k = v.trash.findIndex(x => !id || x.id === id); if (k < 0) throw bad('nothing to undo', 404);
   const [{ deletedAt, ...it }] = v.trash.splice(k, 1), d = dir(), a = join(d, '.trash', it.id);
-  if (existsSync(a)) move(a, join(d, 'items', it.id));
+  if (existsSync(a)) { rmSync(join(d, 'items', it.id), { recursive: true, force: true }); move(a, join(d, 'items', it.id)); }
   v.items.unshift(it); save(v); return it;
 }
 // deleted more than 7 days ago: gone for good
@@ -250,7 +254,9 @@ const linkName = u => { const x = new URL(u); return (x.hostname.replace(/^www\.
 export function addLink(url, o = {}, { capture = null } = {}) {
   const key = x => String(x).replace(/^https?:\/\/(www\.)?/, ''); // the same page with or without www, http or https
   const u = tidyUrl(url), v = load(), dup = v.items.find(x => x.from && x.from.type === 'link' && key(x.from.url) === key(u));
-  if (dup) return { item: { ...dup, duplicate: true }, duplicate: true, ready: Promise.resolve(dup) };
+  // the link you have. One with no picture (the page did not open, or Studio stopped half way) is tried again.
+  if (dup) { const busy = dup.status === 'getting' && Date.now() - Date.parse(dup.addedAt) < 5 * 60e3, again = capture && !dup.file && !busy ? update(dup.id, { patch: { status: 'getting', note: null } }) : null;
+    return { item: { ...(again || dup), duplicate: true }, duplicate: true, ready: again ? grab(again, capture) : Promise.resolve(dup) }; }
   const what = linkKind(u), mine = o.mine === true, rights = mine ? 'mine' : what === 'post' ? 'reference' : 'public-page', id = 'br' + randomBytes(4).toString('hex');
   const it = { id, file: null, name: o.title ? String(o.title).slice(0, 80) : linkName(u), source: 'capture', kind: 'link', rights, license: rights === 'mine' ? LICENSES.mine : rights === 'reference' ? LICENSES.reference : LICENSES.capture,
     author: null, sourceUrl: u, from: { type: 'link', url: u, site: siteOf(u), what }, tags: tagList([...(o.tags || []), ...words(linkName(u).replace(/[./]/g, ' ')), what]), brand: brandList(o.brand), ...(o.describe ? { describe: String(o.describe).slice(0, 300) } : {}),
@@ -266,12 +272,13 @@ async function grab(it, capture) {
   const post = it.from.what === 'post';
   try {
     const r = await capture(it.from.url, { scroll: post ? 0 : 10, width: 780, imageOnly: post, force: true, extras: true });
+    if (!get(it.id)) return null; // deleted while we worked: write nothing, so Undo finds its folder free
     const d = join(dir(), 'items', it.id, 'capture'); mkdirSync(d, { recursive: true });
     const put = (name, as) => { const f = join(r.dir, name); if (!existsSync(f)) return null; copyFileSync(f, join(d, as)); return `items/${it.id}/capture/${as}`; };
     const top = put('shot.png', 'top.png'), full = put('full.png', 'full.png'), scroll = post ? null : put('scroll.mp4', 'scroll.mp4'), og = r.og ? put(r.og, 'og' + extname(r.og)) : null;
     if (r.signin || !top) return update(it.id, { patch: { status: null, note: 'This page needs you signed in. We kept the link.' } });
     const file = scroll || top, abs = join(dir(), file), meta = probe(abs), bytes = [top, full, scroll, og].filter(Boolean).reduce((a, f) => a + statSync(join(dir(), f)).size, 0);
-    const cur = get(it.id); if (!cur) return null; // deleted while we worked
+    const cur = get(it.id);
     const title = String(r.title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
     return update(it.id, { tags: [...(cur.tags || []), ...words(title), ...frameTags(abs, meta)], patch: { status: null, file, kind: scroll ? 'video' : 'image', ...meta, bytes, capture: { og, top, full, scroll }, hash: sha(abs), frames: scroll ? framesOf(abs, it.id) : 0,
       thumb: thumbOf(join(dir(), og || top), it.id) || thumbOf(join(dir(), top), it.id), ...(title ? { title, ...(cur.name === linkName(it.from.url) ? { name: title } : {}) } : {}), text: String(r.text || '').replace(/\s+/g, ' ').trim().slice(0, 4000), captured: new Date().toISOString(), ...(r.final ? { final: r.final } : {}) } });
