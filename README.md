@@ -414,7 +414,7 @@ The code and docs are Apache-2.0, so commercial use is fine. The bundled sounds 
 | Cursor | `npx skills add wrg32786/aigent-talking-head -a cursor` |
 | Codex | `npx skills add wrg32786/aigent-talking-head -a codex` |
 
-That installs ten skills: aigent-talking-head, aigent-studio, talking-head-reel, talking-head-recipe, talking-head-brand, talking-head-teardown, talking-head-split, talking-head-ad, clip-raw-footage and humanizer (by Siqi Chen, MIT, for scripts). Add `-g` to install for every project. By hand: copy the folders under `skills/` into `.claude/skills/` (Claude Code) or `.agents/skills/` (Cursor, Codex). The skills drive a local checkout, so the agent still needs the kit installed ([agent install steps](INSTALL.md)).
+That installs ten skills: aigent-talking-head, aigent-studio, talking-head-reel, talking-head-recipe, talking-head-brand, talking-head-teardown, talking-head-explainer, talking-head-ad, clip-raw-footage and humanizer (by Siqi Chen, MIT, for scripts). Add `-g` to install for every project. By hand: copy the folders under `skills/` into `.claude/skills/` (Claude Code) or `.agents/skills/` (Cursor, Codex). The skills drive a local checkout, so the agent still needs the kit installed ([agent install steps](INSTALL.md)).
 
 **MCP.** `npm run mcp` serves the same flow as MCP tools (menu, list_effects, list_packs, get_pack, draft, explain, set_locks, plan, validate, render, verify) with schemas generated from contract.json, plus studio_ tools that let your agent listen and answer in the Studio chat, add reference links and read their teardowns. See the [MCP setup for Claude Code, Cursor and Codex](docs/mcp.md). For a summary written for language models, see [llms.txt](llms.txt).
 

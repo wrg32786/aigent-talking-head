@@ -51,7 +51,7 @@
     "setup:all": "node kit/setup.mjs",
     "release:notes": "node kit/release-notes.mjs",
     "look": "node kit/stylelook.cjs",
-    "split": "node kit/split.mjs"
+    "explainer": "node kit/explainer.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",

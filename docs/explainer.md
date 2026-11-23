@@ -1,23 +1,27 @@
-# Split-screen explainer
+# Explainer
 
-`npm run split -- <job>` turns a drafted job into a split-screen reel: a proof panel on top (a screenshot, a terminal, a progress card, an equation or a big number), the presenter in a rounded frame on the bottom half over grid paper, and short captions in the gap between them. Cutaways and the call to action go full frame. It suits explainers about a tool, a repo or a result you can show on screen.
+`npm run explainer -- <job>` turns a drafted job into a split-screen reel: a proof panel on top (a screenshot, a terminal, a progress card, an equation or a big number), the presenter in a rounded frame on the bottom half over grid paper, and short captions in the gap between them. Cutaways and the call to action go full frame. It suits explainers about a tool, a repo or a result you can show on screen.
 
-It is built with [HyperFrames](https://hyperframes.heygen.com) (HTML rendered to video), so every reel is also an editable project in `jobs/<job>/split/`.
+It is built with [HyperFrames](https://hyperframes.heygen.com) (HTML rendered to video), so every reel is also an editable project in `jobs/<job>/explainer/`.
 
 ## Steps
 
 ```
 npm run reel -- inbox/my-take.mov --name my-reel --draft     # 1. transcribe and cut, as usual
-cp examples/split/Split.json jobs/my-reel/Split.json          # 2. edit the hook, beats and call to action
-npm run split -- my-reel --no-render                          # 3. build and check the project
-npm run split -- my-reel                                      # 4. render jobs/my-reel/split-v1.mp4
+cp examples/explainer/Explainer.json jobs/my-reel/Explainer.json          # 2. edit the hook, beats and call to action
+npm run explainer -- my-reel --no-render                          # 3. build and check the project
+npm run explainer -- my-reel                                      # 4. render jobs/my-reel/explainer-v1.mp4
 ```
 
-Look at it before you post: `cd jobs/my-reel/split && npx hyperframes@0.9.68 snapshot --at 1,5,10` writes stills, and `npm run dev` there opens the preview. Change a scene in `jobs/<job>/split/compositions/`, or change the Split.json and run split again (it rebuilds the project and renders the next version number).
+Look at it before you post: `cd jobs/my-reel/explainer && npx hyperframes@0.9.68 snapshot --at 1,5,10` writes stills, and `npm run dev` there opens the preview. Change a scene in `jobs/<job>/explainer/compositions/`, or change the Explainer.json and run split again (it rebuilds the project and renders the next version number).
 
 Needs, on top of the kit's install: Node 18+ with `npx` (HyperFrames is fetched at a pinned version on first use) and network access for that first fetch.
 
-## Split.json
+## What goes over the network
+
+Rendering happens on your computer. Two things are fetched from npm the first time and kept: HyperFrames (`npx hyperframes@0.9.68`) and GSAP (`gsap@3.15.0`, into `jobs/.explainer/gsap/`, then copied into each project so the page renders offline). HyperFrames runs with its telemetry off (`HYPERFRAMES_NO_TELEMETRY=1`, `DO_NOT_TRACK=1`), also when you run `npm run dev`, `check` or `render` inside the project (they go through its `hf.mjs`). Fonts and colours come from the kit (`kit/fonts`, `kit/themes/aigent.js`), so nothing loads from a font or script CDN.
+
+## Explainer.json
 
 ```json
 {
@@ -29,7 +33,7 @@ Needs, on top of the kit's install: Node 18+ with `npx` (HyperFrames is fetched 
   "cutaways": [{ "after": "watch this", "file": "inbox/b-roll.mp4" }],
   "beats": [
     { "at": "this repo", "type": "browser", "url": "github.com/you/repo", "image": "shots/repo.png" },
-    { "at": "one command", "type": "terminal", "lines": ["$ npm run split -- my-reel", "✓ 8 scenes, 23 captions"] },
+    { "at": "one command", "type": "terminal", "lines": ["$ npm run explainer -- my-reel", "✓ 8 scenes, 23 captions"] },
     { "at": "free", "type": "keyword", "word": "free", "sub": "to use or build on" }
   ],
   "cta": { "at": "comment", "word": "SPLIT", "sub": "I'll send you the link" }

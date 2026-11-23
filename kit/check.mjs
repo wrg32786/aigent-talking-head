@@ -239,6 +239,10 @@ if (target) {
     const aerrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-agent.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { aerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    const explainerTimingErrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'explainer-timing.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { explainerTimingErrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Explainer timing (tests/explainer-timing.test.mjs: a repeated phrase, a cutaway in the pause, shifted words, beats)', errs: explainerTimingErrs, warns: [] });
     results.push({ label: 'Studio agent tests (tests/studio-agent.test.mjs: reference links, settings, local model, agent channel over MCP, hook)', errs: aerrs, warns: [] });
     const fxerrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-fixes.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
