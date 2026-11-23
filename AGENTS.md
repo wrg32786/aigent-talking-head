@@ -10,6 +10,10 @@ The usual job: a teammate recorded themselves on their phone, dropped the file i
 
 Setup check: `npm install`, `pip install -r requirements.txt`, then `npm run smoke` must print `SMOKE PASS` and `npm run check` must print `CHECK PASS`. If Chrome isn't found, set `CHROME_PATH`; if Python isn't `python3`, set `PYTHON`.
 
+## A ready-made editor agent
+
+`agents/video-editor.md` is a Claude Code subagent that knows the whole kit: which command fits the job (reel, split, Studio, teardown, clip-raw-footage), the draft, plan, review, render and verify loop, and fixes learned on real reels (captions off a low face, cutaways in the pause after a word, numbered versions). Install it with `mkdir -p .claude/agents && cp agents/video-editor.md .claude/agents/` (or `~/.claude/agents/` for every project), then ask Claude Code to use the video-editor agent.
+
 ## Studio: set it up and be the agent in it
 
 When the user says "install and run Studio", "set up Studio and run the Studio chat loop", or anything like it, you do all of it yourself. Studio is a local page (http://127.0.0.1:4757) where they drop footage and reference links, click effects and chat; by default **you** answer that chat. Skill: [skills/aigent-studio/SKILL.md](skills/aigent-studio/SKILL.md). Details: [docs/studio.md](docs/studio.md#your-terminal-agent-in-studio).
