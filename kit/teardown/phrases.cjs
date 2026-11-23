@@ -6,35 +6,40 @@
 'use strict';
 const fs = require('fs'), path = require('path');
 const { TITLE_EFFECTS, TITLE_EXITS, TITLE_BUILDS } = require('../rules.cjs');
+const { clean } = require('./util.cjs');
 
 const AGENT_FILE = 'titles.agent.json';
 const KEY_FONTS = ['italic serif', 'serif', 'sans', 'script', 'mono'];
+const MAX_TITLES = 80;   // the most titles an agent may send, and the most a recipe keeps
+// lines sit on one Reel.md line as "LINE / LINE": the spaces are part of the mark, so "24/7" stays one line
+const LINE_JOIN = ' / ', LINE_SPLIT = /\s+\/\s+/;
 const r2 = x => Math.round(x * 100) / 100;
 
 // The titles an agent (or a vision model) read from the sheets: checked, cleaned, in time order.
-// { ok, errs, unread, titles: [{ start, end, lines, key, font, glow, effect, exit, build, swap, count }] }
+// { ok, errs, unread: [{ start, end }], titles: [{ start, end, lines, key, font, glow, effect, exit, build, swap, count }] }
 // A title may come flat or split into how it is set and how it moves ({ start, end, set: { lines, key, font, glow },
 // move: { build, effect, exit, swap, count } }). { start, end, unread: true } is a title the agent saw and could not
-// read: it is counted and left out, so the OCR's read stays for that moment and no words are made up.
+// read: its span is kept, so the OCR's read stays for that moment (withAgent) and no words are made up.
 // idea from mojomast/open-higgsfield-skills skills/effect-recipe-read (MIT; forkfield design by marciano71, MIT) and Comfy-Org/comfy-skills technique-consistent-characters (MIT)
 function validateAgentTitles(input) {
-  const errs = [], out = [], list = Array.isArray(input) ? input : input && input.titles; let unread = 0;
+  const errs = [], out = [], list = Array.isArray(input) ? input : input && input.titles, unread = [];
+  const num = v => (typeof v === 'number' || (typeof v === 'string' && v.trim()) ? +v : NaN);   // null, true and [] are not seconds
   if (!Array.isArray(list) || !list.length) return { ok: false, errs: ['titles must be a list with at least one title'], titles: [] };
-  if (list.length > 80) return { ok: false, errs: ['at most 80 titles'], titles: [] };
+  if (list.length > MAX_TITLES) return { ok: false, errs: [`at most ${MAX_TITLES} titles`], titles: [] };
   const str = v => typeof v === 'string' && v.trim() && v.length <= 80 && !/[\u0000-\u001f|]/.test(v);
   list.forEach((t, i) => {
     const at = `title ${i + 1}: `, e = m => errs.push(at + m);
     if (!t || typeof t !== 'object') return e('must be an object');
     if (t.set || t.move) t = { ...t, ...(t.set && typeof t.set === 'object' ? t.set : {}), ...(t.move && typeof t.move === 'object' ? t.move : {}) };
-    if (t.unread === true) { unread++; return; }
-    const start = +t.start, end = +t.end;
+    const start = num(t.start), end = num(t.end);
     if (!(Number.isFinite(start) && start >= 0 && Number.isFinite(end) && end > start && end - start <= 30)) return e('start and end are seconds in the reference, end after start, at most 30 s apart');
-    const lines = Array.isArray(t.lines) ? t.lines : typeof t.text === 'string' ? t.text.split('/') : null;
+    if (t.unread === true) { unread.push({ start: r2(start), end: r2(end) }); return; }
+    const lines = Array.isArray(t.lines) ? t.lines : typeof t.text === 'string' ? t.text.split(LINE_SPLIT) : null;
     if (!lines || lines.length < 1 || lines.length > 3 || !lines.every(str)) return e('lines is 1 to 3 lines of text, each up to 80 letters');
     const o = { start: r2(start), end: r2(end), lines: lines.map(l => l.trim().replace(/\s+/g, ' ')) };
     if (t.key != null && t.key !== '') {
       if (!str(t.key)) return e('key is the key word, as it is written in the lines');
-      if (!o.lines.join(' ').toLowerCase().includes(t.key.trim().toLowerCase())) return e(`key "${t.key}" is not in the lines`);
+      if (!o.lines.some(l => l.toLowerCase().includes(t.key.trim().toLowerCase()))) return e(`key "${t.key}" is not in one of the lines`);
       o.key = t.key.trim();
     }
     for (const [k, allowed] of [['font', KEY_FONTS], ['effect', TITLE_EFFECTS], ['exit', TITLE_EXITS], ['build', TITLE_BUILDS]]) {
@@ -46,7 +51,7 @@ function validateAgentTitles(input) {
     if (t.swap != null) { if (!Array.isArray(t.swap) || t.swap.length < 2 || t.swap.length > 6 || !t.swap.every(str)) return e('swap is 2 to 6 words that roll one after another'); o.swap = t.swap.map(x => x.trim()); }
     if (t.count != null) {
       const c = t.count;
-      if (!c || typeof c !== 'object' || !Number.isFinite(+c.from) || !Number.isFinite(+c.to) || (c.unit != null && !str(c.unit)) || (c.final != null && !str(c.final))) return e('count is { from, to, unit, final }: two numbers, a unit word and the text it ends on');
+      if (!c || typeof c !== 'object' || !Number.isFinite(num(c.from)) || !Number.isFinite(num(c.to)) || (c.unit != null && !str(c.unit)) || (c.final != null && !str(c.final))) return e('count is { from, to, unit, final }: two numbers, a unit word and the text it ends on');
       o.count = { from: +c.from, to: +c.to, ...(c.unit ? { unit: c.unit.trim() } : {}), ...(c.final ? { final: c.final.trim() } : {}) };
     }
     out.push(o);
@@ -57,11 +62,11 @@ function validateAgentTitles(input) {
 }
 // Beside the teardown (the folder with Reel.md), so a re-run keeps it.
 function readAgentTitles(dir) {
-  try { const j = JSON.parse(fs.readFileSync(path.join(dir, AGENT_FILE), 'utf8')), v = validateAgentTitles(j); return v.ok ? { ...j, titles: v.titles } : null; } catch { return null; }
+  try { const j = JSON.parse(fs.readFileSync(path.join(dir, AGENT_FILE), 'utf8')), v = validateAgentTitles(j); return v.ok ? { ...j, titles: v.titles, unread: Array.isArray(j.unread) ? j.unread : [] } : null; } catch { return null; }
 }
 function writeAgentTitles(dir, titles, by) {
   const v = validateAgentTitles(titles); if (!v.ok) return v;
-  fs.writeFileSync(path.join(dir, AGENT_FILE), JSON.stringify({ version: 1, by: by || 'agent', at: new Date().toISOString(), titles: v.titles }, null, 1));
+  fs.writeFileSync(path.join(dir, AGENT_FILE), JSON.stringify({ version: 1, by: by || 'agent', at: new Date().toISOString(), titles: v.titles, unread: v.unread }, null, 1));
   return v;
 }
 
@@ -82,7 +87,7 @@ function samples(b) {
   (b.shots || []).forEach((sh, si) => {
     for (const it of ((sh.text || {}).items || [])) {
       const bb = it.bbox || it.box; if (!bb || !(bb[3] >= BIG) || (it.conf ?? it.confidence ?? 1) < 0.5 || Math.abs(+it.angle || 0) > 10) continue;
-      const text = String(it.text || '').trim(), fill = it.style && it.style.fill;
+      const text = clean(it.text || ''), fill = it.style && it.style.fill;
       if (text.replace(/[^A-Za-z0-9]/g, '').length < 2 || /^[@#]|\.(com|html|io)\b/i.test(text) || lumOf(fill) < 0.25) continue;   // handles, addresses and dark print on a card are not titles
       const t = +it.t; if (!at.has(t)) at.set(t, { t, shot: si, rows: [] });
       at.get(t).rows.push({ text, x: bb[0], y: bb[1] + bb[3] / 2, h: bb[3], fill, sat: satOf(fill) > 0.35 && lumOf(fill) > 0.3, grey: satOf(fill) < 0.2 && lumOf(fill) < 0.62, conf: it.conf ?? it.confidence ?? 1 });
@@ -173,21 +178,24 @@ function phraseTitles(b) {
     const fl = cutFlags(start, end, shots), next = fl.endsOnCut ? shots.find(s => Math.abs(+s.start - end) <= 0.15) : null;
     const effect = count ? 'count-up' : swap || lines.some(l => l.rolls) ? 'slot-roll' : fades ? 'stack-fade' : build === 'letter' ? 'type' : null;
     const y = med(lines.map(l => l.y));
-    out.push({ n: out.length + 1, start, end, text: lines.map(l => l.text).join('/'), lines: lines.map(l => l.text), key, band: bandOf(y), y: r2(y), build, effect, exit: (next && EXIT_OF[next.transition_in]) || null,
+    out.push({ n: out.length + 1, start, end, text: lines.map(l => l.text).join(LINE_JOIN), lines: lines.map(l => l.text), key, band: bandOf(y), y: r2(y), build, effect, exit: (next && EXIT_OF[next.transition_in]) || null,
       ...(swap ? { swap } : {}), ...(count ? { count } : {}), ...fl, conf: r2(Math.min(...lines.map(l => l.conf))), fill: (keyL || lines[0]).fill || null, source: 'ocr', from: 'ocr', state: 'proposed' });
   }
   return out;
 }
 
 // The agent's titles win over the OCR read: its text, lines, key word, effect and exit; where the title sits and what it
-// does at the cuts still come from the measured breakdown.
-function withAgent(ocr, agent, shots) {
-  return (agent || []).map((t, i) => {
+// does at the cuts still come from the measured breakdown. unread: the spans the agent saw and could not read; the OCR
+// title there stays, as proposed, unless a title the agent did read covers it.
+function withAgent(ocr, agent, shots, unread = []) {
+  const over = (a, z) => a.start < z.end && z.start < a.end;
+  const kept = (ocr || []).filter(o => unread.some(u => over(o, u)) && !(agent || []).some(t => over(o, t)));
+  return [...kept, ...(agent || []).map((t, i) => {
     const near = (ocr || []).filter(o => o.start < t.end && t.start < o.end).sort((a, z) => (Math.min(z.end, t.end) - Math.max(z.start, t.start)) - (Math.min(a.end, t.end) - Math.max(a.start, t.start)))[0];
-    return { n: i + 1, start: t.start, end: t.end, text: t.lines.join('/'), lines: t.lines, key: t.key || null, band: near ? near.band : 'top', y: near ? near.y : null, build: t.build || (near && near.build) || null,
+    return { n: i + 1, start: t.start, end: t.end, text: t.lines.join(LINE_JOIN), lines: t.lines, key: t.key || null, band: near ? near.band : 'top', y: near ? near.y : null, build: t.build || (near && near.build) || null,
       effect: t.effect || null, exit: t.exit || null, ...(t.swap ? { swap: t.swap } : {}), ...(t.count ? { count: t.count } : {}), ...(t.font ? { font: t.font } : {}), ...(t.glow != null ? { glow: t.glow } : {}),
       ...cutFlags(t.start, t.end, shots), conf: 1, fill: near ? near.fill : null, source: 'agent', from: 'agent', state: 'fixed' };
-  });
+  })].sort((a, z) => a.start - z.start).map((t, i) => ({ ...t, n: i + 1 }));
 }
 
 // The fields of a phrase title on its Reel.md title line (read back by kit/reelmd.cjs).
@@ -208,4 +216,4 @@ function lineFields(t) {
 // "1-365 Days > 1 Year" -> { from, to, unit, final }
 function parseCount(v) { const m = /^(-?\d+(?:\.\d+)?)\s*-\s*(-?\d+(?:\.\d+)?)(?:\s+([^>]+?))?(?:\s*>\s*(.+))?$/.exec(String(v || '').trim()); return m ? { from: +m[1], to: +m[2], ...(m[3] ? { unit: m[3].trim() } : {}), ...(m[4] ? { final: m[4].trim() } : {}) } : null; }
 
-module.exports = { BIG, samples, phraseTitles, withAgent, cutFlags, lineFields, parseCount, AGENT_FILE, KEY_FONTS, validateAgentTitles, readAgentTitles, writeAgentTitles };
+module.exports = { MAX_TITLES, LINE_JOIN, LINE_SPLIT, BIG, samples, phraseTitles, withAgent, cutFlags, lineFields, parseCount, AGENT_FILE, KEY_FONTS, validateAgentTitles, readAgentTitles, writeAgentTitles };

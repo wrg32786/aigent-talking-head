@@ -31,7 +31,7 @@ const CUTS = [2.9, 6, 9.2, 11, 14, 17];
 try {
   const T = PH.phraseTitles(breakdown()), by = x => T.find(q => q.text.startsWith(x));
   t('one title per phrase, with its lines as designed', () => {
-    assert.deepStrictEqual(T.map(x => x.text), ['WAS THE/LOWEST/WE EVER MADE', 'AND IT ONLY HAPPENED/BECAUSE WE/REALIZED', 'THE ONLY/Question/YOU NEED', "PEOPLE DON'T/Kng", "THAT'D KEEP ME GOING FOR/365 Days", "I DON'T KNOW/How to sell", 'I REALIZED/A PROBLEM']);
+    assert.deepStrictEqual(T.map(x => x.text), ['WAS THE / LOWEST / WE EVER MADE', 'AND IT ONLY HAPPENED / BECAUSE WE / REALIZED', 'THE ONLY / Question / YOU NEED', "PEOPLE DON'T / Kng", "THAT'D KEEP ME GOING FOR / 365 Days", "I DON'T KNOW / How to sell", 'I REALIZED / A PROBLEM']);
     assert.ok(T.every(x => x.lines.length >= 1 && x.lines.length <= 3 && x.end > x.start && x.source === 'ocr'));
     assert.ok(T.every((x, i) => !i || x.start >= T[i - 1].end), 'one at a time, in order');
   });
@@ -54,11 +54,11 @@ try {
   const res = V.convert(breakdown(), {}, {}), style = res.md.split('## Style')[1].split('## Shots')[0];
   t('the recipe: a title line per phrase, no one-word captions, running captions off', () => {
     assert.ok(!/captions: one-word/.test(res.md) && /^- running-captions: off$/m.test(style) && /^- titles: on$/m.test(style), style);
-    assert.ok(/^#03 6\.25-8\.75 \| layer front \| role \w+ \| lines 3 \| key Question \| build letter \| effect type \| band top \| across-cut on \| text THE ONLY\/Question\/YOU NEED$/m.test(res.md), res.md.split('## Titles')[1].slice(0, 900));
+    assert.ok(/^#03 6\.25-8\.75 \| layer front \| role \w+ \| lines 3 \| key Question \| build letter \| effect type \| band top \| across-cut on \| text THE ONLY \/ Question \/ YOU NEED$/m.test(res.md), res.md.split('## Titles')[1].slice(0, 900));
     assert.ok(/\| effect count-up \| count 12-365 Days \|/.test(res.md) && /\| effect slot-roll \| swap pitch, market, sell \|/.test(res.md) && /\| exit blow-up \|/.test(res.md));
     assert.strictEqual(res.titles.length, 7); assert.ok(res.phrases && res.runningCaptions === false);
     assert.ok(res.titles.every(x => Array.isArray(x.lines) && 'key' in x && 'build' in x && 'acrossCut' in x), 'titles.json carries the phrase fields');
-    assert.ok(/#4 at 10s: "PEOPLE DON'T\/Kng"/.test(res.report) && /## Phrase titles/.test(res.report) && /draws none/.test(res.report), 'the report lists them and marks the misread one');
+    assert.ok(/#4 at 10s: "PEOPLE DON'T \/ Kng"/.test(res.report) && /## Phrase titles/.test(res.report) && /draws none/.test(res.report), 'the report lists them and marks the misread one');
     assert.ok(!/[—–]/.test(res.md + res.report), 'no em or en dash');
   });
   t('read back: valid, phrase flips with lines, key, build, effect, exit, count and swap', () => {
@@ -87,7 +87,7 @@ try {
     const ok = PH.writeAgentTitles(d, [{ start: 10, end: 11, lines: ["PEOPLE DON'T", 'Buy'], key: 'Buy', font: 'italic serif', glow: true, exit: 'blow-up' }, { start: 11.75, end: 13.6, lines: ["THAT'D KEEP ME GOING FOR", '365 Days'], key: '365 Days', effect: 'count-up', count: { from: 1, to: 365, unit: 'Days', final: '1 Year' } }], 'agent');
     assert.ok(ok.ok); assert.strictEqual(PH.readAgentTitles(d).titles.length, 2);
     for (let i = 0; i < 2; i++) { run(); const md = readFileSync(join(d, 'Reel.md'), 'utf8');
-      assert.ok(/text PEOPLE DON'T\/Buy$/m.test(md) && !/Kng/.test(md) && !/check /.test(md.split('## Titles')[1].split('```')[1]), 'run ' + i + ': the agent text, no check mark');
+      assert.ok(/text PEOPLE DON'T \/ Buy$/m.test(md) && !/Kng/.test(md) && !/check /.test(md.split('## Titles')[1].split('```')[1]), 'run ' + i + ': the agent text, no check mark');
       assert.ok(/\| key Buy \| exit blow-up \| band top \| glow on \| on-cut on \|/.test(md) && /count 1-365 Days > 1 Year/.test(md), md.split('## Titles')[1].slice(0, 600));
       assert.ok(existsSync(join(d, PH.AGENT_FILE)), 'still there'); }
   });
@@ -146,6 +146,40 @@ try {
     const d = join(TMP, 'look'); mkdirSync(d, { recursive: true }); writeFileSync(join(d, 'Reel.md'), res.md);
     const L = SL.fromTeardown ? SL.fromTeardown(d, { name: 'p' }) : null;
     if (L) { assert.strictEqual(L.titles.phrases.length, 7); assert.strictEqual(L.captions.running, false); assert.ok(!/LOWEST|Question|Kng/.test(JSON.stringify(L.titles))); }
+  });
+  // ---- review of PR 76
+  t('a title the agent could not read keeps our own read there, in the file and in the recipe', () => {
+    const d = join(TMP, 'unread'); mkdirSync(d, { recursive: true });
+    const ocr = PH.phraseTitles(breakdown()), miss = ocr[2], other = ocr[0];
+    const v = PH.writeAgentTitles(d, [{ start: other.start, end: other.end, lines: ['READ BY', 'The agent'], key: 'agent' }, { start: miss.start, end: miss.end, unread: true }], 'agent');
+    assert.ok(v.ok, v.errs.join('; ')); const at = PH.readAgentTitles(d); assert.deepStrictEqual(at.unread, [{ start: miss.start, end: miss.end }]);
+    const got = V.convert(breakdown(), {}, { agentTitles: at.titles, agentUnread: at.unread }).titles;
+    assert.deepStrictEqual(got.map(x => [x.text, x.source]), [['READ BY / The agent', 'agent'], [miss.text, 'ocr']], 'the agent title, then our own read of the one it could not read');
+    assert.deepStrictEqual(got.map(x => x.n), [1, 2]); assert.strictEqual(V.convert(breakdown(), {}, { agentTitles: at.titles }).titles.length, 1, 'no unread span: only what the agent read');
+    assert.ok(!PH.validateAgentTitles([{ start: 1, end: 2, lines: ['A B'] }, { unread: true }]).ok, 'an unread title still says where it is');
+  });
+  t('a slash inside a title is not a line break: "OPEN 24/7" stays one line through the recipe', () => {
+    const v = PH.validateAgentTitles([{ start: 1, end: 2.5, lines: ['OPEN 24/7', 'and/or Closed'], key: '24/7', build: 'word' }]); assert.ok(v.ok, v.errs.join('; '));
+    const one = PH.withAgent([], v.titles, [])[0]; assert.strictEqual(one.text, 'OPEN 24/7 / and/or Closed');
+    const md = V.convert(breakdown(), {}, { agentTitles: v.titles }).md; assert.deepStrictEqual(RM.validate(RM.parse(md)).errs, []);
+    const r = RM.parse(md), f = RM.titleFlips(r)[0]; assert.strictEqual(f.text, 'OPEN 24/7|and/or Closed'); assert.strictEqual(f.key, '24/7');
+    assert.strictEqual(PT.shapeOf(r.titles[0]).lines, 2); assert.strictEqual(PT.shapeOf({ start: 0, end: 1, text: 'OPEN 24/7' }).lines, 1);
+    assert.deepStrictEqual(PH.validateAgentTitles([{ start: 1, end: 2, text: 'OPEN 24/7 / NOW' }]).titles[0].lines, ['OPEN 24/7', 'NOW']);
+  });
+  t('agent titles: a key word sits in one line, times are numbers, as many titles kept as accepted, a | the OCR read never reaches the recipe', () => {
+    assert.ok(/not in one of the lines/.test(PH.validateAgentTitles([{ start: 1, end: 2, lines: ['THE ONLY', 'Question'], key: 'ONLY Question' }]).errs[0]));
+    for (const bad of [null, true, [], '']) assert.ok(!PH.validateAgentTitles([{ start: bad, end: 2, lines: ['A B'] }]).ok, 'start ' + JSON.stringify(bad));
+    assert.ok(PH.validateAgentTitles([{ start: '1.5', end: 2, lines: ['A B'] }]).ok, 'a number as text is still a number');
+    const many = Array.from({ length: PH.MAX_TITLES }, (_, i) => ({ start: i, end: i + 0.8, lines: ['TITLE', 'No ' + i] }));
+    assert.ok(PH.validateAgentTitles(many).ok && !PH.validateAgentTitles([...many, many[0]]).ok);
+    assert.strictEqual(V.convert(breakdown(), {}, { agentTitles: PH.validateAgentTitles(many).titles }).titles.length, PH.MAX_TITLES, 'every accepted title is in the recipe');
+    const b = breakdown(); for (const sh of b.shots) for (const it of ((sh.text || {}).items || [])) it.text = String(it.text).replace(/I/, '|');
+    assert.ok(PH.phraseTitles(b).every(x => !/[|]/.test(x.text + (x.key || ''))), 'no | in a title: it is the field mark of a Reel.md line');
+  });
+  t('speech in another script still gives phrase titles', () => {
+    const ru = [...say(0.5, 'Это был самый дешёвый запуск.'), ...say(3.4, 'И он сработал потому что мы спросили,'), ...say(6.3, 'один вопрос на который нужно ответить.')];
+    const m = PT.mapPhrases(refs, ru, { k: 1, len: 20, cuts: [] }); assert.ok(m.flips.length >= 2, m.line);
+    assert.ok(m.flips.every(f => f.words.length >= 2 && f.start >= f.words[0][0]), 'our words, never early, never one word');
   });
   t('nothing to map: no titles, and the log line says so', () => { const m = PT.mapPhrases(refs, [], { len: 20 }); assert.deepStrictEqual(m.flips, []); assert.ok(/0 from your words/.test(m.line)); });
   console.log(`\n${n} phrase title tests passed`);

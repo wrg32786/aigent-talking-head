@@ -36,12 +36,12 @@ const EX = C.extract(join(A, 'Reel.md'));
 assert.strictEqual(EX.captionStyle, 'kinetic'); assert.deepStrictEqual(EX.entrances, ['blur-rise', 'slide-left', 'stagger-rise']); assert.strictEqual(EX.music.bed, 'cinematic-build');
 
 // what the video before left on the board. None of it is in the reference above.
-const OLD = { pack: 'hormozi-bold', picks: { 'font:pirata': 'allow', 'captionStyle:one-word': 'allow', 'look:one-word': 'allow', 'theme:magazine': 'allow', 'titleLayer:behind': 'allow',
+const OLD = { pack: 'hormozi-bold', picks: { 'font:pirata': 'allow', 'captionStyle:one-word': 'allow', 'look:one-word': 'allow', 'theme:magazine': 'allow', 'titleLayer:behind': 'allow', 'titleEffect:decode': 'allow', 'titleExit:polaroid': 'allow',
   'entrance:pop-zoom': 'allow', 'entrance:slam': 'allow', 'entrance:elastic': 'allow', 'transition:glitch': 'allow', 'transition:dip': 'allow', 'finish:bleach': 'allow', 'finish:cool': 'allow',
   'effect:led-sign': 'allow', 'effect:scribble': 'allow', 'graphic:split-flap': 'allow', 'transition:dissolve': 'deny' },
   music: { bed: 'houston-drumline', energy: 'high' }, sound: { sfx: 'off', cap: 'off' }, pace: { tighten: 0.25, punch: 'off' } };
 // every word of the old look that must not show up in a draft's arguments
-const OLD_WORDS = ['hormozi-bold', 'pirata', 'one-word', 'magazine', 'behind', 'pop-zoom', 'slam', 'elastic', 'glitch', 'dip', 'dissolve', 'bleach', 'cool', 'led-sign', 'scribble', 'split-flap', 'houston-drumline', 'high', '--no-sfx', '--no-sfx-cap', '--no-punch', '--tighten', '--theme', '--title-layer', '--fonts'];
+const OLD_WORDS = ['hormozi-bold', 'pirata', 'one-word', 'magazine', 'behind', 'pop-zoom', 'slam', 'elastic', 'glitch', 'dip', 'dissolve', 'bleach', 'cool', 'led-sign', 'scribble', 'split-flap', 'houston-drumline', 'high', '--no-sfx', '--no-sfx-cap', '--no-punch', '--tighten', '--theme', '--title-layer', '--fonts', 'decode', 'polaroid', '--title-effect', '--title-exit'];
 const OLD_IDEAS = () => ({ 1: { idea: 'Stock: sourdough starter', why: 'old', query: 'sourdough starter', by: 'Studio', source: 'rules' }, 2: { idea: 'Like the reference: a bakery counter', why: 'old', query: 'bakery counter', by: 'Studio', source: 'reference' },
   3: { idea: 'Stock: oven timer', why: 'old', query: 'oven timer', by: 'the rules' }, 4: { idea: 'A chart of rising dough', why: 'from the agent', query: 'dough chart', by: 'Claude Code' } });
 const oldBoard = () => { const s = C.defaultState(); s.job = 'from-the-heart'; ok(s, OLD); s.footage = ['inbox/studio/from-the-heart/a.mp4']; s.broll = { 'from-the-heart': { slots: {}, ideas: OLD_IDEAS(), marks: [], cutins: [] } }; return s; };

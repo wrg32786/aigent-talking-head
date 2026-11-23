@@ -9,13 +9,13 @@ const { TITLE_EFFECTS, TITLE_EXITS, TITLE_BUILDS, titleRow } = require('./rules.
 const { group } = require('./phrase-group.cjs');
 const r3 = x => Math.round(x * 1000) / 1000;
 const STOP = new Set('a an the and or but of to in on at for with is are was were it its this that these those you your i im we my our be been as by so if do does did just not no dont have has had will would can could they them he she his her me us about into from then than there here what when how why who'.split(' '));
-const bare = w => String(w).toLowerCase().replace(/[^a-z0-9$%']/g, '');
+const bare = w => String(w).toLowerCase().replace(/[^\p{L}\p{N}$%']/gu, '');   // any script, not only Latin
 const shown = w => String(w).replace(/^["“(]+|[,.;:"”)]+$/g, '');   // a title keeps ? and !, drops the comma and the full stop
 const isNum = w => /\d/.test(w);
 
 // The shape of one reference title, from a recipe title (Reel.md line or titles.json): no text, only the pattern.
 function shapeOf(t) {
-  const lines = Array.isArray(t.lines) ? t.lines : String(t.text || '').split(/\s*[/|]\s*/).filter(Boolean);
+  const lines = Array.isArray(t.lines) ? t.lines : String(t.text || '').split(/\s+\/\s+|\|/).filter(Boolean);
   const n = Math.max(1, Math.min(3, Array.isArray(t.lines) ? t.lines.length : +t.lines || lines.length || 1));
   const key = typeof t.key === 'string' ? t.key.toLowerCase() : null, keyLine = key ? lines.findIndex(l => l.toLowerCase().includes(key)) : -1;
   const pick = (v, list) => (list.includes(String(v || '').toLowerCase()) ? String(v).toLowerCase() : null);

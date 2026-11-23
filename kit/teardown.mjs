@@ -178,7 +178,7 @@ else console.warn('note: extras failed (no layer hints, vignette or contact shee
 stage('recipe');
 // titles your agent read off the sheets (titles.agent.json, kept across re-runs) win over the OCR read
 const agentTitles = require('./teardown/phrases.cjs').readAgentTitles(out);
-const res = V.convert(b, extras, { name, bpms, recipePath: relative(ROOT, join(out, 'Reel.md')), ...(agentTitles ? { agentTitles: agentTitles.titles } : {}) });
+const res = V.convert(b, extras, { name, bpms, recipePath: relative(ROOT, join(out, 'Reel.md')), ...(agentTitles ? { agentTitles: agentTitles.titles, agentUnread: agentTitles.unread } : {}) });
 writeFileSync(join(out, 'Reel.md'), res.md);
 writeFileSync(join(out, 'teardown.md'), res.report);
 // B-roll: where the reference shows it (screen panels, split screens, shots with no speaker), what it showed and how

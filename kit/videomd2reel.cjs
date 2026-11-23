@@ -104,10 +104,10 @@ function convert(b, extras = {}, opts = {}) {
   // the draft draws none (Style "running-captions: off").
   const phOn = cs.phrases || phrasesOnScreen(b);
   const ocrPh = phOn || opts.agentTitles ? PH.phraseTitles(b) : [];
-  const phrases = opts.agentTitles ? PH.withAgent(ocrPh, opts.agentTitles, b.shots) : phOn && ocrPh.length >= 2 ? ocrPh : null;
+  const phrases = opts.agentTitles ? PH.withAgent(ocrPh, opts.agentTitles, b.shots, opts.agentUnread) : phOn && ocrPh.length >= 2 ? ocrPh : null;
   // no running captions: what looked like one-word captions was the phrases being built, or there are no caption cues at all
   if (phrases && phOn && (cs.was === 'one-word' || !((b.packaging || {}).text_cues || []).some(c => c.kind === 'subtitle' && (c.line_h ?? (c.bbox ? c.bbox[3] : 1)) >= 0.025))) cs.running = false;
-  let titles = phrases ? phrases.slice(0, 60).map(t => ({ ...t, seenAs: t.build ? `built by ${t.build}` : 'a phrase', layer: 'front' })) : picked.filter(t => !owned(t)).slice(0, 7);
+  let titles = phrases ? phrases.slice(0, PH.MAX_TITLES).map(t => ({ ...t, seenAs: t.build ? `built by ${t.build}` : 'a phrase', layer: 'front' })) : picked.filter(t => !owned(t)).slice(0, 7);
   titles.forEach((t, i) => { t.n = i + 1; });
   const dropped = phrases ? [] : [...(picked.dropped || []), ...picked.filter(t => owned(t)).map(t => ({ t: t.start, text: t.text, why: `part of the ${owned(t).type} at ${owned(t).start}s` }))];
   // a sticker or app label that is a piece of a phrase title read apart ("WASTHE", a glow read as a sticker) is that title
@@ -173,7 +173,7 @@ if (require.main === module) {
   const ex = opt('extras') && fs.existsSync(opt('extras')) ? JSON.parse(fs.readFileSync(opt('extras'), 'utf8')) : {};
   const out = opt('out', path.join(b._dir, 'Reel.md'));
   const at = PH.readAgentTitles(path.dirname(out));
-  const res = convert(b, ex, { name: opt('name'), recipePath: path.relative(ROOT, out), ...(at ? { agentTitles: at.titles } : {}) });
+  const res = convert(b, ex, { name: opt('name'), recipePath: path.relative(ROOT, out), ...(at ? { agentTitles: at.titles, agentUnread: at.unread } : {}) });
   fs.writeFileSync(out, res.md);
   fs.writeFileSync(opt('report', path.join(path.dirname(out), 'teardown.md')), res.report);
   const added = saveScenes(res, path.dirname(out), { library: !argv.includes('--no-scenes') });

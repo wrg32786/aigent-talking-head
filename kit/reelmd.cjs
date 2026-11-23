@@ -323,7 +323,7 @@ function titleFlips(r) {
     if (t.role) f.role = String(t.role);
     // a phrase title: its lines as designed ("LINE / LINE" in the recipe, "LINE|LINE" for the overlay), the key word, the build, one effect, one exit
     if (t.lines != null || t.key != null || t.build != null || t.effect != null || t.exit != null) {
-      f.phrase = true; f.text = f.text.split(/\s*\/\s*/).filter(Boolean).join('|');
+      f.phrase = true; f.text = f.text.split(PH.LINE_SPLIT).filter(Boolean).join('|');
       if (typeof t.key === 'string') f.key = t.key;
       for (const k of ['build', 'effect', 'exit', 'band']) if (typeof t[k] === 'string') f[k] = t[k].toLowerCase();
       if (typeof t.swap === 'string') f.swap = t.swap.split(',').map(x => x.trim()).filter(Boolean);

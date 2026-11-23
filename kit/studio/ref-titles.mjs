@@ -65,7 +65,7 @@ export function mount({ ROOT, C, update, json, readBody, askAgent, view: pageVie
     let ex = null; try { ex = C.extract(join(t.dir, 'Reel.md')); } catch {}
     const st = update(x => { if (!ex) return; const it = (x.reference.queue || []).find(q => q.out === t.out); if (it) it.extracted = ex; if (x.reference.out === t.out) x.reference.extracted = ex; });
     const n = v.titles.length;
-    return { st, stored: n, by: by || 'agent', file: join(t.dir, PH.AGENT_FILE), refreshed: r.ok, note: `${n} title${n === 1 ? '' : 's'} saved.` + (v.unread ? ` ${v.unread} could not be read and ${v.unread === 1 ? 'was' : 'were'} left out.` : '') + (r.ok ? '' : ` The recipe was not made again (${r.why}), so read the reference again to use them.`) };
+    return { st, stored: n, by: by || 'agent', file: join(t.dir, PH.AGENT_FILE), refreshed: r.ok, note: `${n} title${n === 1 ? '' : 's'} saved.` + (v.unread.length ? ` ${v.unread.length} could not be read: our own read stays there.` : '') + (r.ok ? '' : ` The recipe was not made again (${r.why}), so read the reference again to use them.`) };
   }
   async function readWithModel(t) {
     const p = provider(); if (!p || !PROVIDERS[p]) throw bad('Pick Anthropic or OpenAI as the chat backend in Settings and add its key first.');

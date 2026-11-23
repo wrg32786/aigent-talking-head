@@ -134,7 +134,7 @@ try {
   await t('route: bad titles are refused with the reason and nothing changes', async () => {
     const before = readFileSync(AGENT, 'utf8'), one = x => [{ ...GOOD[0], ...x }];
     for (const [titles, why] of [[one({ effect: 'sparkle' }), /title 1: effect must be one of type, slot-roll/], [one({ lines: ['a', 'b', 'c', 'd'], key: undefined }), /title 1: lines is 1 to 3 lines/],
-      [one({ key: 'Answer' }), /title 1: key "Answer" is not in the lines/], [one({ start: 9, end: 7.9 }), /title 1: start and end are seconds in the reference, end after start/], [[], /at least one title/], ['nope', /must be a list/]]) {
+      [one({ key: 'Answer' }), /title 1: key "Answer" is not in one of the lines/], [one({ start: 9, end: 7.9 }), /title 1: start and end are seconds in the reference, end after start/], [[], /at least one title/], ['nope', /must be a list/]]) {
       const r = await req('/api/reference/titles', { titles });
       assert.strictEqual(r.status, 400); assert.match(r.j.error, why); assert.match(r.j.error, /^Those titles were not saved: /); assert.ok(Array.isArray(r.j.errs) && r.j.errs.length);
     }
@@ -148,7 +148,7 @@ try {
     assert.deepStrictEqual(it.effect.enum, [...R.TITLE_EFFECTS, 'none']); assert.deepStrictEqual(it.exit.enum, [...R.TITLE_EXITS, 'none']); assert.deepStrictEqual(it.build.enum, R.TITLE_BUILDS); assert.deepStrictEqual(it.font.enum, PH.KEY_FONTS);
     assert.deepStrictEqual(tool.inputSchema.required, ['titles']); assert.ok(!DASH.test(tool.description));
     const call = async (name, args = {}) => { const r = await client.callTool({ name, arguments: args }); return r.isError ? { error: r.content[0].text } : r.structuredContent; };
-    for (const [x, why] of [[{ effect: 'sparkle' }, /effect must be one of/], [{ lines: ['a', 'b', 'c', 'd'], key: undefined }, /lines is 1 to 3 lines/], [{ key: 'Answer' }, /key "Answer" is not in the lines/], [{ end: 1 }, /end after start/]])
+    for (const [x, why] of [[{ effect: 'sparkle' }, /effect must be one of/], [{ lines: ['a', 'b', 'c', 'd'], key: undefined }, /lines is 1 to 3 lines/], [{ key: 'Answer' }, /key "Answer" is not in one of the lines/], [{ end: 1 }, /end after start/]])
       assert.match((await call('set_reference_titles', { titles: [{ ...GOOD[0], ...x }] })).error, why);
     assert.strictEqual(calls().length, 1);
     const r = await call('set_reference_titles', { titles: [GOOD[2]] });
