@@ -41,7 +41,14 @@ const port = +url.split(':').pop();
 const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json();
 const upload = async (kind, f, name) => (await fetch(`${url}/api/upload?kind=${kind}&name=${encodeURIComponent(name)}`, { method: 'POST', body: readFileSync(f) })).json();
 const until = async (fn, ms = 20000) => { const end = Date.now() + ms; for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) throw new Error('timed out'); await wait(150); } };
-const waitTask = async (ms = 3 * 60e3) => { await wait(400); return until(async () => { const v = await api('/api/state'); return v.task && v.task.status !== 'running' ? v : null; }, ms); };
+const taskId = async () => ((await api('/api/state')).task || {}).id;
+// Wait for a task newer than prevId to finish. The previous helper waited 400 ms and then
+// returned the last finished task, so a slow click could be mistaken for the previous render.
+const waitTask = async (prevId, ms = 3 * 60e3) => until(async () => {
+  const v = await api('/api/state'); const t = v.task;
+  if (!t || t.id === prevId || t.status === 'running') return null;
+  return v;
+}, ms);
 const log = job => { try { return readFileSync(join(ROOT, 'jobs', job, 'fake-reel.log'), 'utf8'); } catch { return ''; } };
 // a fresh load of a link: via about:blank, because a new hash alone does not reload the page
 const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); };
@@ -107,7 +114,7 @@ try {
     assert.strictEqual(await pg.textContent('#elapsed'), 'A draft is a quick plan of the reel, with no video yet.');
     assert.strictEqual(await pg.$$eval('#s-review button', x => x.filter(b => /^Render/.test(b.textContent.trim())).length), 0, 'no Render button on Review');
     if (shots) { await pg.screenshot({ path: join(shots, 'redesign-finish-dark.png') }); }
-    await pg.click('#draft'); const v = await waitTask(); assert.strictEqual(v.task.status, 'done', JSON.stringify(v.task).slice(0, 800));
+    const d0 = await taskId(); await pg.click('#draft'); const v = await waitTask(d0); assert.strictEqual(v.task.status, 'done', JSON.stringify(v.task).slice(0, 800));
     const L = log(JOB); assert.ok(/--as-is/.test(L) && /--draft/.test(L), L);
     assert.ok(L.indexOf(`inbox/studio/${JOB}/cuts/c1.mp4`) >= 0 && L.indexOf(`cuts/c1.mp4`) < L.indexOf(`cuts/c2.mp4`) && !/cuts\/c3\.mp4/.test(L), 'your pieces in your order, the dropped one left out: ' + L);
     const cj = JSON.parse(readFileSync(join(ROOT, 'inbox', 'studio', JOB, 'cuts', 'clips.json'), 'utf8'));
@@ -127,7 +134,7 @@ try {
     await pg.click('#size-feed45'); await pg.waitForFunction(() => document.querySelector('#size-feed45').checked);
     assert.deepStrictEqual((await api('/api/state')).state.sizes, ['feed45']);
     if (shots) { await pg.locator('#sizes').scrollIntoViewIfNeeded(); await pg.screenshot({ path: join(shots, 'render-sizes-dark.png') }); }
-    await pg.click('#render'); const v = await waitTask(); assert.strictEqual(v.task.status, 'done', JSON.stringify(v.task).slice(0, 800)); assert.strictEqual(v.task.kind, 'render');
+    const r0 = await taskId(); await pg.click('#render'); const v = await waitTask(r0); assert.strictEqual(v.task.status, 'done', JSON.stringify(v.task).slice(0, 800)); assert.strictEqual(v.task.kind, 'render');
     assert.ok(/--rebuild.*--export reels,feed45/.test(log(JOB)), 'one run, both sizes: ' + log(JOB).split('\n').pop());
     await pg.waitForSelector('#outputs .out-use'); assert.strictEqual(await pg.textContent('#outputs .out-use'), 'For Reels and Stories');
     await pg.click('#size-feed45'); await pg.waitForFunction(() => !document.querySelector('#size-feed45').checked);
@@ -144,8 +151,9 @@ try {
     await pg.waitForSelector('#ye-stale'); await pg.waitForFunction(() => document.querySelector('#render').getAttribute('aria-disabled') === 'true');
     assert.strictEqual(await pg.textContent('#elapsed'), 'Your clips changed since the draft. Draft again first.');
     assert.strictEqual(await pg.textContent('#render-status'), 'Your clips changed since the draft. Draft it on Review first');
+    const s0 = await taskId();
     const r = await fetch(url + '/api/render', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); assert.strictEqual(r.status, 202, 'the API still renders the last draft for an agent that asks');
-    await waitTask();
+    await waitTask(s0);
     await api('/api/cut/edit', { id: 'c3', keep: false }); await pg.waitForSelector('#ye-stale', { state: 'detached' });
   });
 
@@ -160,7 +168,7 @@ try {
     await pg.click('#exp-reel'); await pg.waitForSelector('#exp-reel[aria-pressed="false"]');
     assert.ok(await pg.isDisabled('#draft'), 'nothing to draft without the reel'); assert.ok(/^Render plain clips$/.test(await pg.textContent('#render')), await pg.textContent('#render'));
     const before = log(JOB); rmSync(join(ROOT, 'inbox', 'studio', JOB, 'cuts', 'c1.mp4'));
-    await pg.click('#render'); const v = await waitTask(); assert.strictEqual(v.task.status, 'done', JSON.stringify(v.task).slice(0, 800));
+    const p0 = await taskId(); await pg.click('#render'); const v = await waitTask(p0); assert.strictEqual(v.task.status, 'done', JSON.stringify(v.task).slice(0, 800));
     assert.ok(existsSync(join(ROOT, 'inbox', 'studio', JOB, 'cuts', 'c1.mp4')), 'the plain clip'); assert.strictEqual(log(JOB), before, 'no reel edit');
     const none = await api('/api/state', { finish: { reel: false, clips: false, plain: false } }); assert.ok(none.errs && none.errs.length || none.error, 'at least one thing to make');
     await api('/api/state', { finish: { reel: true, clips: false, plain: false } });
@@ -172,12 +180,12 @@ try {
     const names = (await client.listTools()).tools.map(x => x.name); assert.ok(names.includes('get_edit') && names.includes('studio_run'));
     const call = async (name, args) => { const r = await client.callTool({ name, arguments: args }); assert.ok(!r.isError, JSON.stringify(r).slice(0, 400)); return JSON.parse(r.content[0].text); };
     const e = await call('get_edit', {}); assert.strictEqual(e.combo.pieces.length, 2); assert.ok(e.edit.making.text);
-    await call('studio_run', { action: 'draft', from: 'take' }); let v = await waitTask(); assert.strictEqual(v.task.status, 'done');
+    const t0 = await taskId(); await call('studio_run', { action: 'draft', from: 'take' }); let v = await waitTask(t0); assert.strictEqual(v.task.status, 'done');
     assert.strictEqual(v.state.finish.from, 'take'); assert.strictEqual(v.state.drafted.from, 'take');
     const L = log(JOB).trim().split('\n').pop(); assert.ok(!/--as-is/.test(L) && /finish-take/.test(L), 'the whole take: ' + L);
-    await call('studio_run', { action: 'draft', from: 'pieces' }); v = await waitTask(); assert.strictEqual(v.state.drafted.from, 'pieces');
-    const r = await call('studio_run', { action: 'render', exports: { clips: true } }); assert.strictEqual(r.clips.length, 2);
-    v = await waitTask(); assert.strictEqual(v.task.status, 'done'); assert.ok(existsSync(join(ROOT, 'jobs', JOB, 'reel-v3.mp4')) || existsSync(join(ROOT, 'jobs', JOB, 'reel-v2.mp4')));
+    const t1 = await taskId(); await call('studio_run', { action: 'draft', from: 'pieces' }); v = await waitTask(t1); assert.strictEqual(v.state.drafted.from, 'pieces');
+    const t2 = await taskId(); const r = await call('studio_run', { action: 'render', exports: { clips: true } }); assert.strictEqual(r.clips.length, 2);
+    v = await waitTask(t2); assert.strictEqual(v.task.status, 'done'); assert.ok(existsSync(join(ROOT, 'jobs', JOB, 'reel-v3.mp4')) || existsSync(join(ROOT, 'jobs', JOB, 'reel-v2.mp4')));
   });
 
   if (shots) await t('screenshots: dark and light', async () => {
