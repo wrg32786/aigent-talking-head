@@ -2,6 +2,16 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.30.0 (unreleased)
+
+Release notes: [docs/releases/v1.30.0.md](docs/releases/v1.30.0.md).
+
+Highlights in a long talk, and a publish kit beside the finished reel.
+
+- **Highlights on Start.** `kit/highlights.mjs` finds complete moments in a long talk or podcast (about 3 minutes or longer): transcribe locally with the kit Whisper, split on sentence ends (never mid-word or mid-sentence), and score up to N moments (default 10, window 20 to 60 s) with a reason and a start time. Studio's Start step has a Highlights view (`#step=highlights`). The local rules always run first; an agent can rescore them. MCP: `find_highlights`, `get_highlights`, `score_highlights`, `pick_highlights`. The ones you tick are extracted as the take and already cut. Tests: `tests/studio-highlights.test.mjs`.
+- **Publish kit on Render.** After a reel is rendered, a card makes a cover still with the title kept off the face (`kit/publish-cover.py`, `kit/publish-kit.mjs`), post copy for each platform (title, description, hashtags), and a ZIP with the reel, the `.srt`, the cover and the copy, beside the reel. Nothing is posted. MCP: `get_publish_kit`, `set_post_copy`, `make_publish_kit`. Buffer posting stays drafts only. Tests: `tests/studio-publish.test.mjs`.
+- **AutoClip comparison.** The README How it compares section names [AutoClip](https://github.com/zhouxiaoka/autoclip) (MIT) as the closest open-source neighbor. THIRD_PARTY.md credits the idea. No AutoClip code is included.
+
 ## 1.29.0 (unreleased)
 
 Release notes: [docs/releases/v1.29.0.md](docs/releases/v1.29.0.md).

@@ -355,6 +355,8 @@ Recreating a reel you like from a link: in Studio it is free and runs on your co
 
 Other open-source tools in the same space: [OpenShorts](https://github.com/faris-sait/openshorts) (MIT) cuts long videos into vertical clips, and [kinocut](https://github.com/KyaniteLabs/kinocut) (Apache-2.0) is an MCP server that gives agents guarded FFmpeg and HyperFrames editing tools.
 
+[AutoClip](https://github.com/zhouxiaoka/autoclip) (MIT) is the closest open-source neighbor. It finds highlight clips in a long podcast or talk, then packs each one with a cover and post copy. We start from one talking-head take and finish the reel: Recreate a look you like, titles and captions kept off your face, B-roll from our Vault, picture checks, and your own agent in Studio. Use AutoClip to pick the moments, and ours to design the reel.
+
 In short:
 
 - Free and open source. Studio runs on your computer with no account, no credits and no watermark.

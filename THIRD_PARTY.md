@@ -122,6 +122,10 @@ Ideas and starting numbers only, read from three skill packs. No file of theirs 
   - `higgsfield-brandkit/references/brand-lock.md`: lock states and evidence labels (`from` and `state` on every phrase title, `kit/teardown/phrases.cjs`).
 - **[Comfy-Org/comfy-skills](https://github.com/Comfy-Org/comfy-skills)** (MIT, Copyright (c) 2026 Comfy-Org): `technique-consistent-characters`: stating the exact count in an instruction so items are not merged or doubled (`kit/sheets.mjs` `titlesInstruction`).
 
+## Ideas from (1.30.0, no code copied)
+
+- **[zhouxiaoka/autoclip](https://github.com/zhouxiaoka/autoclip)** (MIT): the idea of finding highlight moments in a long talk, then packing a cover, post copy and a ZIP publish kit with the finished reel. Our scoring, covers, copy and ZIP are written here; no AutoClip code is included.
+
 ## Installed at setup, not vendored
 
 These are fetched by `npm run effects:setup` (and the BiRefNet weights on first `kit/mask.py --model birefnet`, or `npm run effects:setup -- --birefnet`). They are not in git. Licences were checked from the primary sources on Nov 10, 2026.
