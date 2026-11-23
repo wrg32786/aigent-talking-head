@@ -19,14 +19,16 @@ const extFor = mime => /mp4/i.test(mime || '') ? '.mp4' : /x-matroska/i.test(mim
 const fmt = sec => { const s = Math.round(sec); return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`; };
 
 // start a take: returns its id; chunks follow with seq 0, 1, 2 ...
-export function start(s, { mime, script } = {}) {
+export function start(s, { mime, script, crop } = {}) {
   if (!s.job) throw Object.assign(new Error('name the reel first'), { code: 400 });
   const dir = takesDir(s); mkdirSync(join(ROOT, dir), { recursive: true });
   s.takes = s.takes || [];
   const id = Math.max(0, ...s.takes.map(t => t.id)) + 1;
   const raw = relOf(join(dir, `take-${id}.part${extFor(mime)}`));
   writeFileSync(join(ROOT, raw), '');
-  live.set(id, { raw, next: 0, bytes: 0, mime: String(mime || '') });
+  // the frame to crop to (9:16, 16:9, 1:1): the page records the whole camera picture and the crop happens here, once
+  const aspect = crop && +crop.aspect > 0.2 && +crop.aspect < 5 ? +crop.aspect : null;
+  live.set(id, { raw, next: 0, bytes: 0, mime: String(mime || ''), aspect });
   s.takes.push({ id, raw, file: null, thumb: null, seconds: null, status: 'recording', kept: true, error: null, at: new Date().toISOString(), mime: String(mime || ''),
     // the script it was read from, as it was when filmed: the draft hands it to Whisper so captions spell its words
     script: script && typeof script.text === 'string' && script.text.trim() ? { id: script.id ? String(script.id).slice(0, 64) : null, title: String(script.title || '').slice(0, 120), text: script.text.slice(0, 20000) } : null });
@@ -64,8 +66,9 @@ export function finish(id, { seconds } = {}, save) {
   return (async () => {
     try {
       const src = join(ROOT, t.raw);
-      await run('ffmpeg', ['-y', '-v', 'error', '-fflags', '+genpts', '-i', src, '-map', '0:v:0', '-map', '0:a:0?', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p',
-        '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-r', '30', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-movflags', '+faststart', join(ROOT, mp4)]);
+      await run('ffmpeg', ['-y', '-v', 'error', '-fflags', '+genpts', '-i', src, '-map', '0:v:0', '-map', '0:a:0?', '-c:v', 'libx264', '-preset', 'medium', '-crf', '16', '-pix_fmt', 'yuv420p',
+        '-vf', t.aspect ? `crop=trunc(min(iw\\,ih*${t.aspect})/2)*2:trunc(min(ih\\,iw/${t.aspect})/2)*2` : 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+        '-r', '30', '-c:a', 'aac', '-b:a', '256k', '-ar', '48000', '-movflags', '+faststart', join(ROOT, mp4)]);
       const dur = (await probe(join(ROOT, mp4))) || +seconds || 0;
       await run('ffmpeg', ['-y', '-v', 'error', '-ss', String(Math.min(1, dur / 2)), '-i', join(ROOT, mp4), '-frames:v', '1', '-vf', 'scale=320:-2', join(ROOT, jpg)]).catch(() => {});
       rmSync(src, { force: true });

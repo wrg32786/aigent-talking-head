@@ -65,8 +65,15 @@ try {
     await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: url });
     await open(pg, '#step=start');
     assert.match(await pg.textContent('#connect-open'), /Connect agent/);
-    await pg.click('#chat-open').catch(() => {}); await pg.click('#chat-connect'); await pg.waitForSelector('#connect-steps');
+    await pg.click('#chat-open').catch(() => {}); await pg.click('#chat-connect'); await pg.waitForSelector('#setup-prompt');
     assert.match(await pg.textContent('#connect-status'), /Waiting for your agent/);
+    // it opens on one prompt that does every step: register, hooks, restart if needed, then the chat loop
+    const one = await pg.textContent('#setup-prompt');
+    assert.match(one, /claude mcp add/); assert.match(one, /connect\.mjs claude --user/); assert.match(one, /restart/); assert.match(one, /Run the Studio chat loop/);
+    await pg.click('#setup-prompt .icon-btn');
+    assert.match(await pg.evaluate(() => navigator.clipboard.readText()), /^Connect yourself to AIgent Studio/);
+    await pg.getByRole('radio', { name: 'Step by step' }).click().catch(async () => pg.click('#connect-mode >> text=Step by step'));
+    await pg.waitForSelector('#connect-steps');
     await pg.click('.agent-card[data-agent="codex"]'); await pg.waitForSelector('#connect-steps >> text=config.toml');
     await pg.click('.agent-card[data-agent="claude"]');
     const code = await pg.textContent('#connect-steps');
@@ -75,8 +82,8 @@ try {
     assert.match(await pg.evaluate(() => navigator.clipboard.readText()), /^claude mcp add /);
     await pg.waitForFunction(() => document.querySelector('#connect-status').textContent.includes('Waiting'));
     if (shots) await pg.screenshot({ path: join(shots, 'connect-desktop.png') });
-    await pg.getByRole('radio', { name: 'Let my agent set it up' }).click().catch(async () => pg.click('#connect-mode >> text=Let my agent set it up'));
-    assert.match(await pg.textContent('#setup-prompt'), /AGENTS\.md/);
+    await pg.getByRole('radio', { name: 'One prompt (easiest)' }).click().catch(async () => pg.click('#connect-mode >> text=One prompt (easiest)'));
+    assert.match(await pg.textContent('#setup-prompt'), /claude mcp add/);
     // a scripted MCP client connects as Claude Code and listens
     client = new Client({ name: 'claude-code', version: '0.0.0-test' });
     await client.connect(new StdioClientTransport({ command: process.execPath, args: [join(ROOT, 'kit', 'mcp.mjs')], cwd: ROOT, env: { ...env, STUDIO_PORT: port }, stderr: 'ignore' }));
@@ -100,7 +107,7 @@ try {
     await ctx.close();
     // phone: the remembered agent, no sideways scroll
     const ph = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1.5, isMobile: true, hasTouch: true });
-    await open(ph, '#connect'); await ph.waitForSelector('#connect-steps');
+    await open(ph, '#connect'); await ph.waitForSelector('#setup-prompt');
     assert.strictEqual(await ph.getAttribute('.agent-card[data-agent="claude"]', 'aria-checked'), 'true');
     assert.ok(await ph.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'no sideways scroll');
     if (shots) await ph.screenshot({ path: join(shots, 'connect-phone.png') });
@@ -146,6 +153,12 @@ try {
     await pg.fill('#rec-script', SCRIPT);
     const [pop] = await Promise.all([pg.waitForEvent('popup'), pg.click('#rp-popout')]);
     await pop.waitForSelector('#rp-window .rec-prompter p[data-line="0"]');
+    // the camera sits in a fixed phone frame and the controls stay on screen, even with the biggest text
+    await pop.waitForSelector('#rp-window.with-cam #rp-cam');
+    for (let i = 0; i < 12; i++) await pop.click('#rp-window [aria-label="Bigger text"]');
+    const fit = await pop.evaluate(() => { const b = document.querySelector('#rp-window .rp-wbar').getBoundingClientRect(); return { bottom: b.bottom, top: b.top, h: innerHeight }; });
+    assert.ok(fit.top >= 0 && fit.bottom <= fit.h + 1, 'the record and rehearse bar stays in the window: ' + JSON.stringify(fit));
+    if (shots) await pop.screenshot({ path: join(shots, 'popout-camera.png') });
     await pg.waitForSelector('.rp-away');
     assert.ok(!(await pg.$('#recorder .rec-prompter')), 'the page shows where the prompter went');
     const before = await pg.$eval('#rec-wpm', e => +e.value);
@@ -160,6 +173,14 @@ try {
     await pop.click('#rp-rehearse');
     await pg.waitForSelector('.rec-live.reh');
     await pop.waitForFunction(() => document.querySelector('#rp-window p.now')?.dataset.line !== '0', null, { timeout: 8000 });
+    // the text glides: sampled every 100 ms it keeps moving up in small steps (not one jump per line)
+    const glide = async () => pop.evaluate(async () => {
+      const roll = document.querySelector('#rp-window .rp-roll'), ys = [];
+      for (let i = 0; i < 12; i++) { const m = /translateY\((-?[\d.]+)px\)/.exec(roll.style.transform || ''); ys.push(m ? +m[1] : 0); await new Promise(r => setTimeout(r, 100)); }
+      const steps = ys.slice(1).map((y, i) => y - ys[i]); return { moving: steps.filter(d => d < -0.05).length, back: steps.filter(d => d > 0.5).length, ys };
+    });
+    const rg = await glide();
+    assert.ok(rg.moving >= 8 && rg.back === 0, 'rehearse scrolls smoothly upward: ' + JSON.stringify(rg));
     if (shots) { await pop.setViewportSize({ width: 560, height: 420 }); await pop.screenshot({ path: join(shots, 'teleprompter-popout.png') }); }
     await pop.click('#rp-rehearse-stop'); await pg.waitForFunction(() => !document.querySelector('.rec-live.reh'));
     // record from the pop-out: countdown, recording on both, stop from the page
@@ -167,7 +188,11 @@ try {
     await pop.waitForSelector('.rp-count', { timeout: 3000 });
     await pop.waitForFunction(() => /Recording/.test(document.querySelector('#rp-state').textContent), null, { timeout: 6000 });
     await pg.waitForSelector('#rec-stop');
-    await pg.waitForTimeout(2200);
+    // while recording, the pop-out's script starts again from the top and scrolls the same smooth way
+    const first = await pop.$eval('#rp-window p.now', e => e.dataset.line);
+    const recg = await glide();
+    assert.ok(recg.moving >= 8 && recg.back === 0, 'recording scrolls smoothly upward: ' + JSON.stringify(recg));
+    await pop.waitForFunction(f => document.querySelector('#rp-window p.now')?.dataset.line !== f, first, { timeout: 8000 });
     await pop.click('#rp-stop');
     await pg.waitForSelector('.take .tstate >> text=In footage', { timeout: 30000 });
     assert.strictEqual((await api('/api/state')).state.takes.filter(x => x.status === 'ready').length, 1);

@@ -104,12 +104,13 @@ try {
     await pg.mouse.click(x(5), b.y + b.height / 2); await wait(200); assert.strictEqual(await pg.$('#pl-sel'), null, 'a click seeks, it does not select');
   });
 
-  await t('Ask my agent: prompts for this step, sent with the step, the chat opens', async () => {
-    await pg.click('#ask-agent'); await pg.waitForSelector('#ask-pop');
+  await t('Ask my agent: opens the one chat, with prompts for this step there, sent with the step', async () => {
+    assert.strictEqual(await pg.isVisible('#ask-agent'), false, 'Ask my agent is hidden while the chat is docked'); await pg.waitForSelector('#ask-chips');
     const chips = await pg.$$eval('#ask-chips .chip', x => x.map(e => e.textContent)); assert.ok(chips.includes('Pick the strongest hook'), chips.join());
     await shot(pg, '#stepnav', 'redesign-ask-agent-dark.png');
     if (shots) { await pg.screenshot({ path: join(shots, 'redesign-ask-agent-page-dark.png') }); }
-    await pg.click('#ask-chips .chip >> text=Pick the strongest hook'); await pg.waitForSelector('#chat.open');
+    await pg.click('#ask-chips .chip >> text=Pick the strongest hook');
+    await pg.waitForFunction(() => document.querySelector('#chatin') !== null);
     assert.strictEqual((await lastUser()).text, '(On the Cut step) Pick the strongest hook');
     await pg.keyboard.press('Escape');
   });
@@ -134,9 +135,11 @@ try {
     await pg.click('#compare-fold > summary'); await pg.waitForSelector('#comment-start');
     await pg.click('#comment-start'); await pg.fill('#cmp-seek', '4'); await wait(300); await pg.click('#comment-end');
     assert.ok(/From 0:00\.0 to 0:04\.0/.test(await pg.textContent('#cm-hint')), await pg.textContent('#cm-hint'));
-    await pg.fill('#comment-text', 'This stretch drags');
     await shot(pg, '#compare', 'redesign-note-range-dark.png');
-    await pg.click('#comment-send'); await pg.waitForFunction(() => !document.querySelector('#comment-text'), null, { timeout: 8000 });
+    await pg.click('#comment-send'); await pg.waitForSelector('#chat-attach');
+    assert.match(await pg.textContent('#chat-attach'), /0:00\.0 to 0:04\.0/);
+    await pg.fill('#chatin', 'This stretch drags'); await pg.press('#chatin', 'Enter');
+    await pg.waitForFunction(() => !document.querySelector('#chat-attach'), null, { timeout: 8000 });
     const m = await lastUser(); assert.strictEqual(m.attach.t, 0); assert.ok(Math.abs(m.attach.end - 4) < 0.1, JSON.stringify(m.attach)); assert.match(m.text, /reel-v1\.mp4 from 0:00\.0 to 0:04\.0/);
   });
 
@@ -160,13 +163,13 @@ try {
     await theme(pg, 'light');
     await pg.click('#more-open'); await pg.click('#more-wizards'); await pg.click('.wz-pick[data-wizard="reel"]'); await pg.waitForSelector('.wz-opt'); await shot(pg, '#wizards', 'redesign-wizard-goal-light.png');
     await pg.click('#wz-back'); await shot(pg, '#wizards', 'redesign-wizards-light.png'); await pg.keyboard.press('Escape');
-    await pg.click('#ask-agent'); await pg.waitForSelector('#ask-pop'); await shot(pg, '#stepnav', 'redesign-ask-agent-light.png'); if (shots) await pg.screenshot({ path: join(shots, 'redesign-ask-agent-page-light.png') }); await pg.keyboard.press('Escape');
+    await shot(pg, '#stepnav', 'redesign-ask-agent-light.png'); if (shots) await pg.screenshot({ path: join(shots, 'redesign-ask-agent-page-light.png') }); await pg.keyboard.press('Escape');
     if (await pg.isVisible('#chat-open')) await pg.click('#chat-open'); await pg.waitForSelector('#msgs .sg-done'); await shot(pg, '#chat', 'redesign-apply-light.png'); await pg.keyboard.press('Escape');
     await theme(pg, 'dark');
     const ph = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1.5, isMobile: true, hasTouch: true });
     ph.on('pageerror', e => errs.push(e.message));
     await ph.addInitScript(() => { try { localStorage.setItem('studio.cutLayer', 'raw'); } catch {} });
-    await open(ph, '#step=cut'); await ph.waitForSelector('#ask-agent'); await ph.click('#ask-agent'); await ph.waitForSelector('#ask-pop');
+    await open(ph, '#step=cut'); await ph.waitForSelector('#ask-agent'); await ph.click('#ask-agent'); await ph.waitForSelector('#chat.open');
     const over = await ph.evaluate(() => Math.max(...[...document.querySelectorAll('body *')].filter(e => e.offsetParent).map(e => e.getBoundingClientRect().right)) - innerWidth); assert.ok(over <= 1, 'no sideways scroll: ' + over);
     if (shots) await ph.screenshot({ path: join(shots, 'redesign-ask-agent-phone-dark.png') });
     await ph.keyboard.press('Escape'); await open(ph, '#step=start'); await ph.waitForSelector('#s-footage:not([hidden])');

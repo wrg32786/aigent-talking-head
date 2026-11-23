@@ -1,4 +1,6 @@
 // Shared helpers for the Studio page. Everything goes through the local server's /api.
+import { useEffect, useRef, useState } from 'react';
+import { Button } from '@astryxdesign/core/Button';
 export const file = p => '/files/' + p.split('/').map(encodeURIComponent).join('/');
 export const RM = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 export const isPaused = () => localStorage.getItem('studio.paused') ? localStorage.getItem('studio.paused') === '1' : RM;
@@ -7,6 +9,37 @@ const toastSubs = new Set();
 export const onToast = fn => { toastSubs.add(fn); return () => toastSubs.delete(fn); };
 // fix: fix ids (kit/studio/fixes.mjs) from an error; the toast then shows the fix buttons instead of a command
 export const toast = (msg, ok, fix) => toastSubs.forEach(fn => fn({ msg, ok, fix: fix ? [].concat(fix) : null, at: Date.now() }));
+// Copy text and say honestly whether it worked. The clipboard API first; then a hidden textarea placed inside the
+// open modal dialog (a textarea outside a modal <dialog> can't be selected, so a body-level fallback copies nothing).
+export async function copyText(t, said) {
+  let ok = false;
+  try { await navigator.clipboard.writeText(t); ok = true; } catch {}
+  if (!ok) {
+    const a = document.createElement('textarea'); a.value = t; a.setAttribute('readonly', ''); a.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+    (document.querySelector('dialog[open]') || document.body).appendChild(a); a.focus(); a.select();
+    try { ok = document.execCommand('copy'); } catch {}
+    a.remove();
+  }
+  toast(ok ? (said || 'Copied') : 'Could not copy. Select the text and press Cmd+C (Ctrl+C on Windows).', ok);
+  return ok;
+}
+// copy with feedback on the button itself: done is true for a moment after a copy that worked
+export function useCopy(ms = 1600) {
+  const [done, setDone] = useState(false), t = useRef(null);
+  useEffect(() => () => clearTimeout(t.current), []);
+  const copy = async (text, said) => { const ok = await copyText(text, said); if (ok) { setDone(true); clearTimeout(t.current); t.current = setTimeout(() => setDone(false), ms); } return ok; };
+  return [done, copy];
+}
+// an icon copy button: presses in on click, then shows a check and "Copied"
+export function CopyBtn({ text, label = '', said, className = '', ...rest }) {
+  const [done, copy] = useCopy();
+  return <IconBtn n={done ? 'check' : 'copy'} label={done ? 'Copied' : ('Copy ' + label).trim()} className={'copy-btn' + (done ? ' copied ' : ' ') + className} onClick={() => copy(text, said)} {...rest} />;
+}
+// a labelled copy button: the label turns to "Copied" with a check
+export function CopyButton({ text, said, label = 'Copy', ...rest }) {
+  const [done, copy] = useCopy();
+  return <Button {...rest} label={done ? 'Copied' : label} icon={<Icon n={done ? 'check' : 'copy'} />} onClick={() => copy(text, said)} />;
+}
 
 // Studio stopped (closed, crashed or restarting): fetch gives the browser's bare "Failed to fetch". We say what happened
 // instead, and the page shows the Studio stopped bar until the server answers again (StudioOffline in App.jsx).
@@ -85,6 +118,9 @@ const P = {
   info: <><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 8h.01" /></>,
   more: <path d="M6 12h.01M12 12h.01M18 12h.01" strokeWidth="3" />,
   spark: <path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" />,
+  expand: <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />,
+  prev: <path d="M6 5v14M18 6l-8 6 8 6z" />,
+  next: <path d="M18 5v14M6 6l8 6-8 6z" />,
 };
 export const Icon = ({ n, className }) => <svg className={'ic' + (className ? ' ' + className : '')} viewBox="0 0 24 24" aria-hidden="true">{P[n]}</svg>;
 export const IconBtn = ({ n, label, onClick, className = '', ...rest }) => <button type="button" className={'icon-btn ' + className} aria-label={label} title={label} onClick={onClick} {...rest}><Icon n={n} /></button>;

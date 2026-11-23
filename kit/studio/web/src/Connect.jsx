@@ -4,25 +4,22 @@ import { Drawer } from '@astryxdesign/core/Drawer';
 import { Badge } from '@astryxdesign/core/Badge';
 import { StatusDot } from '@astryxdesign/core/StatusDot';
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
-import { api, toast, Icon, IconBtn } from './lib.jsx';
+import { api, toast, Icon, IconBtn, copyText, CopyBtn } from './lib.jsx';
+export { copyText };
 
-export async function copyText(t, said) {
-  try { await navigator.clipboard.writeText(t); }
-  catch { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); document.execCommand('copy'); a.remove(); }
-  toast(said || 'Copied', true);
-}
 export function CopyBlock({ code, label, id }) {
-  return <div className="copyblock" id={id}><pre><code>{code}</code></pre><IconBtn n="copy" label={'Copy ' + (label || '')} onClick={() => copyText(code)} /></div>;
+  return <div className="copyblock" id={id}><pre><code>{code}</code></pre><CopyBtn text={code} label={label || ''} /></div>;
 }
 
 export function connState(a) {
   if (a && a.listening) return { k: 'on', dot: 'success', text: `Connected: ${a.name || 'your agent'}, listening` };
   if (a && a.connected) return { k: 'busy', dot: 'warning', text: `Connected: ${a.name || 'your agent'}, busy in the terminal` };
+  if (a && a.recent) return { k: 'busy', dot: 'warning', text: `${a.name || 'Your agent'} answered recently, between replies` };
   return { k: 'off', dot: 'neutral', text: 'Waiting for your agent' };
 }
 
 export function Connect({ V, apply, open, setOpen }) {
-  const [info, setInfo] = useState(null), [pick, setPick] = useState(null), [mode, setMode] = useState('steps');
+  const [info, setInfo] = useState(null), [pick, setPick] = useState(null), [mode, setMode] = useState('agent');
   useEffect(() => {
     if (!open) return;
     api('/api/connect').then(j => { setInfo(j); setPick(p => p || j.selected || 'claude'); }).catch(() => {});
@@ -61,10 +58,10 @@ export function Connect({ V, apply, open, setOpen }) {
           </div>
         </fieldset>
         <div id="connect-mode"><SegmentedControl label="How" size="sm" value={mode} onChange={setMode}>
-          <SegmentedControlItem value="steps" label="Step by step" /><SegmentedControlItem value="agent" label="Let my agent set it up" /></SegmentedControl></div>
+          <SegmentedControlItem value="agent" label="One prompt (easiest)" /><SegmentedControlItem value="steps" label="Step by step" /></SegmentedControl></div>
         {mode === 'agent' ? <div className="conn-steps" id="connect-prompt">
-          <p className="fine">Paste this into {ag ? ag.name : 'your agent'}. It reads AGENTS.md, registers itself and starts listening.</p>
-          <CopyBlock id="setup-prompt" code={info.prompt} label="the setup prompt" />
+          <p className="fine">Copy this once and paste it into {ag ? ag.name : 'your agent'}. It runs every step for you, asks you to restart it once if it needs to, then starts listening here.</p>
+          <CopyBlock id="setup-prompt" code={(ag && ag.prompt) || info.prompt} label="the setup prompt" />
         </div> : ag && <ol className="conn-steps" id="connect-steps">
           {ag.steps.map((s, i) => <li key={i}><b>{s.title}</b>{s.note && <small>{s.note}</small>}<CopyBlock code={s.code} label={s.title.toLowerCase()} /></li>)}
           <li><b>Restart {ag.name}</b><small>{ag.restart}{ag.check ? ` Check with: ${ag.check}` : ''}</small></li>

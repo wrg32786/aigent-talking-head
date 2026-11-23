@@ -162,7 +162,7 @@ Some picks only work with others. One file, `kit/studio/conflicts.mjs`, holds th
 | The Classic look, or a Look with no titles (minimal-clean) | Title entrances and the title layer | Titles on, your captions kept |
 | No music | Beat sync, and Energy | Auto music |
 | Sound effects off | Sound map and Sparse sounds | Sound effects on |
-| Keep pauses | Tighten pauses | Pace from the Look |
+| Keep pauses | Tighten pauses | Studio default: pauses inside a line over 0.3 s are cut, unless the Look sets its own pace (magazine) |
 | Zoom punch off | Punch-in | Zoom punch on |
 | A Look | Your earlier caption style (the Look brings its own) | |
 

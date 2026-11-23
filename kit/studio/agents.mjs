@@ -36,7 +36,7 @@ export function setups({ py = python(), node = NODE, mcp = MCP, url } = {}) {
   const std = json({ mcpServers: { [NAME]: server } });
   const restart = 'Restart the agent once so it loads the new server.';
   const sayLine = `${SAY}${url ? ` (Studio is at ${url})` : ''}`;
-  return [
+  return withPrompt([
     { id: 'claude', name: 'Claude Code', verified: true, docs: ['https://code.claude.com/docs/en/mcp', 'https://code.claude.com/docs/en/hooks'],
       steps: [
         { title: 'Add the Studio MCP server', lang: 'sh', code: `claude mcp add${py ? ` --env PYTHON=${q(py)}` : ''} --transport stdio --scope user ${NAME} -- ${N} ${M}`, note: 'Run it in any terminal. --scope user makes it work in every folder.' },
@@ -70,7 +70,22 @@ export function setups({ py = python(), node = NODE, mcp = MCP, url } = {}) {
         { title: 'A stdio MCP server with this command', lang: 'sh', code: `${N} ${M}`, note: py ? `Set PYTHON=${py} in its environment.` : 'No extra environment needed.' },
         { title: 'Most apps take this JSON', lang: 'json', code: std },
       ], say: sayLine, restart },
-  ];
+  ], url);
+}
+
+// One prompt per agent that does every step in order: the required steps (an "Or ..." step is an alternative and is
+// left out), then a restart if the new tools are not loaded yet, then the chat loop. Users paste this once instead of
+// copying each step.
+function withPrompt(list, url) {
+  return list.map(ag => {
+    const steps = ag.steps.filter(s => !/^Or\b/.test(s.title));
+    const body = steps.map((s, i) => `${i + 1}. ${s.title}:\n${s.code}`).join('\n\n')
+      // a server registered by an earlier install would keep pointing at the old folder
+      + `\n\nIf a step says ${NAME} already exists, remove the old entry (for example \`${ag.id === 'claude' ? `claude mcp remove ${NAME} -s user` : 'your agent\'s mcp remove command'}\`) and run the step again, so it points at this install.`;
+    return { ...ag, prompt: `Connect yourself to AIgent Studio${url ? ` (open at ${url})` : ''}. Do these in order, running the commands yourself:\n\n${body}\n\n`
+      + `${steps.length + 1}. If the ${NAME} tools are not loaded yet, or step 1 changed where they point (you removed and re-added them), tell me to restart you once, and after the restart I will say "${SAY}". Tools loaded from another install read a different Studio session, so the page keeps showing "No agent". If they are loaded from this install, go on.\n\n`
+      + `${steps.length + 2}. ${ag.say}: listen with studio_wait_for_message and answer me in the Studio page with studio_reply.` };
+  });
 }
 
 // one prompt for any agent: it reads AGENTS.md and sets itself up
