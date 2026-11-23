@@ -40,6 +40,7 @@ import * as SLK from './stylelooks.mjs';
 import { mount as mountFolders } from './folders.mjs';
 import { mountScenes } from './scene-routes.mjs';
 import { mount as mountPost } from './post-api.mjs';
+import { mount as mountHighlights } from './highlights-api.mjs';
 import * as SIZES from './sizes.mjs';
 import { mount as mountRefTitles } from './ref-titles.mjs';
 
@@ -69,6 +70,7 @@ const send = (ev, data) => { const s = `event: ${ev}\ndata: ${JSON.stringify(dat
 const aguiClients = new Set();
 function aguiTick() { if (!aguiClients.size) return; const s = C.load(); for (const c of aguiClients) for (const ev of c.obs.next(s, task)) c.res.write(AG.encode(ev)); }
 let lastRev = -1;
+let HL = null;
 const pushState = force => { const s = C.load(); if (s.rev !== lastRev || force === true) { lastRev = s.rev; send('state', view(s)); } };
 const update = fn => { const s = C.load(); const r = fn(s); C.save(s); pushState(); return r === undefined ? s : r; };
 
@@ -150,7 +152,7 @@ function view(s) {
   let edit = null; try { edit = editOf(s, { combo, cut, broll }); } catch (e) { edit = { error: e.message }; }
   let look = null; try { look = lookSources(s); } catch {}
   const outputs = C.outputsOf(s), currentOutputs = currentOutputsOf(s);
-  return { seq: ++viewSeq, boot: BOOT, scenes: C.catalog().scenesSig || '', state: s, look, compose: comp, outputs, currentOutputs, sizes: SIZES.viewOf(s, outputs), refFont: C.refFontOf(s, SLK.fontOf(s.styleLook)), boost: C.boostOf(s), motion: C.motionOf(s), savedLook: (() => { try { return C.savedLookOf(s); } catch { return null; } })(), draftPreview: draftPreviewOf(s), match: matchOf(s), styleLooks: SLK.list(), reopenable, scripts, cut, broll, refTitles: RTI.view(s), pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: noTimeline(s) ? null : swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
+  return { seq: ++viewSeq, boot: BOOT, scenes: C.catalog().scenesSig || '', state: s, look, compose: comp, outputs, currentOutputs, sizes: SIZES.viewOf(s, outputs), refFont: C.refFontOf(s, SLK.fontOf(s.styleLook)), boost: C.boostOf(s), motion: C.motionOf(s), savedLook: (() => { try { return C.savedLookOf(s); } catch { return null; } })(), draftPreview: draftPreviewOf(s), match: matchOf(s), styleLooks: SLK.list(), reopenable, scripts, cut, broll, highlights: HL ? HL.view(s) : null, refTitles: RTI.view(s), pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), swap: noTimeline(s) ? null : swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
 }
 
 // Copy the look (kit/studio/stylelooks.mjs): the reference's timeline is not used, so no "what to swap" and no spots from it
@@ -927,6 +929,7 @@ const sceneApi = mountScenes({ json, readBody, update, chromeOk });
 const FOLDERS = mountFolders({ ROOT, json, readBody, extraFolders: () => { const st = S.load(); return [st.downloads, st.renders, st.broll && st.broll.library, join(ROOT, 'teardown-in', 'studio'), join(ROOT, 'jobs')]; },
   ensure: [join(ROOT, 'teardown-in', 'studio'), join(ROOT, 'jobs')] });
 const POSTR = mountPost({ ROOT, C, json, readBody });
+HL = mountHighlights({ ROOT, C, update, json, readBody, view, startTranscribe, okFootage, durOf, runTask, pushState });
 // sizes: make the 4:5 or 1:1 of a finished reel (kit/studio/sizes.mjs)
 const SIZER = SIZES.mount({ ROOT, C, json, readBody, runTask: (...a) => runTask(...a), needFor: k => needFor(k) });
 // the reference's b-roll parts, on its own clock as a fraction of its length, become spots (kit/studio/lane.mjs spots)
@@ -1122,6 +1125,7 @@ async function api(req, res, u) {
   if (await FOLDERS(p, M, u, req, res)) return;
   if (await BRL.route(p, M, u, req, res)) return;
   if (await POSTR.route(p, M, u, req, res)) return;
+  if (await HL.route(p, M, u, req, res)) return;
   if (await SIZER.route(p, M, u, req, res)) return;
   if (await RTI.route(p, M, u, req, res)) return;
   if (p === '/api/lines' && M === 'GET') return json(res, 200, await linesView(C.load(), u.searchParams.get('path')));

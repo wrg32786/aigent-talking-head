@@ -718,6 +718,27 @@
       "outputs": ["jobs/<job>/manual-cuts.json"],
       "success": "exit 0",
       "failures": ["to is not after from", "a span over 30 s", "no job of that name"]
+    },
+    {
+      "name": "highlights",
+      "script": "kit/highlights.mjs",
+      "summary": "Find highlight moments in a long talk or podcast: transcribe locally with the kit Whisper, split on sentence ends (never mid-word or mid-sentence), and score up to N complete moments with a reason and start time. The local rules are the fallback; an agent can rescore them in Studio.",
+      "positional": [
+        { "name": "video", "type": "path", "required": true, "description": "the long talk or podcast (or a job file under the repo)" }
+      ],
+      "flags": [
+        { "name": "n", "type": "number", "default": 10, "description": "how many moments to keep, 1 to 20" },
+        { "name": "min", "type": "number", "default": 20, "description": "shortest moment, in seconds" },
+        { "name": "max", "type": "number", "default": 60, "description": "longest moment, in seconds" },
+        { "name": "words", "type": "path", "default": null, "description": "a words.json or transcript with word times, to skip Whisper" },
+        { "name": "goal", "type": "enum", "values": ["organic", "ad"], "default": "organic", "description": "organic story pacing, or an ad hook and CTA" },
+        { "name": "point", "type": "string", "default": null, "description": "one line on what the video is for, used in scoring" },
+        { "name": "out", "type": "path", "default": null, "description": "write the JSON result to this file" },
+        { "name": "json", "type": "boolean", "default": false, "description": "print one JSON result line" }
+      ],
+      "outputs": ["jobs/.highlights/<video>.tx.json (the local transcript, reused on the next run)"],
+      "success": "prints each highlight's id, time range, score, reason and a text snippet, or one JSON object with --json",
+      "failures": ["no such file", "n: 1 to 20", "max must be at least min", "Python is missing, so we cannot transcribe yet", "The Python tools for transcribing (faster-whisper) are missing"]
     }
   ]
 }

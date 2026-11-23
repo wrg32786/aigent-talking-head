@@ -100,6 +100,8 @@ export function Footage({ V, s, apply, patch, go, hidden, onLive, looks }) {
       </li>)}
     </ul>
     {s.footage.length > 0 && !s.clips && <div className="as-is"><Toggle id="as-is" label="My clips are already trimmed" description="Use each file as it is, in this order." checked={!!s.asIs} onChange={v => api('/api/state', { asIs: v }).then(apply).catch(() => {})} /></div>}
+    {((V.highlights && V.highlights.offer) || s.footage.some(f => (secs[f] || 0) >= 180)) && !rec && <button type="button" className="rs-open glass-card" id="hl-open" onClick={() => go('highlights', true)}>
+      <Icon n="spark" /><span className="rs-t"><b>Find highlights</b><span className="fine">Pick the best moments from a long talk as your take</span></span><Icon n="right" className="rs-go" /></button>}
     {!rec && <StartMode s={s} apply={apply} patch={patch} go={go} looks={looks} />}
     {!showScripts ? <button type="button" className="rs-open glass-card" id="scripts-open" onClick={() => { localStorage.setItem('studio.scripts.show', '1'); setScriptsOn(true); }}>
       <Icon n="script" /><span className="rs-t"><b>Scripts</b><span className="fine">Write what you will say, or ask your agent to</span></span><Icon n="right" className="rs-go" /></button>
