@@ -77,7 +77,7 @@ function rules(slot, ctx = {}) {
     seconds: +((+slot.end - +slot.start || 0) + 1).toFixed(2), frame: slot.kind === 'full' ? 'upright 9:16' : 'wide 16:9',
     ...(slot.ref ? { reference: { showed: slot.what || null, shot: slot.shot || null, source: slot.source || null } } : {}), avoid: AVOID.slice(), ...(serves ? { serves: true } : {}), by: 'rules' };
 }
-const one = (t, n) => String(t == null ? '' : t).replace(/[–—]/g, ', ').replace(/\s+/g, ' ').trim().slice(0, n);
+const one = (t, n) => String(t == null ? '' : t).replace(/[\u2013\u2014]/g, ', ').replace(/\s+/g, ' ').trim().slice(0, n);
 // a rewrite on top of a brief: only subject, shot and why change; the rest stays what the slot is
 function merge(brief, p = {}, by = 'your agent') {
   const out = { ...brief };

@@ -154,10 +154,12 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
       // library first: the clip that best matches the spot's nouns (then its words), before any stock
       // a reference cutaway says what it showed (Reel.md shot broll): that is the search, before your words
       const what = bt.ref && bt.ref.what ? String(bt.ref.what) : null, wq = what ? (LANE.nounQuery(what) || what) : null;
-      const vp = bt.ref && bt.ref.slot ? ((va[bt.n] || [])[0] || null) : null;
-      let hit = vp ? (vp.ok && !used.has(vp.id) ? vp.item : null) : wq ? (BR.rank(wq + ' ' + what, { exclude: used }).find(c => c.matched >= 1) || null) : null;
-      if (bt.ref && bt.ref.slot) { if (hit) used.add(hit.id); const rs = bt.ref.slot; if (!hit) continue; // a plan slot with nothing over the bar stays "Needs B-roll", with the best guess as its suggestion
-        out.push({ beat: bt.n, at: +rs.start, offset: +Math.max(0, rs.start - bt.start).toFixed(2), dur: +(rs.end - rs.start).toFixed(2), idea: `${hit.name} from your Vault`, why: vp.reason, role, query: wq || null, card: null, clip: hit.id, place: LANE.KIND_PLACE[rs.kind] || 'full', source: 'vault' }); continue; }
+      // a plan slot takes the Vault's pick for its brief or nothing (no looser search goes under the bar); a fast run
+      // slot has no brief, so it keeps the search by what the reference showed
+      const rs = bt.ref && bt.ref.slot, byBrief = rs && !rs.run, vp = byBrief ? ((va[bt.n] || [])[0] || null) : null;
+      let hit = byBrief ? (vp && vp.ok && !used.has(vp.id) ? vp.item : null) : wq ? (BR.rank(wq + ' ' + what, { exclude: used }).find(c => c.matched >= 1) || null) : null;
+      if (rs) { if (hit) used.add(hit.id); if (!hit) continue; // a plan slot with nothing over the bar stays "Needs B-roll", with the best guess as its suggestion
+        out.push({ beat: bt.n, at: +rs.start, offset: +Math.max(0, rs.start - bt.start).toFixed(2), dur: +(rs.end - rs.start).toFixed(2), idea: `${hit.name} from your Vault`, why: vp ? vp.reason : `It matches what this slot should show${rs.what ? ` (${rs.what})` : ''}.`, role, query: wq || null, card: null, clip: hit.id, place: LANE.KIND_PLACE[rs.kind] || 'full', source: 'vault' }); continue; }
       if (!hit) hit = p && p.query ? (BR.rank(p.query, { exclude: used })[0] || null) : null;
       if (!hit && bt.text) { const r = BR.rank(LANE.nounQuery(bt.text) + ' ' + bt.text, { exclude: used }).find(c => c.matched >= 2); if (r) hit = r; }
       if (!hit && want.length) hit = lib.find(c => want.includes(c.type) && !used.has(c.id) && !(c.raw && c.type === 'testimonial' && j.cutins.some(x => x.clip === c.id))) || null;
@@ -350,7 +352,7 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
       const v = q('beat') ? fill(C.load(), +q('beat'), c.id, { place: q('place') }) : C.load();
       return json(res, 200, { clip: clipBrief(c), broll: view(v), ...{ state: v } });
     }
-    if (p === '/api/broll/library' && M === 'POST') { const b = await readBody(req); const c = b.action === 'remove' ? BR.remove(b.id) : BR.update(b.id, { name: b.name, tags: b.tags, type: b.type }); if (b.action === 'remove') dropSlots(b.id); return json(res, 200, { clip: clipBrief(c), broll: view(C.load()) }); }
+    if (p === '/api/broll/library' && M === 'POST') { const b = await readBody(req); if (b.action === 'remove' && req.headers['x-studio-page'] !== '1') throw bad('Only the page can delete from the Vault. Deleting is the user\'s.', 403); const c = b.action === 'remove' ? BR.remove(b.id) : BR.update(b.id, { name: b.name, tags: b.tags, type: b.type }); if (b.action === 'remove') dropSlots(b.id); return json(res, 200, { clip: clipBrief(c), broll: view(C.load()) }); }
     if (p === '/api/broll/stock' && M === 'GET') return json(res, 200, { provider: q('provider'), results: await BR.searchStock(q('provider'), { query: q('q'), orientation: q('orientation'), min: q('min') != null && q('min') !== '' ? +q('min') : null, max: q('max') != null && q('max') !== '' ? +q('max') : null, page: +(q('page') || 1) }) });
     if (p === '/api/broll/stock/add' && M === 'POST') { const b = await readBody(req); const c = await BR.downloadStock(b.provider, b.item); const v = b.beat != null ? fill(C.load(), b.beat, c.id, { place: b.place, by: b.by }) : C.load(); return json(res, 200, { clip: clipBrief(c), broll: view(v) }); }
     if (p === '/api/broll/make' && M === 'POST') { const b = await readBody(req); const c = await makeCard(b.spec || {}); const v = b.beat != null ? fill(C.load(), b.beat, c.id, { place: b.place, by: b.by }) : C.load(); return json(res, 200, { clip: clipBrief(c), broll: view(v) }); }

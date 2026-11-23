@@ -12,14 +12,18 @@ const BB = createRequire(import.meta.url)('../broll-brief.cjs');
 
 export const BAR = 55;
 const DAY = 24 * 3600e3;
-const has = (hay, toks, w) => { const x = String(w).toLowerCase(); return hay.includes(x) || toks.has(V.stem(x)); };
+// a whole word (or its stem), or the whole phrase with a word edge on both sides: "car" is not in "postcard"
+const has = (hay, toks, w) => { const x = String(w).toLowerCase(); return toks.has(V.stem(x)) || new RegExp('(^|[^a-z0-9])' + x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^a-z0-9])').test(hay); };
+// an item's words, split once however many slots it is scored for (the view scores every item against every slot)
+const SETS = new WeakMap();
+const setsOf = it => { let s = SETS.get(it); if (!s) { const names = [it.name, it.title, ...(it.tags || []), ...(it.brand || []), it.from && it.from.site, it.describe].map(v => String(v || '').toLowerCase()).join(' '), text = String(it.text || '').toLowerCase();
+  SETS.set(it, s = { names, text, nt: new Set(V.words(names).map(V.stem)), tt: new Set(V.words(text).map(V.stem)) }); } return s; };
 const when = (iso, now) => { const d = Math.floor((now - Date.parse(iso)) / DAY); return d < 1 ? 'today' : d < 7 ? 'this week' : d < 14 ? 'last week' : d < 45 ? `${Math.round(d / 7)} weeks ago` : `${Math.round(d / 30)} months ago`; };
 
 // one item against one brief: { score, reason, parts } or null when no word of the brief is in it
 export function score(brief, it, { now = Date.now() } = {}) {
   if (!V.placeable(it)) return null;
-  const names = [it.name, it.title, ...(it.tags || []), ...(it.brand || []), it.from && it.from.site, it.describe].map(v => String(v || '').toLowerCase()).join(' '), text = String(it.text || '').toLowerCase();
-  const nt = new Set(V.words(names).map(V.stem)), tt = new Set(V.words(text).map(V.stem));
+  const { names, text, nt, tt } = setsOf(it);
   const named = (brief.named || []).filter(x => !/^\$?\d/.test(x)), inName = named.find(n => has(names, nt, n)), inText = !inName && named.find(n => has(text, tt, n));
   const ws = BB.subjectWords(brief), hit = ws.filter(w => has(names, nt, w) || has(text, tt, w));
   // the reference cutaway is the second voice: what it showed counts when our own words find nothing, and for less
