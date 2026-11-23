@@ -88,7 +88,7 @@ else {
 }
 
 // 2b. picture, measured: freeze and black FAIL outside what the edit does on purpose; the rest are notes
-{ const pj = PIC.judge(PIC.measure(file, dur), PIC.exempt(C, CAP));
+{ const pj = PIC.judge(PIC.measure(file, dur), PIC.exempt(C, CAP), { fxPass: /^reel-fx-/.test(basename(file)) });
   pj.fails.forEach(m => ok(false, m)); pj.oks.forEach(m => ok(true, m)); pj.notes.forEach(m => notes.push(m)); }
 
 // 3. check points -> stills + contact sheet

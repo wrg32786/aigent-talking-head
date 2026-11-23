@@ -64,7 +64,7 @@ t('one Effect and one Exit for the titles: the recipe Style lines and their roun
 t('the vision pass: set apart from move, a title that cannot be read is left out, the instruction states the count', () => {
   const PH = require(path.join(KIT, 'teardown', 'phrases.cjs'));
   const v = PH.validateAgentTitles([{ start: 1, end: 2, set: { lines: ['THE ONLY', 'Question'], key: 'Question', font: 'italic serif', glow: true }, move: { build: 'letter', effect: 'type', exit: 'glitch-slice' } }, { start: 4, end: 5, unread: true }]);
-  assert.ok(v.ok, v.errs.join('; ')); assert.strictEqual(v.unread, 1); assert.strictEqual(v.titles.length, 1);
+  assert.ok(v.ok, v.errs.join('; ')); assert.deepStrictEqual(v.unread, [{ start: 4, end: 5 }]); assert.strictEqual(v.titles.length, 1);
   assert.deepStrictEqual(v.titles[0], { start: 1, end: 2, lines: ['THE ONLY', 'Question'], key: 'Question', font: 'italic serif', effect: 'type', exit: 'glitch-slice', build: 'letter', glow: true });
   const none = PH.validateAgentTitles([{ start: 4, end: 5, unread: true }]); assert.ok(!none.ok && /nothing is kept/.test(none.errs[0]), 'all unread: the OCR read stays');
   assert.ok(!PH.validateAgentTitles([{ start: 1, end: 2, move: { effect: 'wobble' }, set: { lines: ['A'] } }]).ok);
@@ -109,6 +109,10 @@ t('picture: a frozen stretch and black frames fail, and what the edit does on pu
   assert.ok(tail.fails.length === 1 && /black/.test(tail.fails[0]), 'the tail hold is ours, black in it is not');
   const title = P.judge(M, P.exempt({ segs: [{ in: 0, out: 4.5 }], tail: 0 }, { flips: [{ mode: 7, start: 3, end: 4.4, text: 'A TITLE' }] }));
   assert.strictEqual(title.fails.length, 2, 'a title never excuses a frozen picture');
+  // an effects reel (reel-fx-) may hold the picture on purpose: the same freeze is a note there, never a FAIL
+  const fxr = P.judge(M, P.exempt({ segs: [{ in: 0, out: 4.5 }], tail: 0 }, { flips: [] }), { fxPass: true });
+  assert.ok(!fxr.fails.some(m => /frozen/.test(m)) && fxr.notes.some(m => /frozen/.test(m) && /effects pass/.test(m)), JSON.stringify(fxr));
+  assert.ok(/fxPass: \/\^reel-fx-\//.test(fs.readFileSync(path.join(KIT, 'verify.mjs'), 'utf8')), 'verify tells the picture check when the file is an effects reel');
   assert.ok(/did not run/.test(P.judge({ error: 'x' }, {}).notes[0]));
 });
 t('picture: exemptions come from the cut (fade in, dips, seams, hits, pads, inserts) and the rest are notes', () => {

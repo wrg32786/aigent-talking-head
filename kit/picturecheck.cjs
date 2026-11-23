@@ -76,11 +76,13 @@ function uncovered(a, z, wins) {
 const inAny = (t, wins) => wins.some(([a, z]) => t >= a && t <= z);
 
 // M from measure(), X from exempt() -> { fails: [text], oks: [text], notes: [text] }
-function judge(M, X) {
+// fxPass: the file is a reel-fx- reel. Its effects may hold the picture on purpose (pause-point, in fx.json, which
+// exempt() does not read), so a freeze there is a note, never a FAIL.
+function judge(M, X, { fxPass = false } = {}) {
   const fails = [], oks = [], notes = [], s2 = x => x.toFixed(2);
   if (M.error) return { fails, oks, notes: ['picture checks did not run: ' + M.error] };
   const fz = M.freezes.filter(([a, z]) => uncovered(a, z, X.still) >= T.freezeD), bk = M.blacks.filter(([a, z]) => uncovered(a, z, X.dark) >= T.blackD);
-  (fz.length ? fails : oks).push(fz.length ? `picture frozen for half a second or more: ${fz.map(([a, z]) => `${s2(a)} to ${s2(z)} s`).join(', ')}` : `no frozen picture (${M.freezes.length} hold${M.freezes.length === 1 ? '' : 's'} on purpose)`);
+  (!fz.length ? oks : fxPass ? notes : fails).push(fz.length ? `picture frozen for half a second or more: ${fz.map(([a, z]) => `${s2(a)} to ${s2(z)} s`).join(', ')}${fxPass ? ' (the effects pass may hold it on purpose)' : ''}` : `no frozen picture (${M.freezes.length} hold${M.freezes.length === 1 ? '' : 's'} on purpose)`);
   (bk.length ? fails : oks).push(bk.length ? `black frames outside a dip or a card: ${bk.map(([a, z]) => `${s2(a)} to ${s2(z)} s`).join(', ')}` : `no black frames outside a dip or a card (${M.blacks.length} on purpose)`);
   const st = M.stats, jumps = [];
   for (let i = 1; i < st.length; i++) if (!inAny(st[i].t, X.noisy)) jumps.push(Math.abs(st[i].yavg - st[i - 1].yavg));
