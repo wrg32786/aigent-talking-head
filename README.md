@@ -1,6 +1,6 @@
 # aigent-talking-head
 
-**aigent-talking-head is a free, open-source (Apache-2.0) talking-head video editor that turns one phone clip into a captioned vertical reel for TikTok, Instagram Reels and YouTube Shorts, run by you or your coding agent (Claude Code, Codex, Cursor or any MCP client) on your own machine with Whisper, FFmpeg and Chrome.**
+**aigent-talking-head is a free, open-source (Apache-2.0) talking-head video editor that turns one phone clip into a captioned vertical reel for TikTok, Instagram Reels and YouTube Shorts. You or your coding agent (Claude Code, Codex, Cursor or any MCP client) run it on your own machine with Whisper, FFmpeg and Chrome. There is no cloud account. Any keys you add stay on your computer.**
 
 Made by Will Gwyn at [The AIgent](https://theaigent.xyz).
 
@@ -356,6 +356,8 @@ Recreating a reel you like from a link: in Studio it is free and runs on your co
 Other open-source tools in the same space: [OpenShorts](https://github.com/faris-sait/openshorts) (MIT) cuts long videos into vertical clips, and [kinocut](https://github.com/KyaniteLabs/kinocut) (Apache-2.0) is an MCP server that gives agents guarded FFmpeg and HyperFrames editing tools.
 
 [AutoClip](https://github.com/zhouxiaoka/autoclip) (MIT) is the closest open-source neighbor. It finds highlight clips in a long podcast or talk, then packs each one with a cover and post copy. We start from one talking-head take and finish the reel: Recreate a look you like, titles and captions kept off your face, B-roll from our Vault, picture checks, and your own agent in Studio. Use AutoClip to pick the moments, and ours to design the reel.
+
+[ffmpeg-skill](https://github.com/kajisho5/ffmpeg-skill) (MIT) gives coding agents a local FFmpeg toolkit and MCP server for cuts, captions, reframe, loudness and platform exports. It is a general editor your agent can drive. We finish a designed reel from a talking-head take.
 
 In short:
 
