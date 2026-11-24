@@ -14,6 +14,8 @@ Highlights in a long talk, and a publish kit beside the finished reel.
 
 ## 1.29.0 (unreleased)
 
+- **Editor agent.** `agents/video-editor.md`, a Claude Code subagent that picks the right command for the job (reel, Studio, teardown, clip-raw-footage), runs the draft, plan, review, render and verify loop, and carries fixes learned on real reels (captions off a low face, cutaways in the pause after a word, numbered versions, never posting for the person). Install steps in AGENTS.md.
+
 Release notes: [docs/releases/v1.29.0.md](docs/releases/v1.29.0.md).
 
 Titles like the reference (Studio report 4, items 16 and 17; the reference 5 text teardown).
