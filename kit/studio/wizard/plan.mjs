@@ -183,7 +183,7 @@ export function toState(plan, cat = null) {
   const patch = { clearPicks: true, picks, pack: p.template && p.template.kind === 'pack' ? p.template.name : null,
     styleLook: p.template && p.template.kind === 'look' ? p.template.name : null, titles: w.titles.on === false ? 'off' : 'auto',
     music: { bed: p.music.bed, energy: p.music.energy }, sound: { sfx: p.music.sfx ? 'on' : 'off' },
-    pace: { tighten: p.advanced.tighten ?? P.tighten, punch: p.presenter.some(x => x.id === 'punch') ? 'on' : 'off' } };
+    pace: { tighten: p.advanced.tighten ?? P.tighten, punch: p.presenter.some(x => x.id === 'punch') ? 'on' : 'off' }, keyWords: w.keyWords.level };
   const look = w.look || (w.type === 'captions' ? 'classic' : w.type === 'kinetic' ? 'kinetic' : null);
   if (look) pick('captionStyle', look);
   if (w.entrance && w.type !== 'captions') pick('captionEntrance', w.entrance);
@@ -211,7 +211,7 @@ export function pending(plan) {
   const add = (field, text) => out.push({ field, text });
   if (w.place.captions || w.place.titles.length) add('words.place', 'Where words sit');
   if (w.colors.text || w.colors.accent || w.colors.outline) add('words.colors', 'Your own text colors');
-  if (w.keyWords.level !== 'off') add('words.keyWords', 'Bigger key words');
+  if (w.keyWords.level !== 'off' && (w.keyWords.color !== 'accent' || w.keyWords.maxPerLine !== 1)) add('words.keyWords', 'Key word color and how many per line');
   if (Array.isArray(p.transitions.ids) && p.transitions.ids.length && p.transitions.when !== 'every-cut') add('transitions.when', 'Transitions only at some cuts');
   for (const x of p.presenter) {
     if (x.id === 'frame-breakout') add('presenter.frame-breakout', 'Frame breakout');
@@ -239,6 +239,7 @@ export function fromState(s, prev = null, cat = null) {
   const w = p.words, look = allow('captionStyle')[0] || null;
   if (look) { take('captionStyle', look); w.look = look; w.type = KINETIC_LOOKS.includes(look) ? 'kinetic' : 'captions'; } else { w.look = null; w.type = null; }
   const ce = allow('captionEntrance')[0] || null; w.entrance = ce; if (ce) take('captionEntrance', ce);
+  w.keyWords.level = s.keyWords || 'off';
   w.titles.on = s.titles === 'off' ? false : base.words.titles.on === false ? null : base.words.titles.on;
   w.titles.entrances = allow('entrance'); for (const id of w.titles.entrances) take('entrance', id);
   w.titles.effect = allow('titleEffect')[0] || null; if (w.titles.effect) take('titleEffect', w.titles.effect);
