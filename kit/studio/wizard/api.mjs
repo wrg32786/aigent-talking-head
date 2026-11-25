@@ -69,10 +69,12 @@ export function mount({ C, json, readBody, view, pushState }) {
         if (p === '/api/plan-check/report' && M === 'POST') { const b = (await readBody(req)) || {}; if (!Array.isArray(b.looked)) { json(res, 400, { error: 'looked: a list of { id, selection, ok, note, time }.' }); return true; } json(res, 200, { report: PC.report(build, b.looked) }); return true; }
         if (p === '/api/plan-check' && M === 'POST') {
           const b = (await readBody(req)) || {};
+          // a fix writes cut.json and captions.js: never while a draft or render is writing them too
+          if (b.fix === true && s.task && s.task.status === 'running') { json(res, 409, { error: 'Wait for the draft or render to finish, then fix.' }); return true; }
           // the plan as it is now beside the draft, then the newest render for the stills
           mkdirSync(build, { recursive: true }); writeFileSync(join(build, 'video-plan.json'), JSON.stringify(planOf(s, C.catalog()), null, 1));
           const outs = (C.outputsOf ? C.outputsOf(s) : []).map(f => join(ROOT, f)).filter(f => existsSync(f)).sort((x, y) => statSync(y).mtimeMs - statSync(x).mtimeMs);
-          json(res, 200, { report: PC.run(build, { fix: b.fix === true, video: outs[0] || null }), job: s.job }); return true;
+          json(res, 200, { report: PC.run(build, { fix: b.fix === true, video: outs[0] || null, state: { finishWhen: s.finishWhen, transitionsWhen: s.transitionsWhen, keyWords: s.keyWords } }), job: s.job }); return true;
         }
       } catch (e) { json(res, 400, { error: e.message }); return true; }
       return false;

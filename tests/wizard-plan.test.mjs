@@ -340,6 +340,9 @@ try {
       const np = await fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pace: 'zoomy' }) });
       assert.strictEqual(np.status, 400);
       await fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: VP.defaults('steady') }) });
+      // the plan check: with no draft it says so plainly (kit/plan-check.mjs runs once there is one)
+      const pcr = await fetch(url + '/api/plan-check', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fix: true }) });
+      assert.strictEqual(pcr.status, 400); assert.match((await pcr.json()).error, /draft first|name the job/i);
     } finally { srv.kill(); }
     const client = new Client({ name: 'wizard-plan-test', version: '1' });
     await client.connect(new StdioClientTransport({ command: process.execPath, args: [join(ROOT, 'kit', 'mcp.mjs')], cwd: ROOT, env, stderr: 'ignore' }));

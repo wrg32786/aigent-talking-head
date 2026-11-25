@@ -37,10 +37,20 @@ try {
     const r = PC.run(build, { fix: true });
     assert.strictEqual(r.round, 2); assert.deepStrictEqual(r.rounds.map(x => x.failed.includes('filters')), [true, false]);
     assert.ok(r.checks.find(c => c.id === 'filters').ok, 'green after the fix'); assert.ok(r.needsRender && /only on the hook/.test(r.fixed[0].note));
+    assert.ok(PC.run(build).needsRender, 'Check again still says to render');
     const cut = JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8'));
     assert.ok(!cut.finish && cut.segs[0].finish === 'mono' && cut.segs.slice(1).every(s => !s.finish), 'only the hook has the filter');
     assert.ok(existsSync(join(build, 'scene-plan.json')) && existsSync(join(build, 'plan-check.json')));
     assert.ok(PC.run(build).checks.find(c => c.id === 'filters').ok, 'and it stays fixed');
+  });
+  await t('filters: missing on the hook, No filters taken off, and no fix when Studio\'s own setting differs', () => {
+    const { build } = job('fmiss', { plan: P(p => { p.filters = { ids: ['mono'], when: 'hook' }; }) });
+    const r1 = PC.run(build), f1 = r1.checks.find(c => c.id === 'filters'); assert.strictEqual(f1.ok, false); assert.match(f1.note, /missing on the hook/);
+    const held = PC.run(build, { fix: true, state: { finishWhen: 'none' } }); assert.strictEqual(held.fixed.length, 0); assert.match(held.checks.find(c => c.id === 'filters').note, /pick it again/);
+    assert.ok(PC.run(build, { fix: true, state: { finishWhen: 'hook' } }).checks.find(c => c.id === 'filters').ok);
+    const { build: b2 } = job('fnone', { plan: P(p => { p.filters = { ids: [], when: 'hook' }; }), cut: { finish: 'mono' } });
+    const r2 = PC.run(b2, { fix: true }); assert.ok(r2.checks.find(c => c.id === 'filters').ok, 'No filters: taken off, never added');
+    const cut = JSON.parse(readFileSync(join(b2, 'cut.json'), 'utf8')); assert.ok(!cut.finish && cut.segs.every(x => !x.finish));
   });
   await t('transitions: only picked ones, only where the timing keeps them, both fixed', () => {
     const { build } = job('tr', { plan: P(p => { p.transitions = { ids: ['whip'], when: 'hook-cta' }; }) });
@@ -49,6 +59,10 @@ try {
     assert.strictEqual(r1.checks.find(x => x.id === 'transitions-when').ok, false);
     const r = PC.run(build, { fix: true }); assert.ok(r.checks.find(x => x.id === 'transitions').ok && r.checks.find(x => x.id === 'transitions-when').ok, JSON.stringify(r.checks));
     const after = JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8')); assert.strictEqual(after.segs[2].transition, 'cut', 'the body seam is a plain cut'); assert.strictEqual(after.segs[1].transition, 'whip');
+    // a seam you set yourself stays yours
+    const { build: b3 } = job('tr2', { plan: P(p => { p.transitions = { ids: ['whip'], when: 'every-cut' }; }) });
+    const c3 = JSON.parse(readFileSync(join(b3, 'cut.json'), 'utf8')); c3.segs[2].transition = 'zoom'; c3.edited = { transitions: [2] }; writeFileSync(join(b3, 'cut.json'), JSON.stringify(c3));
+    assert.ok(PC.run(b3, { fix: true }).checks.find(x => x.id === 'transitions').ok); assert.strictEqual(JSON.parse(readFileSync(join(b3, 'cut.json'), 'utf8')).segs[2].transition, 'zoom');
   });
   await t('key words, titles, repo shots and the call to action', () => {
     const { build } = job('kw', { plan: P(p => { p.words.keyWords.level = 'strong'; p.words.titles.on = false; }), cut: { inserts: [{ file: 'x.png', at: 5, dur: 2, place: 'top', repo: true }] }, caps: { flips: [{ start: 0.2, end: 2, text: 'This tool', mode: 0 }, { start: 5, end: 7, text: 'Big title', mode: 7 }] } });
@@ -66,23 +80,27 @@ try {
     const r = PC.run(build); const cta = r.checks.find(x => x.id === 'cta');
     assert.strictEqual(cta.ok, false); assert.match(cta.note, /did not hear a call to action/); assert.match(cta.note, /Extras/);
   });
-  await t('the moments to look at, and the render\'s own face, text and contrast checks', () => {
+  await t('the moments to look at, and the render\'s own face, text and contrast checks', async () => {
     const { build } = job('pts', { plan: blank(), caps: { flips: [{ start: 0.2, end: 2, text: 'This tool', mode: 0 }, { start: 5, end: 7, text: 'Big title', mode: 7 }] } });
     const c = JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8')); c.segs[2].transition = 'whip'; c.segs[0].finish = 'mono'; writeFileSync(join(build, 'cut.json'), JSON.stringify(c));
-    writeFileSync(join(build, 'facecheck.json'), JSON.stringify({ faceSafe: false, hits: [{ t: 6.2 }] })); writeFileSync(join(build, 'legibility.json'), JSON.stringify({ under: 0, spans: [] }));
+    writeFileSync(join(build, 'facecheck.json'), JSON.stringify({ faceSafe: false, hits: [{ t: 6.2 }] })); writeFileSync(join(build, 'legibility.json'), JSON.stringify({ under: 1, spans: [[8.4, 9, 2.1]] }));
     const st = PC.load(build); const pts = PC.checkpoints(st.cut, st.caps, build).map(p => p.id);
     for (const id of ['caption-1', 'hook-end', 'cta', 'title-1-in', 'title-1', 'seam-2', 'filter-1']) assert.ok(pts.includes(id), id + ' in ' + pts.join());
     const r = PC.run(build); const face = r.checks.find(x => x.id === 'face'); assert.strictEqual(face.ok, false); assert.strictEqual(face.time, 6.2);
-    assert.ok(r.checks.find(x => x.id === 'contrast').ok);
+    assert.strictEqual(r.checks.find(x => x.id === 'contrast').time, 8.4, 'legibility spans are [start, end, ratio]');
+    // a render result older than the cut is from an earlier render: left out
+    const { utimesSync } = await import('fs'); const old = new Date(Date.now() - 60000); utimesSync(join(build, 'facecheck.json'), old, old);
+    assert.ok(!PC.run(build).checks.some(x => x.id === 'face'));
   });
   await t('an agent\'s looked-at checks sit beside the measured ones; the command line', () => {
     const { jobs, build } = job('cli', { plan: P(p => { p.filters = { ids: ['mono'], when: 'cta' }; }), cut: { finish: 'mono' } });
     const out = execFileSync(process.execPath, [join(ROOT, 'kit', 'plan-check.mjs'), 'check', '--name', 'cli', '--jobs', jobs, '--fix'], { encoding: 'utf8' });
-    assert.match(out, /fixed \(round 1\): Filters now show only on the call to action/); assert.match(out, /Render again/);
+    assert.match(out, /fixed \(round 1\): Filters \(mono\) now show only on the call to action/); assert.match(out, /Render again/);
     const lf = join(TMP, 'looked.json'); writeFileSync(lf, JSON.stringify([{ id: 'title-1', selection: 'Title: slam entrance', ok: false, note: 'The title comes in without the slam.', time: 5.1 }]));
     const rep = JSON.parse(execFileSync(process.execPath, [join(ROOT, 'kit', 'plan-check.mjs'), 'report', '--name', 'cli', '--jobs', jobs, '--looked', lf], { encoding: 'utf8' }));
     assert.strictEqual(rep.looked[0].measured, false); assert.ok(rep.checks.length, 'measured rows stay');
     assert.throws(() => PC.run(join(TMP, 'jobs', 'none', 'build')), /make a draft first/);
+    assert.throws(() => execFileSync(process.execPath, [join(ROOT, 'kit', 'plan-check.mjs'), 'check', '--name', '../../x', '--jobs', jobs], { stdio: 'pipe' }), /status 2|Command failed/);
   });
   console.log(`\nplan check: ${n} tests passed`);
 } finally { rmSync(TMP, { recursive: true, force: true }); }

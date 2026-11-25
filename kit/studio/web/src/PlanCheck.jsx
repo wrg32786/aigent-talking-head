@@ -21,9 +21,9 @@ export function PlanCheck({ V, s, drafted, apply }) {
   if (!s.videoPlan) return null; // only for a video built with Build my own
   const rows = rep ? [...rep.checks, ...(rep.looked || [])] : [], bad = rows.filter(r => !r.ok), fixable = rep && rep.checks.some(r => !r.ok && r.fix);
   const frame = f => f && s.job ? file(`jobs/${s.job}/build/${f}`) : null;
-  return <div className="review glass-card" id="plan-check" aria-labelledby="plan-check-h">
+  return <section className="review glass-card" id="plan-check" aria-labelledby="plan-check-h">
     <div className="rv-head"><h3 id="plan-check-h">Plan check</h3>
-      <span className="fine grow" role="status" id="plan-check-sum">{!rep ? 'Check that the video does what you built.' : bad.length ? `${bad.length} to look at` : 'Everything matches your plan.'}</span>
+      <span className="fine grow" role="status" id="plan-check-sum">{!rep ? 'Check that the video does what you built.' : bad.length ? `${bad.length} to look at` : rows.length ? 'The measured checks passed.' : 'Nothing to check for this plan yet.'}</span>
       <button type="button" className="btn sm outline" id="plan-check-run" disabled={busy} onClick={() => run(false)}>{busy ? 'Checking' : rep ? 'Check again' : 'Check the plan'}</button>
       {fixable && <button type="button" className="btn sm" id="plan-check-fix" disabled={busy} onClick={() => run(true)}>Fix what we can</button>}
     </div>
@@ -31,9 +31,9 @@ export function PlanCheck({ V, s, drafted, apply }) {
     {rep && rep.needsRender && <p className="fine" id="plan-check-render">Fixed: {rep.fixed.map(x => x.note).join(' ')} Render again to see it in the video.</p>}
     {rep && <ul className="pc-list" id="plan-check-rows">{rows.map(r => <li key={(r.measured ? 'm-' : 'l-') + r.id} className={'pc-row ' + (r.ok ? 'ok' : 'warn')} data-check={r.id} data-ok={String(r.ok)}>
       {frame(r.frame) ? <img src={frame(r.frame)} alt="" width="54" height="96" loading="lazy" /> : <span className="pc-mark" aria-hidden="true">{r.ok ? '✓' : '!'}</span>}
-      <span className="pc-text"><b>{r.selection}</b> <span className="sr">{r.ok ? 'matches' : 'needs a look'}</span>{r.time != null && <span className="mono"> {clock(r.time)}</span>}<br /><span className="fine">{r.note}{!r.measured && ' (your agent looked)'}</span></span>
-      {!r.ok && <button type="button" className="btn sm ghost pc-ask" onClick={() => send(r)}>Ask the agent to fix this</button>}
+      <span className="pc-text" id={`pc-${r.measured ? 'm' : 'l'}-${r.id}`}><b>{r.selection}</b> <span className="sr">{r.ok ? 'matches' : 'needs a look'}</span>{r.time != null && <span className="mono"> {clock(r.time)}</span>}<br /><span className="fine">{r.note}{!r.measured && ' (your agent looked)'}</span></span>
+      {!r.ok && <button type="button" className="btn sm ghost pc-ask" aria-describedby={`pc-${r.measured ? 'm' : 'l'}-${r.id}`} onClick={() => send(r)}>Ask the agent to fix this</button>}
     </li>)}</ul>}
-    {rep && !agentOn && !(rep.looked || []).length && <p className="fine" id="plan-check-agent">We ran the measured checks. Looking at each frame against your picks and notes needs your agent: connect one to add those.</p>}
-  </div>;
+    {rep && !(rep.looked || []).length && <p className="fine" id="plan-check-agent">{agentOn ? 'We ran the measured checks. Your agent has not looked at the frames yet: ask it to check the plan to add that.' : 'We ran the measured checks. Looking at each frame against your picks and notes needs your agent: connect one to add those.'}</p>}
+  </section>;
 }
