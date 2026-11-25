@@ -33,7 +33,7 @@ const errsOf = pg => { const e = []; pg.on('pageerror', x => e.push(x.message));
 const noCmd = async (pg, sel, what) => { const txt = await pg.evaluate(s => [...document.querySelectorAll(s)].map(e => e.innerText).join('\n'), sel); const m = txt.match(CMD); assert.ok(!m, `${what} shows a command: ...${m && txt.slice(Math.max(0, m.index - 60), m.index + 40)}...`); };
 // Studio keeps a live connection, so wait for the page, not for a quiet network; about:blank first, so a link that only
 // changes the hash still loads the page
-const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); };
+const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#areas'); };
 const shot = async (pg, name) => { if (shots) { await pg.waitForTimeout(800); await pg.screenshot({ path: join(shots, `noterm-${name}.png`) }); } };
 
 try {
@@ -106,9 +106,11 @@ try {
       await pg.click('#details-fold .fold2-h'); await pg.click('#cmd-copy');
       assert.match(await clip(), /^In my aigent-talking-head folder, make this reel by running npm run reel -- /);
       await open(pg, '#step=review'); await pg.waitForSelector('#s-review:not([hidden])'); assert.ok(await pg.$('#run-foot #details-fold'), 'the same fold under Review');
-      // every step and both second views (the reference view of Picture, the Post view of Render): [link, step, view]
-      for (const [st, step, view] of [['start', 'start', 'main'], ['cut', 'cut', 'main'], ['picture', 'picture', 'main'], ['reference', 'picture', 'reference'], ['text', 'text', 'main'], ['broll', 'broll', 'main'], ['music', 'music', 'main'], ['review', 'review', 'main'], ['render', 'render', 'main'], ['post', 'render', 'post']]) {
+      // every step, the Post view of Render, and the Teardowns and Recording tabs (the old reference link opens Teardowns)
+      for (const [st, step, view] of [['start', 'start', 'main'], ['cut', 'cut', 'main'], ['picture', 'picture', 'main'], ['text', 'text', 'main'], ['broll', 'broll', 'main'], ['music', 'music', 'main'], ['review', 'review', 'main'], ['render', 'render', 'main'], ['post', 'render', 'post']]) {
         await open(pg, '#step=' + st); await pg.waitForSelector(`main[data-step="${step}"][data-view="${view}"] .step:not([hidden]) h2`); await noCmd(pg, 'body', 'step ' + st); }
+      for (const [link, area, h] of [['#step=reference', 'teardowns', 'h-ref'], ['#tab=teardowns', 'teardowns', 'h-ref'], ['#tab=recording', 'recording', 'h-recording']]) {
+        await open(pg, link); await pg.waitForSelector(`main[data-area="${area}"] #${h}`); await noCmd(pg, 'body', link); }
       assert.deepStrictEqual(errs, []);
     });
     await ctx.close();
