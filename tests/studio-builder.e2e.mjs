@@ -221,6 +221,8 @@ try {
   await t('Just captions skip the kinetic-only steps and take key words away', async () => {
     await open(pg, '#build=captionType'); await pg.waitForSelector('#build-type');
     await pg.click('#build-type [data-opt="captions"]'); await pg.waitForSelector('#build-type [data-opt="captions"][aria-checked="true"]');
+    // the step list follows the saved state, which can land a moment after the tile shows picked
+    await pg.waitForFunction(() => /^Words, 1 of 6$/.test(document.querySelector('#build-count')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
     assert.match(await pg.textContent('#build-count'), /^Words, 1 of 6$/);
     assert.strictEqual((await api('/api/state')).state.keyWords, 'off');
     await open(pg, '#build=keyWords'); await pg.waitForSelector('#build-wordsPreview, #build-place, #build-colors', { timeout: 10000 });
