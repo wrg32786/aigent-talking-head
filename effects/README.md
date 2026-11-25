@@ -21,11 +21,11 @@ The effects sit behind and around the speaker, so the cut-out edge shows in ever
 | `--mask` | Edge | Speed at 1080x1920 |
 |---|---|---|
 | `mediapipe` (default) | Soft, a ragged fringe round hats and hair | about 250 frames a second |
-| `birefnet` (birefnet-general-lite) | Clean | 0.98 s a frame on an Intel Arc GPU, 6.6 s on CPU (8 cores), 6.6 GB peak memory |
-| `birefnet-portrait` | Cleanest, keeps hair curls | 1.94 s a frame on the same GPU, 9.0 s on CPU (8 cores), 7.5 GB peak memory for one frame, 8.0 GB for a whole mask run |
+| `birefnet` (birefnet-general-lite) | Clean | 0.98 s a frame on an Intel Arc GPU, 6.6 s on CPU (8 cores), 6.6 GB peak memory on CPU |
+| `birefnet-portrait` | Cleanest, keeps hair curls | 1.94 s a frame on the same GPU, 9.0 s on CPU (8 cores), 7.5 GB peak memory on CPU for one frame, 8.0 GB for a whole CPU mask run |
 
 - Both BiRefNet mattes come from rembg through `kit/mask_refine.py`: the same models, GPU session and cleanup (hole fill, speck removal, guided edge, flow-guided temporal smoothing) as `kit/mask.py`, so titles and effects get one cut-out.
-- ONNX Runtime uses the GPU when it has a provider for it. On Windows `npm run effects:setup` installs the DirectML build, which runs on any DirectX 12 card.
+- ONNX Runtime uses the GPU when it has a provider for it. On Windows `npm run effects:setup` installs the DirectML build, which runs on any DirectX 12 card. The portrait mask needs about 8.8 GB of free memory on CPU or 25.8 GB on DirectML.
 - The raw matte for each frame is cached in `build/fx/matte-<model>/` under a hash of the frame's pixels. A re-render only infers frames that changed; a copy or sound change infers none.
 - The cut-out is made at 1080 px (`FX_TRACK_W`), and the face detector stays at 540 px so effect layout matches the MediaPipe path.
 - Windows Smart App Control blocks MediaPipe's unsigned DLL (`WinError 4551`). The BiRefNet mattes don't load MediaPipe, so `--mask birefnet` runs natively there. For a MediaPipe render on such a machine, set `FX_WSL` to a Python inside WSL that has the effects packages.

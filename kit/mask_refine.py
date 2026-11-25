@@ -152,13 +152,32 @@ MATTE_MB = {'birefnet-general-lite': 214, 'birefnet-general': 928, 'birefnet-por
 # prepacking off), measured as peak RSS on Linux: lite 6.6 GB, portrait and general 7.5 GB. Almost all of it is the
 # Swin attention activations, so the lighter model saves little memory; the MediaPipe preview needs about 0.3 GB.
 # With ONNX Runtime's defaults (arena on, what rembg's new_session uses) the same frame grew past 15 GB and was killed on
-# a 16 GB machine, and about 25 GB was seen on Windows. Need = peak + 0.8 GB for the decoder, encoder and cleanup.
+# a 16 GB machine. Need = peak + 0.8 GB for the decoder, encoder and cleanup.
 # the whole mask.py run (session + flow + cleanup + ffmpeg pipes) peaked at 8.0 GB with portrait on real footage, about
 # 0.5 GB above the one-frame number, so the table is the full run (lite by the same margin)
-MATTE_PEAK_GB = {'birefnet-general-lite': 7.1, 'birefnet-general': 8.0, 'birefnet-portrait': 8.0}
-def matte_need_gb(model):
+MATTE_PEAK_GB = {
+    'cpu': {'birefnet-general-lite': 7.1, 'birefnet-general': 8.0, 'birefnet-portrait': 8.0},
+    # shortcut: only birefnet-portrait was measured on DirectML (21.3 GB and about 25 GB, Intel Arc, shared memory); the other two take its number until measured
+    'dml': {'birefnet-general-lite': 25.0, 'birefnet-general': 25.0, 'birefnet-portrait': 25.0},
+}
+
+def matte_providers():
+    try:
+        import onnxruntime as ort
+    except ImportError:
+        return ['CPUExecutionProvider']
+    have = ort.get_available_providers()
+    return [p for p in ('CUDAExecutionProvider', 'DmlExecutionProvider', 'CoreMLExecutionProvider', 'CPUExecutionProvider') if p in have]
+
+def matte_need_gb(model, provider=None):
     name = MATTE_MODELS.get(model)
-    return round(MATTE_PEAK_GB[name] + 0.8, 1) if name else 0.5
+    if not name:
+        return 0.5
+    if provider is None:
+        provider = matte_providers()[0]
+    # CUDA and CoreML have not been measured and use the CPU peaks.
+    peaks = MATTE_PEAK_GB['dml' if provider == 'DmlExecutionProvider' else 'cpu']
+    return round(peaks[name] + 0.8, 1)
 
 def avail_gb():
     """Memory the OS can hand out now, in GB (Linux MemAvailable, Windows ullAvailPhys, macOS free + inactive), or None."""
@@ -215,12 +234,11 @@ class Matter:
     """BiRefNet on ONNX Runtime, on the GPU when ONNX Runtime has a provider for it (DirectML, CUDA, CoreML), else the CPU.
     Our own pre and post step instead of rembg's predict(): rembg stretches every frame's matte to its own min and max,
     which makes the matte breathe from frame to frame when the person fills more or less of the shot; here it is the
-    plain sigmoid. Memory settings below keep one frame under 7.5 GB (MATTE_PEAK_GB)."""
+    plain sigmoid. One portrait frame peaked at 7.5 GB on the CPU with the memory settings below."""
     def __init__(self, model='birefnet-portrait'):
         import onnxruntime as ort
         self.model = MATTE_MODELS[model]
-        have = ort.get_available_providers()
-        prov = [p for p in ('CUDAExecutionProvider', 'DmlExecutionProvider', 'CoreMLExecutionProvider', 'CPUExecutionProvider') if p in have]
+        prov = matte_providers()
         so = ort.SessionOptions()
         so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         # memory: no arena (it kept every activation size ever seen and grew past 15 GB), no memory pattern, and no

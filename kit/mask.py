@@ -37,7 +37,7 @@
 #   CLI --model and MASK_MODEL override. --no-mask on npm run reel skips this step.
 # - Writes mask.json next to the mask: per window, frames, share of frames with a person, mean coverage, and the
 #   mean alpha in the title band, plus the backend, seconds per BiRefNet frame, keyframes, cache hits and wall time.
-# - Memory: BiRefNet needs about 8.8 GB free (8.0 GB peak for a whole run, 7.5 GB for one frame, kit/mask_refine.py MATTE_PEAK_GB). With less, the
+# - Memory: the portrait mask needs about 8.8 GB free on CPU and 25.8 GB on DirectML. With less, the
 #   default falls back to the MediaPipe preview with a warning; an explicit --model exits with code 3 and says how to get
 #   out (titles in front, or --mask mediapipe). MASK_FORCE=1 tries anyway.
 #   Judge quality on composited stills, by eye.
@@ -115,9 +115,11 @@ def resolve_model(requested, allow_download):
             raise SystemExit(f"{want} weights are not cached and downloads are off (--no-download or MASK_NODL). Run: npm run effects:setup -- --birefnet")
         return "mediapipe", f"{want} weights are not cached and downloads are off, so this mask is the MediaPipe preview. Run: npm run effects:setup -- --birefnet"
     # memory (Will's Windows session, 2026-11-19: a BiRefNet mask was killed with 10 to 12 GB free): check before loading
-    need, free = R.matte_need_gb(want), R.avail_gb()
+    provider = R.matte_providers()[0]
+    need, free = R.matte_need_gb(want, provider), R.avail_gb()
     if free is not None and free < need and os.environ.get("MASK_FORCE") not in ("1", "true"):
-        msg = (f"not enough free memory for the {want} mask: it needs about {need:.1f} GB and {free:.1f} GB is free. "
+        where = "on DirectML (the graphics chip) " if provider == "DmlExecutionProvider" else ""
+        msg = (f"not enough free memory for the {want} mask: {where}it needs about {need:.1f} GB and {free:.1f} GB is free. "
                "Close other apps, or put the titles in front (--no-mask, or Title layer: front), or use the lighter mask (--mask mediapipe). "
                "MASK_FORCE=1 tries anyway.")
         if requested:
@@ -171,8 +173,8 @@ if model == "mediapipe":
         fb = next((m for m in ("birefnet-portrait", "birefnet-lite") if have_rembg() and R.cached_weights(m)), None)
         if not fb:
             raise SystemExit(f"MediaPipe could not load ({e}). Run: npm run effects:setup -- --birefnet")
-        print(f"note: MediaPipe could not load ({e}); using {fb} instead", flush=True)
-        model = fb
+        model, _ = resolve_model(fb, allow_dl)
+        print(f"note: MediaPipe could not load ({e}); using {model} instead", flush=True)
 if model != "mediapipe":
     t_load = time.time()
     matter = R.matte_session(model)
