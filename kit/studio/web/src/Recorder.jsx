@@ -1,4 +1,4 @@
-// Record now: film takes with this computer's camera and mic, right in the Start step.
+// Record now: film takes with this computer's camera and mic, in the Recording tab (Recording.jsx).
 // The preview is the camera as it is; the recording is cropped to the chosen frame (9:16 by default) on a canvas,
 // recorded with MediaRecorder and sent to the server in numbered one-second chunks while you film.
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -268,12 +268,12 @@ export function Recorder({ V, s, apply, onClose, onLive, visible = true, scriptI
       {takes.map(t => <li key={t.id} className={'take' + (t.kept ? ' kept' : '')}>
         <span className="tthumb">{t.thumb ? <img src={file(t.thumb)} alt="" /> : <Icon n="film" />}</span>
         <span className="tmeta"><b>Take {t.id}</b><span>{t.seconds != null ? clock(Math.round(t.seconds)) : ''}</span></span>
-        <span className="tstate">{t.status === 'ready' ? (t.kept ? <Badge label="In footage" variant="success" /> : <Badge label="Not used" variant="neutral" />)
+        <span className="tstate">{t.status === 'ready' ? (t.held ? <Badge label="Not in a video yet" variant="neutral" /> : t.kept ? <Badge label="In footage" variant="success" /> : <Badge label="Not used" variant="neutral" />)
           : t.status === 'failed' ? <Badge label="Failed" variant="error" /> : <Badge label={t.status === 'converting' ? 'Saving' : 'Recording'} variant="cyan" />}</span>
         {t.status === 'failed' && <span className="err">{t.error}</span>}
         <span className="tact">
           {t.status === 'ready' && <a className="icon-btn" href={file(t.file)} target="_blank" rel="noreferrer" aria-label={`Play take ${t.id}`} title="Play"><Icon n="play" /></a>}
-          {t.status === 'ready' && <Switch size="sm" label={`Keep take ${t.id}`} isLabelHidden value={!!t.kept} onChange={v => api('/api/record/take', { id: t.id, action: v ? 'keep' : 'unkeep' }).then(apply).catch(() => {})} />}
+          {t.status === 'ready' && (!t.held || s.job) && <Switch size="sm" label={`Keep take ${t.id}`} isLabelHidden value={!!t.kept} onChange={v => api('/api/record/take', { id: t.id, action: v ? 'keep' : 'unkeep' }).then(apply).catch(() => {})} />}
           {t.id === lastId && t.status === 'ready' && phase === 'ready' && <Button size="sm" variant="secondary" label="Retake" onClick={() => retake(t.id)} />}
           {(t.status === 'ready' || t.status === 'failed') && <IconBtn n="trash" label={`Discard take ${t.id}`} onClick={() => { if (confirm(`Discard take ${t.id}? Its file is deleted.`)) api('/api/record/take', { id: t.id, action: 'discard' }).then(apply).catch(() => {}); }} />}
         </span>

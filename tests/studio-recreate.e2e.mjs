@@ -50,9 +50,9 @@ const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data',
 const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json();
 const until = async (fn, ms = 20000) => { const end = Date.now() + ms; for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) throw new Error('timed out'); await wait(150); } };
 // the page keeps a live connection, so wait for the stepper, not for a quiet network
-const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); };
+const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#areas'); };
 // a reload lands on the step in the address; give a hash to land on a view (the Breakdown is #step=reference)
-const theme = async (pg, th, hash) => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); if (hash) return open(pg, hash); await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); };
+const theme = async (pg, th, hash) => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); if (hash) return open(pg, hash); await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#areas'); };
 const shot = async (pg, name, h = 1100) => { if (!shots) return; const vp = pg.viewportSize(); await pg.setViewportSize({ width: vp.width, height: h }); await pg.evaluate(() => scrollTo(0, 0)); await pg.waitForTimeout(400); await pg.screenshot({ path: join(shots, name) }); await pg.setViewportSize(vp); };
 const allowed = async kind => (((await api('/api/state')).state.picks[kind] || {}).allow || []);
 
@@ -85,7 +85,7 @@ try {
   });
   await t('the Breakdown says what was read and offers a fix for the rest, never a command', async () => {
     await pg.click('#ref-more'); await pg.click('#ref-open'); await pg.waitForSelector('#ref-ran');
-    assert.deepStrictEqual(await pg.evaluate(() => [document.querySelector('main').dataset.step, document.querySelector('main').dataset.view]), ['picture', 'reference'], 'the Breakdown is a view of Picture');
+    assert.strictEqual(await pg.evaluate(() => document.querySelector('main').dataset.area), 'teardowns', 'the Breakdown is on the Teardowns tab');
     const st = await pg.$$eval('#ref-ran .ran li', x => x.map(e => [e.dataset.part, e.className]));
     assert.deepStrictEqual(Object.fromEntries(st), { reader: 'ok', speech: 'miss', layers: 'miss', sheet: 'miss', sounds: 'ok', music: 'ok' });
     const txt = await pg.textContent('#ref-ran');
@@ -151,7 +151,7 @@ try {
     assert.ok(await pg.isVisible('#recreate-upload'), 'a file works too');
     await pg.fill('#recreate-link', `http://127.0.0.1:${media.address().port}/ref.mp4`); await pg.click('#recreate-add');
     await pg.waitForSelector('#recreate-card[data-state="reading"] #recreate-reading'); assert.match(await pg.textContent('#recreate-reading'), /Record or add your footage while we read it\./);
-    assert.ok(await pg.isVisible('#drop-footage') && await pg.isVisible('#record-now'), 'footage and the recorder are right there');
+    assert.ok(await pg.isVisible('#drop-footage') && await pg.isVisible('#use-recording'), 'footage and recordings are right there');
     for (const th of ['dark', 'light']) { await theme(pg, th); await pg.waitForSelector('#recreate-reading'); await shot(pg, `recreate-first-reading-${th}.png`); }
     await theme(pg, 'dark'); release();
     await pg.waitForSelector('#recreate-card[data-state="ready"] #recreate-ready', { timeout: 30000 });

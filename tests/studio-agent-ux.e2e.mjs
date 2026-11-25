@@ -142,7 +142,7 @@ try {
 
   await t('wizards: Make a reel (goal, Look, Let AI choose, Review) and Clips and ads', async () => {
     await open(pg, '#step=start'); await pg.waitForSelector('#s-footage:not([hidden])'); await pg.click('#more-open'); await pg.click('#more-wizards'); await pg.waitForSelector('#wz-list');
-    assert.deepStrictEqual(await pg.$$eval('#wz-list .wz-pick b', x => x.map(e => e.textContent)), ['Make a reel from a long take', 'Copy a reference', 'Clips and ads from one take']);
+    assert.deepStrictEqual(await pg.$$eval('#wz-list .wz-pick b', x => x.map(e => e.textContent)), ['Make a reel from a long take', 'Clips and ads from one take']);
     await shot(pg, '#wizards', 'redesign-wizards-dark.png');
     await pg.click('.wz-pick[data-wizard="reel"]'); await pg.waitForSelector('.wz-opt[data-goal="sell"]');
     await shot(pg, '#wizards', 'redesign-wizard-goal-dark.png');

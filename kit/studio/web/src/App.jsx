@@ -9,7 +9,9 @@ import { BRoll } from './BRoll.jsx';
 import { Keys } from './Keys.jsx';
 import { Footage } from './Footage.jsx';
 import { Highlights } from './Highlights.jsx';
-import { Reference } from './Reference.jsx';
+import { Teardowns } from './Teardowns.jsx';
+import { Recording } from './Recording.jsx';
+import { TabGroup, TabList, Tab } from '@headlessui/react';
 import { Cut } from './Cut.jsx';
 import { Outputs } from './Outputs.jsx';
 import { AskAgent, Wizards } from './Agent.jsx';
@@ -37,9 +39,17 @@ function firstStep() {
   const m = hashMenu(), s = m ? menuStep(m) : stepOf(hashStep() || localStorage.getItem('studio.step') || 'start');
   return STEPS.includes(s) ? s : 'start';
 }
-// Start, Picture and Render each hold a second view: Highlights, how the reference was made, and Post. A link names it
-// (#step=highlights, #step=reference, #step=post); otherwise the view you left
-const firstPicView = () => { const h = hashStep(); return hashMenu() ? 'main' : h ? (h === 'reference' ? 'reference' : 'main') : localStorage.getItem('studio.picture') === 'reference' ? 'reference' : 'main'; };
+// the three tabs: New video (the steps), Teardowns (break down a video you like, and the Template Library) and Recording.
+// A link names one (#tab=teardowns); old links land where their screen lives now: #step=reference on Teardowns, #record on
+// Recording, any other #step= or #menu= on New video. Otherwise the tab you left
+const AREAS = [['new', 'New video', 'plus'], ['teardowns', 'Teardowns', 'spark'], ['recording', 'Recording', 'camera']], AREA_IDS = AREAS.map(a => a[0]);
+const hashArea = () => {
+  const h = location.hash, a = (h.match(/tab=([a-z]+)/) || [])[1];
+  return AREA_IDS.includes(a) ? a : hashStep() === 'reference' ? 'teardowns' : /record/.test(h) ? 'recording' : hashStep() || hashMenu() ? 'new' : null;
+};
+const firstArea = () => hashArea() || (AREA_IDS.includes(localStorage.getItem('studio.tab')) ? localStorage.getItem('studio.tab') : 'new');
+// Start and Render each hold a second view: Highlights and Post. A link names it (#step=highlights, #step=post);
+// otherwise the view you left
 const firstOutView = () => { const h = hashStep(); return h ? (h === 'post' ? 'post' : 'main') : localStorage.getItem('studio.render') === 'post' ? 'post' : 'main'; };
 const firstStartView = () => { const h = hashStep(); return h === 'highlights' ? 'highlights' : 'main'; };
 
@@ -48,10 +58,14 @@ export function App() {
   const [V, setV] = useState(null);
   const [step, setStep] = useState(firstStep);
   const [tab, setTab] = useState(hashMenu() || null);
-  const [picView, setPicViewState] = useState(firstPicView);
+  const [area, setAreaState] = useState(firstArea);
   const [outView, setOutViewState] = useState(firstOutView);
   const [startView, setStartView] = useState(firstStartView);
-  const setPicView = useCallback(v => { setPicViewState(v); localStorage.setItem('studio.picture', v); }, []);
+  // switching tab: New video writes its step back into the address, the other two their own #tab=
+  const setArea = useCallback((a, write = true) => {
+    setAreaState(a); localStorage.setItem('studio.tab', a);
+    if (write) history.replaceState(null, '', a === 'new' ? '#step=' + (localStorage.getItem('studio.step') || 'start') : '#tab=' + a);
+  }, []);
   const setOutView = useCallback(v => { setOutViewState(v); localStorage.setItem('studio.render', v); }, []);
   const [looksList, setLooksList] = useState(null);
   const [theme, setThemeState] = useState(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
@@ -102,15 +116,18 @@ export function App() {
   const catRef = useRef(null); catRef.current = CAT;
   const go = useCallback((s0, focus) => {
     const s = stepOf(s0), v = viewOf(s0);
-    if (s === 'picture' && v) setPicView(v); if (s === 'render' && v) setOutView(v); if (s === 'start' && v) setStartView(v);
+    // the breakdown of a reference lives on Teardowns now
+    if (v === 'reference') { setArea('teardowns'); if (focus) requestAnimationFrame(() => window.scrollTo({ top: 0 })); return; }
+    setArea('new', false);
+    if (s === 'render' && v) setOutView(v); if (s === 'start' && v) setStartView(v);
     setStep(s); localStorage.setItem('studio.step', s);
     // a #menu= link stays while you are on the step that owns its layer
-    const m = hashMenu(); if (!m || menuStep(m, catRef.current && catRef.current.layers) !== s) history.replaceState(null, '', '#step=' + (v === 'reference' || v === 'post' || v === 'highlights' ? v : s));
+    const m = hashMenu(); if (!m || menuStep(m, catRef.current && catRef.current.layers) !== s) history.replaceState(null, '', '#step=' + (v === 'post' || v === 'highlights' ? v : s));
     if (focus) requestAnimationFrame(() => { window.scrollTo({ top: 0 }); const h = document.querySelector('main .step:not([hidden]) h2'); if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); } });
-  }, [setPicView, setOutView]);
+  }, [setArea, setOutView]);
   // open a layer: the step that owns it comes up with that layer showing
   const pickTab = useCallback(id => { const layers = catRef.current && catRef.current.layers, l = layerOf(id, layers) || id, st = menuStep(l, layers);
-    setTab(l); if (st === 'picture') setPicView('main'); setStep(st); localStorage.setItem('studio.step', st); history.replaceState(null, '', '#menu=' + l); }, [setPicView]);
+    setTab(l); setArea('new', false); setStep(st); localStorage.setItem('studio.step', st); history.replaceState(null, '', '#menu=' + l); }, [setArea]);
   // the looks saved from earlier references (GET /api/style-looks); null when this server does not have them
   const reloadLooks = useCallback(() => quiet('/api/style-looks').then(j => { setLooksList(j && Array.isArray(j.looks) ? j.looks : null); }), []);
 
@@ -129,14 +146,14 @@ export function App() {
       es.addEventListener('error', () => { fetch('/api/state', { cache: 'no-store' }).then(r => { if (r.ok) setOffline(false); }).catch(() => setOffline(true)); });
       es.addEventListener('open', () => { if (isOffline()) { setOffline(false); api('/api/state').then(apply).catch(() => {}); } });
     })();
-    const onHash = () => { const m = hashMenu(), st = hashStep(); if (m) pickTab(m); else if (st && STEPS.includes(stepOf(st))) go(st, true); };
+    const onHash = () => { const a = hashArea(), m = hashMenu(), st = hashStep(); if (a && a !== 'new') setArea(a, false); else if (m) pickTab(m); else if (st && STEPS.includes(stepOf(st))) go(st, true); else if (a) setArea(a, false); };
     // "/" searches every option: from Picture or Text and graphics it stays there, from anywhere else it opens Picture
     const onKey = e => {
       if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); if (!document.getElementById('filter')) go('picture'); setTimeout(() => document.getElementById('filter')?.focus(), 30); }
     };
     addEventListener('hashchange', onHash); document.addEventListener('keydown', onKey);
     return () => { es && es.close(); removeEventListener('hashchange', onHash); document.removeEventListener('keydown', onKey); };
-  }, [apply, go, pickTab, reloadLooks]);
+  }, [apply, go, pickTab, reloadLooks, setArea]);
   // an old tab name in a link (#menu=captions) is a group inside a layer: once the catalog is in, open the step that holds it
   useEffect(() => { const m = hashMenu(); if (CAT && m) { const st = menuStep(m, CAT.layers); if (st !== step) pickTab(m); } }, [!!CAT]);
   // the saved looks are asked for only when they can matter: the server knows them (the state has styleLook), the
@@ -161,8 +178,9 @@ export function App() {
   const openKeys = () => { setSettingsOpen(false); setKeysOpen(true); };
   const openChat = () => setChatOpen(true);
   const openOutputs = () => setOutputsOpen(true), openNewVideo = () => setVideoMode('new'), openVault = beat => setVault({ beat: typeof beat === 'number' ? beat : null });
-  const ctx = { CAT, V, s, apply, patch, go, reloadCat, setLog, log, openConnect, openSetup, openKeys, openChat, openOutputs, openNewVideo, openVault, looks };
-  const refAny = !!(s.reference.extracted || s.reference.file || (s.reference.status && s.reference.status !== 'none') || (s.reference.queue || []).length), post = step === 'render' && outView === 'post', breakdown = step === 'picture' && picView === 'reference';
+  const openRecording = () => setArea('recording');
+  const ctx = { CAT, V, s, apply, patch, go, reloadCat, setLog, log, openConnect, openSetup, openKeys, openChat, openOutputs, openNewVideo, openVault, looks, openRecording };
+  const onNew = area === 'new', post = onNew && step === 'render' && outView === 'post';
   const env = V.env, a = env.agent || {}, agentState = env.backend !== 'agent' ? 'alt' : a.listening ? 'on' : a.connected ? 'busy' : 'off';
   const pill = !t ? 'Ready' : running ? `${cap1(t.kind)} running` : t.status === 'failed' ? `${cap1(t.kind)} failed` : `${cap1(t.kind)} ${t.status}`;
 
@@ -173,14 +191,11 @@ export function App() {
       <header className="top glass">
         <div className="brand"><img className="wm wm-dark" src={wordmarkDark} alt="AIgent" width="127" height="59" /><img className="wm wm-light" src={wordmarkLight} alt="AIgent" width="127" height="59" /><span className="bname">Studio</span></div>
         <div className="jobrow"><JobName s={s} patch={patch} /><IconBtn id="new-video-open" n="plus" className="nv-btn" label="New video" aria-haspopup="dialog" onClick={() => setVideoMode('new')} /></div>
-        <nav className="stepper" aria-label="Steps"><ol id="stepper">
-          {STEPS.map((st, k) => <li key={st} className={done[st] ? 'done' : ''}>
-            <button type="button" data-step={st} aria-current={st === step ? 'step' : 'false'} title={stepName(st)} aria-label={`${k + 1}. ${stepName(st)}${done[st] && st !== step ? ', done' : ''}`} onClick={() => go(st, true)}>
-              <span className="sn">{done[st] && st !== step ? <Icon n="check" /> : k + 1}</span><span className="sl">{stepShort(st)}</span>
-            </button></li>)}
-        </ol></nav>
+        <TabGroup as="nav" className="areas" id="areas" aria-label="Studio" selectedIndex={AREA_IDS.indexOf(area)} onChange={k => setArea(AREA_IDS[k])}>
+          <TabList className="seg areas-list">{AREAS.map(([a, label, icon]) => <Tab key={a} id={'tab-' + a} data-area={a} title={label} aria-label={label}><Icon n={icon} /><span className="al">{label}</span></Tab>)}</TabList>
+        </TabGroup>
         <div className="topr">
-          {recLive && step !== 'start' && <button type="button" className="rec-pill" id="rec-pill" onClick={() => go('start', true)} aria-label="Recording, go back to the recorder"><i aria-hidden="true" />{recLive.phase === 'paused' ? 'Paused' : recLive.phase === 'saving' ? 'Saving take' : 'Recording'}</button>}
+          {recLive && area !== 'recording' && <button type="button" className="rec-pill" id="rec-pill" onClick={() => setArea('recording')} aria-label="Recording, go back to the recorder"><i aria-hidden="true" />{recLive.phase === 'paused' ? 'Paused' : recLive.phase === 'saving' ? 'Saving take' : 'Recording'}</button>}
           {env.setup && !env.setup.ready && (() => { const nm = Object.values(env.setup.missing).filter(x => x.need === 'core').length; return <button type="button" className="setup-pill" id="setup-pill" onClick={openSetup} aria-label={`${nm} to fix, open Setup check`} title="Setup check"><Icon n="ban" /><span className="sp-n">{nm}</span><span className="sp-l"> to fix</span></button>; })()}
           <button type="button" className={'connect-btn ' + agentState} id="connect-open" aria-haspopup="dialog" onClick={openConnect} title={agentState === 'on' ? `${a.name} connected` : 'Connect your terminal agent'}><Icon n="plug" /><span className="cb-l">{agentState === 'on' || agentState === 'busy' ? (a.name || 'Agent') : 'Connect agent'}</span></button>
           <button type="button" className="connect-btn vault-btn" id="open-vault" aria-label="Vault" aria-haspopup="dialog" onClick={openVault} title="Everything you can show, in one place"><Icon n="grid" /><span className="cb-l">Vault</span></button>
@@ -199,18 +214,25 @@ export function App() {
         </div>
       </header>
       <div className={'layout' + (chatAway ? ' nochat' : '')}>
-        <main id="main" data-step={step} data-view={step === 'picture' ? picView : step === 'render' ? outView : step === 'start' ? startView : 'main'} ref={mainRef}>
+        <main id="main" data-area={area} data-step={step} data-view={step === 'render' ? outView : step === 'start' ? startView : 'main'} ref={mainRef}>
+          {onNew && <div className="stepbar"><nav className="stepper" aria-label="Steps"><ol id="stepper">
+          {STEPS.map((st, k) => <li key={st} className={done[st] ? 'done' : ''}>
+            <button type="button" data-step={st} aria-current={st === step ? 'step' : 'false'} title={stepName(st)} aria-label={`${k + 1}. ${stepName(st)}${done[st] && st !== step ? ', done' : ''}`} onClick={() => go(st, true)}>
+              <span className="sn">{done[st] && st !== step ? <Icon n="check" /> : k + 1}</span><span className="sl">{stepShort(st)}</span>
+            </button></li>)}
+          </ol></nav></div>}
+          <Recording key={'r' + (s.videoSeq || 0)} {...ctx} hidden={area !== 'recording'} onLive={setRecLive} toNew={() => setArea('new')} />
+          {area === 'teardowns' && <Teardowns {...ctx} />}
+          {onNew && <>
           {!post && step !== 'start' && <YourEdit V={V} s={s} go={go} step={step} />}
-          {step === 'picture' && (refAny || breakdown) && <ViewSwitch id="look-switch" label="Picture" value={picView} set={v => { setPicView(v); history.replaceState(null, '', '#step=' + (v === 'reference' ? 'reference' : 'picture')); }} views={[['main', 'Your picture', 'look-sub-style'], ['reference', 'How the reference was made', 'look-sub-reference', refOn]]} />}
           {step === 'render' && <ViewSwitch id="render-switch" label="Render" value={outView} set={v => { setOutView(v); history.replaceState(null, '', '#step=' + (v === 'post' ? 'post' : 'render')); }} views={[['main', 'Render', 'render-sub-main'], ['post', 'Post', 'render-sub-post']]} />}
           {/* a new or opened video remounts the steps, so no step keeps the last board's local picks */}
           <Fragment key={'v' + (s.videoSeq || 0)}>
           {step === 'start' && V.highlights && V.highlights.offer && <ViewSwitch id="start-switch" label="Start" value={startView} set={v => { setStartView(v); history.replaceState(null, '', '#step=' + (v === 'highlights' ? 'highlights' : 'start')); }} views={[['main', 'Start', 'start-sub-main'], ['highlights', 'Highlights', 'start-sub-highlights', !!(V.highlights.candidates && V.highlights.candidates.length)]]} />}
-          <Footage {...ctx} hidden={step !== 'start' || startView === 'highlights'} onLive={setRecLive} />
+          <Footage {...ctx} hidden={step !== 'start' || startView === 'highlights'} />
           <Highlights {...ctx} hidden={step !== 'start' || startView !== 'highlights'} />
           {step === 'cut' && <Cut {...ctx} />}
-          {breakdown && <Reference {...ctx} />}
-          {step === 'picture' && !breakdown && <Picture {...ctx} tab={tab} setTab={pickTab} />}
+          {step === 'picture' && <Picture {...ctx} tab={tab} setTab={pickTab} />}
           {step === 'text' && <TextStep {...ctx} tab={tab} setTab={pickTab} />}
           {step === 'broll' && <BRoll {...ctx} />}
           {step === 'broll' && <BrollLayer {...ctx} tab={tab} setTab={pickTab} />}
@@ -226,6 +248,7 @@ export function App() {
             <AskAgent step={post ? 'post' : step} apply={apply} openChat={openChat} />
             {i < STEPS.length - 1 ? <Button id="next" variant={step === 'review' && !drafted ? 'secondary' : 'primary'} label={stepName(STEPS[i + 1])} endContent={<Icon n="right" />} onClick={() => go(STEPS[i + 1], true)} /> : <span className="nextpad" />}
           </footer>
+          </>}
         </main>
         <Chat key={s.videoSeq || 0} {...ctx} open={chatOpen} setOpen={setChatOpen} close={closeChat} agentState={agentState} />
       </div>
@@ -243,7 +266,7 @@ export function App() {
   );
 }
 
-// A step with two views (Picture and how the reference was made; Render and Post): one small switch above the step
+// A step with two views (Start and Highlights; Render and Post): one small switch above the step
 function ViewSwitch({ id, label, value, set, views }) {
   return <div className="look-switch" id={id}><div className="seg" role="radiogroup" aria-label={label}>
     {views.map(([v, l, bid, mark]) => <button key={v} type="button" role="radio" id={bid} aria-checked={value === v} onClick={() => set(v)}>{l}{mark ? <span className="dotmark" aria-label=", in use" /> : null}</button>)}

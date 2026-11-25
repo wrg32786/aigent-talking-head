@@ -41,7 +41,7 @@ const start = () => new Promise((ok, bad) => { const srv = spawn(process.execPat
   let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok({ srv, url: m[1] }); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + '\n' + out))); });
 let { srv, url } = await start();
 const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json();
-const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); };
+const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#areas'); };
 const cur = pg => pg.$eval('#stepper [aria-current="step"]', b => b.dataset.step);
 const h2 = pg => pg.$eval('main .step:not([hidden]) h2', h => h.textContent.trim());
 
@@ -93,12 +93,13 @@ try {
     await pg.click('#mode-own'); await pg.waitForSelector('#recreate-card', { state: 'detached' });
   });
 
-  await t('old links land on the step that holds them now', async () => {
-    for (const [hash, step, sel] of [['#step=footage', 'start', '#s-footage'], ['#step=look', 'picture', '#s-look'], ['#step=style', 'picture', '#s-look'], ['#step=reference', 'picture', '#s-ref'],
+  await t('old links land on the step or tab that holds them now', async () => {
+    for (const [hash, step, sel] of [['#step=footage', 'start', '#s-footage'], ['#step=look', 'picture', '#s-look'], ['#step=style', 'picture', '#s-look'], ['#step=reference', 'teardowns', '#s-ref'],
+      ['#tab=teardowns', 'teardowns', '#template-library'], ['#record', 'recording', '#s-recording:not([hidden])'], ['#tab=recording', 'recording', '#recordings'],
       ['#step=finish', 'review', '#s-review:not([hidden])'], ['#step=render', 'render', '#s-render:not([hidden])'], ['#step=post', 'render', '#s-post'], ['#step=music', 'music', '#s-sound'],
       ['#menu=music', 'music', '#s-sound'], ['#menu=transitions', 'picture', '#tab-transitions[aria-selected="true"]'], ['#menu=captions', 'text', '#tab-text[aria-selected="true"]'], ['#menu=graphics', 'text', '#tab-graphics[aria-selected="true"]']]) {
       await open(pg, hash); await pg.waitForSelector(sel);
-      assert.strictEqual(await cur(pg), step, hash);
+      assert.strictEqual(['teardowns', 'recording'].includes(step) ? await pg.$eval('main', m => m.dataset.area) : await cur(pg), step, hash);
     }
   });
 
@@ -157,7 +158,7 @@ try {
 
   if (shots) {
     const VIEWS = [['', { width: 1440, height: 900 }], ['-phone', { width: 390, height: 844 }]];
-    const PAGES = [['start', '#step=start'], ['cut', '#step=cut'], ['picture', '#step=picture'], ['text', '#step=text'], ['broll', '#step=broll'], ['music', '#step=music'], ['review', '#step=review'], ['render', '#step=render'], ['render-post', '#step=post'], ['picture-reference', '#step=reference']];
+    const PAGES = [['start', '#step=start'], ['cut', '#step=cut'], ['picture', '#step=picture'], ['text', '#step=text'], ['broll', '#step=broll'], ['music', '#step=music'], ['review', '#step=review'], ['render', '#step=render'], ['render-post', '#step=post'], ['teardowns', '#tab=teardowns'], ['recording', '#tab=recording']];
     for (const th of ['dark', 'light']) for (const [suffix, vp] of VIEWS) {
       const p2 = await browser.newPage({ viewport: vp });
       await p2.addInitScript(x => { try { localStorage.setItem('studio.paused', '1'); localStorage.setItem('studio.theme', x); } catch {} }, th);

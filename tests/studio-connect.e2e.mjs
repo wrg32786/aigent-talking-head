@@ -1,5 +1,5 @@
 // Connect agent, the teleprompter controls and pop-out, the setup check and footage from a link, in a real Chrome.
-// The recorder and the link box are on the Start step (#step=start).
+// The recorder is on the Recording tab (#tab=recording); the link box is on the Start step (#step=start).
 // - Connect agent: opens from the header and the chat, shows each agent's commands with this install's paths, the
 //   "Let my agent set it up" prompt, waits, then shows "Connected: Claude Code, listening" when a scripted MCP client
 //   (the official SDK client over stdio, as Claude Code) starts listening; the picked agent is remembered
@@ -50,9 +50,9 @@ const port = url.split(':').pop();
 const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json();
 // Studio keeps a live connection, so the page never goes network idle: wait for the stepper, and for the step a link names
 const STEP_OF = { reference: 'picture', post: 'render' };
-const ready = async (pg, hash = '') => { await pg.waitForSelector('#stepper'); const st = (hash.match(/step=([a-z]+)/) || [])[1]; if (st) await pg.waitForSelector(`#stepper [aria-current="step"][data-step="${STEP_OF[st] || st}"]`); };
+const ready = async (pg, hash = '') => { if (/tab=/.test(hash)) return pg.waitForSelector(`main[data-area="${hash.match(/tab=([a-z]+)/)[1]}"]`); await pg.waitForSelector('#stepper'); const st = (hash.match(/step=([a-z]+)/) || [])[1]; if (st) await pg.waitForSelector(`#stepper [aria-current="step"][data-step="${STEP_OF[st] || st}"]`); };
 const open = async (pg, hash) => { await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await ready(pg, hash); };
-const reload = async pg => { await pg.reload({ waitUntil: 'domcontentloaded' }); await ready(pg); };
+const reload = async pg => { await pg.reload({ waitUntil: 'domcontentloaded' }); await ready(pg, new URL(pg.url()).hash); };
 const browser = patient(await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required'] }));
 const errsOf = pg => { const e = []; pg.on('pageerror', x => e.push(x.message)); pg.on('console', m => { if (m.type() === 'error' && !/favicon/.test(m.text())) e.push(m.text()); }); return e; };
 const SCRIPT = ['[hook]', 'Three things I wish I knew before my first reel.', 'One: film more than you need.', 'Two: the first second decides everything.', '[pause]', 'Three: say it like you talk.', '[cta]', 'Follow for the next one.'].join('\n');
@@ -108,7 +108,7 @@ try {
   });
   await t('teleprompter: plus, minus and arrows change the WPM as it scrolls, remembered; rehearse scrolls with no take', async () => {
     const pg = await browser.newPage({ viewport: { width: 1280, height: 860 } }), errs = errsOf(pg);
-    await open(pg, '#step=start');
+    await open(pg, '#tab=recording');
     await pg.evaluate(() => { localStorage.setItem('studio.rec.wpm', '150'); localStorage.setItem('studio.rp.pip', '0'); });
     await reload(pg);
     await pg.click('#record-now'); await pg.click('#rec-enable');
@@ -138,7 +138,7 @@ try {
   });
   await t('teleprompter pop-out: its own window, synced both ways (speed, mirror, rehearse, record, stop); closing it brings it back', async () => {
     const pg = await browser.newPage({ viewport: { width: 1280, height: 860 } }), errs = errsOf(pg);
-    await open(pg, '#step=start');
+    await open(pg, '#tab=recording');
     if (!(await pg.$('#recorder'))) await pg.click('#record-now');
     await pg.click('#rec-enable');
     await pg.waitForFunction(() => { const v = document.querySelector('#recorder video'); return v && v.videoWidth > 0; }, null, { timeout: 15000 });

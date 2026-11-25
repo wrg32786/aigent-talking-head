@@ -12,11 +12,21 @@ That starts Studio on http://127.0.0.1:4757 and opens your browser. `--port <n>`
 
 ![The same Cut step in the light theme](studio/light.png)
 
-Eight steps across the top (1.28.0): **Start**, **Cut**, **Picture**, **Text and graphics**, **B-roll**, **Music and sounds**, **Review**, **Render**. The steps you see come first, sound has its own step, and the last two check the edit and make the video. Each one is its own screen with Back and Next at the bottom, and a step shows a check when it is done.
+**Three tabs** sit in the top bar (being built on the `studio-wizard` branch, see [specs/studio-builder.md](specs/studio-builder.md)):
+
+| Tab | What it holds |
+| --- | --- |
+| **New video** | The steps below, for the video that is open |
+| **Teardowns** | Break down a video you like (paste a link or upload a file), and the **Template Library**: the looks you saved from teardowns and the starter looks that ship with the kit |
+| **Recording** | Film yourself with **Record now**, your Scripts and teleprompter, and **Your recordings**: every take from every video, newest first, each with **Use in this video** and **Use in a new video** |
+
+A take you film before any video is named waits in a holding folder (`inbox/studio/_recordings/`) and joins a video from **Your recordings**. **Use in a new video** starts a fresh video (keeping your look) with that take as its footage. A take from the holding folder moves into the video; a take from another video is copied, so that video keeps its footage. Links: `#tab=new`, `#tab=teardowns`, `#tab=recording`. API: `GET /api/recordings`, `POST /api/recordings/use { file, newVideo }`.
+
+Eight steps under **New video** (1.28.0): **Start**, **Cut**, **Picture**, **Text and graphics**, **B-roll**, **Music and sounds**, **Review**, **Render**. The steps you see come first, sound has its own step, and the last two check the edit and make the video. Each one is its own screen with Back and Next at the bottom, and a step shows a check when it is done.
 
 | Step | What you do there |
 | --- | --- |
-| Start | Add or film your footage, and say what should guide the edit: just your footage, a video to recreate, or a look to copy |
+| Start | Add your footage or use a recording, and say what should guide the edit: just your footage, a video to recreate, or a look to copy |
 | Cut | Say what the video is for and what to make, then go from the raw take to the best lines to the clips you keep |
 | Picture | Pick one Look, then color and finish, motion, transitions and layout |
 | Text and graphics | Captions and titles, fonts, graphics, and your own words and logos |
@@ -25,7 +35,7 @@ Eight steps across the top (1.28.0): **Start**, **Cut**, **Picture**, **Text and
 | Review | Draft, then check what we picked and why |
 | Render | Make the video, compare it with the original, and post it |
 
-Two steps have a second view, behind a small switch above the step. **Picture** has **How the reference was made** (the breakdown of your reference; the switch shows once a reference is in). **Render** has **Post** (Buffer drafts, see [posting.md](posting.md)).
+Two steps have a second view, behind a small switch above the step. **Start** has **Highlights** (for a long talk). **Render** has **Post** (Buffer drafts, see [posting.md](posting.md)).
 
 **Old links still land.** Before 1.28.0 Studio had six: Footage, Cut, Look, B-roll, Finish and Post. A link or bookmark with an old name opens the step that holds the same thing now:
 
@@ -34,7 +44,8 @@ Two steps have a second view, behind a small switch above the step. **Picture** 
 | `#step=footage` | Start |
 | `#step=highlights` | Start, Highlights view |
 | `#step=look`, `#step=style` | Picture |
-| `#step=reference` | Picture, on How the reference was made |
+| `#step=reference` | the Teardowns tab |
+| `#record` | the Recording tab |
 | `#step=finish` | Review |
 | `#step=render` | Render |
 | `#step=post` | Render, on Post |
@@ -46,11 +57,11 @@ Two steps have a second view, behind a small switch above the step. **Picture** 
 
 ## What you can do
 
-1. **Start.** Drag clips onto the page or pick files (mp4, mov, m4v, webm, mkv), or paste a public Dropbox or Google Drive share link or a plain video URL (see [Footage from a link](#footage-from-a-link)). They go to `inbox/studio/<job>/`. An assistant can also point the session at a clips folder (`clips` in `studio_set_selections`, refused when it has no clips.json), reorder or drop files (`footage`: the paths from the session in the order to use; an unknown or repeated file is refused), and mark the files as already cut (`asIs`: each file is one clip, in order, never re-cut). Several different files keep the order you gave them; best-take picking only runs when the files are takes of the same lines. Or film it now with **Record now** (see [Record now](#record-now)).
+1. **Start.** Drag clips onto the page or pick files (mp4, mov, m4v, webm, mkv), or paste a public Dropbox or Google Drive share link or a plain video URL (see [Footage from a link](#footage-from-a-link)). They go to `inbox/studio/<job>/`. An assistant can also point the session at a clips folder (`clips` in `studio_set_selections`, refused when it has no clips.json), reorder or drop files (`footage`: the paths from the session in the order to use; an unknown or repeated file is refused), and mark the files as already cut (`asIs`: each file is one clip, in order, never re-cut). Several different files keep the order you gave them; best-take picking only runs when the files are takes of the same lines. Or click **Use a recording** to open the Recording tab, where you film a take or pick one you made (see [Record now](#record-now)).
    - **What should guide the edit?** One row of three choices under the footage: **Just my footage**, **Recreate a video** and **Copy the look**. See [Start: what guides the edit](#start-what-guides-the-edit-1280).
    - **Find highlights** appears when a clip is about 3 minutes or longer, and opens the Highlights view of Start (`#step=highlights`). We transcribe the talk on your computer, suggest up to 10 complete moments with a reason and a start time, and the ones you tick become the take for the reel (already cut, never mid-word or mid-sentence). Copy the brief for your agent, or use `find_highlights`, `get_highlights`, `score_highlights` and `pick_highlights`. The local scores are the fallback when no agent scores them.
-   - **Scripts** are folded on Start until the job has a script. Click **Scripts** to open them (see [Scripts](#scripts)).
-2. **Reference.** Pick **Recreate a video** or **Copy the look** on Start and paste a link or upload a file. To add more, open Picture and switch to **How the reference was made**: paste one or more links (Enter adds them, Shift+Enter starts another line) or upload a file. Links can be YouTube (and Shorts), TikTok, X, Vimeo, a direct video file (.mp4, .mov, .m4v, .webm), or one public Instagram post. Studio downloads each into your download folder, breaks it down, and shows what it found: length, cut times and pace, music BPM, beats and energy, caption style, titles, transitions, finishes, graphics and effects, plus suggestions mapped to the effects menu that you can click to pick. The chat gets the same teardown. See [Reference links](#reference-links). One control says how the reference is used, with the same four words everywhere:
+   - **Scripts** live on the Recording tab, next to the recorder (see [Scripts](#scripts)).
+2. **Reference.** Pick **Recreate a video** or **Copy the look** on Start and paste a link or upload a file. To add more, open the **Teardowns** tab: paste one or more links (Enter adds them, Shift+Enter starts another line) or upload a file. Links can be YouTube (and Shorts), TikTok, X, Vimeo, a direct video file (.mp4, .mov, .m4v, .webm), or one public Instagram post. Studio downloads each into your download folder, breaks it down, and shows what it found: length, cut times and pace, music BPM, beats and energy, caption style, titles, transitions, finishes, graphics and effects, plus suggestions mapped to the effects menu that you can click to pick. The chat gets the same teardown. See [Reference links](#reference-links). One control says how the reference is used, with the same four words everywhere:
    - **Recreate:** same edit, your take. The draft uses the reference's Reel.md as the recipe (`--recipe --recut`). Your kept pieces (or your one take) are re-cut to the reference's shot plan, scaled to your length, every cut on a word boundary in the quiet between words, and each shot gets the reference's framing as a punch in or out. Its sound effects play at its times (scaled), a quiet music stem means no bed, the boxes and stickers it drew become graphics slots, and your titles take the style of the reference title doing the same job (hook, number, timer, brand).
    - **Copy the look (1.28.0):** same style, your script. The reference gives its look and sound, and the timing comes from your own words.
    - **Influence:** only the parts you switch on, as soft defaults on top of the pack you picked (the pack's locks stay). Saved as a local pack, `ref-<job>`.
@@ -60,7 +71,7 @@ Two steps have a second view, behind a small switch above the step. **Picture** 
    - **The reference card**, when a reference is broken down: its name, length and shots, one control (**Recreate**, **Copy the look**, **Influence**, **Off**, the same words as in the Breakdown) with one line on what it does, and **More** (Save as a Look, Clear reference, Breakdown). On Recreate and Copy the look the card sits above the Looks row, which dims with "Set by your reference", and one row of chips says what it brings: shots, framing, cutaways, sounds, no music, and **N made for you**, which opens the layer with those scenes. On Copy the look the card reads `Your look from <name>`.
    - **The reference sets your Look.** Pick **Recreate** and we set every layer from the reference: its Look, captions, titles, transitions, grade, effects, music, beat sync and pace. **Influence** sets the same picks as soft defaults and keeps your Look and sound. A short line says so, each built-in choice it set is badged **From reference**, a scene it made says **Made for you**, and its layers get an amber dot. The layer says why in one line ("From the reference: glitch, seen 3 times between shots"), and a tile shows its reason when you hover or focus it. Change anything you like; your change is yours. **Back to my look** (the same as Off) takes out only what the reference set and gives back your own caption style, Look and music. A reference that is still being read says so and sets the Look when it is ready. With **Recreate** and **Copy the look** the reference is the whole look: what was on the board before it (the Look, picks, music, sounds and pace from your last video, or from earlier in this one) is put aside when you choose it, and only what you pick afterwards goes over the reference. Back to my look brings the earlier look back. When an earlier look is in use and the reference's is not (the reference is Off after Back to my look, or on Influence over your own Look and picks), the reference card and the breakdown say "Your saved look is in use, not the reference's" with one button, **Use the reference's look**. It sets the board from the reference alone, in the mode you last copied it with (Copy the look if you never did), and **Undo** on the change note puts your look back. A reference's title entrances are a preference: they never narrow the entrances a draft can use.
    - **Influence takes the parts you switch on.** On **Influence** the reference card shows one switch per part: captions, titles, transitions, grade, effects, graphics, pace, music and sound, fonts and theme. Pace and sound start off, so they stay yours. Turn one off and its picks come out of your Look; turn it on and they come back (`reference.parts`).
-   - **What we read.** The Breakdown (the **How the reference was made** view) is short: the same mode control, a row only when part of the reference was not read, the part switches, and **Details** (length, shots, pace, the shot timeline, the contact sheet) and **Pick parts by hand** closed until you open them. It lists which parts of the reference were read (the full read, speech, layers and grade, the contact sheet, sound effects, music). For any that did not run it names what reads it, with Install and Copy for my agent buttons, then Read it again.
+   - **What we read.** The Breakdown (on the **Teardowns** tab) is short: the same mode control, a row only when part of the reference was not read, the part switches, and **Details** (length, shots, pace, the shot timeline, the contact sheet) and **Pick parts by hand** closed until you open them. It lists which parts of the reference were read (the full read, speech, layers and grade, the contact sheet, sound effects, music). For any that did not run it names what reads it, with Install and Copy for my agent buttons, then Read it again.
    - **B-roll where the reference has it.** A Recreate draft keeps a B-roll slot at each moment the reference shows B-roll (a framed panel, a full cutaway, a split), on your edit's own clock and landed on your words. Copy the look keeps as many a minute, of the same kinds, on your lines that fit. A slot with no clip is not dropped: the B-roll step shows a card for it, "Needs B-roll" and what it should show, with Upload, Use stock (when a key is set), Send to my agent or Copy for my agent, and Skip. A clip on a slot sits, moves and arrives like the reference's. Where a slot is still empty at render, you stay on screen.
    - **How many are filled.** The B-roll step starts with one line: "6 of 19 B-roll spots filled", the slots your reference (or look) has on this edit and how many have a clip. The API has it as `slots: { total, filled, skipped, from }` on `/api/broll` and `list_broll`.
    - **Layers.** The effects the engine has for the picture, as looping previews. Click a tile to pick it; press F, right-click it, or use its forbid button to forbid it. Hover or focus a tile for its description. The **Zoom punch** switch sits on the Motion layer. Search looks across every layer in every step, and a result from another step offers **Open in** and the name of that step.
@@ -130,7 +141,7 @@ Every option lives in exactly one of 9 layers (`layers` in `kit/studio/categorie
 | B-roll | B-roll | how b-roll sits: split, match cut, phone fan, carousel, screen card |
 | Music and sounds (Music and SFX in the catalog) | Music and sounds | beds, sound effects and beat sync as tiles |
 
-**Picture.** Pick one Look, then change the color, motion, transitions or layout if you want to. With a reference in, its card sits here with one control: **Recreate**, **Copy the look**, **Influence**, **Off**. On Copy the look the card reads `Your look from <name>` and has **Save as a look**, which keeps that look under a name so it works on a new video with no reference (it then shows on Start, under Copy the look). The page shows the button when the engine provides saved looks. A saved look in use shows as its own card, with **Stop using it**. The second view, **How the reference was made**, holds the breakdown that the Reference view of Look held (`#step=reference`).
+**Picture.** Pick one Look, then change the color, motion, transitions or layout if you want to. With a reference in, its card sits here with one control: **Recreate**, **Copy the look**, **Influence**, **Off**. On Copy the look the card reads `Your look from <name>` and has **Save as a look**, which keeps that look under a name so it works on a new video with no reference (it then shows on Start, under Copy the look). The page shows the button when the engine provides saved looks. A saved look in use shows as its own card, with **Stop using it**. The breakdown that the Reference view of Look held is on the **Teardowns** tab (`#step=reference` still opens it).
 
 **Text and graphics.** Captions and titles, the type they use, and the graphics that sit over you. Scenes made from a reference show here in Graphics, or in Color and finish on Picture.
 
@@ -150,7 +161,7 @@ Every option lives in exactly one of 9 layers (`layers` in `kit/studio/categorie
 
 **Picks.** The Picks tray in the bar at the bottom shows a count on the four steps with layers: Picture, Text and graphics, B-roll, and Music and sounds. Open it for your picks by layer, one line a layer: up to three names and **+N**, which opens the step that owns that layer. Click a name to remove it. **Undo reference** takes out what the reference set (the same as Off) and keeps the reference; **Clear all** removes every pick.
 
-**Clear reference** takes the reference off and every pick Influence added with it, and puts back the Look or bed it changed. Your own picks stay. It is one undo: **Undo** under the Looks row puts it all back (`POST /api/reference/clear`, `{ undo: true }`; `clear_reference` for your agent). Nothing on disk is deleted: the reference stays in the list on **How the reference was made**.
+**Clear reference** takes the reference off and every pick Influence added with it, and puts back the Look or bed it changed. Your own picks stay. It is one undo: **Undo** under the Looks row puts it all back (`POST /api/reference/clear`, `{ undo: true }`; `clear_reference` for your agent). Nothing on disk is deleted: the reference stays in the list on the **Teardowns** tab.
 
 **Save as a Look** under **More** on the reference card saves the reference's look as a Look of its own, beside the built-in ones (`POST /api/pack/save { fromReference }`; `save_look`). Save as a new Look keeps the reference's look too when one is in use. **Save as a look** on a Copy the look card (1.28.0) is a different save: it keeps the look for Copy the look on a later video (`POST /api/style-looks/save`; the page lists them from `GET /api/style-looks` and picks one with `POST /api/state { styleLook }`).
 
@@ -350,7 +361,7 @@ API: `GET /api/footage/info?path=` (length, size, codec, preview copy status), `
 
 ## Record now
 
-Film takes in the Start step with this computer's camera and mic. Click **Record now**, then **Turn on camera**; the browser asks once for the camera and mic.
+Film takes on the **Recording** tab with this computer's camera and mic (**Use a recording** on Start opens it). Click **Record now**, then **Turn on camera**; the browser asks once for the camera and mic.
 
 <p>
 <img src="studio/record-desktop.png" width="520" alt="Studio Record now: a 9:16 camera preview with head and caption guides, the record button and timer, camera and mic pickers with a level meter, the frame, mirror, guides, countdown and teleprompter switches, the script box, and a saved take marked In footage">
@@ -384,7 +395,7 @@ Film takes in the Start step with this computer's camera and mic. Click **Record
 
 ## Scripts
 
-The Scripts area in the Start step holds what you will say on camera, per reel (job). It is folded until the job has a script: click **Scripts** to open it. Scripts are files in `jobs/.studio/scripts/<job>/` (gitignored, next to the session).
+The Scripts area on the Recording tab holds what you will say on camera, per reel (job). It shows once a video is named. Scripts are files in `jobs/.studio/scripts/<job>/` (gitignored, next to the session).
 
 <p>
 <img src="studio/scripts-desktop.png" width="520" alt="Studio Scripts area: the script list, the editor with Hook, Body, CTA and Pause buttons and a WPM box, the stats line with section times, and Read it in Record">
@@ -399,7 +410,7 @@ The Scripts area in the Start step holds what you will say on camera, per reel (
 - **Marks.** A line that is only `[hook]`, `[body]` or `[cta]` starts a section; the stats show when each starts. `[pause]` anywhere is a breath: it adds 1.5 s and the teleprompter holds there.
 - **Ask for one.** Type a request under the editor ("write a 30 s script on cold showers", "rewrite this tighter") and it goes to whoever answers the chat. After a reference breakdown, **Write script from this reference** sends your agent a Studio message with the teardown, so the script follows the reference's hook, pacing and beat times.
 - **Who writes.** Your terminal agent writes with `write_script` and runs a humanizer skill on every draft first: its own if it has one, otherwise the bundled `skills/humanizer` ([blader/humanizer](https://github.com/blader/humanizer), MIT, by Siqi Chen). With an API key or a local model, the Studio chat writes the script itself and follows a short form of the same rules (`HUMANIZER_RULES` in `kit/studio/scripts.mjs`); em dashes are removed either way. In keywords mode the page says in one line that writing scripts needs an agent, an API key or a local model.
-- **From a reference.** **Pull script** on Picture, in **How the reference was made**, puts a reference's own words in Scripts: `[hook]` for its opening seconds, `[body]`, `[cta]` when it ends by asking for something, and `[pause]` at gaps over 1.2 s. The words come from its teardown, or Studio transcribes it. **Adapt to my topic** rewrites it for your topic in the same structure, with about the same lines, pauses and pacing: your agent gets the ask and saves it with `write_script` after the humanizer, or the API or local model writes it with the humanizer rules. The original stays next to it.
+- **From a reference.** **Pull script** on the **Teardowns** tab puts a reference's own words in Scripts: `[hook]` for its opening seconds, `[body]`, `[cta]` when it ends by asking for something, and `[pause]` at gaps over 1.2 s. The words come from its teardown, or Studio transcribes it. **Adapt to my topic** rewrites it for your topic in the same structure, with about the same lines, pauses and pacing: your agent gets the ask and saves it with `write_script` after the humanizer, or the API or local model writes it with the humanizer rules. The original stays next to it.
 - **Read it.** **Read it in Record** opens the recorder with that script in the teleprompter (see [Record now](#record-now)).
 
 API: `GET /api/scripts`, `GET /api/scripts/get?id=`, `POST /api/scripts` (create, or replace with `id`), `POST /api/scripts/action` (`delete`, `duplicate`, `rename`), `POST /api/reference/script` (pull), `POST /api/scripts/adapt` (`{ id, topic }`), `POST /api/scripts/from-reference`. MCP: `list_scripts`, `get_script`, `write_script`.
@@ -705,9 +716,9 @@ When the reel puts titles or captions behind you, Render first checks free memor
 
 ## Review your edit
 
-Five tools on Picture (the **How the reference was made** view), Review and Render help you see what changed and say what to change next. They read files the kit already writes (the teardown's `Reel.md`, the draft's `clips.json` and `choices.json`), so nothing goes online.
+Five tools on the Teardowns tab, Review and Render help you see what changed and say what to change next. They read files the kit already writes (the teardown's `Reel.md`, the draft's `clips.json` and `choices.json`), so nothing goes online.
 
-**What to swap** (Picture, **How the reference was made**, under **Pick parts by hand**). The reference's parts in order with their times: the hook, every cut and how it moves, title moments, b-roll and cards, graphics and the call to action. Click a time to watch that moment in the reference. Each part lists the Studio picks that match it (transition, title entrance, finish, caption style, punch, graphic); click one chip to pick it, or **Use** to pick them all. Only items the menu has are offered.
+**What to swap** (the Teardowns tab, under **Pick parts by hand**). The reference's parts in order with their times: the hook, every cut and how it moves, title moments, b-roll and cards, graphics and the call to action. Click a time to watch that moment in the reference. Each part lists the Studio picks that match it (transition, title entrance, finish, caption style, punch, graphic); click one chip to pick it, or **Use** to pick them all. Only items the menu has are offered.
 
 <img src="studio/swap-desktop.png" width="620" alt="What to swap: the reference video next to a list of its parts, each with a time button, a kind such as Hook, Cut, Title or CTA, what happens there, chips for matching picks and a Use button">
 
@@ -800,15 +811,14 @@ Studio will not switch while a draft, render, download, take, transcript or b-ro
 
 ## Wizards
 
-**Wizards** in the More menu are three guided starts. Each step has **Let my agent decide**, which hands that choice to your agent in the chat.
+**Wizards** in the More menu are two guided starts (Copy a reference is the Teardowns tab now). Each step has **Let my agent decide**, which hands that choice to your agent in the chat.
 
 - **Make a reel from a long take.** What it is for (Grow followers, Sell or sign up, Teach one thing, Full clean take, each setting the output), then a Look, then **Let AI choose** picks the pieces and opens Review. If the take is not transcribed yet, it transcribes first and opens Cut.
-- **Copy a reference.** Paste a reel link; Studio reads it on Recreate and opens Picture on **How the reference was made**.
 - **Clips and ads from one take.** 3, 5 or 8 clips, with 15 s and 30 s ad cuts if you tick them; it finds them on whole words and opens Cut.
 
 <img src="studio/wizards.png" width="560" alt="The Make a reel wizard, step 1 of 3: Grow followers, Sell or sign up, Teach one thing and Full clean take, and Let my agent decide">
 
-API: `GET /api/wizard` (the wizards, goals and clip counts, from `kit/studio/wizards.mjs`), `POST /api/wizard { wizard: reel, goal, look, choose }`, `{ wizard: clips, clips, ads }`, `{ wizard: reference, url }`. MCP `run_wizard` takes the same.
+API: `GET /api/wizard` (the wizards, goals and clip counts, from `kit/studio/wizards.mjs`), `POST /api/wizard { wizard: reel, goal, look, choose }`, `{ wizard: clips, clips, ads }`, `{ wizard: reference, url }` (still there for agents). MCP `run_wizard` takes the same.
 
 ## Outputs
 

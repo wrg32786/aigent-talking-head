@@ -23,7 +23,7 @@ export function Reference({ CAT, V, s, apply, patch }) {
   };
   const item = (id, action) => api('/api/reference/item', { id, action }).then(apply);
   return <section className="step" id="s-ref" data-step="reference" aria-labelledby="h-ref">
-    <header className="sh"><h2 id="h-ref">Reference</h2><Badge label="Optional" variant="neutral" /><p className="sub">A reel you like. We break it down for you and your agent.</p></header>
+    <header className="sh"><h2 id="h-ref">Teardowns</h2><p className="sub">Break down a video you like. We show how it was made, and you can save its look as a template.</p></header>
     <div className="urlbar glass-card">
       <Icon n="link" className="ui" />
       <label className="sr" htmlFor="ref-urls">Reference links, one per line</label>

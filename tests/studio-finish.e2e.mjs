@@ -51,7 +51,7 @@ const waitTask = async (prevId, ms = 3 * 60e3) => until(async () => {
 }, ms);
 const log = job => { try { return readFileSync(join(ROOT, 'jobs', job, 'fake-reel.log'), 'utf8'); } catch { return ''; } };
 // a fresh load of a link: via about:blank, because a new hash alone does not reload the page
-const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); };
+const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#areas'); };
 const onStep = (pg, st) => pg.waitForFunction(x => document.querySelector('main').dataset.step === x, st);
 const toStep = async (pg, st) => { await pg.click(`#stepper button[data-step="${st}"]`); await onStep(pg, st); };
 const openMake = async pg => { if (!(await pg.isVisible('#exp-reel'))) await pg.click('#make-fold > button'); await pg.waitForSelector('#exp-reel', { state: 'visible' }); };
@@ -84,9 +84,10 @@ try {
     assert.ok(await pg.isVisible('#s-menu')); assert.ok(!(await pg.$('#s-ref')), 'the reference view is not on screen');
     assert.strictEqual(await pg.$('#look-switch'), null, 'no view switch on Picture without a reference');
     await open(pg, '#step=reference');
-    await pg.waitForSelector('#s-ref'); assert.strictEqual(await pg.$eval('main', m => m.dataset.step + ' ' + m.dataset.view), 'picture reference');
-    assert.strictEqual(await pg.$eval('#look-sub-reference', b => b.getAttribute('aria-checked')), 'true'); assert.ok(!(await pg.isVisible('#s-menu')));
-    await pg.click('#look-sub-style'); await pg.waitForSelector('#s-menu', { state: 'visible' }); assert.ok(!(await pg.$('#s-ref')));
+    // the breakdown lives on the Teardowns tab now: an old #step=reference link lands there, and New video goes back to Picture
+    await pg.waitForSelector('#s-ref'); assert.strictEqual(await pg.$eval('main', m => m.dataset.area), 'teardowns');
+    assert.strictEqual(await pg.$eval('#tab-teardowns', b => b.getAttribute('aria-selected')), 'true'); assert.ok(!(await pg.$('#s-menu')));
+    await pg.click('#tab-new'); await pg.waitForSelector('#s-menu', { state: 'visible' }); assert.ok(!(await pg.$('#s-ref')));
   });
 
   await t('Your edit: on every step after Start, says what you make and from what, and follows your cuts', async () => {
@@ -192,7 +193,7 @@ try {
     await open(pg, '#step=review'); await pg.waitForTimeout(600);
     await pg.screenshot({ path: join(shots, 'redesign-finish-drafted-dark.png') });
     await pg.click('#stepper button[data-step="picture"]'); await pg.waitForTimeout(600); await pg.screenshot({ path: join(shots, 'redesign-look-dark.png') });
-    const theme = async m => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), m); await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); await pg.waitForTimeout(700); };
+    const theme = async m => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), m); await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#areas'); await pg.waitForTimeout(700); };
     await theme('light'); await pg.screenshot({ path: join(shots, 'redesign-look-light.png') });
     await pg.click('#stepper button[data-step="review"]'); await pg.waitForTimeout(600); await pg.screenshot({ path: join(shots, 'redesign-finish-light.png') });
     await pg.click('#stepper button[data-step="cut"]'); await pg.waitForTimeout(600); await pg.screenshot({ path: join(shots, 'redesign-cut-your-edit-light.png') });

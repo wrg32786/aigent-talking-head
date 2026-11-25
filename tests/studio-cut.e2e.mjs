@@ -52,7 +52,7 @@ const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data',
 const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json();
 // Studio keeps a live connection, so the page never goes network idle: wait for the stepper, and for the step a link names
 const STEP_OF = { reference: 'picture', post: 'render' };
-const ready = async (pg, hash = '') => { await pg.waitForSelector('#stepper'); const st = (hash.match(/step=([a-z]+)/) || [])[1]; if (st) await pg.waitForSelector(`#stepper [aria-current="step"][data-step="${STEP_OF[st] || st}"]`); };
+const ready = async (pg, hash = '') => { await pg.waitForSelector('#areas'); const st = (hash.match(/step=([a-z]+)/) || [])[1]; if (st === 'reference') return pg.waitForSelector('main[data-area="teardowns"]'); if (st) await pg.waitForSelector(`#stepper [aria-current="step"][data-step="${STEP_OF[st] || st}"]`); };
 const openFold = async (pg, sel) => { if (await pg.getAttribute(sel + ' > button', 'aria-expanded') !== 'true') await pg.click(sel + ' > button'); };
 const open = async (pg, hash) => { await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await ready(pg, hash); };
 const upload = async (kind, f, name) => (await fetch(`${url}/api/upload?kind=${kind}&name=${encodeURIComponent(name)}`, { method: 'POST', body: readFileSync(f) })).json();
