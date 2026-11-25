@@ -323,6 +323,7 @@ function renderSteps(s) {
   const args = ['--rebuild', '--name', s.job, '--json'];
   if (comp.lockString && comp.lockString !== s.lockedAtDraft) args.push('--lock', comp.lockString);
   if (C.MOTIONS.includes(s.pace && s.pace.motion)) args.push('--motion', s.pace.motion);
+  if (s.keyWords) args.push('--key-words', s.keyWords); // a key words change after the draft reaches the render
   { const ex = SIZES.exportArg(s); if (ex) args.push('--export', ex); }
   // the b-roll lane goes into cut.json first (kit/studio/broll-run.mjs), with credits.txt for the clips it uses
   const bp = BRL.plan(s), steps = [];

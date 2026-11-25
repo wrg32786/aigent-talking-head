@@ -131,7 +131,15 @@ const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
 const VALUED = new Set(['style-look', 'key-words', 'motion', 'goal', 'words', 'scenes', 'scenes-off', 'pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'title-effect', 'title-exit', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
-const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
+
+// captions.js keyWords from --key-words (off removes it, so the captions are what they always were)
+function keyWordsInto(build) {
+  const v = String(opt('key-words')).toLowerCase(); if (!R.KEY_WORDS.includes(v)) die(`--key-words must be one of ${R.KEY_WORDS.join(', ')}`);
+  const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF);
+  if ((caps.keyWords || 'off') === v) return;
+  if (v === 'off') delete caps.keyWords; else caps.keyWords = v;
+  fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
+}const positional = argv.filter((a, i) => !a.startsWith('--') && !(i && VALUED.has(argv[i - 1].replace(/^--/, ''))));
 const sh = (cmd, args, cwd, env) => { console.log('>', path.basename(cmd), args.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')); execFileSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } }); };
 const JSON_OUT = flag('json');
 const die = m => { if (JSON_OUT) console.log(JSON.stringify({ ok: false, error: m })); console.error(m); process.exit(1); };
@@ -562,12 +570,7 @@ if (!flag('rebuild')) {
   }
   // --key-words off|subtle|strong|dramatic: how big the strongest word of a kinetic caption line gets (captions.js
   // keyWords, kit/overlay.html). off leaves the field out, so the captions are what they always were.
-  if (opt('key-words')) {
-    const v = String(opt('key-words')).toLowerCase(); if (!R.KEY_WORDS.includes(v)) die(`--key-words must be one of ${R.KEY_WORDS.join(', ')}`);
-    const capF = path.join(build, 'captions.js'), caps = R.readCaptions(capF);
-    if (v === 'off') delete caps.keyWords; else caps.keyWords = v;
-    fs.writeFileSync(capF, 'window.CAPTIONS=' + JSON.stringify(caps, null, 1) + ';\n');
-  }
+  if (opt('key-words')) keyWordsInto(build);
   if (cut.titleLayer) {
     const capF = path.join(build, 'captions.js');
     const caps = R.readCaptions(capF);
@@ -852,6 +855,8 @@ if (flag('rebuild') && !L.isEmpty(LOCKS)) { try { CH.lockJob(build, LOCKS).forEa
 // 5. beat-sync (optional), then render + assemble
 let cut = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8'));
 // --motion on a rebuild: the camera moves already on the pieces are sized again
+// --key-words on a rebuild too, so a change made after the draft reaches the render (Studio passes it once you choose)
+if (flag('rebuild') && opt('key-words')) keyWordsInto(build);
 if (flag('rebuild') && opt('motion')) {
   const m = SHP.motionOf(opt('motion')); if (!m) die('--motion must be subtle, medium or strong');
   if (m !== cut.motion && RC.resizeMoves(cut.segs, m)) { cut.motion = m; RF.capMoves(cut.segs, { big: R.PUNCH.big }).forEach(l => console.log(l)); /* a resized move keeps the head in frame, as on a draft */ fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1)); console.log(RC.motionLine(cut.segs, m)); }
