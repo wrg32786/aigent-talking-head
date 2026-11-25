@@ -14,7 +14,7 @@ import { Colors } from './steps/Colors.jsx';
 import { Fonts } from './steps/Fonts.jsx';
 import { KeyWords, KEY_SAYS } from './steps/KeyWords.jsx';
 import { WordsPreview } from './steps/WordsPreview.jsx';
-import { WithPreview } from './steps/WithPreview.jsx';
+import { WithPreview, mergeWords } from './steps/WithPreview.jsx';
 
 // The step by step builder on New video (#build=start, #build=<step>). A choice is saved with POST /api/video-plan
 // { pace } or { words }: the server reads the plan from the session as it is right then and changes only the picks
@@ -37,35 +37,47 @@ export function Builder({ s: st, CAT, apply, go, page, setPage }) {
   const known = page === 'start' || BUILT.includes(page);
   useEffect(() => { api('/api/wizard/steps').then(setSteps).catch(e => setErr(e.message)); }, []);
   // read the plan again whenever the session changes anywhere; an older reply never replaces a newer one
-  useEffect(() => { const k = ++ask.current; api('/api/video-plan').then(v => { if (k === ask.current) setView(v); }).catch(e => setErr(e.message)); }, [st.rev, st.videoSeq]);
+  useEffect(() => { const k = ++ask.current; api('/api/video-plan').then(v => { if (k === ask.current) { setView(v); setErr(''); } }).catch(e => { if (k === ask.current) setErr(e.message); }); }, [st.rev, st.videoSeq]);
   // a link to a step that has no screen yet starts at the beginning
   useEffect(() => { if (!known) { history.replaceState(null, '', '#build=start'); setPage('start'); } }, [known, setPage]);
   useEffect(() => { setHover(null); }, [page]);
   // focus the new screen's heading after a move inside the builder, not on first load
   useEffect(() => { if (!moved.current) return; window.scrollTo({ top: 0 }); const h = page === 'start' ? startHead.current : head.current; if (h) h.focus({ preventScroll: true }); }, [page, !!view]);
   const open = p => { moved.current = true; setPage(p); history.replaceState(null, '', '#build=' + p); };
-  const send = async body => {
-    if (busy) return; setBusy(true); const k = ++ask.current;
-    try { const v = await api('/api/video-plan', body); if (k === ask.current) setView(v); apply(v); } catch {} finally { setBusy(false); }
+  // A choice shows at once; choices made while one is saving wait in a queue (choices of the same kind merge, so only
+  // the latest of each is sent) and are sent in order. Returns when the queue is empty.
+  const [shown, setShown] = useState(null), queue = useRef([]), drain = useRef(null);
+  const kindOf = b => ('pace' in b ? 'pace' : 'words');
+  const send = body => {
+    const q = queue.current, last = q[q.length - 1];
+    if (last && kindOf(last) === kindOf(body)) q[q.length - 1] = 'pace' in body ? body : { words: mergeWords(last.words, body.words) }; else q.push(body);
+    setShown(sh => ({ ...(sh || {}), ...('pace' in body ? { pace: body.pace } : { words: mergeWords((sh && sh.words) || {}, body.words) }) }));
+    if (drain.current) return drain.current;
+    setBusy(true);
+    return (drain.current = (async () => {
+      try { while (queue.current.length) { const b = queue.current.shift(), k = ++ask.current; try { const v = await api('/api/video-plan', b); if (k === ask.current) setView(v); apply(v); } catch {} } }
+      finally { drain.current = null; setBusy(false); setShown(null); }
+    })());
   };
   if (!known) return null;
   if (page === 'start') return <Start s={st} apply={apply} onBuild={() => open('pace')} headRef={startHead} />;
-  if (err) return <p className="fine" role="alert">The builder could not load: {err}</p>;
+  if (err && !view) return <p className="fine" role="alert">The builder could not load: {err}</p>;
   if (!steps || !view) return <p className="fine" role="status">Loading the builder</p>;
-  const plan = view.plan, w = plan.words;
+  const plan = view.plan, w = mergeWords(plan.words, shown && shown.words), pace = (shown && shown.pace) || plan.pace;
   const step = steps.steps.find(x => x.id === page) || steps.steps[0], sec = steps.sections.find(x => x.id === step.section);
-  const visible = steps.steps.filter(x => BUILT.includes(x.id) && shows(x, plan)), at = visible.indexOf(step);
-  const inSec = steps.steps.filter(x => x.section === step.section && shows(x, plan)), k = inSec.indexOf(step) + 1;
+  const now = { ...plan, words: w }; // the plan with choices still saving
+  const visible = steps.steps.filter(x => BUILT.includes(x.id) && shows(x, now)), at = visible.indexOf(step);
+  const inSec = steps.steps.filter(x => x.section === step.section && shows(x, now)), k = inSec.indexOf(step) + 1;
   // a step its condition hides (Key words after switching to Just captions) moves on to the next one that shows
   if (at < 0) { const after = steps.steps.slice(steps.steps.indexOf(step)).find(x => visible.includes(x)); if (after) queueMicrotask(() => open(after.id)); return null; }
   const toClassic = () => { history.replaceState(null, '', '#step=picture'); setPage(null); go('picture', true); };
   const nextStep = visible[at + 1], prevStep = visible[at - 1];
-  const P = view.paces[plan.pace], rows = view.summary || [];
+  const P = view.paces[pace], rows = view.summary || [];
   const does = step.id === 'pace' ? (P ? P.says : '') : step.id === 'captionType' ? TYPE_SAYS[w.type] || '' : step.id === 'keyWords' ? KEY_SAYS[w.keyWords.level] || ''
     : step.id === 'wordsPreview' ? '' : (rows.find(r => r.step === 'captionType') || {}).text || '';
   const pending = (view.pending || []).filter(x => x.field.startsWith(step.id === 'place' ? 'words.place' : step.id === 'colors' ? 'words.colors' : step.id === 'keyWords' ? 'words.keyWords' : '\u0000'));
-  const Body = STEPS[step.id], props = { CAT, step, words: w, save: words => send({ words }), busy, setHover };
-  const body = step.id === 'pace' ? <Pacing paces={view.paces} value={plan.pace} onPick={pace => send({ pace })} busy={busy} />
+  const Body = STEPS[step.id], props = { CAT, step, words: w, save: words => send({ words }), busy: false, setHover };
+  const body = step.id === 'pace' ? <Pacing paces={view.paces} value={pace} onPick={p => send({ pace: p })} />
     : step.id === 'wordsPreview' ? <WordsPreview words={w} behind={behindOf(plan)} summary={(rows.find(r => r.step === 'captionType') || {}).text || ''} />
     : LIVE.includes(step.id) ? <WithPreview words={w} hover={hover} behind={behindOf(plan)}><Body {...props} /></WithPreview> : <Body {...props} />;
   const lock = step.lock, next = lock ? () => send({ words: {} }).then(() => (nextStep ? open(nextStep.id) : toClassic())) : nextStep ? () => open(nextStep.id) : toClassic;

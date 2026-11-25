@@ -105,7 +105,7 @@ try {
     await pg.click('#build-next'); await pg.waitForSelector('#build-pc');
     assert.ok(await pg.$('#build-place svg rect[stroke-dasharray], #build-place svg title'), 'the zone map marks the face');
     await pg.click('#build-pc [data-opt="lower"]'); await pg.waitForSelector('#build-pc [data-opt="lower"][aria-checked="true"]');
-    assert.ok(await pg.isVisible('#build-step-soon'), 'a choice the render does not draw yet says so');
+    await pg.waitForSelector('#build-step-soon'); // a choice the render does not draw yet says so
     await pg.click('#build-next'); await pg.waitForSelector('#build-theme');
     await pg.click('#build-color-outline'); await pg.fill('#build-color-outline-in', '#eeeeee'); await pg.click('text=Use this color');
     await pg.waitForFunction(() => /hard to read/.test(document.querySelector('#build-contrast').textContent));
@@ -148,10 +148,12 @@ try {
   await t('a video with no name yet: the start screen offers one, filled with the date, and a clip card uses it', async () => {
     await api('/api/state', { job: null });
     await open(pg, '#build=start'); await pg.waitForSelector('#build-name');
-    assert.match(await pg.inputValue('#build-name'), /^video-[a-z]+-\d+$/);
-    await pg.fill('#build-name', 'My Builder Reel'); await pg.click('#build-src-link');
+    assert.match(await pg.getAttribute('#build-name', 'placeholder'), /^video-\d{4}-\d{2}-\d{2}$/);
+    // a dropped file starts the video with the typed name, then uploads into it
+    await pg.fill('#build-name', 'My Builder Reel');
+    await pg.setInputFiles('#build-file', { name: 'clip.mp4', mimeType: 'video/mp4', buffer: Buffer.from('not really a video') });
     await pg.waitForFunction(async () => (await (await fetch('/api/state')).json()).state.job === 'my-builder-reel');
-    await pg.waitForSelector('#build-start #footage-link');
+    await pg.waitForSelector('#build-start'); assert.strictEqual(new URL(pg.url()).hash, '#build=start', 'a new video keeps the builder in the address');
     await api('/api/state', { job: JOB });
   });
 

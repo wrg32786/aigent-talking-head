@@ -26,7 +26,7 @@ export function mount({ C, json, readBody, view, pushState }) {
       const b = await readBody(req);
       if (b && typeof b.pace === 'string' && !('plan' in b)) {
         if (!Object.hasOwn(VP.PACES, b.pace)) { json(res, 400, { error: `pace: one of ${Object.keys(VP.PACES).join(', ')}` }); return true; }
-        const s = C.load(), cat = C.catalog(), { plan, patch } = VP.pacePatch(planOf(s, cat), b.pace), r = C.applyPatch(s, { ...patch, from: 'ui' });
+        const s = C.load(), cat = C.catalog(), { plan, patch } = VP.pacePatch(planOf(s, cat), b.pace, s.videoPlan && s.videoPlan.pace), r = C.applyPatch(s, { ...patch, from: 'ui' });
         if (r.errs.length) { json(res, 400, { error: r.errs.join(' '), errs: r.errs }); return true; }
         s.videoPlan = plan; C.save(s); pushState();
         json(res, 200, { ...view(s), ...planView(s, cat), log: r.log }); return true;
