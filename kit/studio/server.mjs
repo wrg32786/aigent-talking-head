@@ -44,6 +44,7 @@ import { mount as mountHighlights } from './highlights-api.mjs';
 import { mount as mountPublish } from './publish-api.mjs';
 import * as SIZES from './sizes.mjs';
 import { mount as mountRefTitles } from './ref-titles.mjs';
+import { mount as mountPlan, planOf } from './wizard/api.mjs';
 
 const require = createRequire(import.meta.url);
 const SNAP = require('../snapshots.cjs');
@@ -141,7 +142,7 @@ function env() {
 const BOOT = Date.now().toString(36); let viewSeq = 0;
 // natural, tight or very: an ad with no pacing chosen is Very tight, as its draft is
 function pacingFor(cut, comp) { const ad = cut.output && cut.output.goal === 'ad' && !comp.args.includes('--tighten') && !comp.args.includes('--no-tighten'); return PACING.pacingOf(ad ? [...comp.args, '--tighten', '0.25'] : comp.args).id; }
-let PUB = null;
+let PUB = null, PLAN = null;
 function view(s) {
 
   let comp; try { comp = C.compose(s, { refPack: refPackName(s) }); } catch (e) { comp = { args: [], errs: [e.message], notes: [] }; }
@@ -304,8 +305,14 @@ function startDraft(d, done) {
   const sl = d.styleLook;
   const tk = runTask('draft', () => d.steps, done); // first: it refuses while something else runs, and a refused draft changes nothing
   update(st => { st.lockedAtDraft = d.lockString || ''; st.drafted = null; if (sl && sl.clear) st.styleLook = null; C.dropAutoIdeas(st); /* ideas we made for the older draft go: their search words came from its cut */ });
+  writePlanFile(C.load());
   if (sl && sl.note) { tk.lines.push(sl.note); send('log', { id: tk.id, line: sl.note }); }
   return tk;
+}
+// the builder plan beside the draft, for the agent and the plan check (docs/specs/studio-builder.md section 10)
+function writePlanFile(s) {
+  if (!s.job || !s.videoPlan) return;
+  try { const d = join(ROOT, 'jobs', s.job, 'build'); mkdirSync(d, { recursive: true }); writeFileSync(join(d, 'video-plan.json'), JSON.stringify(planOf(s, C.catalog()), null, 1)); } catch (e) { console.error(e.message); }
 }
 function renderSteps(s) {
   if (!s.job || !existsSync(join(ROOT, 'jobs', s.job, 'build', 'cut.json'))) throw Object.assign(new Error('make a draft first'), { code: 400 });
@@ -934,6 +941,7 @@ const FOLDERS = mountFolders({ ROOT, json, readBody, extraFolders: () => { const
 const POSTR = mountPost({ ROOT, C, json, readBody });
 HL = mountHighlights({ ROOT, C, update, json, readBody, view, startTranscribe, okFootage, durOf, runTask, pushState });
 PUB = mountPublish({ ROOT, C, json, readBody, view });
+PLAN = mountPlan({ C, json, readBody, view, pushState });
 // sizes: make the 4:5 or 1:1 of a finished reel (kit/studio/sizes.mjs)
 const SIZER = SIZES.mount({ ROOT, C, json, readBody, runTask: (...a) => runTask(...a), needFor: k => needFor(k) });
 // the reference's b-roll parts, on its own clock as a fraction of its length, become spots (kit/studio/lane.mjs spots)
@@ -1131,6 +1139,7 @@ async function api(req, res, u) {
   if (await POSTR.route(p, M, u, req, res)) return;
   if (await HL.route(p, M, u, req, res)) return;
   if (PUB && await PUB.route(p, M, u, req, res)) return;
+  if (PLAN && await PLAN.route(p, M, u, req, res)) return;
   if (await SIZER.route(p, M, u, req, res)) return;
   if (await RTI.route(p, M, u, req, res)) return;
   if (p === '/api/lines' && M === 'GET') return json(res, 200, await linesView(C.load(), u.searchParams.get('path')));
