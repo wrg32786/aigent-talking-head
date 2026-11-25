@@ -277,7 +277,7 @@ function lockup(ws,o,Y0,P){const key=PN+'|'+P.kind+'|'+P.maxW+','+P.target+','+P
  let R=make(s0,L.arrange);
  if(L.arrange==='inline'&&(hl.length>1||R.tot>P.maxW)){const f=P.maxW/R.tot;R=hl.length===1&&f>=.66?make(Math.floor(s0*f),'inline'):null;if(!R||R.tot>P.maxW)R=make(s0,'stack')}
  // on a caption line a long partner that had to shrink to fit pulls the hero down with it, so the pair keeps its ratio
- if(P.kind==='K'){let sk=R.heroes[0].size;while(sk>P.min&&R.parts.some(p=>p.size<sk*.5)){sk=Math.max(P.min,Math.floor(sk*.92));R=make(sk,R.arr)}}
+ if(P.kind==='K'){let sk=R.heroes[0].size;while(sk>P.min&&R.parts.some(p=>p.size<sk*(P.pr||.5))){sk=Math.max(P.min,Math.floor(sk*.92));R=make(sk,R.arr)}}
  let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const h of R.heroes){x0=Math.min(x0,h.x-h.w/2);x1=Math.max(x1,h.x+h.w/2);y0=Math.min(y0,h.y-h.asc);y1=Math.max(y1,h.y+h.desc)}
  for(const p of R.parts){x0=Math.min(x0,p.x);x1=Math.max(x1,p.x+p.w);y0=Math.min(y0,p.y-p.asc);y1=Math.max(y1,p.y+p.desc)}
  let hy0=1e9,hy1=-1e9;for(const h of R.heroes){hy0=Math.min(hy0,h.y-h.asc);hy1=Math.max(hy1,h.y+h.desc)}
@@ -507,7 +507,12 @@ function kinetic(c,t){const o=c[4];if(o.lockup===false)return kineticSolo(c,t);c
  const ce=CENTR.includes(o.entrance)?o.entrance:CENTR.includes(CAP.captionEntrance)?CAP.captionEntrance:'pop';
  R.heroes.forEach(h=>{const dt=t-h.a+.04;if(dt<0)return;if(glowing(o)){const q=cl(dt/.22),s=q<1?1.5-.5*overshoot(q,.2):1;ctx.save();ctx.font=h.font;ctx.letterSpacing=h.track+'px';ctx.textAlign='center';ctx.fillStyle=R.hc;glowSet(R.hc,h.size);ctx.globalAlpha*=cl((dt-.06)/.2);ctx.translate(h.x,h.y-h.asc/2);ctx.scale(s,s);ctx.fillText(h.txt,0,h.asc/2);ctx.restore()}if(ce!=='pop'){ctx.save();ctx.font=h.font;ctx.letterSpacing=h.track+'px';ctx.fillStyle=R.hc;shadow(ctx,h.size);capEnter(ce,h,dt,Math.round(h.a*100));ctx.restore();return}const q=cl(dt/.22),s=q<1?1.5-.5*overshoot(q,.2):1;ctx.save();ctx.font=h.font;ctx.letterSpacing=h.track+'px';ctx.textAlign='center';ctx.fillStyle=R.hc;shadow(ctx,h.size);ctx.globalAlpha*=cl(dt/.05);ctx.translate(h.x,h.y-h.asc/2);ctx.scale(s,s);ctx.fillText(h.txt,0,h.asc/2);ctx.restore()});
  R.parts.forEach(p=>partnerDraw(COUT==='none'?{...p,outline:false}:COUT==='thin'?{...p,thin:true}:p,R.pc,k=>t-k.a+.04));FLAT=false;ctx.restore()}   // captionOutline reaches the partners of kinetic captions and of titles alike (report 4 item 19)
-const LKP={T:{kind:'T',maxW:960,target:880,max:360,min:150,pmin:56},K:{kind:'K',maxW:940,target:620,max:Math.round(CSZ*2.3),min:Math.round(CSZ*1.1),pmin:Math.round(CSZ*.66)}};
+// Key words (captions.js "keyWords", reel.cjs --key-words): how big the strongest word of a kinetic caption line gets.
+// subtle, strong or dramatic scale its target width and largest size (dramatic also lets the partner words run smaller
+// beside it); none (off) is the size it always had. The layout
+// pass runs on the result, so a bigger word still moves or shrinks off the face.
+const KWL={subtle:{t:1.06,m:2.5},strong:{t:1.2,m:2.85,pr:.42},dramatic:{t:1.36,m:3.2,pr:.34}}[CAP.keyWords]||null;
+const LKP={T:{kind:'T',maxW:960,target:880,max:360,min:150,pmin:56},K:{kind:'K',maxW:940,target:KWL?Math.round(620*KWL.t):620,max:Math.round(CSZ*(KWL?KWL.m:2.3)),min:Math.round(CSZ*1.1),pmin:Math.round(CSZ*.66),...(KWL&&KWL.pr?{pr:KWL.pr}:{})}};
 // every lockup in the job, for render.mjs (build/lockups.json) and the smoke test
 window.__lockups=()=>flips.filter(c=>c[4].lockup!==false&&(c[3]===7||(c[3]===0&&(c[4].style||CSTYLE)==='kinetic'))).map(c=>{use(c.ps);const T=c[3]===7,o0=c[4];let ws=T?c[2].replace(/\|/g,' ').split(/\s+/).filter(Boolean).map(w=>[0,0,w]):wordsOf(c),o=o0;if(T&&!titleFull(c)&&ws.length){ws=[ws[heroOf(ws,o0)[0]]];o={...o0,hero:[0]}}const R=lockup(ws,o,T?(o.y||TY):(o.y||KY),T&&o.size?{...LKP.T,target:1e4,max:o.size}:LKP[T?'T':'K']);
  const fam=f=>(f.match(/px "?([^",]+)/)||[])[1];return{start:c[0],kind:T?'title':'kinetic',fonts:PN,faces:[fam(R.heroes[0].font),...R.parts.slice(0,1).map(p=>fam(p.font))],arrange:R.arr,hero:R.heroes.map(h=>h.txt).join(' / '),heroSize:R.heroes[0].size,heroW:Math.round(Math.max(...R.heroes.map(h=>h.w))),partners:R.parts.map(p=>({txt:p.toks.map(k=>k.txt).join(' '),size:p.size,w:Math.round(p.w),script:p.script})),box:R.box.map(Math.round)}});

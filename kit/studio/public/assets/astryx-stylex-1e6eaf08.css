@@ -6035,12 +6035,20 @@
       padding: 0;
     }
 
+    .xc7ga6q {
+      padding: 12px;
+    }
+
     .x1tamke2 {
       padding: 16px;
     }
 
     .x1qhigcl {
       padding: 20px;
+    }
+
+    .x1ruevkc {
+      padding: 6px;
     }
 
     .xe8ttls {
@@ -6061,12 +6069,24 @@
       border-radius: 10px;
     }
 
+    .x4pepcl {
+      border-radius: 12px;
+    }
+
     .xixl9f9 {
       border-radius: 14px;
     }
 
     .xgqmno8 {
       border-radius: 16px;
+    }
+
+    .x1kogg8i {
+      border-radius: 6px;
+    }
+
+    .xur7f20 {
+      border-radius: 8px;
     }
 
     .x1e6avla {
@@ -6081,8 +6101,16 @@
       border-style: solid;
     }
 
+    .xc342km {
+      border-width: 0;
+    }
+
     .xmkeg23 {
       border-width: 1px;
+    }
+
+    .x883omv {
+      gap: 10px;
     }
 
     .x1v2ro7d {
@@ -6093,12 +6121,20 @@
       gap: 16px;
     }
 
+    .x1c1vhfx {
+      gap: 20px;
+    }
+
     .x1jnr06f {
       gap: 4px;
     }
 
     .x17d4w8g {
       gap: 6px;
+    }
+
+    .x167g77z {
+      gap: 8px;
     }
 
     .xe8uvvx {
@@ -6111,6 +6147,10 @@
 
     .xrxpjvj {
       margin-inline: 0;
+    }
+
+    .xb3r6kr {
+      overflow: hidden;
     }
 
     .xt970qd {
@@ -6155,12 +6195,28 @@
   }
 
   @layer priority3 {
+    .x10ukxgv {
+      align-content: start;
+    }
+
     .x6s0dn4 {
       align-items: center;
     }
 
+    .x1cy8zhl {
+      align-items: flex-start;
+    }
+
+    .x6grhm {
+      aspect-ratio: 3 / 4;
+    }
+
     .x15jox0q {
       aspect-ratio: 9 / 16;
+    }
+
+    .x83z2og {
+      background-color: #fff;
     }
 
     .x10d2aqw {
@@ -6201,6 +6257,14 @@
 
     .x9b0yd8 {
       color: var(--primary-foreground, #fff);
+    }
+
+    .xhxegb2 {
+      color: var(--warning, #d97706);
+    }
+
+    .x19aimcq {
+      color-scheme: light;
     }
 
     .xt0e3qv {
@@ -6247,8 +6311,24 @@
       fill: none;
     }
 
+    .x1gc7yrn {
+      flex-basis: 260px;
+    }
+
+    .x1a4bs9z {
+      flex-basis: 320px;
+    }
+
+    .x1iyjqo2 {
+      flex-grow: 1;
+    }
+
     .x2lah0s {
       flex-shrink: 0;
+    }
+
+    .x8hhl5t {
+      flex-wrap: wrap-reverse;
     }
 
     .x1a02dak {
@@ -6267,6 +6347,10 @@
       font-size: 13px;
     }
 
+    .xif65rj {
+      font-size: 14px;
+    }
+
     .x1jvydc1 {
       font-size: 15px;
     }
@@ -6275,8 +6359,16 @@
       font-size: 22px;
     }
 
+    .x1s688f {
+      font-weight: 600;
+    }
+
     .x19s9jnd {
       font-weight: 650;
+    }
+
+    .x1gf0zcd {
+      grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
     }
 
     .x1iuxcc1 {
@@ -6311,6 +6403,10 @@
       outline-offset: 2px;
     }
 
+    .x47corl {
+      pointer-events: none;
+    }
+
     .x10l6tqk {
       position: absolute;
     }
@@ -6319,12 +6415,24 @@
       position: relative;
     }
 
+    .x7wzq59 {
+      position: sticky;
+    }
+
     .xu9muis {
       stroke: color-mix(in srgb,currentColor 45%,transparent);
     }
 
+    .x1m3bbiw {
+      stroke: var(--destructive, #e5484d);
+    }
+
     .x1b4pc8b {
       stroke: var(--primary);
+    }
+
+    .x1ypbokr {
+      stroke-dasharray: 3 2;
     }
 
     .xhr4kjn {
@@ -6338,15 +6446,63 @@
     .xdpxx8g {
       text-align: left;
     }
+
+    .xqyy0d1 {
+      transform: translateX(18px);
+    }
+
+    .x1hj3fc7 {
+      transform-origin: 0 0;
+    }
+
+    .xgdialr {
+      transition-duration: .12s;
+    }
+
+    .x11xpdln {
+      transition-property: transform;
+    }
+
+    .xa9119d {
+      z-index: 50;
+    }
   }
 
   @layer priority4 {
+    .x5yr21d {
+      height: 100%;
+    }
+
     .x1nbnut7 {
       height: 128px;
     }
 
+    .xlup9mm {
+      height: 16px;
+    }
+
+    .xmix8c7 {
+      height: 18px;
+    }
+
+    .xapqtle {
+      height: 1920px;
+    }
+
+    .x17rw0jw {
+      height: 22px;
+    }
+
     .xxk0z11 {
       height: 24px;
+    }
+
+    .xu96u03 {
+      left: 0;
+    }
+
+    .x54rlcq {
+      left: 2px;
     }
 
     .xat24cr {
@@ -6359,6 +6515,10 @@
 
     .x1e56ztr {
       margin-bottom: 8px;
+    }
+
+    .xdj266r {
+      margin-top: 0;
     }
 
     .x1anpbxc {
@@ -6393,20 +6553,64 @@
       min-height: 110px;
     }
 
+    .xeuugli {
+      min-width: 0;
+    }
+
+    .x131sewu {
+      right: 10px;
+    }
+
     .x44moml {
       right: 14px;
+    }
+
+    .x13vifvy {
+      top: 0;
+    }
+
+    .x1eu8d0j {
+      top: 10px;
+    }
+
+    .x1tk7jg1 {
+      top: 12px;
     }
 
     .xuivejd {
       top: 14px;
     }
 
+    .xs7f9wi {
+      top: 2px;
+    }
+
     .xh8yej3 {
       width: 100%;
     }
 
+    .x1cyolm5 {
+      width: 1080px;
+    }
+
+    .x1kky2od {
+      width: 16px;
+    }
+
+    .x1xp8n7a {
+      width: 18px;
+    }
+
+    .x17z2i9w {
+      width: 22px;
+    }
+
     .xvy4d1p {
       width: 24px;
+    }
+
+    .x100vrsf {
+      width: 40px;
     }
 
     .xni59qk {

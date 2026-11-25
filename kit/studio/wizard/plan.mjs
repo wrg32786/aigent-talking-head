@@ -106,6 +106,29 @@ export function pacePatch(plan, pace, last = null) {
     picks: bs === null ? { 'beatSync:beat-sync': 'clear', 'beatSync:no-beat-sync': 'clear' } : { [`beatSync:${bs ? 'beat-sync' : 'no-beat-sync'}`]: 'allow' } };
   return { plan: next, patch };
 }
+// The smallest session patch that turns prev into next: picks the two plans set differently, and only the session
+// fields that change. No clearPicks, so picks neither plan speaks for (a scene, a b-roll rule) stay as they are.
+// prev should be read from the session (api.mjs planOf), so its picks are the session's own.
+export function diffPatch(prev, next, cat = null) {
+  const a = toState(prev, cat), b = toState(next, cat), picks = {};
+  for (const ref of Object.keys(a.picks)) if (!(ref in b.picks)) picks[ref] = 'clear';
+  for (const [ref, how] of Object.entries(b.picks)) if (a.picks[ref] !== how) picks[ref] = how;
+  const patch = Object.keys(picks).length ? { picks } : {};
+  for (const k of ['pack', 'styleLook', 'titles', 'keyWords', 'music', 'sound', 'pace']) if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) patch[k] = b[k];
+  return patch;
+}
+// a builder step's words choices laid over the plan (only the fields given change)
+export function withWords(plan, words) {
+  const p = normalize(plan), deep = (base, x) => { if (!isObj(x)) return x; const o = isObj(base) ? clone(base) : {}; for (const k of Object.keys(x)) o[k] = isObj(x[k]) && isObj(o[k]) ? deep(o[k], x[k]) : clone(x[k]); return o; };
+  p.words = deep(p.words, words);
+  // a choice made here wins over an All options pick of the same kind (a deny of it, or a second font in a list)
+  const kinds = new Set(); const has = k => Object.hasOwn(words || {}, k);
+  if (has('look') || has('type')) kinds.add('captionStyle'); if (has('entrance')) kinds.add('captionEntrance'); if (has('fonts')) kinds.add('font');
+  if (isObj(words && words.titles)) { const t = words.titles; if (has.call(null, 'titles') && Object.hasOwn(t, 'entrances')) kinds.add('entrance'); if (Object.hasOwn(t, 'effect')) kinds.add('titleEffect'); if (Object.hasOwn(t, 'exit')) kinds.add('titleExit'); }
+  if (isObj(words && words.colors) && Object.hasOwn(words.colors, 'theme')) kinds.add('theme');
+  if (kinds.size) for (const r of Object.keys(p.advanced.picks)) if (kinds.has(r.split(':')[0])) delete p.advanced.picks[r];
+  return touch(p, 'words');
+}
 // mark a field as yours, so a later pace change leaves it alone
 export function touch(plan, ...keys) { const p = normalize(plan); for (const k of keys) if (!p.touched.includes(k)) p.touched.push(k); return p; }
 
@@ -177,15 +200,16 @@ export function validate(plan, cat = null) {
 }
 
 // ---------- plan -> session ----------
-// The patch for core.mjs applyPatch: clear the picks, then set exactly what the plan says. Filters are picks
+// The patch for core.mjs applyPatch: clear the picks, then set exactly what the plan says. Just captions chosen in
+// the builder (words touched) turns big titles off; a classic session's caption style alone keeps its titles as before. Filters are picks
 // (finish:<id>); state.finish is what Render makes and is never touched here.
 export function toState(plan, cat = null) {
   const p = normalize(plan), w = p.words, picks = {}, pick = (kind, id, how = 'allow') => { picks[`${kind}:${id}`] = how; };
   const P = Object.hasOwn(PACES, p.pace) ? PACES[p.pace] : PACES.look;
   const patch = { clearPicks: true, picks, pack: p.template && p.template.kind === 'pack' ? p.template.name : null,
-    styleLook: p.template && p.template.kind === 'look' ? p.template.name : null, titles: w.titles.on === false ? 'off' : 'auto',
+    styleLook: p.template && p.template.kind === 'look' ? p.template.name : null, titles: w.titles.on === false || (w.type === 'captions' && p.touched.includes('words')) ? 'off' : 'auto',
     music: { bed: p.music.bed, energy: p.music.energy }, sound: { sfx: p.music.sfx ? 'on' : 'off' },
-    pace: { tighten: p.advanced.tighten ?? P.tighten, punch: p.presenter.some(x => x.id === 'punch') ? 'on' : 'off' } };
+    pace: { tighten: p.advanced.tighten ?? P.tighten, punch: p.presenter.some(x => x.id === 'punch') ? 'on' : 'off' }, keyWords: w.keyWords.level };
   const look = w.look || (w.type === 'captions' ? 'classic' : w.type === 'kinetic' ? 'kinetic' : null);
   if (look) pick('captionStyle', look);
   if (w.entrance && w.type !== 'captions') pick('captionEntrance', w.entrance);
@@ -213,7 +237,7 @@ export function pending(plan) {
   const add = (field, text) => out.push({ field, text });
   if (w.place.captions || w.place.titles.length) add('words.place', 'Where words sit');
   if (w.colors.text || w.colors.accent || w.colors.outline) add('words.colors', 'Your own text colors');
-  if (w.keyWords.level !== 'off') add('words.keyWords', 'Bigger key words');
+  if (w.keyWords.level !== 'off' && (w.keyWords.color !== 'accent' || w.keyWords.maxPerLine !== 1)) add('words.keyWords', 'Key word color and how many per line');
   if (Array.isArray(p.transitions.ids) && p.transitions.ids.length && p.transitions.when !== 'every-cut') add('transitions.when', 'Transitions only at some cuts');
   for (const x of p.presenter) {
     if (x.id === 'frame-breakout') add('presenter.frame-breakout', 'Frame breakout');
@@ -240,8 +264,12 @@ export function fromState(s, prev = null, cat = null) {
   p.advanced.tighten = t === null || t === undefined || t === PACES[p.pace].tighten ? null : t;
   const w = p.words, look = allow('captionStyle')[0] || null;
   if (look) { take('captionStyle', look); w.look = look; w.type = KINETIC_LOOKS.includes(look) ? 'kinetic' : 'captions'; } else { w.look = null; w.type = null; }
-  const ce = allow('captionEntrance')[0] || null; w.entrance = ce; if (ce) take('captionEntrance', ce);
-  w.titles.on = s.titles === 'off' ? false : base.words.titles.on === false ? null : base.words.titles.on;
+  // just captions: no word entrance and no key words (those move kinetic words only), and the titles off that
+  // toState derives from the type is not taken as your own choice, so going back to kinetic brings titles back
+  const caps = w.type === 'captions';
+  const ce = caps ? null : allow('captionEntrance')[0] || null; w.entrance = ce; if (ce) take('captionEntrance', ce);
+  w.keyWords.level = caps ? 'off' : s.keyWords || 'off';
+  w.titles.on = s.titles === 'off' && !(caps && base.words.titles.on !== false) ? false : s.titles === 'off' ? base.words.titles.on : base.words.titles.on === false ? null : base.words.titles.on;
   w.titles.entrances = allow('entrance'); for (const id of w.titles.entrances) take('entrance', id);
   w.titles.effect = allow('titleEffect')[0] || null; if (w.titles.effect) take('titleEffect', w.titles.effect);
   w.titles.exit = allow('titleExit')[0] || null; if (w.titles.exit) take('titleExit', w.titles.exit);

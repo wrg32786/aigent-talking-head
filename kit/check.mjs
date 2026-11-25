@@ -312,6 +312,7 @@ if (target) {
       ['wizard-steps.test.mjs', 'Studio builder step map (tests/wizard-steps.test.mjs: one decision per screen, every option owned by one step or All options, featured options real, plain copy)'],
       ['studio-recordings.test.mjs', 'Studio recordings (tests/studio-recordings.test.mjs: takes from every video and the holding folder, Use in a video moves a held take and copies another video\'s, no clashing take numbers, plain refusals)'],
       ['demos-visible.test.mjs', 'Menu previews (tests/demos-visible.test.mjs: every effect, graphic, finish and title layer has a small moving preview that visibly changes the picture, every sound has a waveform)'],
+      ['preview-face.test.mjs', 'Live text preview (tests/preview-face.test.mjs: the preview serves the render own overlay files, no sample word lands on the face in any combination, key words grow in turn and off changes nothing)'],
       ['wizard-plan.test.mjs', 'Studio builder plan (tests/wizard-plan.test.mjs: defaults per pace, plain errors, a plan sets the same picks as the classic clicks, classic changes read back, no titles and no filters as locks, the route and MCP tools)'],
       ['studio-cut-server.test.mjs', 'Studio Cut server tests (tests/studio-cut-server.test.mjs: the Cut routes, the point, topics, Pacing and the stitched previews over HTTP)'],
       ['studio-stages.test.mjs', 'Studio stage status tests (tests/studio-stages.test.mjs: teardown log lines to the stage line, the list and the bar)'],

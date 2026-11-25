@@ -98,6 +98,7 @@
         { "name": "titles", "type": "boolean", "default": false, "description": "force kinetic titles on" },
         { "name": "no-titles", "type": "boolean", "default": false, "description": "no kinetic titles" },
         { "name": "title-layer", "type": "enum", "values": ["front", "behind", "auto"], "values_from": "kit/rules.cjs TITLE_LAYERS", "default": "front" },
+        { "name": "key-words", "type": "enum", "values": ["off", "subtle", "strong", "dramatic"], "values_from": "kit/rules.cjs KEY_WORDS", "default": null, "description": "how big the strongest word of a kinetic caption line gets; off is the size it always had" },
         { "name": "title-effect", "type": "enum", "values": ["type", "slot-roll", "count-up", "stack-fade", "decode", "split-flap"], "values_from": "kit/rules.cjs TITLE_EFFECTS", "default": null, "description": "the effect of every title that names none" },
         { "name": "title-exit", "type": "enum", "values": ["blow-up", "polaroid", "glitch-slice", "dip-black"], "values_from": "kit/rules.cjs TITLE_EXITS", "default": null, "description": "how every title leaves; when it ends on a cut the exit is the transition there" },
         { "name": "fonts", "type": "list", "default": null, "description": "font pairing names from kit/fonts/pairings.json or kit/fonts/local; several cycle one per title" },
