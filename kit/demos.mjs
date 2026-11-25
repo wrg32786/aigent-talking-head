@@ -23,7 +23,7 @@ const require = createRequire(import.meta.url);
 const B = require('./beats.cjs');
 const KIT = dirname(fileURLToPath(import.meta.url)), ROOT = dirname(KIT);
 export const MENU = join(ROOT, 'docs', 'menu');
-export const DIRS = { effect: 'effects', graphic: 'graphics', finish: 'finishes', titleLayer: 'title-layers' };
+export const DIRS = { effect: 'effects', graphic: 'graphics', finish: 'finishes', titleLayer: 'title-layers', pace: 'paces' };
 export const PLATE = join(MENU, 'demo-plate.webp');
 const PRESENTER = join(ROOT, 'showcase', 'source', 'presenter.jpg'), MASK = join(ROOT, 'showcase', 'source', 'presenter-mask.png');
 const FX_PY = join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python'), RUNNER = join(ROOT, 'effects', 'fx_runner.py');
@@ -121,13 +121,22 @@ const LAYER_DEMO = {
   auto: [{ start: 0.1, end: 1.4, text: 'Record', mode: 7, hero: [0], entrance: 'slam', flicker: false, layer: 'front' },
     { start: 1.5, end: DUR, text: 'One take', mode: 7, hero: [0], entrance: 'slam', flicker: false, layer: 'behind' }],
 };
+// ---- paces (the builder's first step): the cut speed of each pace on the plate. A cut swaps between the wide shot and a
+// closer one; Calm has no cut, only a slow push. Seconds between cuts follow kit/studio/wizard/plan.mjs PACES in spirit
+export const PACE_CUTS = { calm: 0, steady: 1.5, lively: 0.75, high: 0.4 };
+function pace(work, id) {
+  const every = PACE_CUTS[id], out = join(work, `pace-${id}.mp4`);
+  const z = every ? `if(mod(floor(t/${every})\\,2)\\,1.18\\,1)` : `(1+0.1*t/${DUR})`;
+  ff(['-i', plate(work), '-vf', `crop=w='iw/${z}':h='ih/${z}':x='(iw-ow)/2':y='(ih-oh)*0.3',scale=${FW}:${FH},format=yuv420p`, '-t', String(DUR), ...lossless, out]);
+  return out;
+}
 const titleLayer = (work, it) => overlay(work, 'tl-' + it.id, { captionStyle: 'kinetic', layout: false, flips: LAYER_DEMO[it.id] });
 
 // every option this script makes a demo for, by kind
 export function items() {
   const menu = loadMenu(), sec = id => (menu.sections.find(s => s.id === id) || { items: [] }).items;
   return [...sec('effects').map(it => ({ kind: 'effect', it })), ...sec('graphics').map(it => ({ kind: 'graphic', it })),
-    ...sec('finishes').map(it => ({ kind: 'finish', it })), ...['front', 'behind', 'auto'].map(id => ({ kind: 'titleLayer', it: { id } }))];
+    ...sec('finishes').map(it => ({ kind: 'finish', it })), ...['front', 'behind', 'auto'].map(id => ({ kind: 'titleLayer', it: { id } })), ...Object.keys(PACE_CUTS).map(id => ({ kind: 'pace', it: { id } }))];
 }
 
 // ---- sounds: a small waveform (48 bars, 0..100) for every music bed and sound, so the sound tiles can show their shape
@@ -235,7 +244,7 @@ async function main() {
       n++;
       console.log(`making ${n}/${list.length} ${kind} ${it.id}`); // the page's progress line (kit/studio/previews.mjs)
       try {
-        const mp4 = kind === 'effect' ? await effect(work, it) : kind === 'graphic' ? await graphic(work, it) : kind === 'finish' ? finish(work, it.id) : titleLayer(work, it);
+        const mp4 = kind === 'effect' ? await effect(work, it) : kind === 'graphic' ? await graphic(work, it) : kind === 'finish' ? finish(work, it.id) : kind === 'pace' ? pace(work, it.id) : titleLayer(work, it);
         const { size, q } = toWebp(mp4, demoPath(kind, it.id), QUALITY[`${kind}:${it.id}`]);
         const man = manifest(); man[`${kind}:${it.id}`] = { q }; writeFileSync(MANIFEST, JSON.stringify(Object.fromEntries(Object.entries(man).sort(([a], [b]) => a.localeCompare(b))), null, 1) + '\n');
         console.log(`${n}/${list.length} ${kind} ${it.id} ${Math.round(size / 1024)} KB`);

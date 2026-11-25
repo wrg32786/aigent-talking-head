@@ -1,5 +1,14 @@
 {
  "effect:tape-label": {
   "q": 60
+ },
+ "pace:high": {
+  "q": 60
+ },
+ "pace:lively": {
+  "q": 60
+ },
+ "pace:steady": {
+  "q": 60
  }
 }

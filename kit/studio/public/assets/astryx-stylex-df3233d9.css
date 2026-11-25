@@ -6024,3 +6024,309 @@
     }
   }
 }
+
+@layer product {
+  @layer priority1 {
+    .x1ghz6dp {
+      margin: 0;
+    }
+
+    .x1717udv {
+      padding: 0;
+    }
+
+    .x1tamke2 {
+      padding: 16px;
+    }
+
+    .x1qhigcl {
+      padding: 20px;
+    }
+
+    .xe8ttls {
+      padding: 8px;
+    }
+  }
+
+  @layer priority2 {
+    .x1io3bm2 {
+      border-color: var(--border);
+    }
+
+    .xnu7srt {
+      border-color: var(--primary);
+    }
+
+    .x1q4ynmn {
+      border-radius: 10px;
+    }
+
+    .xixl9f9 {
+      border-radius: 14px;
+    }
+
+    .x1e6avla {
+      border-radius: 999px;
+    }
+
+    .x1y0btm7 {
+      border-style: solid;
+    }
+
+    .xmkeg23 {
+      border-width: 1px;
+    }
+
+    .x1v2ro7d {
+      gap: 12px;
+    }
+
+    .xou54vl {
+      gap: 16px;
+    }
+
+    .x17d4w8g {
+      gap: 6px;
+    }
+
+    .xe8uvvx {
+      list-style: none;
+    }
+
+    .xj8oexa {
+      padding-block: 2px;
+    }
+
+    .xf4egzd {
+      padding-block: 3px;
+    }
+
+    .x1t0vds8 {
+      padding-block: 6px;
+    }
+
+    .x1awh872 {
+      padding-inline: 10px;
+    }
+
+    .xdqyycr {
+      padding-inline: 8px;
+    }
+  }
+
+  @layer priority3 {
+    .x6s0dn4 {
+      align-items: center;
+    }
+
+    .x15jox0q {
+      aspect-ratio: 9 / 16;
+    }
+
+    .x10d2aqw {
+      background-color: color-mix(in srgb,var(--primary) 14%,transparent);
+    }
+
+    .x1x8uds5 {
+      background-color: color-mix(in srgb,var(--primary) 16%,transparent);
+    }
+
+    .xjbqb8w {
+      background-color: #0000;
+    }
+
+    .x1ep7253 {
+      background-color: var(--card);
+    }
+
+    .xuhz2es {
+      background-color: var(--muted);
+    }
+
+    .xrkfzz1 {
+      box-shadow: 0 0 0 1px var(--primary) inset;
+    }
+
+    .x14wedtx {
+      box-shadow: 0 0 0 2px var(--primary) inset;
+    }
+
+    .x1heor9g {
+      color: inherit;
+    }
+
+    .xt0e3qv {
+      cursor: default;
+    }
+
+    .x1ypdohk {
+      cursor: pointer;
+    }
+
+    .x1lliihq {
+      display: block;
+    }
+
+    .x78zum5 {
+      display: flex;
+    }
+
+    .xrvj5dj {
+      display: grid;
+    }
+
+    .x1rg5ohu {
+      display: inline-block;
+    }
+
+    .x3nfvp2 {
+      display: inline-flex;
+    }
+
+    .x1e4098y {
+      fill: color-mix(in srgb,currentColor 14%,transparent);
+    }
+
+    .x1sv888t {
+      fill: color-mix(in srgb,var(--primary) 55%,transparent);
+    }
+
+    .xbh8q5q {
+      fill: none;
+    }
+
+    .x2lah0s {
+      flex-shrink: 0;
+    }
+
+    .x1a02dak {
+      flex-wrap: wrap;
+    }
+
+    .x1j6dyjg {
+      font-size: 11px;
+    }
+
+    .xfifm61 {
+      font-size: 12px;
+    }
+
+    .x4z9k3i {
+      font-size: 13px;
+    }
+
+    .x1jvydc1 {
+      font-size: 15px;
+    }
+
+    .x1i1m3gp {
+      font-size: 22px;
+    }
+
+    .x19s9jnd {
+      font-weight: 650;
+    }
+
+    .x1iuxcc1 {
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
+
+    .x19vt64s {
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    .x1qughib {
+      justify-content: space-between;
+    }
+
+    .x619ttb {
+      justify-items: start;
+    }
+
+    .xl1xv1r {
+      object-fit: cover;
+    }
+
+    .xwq05k6 {
+      opacity: .55;
+    }
+
+    .x1us6l5c {
+      opacity: .8;
+    }
+
+    .xu9muis {
+      stroke: color-mix(in srgb,currentColor 45%,transparent);
+    }
+
+    .x1b4pc8b {
+      stroke: var(--primary);
+    }
+
+    .xhr4kjn {
+      stroke-width: 1.5px;
+    }
+
+    .xvlca1e {
+      stroke-width: 2px;
+    }
+
+    .xdpxx8g {
+      text-align: left;
+    }
+  }
+
+  @layer priority4 {
+    .x1nbnut7 {
+      height: 128px;
+    }
+
+    .xat24cr {
+      margin-bottom: 0;
+    }
+
+    .xod5an3 {
+      margin-bottom: 12px;
+    }
+
+    .x1e56ztr {
+      margin-bottom: 8px;
+    }
+
+    .x1anpbxc {
+      margin-top: 10px;
+    }
+
+    .x14vqqas {
+      margin-top: 12px;
+    }
+
+    .x1sy10c2 {
+      margin-top: 20px;
+    }
+
+    .x1gslohp {
+      margin-top: 4px;
+    }
+
+    .x1xmf6yo {
+      margin-top: 8px;
+    }
+
+    .x1lnxjyg {
+      min-height: 1.4em;
+    }
+
+    .xuxxueq {
+      min-height: 110px;
+    }
+
+    .xh8yej3 {
+      width: 100%;
+    }
+
+    .xni59qk {
+      width: 72px;
+    }
+  }
+}

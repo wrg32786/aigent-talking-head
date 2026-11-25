@@ -68,6 +68,7 @@ export function Footage({ V, s, apply, patch, go, hidden, looks, openRecording }
         </button>
       </div>
     <FootageLink s={s} apply={apply} />
+    <a className="build-cta glass-card" id="build-open" href="#build=start"><strong>Build it one choice at a time</strong><span className="fine">Pace first, then words, shots and sound. Your picks carry over here.</span></a>
     {showing && <Player apply={apply} path={showing} tx={(s.tx || {})[showing]} onClose={() => setPlaying(null)} />}
     <ul id="footage" className="clips">
       {s.clips && <li className="note">Using the clips folder {s.clips}</li>}
