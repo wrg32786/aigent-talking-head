@@ -45,7 +45,7 @@ function firstStep() {
 const AREAS = [['new', 'New video', 'plus'], ['teardowns', 'Teardowns', 'spark'], ['recording', 'Recording', 'camera']], AREA_IDS = AREAS.map(a => a[0]);
 const hashArea = () => {
   const h = location.hash, a = (h.match(/tab=([a-z]+)/) || [])[1];
-  return AREA_IDS.includes(a) ? a : hashStep() === 'reference' ? 'teardowns' : /record/.test(h) ? 'recording' : hashStep() || hashMenu() ? 'new' : null;
+  return AREA_IDS.includes(a) ? a : hashStep() === 'reference' ? 'teardowns' : /record/.test(h) ? 'recording' : hashStep() || hashMenu() || /build=/.test(h) ? 'new' : null;
 };
 const firstArea = () => hashArea() || (AREA_IDS.includes(localStorage.getItem('studio.tab')) ? localStorage.getItem('studio.tab') : 'new');
 // Start and Render each hold a second view: Highlights and Post. A link names it (#step=highlights, #step=post);
@@ -53,10 +53,14 @@ const firstArea = () => hashArea() || (AREA_IDS.includes(localStorage.getItem('s
 const firstOutView = () => { const h = hashStep(); return h ? (h === 'post' ? 'post' : 'main') : localStorage.getItem('studio.render') === 'post' ? 'post' : 'main'; };
 const firstStartView = () => { const h = hashStep(); return h === 'highlights' ? 'highlights' : 'main'; };
 
+import { Builder, buildOf } from './Builder/Builder.jsx';
+
 export function App() {
   const [CAT, setCat] = useState(null);
   const [V, setV] = useState(null);
   const [step, setStep] = useState(firstStep);
+  const [build, setBuild] = useState(buildOf); // the step by step builder page, or null for the classic steps
+  const buildRef = useRef(build); buildRef.current = build;
   const [tab, setTab] = useState(hashMenu() || null);
   const [area, setAreaState] = useState(firstArea);
   const [outView, setOutViewState] = useState(firstOutView);
@@ -64,7 +68,7 @@ export function App() {
   // switching tab: New video writes its step back into the address, the other two their own #tab=
   const setArea = useCallback((a, write = true) => {
     setAreaState(a); localStorage.setItem('studio.tab', a);
-    if (write) history.replaceState(null, '', a === 'new' ? '#step=' + (localStorage.getItem('studio.step') || 'start') : '#tab=' + a);
+    if (write) history.replaceState(null, '', a === 'new' ? (buildRef.current ? '#build=' + buildRef.current : '#step=' + (localStorage.getItem('studio.step') || 'start')) : '#tab=' + a);
   }, []);
   const setOutView = useCallback(v => { setOutViewState(v); localStorage.setItem('studio.render', v); }, []);
   const [looksList, setLooksList] = useState(null);
@@ -99,7 +103,9 @@ export function App() {
     if (v.seq && v.boot === k.boot && v.seq < k.seq) return v; // an older reply than what is on screen
     const video = v.state.videoSeq || 0;
     if (k.video !== null && video !== k.video) {
-      setStep('start'); setStartView('main'); localStorage.setItem('studio.step', 'start'); history.replaceState(null, '', '#step=start');
+      // a new video opens where you started it: the builder's first screen, or the classic Start step
+      setStep('start'); setStartView('main'); localStorage.setItem('studio.step', 'start'); history.replaceState(null, '', buildRef.current ? '#build=start' : '#step=start');
+      if (buildRef.current) { buildRef.current = 'start'; setBuild('start'); }
       setLog(''); setRecLive(null); // a task log and a recorder status belong to the previous board
     }
     if (v.seq) seen.current = { boot: v.boot, seq: v.seq, video };
@@ -118,7 +124,7 @@ export function App() {
     const s = stepOf(s0), v = viewOf(s0);
     // the breakdown of a reference lives on Teardowns now
     if (v === 'reference') { setArea('teardowns'); if (focus) requestAnimationFrame(() => window.scrollTo({ top: 0 })); return; }
-    setArea('new', false);
+    setArea('new', false); setBuild(null);
     if (s === 'render' && v) setOutView(v); if (s === 'start' && v) setStartView(v);
     setStep(s); localStorage.setItem('studio.step', s);
     // a #menu= link stays while you are on the step that owns its layer
@@ -127,7 +133,7 @@ export function App() {
   }, [setArea, setOutView]);
   // open a layer: the step that owns it comes up with that layer showing
   const pickTab = useCallback(id => { const layers = catRef.current && catRef.current.layers, l = layerOf(id, layers) || id, st = menuStep(l, layers);
-    setTab(l); setArea('new', false); setStep(st); localStorage.setItem('studio.step', st); history.replaceState(null, '', '#menu=' + l); }, [setArea]);
+    setTab(l); setArea('new', false); setBuild(null); setStep(st); localStorage.setItem('studio.step', st); history.replaceState(null, '', '#menu=' + l); }, [setArea]);
   // the looks saved from earlier references (GET /api/style-looks); null when this server does not have them
   const reloadLooks = useCallback(() => quiet('/api/style-looks').then(j => { setLooksList(j && Array.isArray(j.looks) ? j.looks : null); }), []);
 
@@ -146,7 +152,7 @@ export function App() {
       es.addEventListener('error', () => { fetch('/api/state', { cache: 'no-store' }).then(r => { if (r.ok) setOffline(false); }).catch(() => setOffline(true)); });
       es.addEventListener('open', () => { if (isOffline()) { setOffline(false); api('/api/state').then(apply).catch(() => {}); } });
     })();
-    const onHash = () => { const a = hashArea(), m = hashMenu(), st = hashStep(); if (a && a !== 'new') setArea(a, false); else if (m) pickTab(m); else if (st && STEPS.includes(stepOf(st))) go(st, true); else if (a) setArea(a, false); };
+    const onHash = () => { const b = buildOf(); if (b) { setBuild(b); setArea('new', false); return; } if (!location.hash || location.hash === '#' || hashArea() === 'new') setBuild(null); const a = hashArea(), m = hashMenu(), st = hashStep(); if (a && a !== 'new') setArea(a, false); else if (m) pickTab(m); else if (st && STEPS.includes(stepOf(st))) go(st, true); else if (a) setArea(a, false); };
     // "/" searches every option: from Picture or Text and graphics it stays there, from anywhere else it opens Picture
     const onKey = e => {
       if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); if (!document.getElementById('filter')) go('picture'); setTimeout(() => document.getElementById('filter')?.focus(), 30); }
@@ -180,7 +186,8 @@ export function App() {
   const openOutputs = () => setOutputsOpen(true), openNewVideo = () => setVideoMode('new'), openVault = beat => setVault({ beat: typeof beat === 'number' ? beat : null });
   const openRecording = () => setArea('recording');
   const ctx = { CAT, V, s, apply, patch, go, reloadCat, setLog, log, openConnect, openSetup, openKeys, openChat, openOutputs, openNewVideo, openVault, looks, openRecording };
-  const onNew = area === 'new', post = onNew && step === 'render' && outView === 'post';
+  const building = area === 'new' && !!build;
+  const onNew = area === 'new' && !building, post = onNew && step === 'render' && outView === 'post';
   const env = V.env, a = env.agent || {}, agentState = env.backend !== 'agent' ? 'alt' : a.listening ? 'on' : a.connected ? 'busy' : 'off';
   const pill = !t ? 'Ready' : running ? `${cap1(t.kind)} running` : t.status === 'failed' ? `${cap1(t.kind)} failed` : `${cap1(t.kind)} ${t.status}`;
 
@@ -214,7 +221,7 @@ export function App() {
         </div>
       </header>
       <div className={'layout' + (chatAway ? ' nochat' : '')}>
-        <main id="main" data-area={area} data-step={step} data-view={step === 'render' ? outView : step === 'start' ? startView : 'main'} ref={mainRef}>
+        <main id="main" data-area={area} data-build={building ? build : undefined} data-step={step} data-view={step === 'render' ? outView : step === 'start' ? startView : 'main'} ref={mainRef}>
           {onNew && <div className="stepbar"><nav className="stepper" aria-label="Steps"><ol id="stepper">
           {STEPS.map((st, k) => <li key={st} className={done[st] ? 'done' : ''}>
             <button type="button" data-step={st} aria-current={st === step ? 'step' : 'false'} title={stepName(st)} aria-label={`${k + 1}. ${stepName(st)}${done[st] && st !== step ? ', done' : ''}`} onClick={() => go(st, true)}>
@@ -223,6 +230,7 @@ export function App() {
           </ol></nav></div>}
           <Recording key={'r' + (s.videoSeq || 0)} {...ctx} hidden={area !== 'recording'} onLive={setRecLive} toNew={() => setArea('new')} />
           {area === 'teardowns' && <Teardowns {...ctx} />}
+          {building && <Builder key={'b' + (s.videoSeq || 0)} {...ctx} page={build} setPage={setBuild} />}
           {onNew && <>
           {!post && step !== 'start' && <YourEdit V={V} s={s} go={go} step={step} />}
           {step === 'render' && <ViewSwitch id="render-switch" label="Render" value={outView} set={v => { setOutView(v); history.replaceState(null, '', '#step=' + (v === 'post' ? 'post' : 'render')); }} views={[['main', 'Render', 'render-sub-main'], ['post', 'Post', 'render-sub-post']]} />}

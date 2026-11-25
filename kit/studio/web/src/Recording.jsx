@@ -9,7 +9,7 @@ import { clock } from './Player.jsx';
 
 const day = iso => { if (!iso) return ''; const d = new Date(iso); return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) }); };
 
-export function Recordings({ s, apply, toNew }) {
+export function Recordings({ s, apply, toNew, idp = '' }) {
   const [list, setList] = useState(null), [busy, setBusy] = useState(null), [failed, setFailed] = useState(false), [tries, setTries] = useState(0);
   const takesSig = (s.takes || []).map(t => t.id + t.status).join() + '|' + s.job + '|' + (s.footage || []).length;
   useEffect(() => { let live = true; setFailed(false); api('/api/recordings').then(j => { if (live) setList(j.recordings); }).catch(() => { if (live) { setFailed(true); setList([]); } }); return () => { live = false; }; }, [takesSig, tries]);
@@ -18,11 +18,11 @@ export function Recordings({ s, apply, toNew }) {
     try { const v = await api('/api/recordings/use', { file: x.file, newVideo }); apply(v); toast(newVideo ? `New video ${v.state.job} started with this take` : `Added to ${v.state.job}`, true); toNew(); }
     catch {} finally { setBusy(null); }
   };
-  return <section className="recs" id="recordings" aria-labelledby="recs-h">
-    <h3 className="lbl" id="recs-h">Your recordings</h3>
-    {failed ? <p className="fine" id="recs-err" role="alert">We could not load your recordings. <button type="button" className="linkish" onClick={() => setTries(k => k + 1)}>Try again</button></p>
+  return <section className="recs" id={idp + 'recordings'} aria-labelledby={idp + 'recs-h'}>
+    <h3 className="lbl" id={idp + 'recs-h'}>Your recordings</h3>
+    {failed ? <p className="fine" id={idp + 'recs-err'} role="alert">We could not load your recordings. <button type="button" className="linkish" onClick={() => setTries(k => k + 1)}>Try again</button></p>
       : !list ? <p className="fine">Loading your recordings</p>
-      : !list.length ? <p className="fine" id="recs-empty">Nothing filmed yet. Takes you record show up here, ready to use in any video.</p>
+      : !list.length ? <p className="fine" id={idp + 'recs-empty'}>Nothing filmed yet. Takes you record show up here, ready to use in any video.</p>
       : <ul className="rec-list">{list.map(x => <li key={x.file} className="rec-item glass-card" data-file={x.file}>
         <a className="rec-thumb" href={file(x.file)} target="_blank" rel="noreferrer" aria-label={`Play ${x.script || 'this take'}`}>{x.thumb ? <img src={file(x.thumb)} alt="" /> : <Icon n="film" />}<span className="rec-ov" aria-hidden="true"><Icon n="play" /></span></a>
         <span className="rec-meta"><b>{x.script || 'Take'}</b><span className="fine">{[x.seconds != null ? clock(x.seconds) : null, day(x.at), x.job ? `from ${x.job}` : 'not in a video yet'].filter(Boolean).join(', ')}</span></span>

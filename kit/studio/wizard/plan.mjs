@@ -90,6 +90,22 @@ export function applyPace(plan, pace) {
   return p;
 }
 export function defaults(pace = 'look') { return applyPace(blank(), pace); }
+// A pace picked on its own (the builder's Pacing step). plan: the plan read from the session as it is now. A field
+// whose value is not what the plan's current pace gives was set somewhere else (a classic step, the chat, an agent),
+// so it counts as yours and the new pace leaves it alone. Returns the new plan and the small patch for core.mjs
+// applyPatch that sets only what a pace changes (no clearing of picks, so nothing else moves).
+// last: the pace saved last time (s.videoPlan.pace), or none: then the session never had a pace picked and starts from
+// Let the Look decide. The plan's own pace is only a guess from the pause length, so it is not used here.
+export function pacePatch(plan, pace, last = null) {
+  let p = normalize(plan); const lp = last || 'look', was = Object.hasOwn(PACES, lp) ? PACES[lp] : PACES.look;
+  if (p.music.energy !== was.energy) p = touch(p, 'music.energy');
+  if (p.music.beatSync !== was.beatSync) p = touch(p, 'music.beatSync');
+  if (p.presenter.some(x => x.id === 'punch') !== was.punch) p = touch(p, 'presenter');
+  const next = touch(applyPace(p, pace), 'pace'), P = Object.hasOwn(PACES, next.pace) ? PACES[next.pace] : PACES.look, bs = next.music.beatSync;
+  const patch = { music: { energy: next.music.energy }, pace: { tighten: next.advanced.tighten ?? P.tighten, punch: next.presenter.some(x => x.id === 'punch') ? 'on' : 'off' },
+    picks: bs === null ? { 'beatSync:beat-sync': 'clear', 'beatSync:no-beat-sync': 'clear' } : { [`beatSync:${bs ? 'beat-sync' : 'no-beat-sync'}`]: 'allow' } };
+  return { plan: next, patch };
+}
 // mark a field as yours, so a later pace change leaves it alone
 export function touch(plan, ...keys) { const p = normalize(plan); for (const k of keys) if (!p.touched.includes(k)) p.touched.push(k); return p; }
 
