@@ -799,6 +799,14 @@ irm https://raw.githubusercontent.com/wrg32786/aigent-talking-head/main/install/
 
 A double-click app with no installer at all is planned: [docs/desktop-app-plan.md](desktop-app-plan.md).
 
+## Build it one choice at a time (the builder)
+
+The New video tab has a step by step builder beside the classic steps. Open it from **Build it one choice at a time** on the Start step, or with `#build=start`.
+
+- **Start screen**: your clip (Use a recording, Upload a video, Paste a link; a take made in the last hour shows "From Recording"), then **Build my own**. Use a template arrives with the Template Library.
+- **Pacing** (`#build=pace`): Let the Look decide, Calm, Steady, Lively or High energy. Each card plays the cut speed on our sample presenter (`docs/menu/paces/`, made by `node kit/demos.mjs --only pace`). The frame shows which part of the video the step changes (Applies to, and a small map of the frame).
+- Every choice is saved in the video plan (`POST /api/video-plan`) and turned into today's settings at once, so **Continue in the classic steps** and a draft from Review work at any point. Sections not built yet say Coming soon, and plan choices the engine cannot draw yet are listed under the step as Coming soon.
+
 ## New video
 
 <img src="studio/new-video.png" width="560" alt="The New video dialog: a name field showing it will be saved as next-reel, Keep my look switched on, and Open a past video, Cancel and Start fresh">
