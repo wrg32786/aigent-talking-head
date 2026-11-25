@@ -269,6 +269,8 @@ export function toState(plan, cat = null) {
   if (p.graphics.cards !== null) pick('editing', 'cards-auto', p.graphics.cards ? 'allow' : 'deny');
   // no filters: every finish forbidden (the catalog has the list)
   if (Array.isArray(p.filters.ids)) { if (p.filters.ids.length) for (const id of p.filters.ids) pick('finish', id); else for (const id of finishIds(cat)) pick('finish', id, 'deny'); }
+  // beat sync with no music: "off" is set as it is (a classic session round-trips), "on" waits in the plan and is set
+  // when the music comes back (fromState keeps it while the last plan had no music, so a classic Music pick does not lose it)
   if (p.music.beatSync === false || (p.music.beatSync === true && p.music.bed !== 'none')) pick('beatSync', p.music.beatSync ? 'beat-sync' : 'no-beat-sync');
   Object.assign(picks, p.advanced.picks);
   return patch;
@@ -345,7 +347,7 @@ export function fromState(s, prev = null, cat = null) {
   else p.filters.ids = null;
   p.filters.when = s.finishWhen && s.finishWhen !== 'none' ? s.finishWhen : Array.isArray(p.filters.ids) && p.filters.ids.length ? 'whole' : base.filters.when; // no timing in the session: the look's way
   p.music.bed = (s.music && s.music.bed) || 'auto'; p.music.energy = (s.music && s.music.energy) || 'auto';
-  const bs = allow('beatSync')[0]; p.music.beatSync = bs === 'beat-sync' ? true : bs === 'no-beat-sync' ? false : p.music.bed === 'none' ? base.music.beatSync : null; if (bs) take('beatSync', bs); // no music keeps the beat choice for later
+  const bs = allow('beatSync')[0]; p.music.beatSync = bs === 'beat-sync' ? true : bs === 'no-beat-sync' ? false : p.music.bed === 'none' || (base.music.bed === 'none' && base.music.beatSync === true) ? base.music.beatSync : null; if (bs) take('beatSync', bs); // no music keeps the beat choice for later
   p.music.sfx = !(s.sound && s.sound.sfx === 'off');
   const adv = {};
   for (const [k, slot] of Object.entries(picks)) {

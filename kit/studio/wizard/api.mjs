@@ -11,6 +11,7 @@
 //   POST /api/templates     { name? } save the plan as it is now as a template; no notes
 //   POST /api/templates/use { name, edit? } start this video's plan from a template (edit: a look's choices as your own)
 //   POST /api/templates/rename { name, label }, /duplicate { name }, /delete { name }
+//   GET  /api/templates/preview/<name>  a template's own picture (preview.jpg), when it has one
 //   GET  /api/plan-check    the last plan check of this video (build/plan-check.json), or null
 //   POST /api/plan-check    { fix? } run the measured checks (kit/plan-check.mjs) on the draft and the newest render;
 //                           fix: apply what can be fixed, up to 3 rounds (the video changes on the next render)
@@ -36,6 +37,12 @@ export function mount({ C, json, readBody, view, pushState }) {
   async function route(p, M, u, req, res) {
     if (p === '/api/wizard/steps' && M === 'GET') { json(res, 200, stepsOf()); return true; }
     if (p === '/api/templates' && M === 'GET') { json(res, 200, { templates: TPL.list(C.catalog()) }); return true; }
+    const pm = p.match(/^\/api\/templates\/preview\/([a-z0-9][a-z0-9-]{0,59})$/);
+    if (pm && M === 'GET') {
+      const f = TPL.thumbOf(pm[1]); let buf = null; try { buf = f && readFileSync(f); } catch {}
+      if (!buf) { json(res, 404, { error: 'no picture' }); return true; }
+      res.writeHead(200, { 'content-type': 'image/jpeg', 'content-length': buf.length, 'cache-control': 'no-cache' }); res.end(buf); return true;
+    }
     const tm = p.match(/^\/api\/templates\/(use|rename|duplicate|delete)$/);
     if (tm && M === 'POST') {
       const b = (await readBody(req)) || {}, cat = C.catalog();
@@ -55,7 +62,10 @@ export function mount({ C, json, readBody, view, pushState }) {
     }
     if (p === '/api/templates' && M === 'POST') {
       const b = await readBody(req), s = C.load(), cat = C.catalog();
-      try { json(res, 200, { template: TPL.save(b && typeof b.name === 'string' ? b.name : '', { plan: planOf(s, cat), from: { kind: 'builder' }, cat }) }); }
+      try { const t = TPL.save(b && typeof b.name === 'string' ? b.name : '', { plan: planOf(s, cat), from: { kind: 'builder' }, cat });
+        // its picture: a still from this video's newest render, when there is one
+        try { const outs = (C.outputsOf ? C.outputsOf(s) : []).map(f => join(ROOT, f)).filter(f => existsSync(f)).sort((x, y) => statSync(y).mtimeMs - statSync(x).mtimeMs); if (outs[0]) TPL.setThumb(t.name, outs[0]).catch(() => {}); } catch {}
+        json(res, 200, { template: t }); }
       catch (e) { json(res, typeof e.code === 'number' ? e.code : 500, { error: e.message }); }
       return true;
     }

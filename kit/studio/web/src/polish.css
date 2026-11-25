@@ -328,3 +328,9 @@ main:not([data-area="new"]) { padding-bottom: 32px; }
 .pc-row.warn .pc-mark { background: color-mix(in srgb, var(--warning, #d9822b) 20%, transparent); color: var(--warning, #d9822b); }
 @media (max-width: 560px) { .pc-row { grid-template-columns: 54px minmax(0, 1fr); } .pc-row .pc-ask { grid-column: 2; justify-self: start; } }
 .pc-row.wait .pc-mark { background: color-mix(in srgb, var(--muted-foreground, #888) 18%, transparent); color: var(--muted-foreground, #888); }
+
+/* Template Library: Delete asks first (Library.jsx, Headless UI Dialog) */
+.tpl-dlg-wrap { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; }
+.tpl-dlg-back { position: fixed; inset: 0; background: rgb(0 0 0 / 0.45); }
+.tpl-dlg { position: relative; max-width: 380px; width: 100%; display: grid; gap: 10px; padding: 18px; }
+.tpl-dlg h3 { margin: 0; font-size: 16px; overflow-wrap: anywhere; }

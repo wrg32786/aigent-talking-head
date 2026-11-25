@@ -7,7 +7,7 @@ import { api, toast, IconBtn, showName, KIND_NAME } from './lib.jsx';
 import { FolderField } from './Folders.jsx';
 
 const BACKENDS = [
-  ['agent', 'Terminal agent', 'Claude Code, Codex, Cursor or any MCP client'],
+  ['agent', 'Your agent', 'Claude Code, Codex, Cursor or any MCP client'],
   ['local', 'Local model', 'Ollama, LM Studio, llama.cpp'],
   ['anthropic', 'Claude API', null],
   ['openai', 'OpenAI API', null],
@@ -59,7 +59,7 @@ export function Settings({ V, apply, open, setOpen, theme, setTheme, glass, setG
             <p className="fine" id="local-msg" role="status">{localMsg}</p>
           </div>}
           {f.backend === 'agent' && <div className="row"><Button id="settings-connect" variant="secondary" size="sm" label="Connect agent" onClick={openConnect} /><span className="fine">{e.agent && e.agent.connected ? `${e.agent.name} connected` : 'No agent connected yet'}</span></div>}
-          <Switch id="action-notes" label="Note terminal edits here" description="One line, never the terminal conversation" value={f.actionNotes} onChange={v => set('actionNotes', v)} />
+          <Switch id="action-notes" label="Note your agent's edits here" description="One line each, never the whole conversation" value={f.actionNotes} onChange={v => set('actionNotes', v)} />
         </fieldset>
         <fieldset><legend>API keys and providers</legend>
           <div className="row"><Button id="settings-keys" variant="secondary" size="sm" label="API keys and providers" onClick={openKeys} /><span className="fine" id="keys-summary">{(() => { const k = V.broll ? V.broll.sources.filter(x => x.on && !['upload', 'library', 'screen'].includes(x.id)).map(x => x.name) : []; return k.length ? `On: ${k.join(', ')}` : 'Pexels, Pixabay, Higgsfield, OpenAI, Anthropic, Google, Replicate, fal'; })()}</span></div>

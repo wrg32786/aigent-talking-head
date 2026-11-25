@@ -150,6 +150,18 @@ try {
     assert.strictEqual(s.music.energy, 'high'); assert.deepStrictEqual(r.plan.touched, ['pace']);
   });
 
+  await t('beat sync waits while there is no music and comes back with it, from the builder or a classic Music pick', () => {
+    const plan = VP.normalize({ ...VP.defaults('lively'), music: { bed: 'none', energy: 'mid', beatSync: true, sfx: true } });
+    const a = apply(fresh(), { videoPlan: plan }); assert.ok(!picksOf(a).includes('beat-sync'), 'no beat sync without music');
+    const back = VP.fromState(a, plan, cat); assert.strictEqual(back.music.beatSync, true, 'kept in the plan');
+    const b = apply(a, { music: { bed: 'auto' } }); const p2 = VP.fromState(b, back, cat);
+    assert.strictEqual(p2.music.beatSync, true, 'a classic Music pick brings the music back with beat sync on');
+    const c = apply(b, { videoPlan: p2 }); assert.ok(picksOf(c).includes('beat-sync'), 'and the session gets it');
+    // off with no music, then music and beat sync on from the classic steps: the plan says on too
+    const off = VP.normalize({ ...VP.defaults('lively'), music: { bed: 'none', energy: 'mid', beatSync: false, sfx: true } });
+    const d = apply(fresh(), { videoPlan: off }); const e = apply(apply(d, { music: { bed: 'auto' } }), { picks: { 'beatSync:no-beat-sync': 'clear' } });
+    assert.notStrictEqual(VP.fromState(e, off, cat).music.beatSync, false, 'turning it on on the classic Music step is not undone by the old plan');
+  });
   await t('a session from the classic steps reads into a plan and back to the same picks and reel', () => {
     const sessions = [
       { picks: { 'captionStyle:hormozi': 'allow', 'transition:whip': 'allow', 'graphic:checklist': 'allow', 'effect:todo': 'allow' } },

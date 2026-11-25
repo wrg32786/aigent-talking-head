@@ -4,7 +4,8 @@
 //   save(name, { plan })   from the builder's Make it step; saveFromLook(name, look, from) after a teardown
 //   rename, duplicate, remove (the page asks first), planFor(name, cat) the plan a template starts a video with
 // Starters are read only: Duplicate one to make it yours. A look you saved stays a look: Rename only sets its label.
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
+import { execFile } from 'child_process';
 import { join } from 'path';
 import { createRequire } from 'module';
 import * as VP from './wizard/plan.mjs';
@@ -15,6 +16,18 @@ const SL = require('../stylelook.cjs');
 export const FORMAT = 'aigent-template', VERSION = 1;
 const fail = (msg, code = 400) => Object.assign(new Error(msg), { code });
 export const fileOf = name => join(SL.dirOf(), name, 'template.json');
+// a template's own picture: looks/local/<name>/preview.jpg, a still from the video it came from (the teardown's
+// reference, or the newest render when saved from the builder). Served by GET /api/templates/preview/<name>.
+export const thumbOf = name => typeof name === 'string' && SL.NAME_RE.test(name) ? join(SL.dirOf(), name, 'preview.jpg') : null;
+// (async, so the server keeps answering while ffmpeg works; a half-written picture is removed)
+export async function setThumb(name, video, at = 1.5) {
+  const out = thumbOf(name); if (!out || !video || !existsSync(video)) return false;
+  const run = t => new Promise(ok => execFile('ffmpeg', ['-v', 'error', '-y', '-ss', String(t), '-i', video, '-frames:v', '1', '-vf', 'scale=360:-2', '-q:v', '4', out], { timeout: 30000 }, e => ok(!e && existsSync(out))));
+  for (const t of [at, 0]) { if (await run(t)) return true; }
+  try { rmSync(out, { force: true }); } catch {}
+  return false;
+}
+const thumbUrl = name => { const f = thumbOf(name); return f && existsSync(f) ? `/api/templates/preview/${name}` : null; };
 export const exists = name => typeof name === 'string' && SL.NAME_RE.test(name) && existsSync(fileOf(name));
 // a name already used by a template or a look folder (a teardown save checks first, so nothing is written over)
 const packNames = cat => new Set(((cat && cat.packs) || []).map(p => p.name));
@@ -57,8 +70,8 @@ export function list(cat = null) {
   for (const n of names) {
     const t = load(n), look = existsSync(SL.fileOf(n)) ? lookOf(n) : null;
     if (t) { const fk = (t.from && t.from.kind) || 'builder', src = t.from && (t.from.url || t.from.file);
-      out.push({ name: n, label: t.label || n, kind: 'template', look: !!look, source: SOURCE[fk] || 'Yours', from: src || null, createdAt: t.createdAt || null, pace: (t.plan && t.plan.pace) || 'look', preview: previewOf(t.plan, cat), readOnly: false }); }
-    else if (look) out.push({ name: n, label: n.replace(/-/g, ' '), kind: 'look', look: true, source: 'From a teardown', from: (look.from && (look.from.reference || look.from.teardown)) || null, createdAt: look.created || null, pace: planFromLook(look, cat).pace, preview: null, readOnly: false });
+      out.push({ name: n, label: t.label || n, kind: 'template', look: !!look, source: SOURCE[fk] || 'Yours', from: src || null, createdAt: t.createdAt || null, pace: (t.plan && t.plan.pace) || 'look', preview: previewOf(t.plan, cat), thumb: thumbUrl(n), readOnly: false }); }
+    else if (look) out.push({ name: n, label: n.replace(/-/g, ' '), kind: 'look', look: true, source: 'From a teardown', from: (look.from && (look.from.reference || look.from.teardown)) || null, createdAt: look.created || null, pace: planFromLook(look, cat).pace, preview: null, thumb: thumbUrl(n), readOnly: false });
   }
   out.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
   for (const p of starters(cat)) out.push({ name: p.name, label: p.name.replace(/-/g, ' '), line: p.label || p.description || '', kind: 'pack', source: 'Starter', from: null, createdAt: null, pace: 'look', preview: p.preview || null, readOnly: true });
@@ -99,7 +112,9 @@ export function duplicate(name, cat = null) {
   const base = SL.slug(name).slice(0, 48).replace(/-+$/, ''); let n = `${base}-copy`;
   for (let i = 2; used(n, cat); i++) { if (i > 999) throw fail('Too many copies of this template. Rename or delete some first.', 409); n = `${base}-copy-${i}`; }
   const t = { format: FORMAT, version: VERSION, name: n, label: `${x.label} copy`, createdAt: new Date().toISOString(), from: { kind: 'copy', of: name }, plan: VP.normalize({ ...plan, notes: '' }), summary: {}, preview: null };
-  writeT(n, t); return find(n, cat);
+  writeT(n, t);
+  try { const from = thumbOf(name); if (from && existsSync(from)) copyFileSync(from, thumbOf(n)); } catch {} // its picture comes along
+  return find(n, cat);
 }
 // remove a saved template or look (the page asks first). Starters stay.
 export function remove(name, cat = null) {

@@ -81,7 +81,7 @@ export function actionNote(s, changes, agent) {
   if (!changes || !changes.length) return null;
   const KINDS = { captionStyle: 'caption style', captionEntrance: 'caption entrance', entrance: 'title entrance', titleLayer: 'title layer', beatSync: 'beat sync', bed: 'music bed' };
   const words = changes.map(c => c.replace(/\b(captionStyle|captionEntrance|entrance|titleLayer|beatSync|bed)\b/g, k => KINDS[k]));
-  const text = `${prettyName(agent)}: ${words.slice(0, 6).join(', ')}${words.length > 6 ? ` and ${words.length - 6} more` : ''} (from the terminal).`;
+  const text = `${prettyName(agent)}: ${words.slice(0, 6).join(', ')}${words.length > 6 ? ` and ${words.length - 6} more` : ''} (from your agent).`;
   C.applyPatch(s, { reply: text, from: prettyName(agent), kind: 'action' });
   return text;
 }

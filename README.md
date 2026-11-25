@@ -63,7 +63,7 @@ Made a reel? [Star the repo](https://github.com/wrg32786/aigent-talking-head) an
 
 ## Studio: edit in a browser, with your agent in the chat
 
-Studio is a local page for making a reel without memorising commands. It walks you through eight steps, shown as numbered dots across the top: **Start** (drop in clips, paste a link or film it right there, and say if a video you like should guide the edit), **Cut** (say what to make and keep the clips you want), **Picture** (one Look, then color, motion, transitions and layout), **Text and graphics**, **B-roll**, **Music and sounds**, **Review** (draft and check) and **Render** (make the video and post it). The chat on the page is answered by your own agent (Claude Code, Codex, Cursor or any MCP client), so it can change the edit for you while you watch. Everything runs on your computer. Full guide: [docs/studio.md](docs/studio.md).
+Studio is a local page for making a reel without memorising commands. It has three tabs. **Recording** films a take with a teleprompter; pick **Use in a new video** on it. **New video** builds the video one choice at a time: pace, words on screen, transitions, effects on you, filters, extras, a repo if you feature one, music and your notes, then **Make it** and **Review** with a Plan check that compares the draft with your picks. **Teardowns** breaks down a video you like and keeps it as a template with its own picture. Your first video, step by step: [docs/guide.md](docs/guide.md#your-first-video-in-studio). The chat on the page is answered by your own agent (Claude Code, Codex, Cursor or any MCP client), so it can change the edit for you while you watch. Everything runs on your computer. Full guide: [docs/studio.md](docs/studio.md).
 
 **Set it up by telling your agent:**
 

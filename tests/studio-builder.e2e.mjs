@@ -132,7 +132,7 @@ try {
     await pg.waitForFunction(async () => (await (await fetch('/api/state')).json()).state.transitionsWhen === 'hook-cta');
     await pg.waitForFunction(() => /hook and the call to action/.test(document.getElementById('build-does').textContent), null, { timeout: 10000 });
     await pg.click('#build-tr [data-opt="none"]'); await pg.waitForFunction(async () => { const p = (await (await fetch('/api/video-plan')).json()).plan; return p.transitions.ids && !p.transitions.ids.length; });
-    assert.ok(!(await pg.$('#build-tw')), 'straight cuts have no how often');
+    await pg.waitForSelector('#build-tw', { state: 'detached', timeout: 10000 });
     await noCmd(pg, 'Transitions'); await shot(pg, 'builder-transitions.png');
     await pg.click('#build-next'); await pg.waitForSelector('#build-pres');
     await pg.click('#build-pres [data-opt="behind-head"]'); await pg.waitForSelector('#build-pw-behind-head');

@@ -836,7 +836,7 @@ async function adaptScript(s, id, topic) {
     update(x => { C.applyPatch(x, { say: line, from: 'ui', toAgent: true, attach: { kind: 'adapt', script: sc.id, topic } }); });
     return { via: 'agent', queued: true, agent: a };
   }
-  if (!LLM.provider(KEYS.envWithKeys(), st.chat)) throw Object.assign(new Error('Adapting a script needs your terminal agent, an API key or a local model (Settings).'), { code: 400 });
+  if (!LLM.provider(KEYS.envWithKeys(), st.chat)) throw Object.assign(new Error('Adapting a script needs your agent, an API key or a local model (Settings).'), { code: 400 });
   const r = await LLM.complete('You rewrite talking-head scripts. ' + SC.SCRIPT_FORMAT + ' Write it so it sounds human: ' + SC.HUMANIZER_RULES.join(' ') + ' Reply with JSON only: {"title": "...", "text": "..."}.',
     `${ADAPT_RULES}\nNew topic: ${topic}\nScript:\n${sc.text}`, KEYS.envWithKeys(), st.chat, { maxTokens: 2500 });
   let j; try { j = JSON.parse(String(r.text).match(/\{[\s\S]*\}/)[0]); } catch { throw Object.assign(new Error('the model did not send a script back'), { code: 502 }); }
@@ -929,7 +929,7 @@ function copyRenders(outputs) {
 
 // one Studio chat turn from the page or an AG-UI run: queue it for the terminal agent, or answer with a model or keywords
 const SCRIPT_ASK = /\b(script|rewrite|teleprompter)\b/i;
-const SCRIPT_NOTE = 'Writing scripts needs your terminal agent, an API key or a local model (Settings). Keywords mode only changes effects.';
+const SCRIPT_NOTE = 'Writing scripts needs your agent, an API key or a local model (Settings). Keywords mode only changes effects.';
 async function chatTurn(text, offline, attach) {
   const st = S.load(), backend = offline ? 'keywords' : st.chat.backend;
   if (backend === 'agent') {
@@ -951,7 +951,7 @@ async function chatTurn(text, offline, attach) {
   } else {
     const v = C.vibes(text, s, cat); patch = v.patch; via = 'keywords';
     if (SCRIPT_ASK.test(text) && !v.said.length) { const s3 = C.load(); C.applyPatch(s3, { reply: SCRIPT_NOTE, from: 'keywords' }); C.save(s3); pushState(); return { reply: SCRIPT_NOTE, via, ...view(s3) }; }
-    reply = v.said.length ? `Changed: ${v.said.join('; ')}.` : 'I did not catch an effect or vibe there. Try words like calm, punchy, cinematic, clean, names like "no glitch" or "typewriter titles", or "the transitions from the reference". For a real conversation, connect your terminal agent (Settings, Chat).';
+    reply = v.said.length ? `Changed: ${v.said.join('; ')}.` : 'I did not catch an effect or vibe there. Try words like calm, punchy, cinematic, clean, names like "no glitch" or "typewriter titles", or "the transitions from the reference". For a real conversation, connect your agent (Settings, Chat).';
     if (backend !== 'keywords' && !prov) reply = `No ${backend === 'auto' ? 'API key' : backend} backend is ready, so I used keywords. ` + reply;
   }
   const s2 = C.load(), r = C.applyPatch(s2, patch || {});
@@ -1474,10 +1474,27 @@ async function api(req, res, u) {
     pushState(true); return json(res, 200, { ok: true, name: r.name, looks: SLK.list() });
   }
   // a teardown saved as a named template (its look, and a template.json with the plan derived from it)
+  // is there a call to action in what you say? (Make's warning: a CTA card or a filter timed for it needs one).
+  // After a draft it reads the cut (kit/plan-check.mjs sections); before, the transcripts of your clips.
+  if (p === '/api/plan/cta' && M === 'GET') {
+    const s = C.load(); let heard = null;
+    try {
+      const build = s.job ? join(ROOT, 'jobs', s.job, 'build') : null, cutF = build && join(build, 'cut.json');
+      if (cutF && existsSync(cutF) && s.drafted) { const PC = await import('../plan-check.mjs'), cut = JSON.parse(readFileSync(cutF, 'utf8')), x = PC.sections(cut, build); if (x.words.length) heard = x.b.ctaStart != null; }
+      if (heard == null) {
+        const SEC = createRequire(import.meta.url)('../sections.cjs'); let t0 = 0; const words = [];
+        for (const f of s.footage || []) { const tx = MEDIA.transcript(f); if (!tx || !Array.isArray(tx.words) || !tx.words.length) { words.length = 0; break; } for (const [a, b, w] of tx.words) words.push({ start: t0 + a, end: t0 + b, word: w }); t0 = words[words.length - 1].end + 0.6; }
+        if (words.length) heard = SEC.bounds(words, words[words.length - 1].end).ctaStart != null;
+      }
+    } catch {}
+    return json(res, 200, { heard });
+  }
   if (p === '/api/templates/from-teardown' && M === 'POST') {
     const b = await readBody(req).catch(() => ({})), s = C.load(); let r;
     try { if (TPL.taken(b.name, C.catalog())) throw Object.assign(new Error('You already have a template or look with that name. Pick another name.'), { code: 409 });
-      const L = SLK.saveCurrent(s, ROOT, b.name), ref = s.reference || {}; r = TPL.saveFromLook(L.name, { kind: ref.url ? 'teardown-url' : 'teardown-file', url: ref.url || null, file: ref.file || null, teardown: ref.out || null }, C.catalog(), b.name); }
+      const L = SLK.saveCurrent(s, ROOT, b.name), ref = s.reference || {}; r = TPL.saveFromLook(L.name, { kind: ref.url ? 'teardown-url' : 'teardown-file', url: ref.url || null, file: ref.file || null, teardown: ref.out || null }, C.catalog(), b.name);
+      // its picture: a still from the reference video it was broken down from
+      if (ref.file) TPL.setThumb(L.name, resolve(ROOT, ref.file)).catch(() => {}); }
     catch (e) { return json(res, typeof e.code === 'number' ? e.code : 500, { error: e.message }); }
     pushState(true); return json(res, 200, { ok: true, template: r, templates: TPL.list(C.catalog()), looks: SLK.list() });
   }
