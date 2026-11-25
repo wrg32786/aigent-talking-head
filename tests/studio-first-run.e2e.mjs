@@ -117,8 +117,14 @@ try {
 
   assert.deepStrictEqual(errs, [], 'no page errors');
   console.log(`\nstudio first run: ${n} tests passed`);
+} catch (e) {
+  console.error(e);
+  process.exitCode = 1;
 } finally {
-  await browser.close(); srv.kill();
+  // CI: the four tests pass, then browser.close() can hang and smoke SIGKILLs the file after 360 s
+  await Promise.race([browser.close().catch(() => {}), new Promise(r => setTimeout(r, 8000))]);
+  try { srv.kill(); } catch {}
   rmSync(STATE, { recursive: true, force: true }); rmSync(TAKE, { force: true }); rmSync(TAKE.replace(/\.mp4$/, '.json'), { force: true });
   if (job) { rmSync(join(ROOT, 'jobs', job), { recursive: true, force: true }); rmSync(join(ROOT, 'inbox', 'studio', job), { recursive: true, force: true }); }
 }
+process.exit(process.exitCode || 0);
