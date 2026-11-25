@@ -22,6 +22,7 @@
 // points, fixed, needsRender, looked, at }. --video pulls a small still per checked moment into build/plan-check/.
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs';
 import { execFileSync } from 'child_process';
+import { createHash } from 'crypto';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
@@ -125,7 +126,9 @@ export function check({ plan, cut, caps, build, state = null, since = 0 }) {
   // a seam the timing made a plain cut keeps its old transition aside (heldTransition); it comes back if the timing allows
   const held = segs.map((s, i) => ({ i, t: s.heldTransition })).filter(x => x.i && x.t && x.t !== 'cut' && !mineSeam(cut, x.i) && SEC.seamAllowed(segs, x.i, tw, takeOf));
   // straight cuts: the default seam is a hard cut with a glitch shake (cut.hits), so a shake at a seam is not straight
-  const shakes = picked && !picked.length ? segs.map((s, i) => i).filter(i => i && (cut.hits || []).some(h => Math.abs((Array.isArray(h) ? h[0] : h) - tt[i].start) <= 0.15)) : [];
+  // (also the shakes the timing set aside, cut.heldHits, which come back on the next render, and the caption glitches, captions.js glitchAt)
+  const seamShakes = () => [...(cut.hits || []), ...(cut.heldHits || []), ...((caps && caps.glitchAt) || [])];
+  const shakes = picked && !picked.length ? segs.map((s, i) => i).filter(i => i && seamShakes().some(h => Math.abs((Array.isArray(h) ? h[0] : h) - tt[i].start) <= 0.15)) : [];
   if (picked) {
     const odd = [...used, ...held].filter(x => !picked.length || !picked.includes(x.t));
     if (!odd.length && shakes.length) odd.push({ i: shakes[0], t: 'glitch' });
@@ -152,7 +155,10 @@ export function check({ plan, cut, caps, build, state = null, since = 0 }) {
   // what the render measured
   // (a result older than the cut or the captions is from an earlier render, so it is left out)
   // (the render writes these, then may touch cut.json itself, so the bar is the draft's captions.js or our last fix)
-  const fresh = n => { try { return statSync(join(build, n)).mtimeMs >= since; } catch { return false; } };
+  // and when the render left its signature (render-sig.json), a cut.json or captions.js changed since then also makes them old
+  const sig = readJson(join(build, 'render-sig.json')), same = n => { if (!sig || !sig[n === 'cut.json' ? 'cut' : 'captions']) return true; try { return createHash('sha1').update(readFileSync(join(build, n))).digest('hex') === sig[n === 'cut.json' ? 'cut' : 'captions']; } catch { return false; } };
+  const unchanged = same('cut.json') && same('captions.js');
+  const fresh = n => { try { return unchanged && statSync(join(build, n)).mtimeMs >= since; } catch { return false; } };
   const rd = n => fresh(n) ? readJson(join(build, n)) : null;
   const fc = rd('facecheck.json'), tc = rd('textcheck.json'), lg = rd('legibility.json');
   const was = ['facecheck.json', 'textcheck.json', 'legibility.json'].some(n => existsSync(join(build, n)) && !fresh(n));
@@ -185,7 +191,9 @@ export function applyFixes(rows, { cut, caps, build }) {
       for (let i = 1; i < (cut.segs || []).length; i++) { const s = cut.segs[i]; if (mineSeam(cut, i)) continue;
         if (s.heldTransition && s.heldTransition !== 'cut' && !fx.picked.includes(s.heldTransition)) delete s.heldTransition;
         if (s.transition && s.transition !== 'cut' && !fx.picked.includes(s.transition)) { s.transition = fx.picked.length ? fx.picked[k++ % fx.picked.length] : 'cut'; at.push(i); }
-        if (!fx.picked.length && Array.isArray(cut.hits)) { const n0 = cut.hits.length; cut.hits = cut.hits.filter(h => Math.abs((Array.isArray(h) ? h[0] : h) - tt[i].start) > 0.15); if (cut.hits.length !== n0 && !at.includes(i)) at.push(i); } }
+        if (!fx.picked.length) { const off = h => Math.abs((Array.isArray(h) ? h[0] : h) - tt[i].start) > 0.15;
+          for (const [o, k] of [[cut, 'hits'], [cut, 'heldHits'], [caps, 'glitchAt']]) { if (!o || !Array.isArray(o[k])) continue; const n0 = o[k].length; o[k] = o[k].filter(off); if (o[k].length !== n0 && !at.includes(i)) at.push(i); }
+          if (Array.isArray(cut.heldHits) && !cut.heldHits.length) delete cut.heldHits; } }
       done.push(fx.picked.length ? `Transitions you did not pick (${at.length}) were swapped for ${fx.picked.join(', ')}.` : `Transitions taken out (${at.length}): the plan says straight cuts.`);
     } else if (fx.kind === 'transitions-when') {
       cut.transitionsWhen = fx.when; sections(cut, build); SEC.applyTransitionsWhen(cut, { takeOf: takeOfFor(build), window: shakeWindow(cut) });
