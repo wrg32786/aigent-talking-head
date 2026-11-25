@@ -608,6 +608,10 @@ try {
     if (!existsSync(join(work, 'jobs', 'smoke-reel', 'reel-v2.mp4'))) fail('--rebuild did not write reel-v2.mp4');
     if (!/"keyWords": "strong"/.test(readFileSync(join(work, 'jobs', 'smoke-reel', 'build', 'captions.js'), 'utf8'))) fail('--rebuild --key-words strong did not reach captions.js');
     { const c = JSON.parse(readFileSync(join(work, 'jobs', 'smoke-reel', 'build', 'cut.json'), 'utf8')); if (c.transitionsWhen !== 'hook-cta' || !c.segs.every(x => x.section)) fail('--rebuild --transitions-when hook-cta: cut.json should keep the timing and tag every segment'); }
+    // filters on the hook only (spec 14.1): the hook pieces get the filter, the rest none, and never the job-wide cut.finish
+    run(node, [join(KIT, 'reel.cjs'), '--rebuild', '--jobs', join(work, 'jobs'), '--name', 'smoke-reel', '--mask', 'mediapipe', '--lock', 'finishes=mono', '--finish-when', 'hook'], work);
+    { const c = JSON.parse(readFileSync(join(work, 'jobs', 'smoke-reel', 'build', 'cut.json'), 'utf8')), hook = c.segs.filter(x => x.section === 'hook');
+      if (c.finishWhen !== 'hook' || c.finish || !hook.length || !hook.every(x => x.finish === 'mono') || c.segs.some(x => x.section !== 'hook' && x.finish)) fail('--rebuild --finish-when hook: the filter should be on the hook pieces only: ' + JSON.stringify(c.segs.map(x => [x.section, x.finish || null]))); }
   });
   // --- Muse edit rules: multi-take picking, zoom punch, kinetic titles, pills, named transitions, sound rules, check, verify
   step('clip.py multi-take: best take per sentence across files (word times given, no Whisper)', () => {

@@ -3,12 +3,13 @@
 //   (Use a template is not shown yet)
 // - Build my own opens Pacing: the zone map, the Applies to line, five pace cards with their moving strips
 // - picking a pace saves the plan (GET /api/video-plan) and today's pace setting (state.pace.tighten), and says what it does
-// - Continue in the classic steps lands on Picture; the old links still work
+// - Look, Sound and Finish (phase 7): filters on the hook only, music, Your notes with Change and All options, Make it
+//   (Save as a template, Make my video); the old links still work
 // - no terminal text, both themes, phone width
 // Needs Chrome. Run: node tests/studio-builder.e2e.mjs [--shots <dir>]
 import assert from 'assert';
 import { spawn } from 'child_process';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -25,7 +26,8 @@ process.env.STUDIO_DIR = SDIR;
 const C = await import('../kit/studio/core.mjs');
 mkdirSync(SDIR, { recursive: true });
 writeFileSync(join(SDIR, 'state.json'), JSON.stringify({ ...C.defaultState(), job: JOB }));
-const env = { ...process.env, CI: '1', STUDIO_DIR: SDIR, STUDIO_CHAT: '', STUDIO_BROLL_AUTO: '' };
+const LOOKS = join(STATE, 'looks');
+const env = { ...process.env, CI: '1', STUDIO_DIR: SDIR, LOOKS_DIR: LOOKS, STUDIO_CHAT: '', STUDIO_BROLL_AUTO: '' };
 const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), '--port', '0', '--no-open'], { cwd: ROOT, env });
 const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out))); });
 const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json();
@@ -57,8 +59,8 @@ try {
     assert.ok(await pg.$('#build-pace svg[role="img"]'), 'the zone map');
     assert.deepStrictEqual(await pg.$$eval('#build-paces [data-pace]', e => e.map(x => x.dataset.pace)), ['look', 'calm', 'steady', 'lively', 'high']);
     assert.match(await pg.textContent('#build-count'), /^Pace, 1 of 1$/);
-    assert.ok(await pg.$('#build-sections [data-section="look"][disabled]'), 'sections not built yet say Coming soon');
-    assert.match(await pg.innerText('#build-sections [data-section="look"]'), /Soon/, 'and say so where you can see it');
+    assert.ok(await pg.$('#build-sections [data-section="content"][disabled]'), 'sections not built yet say Coming soon');
+    assert.match(await pg.innerText('#build-sections [data-section="content"]'), /Soon/, 'and say so where you can see it');
     for (const id of ['calm', 'steady', 'lively', 'high']) assert.match(await pg.getAttribute(`#build-paces [data-pace="${id}"] img`, 'src'), new RegExp(`paces/${id}\\.webp$`));
   });
 
@@ -142,7 +144,49 @@ try {
     await pg.click('#build-gx-nameTag');
     await pg.waitForFunction(async () => ((await (await fetch('/api/state')).json()).state.picks.graphic || { deny: [] }).deny.includes('lower-third'));
     await noCmd(pg, 'Graphics'); await shot(pg, 'builder-graphics.png');
-    assert.strictEqual(await pg.textContent('#build-next'), 'Continue in the classic steps');
+    assert.strictEqual(await pg.textContent('#build-next'), 'Next');
+  });
+
+  await t('Look, Sound and Finish: filters on the hook only, music, your notes with Change, then Make it', async () => {
+    await pg.click('#build-next'); await pg.waitForSelector('#build-fi-ours');
+    await pg.click('#build-fi-ours'); await pg.waitForSelector('#build-fi');
+    await pg.click('#build-fi [data-opt="mono"]'); await pg.waitForSelector('#build-fi [data-opt="mono"][aria-pressed="true"]');
+    await noCmd(pg, 'Filters'); await shot(pg, 'builder-filters.png');
+    await pg.click('#build-next'); await pg.waitForSelector('#build-ft');
+    await pg.click('#build-ft [data-opt="hook"]');
+    await pg.waitForFunction(async () => (await (await fetch('/api/state')).json()).state.finishWhen === 'hook');
+    assert.match(await pg.textContent('#build-does'), /first lines/);
+    const cv = await api('/api/state'); assert.ok(cv.compose.args.join(' ').includes('--finish-when hook'), 'the hook-only filter reaches the draft');
+    await shot(pg, 'builder-filter-timing.png');
+    await pg.click('#build-next'); await pg.waitForSelector('#build-mu');
+    assert.ok(await pg.$('#build-mu-beds .snd-tile'), 'tracks to hear');
+    await pg.click('#build-mu [data-opt="none"]');
+    await pg.waitForFunction(async () => (await (await fetch('/api/state')).json()).state.music.bed === 'none');
+    assert.ok(!(await pg.$('#build-mu-beat')), 'no beat to cut on without music');
+    await pg.click('#build-mu-sfx'); await pg.waitForFunction(async () => (await (await fetch('/api/state')).json()).state.sound.sfx === 'off');
+    await noCmd(pg, 'Music'); await shot(pg, 'builder-music.png');
+    await pg.click('#build-next'); await pg.waitForSelector('#build-notes-text');
+    assert.strictEqual(await pg.textContent('#build-h-notes'), 'Anything else for the agent?');
+    await pg.fill('#build-notes-text', 'Keep my jokes in.'); await pg.click('[data-chip="0"]');
+    await pg.waitForFunction(async () => /Keep my jokes in\.\nHook in the first line/.test((await (await fetch('/api/video-plan')).json()).plan.notes));
+    assert.match(await pg.innerText('#build-summary [data-row="filters"]'), /mono, hook only/);
+    // Change opens only that step, and its Next comes back here
+    await pg.click('#build-summary [data-row="music"] button'); await pg.waitForSelector('#build-mu');
+    assert.strictEqual(await pg.textContent('#build-next'), 'Back to your notes');
+    await pg.click('#build-next'); await pg.waitForSelector('#build-notes-text');
+    assert.strictEqual(await pg.inputValue('#build-notes-text'), 'Keep my jokes in.\nHook in the first line, short and punchy.');
+    await pg.click('#build-all .fold2-h'); await pg.waitForSelector('#build-all .fold2-b', { state: 'visible' });
+    await noCmd(pg, 'Your notes'); await shot(pg, 'builder-notes.png');
+    await pg.click('#build-next'); await pg.waitForSelector('#build-make-go');
+    assert.strictEqual(await pg.$('#build-next'), null, 'Make it has its own buttons');
+    await pg.fill('#build-tpl-name', 'Builder Test'); await pg.click('#build-tpl-save'); await pg.waitForSelector('#build-tpl-done');
+    const tpl = JSON.parse(readFileSync(join(LOOKS, 'builder-test', 'template.json'), 'utf8')); assert.strictEqual(tpl.plan.notes, ''); assert.deepStrictEqual(tpl.plan.filters, { ids: ['mono'], when: 'hook' });
+    await noCmd(pg, 'Make it'); await shot(pg, 'builder-make.png');
+    // no clip in this video: Make my video says so in plain words and keeps you here
+    await pg.click('#build-make-go'); await pg.waitForSelector('#build-make-err, #s-review:not([hidden])', { timeout: 20000 }).catch(() => {});
+    const made = await pg.evaluate(() => ({ err: document.querySelector('#build-make-err')?.textContent || null, review: !!document.querySelector('#s-review:not([hidden])'), hash: location.hash, making: document.querySelector('#build-make-go')?.textContent || null }));
+    assert.ok(made.err, 'Make my video with no clip: ' + JSON.stringify(made));
+    assert.doesNotMatch(made.err, /Failed to fetch|undefined/);
   });
 
   await t('Just captions skip the kinetic-only steps and take key words away', async () => {

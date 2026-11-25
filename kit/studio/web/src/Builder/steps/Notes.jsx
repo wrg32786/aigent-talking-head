@@ -29,7 +29,7 @@ export function Notes({ CAT, plan, V, save, busy, rows, onChange, st, appV, patc
   return <>
     <Field>
       <Label {...stylex.props(s.label)}>Anything else for the agent?</Label>
-      <Textarea id="build-notes" value={text} maxLength={MAX_NOTES} onChange={e => setText(e.target.value)} onBlur={() => keep(text)} {...stylex.props(s.area)} />
+      <Textarea id="build-notes-text" value={text} maxLength={MAX_NOTES} onChange={e => setText(e.target.value)} onBlur={() => keep(text)} {...stylex.props(s.area)} />
     </Field>
     <div {...stylex.props(s.chips)} role="group" aria-label="Examples to add">
       {NOTE_CHIPS.map((c, i) => <button key={i} type="button" className="btn sm outline" data-chip={i} disabled={text.includes(c)} onClick={() => add(c)}>{c}</button>)}

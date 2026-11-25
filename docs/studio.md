@@ -805,13 +805,17 @@ The New video tab has a step by step builder beside the classic steps. Open it f
 
 - **Start screen**: your clip (Use a recording, Upload a video, Paste a link; a take made in the last hour shows "From Recording"), then **Build my own**. Use a template arrives with the Template Library.
 - **Pacing** (`#build=pace`): Let the Look decide, Calm, Steady, Lively or High energy. Each card plays the cut speed on our sample presenter (`docs/menu/paces/`, made by `node kit/demos.mjs --only pace`). The frame shows which part of the video the step changes (Applies to, and a small map of the frame).
-- Every choice is saved in the video plan (`POST /api/video-plan`) and turned into today's settings at once, so **Continue in the classic steps** and a draft from Review work at any point. Sections not built yet say Coming soon, and plan choices the engine cannot draw yet are listed under the step as Coming soon.
+- Every choice is saved in the video plan (`POST /api/video-plan`) and turned into today's settings at once, so a draft from Review works at any point. Sections not built yet say Coming soon, and plan choices the engine cannot draw yet are listed under the step as Coming soon.
 - **Words on screen** (`#build=captionType` and on): Caption type (Just captions or Kinetic words), the caption look, how words come in (kinetic only), big titles with how they come in, an effect and an exit (kinetic only), where words sit (a caption band and the places a title may take; never your face), text colors (a theme, then your own text, key word and outline colors with the contrast shown), the font pairing, key words (Off, Subtle, Strong or Dramatic, kinetic only), then **Preview and lock**. Steps that do not fit your caption type are skipped.
 - **Live preview**: the words steps show a live preview beside the options that follows the option you point at or focus. It is the real caption renderer (`kit/overlay.html`) on a sample script over our sample presenter, served by `GET /api/preview/overlay/<key>/overlay.html` (`kit/studio/preview.mjs`) with the same theme, font and graphics files a render uses, and the presenter's face zone, so the layout keeps every word off the face as a render does. Replay and Pause sit under it; with previews paused it shows one settled moment.
 - **Between shots** (`#build=transitions`): let the look pick, or choose several transitions (None is straight cuts only), then how often they play: every cut, topic changes only (a new take or a new part), or the hook and call to action only. The rest of the joins are straight cuts (`reel.cjs --transitions-when`).
 - **You on screen** (`#build=presenter`): Words behind your head, Zoom punch, Frame breakout and the camera and room effects, each with when it plays: the hook, key moments (the hook, the call to action and the big punches) or the whole video. The camera and room effects play at Render with the effects add-on; without it the step says so, with its Set up button. Frame breakout is kept in your plan and marked Coming soon.
 - **Extras** (`#build=graphics`): Let the agent choose is on by default; switch it off to turn name tags, numbers and lists, stickers and callouts, the call to action, or colour and chapter cards on or off.
 - Choices the render does not draw yet (where words sit, your own colors, key word color and count) show in the preview and are marked "Coming soon in your rendered video".
+- **Look** (`#build=filters`, `#build=filterTiming`): let the look pick, choose one or more filters (None is no filter), then when they show: the whole video, the hook only, the call to action only, or both. A timed filter sits only on those pieces (`reel.cjs --finish-when`); the job-wide filter a recipe, preset or pack sets is set aside, and comes back when you pick the whole video again.
+- **Sound** (`#build=music`, last of the style steps): We pick, No music, a track you heard here (play to listen, Use this to choose), or your own file; then how lively, Cut on the beat, and Sounds on the cuts.
+- **Your notes** (`#build=notes`): "Anything else for the agent?" with four example lines to add, your plan so far with **Change** on each row (it opens only that step, and its button says Back to your notes), and **All options**, every layer's tiles as the classic steps show them. Your notes reach the agent: `studio_get_state` has `notes`, and `get_video_plan` has them in the plan.
+- **Make it** (`#build=make`): **Save as a template** (the name is optional; it is saved as `looks/local/<name>/template.json`, without your notes, and a name already used is never written over) and **Make my video**, which sets the plan, starts the draft (writing `jobs/<job>/build/video-plan.json` beside it) and opens Review.
 
 ## New video
 
@@ -831,16 +835,9 @@ Nothing is deleted. The old reel's files stay where they were (`inbox/studio/<jo
 
 Studio will not switch while a draft, render, download, take, transcript or b-roll generate is running: cancel it or let it finish. Your agent does the same with `new_video`, `open_video` and `list_videos` (see [mcp.md](mcp.md)); when it switches, the page follows to Start.
 
-## Wizards
+## Wizards (retired)
 
-**Wizards** in the More menu are two guided starts (Copy a reference is the Teardowns tab now). Each step has **Let my agent decide**, which hands that choice to your agent in the chat.
-
-- **Make a reel from a long take.** What it is for (Grow followers, Sell or sign up, Teach one thing, Full clean take, each setting the output), then a Look, then **Let AI choose** picks the pieces and opens Review. If the take is not transcribed yet, it transcribes first and opens Cut.
-- **Clips and ads from one take.** 3, 5 or 8 clips, with 15 s and 30 s ad cuts if you tick them; it finds them on whole words and opens Cut.
-
-<img src="studio/wizards.png" width="560" alt="The Make a reel wizard, step 1 of 3: Grow followers, Sell or sign up, Teach one thing and Full clean take, and Let my agent decide">
-
-API: `GET /api/wizard` (the wizards, goals and clip counts, from `kit/studio/wizards.mjs`), `POST /api/wizard { wizard: reel, goal, look, choose }`, `{ wizard: clips, clips, ads }`, `{ wizard: reference, url }` (still there for agents). MCP `run_wizard` takes the same.
+The Wizards dialog is gone: the builder asks one thing per screen instead, and an old `#wizards` link opens it. For agents, `POST /api/wizard` and MCP `run_wizard` still work (`{ wizard: reel, goal, look, choose }`, `{ wizard: clips, clips, ads }`, `{ wizard: reference, url }`). A goal now sets the builder plan too: its pace (Grow followers is Lively, Sell or sign up High energy, Teach one thing Steady, Full clean take Calm; a pace you chose yourself stays) and its line in Your notes, added once (`kit/studio/wizards.mjs`).
 
 ## Outputs
 
@@ -865,10 +862,10 @@ Nothing is deleted from here.
 
 ### The top bar
 
-<img src="studio/more-menu.png" width="520" alt="The top bar with numbered steps, Wizards, Outputs, Connect agent, theme, Settings and the More menu open with Past videos, Setup check and API keys">
+<img src="studio/more-menu.png" width="520" alt="The top bar with numbered steps, Outputs, Connect agent, theme, Settings and the More menu open with Past videos, Setup check and API keys">
 <img src="studio/top-phone.png" width="260" alt="The top bar on a phone: the reel name and buttons on the first row and the steps (six in this older picture, eight now) on a second row">
 
-The top bar always fits on one line. From 1280 px wide the step bar names every step in its short form (Start, Cut, Picture, Text, B-roll, Music, Review, Render); on a narrower window only the current step shows its name (the others show their number, and hovering a step still names it). The setup pill says how many things there are to fix, and Connect agent shrinks to its plug. **More** (the three dots) holds Past videos, Setup check, API keys, **Wizards** (the [wizards](#wizards)) and **Outputs** (the [Outputs library](#outputs)), each with its name, and works with the keyboard: Enter or Space opens it, the arrow keys move, Enter picks, Escape closes. On a phone the steps get their own row under the reel name, and the theme moves into More too.
+The top bar always fits on one line. From 1280 px wide the step bar names every step in its short form (Start, Cut, Picture, Text, B-roll, Music, Review, Render); on a narrower window only the current step shows its name (the others show their number, and hovering a step still names it). The setup pill says how many things there are to fix, and Connect agent shrinks to its plug. **More** (the three dots) holds Past videos, Setup check, API keys and **Outputs** (the [Outputs library](#outputs)), each with its name, and works with the keyboard: Enter or Space opens it, the arrow keys move, Enter picks, Escape closes. On a phone the steps get their own row under the reel name, and the theme moves into More too.
 
 Longer explanations sit behind a small **i** next to the thing they explain (Footage from a link, Clean-up pass, Record screen in B-roll); click it to read, Escape or a click elsewhere closes it.
 

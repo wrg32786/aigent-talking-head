@@ -35,7 +35,7 @@ export function Make({ V, st, apply, go, flush }) {
       {saved && <p className="fine" id="build-tpl-done" role="status" style={{ margin: 0 }}>Saved as {saved.label}.</p>}
     </section>
     <div {...stylex.props(s.go)}>
-      <button type="button" className="btn" id="build-make" disabled={making} onClick={make}>{making ? 'Starting' : 'Make my video'}</button>
+      <button type="button" className="btn" id="build-make-go" disabled={making} onClick={make}>{making ? 'Starting' : 'Make my video'}</button>
     </div>
     {err && <p className="fine" role="alert" id="build-make-err">{err}</p>}
   </>;
