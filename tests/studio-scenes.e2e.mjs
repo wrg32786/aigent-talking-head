@@ -40,7 +40,7 @@ const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), 
 const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + '\n' + out))); });
 const api = async (p, b, method) => (await fetch(url + p, b === undefined && !method ? {} : { method: method || 'POST', headers: { 'content-type': 'application/json' }, body: b === undefined ? undefined : JSON.stringify(b) })).json();
 // the page keeps a live connection, so wait for the stepper, not for a quiet network. A reload lands on the step in the address
-const theme = async (pg, th) => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); };
+const theme = async (pg, th) => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#areas'); };
 const step = async (pg, st) => { await pg.click(`#stepper [data-step="${st}"]`); await pg.waitForSelector(`main[data-step="${st}"][data-view="main"]`); };
 const shot = async (pg, name, top = true) => { if (!shots) return; if (top) await pg.evaluate(() => scrollTo(0, 0)); await pg.waitForTimeout(500); await pg.screenshot({ path: join(shots, name), fullPage: false }); };
 const tile = id => `#grid .tile:has(.pick[data-focus="p:graphic:${id}"])`;
