@@ -75,6 +75,25 @@ try {
     const p = VP.withWords(VP.normalize({ advanced: { picks: { 'entrance:slam': 'deny', 'font:modern': 'allow', 'transition:whip': 'allow' } } }), { fonts: 'druk', titles: { entrances: ['slam'] } });
     assert.deepStrictEqual(p.advanced.picks, { 'transition:whip': 'allow' });
   });
+  await t('transition timing reaches the reel, and straight cuts or the look picking leave it as it was', () => {
+    const a = apply(fresh(), { videoPlan: VP.normalize({ transitions: { ids: ['whip'], when: 'topic' } }) });
+    assert.strictEqual(a.transitionsWhen, 'topic'); assert.ok(reel(a).args.includes('--transitions-when topic'));
+    const b = apply(fresh(), { videoPlan: VP.normalize({ transitions: { ids: [], when: 'topic' } }) });
+    assert.ok(!reel(b).args.includes('--transitions-when'));
+    assert.strictEqual(VP.fromState(a, null, cat).transitions.when, 'topic');
+    const calm = VP.pacePatch(VP.normalize({}), 'calm'); assert.strictEqual(calm.patch.transitionsWhen, 'topic');
+    const mine = VP.pacePatch(VP.normalize({ transitions: { ids: ['whip'], when: 'hook-cta' } }), 'high'); assert.strictEqual(mine.patch.transitionsWhen, 'hook-cta', 'a timing set elsewhere stays');
+    const sc = apply(fresh(), { videoPlan: VP.normalize({ transitions: { ids: [], when: 'hook-cta' } }) }); assert.strictEqual(VP.fromState(sc, sc.videoPlan, cat).transitions.when, 'hook-cta');
+    const g = VP.withPart(VP.normalize({ graphics: { agent: false, nameTag: true, numbers: true, stickers: true, cta: true, cards: null }, advanced: { picks: { 'graphic:stat-callout': 'deny' } } }), 'graphics', { cta: false });
+    assert.deepStrictEqual(g.advanced.picks, { 'graphic:stat-callout': 'deny' }, 'turning off the call to action keeps a numbers pick');
+  });
+  await t('a Between shots, You on screen or Extras choice wins over All options picks it speaks for', () => {
+    const base = VP.normalize({ advanced: { picks: { 'transition:film': 'allow', 'effect:lean-in': 'deny', 'graphic:lower-third': 'allow', 'font:anton': 'allow' } } });
+    assert.deepStrictEqual(Object.keys(VP.withPart(base, 'transitions', { ids: ['whip'] }).advanced.picks).sort(), ['effect:lean-in', 'font:anton', 'graphic:lower-third']);
+    assert.deepStrictEqual(Object.keys(VP.withPart(base, 'presenter', [{ id: 'effect:lean-in', when: 'hook' }]).advanced.picks).sort(), ['font:anton', 'graphic:lower-third', 'transition:film']);
+    const g = VP.withPart(base, 'graphics', { agent: false, nameTag: false }); assert.ok(!('graphic:lower-third' in g.advanced.picks)); assert.ok(g.touched.includes('graphics'));
+    assert.ok(VP.withPart(base, 'transitions', { when: 'hook-cta' }).touched.includes('transitions.when'));
+  });
   await t('a pace change leaves the choices you made yourself alone', () => {
     let p = VP.defaults('calm'); p.music.energy = 'high'; p = VP.touch(p, 'music.energy');
     const q = VP.applyPace(p, 'high');
@@ -192,7 +211,7 @@ try {
     const p = FL.planFromLook(look, cat);
     assert.ok(VP.validate(p, cat).ok, VP.validate(p, cat).errs.join('; '));
     assert.strictEqual(p.pace, 'lively'); assert.strictEqual(p.words.type, 'captions'); assert.deepStrictEqual(p.words.titles.entrances, ['slam']);
-    assert.deepStrictEqual(p.transitions.ids, ['whip']); assert.deepStrictEqual(p.filters.ids, ['warm']); assert.ok(p.presenter.some(x => x.id === 'behind-head' && x.when === 'hook'));
+    assert.deepStrictEqual(p.transitions.ids, ['whip']); assert.deepStrictEqual(p.filters.ids, ['warm']); assert.ok(p.presenter.some(x => x.id === 'behind-head' && x.when === 'key-moments'));
     assert.strictEqual(FL.planFromLook({ pace: { shotMean: 6 }, music: { present: false } }, cat).music.bed, 'none');
     const tp = VP.fromTemplate({ kind: 'pack', name: 'cinematic' });
     assert.deepStrictEqual(tp.template, { kind: 'pack', name: 'cinematic' }); assert.strictEqual(tp.transitions.ids, null);
@@ -226,6 +245,16 @@ try {
       assert.strictEqual(wd.plan.words.keyWords.level, 'dramatic'); assert.strictEqual(wd.state.keyWords, 'dramatic');
       const wbad = await fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ words: { type: 'captions', look: 'classic', keyWords: { level: 'strong' } } }) });
       assert.strictEqual(wbad.status, 400, 'key words need kinetic words');
+      const post = b => fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) });
+      const tr = await (await post({ transitions: { ids: ['whip', 'crossfade'], when: 'hook-cta' } })).json();
+      assert.deepStrictEqual([tr.plan.transitions.ids, tr.plan.transitions.when], [['whip', 'crossfade'], 'hook-cta']); assert.strictEqual(tr.state.transitionsWhen, 'hook-cta');
+      assert.ok(tr.compose.args.join(' ').includes('--transitions-when hook-cta'));
+      const pr = await (await post({ presenter: [{ id: 'behind-head', when: 'hook' }, { id: 'effect:lean-in', when: 'key-moments' }] })).json();
+      assert.deepStrictEqual(pr.plan.presenter.map(x => x.id + '@' + x.when), ['behind-head@hook', 'effect:lean-in@key-moments']);
+      const gx = await (await post({ graphics: { agent: false, nameTag: false, numbers: true, stickers: true, cta: true } })).json();
+      assert.strictEqual(gx.plan.graphics.nameTag, false); assert.ok(gx.state.picks.graphic.deny.includes('lower-third'));
+      assert.strictEqual((await post({ presenter: { id: 'punch' } })).status, 400);
+      assert.strictEqual((await post({ presenter: [{ id: 'punch', when: 'hook' }] })).status, 400, 'zoom punch is the whole video for now');
       const np = await fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pace: 'zoomy' }) });
       assert.strictEqual(np.status, 400);
       await fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: VP.defaults('steady') }) });

@@ -101,8 +101,9 @@ export function pacePatch(plan, pace, last = null) {
   if (p.music.energy !== was.energy) p = touch(p, 'music.energy');
   if (p.music.beatSync !== was.beatSync) p = touch(p, 'music.beatSync');
   if (p.presenter.some(x => x.id === 'punch') !== was.punch) p = touch(p, 'presenter');
+  if (p.transitions.when !== was.transitionsWhen) p = touch(p, 'transitions.when');
   const next = touch(applyPace(p, pace), 'pace'), P = Object.hasOwn(PACES, next.pace) ? PACES[next.pace] : PACES.look, bs = next.music.beatSync;
-  const patch = { music: { energy: next.music.energy }, pace: { tighten: next.advanced.tighten ?? P.tighten, punch: next.presenter.some(x => x.id === 'punch') ? 'on' : 'off' },
+  const patch = { transitionsWhen: Array.isArray(next.transitions.ids) && !next.transitions.ids.length ? 'every-cut' : next.transitions.when, music: { energy: next.music.energy }, pace: { tighten: next.advanced.tighten ?? P.tighten, punch: next.presenter.some(x => x.id === 'punch') ? 'on' : 'off' },
     picks: bs === null ? { 'beatSync:beat-sync': 'clear', 'beatSync:no-beat-sync': 'clear' } : { [`beatSync:${bs ? 'beat-sync' : 'no-beat-sync'}`]: 'allow' } };
   return { plan: next, patch };
 }
@@ -114,7 +115,7 @@ export function diffPatch(prev, next, cat = null) {
   for (const ref of Object.keys(a.picks)) if (!(ref in b.picks)) picks[ref] = 'clear';
   for (const [ref, how] of Object.entries(b.picks)) if (a.picks[ref] !== how) picks[ref] = how;
   const patch = Object.keys(picks).length ? { picks } : {};
-  for (const k of ['pack', 'styleLook', 'titles', 'keyWords', 'music', 'sound', 'pace']) if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) patch[k] = b[k];
+  for (const k of ['pack', 'styleLook', 'titles', 'keyWords', 'transitionsWhen', 'music', 'sound', 'pace']) if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) patch[k] = b[k];
   return patch;
 }
 // a builder step's words choices laid over the plan (only the fields given change)
@@ -128,6 +129,29 @@ export function withWords(plan, words) {
   if (isObj(words && words.colors) && Object.hasOwn(words.colors, 'theme')) kinds.add('theme');
   if (kinds.size) for (const r of Object.keys(p.advanced.picks)) if (kinds.has(r.split(':')[0])) delete p.advanced.picks[r];
   return touch(p, 'words');
+}
+// a builder step's Between shots, You on screen or Extras choice laid over the plan: transitions and graphics change
+// only the fields given, presenter is the whole list. A choice here wins over All options picks it speaks for.
+export const PARTS = ['transitions', 'presenter', 'graphics'];
+export function withPart(plan, part, value) {
+  const p = normalize(plan), before = clone(p);
+  if (part === 'presenter') p.presenter = clone(value);
+  else p[part] = { ...p[part], ...clone(value) };
+  // only the All options picks for what this choice changed
+  let speaks = () => false;
+  if (part === 'transitions' && value && 'ids' in value) speaks = (k) => k === 'transition';
+  if (part === 'graphics') {
+    const ids = new Set(Object.entries(GRAPHIC_GROUPS).filter(([g]) => before.graphics[g] !== p.graphics[g] || (value && 'agent' in value)).flatMap(([, v]) => v));
+    const cards = before.graphics.cards !== p.graphics.cards;
+    speaks = (k, id) => (k === 'graphic' && ids.has(id)) || (cards && k === 'editing' && id === 'cards-auto');
+  }
+  if (part === 'presenter') {
+    const key = x => `${x.id}@${x.when}`, a = new Set(before.presenter.map(key)), b = new Set(p.presenter.map(key));
+    const moved = new Set([...before.presenter.filter(x => !b.has(key(x))), ...p.presenter.filter(x => !a.has(key(x)))].map(x => x.id));
+    speaks = (k, id) => (k === 'titleLayer' && moved.has('behind-head')) || (k === 'effect' && moved.has('effect:' + id));
+  }
+  for (const r of Object.keys(p.advanced.picks)) { const i = r.indexOf(':'); if (speaks(r.slice(0, i), r.slice(i + 1))) delete p.advanced.picks[r]; }
+  return touch(p, part === 'transitions' && value && 'when' in value ? 'transitions.when' : part, part);
 }
 // mark a field as yours, so a later pace change leaves it alone
 export function touch(plan, ...keys) { const p = normalize(plan); for (const k of keys) if (!p.touched.includes(k)) p.touched.push(k); return p; }
@@ -209,7 +233,8 @@ export function toState(plan, cat = null) {
   const patch = { clearPicks: true, picks, pack: p.template && p.template.kind === 'pack' ? p.template.name : null,
     styleLook: p.template && p.template.kind === 'look' ? p.template.name : null, titles: w.titles.on === false || (w.type === 'captions' && p.touched.includes('words')) ? 'off' : 'auto',
     music: { bed: p.music.bed, energy: p.music.energy }, sound: { sfx: p.music.sfx ? 'on' : 'off' },
-    pace: { tighten: p.advanced.tighten ?? P.tighten, punch: p.presenter.some(x => x.id === 'punch') ? 'on' : 'off' }, keyWords: w.keyWords.level };
+    pace: { tighten: p.advanced.tighten ?? P.tighten, punch: p.presenter.some(x => x.id === 'punch') ? 'on' : 'off' }, keyWords: w.keyWords.level,
+    transitionsWhen: Array.isArray(p.transitions.ids) && !p.transitions.ids.length ? 'every-cut' : p.transitions.when };
   const look = w.look || (w.type === 'captions' ? 'classic' : w.type === 'kinetic' ? 'kinetic' : null);
   if (look) pick('captionStyle', look);
   if (w.entrance && w.type !== 'captions') pick('captionEntrance', w.entrance);
@@ -238,10 +263,8 @@ export function pending(plan) {
   if (w.place.captions || w.place.titles.length) add('words.place', 'Where words sit');
   if (w.colors.text || w.colors.accent || w.colors.outline) add('words.colors', 'Your own text colors');
   if (w.keyWords.level !== 'off' && (w.keyWords.color !== 'accent' || w.keyWords.maxPerLine !== 1)) add('words.keyWords', 'Key word color and how many per line');
-  if (Array.isArray(p.transitions.ids) && p.transitions.ids.length && p.transitions.when !== 'every-cut') add('transitions.when', 'Transitions only at some cuts');
   for (const x of p.presenter) {
     if (x.id === 'frame-breakout') add('presenter.frame-breakout', 'Frame breakout');
-    else if (String(x.id).startsWith('effect:') && x.when !== 'whole') add('presenter.when', 'Presenter effects at set moments');
   }
   if (Array.isArray(p.filters.ids) && p.filters.ids.length && p.filters.when !== 'whole') add('filters.when', 'Filters only on the hook or CTA');
   if (p.content.repoFeature) add('content', 'Repo or tool feature');
@@ -277,12 +300,14 @@ export function fromState(s, prev = null, cat = null) {
   w.fonts = allow('font')[0] || null; if (w.fonts) take('font', w.fonts);
   const tr = allow('transition');
   if (tr.length) { p.transitions.ids = tr.length === 1 && tr[0] === 'cut' ? [] : tr; for (const id of tr) take('transition', id); } else p.transitions.ids = null;
+  // straight cuts send no timing, so the timing you chose before stays in the plan
+  p.transitions.when = Array.isArray(p.transitions.ids) && !p.transitions.ids.length ? base.transitions.when : s.transitionsWhen || 'every-cut';
   const wasWhen = id => (base.presenter.find(x => x.id === id) || {}).when;
   const pres = [];
   if (!(s.pace && s.pace.punch === 'off')) pres.push({ id: 'punch', when: 'whole' });
   const tl = allow('titleLayer')[0];
   if (tl === 'behind') { pres.push({ id: 'behind-head', when: 'whole' }); take('titleLayer', tl); }
-  else if (tl === 'auto') { const was = wasWhen('behind-head'); pres.push({ id: 'behind-head', when: was && was !== 'whole' ? was : 'hook' }); take('titleLayer', tl); }
+  else if (tl === 'auto') { const was = wasWhen('behind-head'); pres.push({ id: 'behind-head', when: was && was !== 'whole' ? was : 'key-moments' }); take('titleLayer', tl); }
   if (base.presenter.some(x => x.id === 'frame-breakout')) pres.push(base.presenter.find(x => x.id === 'frame-breakout'));
   const presenterFx = new Set(base.presenter.filter(x => String(x.id).startsWith('effect:')).map(x => x.id.slice(7)));
   for (const id of allow('effect')) if (presenterFx.has(id) || PRESENTER_EFFECTS.has(id)) { pres.push({ id: 'effect:' + id, when: wasWhen('effect:' + id) || 'whole' }); take('effect', id); }

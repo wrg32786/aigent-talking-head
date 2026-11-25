@@ -15,7 +15,7 @@ export function planFromLook(look, cat = null) {
   const ti = L.titles || {};
   if (ti.on === false) w.titles.on = false;
   else { w.titles.on = true; w.titles.entrances = (ti.entrances || []).filter(id => ok(cat, 'entrance', id)); }
-  if (ti.on !== false && (ti.layer === 'behind' || ti.layer === 'auto')) p.presenter.push({ id: 'behind-head', when: ti.layer === 'behind' ? 'whole' : 'hook' });
+  if (ti.on !== false && (ti.layer === 'behind' || ti.layer === 'auto')) p.presenter.push({ id: 'behind-head', when: ti.layer === 'behind' ? 'whole' : 'key-moments' });
   const br = L.brand || {};
   if (ok(cat, 'theme', br.theme)) w.colors.theme = br.theme;
   const font = cap.font || br.fonts; if (typeof font === 'string' && ok(cat, 'font', font)) w.fonts = font;

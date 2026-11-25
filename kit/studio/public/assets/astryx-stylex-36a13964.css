@@ -6047,6 +6047,10 @@
       padding: 20px;
     }
 
+    .x9ms5i6 {
+      padding: 3px;
+    }
+
     .x1ruevkc {
       padding: 6px;
     }
@@ -6167,6 +6171,10 @@
 
     .xf4egzd {
       padding-block: 3px;
+    }
+
+    .x12ulsxz {
+      padding-block: 4px;
     }
 
     .x1t0vds8 {
@@ -6367,6 +6375,10 @@
       font-weight: 650;
     }
 
+    .x1xlr1w8 {
+      font-weight: 700;
+    }
+
     .x1gf0zcd {
       grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
     }
@@ -6399,8 +6411,20 @@
       opacity: .8;
     }
 
+    .x5uitqu {
+      outline-color: var(--primary);
+    }
+
     .x1hl8ikr {
       outline-offset: 2px;
+    }
+
+    .x1t137rt {
+      outline-style: none;
+    }
+
+    .x1de99jn {
+      outline-width: 2px;
     }
 
     .x47corl {
@@ -6465,6 +6489,18 @@
 
     .xa9119d {
       z-index: 50;
+    }
+
+    .x1bvvbcr[data-checked] {
+      background-color: var(--primary);
+    }
+
+    .x1u4adua[data-checked] {
+      color: var(--primary-foreground, #fff);
+    }
+
+    .x9v5kkp:focus-visible {
+      outline-style: solid;
     }
   }
 
@@ -6555,6 +6591,10 @@
 
     .xeuugli {
       min-width: 0;
+    }
+
+    .x5w4yej {
+      min-width: 160px;
     }
 
     .x131sewu {
