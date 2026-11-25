@@ -11,11 +11,18 @@
 //   POST /api/templates     { name? } save the plan as it is now as a template; no notes
 //   POST /api/templates/use { name, edit? } start this video's plan from a template (edit: a look's choices as your own)
 //   POST /api/templates/rename { name, label }, /duplicate { name }, /delete { name }
-import { readFileSync } from 'fs';
+//   GET  /api/plan-check    the last plan check of this video (build/plan-check.json), or null
+//   POST /api/plan-check    { fix? } run the measured checks (kit/plan-check.mjs) on the draft and the newest render;
+//                           fix: apply what can be fixed, up to 3 rounds (the video changes on the next render)
+//   GET  /api/plan-check/points   the moments to look at (for an agent's own look)
+//   POST /api/plan-check/report   { looked: [{ id, selection, ok, note, time }] } an agent's looked-at checks
+import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import * as VP from './plan.mjs';
 import * as TPL from '../templates.mjs';
+import * as PC from '../../plan-check.mjs';
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const lastPace = s => VP.lastPace(s);
 
 export const STEPS_FILE = join(dirname(fileURLToPath(import.meta.url)), 'steps.json');
@@ -51,6 +58,24 @@ export function mount({ C, json, readBody, view, pushState }) {
       try { json(res, 200, { template: TPL.save(b && typeof b.name === 'string' ? b.name : '', { plan: planOf(s, cat), from: { kind: 'builder' }, cat }) }); }
       catch (e) { json(res, typeof e.code === 'number' ? e.code : 500, { error: e.message }); }
       return true;
+    }
+    if (p === '/api/plan-check' || p === '/api/plan-check/points' || p === '/api/plan-check/report') {
+      const s = C.load(); if (!s.job) { json(res, 400, { error: 'name the job first' }); return true; }
+      const build = join(ROOT, 'jobs', s.job, 'build'), read = () => { try { return JSON.parse(readFileSync(join(build, 'plan-check.json'), 'utf8')); } catch { return null; } };
+      if (p === '/api/plan-check' && M === 'GET') { json(res, 200, { report: read(), job: s.job }); return true; }
+      if (!existsSync(join(build, 'cut.json'))) { json(res, 400, { error: 'Make a draft first.' }); return true; }
+      try {
+        if (p === '/api/plan-check/points' && M === 'GET') { const st = PC.load(build); json(res, 200, { points: PC.checkpoints(st.cut, st.caps, build) }); return true; }
+        if (p === '/api/plan-check/report' && M === 'POST') { const b = (await readBody(req)) || {}; if (!Array.isArray(b.looked)) { json(res, 400, { error: 'looked: a list of { id, selection, ok, note, time }.' }); return true; } json(res, 200, { report: PC.report(build, b.looked) }); return true; }
+        if (p === '/api/plan-check' && M === 'POST') {
+          const b = (await readBody(req)) || {};
+          // the plan as it is now beside the draft, then the newest render for the stills
+          mkdirSync(build, { recursive: true }); writeFileSync(join(build, 'video-plan.json'), JSON.stringify(planOf(s, C.catalog()), null, 1));
+          const outs = (C.outputsOf ? C.outputsOf(s) : []).map(f => join(ROOT, f)).filter(f => existsSync(f)).sort((x, y) => statSync(y).mtimeMs - statSync(x).mtimeMs);
+          json(res, 200, { report: PC.run(build, { fix: b.fix === true, video: outs[0] || null }), job: s.job }); return true;
+        }
+      } catch (e) { json(res, 400, { error: e.message }); return true; }
+      return false;
     }
     if (p !== '/api/video-plan') return false;
     if (M === 'GET') { json(res, 200, planView(C.load(), C.catalog())); return true; }
