@@ -5,7 +5,7 @@
 // Run: node tests/wizard-plan.test.mjs   (npm run check runs it)
 import assert from 'assert';
 import { spawn } from 'child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -295,7 +295,14 @@ try {
       const auto = await (await fetch(url + '/api/templates', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).json(); assert.match(auto.template.name, /^[a-z0-9-]+$/);
       // the Template Library: list, use, rename, duplicate, delete; starters are read only
       const tpost = (r, b) => fetch(url + '/api/templates/' + r, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) });
+      // a look you saved before templates existed shows in the library, its choices read from the look
+      mkdirSync(join(STATE, 'looks', 'old-look'), { recursive: true });
+      writeFileSync(join(STATE, 'looks', 'old-look', 'look.json'), JSON.stringify({ kind: 'style-look', version: 1, name: 'old-look', created: '2026-01-02T00:00:00Z', framing: {}, grade: { finish: 'warm' }, captions: { style: 'pill' }, titles: {}, stickers: {}, transitions: {}, moves: {}, pace: { shotMean: 1.9 }, broll: {}, music: {}, sfx: {}, loudness: {} }));
       const lib = (await (await fetch(url + '/api/templates')).json()).templates, mine = lib.find(x => x.name === 'my-test');
+      const old = lib.find(x => x.name === 'old-look'); assert.deepStrictEqual([old && old.kind, old && old.source, old && old.pace], ['look', 'From a teardown', 'lively'], JSON.stringify(old));
+      const oldEdit = await (await tpost('use', { name: 'old-look', edit: true })).json(); assert.deepStrictEqual(oldEdit.plan.filters.ids, ['warm'], 'Edit in builder makes the look\'s choices your own');
+      const oldRen = await (await tpost('rename', { name: 'old-look', label: 'My old look' })).json(); assert.strictEqual(oldRen.template.label, 'My old look');
+      assert.ok(existsSync(join(STATE, 'looks', 'old-look', 'look.json')), 'a rename leaves the look where it is');
       assert.deepStrictEqual([mine.kind, mine.source, mine.label, mine.readOnly], ['template', 'Built by you', 'My Test', false]);
       const starter = lib.find(x => x.kind === 'pack'); assert.ok(starter && starter.readOnly, 'the starter packs are in the library');
       assert.strictEqual(lib.filter(x => x.kind === 'pack').length, cat.packs.filter(p => p.shipped && !/^ref-/.test(p.name)).length);
@@ -324,6 +331,12 @@ try {
       // the notes reach the agent: in studio_get_state and get_video_plan
       assert.strictEqual((await client.callTool({ name: 'studio_get_state', arguments: {} })).structuredContent.notes, 'From the agent.');
       assert.strictEqual((await client.callTool({ name: 'get_video_plan', arguments: {} })).structuredContent.plan.notes, 'From the agent.');
+      // the Template Library for agents: list it, save the plan as a template (no notes), a used name refused
+      const tl = (await client.callTool({ name: 'list_templates', arguments: {} })).structuredContent.templates;
+      assert.ok(tl.some(x => x.name === 'my-test' && x.label === 'Hook in mono') && tl.some(x => x.readOnly), JSON.stringify(tl.map(x => x.name)));
+      const st = (await client.callTool({ name: 'save_template', arguments: { name: 'Agent Look' } })).structuredContent;
+      assert.strictEqual(st.template.name, 'agent-look'); assert.strictEqual(JSON.parse(readFileSync(join(STATE, 'looks', 'agent-look', 'template.json'), 'utf8')).plan.notes, '');
+      assert.ok((await client.callTool({ name: 'save_template', arguments: { name: 'agent look' } })).isError, 'never written over');
       const no = await client.callTool({ name: 'set_video_plan', arguments: { plan: { format: 'aigent-video-plan', filters: { ids: ['sepia'] } } } });
       assert.ok(no.isError); assert.match(JSON.stringify(no.content), /Filters: we do not have one called sepia/);
     } finally { await client.close(); }
