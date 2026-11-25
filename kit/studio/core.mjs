@@ -188,7 +188,7 @@ export const KIT_BRANDS = ['kit/example/skool-logo.svg'];
 // and makes the one change it needs (the page's one click switch on a greyed option).
 //   useReferenceLook: true sets the board from the reference alone (kit/studio/reference.mjs useReferenceLook): an
 //   earlier look that was in use is set aside, your picks since the reference go. The same one Undo puts it back.
-const SETTLE_KEYS = ['pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'reference', 'switchFor'];
+const SETTLE_KEYS = ['pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'reference', 'switchFor', 'keyWords', 'titles'];
 const lookSnap = s => JSON.parse(JSON.stringify({ pack: s.pack || null, picks: s.picks || {}, music: s.music, sound: s.sound, pace: s.pace,
   reference: s.reference ? { mode: s.reference.mode, added: s.reference.added, prev: s.reference.prev, auto: s.reference.auto, applied: s.reference.applied, lookFor: s.reference.lookFor || null, prevLook: s.reference.prevLook || null, fontFor: s.reference.fontFor || null, prevFont: s.reference.prevFont || null, copyMode: s.reference.copyMode || null } : null, entranceLock: !!s.entranceLock, fontLock: !!s.fontLock, boost: s.boost ?? null, titles: s.titles || 'auto', keyWords: s.keyWords || 'off' }));
 export const effectsReady = () => existsSync(join(ROOT, 'effects', '.venv'));

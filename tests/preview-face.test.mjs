@@ -62,6 +62,7 @@ else {
   const browser = await chromium.launch({ executablePath: chrome, args: ['--no-sandbox'] });
   try {
     const pg = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
+    const outside = []; pg.on('request', r => { const h = new URL(r.url()).hostname; if (!['preview.local', 'raw.local'].includes(h) && !r.url().startsWith('data:')) outside.push(r.url()); });
     await pg.route('https://preview.local/**', r => {
       const u = new URL(r.request().url());
       if (u.pathname.startsWith('/files/')) { const f = join(ROOT, decodeURIComponent(u.pathname.slice(7))); return existsSync(f) ? r.fulfill({ body: readFileSync(f) }) : r.fulfill({ status: 404 }); }
@@ -91,6 +92,7 @@ else {
       assert.deepStrictEqual(off, none, 'off is the size it always had');
       assert.ok(none.size < sub.size && sub.size < strong.size && strong.size < dram.size, JSON.stringify({ none, sub, strong, dram }));
     });
+    await t('the preview asks nothing of the internet (theme fonts come from the kit)', () => assert.deepStrictEqual(outside, []));
   } finally { await browser.close(); }
 }
 console.log(`\npreview face: ${n} tests passed`);

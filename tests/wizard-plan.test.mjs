@@ -50,19 +50,31 @@ try {
   await t('a plan sets the same picks as the same clicks on the classic steps', () => {
     const cases = [
       [{ words: { type: 'kinetic', entrance: 'pop' } }, { picks: { 'captionStyle:kinetic': 'allow', 'captionEntrance:pop': 'allow' } }],
-      [{ words: { type: 'captions', look: 'pill', fonts: 'druk', colors: { theme: 'magazine' } } }, { picks: { 'captionStyle:pill': 'allow', 'font:druk': 'allow', 'theme:magazine': 'allow' } }],
+      [{ words: { type: 'captions', look: 'pill', fonts: 'druk', colors: { theme: 'magazine' } } }, { picks: { 'captionStyle:pill': 'allow', 'font:druk': 'allow', 'theme:magazine': 'allow' }, titles: 'off' }], // just captions: no big titles (spec 14.2)
       [{ transitions: { ids: ['whip', 'glitch'], when: 'every-cut' } }, { picks: { 'transition:whip': 'allow', 'transition:glitch': 'allow' } }],
       [{ filters: { ids: ['mono'], when: 'whole' }, music: { beatSync: false } }, { picks: { 'finish:mono': 'allow', 'beatSync:no-beat-sync': 'allow' } }],
       [{ presenter: [{ id: 'punch', when: 'whole' }, { id: 'behind-head', when: 'whole' }, { id: 'effect:slow-push', when: 'whole' }] }, { picks: { 'titleLayer:behind': 'allow', 'effect:slow-push': 'allow' } }],
       [{ graphics: { agent: false, nameTag: false, numbers: true, stickers: true, cta: true, cards: false } }, { picks: { 'graphic:lower-third': 'deny', 'editing:cards-auto': 'deny' } }],
     ];
     for (const [plan, clicks] of cases) {
-      const a = apply(fresh(), { videoPlan: VP.normalize(plan) }), b = apply(fresh(), clicks);
+      const a = apply(fresh(), { videoPlan: VP.touch(VP.normalize(plan), ...Object.keys(plan)) }), b = apply(fresh(), clicks);
       assert.strictEqual(picksOf(a), picksOf(b), JSON.stringify(plan));
       assert.deepStrictEqual(reel(a), reel(b), JSON.stringify(plan));
     }
   });
 
+  await t('just captions turns titles and key words off without losing the kinetic choices', () => {
+    let s = apply(fresh(), { videoPlan: VP.touch({ words: { type: 'kinetic', entrance: 'pop', keyWords: { level: 'strong' }, titles: { on: null, entrances: ['slam'] } } }, 'words') });
+    s = apply(s, { picks: { 'captionStyle:kinetic': 'clear', 'captionStyle:classic': 'allow' }, titles: 'off' });
+    const p = VP.fromState(s, s.videoPlan);
+    assert.strictEqual(p.words.type, 'captions'); assert.strictEqual(p.words.keyWords.level, 'off'); assert.strictEqual(p.words.entrance, null);
+    assert.notStrictEqual(p.words.titles.on, false, 'the derived titles off is not your own choice');
+    assert.ok(VP.validate(p).ok, VP.validate(p).errs.join(' '));
+  });
+  await t('a words choice wins over an All options pick of the same kind', () => {
+    const p = VP.withWords(VP.normalize({ advanced: { picks: { 'entrance:slam': 'deny', 'font:modern': 'allow', 'transition:whip': 'allow' } } }), { fonts: 'druk', titles: { entrances: ['slam'] } });
+    assert.deepStrictEqual(p.advanced.picks, { 'transition:whip': 'allow' });
+  });
   await t('a pace change leaves the choices you made yourself alone', () => {
     let p = VP.defaults('calm'); p.music.energy = 'high'; p = VP.touch(p, 'music.energy');
     const q = VP.applyPace(p, 'high');

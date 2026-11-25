@@ -32,7 +32,7 @@ export const shows = (step, plan) => { if (!step.onlyIf) return true; const m = 
 const behindOf = plan => plan.presenter.some(x => x.id === 'behind-head');
 
 export function Builder({ s: st, CAT, apply, go, page, setPage }) {
-  const [steps, setSteps] = useState(null), [view, setView] = useState(null), [err, setErr] = useState(''), [busy, setBusy] = useState(false), [hover, setHover] = useState(null);
+  const [steps, setSteps] = useState(null), [view, setView] = useState(null), [err, setErr] = useState(''), [busy, setBusy] = useState(false), [hover, setHover] = useState(null), [saveErr, setSaveErr] = useState('');
   const ask = useRef(0), head = useRef(null), startHead = useRef(null), moved = useRef(false);
   const known = page === 'start' || BUILT.includes(page);
   useEffect(() => { api('/api/wizard/steps').then(setSteps).catch(e => setErr(e.message)); }, []);
@@ -55,8 +55,11 @@ export function Builder({ s: st, CAT, apply, go, page, setPage }) {
     if (drain.current) return drain.current;
     setBusy(true);
     return (drain.current = (async () => {
-      try { while (queue.current.length) { const b = queue.current.shift(), k = ++ask.current; try { const v = await api('/api/video-plan', b); if (k === ask.current) setView(v); apply(v); } catch {} } }
+      // a refused choice says why and keeps you on the screen (resolves false); the plan shown is the saved one
+      let ok = true;
+      try { while (queue.current.length) { const b = queue.current.shift(), k = ++ask.current; try { const v = await api('/api/video-plan', b); if (k === ask.current) setView(v); apply(v); setSaveErr(''); } catch (e) { ok = false; setSaveErr(e.message || 'it did not save'); } } }
       finally { drain.current = null; setBusy(false); setShown(null); }
+      return ok;
     })());
   };
   if (!known) return null;
@@ -80,13 +83,14 @@ export function Builder({ s: st, CAT, apply, go, page, setPage }) {
   const body = step.id === 'pace' ? <Pacing paces={view.paces} value={pace} onPick={p => send({ pace: p })} />
     : step.id === 'wordsPreview' ? <WordsPreview words={w} behind={behindOf(plan)} summary={(rows.find(r => r.step === 'captionType') || {}).text || ''} />
     : LIVE.includes(step.id) ? <WithPreview words={w} hover={hover} behind={behindOf(plan)}><Body {...props} /></WithPreview> : <Body {...props} />;
-  const lock = step.lock, next = lock ? () => send({ words: {} }).then(() => (nextStep ? open(nextStep.id) : toClassic())) : nextStep ? () => open(nextStep.id) : toClassic;
+  const lock = step.lock, next = lock ? () => send({ words: {} }).then(ok => { if (ok) (nextStep ? open(nextStep.id) : toClassic()); }) : nextStep ? () => open(nextStep.id) : toClassic;
   const doneSecs = [...(plan.touched.includes('pace') ? ['pace'] : []), ...(plan.touched.includes('words') ? ['words'] : [])];
   return <div id="builder" {...stylex.props(s.wrap)}>
     <SectionBar sections={steps.sections} current={step.section} done={doneSecs} ready={READY} onOpen={id => open(visible.find(x => x.section === id).id)} />
     <StepFrame step={step} count={`${sec.label}, ${k} of ${inSec.length}`} does={does} back={() => open(prevStep ? prevStep.id : 'start')} headRef={head} face={step.id === 'place'}
-      next={next} nextDisabled={busy} nextLabel={lock ? 'Lock and continue' : nextStep ? 'Next' : 'Continue in the classic steps'}>
+      next={next} nextDisabled={busy || (step.id === 'captionType' && !w.type)} nextLabel={lock ? 'Lock and continue' : nextStep ? 'Next' : 'Continue in the classic steps'}>
       {body}
+      {saveErr && <p className="fine" role="alert" id="build-save-err">We could not save that choice: {saveErr}</p>}
       {pending.length > 0 && <p className="fine" id="build-step-soon">Shows in the preview now. Coming soon in your rendered video: {pending.map(x => x.text).join(', ')}.</p>}
     </StepFrame>
     {view.pending && view.pending.length > 0 && <p className="fine" id="build-pending">Coming soon, kept in your plan for later: {view.pending.map(x => x.text).join(', ')}.</p>}

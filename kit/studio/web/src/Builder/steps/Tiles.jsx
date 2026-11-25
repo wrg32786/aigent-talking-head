@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import * as stylex from '@stylexjs/stylex';
+const withClass = (name, ...st) => { const p = stylex.props(...st); return { ...p, className: name + (p.className ? ' ' + p.className : '') }; };
 import { RadioGroup, Radio } from '@headlessui/react';
 import { file, isPaused, showName, Icon } from '../../lib.jsx';
 
@@ -41,7 +42,7 @@ export function Tiles({ id, label, items, featured = [], value, multi = false, a
     {(multi ? x.id === null ? !chosen.length : chosen.includes(x.id) : chosen === x.id) && <span aria-hidden="true" {...stylex.props(s.mark)}><Icon n="check" /></span>}
     <span {...stylex.props(s.name)}>{x.id === null ? noneLabel : x.name}</span></>;
   const list = [...(allowNone ? [{ id: null, name: noneLabel }] : []), ...shown];
-  const more = sorted.length > top.length && <button type="button" className="btn ghost sm" id={id + '-all'} aria-expanded={all} onClick={() => setAll(a => !a)} {...stylex.props(s.more)}>{all ? 'Show fewer' : `See all ${sorted.length}`}</button>;
+  const more = sorted.length > top.length && <button type="button" id={id + '-all'} aria-expanded={all} onClick={() => setAll(a => !a)} {...withClass('btn ghost sm', s.more)}>{all ? 'Show fewer' : `See all ${sorted.length}`}</button>;
   if (!multi) return <div><RadioGroup value={chosen ?? null} by={(a, b) => a === b} onChange={v => { if (!disabled) onChange(v); }} aria-label={label} id={id} {...stylex.props(s.grid)}>
     {list.map(x => <Radio key={String(x.id)} value={x.id} data-opt={x.id ?? 'none'} aria-label={x.id === null ? noneLabel : x.name} {...hover(x)} {...stylex.props(s.tile, chosen === x.id && s.on)}>{body(x)}</Radio>)}
   </RadioGroup>{more}</div>;
