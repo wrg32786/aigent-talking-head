@@ -57,8 +57,8 @@ try {
     assert.ok(await pg.$('#build-pace svg[role="img"]'), 'the zone map');
     assert.deepStrictEqual(await pg.$$eval('#build-paces [data-pace]', e => e.map(x => x.dataset.pace)), ['look', 'calm', 'steady', 'lively', 'high']);
     assert.match(await pg.textContent('#build-count'), /^Pace, 1 of 1$/);
-    assert.ok(await pg.$('#build-sections [data-section="shots"][disabled]'), 'sections not built yet say Coming soon');
-    assert.match(await pg.innerText('#build-sections [data-section="shots"]'), /Soon/, 'and say so where you can see it');
+    assert.ok(await pg.$('#build-sections [data-section="look"][disabled]'), 'sections not built yet say Coming soon');
+    assert.match(await pg.innerText('#build-sections [data-section="look"]'), /Soon/, 'and say so where you can see it');
     for (const id of ['calm', 'steady', 'lively', 'high']) assert.match(await pg.getAttribute(`#build-paces [data-pace="${id}"] img`, 'src'), new RegExp(`paces/${id}\\.webp$`));
   });
 
@@ -112,13 +112,37 @@ try {
     await pg.click('#build-next'); await pg.waitForSelector('#build-fonts');
     await pg.click('#build-next'); await pg.waitForSelector('#build-kw');
     await pg.click('#build-kw [data-opt="strong"]'); await pg.waitForFunction(async () => (await (await fetch('/api/state')).json()).state.keyWords === 'strong');
-    assert.match(await pg.textContent('#build-does'), /clearly bigger/);
+    await pg.waitForFunction(() => /clearly bigger/.test(document.querySelector('#build-does').textContent));
     await pg.click('#build-next'); await pg.waitForSelector('#build-final[data-ready]', { timeout: 15000 });
     assert.match(await pg.textContent('#build-words-sum'), /Kinetic words/);
     await noCmd(pg, 'Words'); await shot(pg, 'builder-words-preview.png');
     assert.strictEqual(await pg.textContent('#build-next'), 'Lock and continue');
-    await pg.click('#build-next'); await pg.waitForSelector('main[data-step="picture"]:not([data-build])');
+    await pg.click('#build-next'); await pg.waitForSelector('#build-tr-ours');
     const v = await api('/api/video-plan'); assert.ok(v.plan.touched.includes('words')); assert.strictEqual(v.plan.words.place.captions, 'lower');
+  });
+
+  await t('Between shots, You on screen and Extras: transitions and how often, presenter effects with when, graphics', async () => {
+    await open(pg, '#build=transitions'); await pg.waitForSelector('#build-tr-ours');
+    await pg.click('#build-tr-ours'); await pg.waitForSelector('#build-tr');
+    await pg.click('#build-tr [data-opt="whip"]'); await pg.waitForSelector('#build-tr [data-opt="whip"][aria-pressed="true"]');
+    await pg.click('#build-tw [data-opt="hook-cta"]');
+    await pg.waitForFunction(async () => (await (await fetch('/api/state')).json()).state.transitionsWhen === 'hook-cta');
+    assert.match(await pg.textContent('#build-does'), /hook and the call to action/);
+    await pg.click('#build-tr [data-opt="none"]'); await pg.waitForFunction(async () => { const p = (await (await fetch('/api/video-plan')).json()).plan; return p.transitions.ids && !p.transitions.ids.length; });
+    assert.ok(!(await pg.$('#build-tw')), 'straight cuts have no how often');
+    await noCmd(pg, 'Transitions'); await shot(pg, 'builder-transitions.png');
+    await pg.click('#build-next'); await pg.waitForSelector('#build-pres');
+    await pg.click('#build-pres [data-opt="behind-head"]'); await pg.waitForSelector('#build-pw-behind-head');
+    await pg.click('[data-when-for="behind-head"] [data-when="whole"]');
+    await pg.waitForFunction(async () => (await (await fetch('/api/video-plan')).json()).plan.presenter.some(x => x.id === 'behind-head' && x.when === 'whole'));
+    assert.ok((await api('/api/state')).state.picks.titleLayer.allow.includes('behind'));
+    await noCmd(pg, 'Presenter'); await shot(pg, 'builder-presenter.png');
+    await pg.click('#build-next'); await pg.waitForSelector('#build-gx-agent');
+    await pg.click('#build-gx-agent'); await pg.waitForSelector('#build-gx-nameTag');
+    await pg.click('#build-gx-nameTag');
+    await pg.waitForFunction(async () => ((await (await fetch('/api/state')).json()).state.picks.graphic || { deny: [] }).deny.includes('lower-third'));
+    await noCmd(pg, 'Graphics'); await shot(pg, 'builder-graphics.png');
+    assert.strictEqual(await pg.textContent('#build-next'), 'Continue in the classic steps');
   });
 
   await t('Just captions skip the kinetic-only steps and take key words away', async () => {
