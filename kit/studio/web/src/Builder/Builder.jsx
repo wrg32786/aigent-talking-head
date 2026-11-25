@@ -21,30 +21,33 @@ export function Builder({ s: st, apply, go, page, setPage }) {
   const known = page === 'start' || BUILT.includes(page);
   useEffect(() => { api('/api/wizard/steps').then(setSteps).catch(e => setErr(e.message)); }, []);
   // read the plan again whenever the session changes anywhere; an older reply never replaces a newer one
-  useEffect(() => { const k = ++ask.current; api('/api/video-plan').then(v => { if (k === ask.current) setView(v); }).catch(e => setErr(e.message)); }, [st.rev, st.videoSeq]);
+  useEffect(() => { const k = ++ask.current; api('/api/video-plan').then(v => { if (k === ask.current) { setView(v); setErr(''); } }).catch(e => { if (k === ask.current) setErr(e.message); }); }, [st.rev, st.videoSeq]);
   // a link to a step that has no screen yet starts at the beginning
   useEffect(() => { if (!known) { history.replaceState(null, '', '#build=start'); setPage('start'); } }, [known, setPage]);
   // focus the new screen's heading after Build my own, Back or a section, not on first load
   useEffect(() => { if (!moved.current) return; window.scrollTo({ top: 0 }); const h = page === 'start' ? startHead.current : head.current; if (h) h.focus({ preventScroll: true }); }, [page, !!view]);
   const open = p => { moved.current = true; setPage(p); history.replaceState(null, '', '#build=' + p); };
+  // the chosen pace shows at once; quick changes while one is saving are queued and only the last is sent
+  const [shown, setShown] = useState(null), queued = useRef(null), saving = useRef(false);
   const pick = async pace => {
-    if (busy) return; setBusy(true); const k = ++ask.current;
-    try { const v = await api('/api/video-plan', { pace }); if (k === ask.current) setView(v); apply(v); } catch {} finally { setBusy(false); }
+    setShown(pace); queued.current = pace; if (saving.current) return; saving.current = true; setBusy(true);
+    try { while (queued.current) { const p = queued.current; queued.current = null; const k = ++ask.current; try { const v = await api('/api/video-plan', { pace: p }); if (k === ask.current) setView(v); apply(v); } catch { setShown(null); } } }
+    finally { saving.current = false; setBusy(false); setShown(null); }
   };
   if (!known) return null;
   if (page === 'start') return <Start s={st} apply={apply} onBuild={() => open('pace')} headRef={startHead} />;
-  if (err) return <p className="fine" role="alert">The builder could not load: {err}</p>;
+  if (err && !view) return <p className="fine" role="alert">The builder could not load: {err}</p>;
   if (!steps || !view) return <p className="fine" role="status">Loading the builder</p>;
   const step = steps.steps.find(x => x.id === page) || steps.steps[0], sec = steps.sections.find(x => x.id === step.section);
   const inSec = steps.steps.filter(x => x.section === step.section), k = inSec.indexOf(step) + 1;
-  const plan = view.plan, P = view.paces[plan.pace];
+  const plan = view.plan, P = view.paces[shown || plan.pace];
   // past the last built step: carry on in the classic steps, the plan stays as set
   const toClassic = () => { history.replaceState(null, '', '#step=picture'); setPage(null); go('picture', true); };
   return <div id="builder" {...stylex.props(s.wrap)}>
     <SectionBar sections={steps.sections} current={step.section} done={plan.touched.includes('pace') ? ['pace'] : []} ready={READY} onOpen={id => open(steps.steps.find(x => x.section === id).id)} />
     <StepFrame step={step} count={`${sec.label}, ${k} of ${inSec.length}`} does={P ? P.says : ''} back={() => open('start')} headRef={head}
       next={toClassic} nextLabel="Continue in the classic steps">
-      {step.id === 'pace' && <Pacing paces={view.paces} value={plan.pace} onPick={pick} busy={busy} />}
+      {step.id === 'pace' && <Pacing paces={view.paces} value={shown || plan.pace} onPick={pick} />}
     </StepFrame>
     {view.pending && view.pending.length > 0 && <p className="fine" id="build-pending">Coming soon, kept in your plan for later: {view.pending.map(x => x.text).join(', ')}.</p>}
   </div>;

@@ -105,7 +105,7 @@ export function App() {
     if (k.video !== null && video !== k.video) {
       // a new video opens where you started it: the builder's first screen, or the classic Start step
       setStep('start'); setStartView('main'); localStorage.setItem('studio.step', 'start'); history.replaceState(null, '', buildRef.current ? '#build=start' : '#step=start');
-      if (buildRef.current) setBuild('start');
+      if (buildRef.current) { buildRef.current = 'start'; setBuild('start'); }
       setLog(''); setRecLive(null); // a task log and a recorder status belong to the previous board
     }
     if (v.seq) seen.current = { boot: v.boot, seq: v.seq, video };

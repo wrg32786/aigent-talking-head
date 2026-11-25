@@ -7,26 +7,30 @@ import { Player, clock } from './Player.jsx';
 import { Toggle, Hint } from './ui.jsx';
 import { StartMode } from './RecreateStart.jsx';
 
-export function Dropzone({ id, inputId, kind, s, apply, accept, multiple, big, children, label }) {
+// prepare: an optional async step before the upload that returns the state to upload into (the builder names an
+// unnamed video there); null stops the upload
+export function Dropzone({ id, inputId, kind, s, apply, accept, multiple, big, children, label, prepare }) {
   const input = useRef(null); const [over, setOver] = useState(false);
+  const send = async files => { const st = prepare ? await prepare() : s; if (st) upload(kind, files, st, apply); };
   const pick = () => input.current.click();
   return <div className={'drop' + (big ? ' big' : '') + (over ? ' over' : '')} id={id} tabIndex={0} role="button" aria-label={label}
     onClick={pick} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } }}
     onDragOver={e => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
-    onDrop={e => { e.preventDefault(); setOver(false); upload(kind, [...e.dataTransfer.files], s, apply); }}>
+    onDrop={e => { e.preventDefault(); setOver(false); send([...e.dataTransfer.files]); }}>
     {children}
-    <input type="file" id={inputId} ref={input} accept={accept} multiple={multiple} hidden onClick={e => e.stopPropagation()} onChange={e => { upload(kind, [...e.target.files], s, apply); e.target.value = ''; }} />
+    <input type="file" id={inputId} ref={input} accept={accept} multiple={multiple} hidden onClick={e => e.stopPropagation()} onChange={e => { const files = [...e.target.files]; e.target.value = ''; send(files); }} />
   </div>;
 }
 
 const SITES = { dropbox: 'Dropbox', drive: 'Google Drive', direct: 'Link' };
 export const bytes = n => n == null ? '' : n >= 1e9 ? (n / 1e9).toFixed(2) + ' GB' : n >= 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1e3)) + ' KB';
 // paste a public Dropbox or Google Drive share link, or a direct video URL; the server downloads it into the footage
-export function FootageLink({ s, apply }) {
+export function FootageLink({ s, apply, prepare }) {
   const [url, setUrl] = useState(''), [busy, setBusy] = useState(false);
   const add = async ev => {
     ev.preventDefault(); const u = url.trim(); if (!u) return;
-    if (!s.job) { toast('Name the reel first (top left)'); document.getElementById('job')?.focus(); return; }
+    const st = prepare ? await prepare() : s; if (!st) return;
+    if (!st.job) { toast('Name the reel first (top left)'); document.getElementById('job')?.focus(); return; }
     setBusy(true); try { apply(await api('/api/footage/url', { url: u })); setUrl(''); } catch {} finally { setBusy(false); }
   };
   const items = (s.imports || []).slice().reverse();

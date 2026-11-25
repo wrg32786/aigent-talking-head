@@ -94,8 +94,10 @@ export function defaults(pace = 'look') { return applyPace(blank(), pace); }
 // whose value is not what the plan's current pace gives was set somewhere else (a classic step, the chat, an agent),
 // so it counts as yours and the new pace leaves it alone. Returns the new plan and the small patch for core.mjs
 // applyPatch that sets only what a pace changes (no clearing of picks, so nothing else moves).
-export function pacePatch(plan, pace) {
-  let p = normalize(plan); const was = Object.hasOwn(PACES, p.pace) ? PACES[p.pace] : PACES.look;
+// last: the pace saved last time (s.videoPlan.pace), or none: then the session never had a pace picked and starts from
+// Let the Look decide. The plan's own pace is only a guess from the pause length, so it is not used here.
+export function pacePatch(plan, pace, last = null) {
+  let p = normalize(plan); const lp = last || 'look', was = Object.hasOwn(PACES, lp) ? PACES[lp] : PACES.look;
   if (p.music.energy !== was.energy) p = touch(p, 'music.energy');
   if (p.music.beatSync !== was.beatSync) p = touch(p, 'music.beatSync');
   if (p.presenter.some(x => x.id === 'punch') !== was.punch) p = touch(p, 'presenter');

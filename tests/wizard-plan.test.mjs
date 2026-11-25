@@ -90,6 +90,18 @@ try {
     assert.strictEqual(s.pace.tighten, 'off'); assert.strictEqual(s.pace.punch, 'off'); assert.strictEqual(s.music.energy, 'low');
   });
 
+  await t('a pace compares against the pace saved last, not a guess from the pause length', () => {
+    // a new session with a hand-set pause of 0.6 s: nothing else was touched, so Calm sets all of its fields
+    let s = apply(fresh(), { pace: { tighten: 0.6 } }), r = VP.pacePatch(API.planOf(s, cat), 'calm', s.videoPlan && s.videoPlan.pace);
+    apply(s, r.patch); s.videoPlan = r.plan;
+    assert.strictEqual(s.music.energy, 'low'); assert.strictEqual(s.pace.punch, 'off'); assert.strictEqual(s.pace.tighten, 'off');
+    // Lively, then pauses turned off on a classic step, then High: Lively's own values were never yours
+    r = VP.pacePatch(API.planOf(s, cat), 'lively', s.videoPlan.pace); apply(s, r.patch); s.videoPlan = r.plan;
+    apply(s, { pace: { tighten: 'off' } });
+    r = VP.pacePatch(API.planOf(s, cat), 'high', s.videoPlan.pace); apply(s, r.patch); s.videoPlan = r.plan;
+    assert.strictEqual(s.music.energy, 'high'); assert.deepStrictEqual(r.plan.touched, ['pace']);
+  });
+
   await t('a session from the classic steps reads into a plan and back to the same picks and reel', () => {
     const sessions = [
       { picks: { 'captionStyle:hormozi': 'allow', 'transition:whip': 'allow', 'graphic:checklist': 'allow', 'effect:todo': 'allow' } },
