@@ -48,7 +48,7 @@ const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data',
 const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json();
 const until = async (fn, ms = 20000) => { const end = Date.now() + ms; for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) throw new Error('timed out'); await wait(150); } };
 // the page keeps a live connection, so wait for the stepper, not for a quiet network. A reload lands on the step in the hash
-const theme = async (pg, th) => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); };
+const theme = async (pg, th) => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#areas'); };
 const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); };
 const step = async (pg, st) => { await pg.click(`#stepper [data-step="${st}"]`); await pg.waitForSelector(`main[data-step="${st}"][data-view="main"]`); };
 const shot = async (pg, name, h = 1300) => { if (!shots) return; const vp = pg.viewportSize(); await pg.setViewportSize({ width: vp.width, height: h }); await pg.evaluate(() => scrollTo(0, 0)); await pg.waitForTimeout(400); await pg.screenshot({ path: join(shots, name) }); await pg.setViewportSize(vp); };
@@ -184,7 +184,7 @@ try {
     // the breakdown is the second view of Picture, so the card is not on screen with it: read its hint first
     const cardHint = await pg.textContent('#ref-card-mode-hint');
     await pg.click('#ref-more'); await pg.click('#ref-open'); await pg.waitForSelector('#ref-notice-td[data-mode="influence"]');
-    assert.strictEqual(await pg.getAttribute('main', 'data-view'), 'reference');
+    assert.strictEqual(await pg.getAttribute('main', 'data-area'), 'teardowns', 'the breakdown opens on the Teardowns tab');
     assert.match(await pg.textContent('#ref-notice-td'), /We set your picks from the reference\. Your Look and sound stay yours\./);
     assert.deepStrictEqual(await pg.$$eval('#ref-mode [role="radio"]', x => x.map(e => e.textContent.trim())), ['Recreate', 'Copy the look', 'Influence', 'Off'], 'the same vocabulary in the Breakdown');
     assert.strictEqual(await pg.getAttribute('#ref-mode [data-mode="influence"]', 'aria-checked'), 'true'); assert.strictEqual(await pg.getAttribute('#ref-mode', 'role'), 'radiogroup');
