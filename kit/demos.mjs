@@ -127,7 +127,8 @@ export const PACE_CUTS = { calm: 0, steady: 1.5, lively: 0.75, high: 0.4 };
 function pace(work, id) {
   const every = PACE_CUTS[id], out = join(work, `pace-${id}.mp4`);
   const z = every ? `if(mod(floor(t/${every})\\,2)\\,1.18\\,1)` : `(1+0.1*t/${DUR})`;
-  ff(['-i', plate(work), '-vf', `crop=w='iw/${z}':h='ih/${z}':x='(iw-ow)/2':y='(ih-oh)*0.3',scale=${FW}:${FH},format=yuv420p`, '-t', String(DUR), ...lossless, out]);
+  // scale per frame (crop sizes are fixed once), then cut the 9:16 frame back out a little above centre
+  ff(['-i', plate(work), '-vf', `scale=w='trunc(iw*${z}/2)*2':h='trunc(ih*${z}/2)*2':eval=frame,crop=${FW}:${FH}:'(iw-ow)/2':'(ih-oh)*0.3',format=yuv420p`, '-t', String(DUR), ...lossless, out]);
   return out;
 }
 const titleLayer = (work, it) => overlay(work, 'tl-' + it.id, { captionStyle: 'kinetic', layout: false, flips: LAYER_DEMO[it.id] });

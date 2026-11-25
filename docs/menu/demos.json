@@ -2,6 +2,9 @@
  "effect:tape-label": {
   "q": 60
  },
+ "pace:calm": {
+  "q": 12
+ },
  "pace:high": {
   "q": 60
  },

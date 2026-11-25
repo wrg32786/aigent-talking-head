@@ -15,9 +15,9 @@ export function SectionBar({ sections, current, done, ready, onOpen }) {
     {sections.map(x => {
       const ok = ready.includes(x.id), here = x.id === current;
       return <li key={x.id}>
-        <button type="button" data-section={x.id} disabled={!ok} aria-current={here ? 'step' : undefined} onClick={() => ok && onOpen(x.id)}
+        <button type="button" data-section={x.id} disabled={!ok} title={ok ? undefined : 'Coming soon'} aria-current={here ? 'step' : undefined} onClick={() => ok && onOpen(x.id)}
           {...stylex.props(s.item, here && s.current, !ok && s.soon)}>
-          {done.includes(x.id) && <Icon n="check" />}{x.label}{!ok && <span {...stylex.props(s.tag)}>Coming soon</span>}
+          {done.includes(x.id) && <Icon n="check" />}{x.label}{!ok && <span className="sr">, coming soon</span>}
         </button>
       </li>;
     })}

@@ -4,6 +4,7 @@ import { ZoneMap } from './ZoneMap.jsx';
 // The frame every builder step uses (spec section 6): the question, an Applies to chip with the zone map, the options,
 // one line on what the chosen option does, and Back, the step count and Next.
 const s = stylex.create({
+  frame: { padding: 20, marginTop: 12, borderRadius: 16, borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--border)' },
   head: { display: 'flex', gap: 16, alignItems: 'center', marginBottom: 12 },
   title: { margin: 0, fontSize: 22 },
   sub: { marginTop: 4, marginBottom: 0, opacity: 0.8 },
@@ -13,14 +14,17 @@ const s = stylex.create({
   count: { fontSize: 13, opacity: 0.8 },
 });
 
+// stylex.props gives a className, so a plain class for tests and CSS goes in with it
+const withClass = (name, ...st) => { const p = stylex.props(...st); return { ...p, className: name + ' ' + (p.className || '') }; };
+
 export function StepFrame({ step, count, does, back, next, nextLabel = 'Next', children }) {
-  return <section className="step glass-card" id={'build-' + step.id} aria-labelledby={'build-h-' + step.id}>
+  return <section {...withClass('step glass-card', s.frame)} id={'build-' + step.id} aria-labelledby={'build-h-' + step.id}>
     <div {...stylex.props(s.head)}>
       <ZoneMap zone={step.zone} label={'Applies to: ' + step.appliesTo} />
       <div>
         <h2 id={'build-h-' + step.id} {...stylex.props(s.title)}>{step.question}</h2>
         <p {...stylex.props(s.sub)}>{step.title}</p>
-        <span className="applies" {...stylex.props(s.chip)}>Applies to: {step.appliesTo}</span>
+        <span {...withClass('applies', s.chip)}>Applies to: {step.appliesTo}</span>
       </div>
     </div>
     {children}
