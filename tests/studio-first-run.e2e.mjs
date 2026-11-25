@@ -24,6 +24,8 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args], { stdi
 // a take filmed before any video was named: the holding folder the Recording tab lists (kit/studio/recordings.mjs)
 const HOLD = join(ROOT, 'inbox', 'studio', '_recordings', 'takes'); mkdirSync(HOLD, { recursive: true });
 const TAKE_N = 900 + (process.pid % 90), TAKE = join(HOLD, `take-${TAKE_N}.mp4`);
+// never over a real take: stop before anything is written (or cleaned up) when the name is used
+if (existsSync(TAKE) || existsSync(TAKE.replace(/\.mp4$/, '.json'))) { console.error(`${TAKE} already exists; not touching it`); process.exit(1); }
 ff(['-f', 'lavfi', '-i', 'color=c=0x30384a:s=360x640:r=12:d=8', '-f', 'lavfi', '-i', 'sine=f=220:d=8', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', TAKE]);
 writeFileSync(TAKE.replace(/\.mp4$/, '.json'), JSON.stringify({ seconds: 8, at: new Date().toISOString(), script: 'First run take' }));
 // words with no call to action in them (fake-tx: matched by part of the file name)
@@ -95,7 +97,7 @@ try {
     process.env.LOOKS_DIR = LOOKS; const T = await import('../kit/studio/templates.mjs'), d = join(LOOKS, 'first-look');
     mkdirSync(d, { recursive: true });
     const plan = (await api('/api/video-plan')).plan; writeFileSync(join(d, 'template.json'), JSON.stringify({ format: 'aigent-template', version: 1, name: 'first-look', label: 'First look', createdAt: new Date().toISOString(), from: { kind: 'teardown-url', url: 'https://example.com/v' }, plan: { ...plan, notes: '' }, summary: {}, preview: null }));
-    assert.ok(T.setThumb('first-look', join(ROOT, (await api('/api/state')).state.footage[0])), 'a still from the video');
+    assert.ok(await T.setThumb('first-look', join(ROOT, (await api('/api/state')).state.footage[0])), 'a still from the video');
     await pg.goto('about:blank'); await pg.goto(url + '/#tab=teardowns', { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#template-library li[data-template="first-look"]');
     const src = await pg.getAttribute('#template-library li[data-template="first-look"] img', 'src'); assert.strictEqual(src, '/api/templates/preview/first-look');
     assert.ok(await pg.evaluate(async u => (await fetch(u)).headers.get('content-type'), src) === 'image/jpeg');

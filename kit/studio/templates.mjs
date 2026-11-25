@@ -5,7 +5,7 @@
 //   rename, duplicate, remove (the page asks first), planFor(name, cat) the plan a template starts a video with
 // Starters are read only: Duplicate one to make it yours. A look you saved stays a look: Rename only sets its label.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
-import { execFileSync } from 'child_process';
+import { execFile } from 'child_process';
 import { join } from 'path';
 import { createRequire } from 'module';
 import * as VP from './wizard/plan.mjs';
@@ -19,9 +19,12 @@ export const fileOf = name => join(SL.dirOf(), name, 'template.json');
 // a template's own picture: looks/local/<name>/preview.jpg, a still from the video it came from (the teardown's
 // reference, or the newest render when saved from the builder). Served by GET /api/templates/preview/<name>.
 export const thumbOf = name => typeof name === 'string' && SL.NAME_RE.test(name) ? join(SL.dirOf(), name, 'preview.jpg') : null;
-export function setThumb(name, video, at = 1.5) {
+// (async, so the server keeps answering while ffmpeg works; a half-written picture is removed)
+export async function setThumb(name, video, at = 1.5) {
   const out = thumbOf(name); if (!out || !video || !existsSync(video)) return false;
-  for (const t of [at, 0]) { try { execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', String(t), '-i', video, '-frames:v', '1', '-vf', 'scale=360:-2', '-q:v', '4', out], { stdio: 'ignore', timeout: 30000 }); if (existsSync(out)) return true; } catch {} }
+  const run = t => new Promise(ok => execFile('ffmpeg', ['-v', 'error', '-y', '-ss', String(t), '-i', video, '-frames:v', '1', '-vf', 'scale=360:-2', '-q:v', '4', out], { timeout: 30000 }, e => ok(!e && existsSync(out))));
+  for (const t of [at, 0]) { if (await run(t)) return true; }
+  try { rmSync(out, { force: true }); } catch {}
   return false;
 }
 const thumbUrl = name => { const f = thumbOf(name); return f && existsSync(f) ? `/api/templates/preview/${name}` : null; };

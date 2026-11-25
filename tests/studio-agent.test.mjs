@@ -164,7 +164,7 @@ try {
     const s = (await req('/api/state')).j.state;
     assert.ok(s.picks.transition.allow.includes('zoom'));
     const added = s.chat.slice(before); assert.strictEqual(added.length, 1); assert.strictEqual(added[0].kind, 'action');
-    assert.ok(/transition zoom/.test(added[0].text) && /from the terminal/.test(added[0].text)); assert.ok(!/chatter|terminal line/.test(JSON.stringify(s.chat)));
+    assert.ok(/transition zoom/.test(added[0].text) && /from your agent/.test(added[0].text)); assert.ok(!/chatter|terminal line/.test(JSON.stringify(s.chat)));
     assert.ok(r.actionNote);
     await call('studio_settings', { actionNotes: false });
     await call('studio_set_selections', { origin: 'terminal', picks: { 'transition:whip': 'clear' } });

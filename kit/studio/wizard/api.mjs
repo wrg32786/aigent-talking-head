@@ -64,7 +64,7 @@ export function mount({ C, json, readBody, view, pushState }) {
       const b = await readBody(req), s = C.load(), cat = C.catalog();
       try { const t = TPL.save(b && typeof b.name === 'string' ? b.name : '', { plan: planOf(s, cat), from: { kind: 'builder' }, cat });
         // its picture: a still from this video's newest render, when there is one
-        try { const outs = (C.outputsOf ? C.outputsOf(s) : []).map(f => join(ROOT, f)).filter(f => existsSync(f)).sort((x, y) => statSync(y).mtimeMs - statSync(x).mtimeMs); if (outs[0]) TPL.setThumb(t.name, outs[0]); } catch {}
+        try { const outs = (C.outputsOf ? C.outputsOf(s) : []).map(f => join(ROOT, f)).filter(f => existsSync(f)).sort((x, y) => statSync(y).mtimeMs - statSync(x).mtimeMs); if (outs[0]) TPL.setThumb(t.name, outs[0]).catch(() => {}); } catch {}
         json(res, 200, { template: t }); }
       catch (e) { json(res, typeof e.code === 'number' ? e.code : 500, { error: e.message }); }
       return true;

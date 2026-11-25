@@ -347,7 +347,7 @@ export function fromState(s, prev = null, cat = null) {
   else p.filters.ids = null;
   p.filters.when = s.finishWhen && s.finishWhen !== 'none' ? s.finishWhen : Array.isArray(p.filters.ids) && p.filters.ids.length ? 'whole' : base.filters.when; // no timing in the session: the look's way
   p.music.bed = (s.music && s.music.bed) || 'auto'; p.music.energy = (s.music && s.music.energy) || 'auto';
-  const bs = allow('beatSync')[0]; p.music.beatSync = bs === 'beat-sync' ? true : bs === 'no-beat-sync' ? false : p.music.bed === 'none' || base.music.bed === 'none' ? base.music.beatSync : null; if (bs) take('beatSync', bs); // no music keeps the beat choice for later
+  const bs = allow('beatSync')[0]; p.music.beatSync = bs === 'beat-sync' ? true : bs === 'no-beat-sync' ? false : p.music.bed === 'none' || (base.music.bed === 'none' && base.music.beatSync === true) ? base.music.beatSync : null; if (bs) take('beatSync', bs); // no music keeps the beat choice for later
   p.music.sfx = !(s.sound && s.sound.sfx === 'off');
   const adv = {};
   for (const [k, slot] of Object.entries(picks)) {
