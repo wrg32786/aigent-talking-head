@@ -327,7 +327,8 @@ function renderSteps(s) {
   if (C.MOTIONS.includes(s.pace && s.pace.motion)) args.push('--motion', s.pace.motion);
   if (s.keyWords) args.push('--key-words', s.keyWords); // a key words change after the draft reaches the render
   if (s.transitionsWhen) args.push('--transitions-when', s.transitionsWhen); // and a transition timing change
-  if (s.finishWhen) args.push('--finish-when', s.finishWhen); // and where filters show
+  if (s.finishWhen) { args.push('--finish-when', s.finishWhen); // and where filters show, with which filters said outright
+    if (s.finishWhen !== 'none') args.push('--finish-ids', ((s.picks.finish && s.picks.finish.allow) || []).join(',') || 'none'); }
   { const ex = SIZES.exportArg(s); if (ex) args.push('--export', ex); }
   // the b-roll lane goes into cut.json first (kit/studio/broll-run.mjs), with credits.txt for the clips it uses
   const bp = BRL.plan(s), steps = [];
@@ -1306,6 +1307,10 @@ async function api(req, res, u) {
     return json(res, 200, { ...view(s), log: r.log, errs: r.errs });
   }
   if (p === '/api/draft' && M === 'POST') {
+    // { plan: true } from the builder's Make my video: a session with no plan of its own keeps the plan read from it, as
+    // it is (nothing is applied again, so classic picks keep who made them), and the draft writes it beside the cut
+    const b = await readBody(req).catch(() => ({}));
+    if (b && b.plan === true) update(x => { if (!x.videoPlan) x.videoPlan = VP.normalize(planOf(x, C.catalog())); });
     const s = C.load(); const d = draftSteps(s); // checks the footage first, so an empty job says that before a missing tool
     const miss = needFor('draft'); if (miss) return json(res, 400, miss);
     startDraft(d, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; delete st.draftStale; }); BRL.autoPick(s.job); return { choices: !!readChoices(C.load()), note: DRAFT_DONE, from: d.from }; });
@@ -1485,11 +1490,15 @@ async function api(req, res, u) {
     if ((w.wizard !== 'reference') && !rel) return json(res, 400, { error: 'add footage first, on the Start step' });
     const setOut = o => { const r = CUT.normalize(outputOf(C.load()), o); if (r.errs.length) throw new Error(r.errs.join('; ')); update(x => { x.output = r.output; if (!x.cut || x.cut.source !== rel) x.cut = { source: rel, candidates: [], scoredBy: null }; }); };
     if (w.goal) { setOut(WIZ.GOALS[w.goal].out); done.push(`goal: ${WIZ.GOALS[w.goal].label}`); next = 'look';
-      // the goal is a plan too: its pace (what you made yours stays), and its line in Your notes once
-      const G = WIZ.GOALS[w.goal], s1 = C.load(), cat = C.catalog(), { plan, patch } = VP.pacePatch(planOf(s1, cat), G.pace, s1.videoPlan && s1.videoPlan.pace);
-      plan.notes = plan.notes.includes(G.note) ? plan.notes : ((plan.notes.trim() ? plan.notes.trim() + '\n' : '') + G.note).slice(0, 2000);
-      update(x => { const r = C.applyPatch(x, { ...patch, from: 'assistant' }); if (!r.errs.length) x.videoPlan = VP.normalize(plan); });
-      done.push(`pace: ${VP.PACES[G.pace].label}`); }
+      // the goal is a plan too: its pace, unless you picked one yourself in the builder, and its line in Your notes
+      // (another goal's line goes; a note that would not fit is left out and said)
+      const G = WIZ.GOALS[w.goal], s1 = C.load(), cat = C.catalog(), prev = planOf(s1, cat), mine = !!(s1.videoPlan && s1.videoPlan.touched && s1.videoPlan.touched.includes('pace') && !s1.videoPlan.goalPace);
+      const { plan, patch } = mine ? { plan: prev, patch: {} } : VP.pacePatch(prev, G.pace, s1.videoPlan && s1.videoPlan.pace);
+      const kept = plan.notes.split('\n').filter(l => !WIZ.NOTE_LINES.includes(l.trim())).join('\n').trim(), joined = (kept ? kept + '\n' : '') + G.note;
+      if (joined.length <= 2000) plan.notes = joined; else done.push('note: your notes are full, so the goal line was left out');
+      let errs = [];
+      update(x => { const r = C.applyPatch(x, { ...patch, from: 'assistant' }); errs = r.errs; if (!r.errs.length) x.videoPlan = { ...VP.normalize(plan), ...(mine ? {} : { goalPace: true }) }; });
+      done.push(errs.length ? `pace: not set (${errs.join(' ')})` : mine ? `pace: kept yours (${(VP.PACES[plan.pace] || {}).label || plan.pace})` : `pace: ${VP.PACES[G.pace].label}`); }
     if (w.look) { update(x => { C.applyPatch(x, { pack: w.look }); }); done.push(`look: ${w.look}`); next = 'choose'; }
     if (w.choose) {
       if (!(await linesOf(rel))) { if (!MEDIA.transcript(rel)) startTranscribe(rel, () => findCuts(rel, 'auto').catch(e => console.error(e.message))); pending = 'transcript'; next = 'cut'; note = 'Reading the words of the take first. Use our best lines on Cut when it is ready.'; }

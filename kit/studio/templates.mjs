@@ -28,13 +28,15 @@ function nameFor(plan) {
 export function save(rawName, { plan, from = { kind: 'builder' }, cat = null } = {}) {
   const v = VP.validate(plan, cat); if (!v.ok) throw fail(v.errs.join(' '));
   const p = VP.normalize(plan); p.notes = '';
-  const label = String(rawName || '').trim().slice(0, 60), name = label ? SL.slug(label) : nameFor(p);
+  if (p.music.bed === 'upload') p.music.bed = 'auto'; // your uploaded track stays with this video
+  const label = String(rawName || '').trim().slice(0, 60), name = label ? SL.slug(label).replace(/^-+|-+$/g, '') : nameFor(p);
   if (!name || !SL.NAME_RE.test(name)) throw fail('Give the template a name with letters or numbers.');
-  if (existsSync(fileOf(name))) throw fail(`You already have a template called ${name}. Pick another name.`, 409);
+  if (existsSync(join(SL.dirOf(), name))) throw fail(`You already have a template or look called ${name}. Pick another name.`, 409);
   const t = { format: FORMAT, version: VERSION, name, label: label || name.replace(/-/g, ' '), createdAt: new Date().toISOString(), from, plan: p,
     summary: Object.fromEntries(VP.summary(p, cat).map(r => [r.step, r.text])), preview: null };
   mkdirSync(join(SL.dirOf(), name), { recursive: true });
-  writeFileSync(fileOf(name), JSON.stringify(t, null, 2) + '\n');
+  try { writeFileSync(fileOf(name), JSON.stringify(t, null, 2) + '\n', { flag: 'wx' }); }
+  catch (e) { throw e.code === 'EEXIST' ? fail(`You already have a template called ${name}. Pick another name.`, 409) : fail(`We could not save the template: ${e.message}`, 500); }
   return { name, label: t.label, file: fileOf(name) };
 }
 

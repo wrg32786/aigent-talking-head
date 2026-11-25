@@ -167,16 +167,16 @@ try {
     }
   });
 
-  await t('a change on a classic step updates the plan and keeps its notes, timing and repo links', () => {
+  await t('a change on a classic step updates the plan and keeps its notes and repo links, and a classic filter pick resets filter timing', () => {
     const plan = VP.normalize({ notes: 'Hook with big red words.', filters: { ids: ['mono'], when: 'hook' }, content: { repoFeature: true, repos: ['https://github.com/wrg32786/aigent-talking-head'] } });
     const s = apply(fresh(), { videoPlan: plan });
     apply(s, { picks: { 'transition:whip': 'allow', 'finish:warm': 'allow' } });
     const now = API.planOf(s, cat);
     assert.deepStrictEqual(now.transitions.ids, ['whip']);
     assert.deepStrictEqual(now.filters.ids.sort(), ['mono', 'warm']);
-    assert.strictEqual(now.filters.when, 'hook'); assert.strictEqual(now.notes, 'Hook with big red words.');
+    assert.strictEqual(now.filters.when, 'whole', 'a filter picked where there is no timing control goes back to the look\'s way'); assert.strictEqual(now.notes, 'Hook with big red words.');
     assert.strictEqual(now.content.repos.length, 1);
-    assert.deepStrictEqual(VP.pending(now).map(x => x.field).sort(), ['content'], 'filter timing now reaches the render'); assert.strictEqual(s.finishWhen, 'hook');
+    assert.deepStrictEqual(VP.pending(now).map(x => x.field).sort(), ['content']); assert.strictEqual(s.finishWhen, undefined);
     // a pause length set by hand on Cut survives a read and a set
     apply(s, { pace: { tighten: 1.2 } }); const again = apply(fresh(), { videoPlan: API.planOf(s, cat) });
     assert.strictEqual(again.pace.tighten, 1.2);
@@ -227,6 +227,17 @@ try {
     assert.strictEqual(VP.applyPace(m, 'high').music.beatSync, false, 'a pace keeps your beat choice');
     const n = VP.withPart(p, 'notes', 'Hi'); assert.strictEqual(n.notes, 'Hi'); assert.deepStrictEqual(n.advanced.picks, p.advanced.picks);
     const hook = VP.toState(VP.withPart(VP.withPart(p, 'filters', { ids: ['mono'] }), 'filters', { when: 'hook' })); assert.strictEqual(hook.finishWhen, 'hook');
+  });
+  await t('no music keeps your beat choice for when music comes back, and a pace never asks for beat sync with no music', () => {
+    const s = fresh(); apply(s, { music: { bed: 'none' } });
+    const prev = VP.normalize({ music: { bed: 'none', beatSync: true } }), p = VP.fromState(s, prev, cat); assert.strictEqual(p.music.beatSync, true);
+    const { patch, plan } = VP.pacePatch(p, 'calm', 'lively'); assert.deepStrictEqual(patch.picks, {}); assert.ok(!plan.touched.includes('music.beatSync') || plan.music.beatSync === true);
+  });
+  await t('a filter picked with no timing control puts timing back to the look; the builder always sends its timing', () => {
+    const s = fresh(); apply(s, { finishWhen: 'hook', picks: { 'finish:mono': 'allow' } }); assert.strictEqual(s.finishWhen, 'hook');
+    apply(s, { picks: { 'finish:grain': 'allow' } }); assert.strictEqual(s.finishWhen, undefined, 'a classic filter is not hook only');
+    const a = VP.normalize({ filters: { ids: ['mono'], when: 'hook' }, touched: ['filters'] }), b = VP.withPart(a, 'filters', { ids: ['mono', 'grain'] });
+    assert.strictEqual(VP.diffPatch(a, b).finishWhen, 'hook');
   });
   await t('the summary reads in plain words for the Your notes step', () => {
     const rows = VP.summary(VP.normalize({ pace: 'high', words: { type: 'kinetic', keyWords: { level: 'strong' } }, notes: 'Keep it fun.' }), cat);

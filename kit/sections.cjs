@@ -97,8 +97,9 @@ function applyTransitionsWhen(cut, { takeOf, window = 0.15 } = {}) {
 // cover the whole video), and a finish a recipe, preset or pack set on a segment gives way. What it replaced is kept
 // (seg.heldFinish, cut.heldFinish) so a later timing, or none, brings it back.
 const FINISH_WHEN = ['whole', 'hook', 'cta', 'hook-cta'], FINISH_WHEN_FLAG = [...FINISH_WHEN, 'none'];
+// a piece whose filter you changed since the timing placed it (choices --apply, cut.json) keeps yours
 function restoreFinish(cut) {
-  for (const s of cut.segs || []) if ('heldFinish' in s) { if (s.heldFinish == null) delete s.finish; else s.finish = s.heldFinish; delete s.heldFinish; }
+  for (const s of cut.segs || []) if ('heldFinish' in s) { if ((s.finish ?? null) === (s.timedFinish ?? null)) { if (s.heldFinish == null) delete s.finish; else s.finish = s.heldFinish; } delete s.heldFinish; delete s.timedFinish; }
   if ('heldFinish' in cut) { if (cut.heldFinish == null) delete cut.finish; else cut.finish = cut.heldFinish; delete cut.heldFinish; }
 }
 function applyFinishWhen(cut) {
@@ -111,6 +112,7 @@ function applyFinishWhen(cut) {
   for (const s of cut.segs || []) {
     s.heldFinish = s.finish ?? null;
     if (!want || want.includes(s.section)) { s.finish = ids[k++ % ids.length]; n++; } else delete s.finish;
+    s.timedFinish = s.finish ?? null;
   }
   return n;
 }

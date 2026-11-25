@@ -148,7 +148,7 @@ try {
     const V = await api('/api/video-plan'); assert.strictEqual(V.plan.pace, 'high'); assert.match(V.plan.notes, /one clear ask/);
     await api('/api/wizard', { wizard: 'reel', goal: 'sell' }); assert.strictEqual((await api('/api/video-plan')).plan.notes.match(/one clear ask/g).length, 1, 'the note is added once');
     await api('/api/wizard', { wizard: 'clips', clips: 3, ads: true });
-    const c = await until(async () => { const v = await api('/api/cut'); return v.candidates && v.candidates.length ? v : null; }); assert.strictEqual(c.output.kind, 'clips');
+    const c = await until(async () => { const v = await api('/api/cut'); return v.candidates && v.candidates.length ? v : null; }); assert.strictEqual(c.output.kind, 'clips'); assert.strictEqual(c.output.clips, 3); assert.strictEqual(c.output.adCuts, true);
     await open(pg, '#step=cut');
   });
 

@@ -143,9 +143,7 @@ Your agent installs everything up front (Python, the downloaders, the Whisper mo
 
 <img src="docs/studio/ask-agent.png" width="440" alt="Ask my agent open on the Cut step: three suggested asks, a box for your own words and Send"> <img src="docs/studio/apply.png" width="210" alt="The chat: the ask marked Answered and Claude Code's reply with Use cinematic and Show me"> <img src="docs/studio/apply-light.png" width="210" alt="The same reply in the light theme">
 
-**Wizards.** **Wizards** in the More menu walks you through a whole job in two or three questions: make a reel from a long take, copy a reference, or clips and ads from one take. Each answer sets the steps for you, and **Let my agent decide** hands the choice to your agent.
-
-<img src="docs/studio/wizards.png" width="400" alt="The Make a reel from a long take wizard in dark: What is this reel for, with Grow followers, Sell or sign up, Teach one thing and Full clean take"> <img src="docs/studio/wizards-light.png" width="400" alt="The same wizard in the light theme">
+**The builder.** A new video asks one thing per screen: how fast it moves, the words on screen, the key words, between shots, you on screen, filters and when they show, music last, then anything else for your agent. Every screen has **Let the look decide**, and **Change** on Your notes opens just that step. An old Wizards link opens the builder.
 **Settings.** Dark by default, with a light theme. The chat, step bar and settings are frosted glass panels; a switch turns them solid on older computers. Choose who answers the chat (your terminal agent by default, or a local model through Ollama, LM Studio or llama.cpp, the Claude or OpenAI API, or keywords only), where reference downloads go, and where finished reels are copied.
 
 <img src="docs/studio/settings.png" width="720" alt="Studio settings in a side sheet: who answers the chat, the terminal note switch, API keys and providers, and the reference downloads and finished reels folders with Browse">

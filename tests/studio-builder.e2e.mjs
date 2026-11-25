@@ -176,6 +176,7 @@ try {
     await pg.click('#build-next'); await pg.waitForSelector('#build-notes-text');
     assert.strictEqual(await pg.inputValue('#build-notes-text'), 'Keep my jokes in.\nHook in the first line, short and punchy.');
     await pg.click('#build-all .fold2-h'); await pg.waitForSelector('#build-all .fold2-b', { state: 'visible' });
+    assert.strictEqual(await pg.$$eval('#build-all [role="tab"]', x => x.length), (await api('/api/catalog')).layers.length, 'All options has every layer');
     await noCmd(pg, 'Your notes'); await shot(pg, 'builder-notes.png');
     await pg.click('#build-next'); await pg.waitForSelector('#build-make-go');
     assert.strictEqual(await pg.$('#build-next'), null, 'Make it has its own buttons');

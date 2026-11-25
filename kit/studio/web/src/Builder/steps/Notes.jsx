@@ -20,16 +20,22 @@ const s = stylex.create({
 // what the old guided starts asked for, one line per goal (grow, sell, teach, clean; kit/studio/wizards.mjs)
 export const NOTE_CHIPS = NOTE_LINES;
 export const MAX_NOTES = 2000;
-export function Notes({ CAT, plan, V, save, busy, rows, onChange, st, appV, patch }) {
-  const [text, setText] = useState(plan.notes || ''), saved = useRef(plan.notes || ''), [tab, setTab] = useState(null);
-  // a note set elsewhere (the chat, an agent) shows here unless you are typing
-  useEffect(() => { if ((plan.notes || '') !== saved.current) { saved.current = plan.notes || ''; setText(plan.notes || ''); } }, [plan.notes]);
-  const keep = t => { const v = t.slice(0, MAX_NOTES); if (v === saved.current) return; saved.current = v; save(v); };
-  const add = line => { const v = (text.trim() ? text.trim() + '\n' : '') + line; setText(v); keep(v); };
+export function Notes({ CAT, plan, save, rows, onChange, st, appV, patch, apply }) {
+  const [text, setText] = useState(plan.notes || ''), [tab, setTab] = useState(null);
+  // dirty: typed and not yet confirmed by the server. A note set elsewhere (the chat, an agent) shows here only while
+  // you are not typing; a save that fails stays dirty, so leaving the field tries again
+  const live = useRef(text), dirty = useRef(false), area = useRef(null);
+  useEffect(() => { if (!dirty.current && document.activeElement !== area.current && (plan.notes || '') !== live.current) { live.current = plan.notes || ''; setText(plan.notes || ''); } }, [plan.notes]);
+  const keep = t => { const v = t.slice(0, MAX_NOTES); if (!dirty.current && v === (plan.notes || '')) return Promise.resolve(true);
+    return Promise.resolve(save(v)).then(ok => { if (ok !== false && live.current === v) dirty.current = false; return ok; }); };
+  const type = v => { live.current = v; dirty.current = true; setText(v); };
+  // leaving the step (Next, Back, a link) saves what you typed
+  useEffect(() => () => { if (dirty.current) save(live.current.slice(0, MAX_NOTES)); }, []);
+  const add = line => { const v = (text.trim() ? text.trim() + '\n' : '') + line; type(v); keep(v); };
   return <>
     <Field>
       <Label {...stylex.props(s.label)}>Anything else for the agent?</Label>
-      <Textarea id="build-notes-text" value={text} maxLength={MAX_NOTES} onChange={e => setText(e.target.value)} onBlur={() => keep(text)} {...stylex.props(s.area)} />
+      <Textarea id="build-notes-text" ref={area} value={text} maxLength={MAX_NOTES} onChange={e => type(e.target.value)} onBlur={() => keep(text)} {...stylex.props(s.area)} />
     </Field>
     <div {...stylex.props(s.chips)} role="group" aria-label="Examples to add">
       {NOTE_CHIPS.map((c, i) => <button key={i} type="button" className="btn sm outline" data-chip={i} disabled={text.includes(c)} onClick={() => add(c)}>{c}</button>)}
@@ -42,7 +48,7 @@ export function Notes({ CAT, plan, V, save, busy, rows, onChange, st, appV, patc
     </ul>
     <div {...stylex.props(s.fold)}>
       <Fold id="build-all" title="All options">
-        {['picture', 'text', 'broll', 'music'].map(step => <Layers key={step} step={step} bare CAT={CAT} V={appV} s={st} apply={null} patch={patch} tab={tab} setTab={setTab} />)}
+        <Layers step="all" CAT={CAT} V={appV} s={st} apply={apply} patch={patch} tab={tab} setTab={setTab} />
       </Fold>
     </div>
   </>;

@@ -81,4 +81,11 @@ t('a seam you changed while it was held stays yours; a lock sees the real seams 
 t('"I want to share a story" and "that is the message" are not calls to action', () => {
   assert.strictEqual(SEC.bounds([...W(0, 'Build it once.'), ...W(4, 'I want to share a story.'), ...W(6, 'That is the message.')], 8).ctaStart, null);
 });
+t('a timed filter you changed by hand stays yours when the timing goes; the rest come back', () => {
+  const c = cut(); c.finish = 'warm'; SEC.tag(c, words); c.finishWhen = 'hook'; c.finishIds = ['mono']; SEC.applyFinishWhen(c);
+  c.segs[0].finish = 'grain'; // choices --apply while timed
+  delete c.finishWhen; delete c.finishIds; SEC.applyFinishWhen(c);
+  assert.strictEqual(c.segs[0].finish, 'grain'); assert.strictEqual(c.segs[1].finish, undefined); assert.strictEqual(c.finish, 'warm');
+  assert.ok(!c.segs.some(x => 'heldFinish' in x || 'timedFinish' in x));
+});
 console.log(`\nsections: ${n} tests passed`);
