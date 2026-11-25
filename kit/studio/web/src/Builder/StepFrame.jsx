@@ -17,10 +17,10 @@ const s = stylex.create({
 // stylex.props gives a className, so a plain class for tests and CSS goes in with it
 const withClass = (name, ...st) => { const p = stylex.props(...st); return { ...p, className: name + ' ' + (p.className || '') }; };
 
-export function StepFrame({ step, count, does, back, next, nextLabel = 'Next', headRef, children }) {
+export function StepFrame({ step, count, does, back, next, nextLabel = 'Next', headRef, face = false, nextDisabled = false, children }) {
   return <section {...withClass('step glass-card', s.frame)} id={'build-' + step.id} aria-labelledby={'build-h-' + step.id}>
     <div {...stylex.props(s.head)}>
-      <ZoneMap zone={step.zone} label={'Applies to: ' + step.appliesTo} />
+      <ZoneMap zone={step.zone} label={'Applies to: ' + step.appliesTo} face={face} />
       <div>
         <h2 id={'build-h-' + step.id} ref={headRef} tabIndex={-1} {...stylex.props(s.title)}>{step.question}</h2>
         <p {...stylex.props(s.sub)}>{step.title}</p>
@@ -32,7 +32,7 @@ export function StepFrame({ step, count, does, back, next, nextLabel = 'Next', h
     <div {...stylex.props(s.foot)}>
       <button type="button" className="btn ghost" id="build-back" onClick={back}>Back</button>
       <span id="build-count" {...stylex.props(s.count)}>{count}</span>
-      <button type="button" className="btn" id="build-next" onClick={next}>{nextLabel}</button>
+      <button type="button" className="btn" id="build-next" onClick={next} disabled={nextDisabled}>{nextLabel}</button>
     </div>
   </section>;
 }

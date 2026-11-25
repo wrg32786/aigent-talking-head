@@ -90,6 +90,23 @@ try {
     assert.strictEqual(s.pace.tighten, 'off'); assert.strictEqual(s.pace.punch, 'off'); assert.strictEqual(s.music.energy, 'low');
   });
 
+  await t('a words step changes only the picks it moves', () => {
+    const pack = cat.packs[0].name, sc = Object.values(cat.items).find(it => it.kind === 'graphic').ref;
+    const s = apply(fresh(), { pack, picks: { [sc]: 'deny', 'captionStyle:classic': 'allow' }, music: { energy: 'low' } });
+    const prev = API.planOf(s, cat), next = VP.withWords(prev, { type: 'kinetic', look: 'kinetic', entrance: 'cascade', keyWords: { level: 'strong' } });
+    assert.ok(VP.validate(next, cat).ok, VP.validate(next, cat).errs.join(' '));
+    const patch = VP.diffPatch(prev, next, cat);
+    assert.ok(!patch.clearPicks && !('pack' in patch) && !('music' in patch), JSON.stringify(patch));
+    apply(s, patch);
+    assert.deepStrictEqual(s.picks.captionStyle.allow, ['kinetic']); assert.deepStrictEqual(s.picks.captionEntrance.allow, ['cascade']);
+    assert.strictEqual(s.keyWords, 'strong'); assert.strictEqual(s.pack, pack); assert.strictEqual(s.music.energy, 'low');
+    assert.ok(s.picks.graphic.deny.includes(sc.split(':')[1]), 'a pick the step does not speak for stays');
+    // and back: plain captions take the entrance and key words away again
+    const back = VP.withWords(API.planOf(s, cat), { type: 'captions', look: 'pill', entrance: null, keyWords: { level: 'off' } });
+    apply(s, VP.diffPatch(API.planOf(s, cat), back, cat));
+    assert.deepStrictEqual(s.picks.captionStyle.allow, ['pill']); assert.deepStrictEqual(s.picks.captionEntrance.allow, []); assert.strictEqual(s.keyWords, 'off');
+  });
+
   await t('a session from the classic steps reads into a plan and back to the same picks and reel', () => {
     const sessions = [
       { picks: { 'captionStyle:hormozi': 'allow', 'transition:whip': 'allow', 'graphic:checklist': 'allow', 'effect:todo': 'allow' } },
@@ -181,6 +198,10 @@ try {
       assert.strictEqual(ok.plan.pace, 'steady'); assert.strictEqual(ok.state.pace.tighten, 0.45); assert.strictEqual(ok.own, true);
       const pc = await (await fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pace: 'lively' }) })).json();
       assert.strictEqual(pc.plan.pace, 'lively'); assert.ok(pc.plan.touched.includes('pace')); assert.strictEqual(pc.state.pace.tighten, 0.45);
+      const wd = await (await fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ words: { type: 'kinetic', look: 'kinetic', keyWords: { level: 'dramatic' } } }) })).json();
+      assert.strictEqual(wd.plan.words.keyWords.level, 'dramatic'); assert.strictEqual(wd.state.keyWords, 'dramatic');
+      const wbad = await fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ words: { type: 'captions', look: 'classic', keyWords: { level: 'strong' } } }) });
+      assert.strictEqual(wbad.status, 400, 'key words need kinetic words');
       const np = await fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pace: 'zoomy' }) });
       assert.strictEqual(np.status, 400);
       await fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: VP.defaults('steady') }) });

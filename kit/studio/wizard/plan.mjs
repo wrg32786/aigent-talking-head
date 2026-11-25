@@ -104,6 +104,22 @@ export function pacePatch(plan, pace) {
     picks: bs === null ? { 'beatSync:beat-sync': 'clear', 'beatSync:no-beat-sync': 'clear' } : { [`beatSync:${bs ? 'beat-sync' : 'no-beat-sync'}`]: 'allow' } };
   return { plan: next, patch };
 }
+// The smallest session patch that turns prev into next: picks the two plans set differently, and only the session
+// fields that change. No clearPicks, so picks neither plan speaks for (a scene, a b-roll rule) stay as they are.
+// prev should be read from the session (api.mjs planOf), so its picks are the session's own.
+export function diffPatch(prev, next, cat = null) {
+  const a = toState(prev, cat), b = toState(next, cat), picks = {};
+  for (const ref of Object.keys(a.picks)) if (!(ref in b.picks)) picks[ref] = 'clear';
+  for (const [ref, how] of Object.entries(b.picks)) if (a.picks[ref] !== how) picks[ref] = how;
+  const patch = Object.keys(picks).length ? { picks } : {};
+  for (const k of ['pack', 'styleLook', 'titles', 'keyWords', 'music', 'sound', 'pace']) if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) patch[k] = b[k];
+  return patch;
+}
+// a builder step's words choices laid over the plan (only the fields given change)
+export function withWords(plan, words) {
+  const p = normalize(plan), deep = (base, x) => { if (!isObj(x)) return x; const o = isObj(base) ? clone(base) : {}; for (const k of Object.keys(x)) o[k] = isObj(x[k]) && isObj(o[k]) ? deep(o[k], x[k]) : clone(x[k]); return o; };
+  p.words = deep(p.words, words); return touch(p, 'words');
+}
 // mark a field as yours, so a later pace change leaves it alone
 export function touch(plan, ...keys) { const p = normalize(plan); for (const k of keys) if (!p.touched.includes(k)) p.touched.push(k); return p; }
 

@@ -9,13 +9,15 @@ const s = stylex.create({
   soft: { fill: 'color-mix(in srgb, currentColor 14%, transparent)' },
   on: { fill: 'color-mix(in srgb, var(--primary) 55%, transparent)', stroke: 'var(--primary)', strokeWidth: 1.5 },
   onLine: { fill: 'none', stroke: 'var(--primary)', strokeWidth: 2 },
+  face: { fill: 'none', stroke: 'var(--destructive, #e5484d)', strokeWidth: 1.5, strokeDasharray: '3 2' },
 });
 
 const Person = ({ glow }) => <g {...stylex.props(glow ? s.on : s.soft)}>
   <circle cx="36" cy="50" r="11" /><path d="M14 112 C14 84 22 70 36 70 C50 70 58 84 58 112 Z" />
 </g>;
 
-export function ZoneMap({ zone, label }) {
+// face: also outline the face as the place words never go (Where words sit)
+export function ZoneMap({ zone, label, face = false }) {
   const frame = zone === 'frame';
   return <svg viewBox="0 0 72 128" {...stylex.props(s.map)} role="img" aria-label={label}>
     <rect x="2" y="2" width="68" height="124" rx="10" {...stylex.props(frame ? s.on : s.line)} />
@@ -26,6 +28,7 @@ export function ZoneMap({ zone, label }) {
     {zone === 'titles' && <rect x="10" y="16" width="52" height="12" rx="3" {...stylex.props(s.on)} />}
     {zone === 'captions' && <rect x="10" y="88" width="52" height="10" rx="3" {...stylex.props(s.on)} />}
     {zone === 'time' && <><rect x="8" y="114" width="56" height="5" rx="2.5" {...stylex.props(s.on)} /><line x1="18" y1="110" x2="18" y2="122" {...stylex.props(s.onLine)} /><line x1="54" y1="110" x2="54" y2="122" {...stylex.props(s.onLine)} /></>}
+    {face && <rect x="22" y="36" width="28" height="28" rx="6" {...stylex.props(s.face)}><title>Your face: no words here</title></rect>}
     {zone === 'sound' && <path d="M26 16 h6 l8 -6 v20 l-8 -6 h-6 Z M44 13 q4 7 0 14" {...stylex.props(s.on)} />}
   </svg>;
 }
