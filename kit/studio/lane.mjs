@@ -5,10 +5,11 @@
 // top: the split, its panel behind the top of your head; frame: two rounded cards, you in the smaller one with your head
 // over its top edge (kit/split.cjs)
 // card (1.28.0): a framed panel under your face, drawn as a screen card in the overlay (kit/broll-slots.cjs flipOf)
+import BS from '../broll-slots.cjs';
 export const PLACES = ['full', 'top', 'pip', 'frame', 'card'];
 export const PLACE_LABEL = { full: 'Full cutaway', top: 'Split top panel', pip: 'Picture in picture', frame: 'Framed cards', card: 'Panel under you' };
 // how a reference B-roll slot sits, by its kind (kit/broll-slots.cjs)
-export const KIND_PLACE = { full: 'full', panel: 'card', split: 'top', pip: 'pip' };
+export const KIND_PLACE = BS.KIND_PLACE;
 const r2 = x => +(+x).toFixed(2);
 
 export function beats(cut, caps) {
@@ -39,7 +40,7 @@ export function inserts(slots, bts, clipOf, pathOf) {
     const t = timing(sl, b, c);
     // a spot that is a reference B-roll slot keeps the slot's treatment (kit/broll-slots.cjs): its effects, border and place
     const rs = b.ref && b.ref.slot ? b.ref.slot : null;
-    out.push({ file: pathOf(c), at: t.at, dur: t.dur, in: c.kind === 'image' ? 0 : t.in, place: PLACES.includes(sl.place) ? sl.place : 'full', ...(c.kind === 'image' ? { image: true } : {}), beat: b.n, clip: c.id, studio: true,
+    out.push({ file: pathOf(c), at: t.at, dur: t.dur, in: c.kind === 'image' ? 0 : t.in, place: PLACES.includes(sl.place) ? sl.place : rs?.kind === 'split' ? BS.placeOf(rs) : 'full', ...(c.kind === 'image' ? { image: true } : {}), beat: b.n, clip: c.id, studio: true,
       // a fast run goes to the render as its own clips: kit/reel.cjs cuts them again on the real beats of the bed
       // (kit/fastrun.cjs), starting on the beat nearest this spot. The library clip is the preview, and what plays if
       // one of its clips is gone. It is shown whole.

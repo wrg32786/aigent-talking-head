@@ -320,7 +320,7 @@
     {
       "name": "pack",
       "script": "kit/packs.cjs",
-      "summary": "Style packs: list, show, scaffold or validate a pack (packs/<name>/pack.json: a base preset, style keys, locks, weights, preview). Gallery: docs/packs.md.",
+      "summary": "Style packs: list, show, scaffold or validate a pack (packs/<name>/pack.json: a base preset, style keys including splitPlace (top or frame, default top), locks, weights, preview). Gallery: docs/packs.md.",
       "subcommands": [
         { "name": "list", "positional": [], "outputs": ["the pack list with each pack's locks (default when no subcommand)"] },
         { "name": "show", "positional": [{ "name": "pack", "type": "string", "required": true, "description": "a pack name or folder" }], "outputs": ["the resolved pack: merged style, locks, weights, preview paths"] },
