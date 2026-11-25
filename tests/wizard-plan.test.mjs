@@ -5,7 +5,7 @@
 // Run: node tests/wizard-plan.test.mjs   (npm run check runs it)
 import assert from 'assert';
 import { spawn } from 'child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -289,6 +289,23 @@ try {
       assert.strictEqual(saved.format, 'aigent-template'); assert.strictEqual(saved.plan.notes, '', 'a template keeps no notes'); assert.deepStrictEqual(saved.plan.filters, { ids: ['mono'], when: 'hook' });
       assert.strictEqual((await fetch(url + '/api/templates', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'my test' }) })).status, 409, 'never written over');
       const auto = await (await fetch(url + '/api/templates', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).json(); assert.match(auto.template.name, /^[a-z0-9-]+$/);
+      // the Template Library: list, use, rename, duplicate, delete; starters are read only
+      const tpost = (r, b) => fetch(url + '/api/templates/' + r, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) });
+      const lib = (await (await fetch(url + '/api/templates')).json()).templates, mine = lib.find(x => x.name === 'my-test');
+      assert.deepStrictEqual([mine.kind, mine.source, mine.label, mine.readOnly], ['template', 'Built by you', 'My Test', false]);
+      const starter = lib.find(x => x.kind === 'pack'); assert.ok(starter && starter.readOnly, 'the starter packs are in the library');
+      assert.strictEqual(lib.filter(x => x.kind === 'pack').length, cat.packs.filter(p => p.shipped && !/^ref-/.test(p.name)).length);
+      await post({ notes: 'For this video only.' });
+      const used = await (await tpost('use', { name: 'my-test' })).json();
+      assert.deepStrictEqual(used.plan.filters, { ids: ['mono'], when: 'hook' }); assert.strictEqual(used.state.finishWhen, 'hook'); assert.strictEqual(used.plan.notes, '', 'a template brings no notes');
+      const ren = await (await tpost('rename', { name: 'my-test', label: 'Hook in mono' })).json(); assert.strictEqual(ren.template.label, 'Hook in mono'); assert.strictEqual(ren.template.name, 'my-test', 'the folder keeps its name');
+      const dup = await (await tpost('duplicate', { name: 'my-test' })).json(); assert.strictEqual(dup.template.name, 'my-test-copy'); assert.strictEqual(dup.template.source, 'Your copy');
+      assert.strictEqual((await tpost('duplicate', { name: 'my-test' })).status, 200); assert.ok(existsSync(join(STATE, 'looks', 'my-test-copy-2', 'template.json')), 'a second copy gets its own folder');
+      const sdup = await (await tpost('duplicate', { name: starter.name })).json(); assert.strictEqual(sdup.template.readOnly, false, 'a starter copy is yours');
+      assert.strictEqual((await tpost('rename', { name: starter.name, label: 'x' })).status, 400); assert.strictEqual((await tpost('delete', { name: starter.name })).status, 400, 'starters stay');
+      assert.strictEqual((await tpost('use', { name: 'no-such' })).status, 404); assert.strictEqual((await tpost('rename', { name: 'my-test', label: '  ' })).status, 400);
+      const del = await (await tpost('delete', { name: 'my-test-copy' })).json(); assert.ok(!del.templates.some(x => x.name === 'my-test-copy')); assert.ok(!existsSync(join(STATE, 'looks', 'my-test-copy')));
+      const su = await (await tpost('use', { name: starter.name })).json(); assert.deepStrictEqual(su.plan.template, { kind: 'pack', name: starter.name });
       const np = await fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pace: 'zoomy' }) });
       assert.strictEqual(np.status, 400);
       await fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: VP.defaults('steady') }) });

@@ -39,7 +39,7 @@ export function mount({ C, json, readBody, view, pushState }) {
         }
         const out = tm[1] === 'rename' ? TPL.rename(b.name, b.label, cat) : tm[1] === 'duplicate' ? TPL.duplicate(b.name, cat) : TPL.remove(b.name, cat);
         json(res, 200, { ok: true, template: out === true ? null : out, templates: TPL.list(cat) }); return true;
-      } catch (e) { json(res, e.code || 500, { error: e.message }); return true; }
+      } catch (e) { json(res, typeof e.code === 'number' ? e.code : 500, { error: e.message }); return true; }
     }
     if (p === '/api/templates' && M === 'POST') {
       const b = await readBody(req), s = C.load(), cat = C.catalog();
