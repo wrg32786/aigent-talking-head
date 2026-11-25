@@ -333,6 +333,9 @@ function renderSteps(s) {
   // the b-roll lane goes into cut.json first (kit/studio/broll-run.mjs), with credits.txt for the clips it uses
   const bp = BRL.plan(s), steps = [];
   if (bp) { const f = join('jobs', s.job, 'broll.json'); writeFileSync(join(ROOT, f), JSON.stringify(bp, null, 1)); steps.push(['kit/studio/broll-run.mjs', ['apply', '--name', s.job, '--plan', f]]); }
+  // repo or tool feature mode (kit/repo-broll.mjs): the README's pictures as split and full screen b-roll, after the
+  // lane so a spot it uses keeps its clip; it also clears its own inserts when the mode is turned off
+  if (s.videoPlan) { writePlanFile(s); steps.push(['kit/repo-broll.mjs', ['apply', '--name', s.job, '--plan', join('jobs', s.job, 'build', 'video-plan.json')]]); }
   steps.push([process.env.STUDIO_REEL || 'kit/reel.cjs', args, { STUDIO_DRAFT_KEY: draftKey(s), STUDIO_FOOTAGE_KEY: C.footageKey(s) }]);
   let fx = null;
   if (comp.effects.length && env().effectsReady) {

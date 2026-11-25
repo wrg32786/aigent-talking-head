@@ -176,7 +176,7 @@ try {
     assert.deepStrictEqual(now.filters.ids.sort(), ['mono', 'warm']);
     assert.strictEqual(now.filters.when, 'whole', 'a filter picked where there is no timing control goes back to the look\'s way'); assert.strictEqual(now.notes, 'Hook with big red words.');
     assert.strictEqual(now.content.repos.length, 1);
-    assert.deepStrictEqual(VP.pending(now).map(x => x.field).sort(), ['content']); assert.strictEqual(s.finishWhen, 'none', 'none, so a rebuild clears the old timing');
+    assert.deepStrictEqual(VP.pending(now).map(x => x.field).sort(), [], 'repo mode reaches the render now (kit/repo-broll.mjs)'); assert.strictEqual(s.finishWhen, 'none', 'none, so a rebuild clears the old timing');
     // a pause length set by hand on Cut survives a read and a set
     apply(s, { pace: { tighten: 1.2 } }); const again = apply(fresh(), { videoPlan: API.planOf(s, cat) });
     assert.strictEqual(again.pace.tighten, 1.2);
@@ -288,6 +288,12 @@ try {
       assert.ok(ft.compose.args.join(' ').includes('--finish-when hook'), ft.compose.args.join(' '));
       const mu = await (await post({ music: { bed: 'none', sfx: false, beatSync: false } })).json();
       assert.deepStrictEqual([mu.state.music.bed, mu.state.sound.sfx, mu.plan.music.beatSync], ['none', 'off', false]); assert.ok(mu.plan.touched.includes('music.beatSync'));
+      // repo or tool feature: links checked, the example a link or nothing
+      const rp = await (await post({ content: { repoFeature: true, repos: ['https://github.com/wrg32786/aigent-talking-head'], takeovers: 'off' } })).json();
+      assert.deepStrictEqual([rp.plan.content.repoFeature, rp.plan.content.takeovers], [true, 'off']); assert.ok(rp.plan.touched.includes('content'));
+      assert.strictEqual((await post({ content: { repoFeature: true, repos: ['https://gitlab.com/a/b'] } })).status, 400);
+      assert.strictEqual((await post({ content: { example: 'not a link' } })).status, 400);
+      await post({ content: { repoFeature: false } });
       const nt = await (await post({ notes: 'Keep it under 30 seconds.' })).json(); assert.strictEqual(nt.plan.notes, 'Keep it under 30 seconds.');
       assert.strictEqual((await post({ notes: 42 })).status, 400); assert.strictEqual((await post({ notes: 'x'.repeat(2001) })).status, 400);
       const tp = await fetch(url + '/api/templates', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'My Test' }) });

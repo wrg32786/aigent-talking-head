@@ -140,7 +140,7 @@ export function withWords(plan, words) {
 }
 // a builder step's Between shots, You on screen or Extras choice laid over the plan: transitions and graphics change
 // only the fields given, presenter is the whole list. A choice here wins over All options picks it speaks for.
-export const PARTS = ['transitions', 'presenter', 'graphics', 'filters', 'music', 'notes'];
+export const PARTS = ['transitions', 'presenter', 'graphics', 'filters', 'content', 'music', 'notes'];
 export function withPart(plan, part, value) {
   const p = normalize(plan), before = clone(p);
   if (part === 'presenter') p.presenter = clone(value);
@@ -225,6 +225,7 @@ export function validate(plan, cat = null) {
   need(Array.isArray(c.repos) && c.repos.length <= 3 && c.repos.every(u => /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/?$/.test(u)), 'Repos: up to 3 links like https://github.com/owner/repo.');
   if (c.repoFeature) need(c.repos.length > 0, 'Repo feature: add at least one repo link.');
   need(['split'].includes(c.layout) && ['auto', 'off'].includes(c.takeovers), 'Repo feature: layout split, takeovers auto or off.');
+  need(c.example === null || (typeof c.example === 'string' && /^https?:\/\/\S+$/.test(c.example) && c.example.length <= 500), 'Example video: a link, or leave it empty.');
   const m = p.music;
   if (cat && !['auto', 'none', 'upload'].includes(m.bed)) need((cat.beds || []).some(b => b.id === m.bed), `Music: we do not have a track called ${m.bed}.`);
   need(['auto', 'low', 'mid', 'high'].includes(m.energy), 'Music energy: auto, low, mid or high.');
@@ -282,7 +283,6 @@ export function pending(plan) {
   for (const x of p.presenter) {
     if (x.id === 'frame-breakout') add('presenter.frame-breakout', 'Frame breakout');
   }
-  if (p.content.repoFeature) add('content', 'Repo or tool feature');
   return out.filter((x, i, a) => a.findIndex(y => y.field === x.field) === i);
 }
 
