@@ -1460,8 +1460,9 @@ async function api(req, res, u) {
   // a teardown saved as a named template (its look, and a template.json with the plan derived from it)
   if (p === '/api/templates/from-teardown' && M === 'POST') {
     const b = await readBody(req).catch(() => ({})), s = C.load(); let r;
-    try { const L = SLK.saveCurrent(s, ROOT, b.name), ref = s.reference || {}; r = TPL.saveFromLook(L.name, { kind: ref.url ? 'teardown-url' : 'teardown-file', url: ref.url || null, file: ref.file || null, teardown: ref.out || null }, C.catalog()); }
-    catch (e) { return json(res, e.code || 500, { error: e.message }); }
+    try { if (TPL.taken(b.name, C.catalog())) throw Object.assign(new Error('You already have a template or look with that name. Pick another name.'), { code: 409 });
+      const L = SLK.saveCurrent(s, ROOT, b.name), ref = s.reference || {}; r = TPL.saveFromLook(L.name, { kind: ref.url ? 'teardown-url' : 'teardown-file', url: ref.url || null, file: ref.file || null, teardown: ref.out || null }, C.catalog(), b.name); }
+    catch (e) { return json(res, typeof e.code === 'number' ? e.code : 500, { error: e.message }); }
     pushState(true); return json(res, 200, { ok: true, template: r, templates: TPL.list(C.catalog()), looks: SLK.list() });
   }
   if (p === '/api/pack/save' && M === 'POST') {

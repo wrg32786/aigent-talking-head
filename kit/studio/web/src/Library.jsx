@@ -12,7 +12,7 @@ const s = stylex.create({
   pick: { cursor: 'pointer', ':focus-visible': { outline: '2px solid var(--primary)', outlineOffset: 2 }, ':hover': { borderColor: 'var(--primary)' } },
   img: { width: '100%', aspectRatio: '9 / 16', maxHeight: 220, objectFit: 'cover', borderRadius: 10, display: 'block', backgroundColor: 'var(--muted)' },
   ph: { width: '100%', aspectRatio: '9 / 16', maxHeight: 220, borderRadius: 10, display: 'grid', placeItems: 'center', backgroundColor: 'var(--muted)', opacity: 0.8 },
-  name: { fontWeight: 600, textTransform: 'capitalize', overflowWrap: 'anywhere' },
+  name: { fontWeight: 600, overflowWrap: 'anywhere' },
   menu: { position: 'absolute', top: 12, right: 12 },
   row: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' },
   input: { padding: 6, borderRadius: 8, borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--border)', backgroundColor: 'transparent', color: 'inherit', font: 'inherit', width: '100%', boxSizing: 'border-box' },
@@ -48,7 +48,7 @@ function Card({ x, mode, act, busy }) {
     {renaming && <form {...stylex.props(s.row)} onSubmit={e => { e.preventDefault(); act('rename', x, label).then(ok => { if (ok) setRenaming(false); }); }}>
       <input aria-label="New name" id={`tpl-name-${x.name}`} value={label} maxLength={60} autoFocus onChange={e => setLabel(e.target.value)} {...stylex.props(s.input)} />
       <button type="submit" className="btn sm" disabled={busy}>Save</button><button type="button" className="btn sm ghost" onClick={() => { setLabel(x.label); setRenaming(false); }}>Cancel</button></form>}
-    {asking && <div role="alertdialog" aria-label={`Delete ${x.label}?`} {...stylex.props(s.row)}><span className="fine">Delete {x.label}? This cannot be undone.</span>
+    {asking && <div role="alertdialog" aria-label={`Delete ${x.label}?`} onKeyDown={e => { if (e.key === 'Escape') setAsking(false); }} {...stylex.props(s.row)}><span className="fine">Delete {x.label}?{x.look ? ' Its saved look goes too.' : ''} This cannot be undone.</span>
       <button type="button" className="btn sm" id={`tpl-del-yes-${x.name}`} disabled={busy} onClick={() => act('delete', x)}>Delete</button><button type="button" className="btn sm ghost" autoFocus onClick={() => setAsking(false)}>Keep it</button></div>}
   </li>;
 }
@@ -59,7 +59,11 @@ export function Library({ T, mode = 'manage', apply, onUse }) {
   const act = async (what, x, label) => {
     setBusy(true);
     try {
-      if (what === 'use' || what === 'edit') { apply(await api('/api/templates/use', { name: x.name, edit: what === 'edit' })); onUse(what === 'edit'); return true; }
+      if (what === 'use' || what === 'edit') {
+        // from the Teardowns tab, Use for a new video starts one first (the video open now is saved, nothing is lost)
+        if (what === 'use' && mode === 'manage') { await api('/api/videos/new', { keepLook: false }); toast(`New video started with ${x.label}. Add your clip.`, true); }
+        apply(await api('/api/templates/use', { name: x.name, edit: what === 'edit' })); onUse(what === 'edit', mode === 'manage' && what === 'use'); return true;
+      }
       const j = await api('/api/templates/' + what, what === 'rename' ? { name: x.name, label } : { name: x.name });
       T.setList(j.templates); if (what === 'duplicate' && j.template) toast(`Made ${j.template.label}`); return true;
     } catch (e) { toast(e.message, false); return false; } finally { setBusy(false); }

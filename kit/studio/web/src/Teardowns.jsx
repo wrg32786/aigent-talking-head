@@ -25,7 +25,7 @@ function SaveTemplate({ s, T, looks }) {
 
 export function TemplateLibrary({ s, apply, looks }) {
   const T = useTemplates();
-  const go = edit => { location.hash = edit ? '#build=pace' : '#build=notes'; };
+  const go = (edit, fresh) => { location.hash = edit ? '#build=pace' : fresh ? '#build=start' : '#build=notes'; }; // a new video starts with its clip
   return <section className="tlib" id="template-library" aria-labelledby="tlib-h">
     <header className="sh"><h2 id="tlib-h">Template Library</h2><p className="sub">Your templates and our starters. Use one for a new video, or open it in the builder to change it.</p></header>
     <SaveTemplate s={s} T={T} looks={looks} />

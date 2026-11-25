@@ -317,6 +317,14 @@ try {
       assert.strictEqual((await tpost('use', { name: 'no-such' })).status, 404); assert.strictEqual((await tpost('rename', { name: 'my-test', label: '  ' })).status, 400);
       const del = await (await tpost('delete', { name: 'my-test-copy' })).json(); assert.ok(!del.templates.some(x => x.name === 'my-test-copy')); assert.ok(!existsSync(join(STATE, 'looks', 'my-test-copy')));
       const su = await (await tpost('use', { name: starter.name })).json(); assert.deepStrictEqual(su.plan.template, { kind: 'pack', name: starter.name });
+      // a starter's name is never taken; a long name still gets its own copies; a look another template uses stays
+      const sn = await fetch(url + '/api/templates', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: starter.name }) }); assert.strictEqual(sn.status, 409, 'a starter name is refused');
+      const long = 'a'.repeat(30) + ' ' + 'b'.repeat(29), ls = await (await fetch(url + '/api/templates', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: long }) })).json();
+      const c1 = await (await tpost('duplicate', { name: ls.template.name })).json(), c2 = await (await tpost('duplicate', { name: ls.template.name })).json();
+      assert.ok(c1.template && c2.template && c1.template.name !== c2.template.name && c1.template.name !== ls.template.name, JSON.stringify([c1.template, c2.template]));
+      const oc = await (await tpost('duplicate', { name: 'old-look' })).json(); assert.strictEqual(oc.template.name, 'old-look-copy');
+      const blocked = await tpost('delete', { name: 'old-look' }); assert.strictEqual(blocked.status, 409); assert.match((await blocked.json()).error, /uses this look/);
+      assert.strictEqual((await tpost('delete', { name: 'old-look-copy' })).status, 200); assert.strictEqual((await tpost('delete', { name: 'old-look' })).status, 200, 'with its copy gone the look can go');
       const np = await fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pace: 'zoomy' }) });
       assert.strictEqual(np.status, 400);
       await fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: VP.defaults('steady') }) });

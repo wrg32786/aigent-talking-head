@@ -195,7 +195,7 @@ try {
     await open(pg, '#tab=teardowns'); await pg.waitForSelector('#template-library [data-template="builder-test"]');
     const card = '#template-library li[data-template="builder-test"]';
     assert.match(await pg.innerText(card), /Built by you/);
-    assert.ok(await pg.$('#template-library li.tpl-card[data-template]:not([data-template="builder-test"])'), 'the starters are there');
+    const starterName = (await api('/api/templates')).templates.find(x => x.readOnly).name; assert.ok(await pg.$(`#template-library li[data-template="${starterName}"]`), 'the starters are there');
     await pg.click('#tpl-menu-builder-test'); await pg.click('#tpl-rename-builder-test');
     await pg.fill('#tpl-name-builder-test', 'Hook in mono'); await pg.click(card + ' form button[type="submit"]');
     await pg.waitForFunction(() => /Hook in mono/i.test(document.querySelector('#template-library li[data-template="builder-test"]').innerText));
