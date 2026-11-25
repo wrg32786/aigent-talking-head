@@ -8,6 +8,8 @@ import { Library, useTemplates } from '../Library.jsx';
 
 // The New video start screen (spec 2.1): your clip, then how to build it: Use a template (the Template Library grid;
 // picking one sets the plan and goes straight to Your notes) or Build my own.
+// StyleX's className with the shared fine-print class kept beside it
+const fine = st => { const p = stylex.props(st); return { ...p, className: ['fine', p.className].filter(Boolean).join(' ') }; };
 const s = stylex.create({
   cards: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 },
   card: { display: 'grid', gap: 6, justifyItems: 'start', textAlign: 'left', padding: 16, borderRadius: 14, borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--border)', backgroundColor: 'var(--card)', color: 'inherit', cursor: 'pointer' },
@@ -50,7 +52,7 @@ export function Start({ s: st, apply, onBuild, onTemplate, headRef }) {
     </div>
     {src === 'recording' && <Recordings s={st} apply={apply} toNew={() => setSrc(null)} idp="build-" />}
     {src === 'link' && <FootageLink s={st} apply={apply} prepare={named} />}
-    <p id="build-have" className="fine" role="status" {...stylex.props(s.have)}>
+    <p id="build-have" role="status" {...fine(s.have)}>
       {n ? `${n} clip${n === 1 ? '' : 's'} in this video.` : 'No clip yet. You can also add one later.'}
       {fresh && <> <span id="build-fresh" {...stylex.props(s.chip)}>From Recording, {ago(fresh.at)}: {(fresh.script && fresh.script.title) || 'your newest take'}</span></>}
     </p>

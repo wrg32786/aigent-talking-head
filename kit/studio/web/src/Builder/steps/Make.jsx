@@ -5,6 +5,8 @@ import { api, toast } from '../../lib.jsx';
 
 // Step 18: save the plan as a template (the name is optional) and make the video: the plan is kept as the session's
 // own, the draft starts (it writes jobs/<job>/build/video-plan.json beside the cut), and Review shows it coming in.
+// StyleX's className with the shared fine-print class kept beside it
+const fine = st => { const p = stylex.props(st); return { ...p, className: ['fine', p.className].filter(Boolean).join(' ') }; };
 const s = stylex.create({
   box: { display: 'grid', gap: 10, padding: 14, borderRadius: 12, borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--border)', backgroundColor: 'var(--card)' },
   row: { display: 'flex', gap: 8, alignItems: 'end', flexWrap: 'wrap' },
@@ -28,12 +30,12 @@ export function Make({ apply, go, flush }) {
   return <>
     <section {...stylex.props(s.box)} aria-labelledby="build-tpl-h">
       <h3 id="build-tpl-h" {...stylex.props(s.h)}>Save as a template</h3>
-      <p className="fine" {...stylex.props(s.p)}>Use this look again for another video. Your notes stay with this one.</p>
+      <p {...fine(s.p)}>Use this look again for another video. Your notes stay with this one.</p>
       <div {...stylex.props(s.row)}>
         <Field><Label {...stylex.props(s.label)}>Name (optional)</Label><Input id="build-tpl-name" value={name} maxLength={60} onChange={e => { setName(e.target.value); setSaved(null); }} {...stylex.props(s.input)} /></Field>
         <button type="button" className="btn sm outline" id="build-tpl-save" disabled={!!saved} onClick={saveT}>{saved ? 'Saved' : 'Save as a template'}</button>
       </div>
-      {saved && <p className="fine" id="build-tpl-done" role="status" {...stylex.props(s.p)}>Saved as {saved.label}.</p>}
+      {saved && <p id="build-tpl-done" role="status" {...fine(s.p)}>Saved as {saved.label}.</p>}
     </section>
     <div {...stylex.props(s.go)}>
       <button type="button" className="btn" id="build-make-go" disabled={making} onClick={make}>{making ? 'Starting' : 'Make my video'}</button>

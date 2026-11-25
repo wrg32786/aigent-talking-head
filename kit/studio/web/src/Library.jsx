@@ -18,6 +18,8 @@ const s = stylex.create({
   input: { padding: 6, borderRadius: 8, borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--border)', backgroundColor: 'transparent', color: 'inherit', font: 'inherit', width: '100%', boxSizing: 'border-box' },
   h: { marginTop: 18, marginBottom: 8, fontSize: 14 },
 });
+// the card's own class kept beside StyleX's (a className before the spread would be replaced)
+const cardProps = (...st) => { const p = stylex.props(...st); return { ...p, className: ['tpl-card', p.className].filter(Boolean).join(' ') }; };
 const PACE = { look: 'Pace from the look', calm: 'Calm', steady: 'Steady', lively: 'Lively', high: 'High energy' };
 const when = iso => { const d = iso && new Date(iso); return d && !isNaN(d) ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : null; };
 export const useTemplates = () => {
@@ -32,7 +34,7 @@ function Card({ x, mode, act, busy }) {
   const pic = x.preview ? <img src={file(x.preview)} alt="" loading="lazy" {...stylex.props(s.img)} /> : <span {...stylex.props(s.ph)} aria-hidden="true"><Icon n="spark" /></span>;
   const meta = [x.source, when(x.createdAt), PACE[x.pace] || null].filter(Boolean).join(', ');
   const body = <>{pic}<span {...stylex.props(s.name)}>{x.label}</span><span className="fine">{meta}</span>{x.line && <span className="fine">{x.line}</span>}</>;
-  if (mode === 'pick') return <li><button type="button" className="tpl-card" data-template={x.name} disabled={busy} onClick={() => act('use', x)} {...stylex.props(s.card, s.pick)} aria-label={`Use ${x.label}: ${meta}`}>{body}</button></li>;
+  if (mode === 'pick') return <li><button type="button" data-template={x.name} disabled={busy} onClick={() => act('use', x)} {...cardProps(s.card, s.pick)} aria-label={`Use ${x.label}: ${meta}`}>{body}</button></li>;
   const items = [
     { id: `tpl-use-${x.name}`, label: 'Use for a new video', icon: 'right', onClick: () => act('use', x) },
     { id: `tpl-edit-${x.name}`, label: 'Edit in builder', icon: 'sliders', onClick: () => act('edit', x) },
@@ -40,7 +42,7 @@ function Card({ x, mode, act, busy }) {
     { id: `tpl-dup-${x.name}`, label: 'Duplicate', icon: 'dup', onClick: () => act('duplicate', x) },
     !x.readOnly && { id: `tpl-del-${x.name}`, label: 'Delete', icon: 'trash', onClick: () => setAsking(true) },
   ];
-  return <li className="tpl-card" data-template={x.name} {...stylex.props(s.card)}>
+  return <li data-template={x.name} {...cardProps(s.card)}>
     {body}
     <span {...stylex.props(s.menu)}><MoreMenu id={`tpl-menu-${x.name}`} label={`Options for ${x.label}`} items={items} /></span>
     {renaming && <form {...stylex.props(s.row)} onSubmit={e => { e.preventDefault(); act('rename', x, label).then(ok => { if (ok) setRenaming(false); }); }}>
@@ -60,7 +62,7 @@ export function Library({ T, mode = 'manage', apply, onUse }) {
       if (what === 'use' || what === 'edit') { apply(await api('/api/templates/use', { name: x.name, edit: what === 'edit' })); onUse(what === 'edit'); return true; }
       const j = await api('/api/templates/' + what, what === 'rename' ? { name: x.name, label } : { name: x.name });
       T.setList(j.templates); if (what === 'duplicate' && j.template) toast(`Made ${j.template.label}`); return true;
-    } catch { return false; } finally { setBusy(false); }
+    } catch (e) { toast(e.message, false); return false; } finally { setBusy(false); }
   };
   if (T.err && !T.list) return <p className="fine" role="alert">The library could not load: {T.err}</p>;
   if (!T.list) return <p className="fine" role="status">Loading your templates</p>;
