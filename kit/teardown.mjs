@@ -25,6 +25,7 @@ import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const V = require('./videomd2reel.cjs');
+const { loadExtras } = require('./teardown/extras.cjs');
 const RM = require('./reelmd.cjs');
 const R = require('./rules.cjs');
 
@@ -172,7 +173,8 @@ const bf = engine === 'rea' ? join(out, 'videomd', 'breakdown.json') : join(out,
 let extras = {};
 stage('graphics');
 const ex = spawnSync(exPy, [join(KIT, 'teardown.py'), 'extras', video, '--breakdown', bf, '--titles', join(out, 'titles.json'), '--out', join(out, 'extras.json'), '--sheet', join(out, 'contact.jpg')], { stdio: 'inherit' });
-if (!ex.status) extras = JSON.parse(readFileSync(join(out, 'extras.json'), 'utf8'));
+const got = !ex.status ? loadExtras(join(out, 'extras.json')) : null;
+if (got) extras = got;
 else console.warn('note: extras failed (no layer hints, vignette or contact sheet)');
 
 stage('recipe');

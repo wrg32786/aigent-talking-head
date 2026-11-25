@@ -469,7 +469,7 @@
         { "name": "skip", "type": "string", "description": "comma list of steps to skip: npm, python, ytdlp, ffmpeg, chrome, model, effects, humanizer, studio" },
         { "name": "json", "type": "boolean", "default": false, "description": "print the result as JSON" }
       ],
-      "outputs": ["a summary: installed, already there, skipped, failed, needs you", "jobs/.studio/setup.json (the last run)"],
+      "outputs": ["a summary: installed, already there, skipped, failed, needs you", "a line to restart Studio if it is already running", "jobs/.studio/setup.json (the last run)"],
       "success": "prints SETUP READY",
       "failures": ["a step failed (its line says why and the fix)", "SETUP INCOMPLETE: something only the user can do is listed"]
     },

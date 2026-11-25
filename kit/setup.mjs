@@ -25,7 +25,13 @@ const stateDir = () => resolve(process.env.STUDIO_DIR || join(ROOT, 'jobs', '.st
 export const lastRunPath = () => join(stateDir(), 'setup.json');
 
 const onPath = b => (process.env.PATH || '').split(delimiter).filter(Boolean).map(d => [join(d, b), join(d, b + '.exe'), join(d, b + '.cmd')].find(existsSync)).find(Boolean) || null;
-const run = (cmd, args, o = {}) => spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8', timeout: o.timeout || 60e3, stdio: o.inherit ? 'inherit' : 'pipe', shell: WIN && !/\.exe$/i.test(cmd), env: process.env });
+// Node 24 DEP0190: do not pass an args array with shell:true. A .exe path is spawned directly. Any other
+// command on Windows goes through cmd /d /c so npm.cmd and other shims start (Node refuses .cmd with shell:false).
+const run = (cmd, args, o = {}) => {
+  const opts = { cwd: ROOT, encoding: 'utf8', timeout: o.timeout || 60e3, stdio: o.inherit ? 'inherit' : 'pipe', shell: false, env: process.env };
+  if (WIN && !/\.exe$/i.test(cmd)) return spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/c', cmd, ...args], opts);
+  return spawnSync(cmd, args, opts);
+};
 const okRun = (cmd, args, o) => { try { return run(cmd, args, o).status === 0; } catch { return false; } };
 // the Python the kit runs: PYTHON (a path or a name on PATH), else the kit's .venv, else python3 on PATH
 export const python = () => { const e = process.env.PYTHON; if (e && (existsSync(e) || onPath(e))) return e; if (existsSync(VENV_PY)) return VENV_PY; return onPath(WIN ? 'python' : 'python3') ? (WIN ? 'python' : 'python3') : null; };
@@ -223,6 +229,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     console.log(`  ${rec.summary.installed} installed, ${rec.summary.ready} already there, ${rec.summary.skipped} skipped, ${rec.summary.failed} failed, ${rec.summary.needsYou} need you`);
     if (s.forUser.length) console.log('\nOnly you can do these:\n- ' + s.forUser.join('\n- '));
     console.log(s.ready ? '\nSETUP READY' : '\nSETUP INCOMPLETE (see above)');
+    console.log('If Studio is already running, restart it so it picks this up.');
   }
   process.exit(rec.summary.failed ? 1 : 0);
 }
