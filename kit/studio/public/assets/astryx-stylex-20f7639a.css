@@ -6073,6 +6073,10 @@
       border-radius: 999px;
     }
 
+    .xbsl7fq {
+      border-style: dashed;
+    }
+
     .x1y0btm7 {
       border-style: solid;
     }
@@ -6089,12 +6093,32 @@
       gap: 16px;
     }
 
+    .x1jnr06f {
+      gap: 4px;
+    }
+
     .x17d4w8g {
       gap: 6px;
     }
 
     .xe8uvvx {
       list-style: none;
+    }
+
+    .x10im51j {
+      margin-block: 0;
+    }
+
+    .xrxpjvj {
+      margin-inline: 0;
+    }
+
+    .xt970qd {
+      padding-block: 0;
+    }
+
+    .xsplgde {
+      padding-block: 1px;
     }
 
     .xj8oexa {
@@ -6109,12 +6133,24 @@
       padding-block: 6px;
     }
 
+    .xnjsko4 {
+      padding-inline: 0;
+    }
+
     .x1awh872 {
       padding-inline: 10px;
     }
 
+    .x1xijbu4 {
+      padding-inline: 6px;
+    }
+
     .xdqyycr {
       padding-inline: 8px;
+    }
+
+    .x1ku5rj1 {
+      place-items: center;
     }
   }
 
@@ -6147,6 +6183,10 @@
       background-color: var(--muted);
     }
 
+    .x8qxh4v {
+      background-color: var(--primary);
+    }
+
     .xrkfzz1 {
       box-shadow: 0 0 0 1px var(--primary) inset;
     }
@@ -6159,12 +6199,20 @@
       color: inherit;
     }
 
+    .x9b0yd8 {
+      color: var(--primary-foreground, #fff);
+    }
+
     .xt0e3qv {
       cursor: default;
     }
 
     .x1ypdohk {
       cursor: pointer;
+    }
+
+    .x19v85br {
+      cursor: progress;
     }
 
     .x1lliihq {
@@ -6251,12 +6299,24 @@
       object-fit: cover;
     }
 
-    .xwq05k6 {
-      opacity: .55;
+    .x18km98s {
+      opacity: .75;
     }
 
     .x1us6l5c {
       opacity: .8;
+    }
+
+    .x1hl8ikr {
+      outline-offset: 2px;
+    }
+
+    .x10l6tqk {
+      position: absolute;
+    }
+
+    .x1n2onr6 {
+      position: relative;
     }
 
     .xu9muis {
@@ -6283,6 +6343,10 @@
   @layer priority4 {
     .x1nbnut7 {
       height: 128px;
+    }
+
+    .xxk0z11 {
+      height: 24px;
     }
 
     .xat24cr {
@@ -6317,6 +6381,10 @@
       margin-top: 8px;
     }
 
+    .xxc7z9f {
+      max-width: 360px;
+    }
+
     .x1lnxjyg {
       min-height: 1.4em;
     }
@@ -6325,8 +6393,20 @@
       min-height: 110px;
     }
 
+    .x44moml {
+      right: 14px;
+    }
+
+    .xuivejd {
+      top: 14px;
+    }
+
     .xh8yej3 {
       width: 100%;
+    }
+
+    .xvy4d1p {
+      width: 24px;
     }
 
     .xni59qk {

@@ -72,6 +72,24 @@ try {
     assert.strictEqual(r.music.beatSync, false, 'what you did not touch follows the pace');
   });
 
+  await t('a pace picked on its own keeps classic edits and moves nothing else', () => {
+    const font = Object.values(cat.items).find(it => it.kind === 'font').id, pack = cat.packs[0].name;
+    // a classic step set music energy and a font; the session has a pack and no builder plan yet
+    const s = apply(fresh(), { pack, picks: { [`font:${font}`]: 'allow' }, music: { energy: 'low' } });
+    s.fontLock = false; const before = picksOf(s);
+    const { plan, patch } = VP.pacePatch(API.planOf(s, cat), 'high');
+    assert.ok(!patch.clearPicks && !('pack' in patch) && !('styleLook' in patch), 'the pace patch only sets what a pace sets');
+    apply(s, patch); s.videoPlan = plan;
+    assert.strictEqual(s.music.energy, 'low', 'energy set on a classic step stays');
+    assert.strictEqual(s.pace.tighten, 0.25); assert.strictEqual(s.pace.punch, 'on');
+    assert.strictEqual(s.pack, pack, 'the pack stays'); assert.strictEqual(s.fontLock, false, 'a pace click never makes a font yours');
+    const after = JSON.parse(picksOf(s)); assert.deepStrictEqual(after.beatSync, { allow: ['beat-sync'], deny: [] }); delete after.beatSync;
+    assert.deepStrictEqual(after, JSON.parse(before), 'only the beat sync pick moved');
+    // the next pace still follows for what you never touched
+    const r = VP.pacePatch(API.planOf(s, cat), 'calm'); apply(s, r.patch);
+    assert.strictEqual(s.pace.tighten, 'off'); assert.strictEqual(s.pace.punch, 'off'); assert.strictEqual(s.music.energy, 'low');
+  });
+
   await t('a session from the classic steps reads into a plan and back to the same picks and reel', () => {
     const sessions = [
       { picks: { 'captionStyle:hormozi': 'allow', 'transition:whip': 'allow', 'graphic:checklist': 'allow', 'effect:todo': 'allow' } },
@@ -161,6 +179,11 @@ try {
       assert.strictEqual(typo.status, 400, 'a typo never clears the plan');
       const ok = await (await fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: VP.defaults('steady') }) })).json();
       assert.strictEqual(ok.plan.pace, 'steady'); assert.strictEqual(ok.state.pace.tighten, 0.45); assert.strictEqual(ok.own, true);
+      const pc = await (await fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pace: 'lively' }) })).json();
+      assert.strictEqual(pc.plan.pace, 'lively'); assert.ok(pc.plan.touched.includes('pace')); assert.strictEqual(pc.state.pace.tighten, 0.45);
+      const np = await fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pace: 'zoomy' }) });
+      assert.strictEqual(np.status, 400);
+      await fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: VP.defaults('steady') }) });
     } finally { srv.kill(); }
     const client = new Client({ name: 'wizard-plan-test', version: '1' });
     await client.connect(new StdioClientTransport({ command: process.execPath, args: [join(ROOT, 'kit', 'mcp.mjs')], cwd: ROOT, env, stderr: 'ignore' }));

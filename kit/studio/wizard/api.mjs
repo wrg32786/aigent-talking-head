@@ -2,6 +2,7 @@
 //   GET  /api/video-plan    the plan (the session's own, or one read from the session), its summary rows, what the
 //                           engine cannot draw yet, and the paces
 //   POST /api/video-plan    { plan } check it and set it; the same as POST /api/state { videoPlan }
+//                           { pace } pick a pace only: read the plan from the session now, change what a pace sets, keep the rest
 //   GET  /api/wizard/steps  the builder steps (kit/studio/wizard/steps.json)
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
@@ -21,7 +22,15 @@ export function mount({ C, json, readBody, view, pushState }) {
     if (p !== '/api/video-plan') return false;
     if (M === 'GET') { json(res, 200, planView(C.load(), C.catalog())); return true; }
     if (M === 'POST') {
-      const b = await readBody(req); if (!b || !('plan' in b)) { json(res, 400, { error: 'Send { plan }, or { plan: null } to clear it.' }); return true; }
+      const b = await readBody(req);
+      if (b && typeof b.pace === 'string' && !('plan' in b)) {
+        if (!Object.hasOwn(VP.PACES, b.pace)) { json(res, 400, { error: `pace: one of ${Object.keys(VP.PACES).join(', ')}` }); return true; }
+        const s = C.load(), cat = C.catalog(), { plan, patch } = VP.pacePatch(planOf(s, cat), b.pace), r = C.applyPatch(s, { ...patch, from: 'ui' });
+        if (r.errs.length) { json(res, 400, { error: r.errs.join(' '), errs: r.errs }); return true; }
+        s.videoPlan = plan; C.save(s); pushState();
+        json(res, 200, { ...view(s), ...planView(s, cat), log: r.log }); return true;
+      }
+      if (!b || !('plan' in b)) { json(res, 400, { error: 'Send { plan }, { pace }, or { plan: null } to clear it.' }); return true; }
       const s = C.load(), r = C.applyPatch(s, { videoPlan: b.plan, from: 'ui' });
       if (r.errs.length) { json(res, 400, { error: r.errs.join(' '), errs: r.errs }); return true; }
       C.save(s); pushState();

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import * as stylex from '@stylexjs/stylex';
-import { Icon } from '../lib.jsx';
+import { api, Icon } from '../lib.jsx';
+import { cleanJob } from '../NewVideo.jsx';
 import { Dropzone, FootageLink } from '../Footage.jsx';
 import { Recordings } from '../Recording.jsx';
 
@@ -15,18 +16,26 @@ const s = stylex.create({
   h3: { marginTop: 20, marginBottom: 8, fontSize: 15 },
   chip: { display: 'inline-block', paddingBlock: 2, paddingInline: 8, borderRadius: 999, fontSize: 12, backgroundColor: 'color-mix(in srgb, var(--primary) 16%, transparent)' },
   have: { marginTop: 10, marginBottom: 0 },
+  name: { display: 'grid', gap: 4, maxWidth: 360, marginTop: 8 },
 });
-const ago = iso => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : null; };
+// a take from the last hour counts as just recorded
+const ago = iso => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 1 ? 'just now' : m <= 60 ? `${m} min ago` : null; };
+const today = () => 'video-' + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toLowerCase().replace(/\s+/g, '-');
 
-export function Start({ s: st, apply, onBuild }) {
-  const [src, setSrc] = useState(null);
+export function Start({ s: st, apply, onBuild, headRef }) {
   const n = (st.footage || []).length;
-  // a take made in the last hour that is in this video's footage
-  const fresh = (st.takes || []).filter(t => t.status === 'ready' && t.file && st.footage.includes(t.file) && ago(t.at)).pop();
+  // the newest take made in the last hour: its card starts chosen
+  const fresh = (st.takes || []).filter(t => t.status === 'ready' && t.file && t.at && ago(t.at)).sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).pop();
+  const [src, setSrc] = useState(() => (fresh ? 'recording' : null)), [name, setName] = useState(today);
+  // a clip needs a name for its folder: the name you typed, or today's date
+  const named = async () => { if (st.job) return; const j = cleanJob(name) || today(); try { apply(await api('/api/state', { job: j })); } catch {} };
   return <section className="step" id="build-start" aria-labelledby="build-h-start">
-    <header className="sh"><h2 id="build-h-start">New video</h2><p className="sub">Pick your clip, then build the look one choice at a time.</p></header>
+    <header className="sh"><h2 id="build-h-start" ref={headRef} tabIndex={-1}>New video</h2><p className="sub">Pick your clip, then build the look one choice at a time.</p></header>
+    {!st.job && <label id="build-name-row" {...stylex.props(s.name)}><span>Name <span className="fine">(optional)</span></span>
+      <input id="build-name" value={name} autoComplete="off" spellCheck="false" aria-describedby="build-name-hint" onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') named(); }} />
+      <span id="build-name-hint" className="fine">Lowercase letters, numbers and dashes. Today's date if you leave it.</span></label>}
     <h3 {...stylex.props(s.h3)}>Your clip</h3>
-    <div {...stylex.props(s.cards)} role="group" aria-label="Your clip">
+    <div {...stylex.props(s.cards)} role="group" aria-label="Your clip" onClickCapture={named} onDropCapture={named}>
       <button type="button" id="build-src-recording" aria-pressed={src === 'recording'} onClick={() => setSrc('recording')} {...stylex.props(s.card, src === 'recording' && s.chosen)}>
         <Icon n="camera" /><strong>Use a recording</strong><span className="fine">A take you made on the Recording tab</span></button>
       <Dropzone id="build-src-upload" inputId="build-file" kind="footage" s={st} apply={apply} multiple accept="video/*,.mov,.mp4,.m4v,.webm,.mkv" label="Upload a video: drop files or press Enter to choose">
@@ -35,11 +44,11 @@ export function Start({ s: st, apply, onBuild }) {
       <button type="button" id="build-src-link" aria-pressed={src === 'link'} onClick={() => setSrc('link')} {...stylex.props(s.card, src === 'link' && s.chosen)}>
         <Icon n="link" /><strong>Paste a link</strong><span className="fine">A Dropbox, Google Drive or direct video link</span></button>
     </div>
-    {src === 'recording' && <Recordings s={st} apply={apply} toNew={() => {}} />}
+    {src === 'recording' && <Recordings s={st} apply={apply} toNew={() => setSrc(null)} idp="build-" />}
     {src === 'link' && <FootageLink s={st} apply={apply} />}
     <p id="build-have" className="fine" role="status" {...stylex.props(s.have)}>
       {n ? `${n} clip${n === 1 ? '' : 's'} in this video.` : 'No clip yet. You can also add one later.'}
-      {fresh && <> <span id="build-fresh" {...stylex.props(s.chip)}>From Recording, {ago(fresh.at)}</span></>}
+      {fresh && <> <span id="build-fresh" {...stylex.props(s.chip)}>From Recording, {ago(fresh.at)}: {fresh.script || 'your newest take'}</span></>}
     </p>
     <h3 {...stylex.props(s.h3)}>How do you want to build it?</h3>
     <div {...stylex.props(s.cards)}>

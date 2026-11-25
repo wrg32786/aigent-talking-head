@@ -60,6 +60,7 @@ export function App() {
   const [V, setV] = useState(null);
   const [step, setStep] = useState(firstStep);
   const [build, setBuild] = useState(buildOf); // the step by step builder page, or null for the classic steps
+  const buildRef = useRef(build); buildRef.current = build;
   const [tab, setTab] = useState(hashMenu() || null);
   const [area, setAreaState] = useState(firstArea);
   const [outView, setOutViewState] = useState(firstOutView);
@@ -67,7 +68,7 @@ export function App() {
   // switching tab: New video writes its step back into the address, the other two their own #tab=
   const setArea = useCallback((a, write = true) => {
     setAreaState(a); localStorage.setItem('studio.tab', a);
-    if (write) history.replaceState(null, '', a === 'new' ? '#step=' + (localStorage.getItem('studio.step') || 'start') : '#tab=' + a);
+    if (write) history.replaceState(null, '', a === 'new' ? (buildRef.current ? '#build=' + buildRef.current : '#step=' + (localStorage.getItem('studio.step') || 'start')) : '#tab=' + a);
   }, []);
   const setOutView = useCallback(v => { setOutViewState(v); localStorage.setItem('studio.render', v); }, []);
   const [looksList, setLooksList] = useState(null);
@@ -102,7 +103,9 @@ export function App() {
     if (v.seq && v.boot === k.boot && v.seq < k.seq) return v; // an older reply than what is on screen
     const video = v.state.videoSeq || 0;
     if (k.video !== null && video !== k.video) {
-      setStep('start'); setStartView('main'); localStorage.setItem('studio.step', 'start'); history.replaceState(null, '', '#step=start');
+      // a new video opens where you started it: the builder's first screen, or the classic Start step
+      setStep('start'); setStartView('main'); localStorage.setItem('studio.step', 'start'); history.replaceState(null, '', buildRef.current ? '#build=start' : '#step=start');
+      if (buildRef.current) setBuild('start');
       setLog(''); setRecLive(null); // a task log and a recorder status belong to the previous board
     }
     if (v.seq) seen.current = { boot: v.boot, seq: v.seq, video };
@@ -149,7 +152,7 @@ export function App() {
       es.addEventListener('error', () => { fetch('/api/state', { cache: 'no-store' }).then(r => { if (r.ok) setOffline(false); }).catch(() => setOffline(true)); });
       es.addEventListener('open', () => { if (isOffline()) { setOffline(false); api('/api/state').then(apply).catch(() => {}); } });
     })();
-    const onHash = () => { const b = buildOf(); if (b) { setBuild(b); setArea('new', false); return; } const a = hashArea(), m = hashMenu(), st = hashStep(); if (a && a !== 'new') setArea(a, false); else if (m) pickTab(m); else if (st && STEPS.includes(stepOf(st))) go(st, true); else if (a) setArea(a, false); };
+    const onHash = () => { const b = buildOf(); if (b) { setBuild(b); setArea('new', false); return; } if (!location.hash || location.hash === '#' || hashArea() === 'new') setBuild(null); const a = hashArea(), m = hashMenu(), st = hashStep(); if (a && a !== 'new') setArea(a, false); else if (m) pickTab(m); else if (st && STEPS.includes(stepOf(st))) go(st, true); else if (a) setArea(a, false); };
     // "/" searches every option: from Picture or Text and graphics it stays there, from anywhere else it opens Picture
     const onKey = e => {
       if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); if (!document.getElementById('filter')) go('picture'); setTimeout(() => document.getElementById('filter')?.focus(), 30); }
