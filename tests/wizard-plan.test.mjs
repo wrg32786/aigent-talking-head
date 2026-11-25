@@ -317,6 +317,9 @@ try {
       assert.strictEqual((await tpost('use', { name: 'no-such' })).status, 404); assert.strictEqual((await tpost('rename', { name: 'my-test', label: '  ' })).status, 400);
       const del = await (await tpost('delete', { name: 'my-test-copy' })).json(); assert.ok(!del.templates.some(x => x.name === 'my-test-copy')); assert.ok(!existsSync(join(STATE, 'looks', 'my-test-copy')));
       const su = await (await tpost('use', { name: starter.name })).json(); assert.deepStrictEqual(su.plan.template, { kind: 'pack', name: starter.name });
+      // a reference waiting to be read steps aside first, so the template's own choices are what the video gets
+      { const s0 = C.load(); s0.reference = { ...s0.reference, mode: 'look', url: 'https://example.com/v.mp4', extracted: null, status: 'running' }; C.save(s0); }
+      const ra = await (await tpost('use', { name: 'my-test' })).json(); assert.strictEqual(ra.state.reference.mode, 'off'); assert.deepStrictEqual(ra.plan.filters, { ids: ['mono'], when: 'hook' }); assert.match(ra.log[0], /reference steps aside/);
       // a starter's name is never taken; a long name still gets its own copies; a look another template uses stays
       const sn = await fetch(url + '/api/templates', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: starter.name }) }); assert.strictEqual(sn.status, 409, 'a starter name is refused');
       const long = 'a'.repeat(30) + ' ' + 'b'.repeat(29), ls = await (await fetch(url + '/api/templates', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: long }) })).json();

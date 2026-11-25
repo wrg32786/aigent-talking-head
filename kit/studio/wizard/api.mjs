@@ -34,10 +34,11 @@ export function mount({ C, json, readBody, view, pushState }) {
       const b = (await readBody(req)) || {}, cat = C.catalog();
       try {
         if (tm[1] === 'use') {
-          // a broken-down reference in Influence or Recreate would win over the template's look, so it steps aside (Clear
-          // reference on Teardowns, or picking it again, brings it back)
-          const plan = TPL.planFor(b.name, cat, { edit: b.edit === true }), s = C.load(), ref = s.reference || {}, aside = !!(ref.extracted && ['influence', 'recreate'].includes(ref.mode));
-          const r = C.applyPatch(s, { videoPlan: plan, ...(aside ? { reference: { mode: 'off' } } : {}), from: 'ui' }); if (aside) r.log.push('the reference steps aside so the template is used');
+          // a reference (Influence, Recreate or Copy the look, broken down or still being read) would win over the template,
+          // so it steps aside first, with its own clean-up, and the template goes on after (picking it again brings it back)
+          const plan = TPL.planFor(b.name, cat, { edit: b.edit === true }), s = C.load(), ref = s.reference || {}, aside = !!(ref.mode && ref.mode !== 'off' && (ref.extracted || ref.url || ref.file));
+          if (aside) { const off = C.applyPatch(s, { reference: { mode: 'off' }, from: 'ui' }); if (off.errs.length) { json(res, 400, { error: off.errs.join(' '), errs: off.errs }); return true; } }
+          const r = C.applyPatch(s, { videoPlan: plan, from: 'ui' }); if (aside) r.log.unshift('the reference steps aside so the template is used');
           if (r.errs.length) { json(res, 400, { error: r.errs.join(' '), errs: r.errs }); return true; }
           C.save(s); pushState(); json(res, 200, { ...view(s), ...planView(s, cat), log: r.log }); return true;
         }
