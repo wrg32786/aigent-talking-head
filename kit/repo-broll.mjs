@@ -75,14 +75,15 @@ const TEXT = /^(text\/|application\/(json|vnd\.github))/i, MEDIA = /^(image\/(pn
 // GET one public URL, every redirect hop checked the same way. kind: text (the README, the repo facts) or media.
 // o.request (tests) replaces the network: (url, { lookup }) => Promise<{ status, headers, body: Buffer | AsyncIterable }>
 export async function safeGet(url, { kind = 'media', max = MAX_BYTES, hops = 5, headers = {}, request = null, resolver, deadline = 60000 } = {}) {
-  let u = String(url);
+  let u = String(url); const t0 = Date.now(); // the deadline covers the whole file, redirects included
   for (let hop = 0; hop <= hops; hop++) {
+    const left = deadline - (Date.now() - t0); if (left <= 0) throw new Error(`took too long: ${url}`);
     let p; try { p = new URL(u); } catch { throw new Error(`not a link: ${u}`); }
     if (!/^https?:$/.test(p.protocol)) throw new Error(`only http and https: ${u}`);
     if (p.username || p.password) throw new Error(`no logins in links: ${p.host}`);
     if (badName(p.hostname)) throw new Error(`${bare(p.hostname)} is not a public host`);
     const lookup = safeLookup(resolver);
-    const r = await (request ? request(u, { lookup }) : nodeGet(p, lookup, { 'user-agent': 'aigent-talking-head repo-broll', accept: kind === 'text' ? 'application/vnd.github.raw, text/plain, application/json' : 'image/*, video/*', ...headers }, deadline));
+    const r = await (request ? request(u, { lookup }) : nodeGet(p, lookup, { 'user-agent': 'aigent-talking-head repo-broll', accept: kind === 'text' ? 'application/vnd.github.raw, text/plain, application/json' : 'image/*, video/*', ...headers }, left));
     try { return await readOne(r, u, kind, max); } catch (e) { if (r.abort) r.abort(); if (e.redirect) { u = new URL(e.redirect, u).href; continue; } throw e; }
   }
   throw new Error(`too many redirects: ${url}`);
@@ -159,15 +160,27 @@ export function sizeOf(buf) {
 const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' };
 
 // fetch one repo: { owner, repo, url, dir, header, assets: [{ file, kind, alt, heading, source, w, h }], skipped, fallback }
+// what the file really is from its first bytes (never the server's label alone): a playlist or anything else FFmpeg
+// could follow never reaches it
+export function magicOk(type, b) {
+  const at = (o, str) => b.length >= o + str.length && b.toString('latin1', o, o + str.length) === str;
+  if (type === 'image/png') return b.length > 8 && b.readUInt32BE(0) === 0x89504e47;
+  if (type === 'image/jpeg') return b.length > 3 && b[0] === 0xff && b[1] === 0xd8;
+  if (type === 'image/gif') return at(0, 'GIF87a') || at(0, 'GIF89a');
+  if (type === 'image/webp') return at(0, 'RIFF') && at(8, 'WEBP');
+  if (type === 'video/webm') return b.length > 4 && b.readUInt32BE(0) === 0x1a45dfa3;
+  if (type === 'video/mp4' || type === 'video/quicktime') return ['ftyp', 'moov', 'mdat', 'wide', 'free', 'skip'].some(x => at(4, x));
+  return false;
+}
 // an animated WebP (VP8X with the animation bit): FFmpeg reads only stills, so it is left out
 export const animatedWebp = b => b.length > 21 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 12, 16) === 'VP8X' && !!(b[20] & 2);
 // a GIF becomes a looping 12 second MP4 (the render trims video, it never loops a GIF); a video's length is read so no
 // insert runs past its end. Both use FFmpeg and can be swapped in tests.
 export function gifToMp4(src, out) {
-  execFileSync('ffmpeg', ['-v', 'error', '-y', '-stream_loop', '-1', '-i', src, '-t', '12', '-an', '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=24', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out], { stdio: 'ignore', timeout: 120000 });
+  execFileSync('ffmpeg', ['-v', 'error', '-y', '-protocol_whitelist', 'file', '-f', 'gif', '-stream_loop', '-1', '-i', src, '-t', '12', '-an', '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=24', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out], { stdio: 'ignore', timeout: 120000 });
 }
 export function videoSeconds(file) {
-  const v = parseFloat(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file], { encoding: 'utf8', timeout: 30000 }));
+  const v = parseFloat(execFileSync('ffprobe', ['-v', 'error', '-protocol_whitelist', 'file', '-show_entries', 'format=duration', '-of', 'csv=p=0', file], { encoding: 'utf8', timeout: 30000 }));
   return Number.isFinite(v) && v > 0 ? v : null;
 }
 
@@ -202,6 +215,7 @@ export async function fetchRepo(link, { request = null, resolver, capture = null
       const g = await get(a.url, 'media'); let kind = g.type.startsWith('video/') ? 'video' : 'image';
       const sz = kind === 'image' ? sizeOf(g.body) : null;
       if (sz && (sz.h < 40 || ((sz.w < 200 || sz.h < 200) && !a.header))) { skipped.push({ url: a.url, why: `too small (${sz.w}x${sz.h})` }); continue; }
+      if (!magicOk(g.type, g.body)) { skipped.push({ url: a.url, why: `not really ${g.type}` }); continue; }
       if (g.type === 'image/webp' && animatedWebp(g.body)) { skipped.push({ url: a.url, why: 'an animated WebP' }); continue; }
       const n = String(assets.length + 1).padStart(2, '0'); let file = `${n}.${EXT[g.type] || 'bin'}`;
       writeFileSync(join(tmp, file), g.body);
@@ -218,11 +232,14 @@ export async function fetchRepo(link, { request = null, resolver, capture = null
     try { const c = await capture(r.url); if (c && c.image) { const file = 'page.png'; writeFileSync(join(tmp, file), readFileSync(c.image)); assets.push({ file, kind: 'image', alt: header.name, heading: '', source: r.url, capture: true }); fallback = true; } } catch (e) { log(`capture: ${e.message}`); }
   }
   const meta = { owner: r.owner, repo: r.repo, url: r.url, header, assets, skipped, fallback, fetchedAt: new Date().toISOString() };
-  const good = (readOk || fallback) && assets.some(a => !a.header);
+  // a partial fetch (some files timed out or were refused for now) never replaces a fuller folder we already have
+  let older = null; if (existsSync(mf)) { try { older = JSON.parse(readFileSync(mf, 'utf8')); } catch {} }
+  const temporary = skipped.some(x => /timed out|took too long|^(429|5\d\d) |ECONN|ENOTFOUND|EAI_AGAIN/.test(x.why));
+  const good = (readOk || fallback) && assets.some(a => !a.header) && !(older && temporary && (older.assets || []).length > assets.length);
   if (!good) {
     // not cached: an older good folder (which a cut may point at) stays as it is
     rmSync(tmp, { recursive: true, force: true });
-    if (existsSync(mf)) { try { const m = JSON.parse(readFileSync(mf, 'utf8')); return { ...m, dir, cached: true, stale: true }; } catch {} }
+    if (older) return { ...older, dir, cached: true, stale: true };
     return { ...meta, assets: [], dir, failed: true };
   }
   writeFileSync(join(tmp, 'meta.json'), JSON.stringify(meta, null, 1) + '\n');
@@ -261,9 +278,11 @@ export function planRepo(lines, assets, { takeovers = 'auto', breakout = false, 
   }
   // no flashes back to you: a short gap (a pause, a short line) between two inserts of the same layout is closed by
   // holding the first one longer, as far as a video's own length allows
+  // (never over a moment that is yours: a punch line, the hook or the CTA)
   for (let i = 0; i + 1 < inserts.length; i++) {
-    const p = inserts[i], q = inserts[i + 1], gap = q.at - (p.at + p.dur);
-    if (p.place === q.place && gap > 0 && gap < 1.5) { const d = +(q.at - p.at).toFixed(2); if (!(p.seconds && d > p.seconds)) p.dur = d; }
+    const p = inserts[i], q = inserts[i + 1], gap = q.at - (p.at + p.dur), end = p.at + p.dur;
+    const yours = who.some(w => w.who === 'you' && w.at < q.at && w.at + w.dur > end);
+    if (p.place === q.place && gap > 0 && gap < 1.5 && !yours) { const d = +(q.at - p.at).toFixed(2); if (!(p.seconds && d > p.seconds)) { p.own = p.own || p.dur; p.dur = d; } }
   }
   inserts.forEach(x => delete x.seconds);
   return { inserts, takeovers: who };
@@ -301,7 +320,9 @@ if (isMain) {
     const breakout = (plan.presenter || []).some(x => x && x.id === 'frame-breakout');
     const { inserts, takeovers } = planRepo(linesOf(cut, build), assets, { takeovers: c.takeovers === 'off' ? 'off' : 'auto', breakout });
     // a spot the b-roll lane already uses keeps its clip
-    const free = inserts.filter(x => !others.some(o => x.at < +o.at + +o.dur && +o.at < x.at + x.dur)).map(x => ({ ...x, file: relative(build, x.file).split(sep).join('/') }));
+    // (an insert held over a gap is trimmed back to its own line first, rather than dropped)
+    const hits = x => others.some(o => x.at < +o.at + +o.dur && +o.at < x.at + x.dur);
+    const free = inserts.map(x => hits(x) && x.own && x.own < x.dur ? { ...x, dur: x.own } : x).filter(x => !hits(x)).map(({ own, ...x }) => ({ ...x, file: relative(build, x.file).split(sep).join('/') }));
     cut.inserts = [...others, ...free].sort((p, q) => p.at - q.at); if (!cut.inserts.length) delete cut.inserts;
     // what happened, per line: you full screen, and the repo full screen only where its insert was kept
     cut.repoTakeovers = takeovers.filter(t => t.who === 'you' || free.some(x => x.place === 'full' && x.at === t.at));
