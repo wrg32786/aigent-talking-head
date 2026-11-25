@@ -220,6 +220,14 @@ The categories come from `kit/studio/categories.json`, which maps the engine's o
 
 ![The Captions tab of the effects menu](studio/menu-captions.png)
 
+### Moving previews and sound tiles
+
+Every effect, graphic, finish and title layer tile plays a short loop of what it does on our sample presenter (`docs/menu/<kind>/<id>.webp`, 270x480, 15 fps, 3 s). Finishes wipe in from left to right so you see the before and after; words behind the head use the presenter's person mask. `node kit/demos.mjs` makes them (`--missing` only the ones not there yet), and **Settings > Previews > Make missing previews** does the same from the page with a progress line. Effect previews need the effects add-on.
+
+`tests/demos-visible.test.mjs` (in `npm run check`) fails if an option has no preview, a preview is over 128 KB, they add up to 8 MB or more, or a preview does not visibly change the picture: Chrome decodes each loop and compares it with the plain presenter, and at least 10% of the picture has to change by a visible amount at its clearest moment.
+
+In Music and pace, **Hear the music** shows every bed as a tile with a play button, its waveform and **Use this**, and **Hear the sounds** lists the sound effects by kind so you can hear what Studio puts on the cuts. The waveforms come from `docs/menu/sounds.json` (`node kit/demos.mjs --sounds`); the audio loads only when you press play.
+
 ### Candidates to build next
 
 No category is empty today, so none is hidden. These are thin, or are things people ask for that the engine does not do yet (listed in `categories.json` under `candidates`):

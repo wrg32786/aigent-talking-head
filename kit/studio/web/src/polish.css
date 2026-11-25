@@ -300,3 +300,19 @@ main:not([data-area="new"]) { padding-bottom: 32px; }
 .tlib-card { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 12px; }
 .tlib-card > span { display: flex; flex-direction: column; min-width: 0; }
 .tlib-card .fine { margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* sound tiles (SoundTiles.jsx): play, waveform, name; the bars fill as it plays */
+.snd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-2); margin-top: var(--space-2); }
+.snd-tile { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); min-width: 0; }
+.snd-tile.chosen { border-color: var(--primary); }
+.snd-tile.playing { box-shadow: 0 0 0 1px var(--primary) inset; }
+.snd-body { display: grid; gap: 4px; flex: 1; min-width: 0; }
+.snd-name { font-weight: 600; font-size: 13px; overflow-wrap: anywhere; }
+.snd-sub { opacity: .75; }
+.wave { width: 100%; height: 28px; display: block; }
+.wave rect { fill: color-mix(in srgb, currentColor 35%, transparent); }
+.wave rect.on { fill: var(--primary); }
+.wave-none { height: 28px; }
+.snd-group + .snd-group { margin-top: var(--space-3); }
+.snd-group h4 { margin: 0; }
+@media (max-width: 520px) { .snd-grid { grid-template-columns: 1fr; } }
