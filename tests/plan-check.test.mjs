@@ -91,6 +91,13 @@ try {
     // a render result older than the cut is from an earlier render: left out
     const { utimesSync } = await import('fs'); const old = new Date(Date.now() - 60000); utimesSync(join(build, 'facecheck.json'), old, old);
     assert.ok(!PC.run(build).checks.some(x => x.id === 'face'));
+    // a cut changed after the render (its render-sig.json no longer matches) also leaves the results out
+    const { createHash } = await import('crypto'), h = n => createHash('sha1').update(readFileSync(join(build, n))).digest('hex');
+    writeFileSync(join(build, 'facecheck.json'), JSON.stringify({ faceSafe: false, hits: [{ t: 6.2 }] }));
+    writeFileSync(join(build, 'render-sig.json'), JSON.stringify({ cut: h('cut.json'), captions: h('captions.js') }));
+    assert.ok(PC.run(build).checks.some(x => x.id === 'face'), 'matching signature: counted');
+    const c2 = JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8')); c2.segs[1].transition = 'zoom'; writeFileSync(join(build, 'cut.json'), JSON.stringify(c2));
+    const r2 = PC.run(build); assert.ok(!r2.checks.some(x => x.id === 'face'), 'cut edited after the render: not counted');
   });
   await t('an agent\'s looked-at checks sit beside the measured ones; the command line', () => {
     const { jobs, build } = job('cli', { plan: P(p => { p.filters = { ids: ['mono'], when: 'cta' }; }), cut: { finish: 'mono' } });
@@ -114,6 +121,11 @@ try {
     const { build: b3 } = job('gl', { plan: P(p => { p.transitions = { ids: [], when: 'every-cut' }; }), cut: { hits: [[4.02, 14], [10, 10]] } });
     const g1 = PC.run(b3); assert.strictEqual(g1.checks.find(c => c.id === 'transitions').ok, false, 'a glitch shake at a seam is not a straight cut');
     PC.run(b3, { fix: true }); assert.deepStrictEqual(JSON.parse(readFileSync(join(b3, 'cut.json'), 'utf8')).hits, [[10, 10]], 'only the seam shake goes');
+    // the caption glitches (captions.js glitchAt) and the shakes held aside (cut.heldHits) count too, and the fix takes them off
+    const { build: b5 } = job('gl2', { plan: P(p => { p.transitions = { ids: [], when: 'every-cut' }; }), cut: { heldHits: [[8.05, 12]] }, caps: { glitchAt: [12, 2.5] } });
+    assert.strictEqual(PC.run(b5).checks.find(c => c.id === 'transitions').ok, false, 'held and caption shakes at seams are caught');
+    assert.ok(PC.run(b5, { fix: true }).checks.find(c => c.id === 'transitions').ok);
+    assert.ok(!('heldHits' in JSON.parse(readFileSync(join(b5, 'cut.json'), 'utf8')))); assert.deepStrictEqual(PC.readCaptions(join(b5, 'captions.js')).glitchAt, [2.5]);
     const { build: b4 } = job('ctaonly', { plan: P(p => { p.filters = { ids: ['mono'], when: 'cta' }; }) });
     const c4 = JSON.parse(readFileSync(join(b4, 'cut.json'), 'utf8')); c4.segs = c4.segs.slice(0, 4); writeFileSync(join(b4, 'cut.json'), JSON.stringify(c4));
     const f4 = PC.run(b4).checks.find(c => c.id === 'filters'); assert.strictEqual(f4.ok, false); assert.match(f4.note, /nowhere to go/);

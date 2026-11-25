@@ -1114,6 +1114,10 @@ sh(process.execPath, [path.join(KIT, 'assemble.cjs'), out], build, (flag('no-sfx
     }
     if (spans.length) console.warn('note: some caption moments read under 3:1 against the picture (listed above). Move the word, change its colour or pick another shot.');
   } }
+// what this render's checks were measured on (render-sig.json): the final cut.json and captions.js, so the plan check
+// (kit/plan-check.mjs) can tell when either changed after the render and its face, text and contrast results no longer count
+try { const hf = n => { try { return require('crypto').createHash('sha1').update(fs.readFileSync(path.join(build, n))).digest('hex'); } catch { return null; } };
+  fs.writeFileSync(path.join(build, 'render-sig.json'), JSON.stringify({ cut: hf('cut.json'), captions: hf('captions.js'), at: new Date().toISOString() }) + '\n'); } catch {}
 // what is said as a subtitle file beside the reel (reel-vN.srt), also when the captions are burned in or not drawn
 try { const srt = require('./phrase-group.cjs').toSrt(R.readCaptions(path.join(build, 'captions.js')), LEN, S.timeline(cut.segs, build)); if (srt) { fs.writeFileSync(out.replace(/\.mp4$/, '.srt'), srt); console.log(`subtitles: ${path.basename(out).replace(/\.mp4$/, '.srt')}`); } } catch (e) { console.warn('note: no subtitle file (' + e.message + ')'); }
 // everything this reel was made from, kept beside it (jobs/<job>/reel-vN.build/), so a later Draft cannot erase it
