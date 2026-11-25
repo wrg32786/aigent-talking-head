@@ -6027,6 +6027,10 @@
 
 @layer product {
   @layer priority1 {
+    .xln7xf2 {
+      font: inherit;
+    }
+
     .x1ghz6dp {
       margin: 0;
     }
@@ -6035,8 +6039,16 @@
       padding: 0;
     }
 
+    .x7z7khe {
+      padding: 10px;
+    }
+
     .xc7ga6q {
       padding: 12px;
+    }
+
+    .x1gnqi22 {
+      padding: 14px;
     }
 
     .x1tamke2 {
@@ -6207,8 +6219,16 @@
       align-content: start;
     }
 
+    .x1pha0wt {
+      align-items: baseline;
+    }
+
     .x6s0dn4 {
       align-items: center;
+    }
+
+    .xpqajaz {
+      align-items: end;
     }
 
     .x1cy8zhl {
@@ -6257,6 +6277,10 @@
 
     .x14wedtx {
       box-shadow: 0 0 0 2px var(--primary) inset;
+    }
+
+    .x9f619 {
+      box-sizing: border-box;
     }
 
     .x1heor9g {
@@ -6379,6 +6403,10 @@
       font-weight: 700;
     }
 
+    .x1pfyyx7 {
+      grid-template-columns: 9em 1fr auto;
+    }
+
     .x1gf0zcd {
       grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
     }
@@ -6441,6 +6469,10 @@
 
     .x7wzq59 {
       position: sticky;
+    }
+
+    .x288g5 {
+      resize: vertical;
     }
 
     .xu9muis {
@@ -6549,6 +6581,14 @@
       margin-bottom: 12px;
     }
 
+    .x12nagc {
+      margin-bottom: 4px;
+    }
+
+    .xzueoph {
+      margin-bottom: 6px;
+    }
+
     .x1e56ztr {
       margin-bottom: 8px;
     }
@@ -6563,6 +6603,14 @@
 
     .x14vqqas {
       margin-top: 12px;
+    }
+
+    .xw7yly9 {
+      margin-top: 16px;
+    }
+
+    .xhrpt6u {
+      margin-top: 18px;
     }
 
     .x1sy10c2 {
@@ -6595,6 +6643,10 @@
 
     .x5w4yej {
       min-width: 160px;
+    }
+
+    .x12rczxh {
+      min-width: 220px;
     }
 
     .x131sewu {

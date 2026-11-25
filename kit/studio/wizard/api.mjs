@@ -7,10 +7,12 @@
 //                           { transitions } { presenter } { graphics } { filters } { music } { notes } the same for
 //                           Between shots, You on screen, Extras, Look, Sound and Your notes (notes is the text)
 //   GET  /api/wizard/steps  the builder steps (kit/studio/wizard/steps.json)
+//   POST /api/templates     { name? } save the plan as it is now as a template (kit/studio/templates.mjs); no notes
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import * as VP from './plan.mjs';
+import * as TPL from '../templates.mjs';
 
 export const STEPS_FILE = join(dirname(fileURLToPath(import.meta.url)), 'steps.json');
 export const stepsOf = () => JSON.parse(readFileSync(STEPS_FILE, 'utf8'));
@@ -22,6 +24,12 @@ export const planView = (s, cat) => { const plan = planOf(s, cat); return { plan
 export function mount({ C, json, readBody, view, pushState }) {
   async function route(p, M, u, req, res) {
     if (p === '/api/wizard/steps' && M === 'GET') { json(res, 200, stepsOf()); return true; }
+    if (p === '/api/templates' && M === 'POST') {
+      const b = await readBody(req), s = C.load(), cat = C.catalog();
+      try { json(res, 200, { template: TPL.save(b && typeof b.name === 'string' ? b.name : '', { plan: planOf(s, cat), from: { kind: 'builder' }, cat }) }); }
+      catch (e) { json(res, e.code || 500, { error: e.message }); }
+      return true;
+    }
     if (p !== '/api/video-plan') return false;
     if (M === 'GET') { json(res, 200, planView(C.load(), C.catalog())); return true; }
     if (M === 'POST') {
