@@ -47,7 +47,7 @@ try {
   });
   t('the choice is part of the look a new video can keep', () => { assert.ok(C.LOOK_KEYS.includes('boost')); });
   t('the page has one plain switch for it on Text and graphics, and the agent tool takes the same field', () => {
-    const jsx = readFileSync(join(KIT, 'studio', 'web', 'src', 'Style.jsx'), 'utf8');
+    const jsx = ['Style.jsx', 'AllOptions.jsx'].map(f => readFileSync(join(KIT, 'studio', 'web', 'src', f), 'utf8')).join('\n'); // the layer tiles live in AllOptions.jsx since the builder
     assert.ok(/cur === 'text'[^\n]*id="boost"[^\n]*label="Make hard-to-read words easier to read"/.test(jsx)); assert.ok(/patch\(\{ boost: on \? 'on' : 'off' \}\)/.test(jsx));
     assert.ok(/boost: \{ type: \['string', 'null'\]/.test(readFileSync(join(KIT, 'mcp.mjs'), 'utf8')));
   });

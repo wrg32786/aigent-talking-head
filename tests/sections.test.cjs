@@ -59,6 +59,17 @@ t('a call to action asks: "this will save you hours" is not one, "check out the 
   assert.strictEqual(SEC.bounds([...W(0, 'Build it once.'), ...W(4, 'Check out the link below.')], 8).ctaStart, 4);
   assert.strictEqual(SEC.bounds([...W(0, 'Build it once.'), ...W(4, 'If you want more, follow me.')], 8).ctaStart, 4);
 });
+t('filters on the hook only: the hook pieces get them, the rest none, the job-wide finish is set aside and comes back', () => {
+  const c = cut(); c.finish = 'warm'; c.segs[4].finish = 'grain'; SEC.tag(c, words); const before = JSON.stringify(c);
+  c.finishWhen = 'hook'; c.finishIds = ['mono'];
+  assert.strictEqual(SEC.applyFinishWhen(c), 2);
+  assert.strictEqual(c.finish, undefined, 'never the whole video through cut.finish');
+  assert.deepStrictEqual(c.segs.map(s => s.finish || null), ['mono', 'mono', null, null, null, null]);
+  c.finishWhen = 'hook-cta'; c.finishIds = ['mono', 'grain']; SEC.applyFinishWhen(c);
+  assert.deepStrictEqual(c.segs.map(s => s.finish || null), ['mono', 'grain', null, null, null, 'mono']);
+  delete c.finishWhen; delete c.finishIds; SEC.applyFinishWhen(c);
+  assert.deepStrictEqual(c, JSON.parse(before), 'no timing is the draft again');
+});
 t('a seam you changed while it was held stays yours; a lock sees the real seams first', () => {
   const c = cut(); SEC.tag(c, words); c.transitionsWhen = 'hook-cta'; SEC.applyTransitionsWhen(c);
   c.segs[3].transition = 'film'; // changed by hand or by choices --apply while held
@@ -69,5 +80,12 @@ t('a seam you changed while it was held stays yours; a lock sees the real seams 
 });
 t('"I want to share a story" and "that is the message" are not calls to action', () => {
   assert.strictEqual(SEC.bounds([...W(0, 'Build it once.'), ...W(4, 'I want to share a story.'), ...W(6, 'That is the message.')], 8).ctaStart, null);
+});
+t('a timed filter you changed by hand stays yours when the timing goes; the rest come back', () => {
+  const c = cut(); c.finish = 'warm'; SEC.tag(c, words); c.finishWhen = 'hook'; c.finishIds = ['mono']; SEC.applyFinishWhen(c);
+  c.segs[0].finish = 'grain'; // choices --apply while timed
+  delete c.finishWhen; delete c.finishIds; SEC.applyFinishWhen(c);
+  assert.strictEqual(c.segs[0].finish, 'grain'); assert.strictEqual(c.segs[1].finish, undefined); assert.strictEqual(c.finish, 'warm');
+  assert.ok(!c.segs.some(x => 'heldFinish' in x || 'timedFinish' in x));
 });
 console.log(`\nsections: ${n} tests passed`);

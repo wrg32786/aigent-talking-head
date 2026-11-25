@@ -83,3 +83,10 @@ export function SfxTiles({ CAT }) {
     </div>)}
   </Fold>;
 }
+
+// the music beds for the builder's Music step: play to hear one, Use this to choose it (no fold, the step is the list)
+export function BedList({ CAT, value, onChoose, disabled }) {
+  const p = usePlayer();
+  return <div className="snd-grid" id="build-mu-beds" role="group" aria-label="Music tracks">{(CAT.beds || []).map(b => <Tile key={b.id} x={b} p={p} sub={`${b.energy} energy, ${secs(b.seconds)}`} chosen={value === b.id}
+    onChoose={disabled ? null : () => onChoose(b.id)} />)}</div>;
+}

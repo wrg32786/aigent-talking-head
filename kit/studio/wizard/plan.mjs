@@ -96,15 +96,21 @@ export function defaults(pace = 'look') { return applyPace(blank(), pace); }
 // applyPatch that sets only what a pace changes (no clearing of picks, so nothing else moves).
 // last: the pace saved last time (s.videoPlan.pace), or none: then the session never had a pace picked and starts from
 // Let the Look decide. The plan's own pace is only a guess from the pause length, so it is not used here.
+// the pace saved last (the builder, a goal, an agent's plan, a template), never the guess Make stores when no plan was
+// set (plan.guessed), so a guess never makes the defaults look like your own choices
+export const lastPace = s => (s && s.videoPlan && !s.videoPlan.guessed && s.videoPlan.pace) || null;
 export function pacePatch(plan, pace, last = null) {
   let p = normalize(plan); const lp = last || 'look', was = Object.hasOwn(PACES, lp) ? PACES[lp] : PACES.look;
   if (p.music.energy !== was.energy) p = touch(p, 'music.energy');
-  if (p.music.beatSync !== was.beatSync) p = touch(p, 'music.beatSync');
+  if (p.music.beatSync !== was.beatSync && p.music.bed !== 'none') p = touch(p, 'music.beatSync');
   if (p.presenter.some(x => x.id === 'punch') !== was.punch) p = touch(p, 'presenter');
   if (p.transitions.when !== was.transitionsWhen) p = touch(p, 'transitions.when');
-  const next = touch(applyPace(p, pace), 'pace'), P = Object.hasOwn(PACES, next.pace) ? PACES[next.pace] : PACES.look, bs = next.music.beatSync;
+  const next = touch(applyPace(p, pace), 'pace');
+  if (p.music.bed === 'none') next.music.beatSync = p.music.beatSync; // no music: your beat choice waits for the music to come back
+  const P = Object.hasOwn(PACES, next.pace) ? PACES[next.pace] : PACES.look, bs = next.music.beatSync;
   const patch = { transitionsWhen: Array.isArray(next.transitions.ids) && !next.transitions.ids.length ? 'every-cut' : next.transitions.when, music: { energy: next.music.energy }, pace: { tighten: next.advanced.tighten ?? P.tighten, punch: next.presenter.some(x => x.id === 'punch') ? 'on' : 'off' },
-    picks: bs === null ? { 'beatSync:beat-sync': 'clear', 'beatSync:no-beat-sync': 'clear' } : { [`beatSync:${bs ? 'beat-sync' : 'no-beat-sync'}`]: 'allow' } };
+    // with no music there is no beat to cut on, so a pace leaves beat sync alone then
+    picks: next.music.bed === 'none' ? {} : bs === null ? { 'beatSync:beat-sync': 'clear', 'beatSync:no-beat-sync': 'clear' } : { [`beatSync:${bs ? 'beat-sync' : 'no-beat-sync'}`]: 'allow' } };
   return { plan: next, patch };
 }
 // The smallest session patch that turns prev into next: picks the two plans set differently, and only the session
@@ -115,7 +121,9 @@ export function diffPatch(prev, next, cat = null) {
   for (const ref of Object.keys(a.picks)) if (!(ref in b.picks)) picks[ref] = 'clear';
   for (const [ref, how] of Object.entries(b.picks)) if (a.picks[ref] !== how) picks[ref] = how;
   const patch = Object.keys(picks).length ? { picks } : {};
-  for (const k of ['pack', 'styleLook', 'titles', 'keyWords', 'transitionsWhen', 'music', 'sound', 'pace']) if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) patch[k] = b[k];
+  for (const k of ['pack', 'styleLook', 'titles', 'keyWords', 'transitionsWhen', 'finishWhen', 'music', 'sound', 'pace']) if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) patch[k] = b[k];
+  // a filter pick always comes with its timing, so the session never reads it as a choice made with no timing control
+  if (Object.keys(picks).some(r => r.startsWith('finish:'))) patch.finishWhen = b.finishWhen;
   return patch;
 }
 // a builder step's words choices laid over the plan (only the fields given change)
@@ -132,10 +140,11 @@ export function withWords(plan, words) {
 }
 // a builder step's Between shots, You on screen or Extras choice laid over the plan: transitions and graphics change
 // only the fields given, presenter is the whole list. A choice here wins over All options picks it speaks for.
-export const PARTS = ['transitions', 'presenter', 'graphics'];
+export const PARTS = ['transitions', 'presenter', 'graphics', 'filters', 'music', 'notes'];
 export function withPart(plan, part, value) {
   const p = normalize(plan), before = clone(p);
   if (part === 'presenter') p.presenter = clone(value);
+  else if (part === 'notes') p.notes = typeof value === 'string' ? value : '';
   else p[part] = { ...p[part], ...clone(value) };
   // only the All options picks for what this choice changed
   let speaks = () => false;
@@ -150,8 +159,12 @@ export function withPart(plan, part, value) {
     const moved = new Set([...before.presenter.filter(x => !b.has(key(x))), ...p.presenter.filter(x => !a.has(key(x)))].map(x => x.id));
     speaks = (k, id) => (k === 'titleLayer' && moved.has('behind-head')) || (k === 'effect' && moved.has('effect:' + id));
   }
+  if (part === 'filters' && value && 'ids' in value) speaks = k => k === 'finish';
+  if (part === 'music' && value) speaks = k => ('beatSync' in value && k === 'beatSync') || ('bed' in value && k === 'music');
   for (const r of Object.keys(p.advanced.picks)) { const i = r.indexOf(':'); if (speaks(r.slice(0, i), r.slice(i + 1))) delete p.advanced.picks[r]; }
-  return touch(p, part === 'transitions' && value && 'when' in value ? 'transitions.when' : part, part);
+  const extra = part === 'transitions' && value && 'when' in value ? ['transitions.when'] : part === 'filters' && value && 'when' in value ? ['filters.when']
+    : part === 'music' && value ? ['energy', 'beatSync'].filter(k => k in value).map(k => 'music.' + k) : [];
+  return touch(p, ...extra, part);
 }
 // mark a field as yours, so a later pace change leaves it alone
 export function touch(plan, ...keys) { const p = normalize(plan); for (const k of keys) if (!p.touched.includes(k)) p.touched.push(k); return p; }
@@ -234,7 +247,10 @@ export function toState(plan, cat = null) {
     styleLook: p.template && p.template.kind === 'look' ? p.template.name : null, titles: w.titles.on === false || (w.type === 'captions' && p.touched.includes('words')) ? 'off' : 'auto',
     music: { bed: p.music.bed, energy: p.music.energy }, sound: { sfx: p.music.sfx ? 'on' : 'off' },
     pace: { tighten: p.advanced.tighten ?? P.tighten, punch: p.presenter.some(x => x.id === 'punch') ? 'on' : 'off' }, keyWords: w.keyWords.level,
-    transitionsWhen: Array.isArray(p.transitions.ids) && !p.transitions.ids.length ? 'every-cut' : p.transitions.when };
+    transitionsWhen: Array.isArray(p.transitions.ids) && !p.transitions.ids.length ? 'every-cut' : p.transitions.when,
+    // filters chosen in the builder (or given a timing) show where you said, on their own pieces; filters only
+    // allowed on a classic step, or none chosen, leave it to the look as before
+    finishWhen: Array.isArray(p.filters.ids) && p.filters.ids.length && (p.touched.includes('filters') || p.filters.when !== 'whole') ? p.filters.when : 'none' };
   const look = w.look || (w.type === 'captions' ? 'classic' : w.type === 'kinetic' ? 'kinetic' : null);
   if (look) pick('captionStyle', look);
   if (w.entrance && w.type !== 'captions') pick('captionEntrance', w.entrance);
@@ -250,7 +266,7 @@ export function toState(plan, cat = null) {
   if (p.graphics.cards !== null) pick('editing', 'cards-auto', p.graphics.cards ? 'allow' : 'deny');
   // no filters: every finish forbidden (the catalog has the list)
   if (Array.isArray(p.filters.ids)) { if (p.filters.ids.length) for (const id of p.filters.ids) pick('finish', id); else for (const id of finishIds(cat)) pick('finish', id, 'deny'); }
-  if (p.music.beatSync !== null) pick('beatSync', p.music.beatSync ? 'beat-sync' : 'no-beat-sync');
+  if (p.music.beatSync === false || (p.music.beatSync === true && p.music.bed !== 'none')) pick('beatSync', p.music.beatSync ? 'beat-sync' : 'no-beat-sync');
   Object.assign(picks, p.advanced.picks);
   return patch;
 }
@@ -266,7 +282,6 @@ export function pending(plan) {
   for (const x of p.presenter) {
     if (x.id === 'frame-breakout') add('presenter.frame-breakout', 'Frame breakout');
   }
-  if (Array.isArray(p.filters.ids) && p.filters.ids.length && p.filters.when !== 'whole') add('filters.when', 'Filters only on the hook or CTA');
   if (p.content.repoFeature) add('content', 'Repo or tool feature');
   return out.filter((x, i, a) => a.findIndex(y => y.field === x.field) === i);
 }
@@ -326,8 +341,9 @@ export function fromState(s, prev = null, cat = null) {
   if (fa.length) { p.filters.ids = fa; for (const id of fa) take('finish', id); }
   else if (fd.length && cat && finishIds(cat).every(id => fd.includes(id))) { p.filters.ids = []; for (const id of fd) take('finish', id); }
   else p.filters.ids = null;
+  p.filters.when = s.finishWhen && s.finishWhen !== 'none' ? s.finishWhen : Array.isArray(p.filters.ids) && p.filters.ids.length ? 'whole' : base.filters.when; // no timing in the session: the look's way
   p.music.bed = (s.music && s.music.bed) || 'auto'; p.music.energy = (s.music && s.music.energy) || 'auto';
-  const bs = allow('beatSync')[0]; p.music.beatSync = bs === 'beat-sync' ? true : bs === 'no-beat-sync' ? false : null; if (bs) take('beatSync', bs);
+  const bs = allow('beatSync')[0]; p.music.beatSync = bs === 'beat-sync' ? true : bs === 'no-beat-sync' ? false : p.music.bed === 'none' ? base.music.beatSync : null; if (bs) take('beatSync', bs); // no music keeps the beat choice for later
   p.music.sfx = !(s.sound && s.sound.sfx === 'off');
   const adv = {};
   for (const [k, slot] of Object.entries(picks)) {

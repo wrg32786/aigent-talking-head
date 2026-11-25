@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex';
 import { ZoneMap } from './ZoneMap.jsx';
 
 // The frame every builder step uses (spec section 6): the question, an Applies to chip with the zone map, the options,
-// one line on what the chosen option does, and Back, the step count and Next.
+// one line on what the chosen option does, and Back, the step count and Next (none on the last step, which has its own).
 const s = stylex.create({
   frame: { padding: 20, borderRadius: 16 },
   head: { display: 'flex', gap: 16, alignItems: 'center', marginBottom: 12 },
@@ -32,7 +32,7 @@ export function StepFrame({ step, count, does, back, next, nextLabel = 'Next', h
     <div {...stylex.props(s.foot)}>
       <button type="button" className="btn ghost" id="build-back" onClick={back}>Back</button>
       <span id="build-count" {...stylex.props(s.count)}>{count}</span>
-      <button type="button" className="btn" id="build-next" onClick={next} disabled={nextDisabled}>{nextLabel}</button>
+      {next ? <button type="button" className="btn" id="build-next" onClick={next} disabled={nextDisabled}>{nextLabel}</button> : <span />}
     </div>
   </section>;
 }

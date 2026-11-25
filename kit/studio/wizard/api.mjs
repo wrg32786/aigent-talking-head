@@ -4,12 +4,16 @@
 //   POST /api/video-plan    { plan } check it and set it; the same as POST /api/state { videoPlan }
 //                           { pace } pick a pace only: read the plan from the session now, change what a pace sets, keep the rest
 //                           { words } change some words choices (a builder step); only the picks they move change
-//                           { transitions } { presenter } { graphics } the same for Between shots, You on screen, Extras
+//                           { transitions } { presenter } { graphics } { filters } { music } { notes } the same for
+//                           Between shots, You on screen, Extras, Look, Sound and Your notes (notes is the text)
 //   GET  /api/wizard/steps  the builder steps (kit/studio/wizard/steps.json)
+//   POST /api/templates     { name? } save the plan as it is now as a template (kit/studio/templates.mjs); no notes
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import * as VP from './plan.mjs';
+import * as TPL from '../templates.mjs';
+const lastPace = s => VP.lastPace(s);
 
 export const STEPS_FILE = join(dirname(fileURLToPath(import.meta.url)), 'steps.json');
 export const stepsOf = () => JSON.parse(readFileSync(STEPS_FILE, 'utf8'));
@@ -21,14 +25,21 @@ export const planView = (s, cat) => { const plan = planOf(s, cat); return { plan
 export function mount({ C, json, readBody, view, pushState }) {
   async function route(p, M, u, req, res) {
     if (p === '/api/wizard/steps' && M === 'GET') { json(res, 200, stepsOf()); return true; }
+    if (p === '/api/templates' && M === 'POST') {
+      const b = await readBody(req), s = C.load(), cat = C.catalog();
+      try { json(res, 200, { template: TPL.save(b && typeof b.name === 'string' ? b.name : '', { plan: planOf(s, cat), from: { kind: 'builder' }, cat }) }); }
+      catch (e) { json(res, typeof e.code === 'number' ? e.code : 500, { error: e.message }); }
+      return true;
+    }
     if (p !== '/api/video-plan') return false;
     if (M === 'GET') { json(res, 200, planView(C.load(), C.catalog())); return true; }
     if (M === 'POST') {
       const b = await readBody(req);
       if (b && typeof b.pace === 'string' && !('plan' in b)) {
         if (!Object.hasOwn(VP.PACES, b.pace)) { json(res, 400, { error: `pace: one of ${Object.keys(VP.PACES).join(', ')}` }); return true; }
-        const s = C.load(), cat = C.catalog(), { plan, patch } = VP.pacePatch(planOf(s, cat), b.pace, s.videoPlan && s.videoPlan.pace), r = C.applyPatch(s, { ...patch, from: 'ui' });
+        const s = C.load(), cat = C.catalog(), { plan, patch } = VP.pacePatch(planOf(s, cat), b.pace, lastPace(s)), r = C.applyPatch(s, { ...patch, from: 'ui' });
         if (r.errs.length) { json(res, 400, { error: r.errs.join(' '), errs: r.errs }); return true; }
+        delete plan.goalPace; delete plan.guessed; // a pace you pick here is yours: a run_wizard goal leaves it alone
         s.videoPlan = plan; C.save(s); pushState();
         json(res, 200, { ...view(s), ...planView(s, cat), log: r.log }); return true;
       }
@@ -42,8 +53,8 @@ export function mount({ C, json, readBody, view, pushState }) {
       }
       const part = b && !('plan' in b) && VP.PARTS.find(k => k in b);
       if (part) {
-        const val = b[part], okShape = part === 'presenter' ? Array.isArray(val) : val && typeof val === 'object' && !Array.isArray(val);
-        if (!okShape) { json(res, 400, { error: part === 'presenter' ? 'presenter: a list of { id, when }.' : `${part}: an object.` }); return true; }
+        const val = b[part], okShape = part === 'presenter' ? Array.isArray(val) : part === 'notes' ? typeof val === 'string' : val && typeof val === 'object' && !Array.isArray(val);
+        if (!okShape) { json(res, 400, { error: part === 'presenter' ? 'presenter: a list of { id, when }.' : part === 'notes' ? 'notes: plain text.' : `${part}: an object.` }); return true; }
         const s = C.load(), cat = C.catalog(), prev = planOf(s, cat), next = VP.withPart(prev, part, val), v = VP.validate(next, cat);
         if (!v.ok) { json(res, 400, { error: v.errs.join(' '), errs: v.errs }); return true; }
         const r = C.applyPatch(s, { ...VP.diffPatch(prev, next, cat), from: 'ui' });
@@ -51,7 +62,7 @@ export function mount({ C, json, readBody, view, pushState }) {
         s.videoPlan = VP.normalize(next); C.save(s); pushState();
         json(res, 200, { ...view(s), ...planView(s, cat), log: r.log }); return true;
       }
-      if (!b || !('plan' in b)) { json(res, 400, { error: 'Send { plan }, { pace }, { words }, { transitions }, { presenter }, { graphics }, or { plan: null } to clear it.' }); return true; }
+      if (!b || !('plan' in b)) { json(res, 400, { error: 'Send { plan }, { pace }, { words }, { transitions }, { presenter }, { graphics }, { filters }, { music }, { notes }, or { plan: null } to clear it.' }); return true; }
       const s = C.load(), r = C.applyPatch(s, { videoPlan: b.plan, from: 'ui' });
       if (r.errs.length) { json(res, 400, { error: r.errs.join(' '), errs: r.errs }); return true; }
       C.save(s); pushState();

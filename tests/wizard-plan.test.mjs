@@ -5,7 +5,7 @@
 // Run: node tests/wizard-plan.test.mjs   (npm run check runs it)
 import assert from 'assert';
 import { spawn } from 'child_process';
-import { mkdtempSync, rmSync } from 'fs';
+import { mkdtempSync, readFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -52,7 +52,7 @@ try {
       [{ words: { type: 'kinetic', entrance: 'pop' } }, { picks: { 'captionStyle:kinetic': 'allow', 'captionEntrance:pop': 'allow' } }],
       [{ words: { type: 'captions', look: 'pill', fonts: 'druk', colors: { theme: 'magazine' } } }, { picks: { 'captionStyle:pill': 'allow', 'font:druk': 'allow', 'theme:magazine': 'allow' }, titles: 'off' }], // just captions: no big titles (spec 14.2)
       [{ transitions: { ids: ['whip', 'glitch'], when: 'every-cut' } }, { picks: { 'transition:whip': 'allow', 'transition:glitch': 'allow' } }],
-      [{ filters: { ids: ['mono'], when: 'whole' }, music: { beatSync: false } }, { picks: { 'finish:mono': 'allow', 'beatSync:no-beat-sync': 'allow' } }],
+      [{ filters: { ids: ['mono'], when: 'whole' }, music: { beatSync: false } }, { picks: { 'finish:mono': 'allow', 'beatSync:no-beat-sync': 'allow' }, finishWhen: 'whole' }], // filters chosen in the builder show (spec 14.1)
       [{ presenter: [{ id: 'punch', when: 'whole' }, { id: 'behind-head', when: 'whole' }, { id: 'effect:slow-push', when: 'whole' }] }, { picks: { 'titleLayer:behind': 'allow', 'effect:slow-push': 'allow' } }],
       [{ graphics: { agent: false, nameTag: false, numbers: true, stickers: true, cta: true, cards: false } }, { picks: { 'graphic:lower-third': 'deny', 'editing:cards-auto': 'deny' } }],
     ];
@@ -167,16 +167,16 @@ try {
     }
   });
 
-  await t('a change on a classic step updates the plan and keeps its notes, timing and repo links', () => {
+  await t('a change on a classic step updates the plan and keeps its notes and repo links, and a classic filter pick resets filter timing', () => {
     const plan = VP.normalize({ notes: 'Hook with big red words.', filters: { ids: ['mono'], when: 'hook' }, content: { repoFeature: true, repos: ['https://github.com/wrg32786/aigent-talking-head'] } });
     const s = apply(fresh(), { videoPlan: plan });
     apply(s, { picks: { 'transition:whip': 'allow', 'finish:warm': 'allow' } });
     const now = API.planOf(s, cat);
     assert.deepStrictEqual(now.transitions.ids, ['whip']);
     assert.deepStrictEqual(now.filters.ids.sort(), ['mono', 'warm']);
-    assert.strictEqual(now.filters.when, 'hook'); assert.strictEqual(now.notes, 'Hook with big red words.');
+    assert.strictEqual(now.filters.when, 'whole', 'a filter picked where there is no timing control goes back to the look\'s way'); assert.strictEqual(now.notes, 'Hook with big red words.');
     assert.strictEqual(now.content.repos.length, 1);
-    assert.deepStrictEqual(VP.pending(now).map(x => x.field).sort(), ['content', 'filters.when']);
+    assert.deepStrictEqual(VP.pending(now).map(x => x.field).sort(), ['content']); assert.strictEqual(s.finishWhen, 'none', 'none, so a rebuild clears the old timing');
     // a pause length set by hand on Cut survives a read and a set
     apply(s, { pace: { tighten: 1.2 } }); const again = apply(fresh(), { videoPlan: API.planOf(s, cat) });
     assert.strictEqual(again.pace.tighten, 1.2);
@@ -218,6 +218,34 @@ try {
     const s = apply(fresh(), { videoPlan: tp }); assert.strictEqual(s.pack, 'cinematic');
   });
 
+  await t('a Filters, Music or Your notes choice changes only what it speaks for, and marks it yours', () => {
+    const p = VP.normalize({ advanced: { picks: { 'finish:warm': 'allow', 'beatSync:beat-sync': 'allow', 'font:anton': 'allow' } } });
+    const f = VP.withPart(p, 'filters', { ids: ['mono'] }); assert.ok(!f.advanced.picks['finish:warm'] && f.advanced.picks['beatSync:beat-sync'] && f.touched.includes('filters'));
+    const ft = VP.withPart(f, 'filters', { when: 'cta' }); assert.deepStrictEqual(ft.filters, { ids: ['mono'], when: 'cta' }); assert.ok(ft.touched.includes('filters.when'));
+    const m = VP.withPart(p, 'music', { beatSync: false }); assert.ok(!m.advanced.picks['beatSync:beat-sync'] && m.advanced.picks['finish:warm']);
+    assert.ok(m.touched.includes('music.beatSync') && !m.touched.includes('music.energy'));
+    assert.strictEqual(VP.applyPace(m, 'high').music.beatSync, false, 'a pace keeps your beat choice');
+    const n = VP.withPart(p, 'notes', 'Hi'); assert.strictEqual(n.notes, 'Hi'); assert.deepStrictEqual(n.advanced.picks, p.advanced.picks);
+    const hook = VP.toState(VP.withPart(VP.withPart(p, 'filters', { ids: ['mono'] }), 'filters', { when: 'hook' })); assert.strictEqual(hook.finishWhen, 'hook');
+  });
+  await t('no music keeps your beat choice for when music comes back, and a pace never asks for beat sync with no music', () => {
+    const s = fresh(); apply(s, { music: { bed: 'none' } });
+    const prev = VP.normalize({ music: { bed: 'none', beatSync: true } }), p = VP.fromState(s, prev, cat); assert.strictEqual(p.music.beatSync, true);
+    const { patch, plan } = VP.pacePatch(p, 'calm', 'lively'); assert.deepStrictEqual(patch.picks, {}); assert.ok(!plan.touched.includes('music.beatSync') || plan.music.beatSync === true);
+  });
+  await t('only a pace you picked counts as the last pace, never one stored with a draft', () => {
+    assert.strictEqual(VP.lastPace({ videoPlan: { ...VP.normalize({ pace: 'high' }), guessed: true } }), null, 'a guessed pace is not a choice');
+    assert.strictEqual(VP.lastPace({ videoPlan: VP.normalize({ pace: 'high' }) }), 'high', 'a full plan saved without marks still counts'); assert.strictEqual(VP.lastPace({}), null);
+    // a full high plan, then calm: the high defaults follow the pace, none of them read as yours
+    const hi = VP.defaults('high'), { plan: calm } = VP.pacePatch(hi, 'calm', VP.lastPace({ videoPlan: hi }));
+    assert.deepStrictEqual([calm.music.energy, calm.music.beatSync, calm.transitions.when], ['low', false, 'topic']);
+  });
+  await t('a filter picked with no timing control puts timing back to the look; the builder always sends its timing', () => {
+    const s = fresh(); apply(s, { finishWhen: 'hook', picks: { 'finish:mono': 'allow' } }); assert.strictEqual(s.finishWhen, 'hook');
+    apply(s, { picks: { 'finish:grain': 'allow' } }); assert.strictEqual(s.finishWhen, 'none', 'a classic filter is not hook only');
+    const a = VP.normalize({ filters: { ids: ['mono'], when: 'hook' }, touched: ['filters'] }), b = VP.withPart(a, 'filters', { ids: ['mono', 'grain'] });
+    assert.strictEqual(VP.diffPatch(a, b).finishWhen, 'hook');
+  });
   await t('the summary reads in plain words for the Your notes step', () => {
     const rows = VP.summary(VP.normalize({ pace: 'high', words: { type: 'kinetic', keyWords: { level: 'strong' } }, notes: 'Keep it fun.' }), cat);
     const text = rows.map(r => `${r.section}: ${r.text}`).join('\n');
@@ -226,7 +254,7 @@ try {
   });
 
   await t('the page route and the MCP tools read and set the same plan', async () => {
-    const env = { ...process.env, CI: '1', STUDIO_DIR: STATE, STUDIO_CHAT: '', ANTHROPIC_API_KEY: '', OPENAI_API_KEY: '' };
+    const env = { ...process.env, CI: '1', STUDIO_DIR: STATE, LOOKS_DIR: join(STATE, 'looks'), STUDIO_CHAT: '', ANTHROPIC_API_KEY: '', OPENAI_API_KEY: '' };
     const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), '--port', '0', '--no-open'], { cwd: ROOT, env });
     try {
       const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.on('exit', () => bad(new Error(out))); setTimeout(() => bad(new Error('Studio did not start: ' + out)), 20000); });
@@ -255,6 +283,19 @@ try {
       assert.strictEqual(gx.plan.graphics.nameTag, false); assert.ok(gx.state.picks.graphic.deny.includes('lower-third'));
       assert.strictEqual((await post({ presenter: { id: 'punch' } })).status, 400);
       assert.strictEqual((await post({ presenter: [{ id: 'punch', when: 'hook' }] })).status, 400, 'zoom punch is the whole video for now');
+      const fi = await (await post({ filters: { ids: ['mono'] } })).json(), ft = await (await post({ filters: { when: 'hook' } })).json();
+      assert.deepStrictEqual([ft.plan.filters.ids, ft.plan.filters.when], [['mono'], 'hook']); assert.strictEqual(fi.state.finishWhen, 'whole'); assert.strictEqual(ft.state.finishWhen, 'hook');
+      assert.ok(ft.compose.args.join(' ').includes('--finish-when hook'), ft.compose.args.join(' '));
+      const mu = await (await post({ music: { bed: 'none', sfx: false, beatSync: false } })).json();
+      assert.deepStrictEqual([mu.state.music.bed, mu.state.sound.sfx, mu.plan.music.beatSync], ['none', 'off', false]); assert.ok(mu.plan.touched.includes('music.beatSync'));
+      const nt = await (await post({ notes: 'Keep it under 30 seconds.' })).json(); assert.strictEqual(nt.plan.notes, 'Keep it under 30 seconds.');
+      assert.strictEqual((await post({ notes: 42 })).status, 400); assert.strictEqual((await post({ notes: 'x'.repeat(2001) })).status, 400);
+      const tp = await fetch(url + '/api/templates', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'My Test' }) });
+      const tj = await tp.json(); assert.strictEqual(tp.status, 200, JSON.stringify(tj)); assert.strictEqual(tj.template.name, 'my-test');
+      const saved = JSON.parse(readFileSync(join(STATE, 'looks', 'my-test', 'template.json'), 'utf8'));
+      assert.strictEqual(saved.format, 'aigent-template'); assert.strictEqual(saved.plan.notes, '', 'a template keeps no notes'); assert.deepStrictEqual(saved.plan.filters, { ids: ['mono'], when: 'hook' });
+      assert.strictEqual((await fetch(url + '/api/templates', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'my test' }) })).status, 409, 'never written over');
+      const auto = await (await fetch(url + '/api/templates', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).json(); assert.match(auto.template.name, /^[a-z0-9-]+$/);
       const np = await fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pace: 'zoomy' }) });
       assert.strictEqual(np.status, 400);
       await fetch(url + '/api/video-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: VP.defaults('steady') }) });
@@ -266,6 +307,9 @@ try {
       assert.strictEqual(g.plan.pace, 'steady');
       const set = (await client.callTool({ name: 'set_video_plan', arguments: { plan: { ...g.plan, notes: 'From the agent.', transitions: { ids: ['crossfade'], when: 'topic' } } } })).structuredContent;
       assert.strictEqual(set.ok, true); assert.strictEqual(set.plan.notes, 'From the agent.'); assert.deepStrictEqual(set.plan.transitions.ids, ['crossfade']);
+      // the notes reach the agent: in studio_get_state and get_video_plan
+      assert.strictEqual((await client.callTool({ name: 'studio_get_state', arguments: {} })).structuredContent.notes, 'From the agent.');
+      assert.strictEqual((await client.callTool({ name: 'get_video_plan', arguments: {} })).structuredContent.plan.notes, 'From the agent.');
       const no = await client.callTool({ name: 'set_video_plan', arguments: { plan: { format: 'aigent-video-plan', filters: { ids: ['sepia'] } } } });
       assert.ok(no.isError); assert.match(JSON.stringify(no.content), /Filters: we do not have one called sepia/);
     } finally { await client.close(); }
