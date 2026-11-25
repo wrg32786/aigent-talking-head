@@ -20,7 +20,7 @@
 // (Studio: Render again); the report says which fixes wait for it.
 // Writes build/plan-check.json { round, rounds, checks: [{ id, selection, ok, measured, time, frame, note, fix }],
 // points, fixed, needsRender, looked, at }. --video pulls a small still per checked moment into build/plan-check/.
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs';
 import { execFileSync } from 'child_process';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -47,7 +47,8 @@ export function sections(cut, build) {
   let words = []; try { words = SP.timeline(cut.segs, build); } catch {}
   const segs = cut.segs || [], tt = SEC.times(segs), len = tt.length ? tt[tt.length - 1].end : 0, b = SEC.bounds(words, len);
   const had = segs.some(x => x.section);
-  if (words.length || !had) SEC.tag(cut, words);
+  // only real word times tag the cut; without them the tags it had stay and nothing new is written into it
+  if (words.length) SEC.tag(cut, words);
   return { words, tt, len, b, known: words.length > 0 || had };
 }
 // the recording each piece comes from (clips.json "take" beside the clip), for "when the topic changes", as reel.cjs
@@ -88,15 +89,21 @@ export function check({ plan, cut, caps, build, state = null, since = 0 }) {
   const differs = ' Studio\'s own setting differs from the plan: pick it again in the builder.';
   // filters: ids null is "not chosen", [] is "No filters"
   const f = plan.filters || {}, when = f.when || 'whole', ids = Array.isArray(f.ids) ? f.ids.filter(x => x && x !== 'none') : null;
-  const fin = [cut.finish, ...segs.map(s => s.finish)].filter(x => x && x !== 'none');
+  const yoursF = new Set((cut.edited && cut.edited.finishes) || []); // pieces whose filter you set yourself stay yours
+  const fin = [cut.finish, ...segs.filter((s, i) => !yoursF.has(i)).map(s => s.finish)].filter(x => x && x !== 'none');
   if (ids && !ids.length) {
     const ok = !fin.length;
     row('filters', 'Filters: none', ok, ok ? 'No filters, as planned.' : 'A filter is used, but the plan says no filters.', { time: ok ? null : 0.5, fix: ok ? null : { kind: 'filters-none' } });
-  } else if (when !== 'whole' && known) {
+  } else if (when !== 'whole' && !known) {
+    row('filters', `Filters: ${SECTION_WORDS[when] || when}`, null, 'We could not check where the filters sit: this draft has no word times. Draft again to check it.', {});
+  } else if (when === 'cta' && !segs.some(x => x.section === 'cta')) {
+    row('filters', 'Filters: the call to action', false, 'We did not hear a call to action, so the filter has nowhere to go. Say one at the end, or pick another filter timing on Look.', {});
+  } else if (when !== 'whole') {
     const want = when === 'hook-cta' ? ['hook', 'cta'] : [when];
-    const stray = segs.map((s, i) => ({ s, i })).filter(({ s }) => s.finish && s.finish !== 'none' && !want.includes(s.section));
+    const pieces = segs.map((s, i) => ({ s, i })).filter(({ i }) => !yoursF.has(i));
+    const stray = pieces.filter(({ s }) => s.finish && s.finish !== 'none' && !want.includes(s.section));
     const wide = cut.finish && cut.finish !== 'none';
-    const there = segs.map((s, i) => ({ s, i })).filter(({ s }) => want.includes(s.section));
+    const there = pieces.filter(({ s }) => want.includes(s.section));
     const missing = ids ? there.filter(({ s }) => !(s.finish && ids.includes(s.finish))) : [];
     const odd = ids ? [...new Set(fin.filter(x => !ids.includes(x)))] : [];
     const noCta = want.includes('cta') && !segs.some(s => s.section === 'cta');
@@ -107,14 +114,21 @@ export function check({ plan, cut, caps, build, state = null, since = 0 }) {
       + (noCta ? ' We did not hear a call to action, so there is no call to action part for it.' : '') + (!ok && ids && !fx ? differs : ''),
       { time: wide ? 0.5 : stray.length ? r2(tt[stray[0].i].start + 0.2) : missing.length ? r2(tt[missing[0].i].start + 0.2) : null, fix: fx });
   } else if (ids) {
+    // the whole video: only picked filters; and when Studio's own timing says whole, a picked filter on every piece
     const odd = [...new Set(fin.filter(x => !ids.includes(x)))];
-    row('filters', 'Filters: the ones you picked', !odd.length, odd.length ? `A filter you did not pick is used: ${odd.join(', ')}.` : 'Only the filters you picked are used.', {});
+    const bare = state && state.finishWhen === 'whole' && !(cut.finish && ids.includes(cut.finish)) ? segs.map((x, i) => ({ x, i })).filter(({ x, i }) => !yoursF.has(i) && !(x.finish && ids.includes(x.finish))) : [];
+    row('filters', 'Filters: the ones you picked', !odd.length && !bare.length, odd.length ? `A filter you did not pick is used: ${odd.join(', ')}.` : bare.length ? `The filter is missing from ${bare[0].i ? `${tt[bare[0].i].start.toFixed(1)} s` : 'the start'}.` : 'Only the filters you picked are used.', { time: bare.length ? r2(tt[bare[0].i].start + 0.2) : null });
   }
   // transitions
   const tr = plan.transitions || {}, picked = Array.isArray(tr.ids) ? tr.ids.filter(Boolean) : null, tw = tr.when || 'every-cut';
   const used = segs.map((s, i) => ({ i, t: s.transition })).filter(x => x.i && x.t && x.t !== 'cut' && !mineSeam(cut, x.i));
+  // a seam the timing made a plain cut keeps its old transition aside (heldTransition); it comes back if the timing allows
+  const held = segs.map((s, i) => ({ i, t: s.heldTransition })).filter(x => x.i && x.t && x.t !== 'cut' && !mineSeam(cut, x.i) && SEC.seamAllowed(segs, x.i, tw, takeOf));
+  // straight cuts: the default seam is a hard cut with a glitch shake (cut.hits), so a shake at a seam is not straight
+  const shakes = picked && !picked.length ? segs.map((s, i) => i).filter(i => i && (cut.hits || []).some(h => Math.abs((Array.isArray(h) ? h[0] : h) - tt[i].start) <= 0.15)) : [];
   if (picked) {
-    const odd = used.filter(x => !picked.length || !picked.includes(x.t));
+    const odd = [...used, ...held].filter(x => !picked.length || !picked.includes(x.t));
+    if (!odd.length && shakes.length) odd.push({ i: shakes[0], t: 'glitch' });
     const sel = picked.length ? 'Transitions: the ones you picked' : 'Transitions: straight cuts only';
     row('transitions', sel, !odd.length, odd.length ? (picked.length ? `${odd[0].t} is used at ${tt[odd[0].i].start.toFixed(1)} s, which you did not pick.` : `A ${odd[0].t} transition is used at ${tt[odd[0].i].start.toFixed(1)} s; the plan says straight cuts.`) : picked.length ? 'Only the transitions you picked are used.' : 'Straight cuts only, as planned.', { time: odd.length ? tt[odd[0].i].start : null, fix: odd.length ? { kind: 'transitions-picked', picked } : null });
   }
@@ -137,9 +151,12 @@ export function check({ plan, cut, caps, build, state = null, since = 0 }) {
   if (plan.graphics && plan.graphics.cta !== false && (known || b.ctaStart != null)) row('cta', 'Call to action', b.ctaStart != null, b.ctaStart != null ? `Starts at ${b.ctaStart.toFixed(1)} s.` : 'We did not hear a call to action (like "follow for more"), so there is nowhere to show one. Say one at the end, or turn the call to action off on Extras.', { time: b.ctaStart != null ? r2(b.ctaStart + 0.4) : null });
   // what the render measured
   // (a result older than the cut or the captions is from an earlier render, so it is left out)
+  // (the render writes these, then may touch cut.json itself, so the bar is the draft's captions.js or our last fix)
   const fresh = n => { try { return statSync(join(build, n)).mtimeMs >= since; } catch { return false; } };
   const rd = n => fresh(n) ? readJson(join(build, n)) : null;
   const fc = rd('facecheck.json'), tc = rd('textcheck.json'), lg = rd('legibility.json');
+  const was = ['facecheck.json', 'textcheck.json', 'legibility.json'].some(n => existsSync(join(build, n)) && !fresh(n));
+  if (was) row('render-checks', 'Face, text and contrast', null, 'Not checked yet for this draft: render it, then check again.', {});
   if (fc) { const hit = (fc.hits || [])[0]; row('face', 'Words off your face', fc.faceSafe !== false && !(fc.hits || []).length, fc.faceSafe !== false && !(fc.hits || []).length ? 'No words over your face.' : `Words touch your face${hit && hit.t != null ? ` at ${(+hit.t).toFixed(1)} s` : ''}.`, { time: hit && hit.t != null ? +hit.t : null }); }
   if (tc) { const cl = (tc.clashes || [])[0]; row('text', 'Words not on words', !(tc.clashFrames > 0 || (tc.clashes || []).length), cl ? `Two pieces of text overlap${cl.t != null ? ` at ${(+cl.t).toFixed(1)} s` : ''}.` : 'No text sits on other text.', { time: cl && cl.t != null ? +cl.t : null }); }
   // legibility.py writes spans as [start, end, ratio]
@@ -154,14 +171,21 @@ export function applyFixes(rows, { cut, caps, build }) {
     const fx = r.fix;
     if (fx.kind === 'filters') {
       if (!fx.ids || !fx.ids.length) continue;
+      const ed = (cut.edited && cut.edited.finishes) || [], keep = ed.map(i => [i, (cut.segs[i] || {}).finish]);
       cut.finishWhen = fx.when; cut.finishIds = fx.ids; sections(cut, build); SEC.applyFinishWhen(cut);
+      keep.forEach(([i, f]) => { const sg = cut.segs[i]; if (!sg) return; if (f) sg.finish = f; else delete sg.finish; }); // yours stay (restoreFinish keeps a changed one)
       done.push(`Filters (${fx.ids.join(', ')}) now show only on ${SECTION_WORDS[fx.when] || fx.when}.`);
     } else if (fx.kind === 'filters-none') {
-      SEC.restoreFinish(cut); delete cut.finish; delete cut.finishWhen; delete cut.finishIds; (cut.segs || []).forEach(s => { delete s.finish; });
+      const ed = new Set((cut.edited && cut.edited.finishes) || []);
+      SEC.restoreFinish(cut); delete cut.finish; delete cut.finishWhen; delete cut.finishIds; (cut.segs || []).forEach((s, i) => { if (!ed.has(i)) delete s.finish; });
       done.push('Filters taken off: the plan says no filters.');
     } else if (fx.kind === 'transitions-picked') {
       let k = 0; const at = [];
-      for (let i = 1; i < (cut.segs || []).length; i++) { const s = cut.segs[i]; if (s.transition && s.transition !== 'cut' && !mineSeam(cut, i) && !fx.picked.includes(s.transition)) { s.transition = fx.picked.length ? fx.picked[k++ % fx.picked.length] : 'cut'; at.push(i); } }
+      const tt = SEC.times(cut.segs || []);
+      for (let i = 1; i < (cut.segs || []).length; i++) { const s = cut.segs[i]; if (mineSeam(cut, i)) continue;
+        if (s.heldTransition && s.heldTransition !== 'cut' && !fx.picked.includes(s.heldTransition)) delete s.heldTransition;
+        if (s.transition && s.transition !== 'cut' && !fx.picked.includes(s.transition)) { s.transition = fx.picked.length ? fx.picked[k++ % fx.picked.length] : 'cut'; at.push(i); }
+        if (!fx.picked.length && Array.isArray(cut.hits)) { const n0 = cut.hits.length; cut.hits = cut.hits.filter(h => Math.abs((Array.isArray(h) ? h[0] : h) - tt[i].start) > 0.15); if (cut.hits.length !== n0 && !at.includes(i)) at.push(i); } }
       done.push(fx.picked.length ? `Transitions you did not pick (${at.length}) were swapped for ${fx.picked.join(', ')}.` : `Transitions taken out (${at.length}): the plan says straight cuts.`);
     } else if (fx.kind === 'transitions-when') {
       cut.transitionsWhen = fx.when; sections(cut, build); SEC.applyTransitionsWhen(cut, { takeOf: takeOfFor(build), window: shakeWindow(cut) });
@@ -205,23 +229,27 @@ export function run(build, { fix = false, rounds = 3, video = null, state = null
   const st = load(build); if (!st.cut) throw new Error('make a draft first: no build/cut.json');
   if (!st.plan) throw new Error('no plan for this video: build it in Studio (Build my own) first');
   const mt = n => { try { return statSync(join(build, n)).mtimeMs; } catch { return 0; } };
-  st.build = build; st.state = state; st.since = Math.max(mt('cut.json'), mt('captions.js')) - 2000; const hist = [], fixed = [];
-  let rows = check(st), round = 1; hist.push({ round, failed: rows.filter(r => !r.ok).map(r => r.id) });
-  while (fix && round < rounds && rows.some(r => !r.ok && r.fix)) {
-    const done = applyFixes(rows, st); if (!done.length) break;
+  const prev = readJson(join(build, 'plan-check.json'));
+  if (!video) { try { const d = dirname(build); video = readdirSync(d).filter(f => /^reel-v\d+\.mp4$/.test(f)).map(f => join(d, f)).sort((x, y) => statSync(y).mtimeMs - statSync(x).mtimeMs)[0] || null; } catch {} }
+  st.build = build; st.state = state; st.since = Math.max(mt('captions.js') - 2000, prev && prev.fixedAt ? Date.parse(prev.fixedAt) : 0); const hist = [], fixed = [];
+  let rows = check(st), round = 1; hist.push({ round, failed: rows.filter(r => r.ok === false).map(r => r.id) });
+  while (fix && round < rounds && rows.some(r => r.ok === false && r.fix)) {
+    const done = applyFixes(rows.filter(r => r.ok === false), st); if (!done.length) break;
     fixed.push(...done.map(note => ({ round, note })));
     writeFileSync(join(build, 'cut.json'), JSON.stringify(st.cut, null, 1)); if (st.caps) writeCaptions(join(build, 'captions.js'), st.caps);
-    st.since = Date.now() - 2000; // the render's own checks were for the cut before this fix
-    round++; rows = check(st); hist.push({ round, failed: rows.filter(r => !r.ok).map(r => r.id) });
+    st.since = Date.now(); // the render's own checks were for the cut before this fix
+    round++; rows = check(st); hist.push({ round, failed: rows.filter(r => r.ok === false).map(r => r.id) });
   }
   // the receipt and Every pick and why follow the fixed cut (kit/choices.cjs, as reel.cjs writes it)
   if (fixed.length) { try { const CH = require('./choices.cjs'); writeFileSync(join(dirname(build), 'choices.json'), JSON.stringify(CH.explain(build), null, 1) + '\n'); } catch {} }
-  const points = checkpoints(st.cut, st.caps, build), old = readJson(join(build, 'plan-check.json'));
+  const points = checkpoints(st.cut, st.caps, build), old = prev;
   const vt = video && existsSync(video) ? statSync(video).mtimeMs : 0, oldAt = old && old.at ? Date.parse(old.at) : 0;
   let shots = {}; if (video && existsSync(video)) shots = stills(video, [...points, ...rows.filter(r => r.time != null).map(r => ({ id: `row-${r.id}`, time: r.time }))], join(build, 'plan-check'));
   const frame = id => shots[id] ? `plan-check/${id}.jpg` : null;
   const checks = rows.map(r => ({ ...r, frame: frame(`row-${r.id}`) }));
-  const rep = { round, rounds: hist, checks, points: points.map(p => ({ ...p, frame: frame(p.id) })), fixed, needsRender: fixed.length > 0 || !!(old && old.needsRender && vt <= oldAt),
+  const pending = fixed.length > 0 || !!(old && old.needsRender && vt <= oldAt);
+  const rep = { round, rounds: hist, checks, points: points.map(p => ({ ...p, frame: frame(p.id) })), fixed: fixed.length ? fixed : pending && old ? old.fixed || [] : [], needsRender: pending,
+    fixedAt: fixed.length ? new Date().toISOString() : old && old.fixedAt || null,
     // an agent's looks hold until the next draft, fix or render
     looked: old && old.looked && !fixed.length ? old.looked.filter(x => !x.at || (Date.parse(x.at) >= st.since && Date.parse(x.at) >= vt)) : [], at: new Date().toISOString() };
   writeFileSync(join(build, 'plan-check.json'), JSON.stringify(rep, null, 1) + '\n');
@@ -248,7 +276,7 @@ if (isMain) {
     if (cmd === 'check') {
       const r = run(build, { fix: a.includes('--fix'), rounds: Math.max(1, Math.min(3, +(opt('rounds') || 3))), video: opt('video') });
       if (a.includes('--json')) console.log(JSON.stringify(r));
-      else { for (const c of r.checks) console.log(`${c.ok ? 'ok  ' : 'warn'} ${c.selection}: ${c.note}`); r.fixed.forEach(x => console.log(`fixed (round ${x.round}): ${x.note}`)); if (r.needsRender) console.log('Render again to see the fixes.'); }
+      else { for (const c of r.checks) console.log(`${c.ok ? 'ok  ' : c.ok === null ? '?   ' : 'warn'} ${c.selection}: ${c.note}`); r.fixed.forEach(x => console.log(`fixed (round ${x.round}): ${x.note}`)); if (r.needsRender) console.log('Render again to see the fixes.'); }
     } else if (cmd === 'scene') { const st = load(build); if (!st.cut) throw new Error('make a draft first'); writeFileSync(join(build, 'scene-plan.json'), JSON.stringify(scenePlan({ ...st, build }), null, 1) + '\n'); console.log(JSON.stringify({ ok: true })); }
     else if (cmd === 'points') { const st = load(build); if (!st.cut) throw new Error('make a draft first'); console.log(JSON.stringify(checkpoints(st.cut, st.caps, build))); }
     else { const f = opt('looked'); if (!f) throw new Error('--looked <file.json> is needed'); console.log(JSON.stringify(report(build, JSON.parse(readFileSync(f, 'utf8'))))); }

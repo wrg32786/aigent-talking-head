@@ -102,5 +102,21 @@ try {
     assert.throws(() => PC.run(join(TMP, 'jobs', 'none', 'build')), /make a draft first/);
     assert.throws(() => execFileSync(process.execPath, [join(ROOT, 'kit', 'plan-check.mjs'), 'check', '--name', '../../x', '--jobs', jobs], { stdio: 'pipe' }), /status 2|Command failed/);
   });
+  await t('no word times: nothing made up is written into the cut; edited filters, glitch shakes and a missing call to action', () => {
+    const { build } = job('nowords', { plan: P(p => { p.words.keyWords.level = 'strong'; p.filters = { ids: ['mono'], when: 'hook' }; }) });
+    rmSync(join(TMP, 'clips-nowords', 'clips.json'));
+    const r = PC.run(build, { fix: true }); assert.strictEqual(r.checks.find(c => c.id === 'filters').ok, null, 'timing not checked without words');
+    const cut = JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8')); assert.ok(cut.segs.every(x => !x.section), 'no made-up sections saved: ' + JSON.stringify(cut.segs.map(x => x.section)));
+    assert.ok(r.checks.find(c => c.id === 'key-words').ok, 'the key words fix still ran');
+    const { build: b2 } = job('edf', { plan: P(p => { p.filters = { ids: [], when: 'whole' }; }) });
+    const c2 = JSON.parse(readFileSync(join(b2, 'cut.json'), 'utf8')); c2.segs[3].finish = 'warm'; c2.edited = { finishes: [3] }; writeFileSync(join(b2, 'cut.json'), JSON.stringify(c2));
+    assert.ok(PC.run(b2, { fix: true }).checks.find(c => c.id === 'filters').ok); assert.strictEqual(JSON.parse(readFileSync(join(b2, 'cut.json'), 'utf8')).segs[3].finish, 'warm', 'your own filter stays');
+    const { build: b3 } = job('gl', { plan: P(p => { p.transitions = { ids: [], when: 'every-cut' }; }), cut: { hits: [[4.02, 14], [10, 10]] } });
+    const g1 = PC.run(b3); assert.strictEqual(g1.checks.find(c => c.id === 'transitions').ok, false, 'a glitch shake at a seam is not a straight cut');
+    PC.run(b3, { fix: true }); assert.deepStrictEqual(JSON.parse(readFileSync(join(b3, 'cut.json'), 'utf8')).hits, [[10, 10]], 'only the seam shake goes');
+    const { build: b4 } = job('ctaonly', { plan: P(p => { p.filters = { ids: ['mono'], when: 'cta' }; }) });
+    const c4 = JSON.parse(readFileSync(join(b4, 'cut.json'), 'utf8')); c4.segs = c4.segs.slice(0, 4); writeFileSync(join(b4, 'cut.json'), JSON.stringify(c4));
+    const f4 = PC.run(b4).checks.find(c => c.id === 'filters'); assert.strictEqual(f4.ok, false); assert.match(f4.note, /nowhere to go/);
+  });
   console.log(`\nplan check: ${n} tests passed`);
 } finally { rmSync(TMP, { recursive: true, force: true }); }

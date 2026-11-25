@@ -327,3 +327,4 @@ main:not([data-area="new"]) { padding-bottom: 32px; }
 .pc-row.ok .pc-mark { background: color-mix(in srgb, var(--success, #2f9e6b) 18%, transparent); color: var(--success, #2f9e6b); }
 .pc-row.warn .pc-mark { background: color-mix(in srgb, var(--warning, #d9822b) 20%, transparent); color: var(--warning, #d9822b); }
 @media (max-width: 560px) { .pc-row { grid-template-columns: 54px minmax(0, 1fr); } .pc-row .pc-ask { grid-column: 2; justify-self: start; } }
+.pc-row.wait .pc-mark { background: color-mix(in srgb, var(--muted-foreground, #888) 18%, transparent); color: var(--muted-foreground, #888); }
