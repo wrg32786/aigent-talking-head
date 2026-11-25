@@ -129,6 +129,20 @@ export function withWords(plan, words) {
   if (kinds.size) for (const r of Object.keys(p.advanced.picks)) if (kinds.has(r.split(':')[0])) delete p.advanced.picks[r];
   return touch(p, 'words');
 }
+// a builder step's Between shots, You on screen or Extras choice laid over the plan: transitions and graphics change
+// only the fields given, presenter is the whole list. A choice here wins over All options picks it speaks for.
+export const PARTS = ['transitions', 'presenter', 'graphics'];
+export function withPart(plan, part, value) {
+  const p = normalize(plan);
+  if (part === 'presenter') p.presenter = clone(value);
+  else p[part] = { ...p[part], ...clone(value) };
+  const speaks = r => { const [k, id] = r.split(':');
+    if (part === 'transitions') return k === 'transition';
+    if (part === 'presenter') return k === 'titleLayer' || (k === 'effect' && PRESENTER_EFFECTS.has(id));
+    return (k === 'graphic' && Object.values(GRAPHIC_GROUPS).flat().includes(id)) || r === 'editing:cards-auto'; };
+  for (const r of Object.keys(p.advanced.picks)) if (speaks(r)) delete p.advanced.picks[r];
+  return touch(p, part === 'transitions' && value && 'when' in value ? 'transitions.when' : part, part);
+}
 // mark a field as yours, so a later pace change leaves it alone
 export function touch(plan, ...keys) { const p = normalize(plan); for (const k of keys) if (!p.touched.includes(k)) p.touched.push(k); return p; }
 
