@@ -286,6 +286,9 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
   // which seams keep a named transition (reel.cjs --transitions-when, kit/sections.cjs); every-cut is how it always was
   if (p.transitionsWhen !== undefined) { if (!['every-cut', 'topic', 'hook-cta'].includes(p.transitionsWhen)) errs.push('transitionsWhen: every-cut, topic or hook-cta'); else if (p.transitionsWhen !== (s.transitionsWhen || 'every-cut')) { s.transitionsWhen = p.transitionsWhen; log.push(`transitions ${p.transitionsWhen === 'every-cut' ? 'on every cut' : p.transitionsWhen === 'topic' ? 'on topic changes only' : 'on the hook and CTA only'}`); } }
   // where the filters show (reel.cjs --finish-when): on their own pieces of the video; none is how it always was
+  // a filter changed where there is no timing control (a classic step, the chat, an agent's picks) puts timing back to
+  // the look's way, so a later classic filter never shows only on the hook; the builder always says its timing
+  if (p.finishWhen === undefined && s.finishWhen && s.finishWhen !== 'none' && (p.clearPicks || Object.keys(p.picks || {}).some(r => r.startsWith('finish:')))) { delete s.finishWhen; log.push('filters: the look decides where'); }
   if (p.finishWhen !== undefined) { if (!['none', 'whole', 'hook', 'cta', 'hook-cta'].includes(p.finishWhen)) errs.push('finishWhen: none, whole, hook, cta or hook-cta'); else if (p.finishWhen !== (s.finishWhen || 'none')) { s.finishWhen = p.finishWhen; log.push(p.finishWhen === 'none' ? 'filters: the look decides where' : `filters on ${p.finishWhen === 'whole' ? 'the whole video' : 'the ' + p.finishWhen.replace('-', ' and ') + ' only'}`); } }
   if (p.titles !== undefined) { if (!['auto', 'off'].includes(p.titles)) errs.push('titles: auto or off'); else if (p.titles !== (s.titles || 'auto')) { s.titles = p.titles; log.push(p.titles === 'off' ? 'no big titles' : 'big titles: the Look decides'); } }
   if (p.export !== undefined) { if (p.export && !cat.exports.includes(p.export)) errs.push(`export: ${cat.exports.join(', ')}`); else if (SZ.EXTRA.includes(p.export)) { s.sizes = SZ.sizesOf({ sizes: s.sizes, export: p.export }); log.push(`sizes 9:16, ${s.sizes.join(', ')}`); } else { s.export = p.export || null; log.push(`export ${s.export}`); } }
@@ -418,7 +421,7 @@ export function compose(s, { refPack = null } = {}) {
   if (one('titleExit')) args.push('--title-exit', one('titleExit'));
   if (s.keyWords && s.keyWords !== 'off') args.push('--key-words', s.keyWords);
   if (s.transitionsWhen && s.transitionsWhen !== 'every-cut') args.push('--transitions-when', s.transitionsWhen);
-  if (s.finishWhen && s.finishWhen !== 'none') args.push('--finish-when', s.finishWhen);
+  if (s.finishWhen && s.finishWhen !== 'none') args.push('--finish-when', s.finishWhen, '--finish-ids', ((s.picks.finish && s.picks.finish.allow) || []).join(',') || 'none');
   // fonts: yours, unless a reference's style is being copied (Recreate, Copy the look, a saved look) and you have not
   // picked a font since. Then the font the teardown matched is used and an older pick is never sent.
   { const mine = (s.picks.font && s.picks.font.allow) || [], fonts = mine.filter(f => f !== 'theme'), copied = copiesStyle(s.reference) || (!!s.styleLook && !(s.reference && s.reference.mode !== 'off' && s.reference.extracted));
@@ -614,6 +617,7 @@ export function freshSession(s, { job = null, keepLook = true } = {}) {
   for (const k of KEEP_KEYS) if (s[k] !== undefined) keep[k] = s[k];
   const mine = keepLook ? ownLook(s) : null; // after a Recreate or Copy the look, your own look, not the reference's
   const look = {}; if (keepLook) for (const k of LOOK_KEYS) if (mine[k] !== undefined) look[k] = clone(mine[k]);
+  if (look.videoPlan) look.videoPlan = { ...look.videoPlan, notes: '' }; // your notes were for that video
   for (const k of Object.keys(s)) delete s[k];
   Object.assign(s, d, keep, look, { job: job || null, keepLook: !!keepLook });
   clearFontPick(s); // a font pick belongs to the video it was made for: it never rides into the next one

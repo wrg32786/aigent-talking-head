@@ -49,10 +49,11 @@ export function Builder({ s: st, CAT, V: appV, apply, patch, go, page, setPage }
   useEffect(() => { const k = ++ask.current; api('/api/video-plan').then(v => { if (k === ask.current) { setView(v); setErr(''); } }).catch(e => { if (k === ask.current) setErr(e.message); }); }, [st.rev, st.videoSeq]);
   // a link to a step that has no screen yet starts at the beginning
   useEffect(() => { if (!known) { history.replaceState(null, '', '#build=start'); setPage('start'); } }, [known, setPage]);
-  useEffect(() => { setHover(null); }, [page]);
+  useEffect(() => { setHover(null); setSaveErr(''); }, [page]);
   // focus the new screen's heading after a move inside the builder, not on first load
   useEffect(() => { if (!moved.current) return; window.scrollTo({ top: 0 }); const h = page === 'start' ? startHead.current : head.current; if (h) h.focus({ preventScroll: true }); }, [page, !!view]);
-  const open = p => { moved.current = true; setPage(p); history.replaceState(null, '', '#build=' + p); };
+  // keepRet: a Change link from Your notes (its Next comes back there); any other move forgets it
+  const open = (p, keepRet = false) => { moved.current = true; if (!keepRet) setRet(null); setPage(p); history.replaceState(null, '', '#build=' + p); };
   // A choice shows at once; choices made while one is saving wait in a queue (choices of the same kind merge, so only
   // the latest of each is sent) and are sent in order. Returns when the queue is empty.
   const [shown, setShown] = useState(null), queue = useRef([]), drain = useRef(null);
@@ -99,14 +100,15 @@ export function Builder({ s: st, CAT, V: appV, apply, patch, go, page, setPage }
   const pending = (view.pending || []).filter(x => x.field.startsWith(step.id === 'place' ? 'words.place' : step.id === 'colors' ? 'words.colors' : step.id === 'keyWords' ? 'words.keyWords' : step.id === 'presenter' ? 'presenter.' : '\u0000'));
   const part = SAVES[step.id] || step.id;
   // Change on Your notes opens only that step; its Next comes back to Your notes
-  const changeTo = id => (visible.some(x => x.id === id) ? () => { setRet('notes'); open(id); } : null);
-  const flush = () => (drain.current || Promise.resolve(!saveErr));
+  const changeTo = id => (visible.some(x => x.id === id) ? () => { setRet('notes'); open(id, true); } : null);
+  const flush = () => (drain.current || Promise.resolve(true));
   const Body = STEPS[step.id], props = { CAT, step, words: w, plan: now, V: view, apply, save: PARTS.includes(part) ? v => send({ [part]: v }) : words => send({ words }), busy: false, setHover,
     st, appV, patch, go, rows, onChange: changeTo, flush };
   const body = step.id === 'pace' ? <Pacing paces={view.paces} value={pace} onPick={p => send({ pace: p })} />
     : step.id === 'wordsPreview' ? <WordsPreview words={w} behind={behindOf(plan)} summary={(rows.find(r => r.step === 'captionType') || {}).text || ''} />
     : LIVE.includes(step.id) ? <WithPreview words={w} hover={hover} behind={behindOf(plan)}><Body {...props} /></WithPreview> : <Body {...props} />;
-  const back = ret && step.id !== ret, goOn = id => { if (back) setRet(null); open(back ? ret : id); };
+  // Change on Filters goes on to When filters show before coming back
+  const back = ret && step.id !== ret && !(step.id === 'filters' && (now.filters.ids || []).length), goOn = id => open(back ? ret : id, !back && !!ret);
   const lock = step.lock, next = step.id === 'make' ? null : lock ? () => send({ words: {} }).then(ok => { if (ok) (back || nextStep ? goOn(nextStep && nextStep.id) : toClassic()); }) : back || nextStep ? () => goOn(nextStep && nextStep.id) : toClassic;
   const doneSecs = [['pace', 'pace'], ['words', 'words'], ['transitions', 'shots'], ['presenter', 'you'], ['graphics', 'extras'], ['filters', 'look'], ['music', 'sound'], ['notes', 'finish']].filter(([f]) => plan.touched.includes(f)).map(([, sec]) => sec);
   return <div id="builder" {...stylex.props(s.wrap)}>

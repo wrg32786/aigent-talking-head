@@ -12,7 +12,8 @@ export function Layers({ step, bare, CAT, V, s, apply, patch, tab, setTab }) {
   const tabsRef = useRef(null), gridRef = useRef(null), focusKey = useRef(null);
   const every = (CAT.layers || []).map(l => ({ ...l, label: LAYER_LABEL[l.id] || l.label }));
   // this step's layers, in the step's order; a layer the map does not know yet shows on Picture
-  const mine = STEP_LAYERS[step] || [], layers = [...mine.map(id => every.find(l => l.id === id)).filter(Boolean), ...(step === 'picture' ? every.filter(l => !LAYER_STEP[l.id]) : [])];
+  // step 'all' (the builder's All options): every layer, with its tabs and the search
+  const mine = step === 'all' ? every.map(l => l.id) : STEP_LAYERS[step] || [], layers = [...mine.map(id => every.find(l => l.id === id)).filter(Boolean), ...(step === 'picture' ? every.filter(l => !LAYER_STEP[l.id]) : [])];
   // an old tab name (#menu=captions) opens the layer that now holds it
   const want = layerOf(tab, every), cur = layers.some(c => c.id === want) ? want : (layers[0] || {}).id;
   const L = layers.find(x => x.id === cur), ql = q.trim().toLowerCase();
@@ -45,7 +46,7 @@ export function Layers({ step, bare, CAT, V, s, apply, patch, tab, setTab }) {
   const grid = <div id="grid" className="layer-groups" role={bare ? 'group' : 'tabpanel'} aria-labelledby={bare ? undefined : 'tab-' + cur} aria-label={bare ? L.label : undefined} data-layer={cur} ref={gridRef}>
     {groups.length ? groups.map(g => <section key={g.key || g.label} className="lg" data-group={g.id} aria-label={g.label}>
       {(groups.length > 1 || ql) && <h4 className="lg-h">{g.label}<span className="fine"> {g.items.length}</span>
-        {ql && g.layer && LAYER_STEP[g.layer] && LAYER_STEP[g.layer] !== step && <button type="button" className="linkish lg-jump" data-jump={g.layer} onClick={() => { setQ(''); setTab(g.layer); }}>Open in {stepName(LAYER_STEP[g.layer])}</button>}</h4>}
+        {ql && step !== 'all' && g.layer && LAYER_STEP[g.layer] && LAYER_STEP[g.layer] !== step && <button type="button" className="linkish lg-jump" data-jump={g.layer} onClick={() => { setQ(''); setTab(g.layer); }}>Open in {stepName(LAYER_STEP[g.layer])}</button>}</h4>}
       <div className="grid">{g.items.map(r => CAT.items[r]).filter(Boolean).map(it => { const st = pickState(s, it); const block = st === 'deny' ? null : blockOf(it, ctx); const sc = sourceOf(it, st); return <Tile key={it.ref} it={it} st={st} src={sc} why={whyOf(it, sc)} paused={paused} setPick={setPick} setTip={setTip} block={block} need={needsOf(it, ctx)} sw={() => { focusKey.current = 'p:' + it.ref; patch({ switchFor: it.ref }); }} />; })}</div>
     </section>) : <p className="fine">Nothing matches that search.</p>}
   </div>;

@@ -99,13 +99,15 @@ export function defaults(pace = 'look') { return applyPace(blank(), pace); }
 export function pacePatch(plan, pace, last = null) {
   let p = normalize(plan); const lp = last || 'look', was = Object.hasOwn(PACES, lp) ? PACES[lp] : PACES.look;
   if (p.music.energy !== was.energy) p = touch(p, 'music.energy');
-  if (p.music.beatSync !== was.beatSync) p = touch(p, 'music.beatSync');
+  if (p.music.beatSync !== was.beatSync && p.music.bed !== 'none') p = touch(p, 'music.beatSync');
   if (p.presenter.some(x => x.id === 'punch') !== was.punch) p = touch(p, 'presenter');
   if (p.transitions.when !== was.transitionsWhen) p = touch(p, 'transitions.when');
-  const next = touch(applyPace(p, pace), 'pace'), P = Object.hasOwn(PACES, next.pace) ? PACES[next.pace] : PACES.look, bs = next.music.beatSync;
+  const next = touch(applyPace(p, pace), 'pace');
+  if (p.music.bed === 'none') next.music.beatSync = p.music.beatSync; // no music: your beat choice waits for the music to come back
+  const P = Object.hasOwn(PACES, next.pace) ? PACES[next.pace] : PACES.look, bs = next.music.beatSync;
   const patch = { transitionsWhen: Array.isArray(next.transitions.ids) && !next.transitions.ids.length ? 'every-cut' : next.transitions.when, music: { energy: next.music.energy }, pace: { tighten: next.advanced.tighten ?? P.tighten, punch: next.presenter.some(x => x.id === 'punch') ? 'on' : 'off' },
-    // with no music there is no beat to cut on, so a pace never asks for beat sync then
-    picks: next.music.bed === 'none' && bs !== false ? {} : bs === null ? { 'beatSync:beat-sync': 'clear', 'beatSync:no-beat-sync': 'clear' } : { [`beatSync:${bs ? 'beat-sync' : 'no-beat-sync'}`]: 'allow' } };
+    // with no music there is no beat to cut on, so a pace leaves beat sync alone then
+    picks: next.music.bed === 'none' ? {} : bs === null ? { 'beatSync:beat-sync': 'clear', 'beatSync:no-beat-sync': 'clear' } : { [`beatSync:${bs ? 'beat-sync' : 'no-beat-sync'}`]: 'allow' } };
   return { plan: next, patch };
 }
 // The smallest session patch that turns prev into next: picks the two plans set differently, and only the session
@@ -117,6 +119,8 @@ export function diffPatch(prev, next, cat = null) {
   for (const [ref, how] of Object.entries(b.picks)) if (a.picks[ref] !== how) picks[ref] = how;
   const patch = Object.keys(picks).length ? { picks } : {};
   for (const k of ['pack', 'styleLook', 'titles', 'keyWords', 'transitionsWhen', 'finishWhen', 'music', 'sound', 'pace']) if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) patch[k] = b[k];
+  // a filter pick always comes with its timing, so the session never reads it as a choice made with no timing control
+  if (Object.keys(picks).some(r => r.startsWith('finish:'))) patch.finishWhen = b.finishWhen;
   return patch;
 }
 // a builder step's words choices laid over the plan (only the fields given change)
@@ -334,9 +338,9 @@ export function fromState(s, prev = null, cat = null) {
   if (fa.length) { p.filters.ids = fa; for (const id of fa) take('finish', id); }
   else if (fd.length && cat && finishIds(cat).every(id => fd.includes(id))) { p.filters.ids = []; for (const id of fd) take('finish', id); }
   else p.filters.ids = null;
-  p.filters.when = s.finishWhen && s.finishWhen !== 'none' ? s.finishWhen : base.filters.when;
+  p.filters.when = s.finishWhen && s.finishWhen !== 'none' ? s.finishWhen : Array.isArray(p.filters.ids) && p.filters.ids.length ? 'whole' : base.filters.when; // no timing in the session: the look's way
   p.music.bed = (s.music && s.music.bed) || 'auto'; p.music.energy = (s.music && s.music.energy) || 'auto';
-  const bs = allow('beatSync')[0]; p.music.beatSync = bs === 'beat-sync' ? true : bs === 'no-beat-sync' ? false : null; if (bs) take('beatSync', bs);
+  const bs = allow('beatSync')[0]; p.music.beatSync = bs === 'beat-sync' ? true : bs === 'no-beat-sync' ? false : p.music.bed === 'none' ? base.music.beatSync : null; if (bs) take('beatSync', bs); // no music keeps the beat choice for later
   p.music.sfx = !(s.sound && s.sound.sfx === 'off');
   const adv = {};
   for (const [k, slot] of Object.entries(picks)) {

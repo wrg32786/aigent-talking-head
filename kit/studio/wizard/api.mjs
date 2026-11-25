@@ -27,7 +27,7 @@ export function mount({ C, json, readBody, view, pushState }) {
     if (p === '/api/templates' && M === 'POST') {
       const b = await readBody(req), s = C.load(), cat = C.catalog();
       try { json(res, 200, { template: TPL.save(b && typeof b.name === 'string' ? b.name : '', { plan: planOf(s, cat), from: { kind: 'builder' }, cat }) }); }
-      catch (e) { json(res, e.code || 500, { error: e.message }); }
+      catch (e) { json(res, typeof e.code === 'number' ? e.code : 500, { error: e.message }); }
       return true;
     }
     if (p !== '/api/video-plan') return false;
@@ -38,6 +38,7 @@ export function mount({ C, json, readBody, view, pushState }) {
         if (!Object.hasOwn(VP.PACES, b.pace)) { json(res, 400, { error: `pace: one of ${Object.keys(VP.PACES).join(', ')}` }); return true; }
         const s = C.load(), cat = C.catalog(), { plan, patch } = VP.pacePatch(planOf(s, cat), b.pace, s.videoPlan && s.videoPlan.pace), r = C.applyPatch(s, { ...patch, from: 'ui' });
         if (r.errs.length) { json(res, 400, { error: r.errs.join(' '), errs: r.errs }); return true; }
+        delete plan.goalPace; // a pace you pick here is yours: a run_wizard goal leaves it alone
         s.videoPlan = plan; C.save(s); pushState();
         json(res, 200, { ...view(s), ...planView(s, cat), log: r.log }); return true;
       }

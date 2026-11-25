@@ -130,7 +130,7 @@ if (!process.env.PYTHONUTF8) process.env.PYTHONUTF8 = '1';
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['style-look', 'key-words', 'transitions-when', 'finish-when', 'motion', 'goal', 'words', 'scenes', 'scenes-off', 'pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'title-effect', 'title-exit', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
+const VALUED = new Set(['style-look', 'key-words', 'transitions-when', 'finish-when', 'finish-ids', 'motion', 'goal', 'words', 'scenes', 'scenes-off', 'pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'title-effect', 'title-exit', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
 
 // cut.json sections (kit/sections.cjs: hook, body, cta on each segment) and --transitions-when, which keeps named
 // transitions only on the seams it names (every-cut, topic, hook-cta); the rest become plain hard cuts. The timing is
@@ -144,6 +144,10 @@ function sectionsPass(build, cut, { always = false } = {}) {
   else if (fw) { if (!SEC.FINISH_WHEN.includes(fw)) die(`--finish-when must be one of ${SEC.FINISH_WHEN.join(', ')}, or none`);
     const ids = (LOCKS.finishes || []).filter(f => f !== 'none'); cut.finishWhen = fw; if (ids.length) cut.finishIds = ids; }
   if (opt('lock') && cut.finishWhen && (LOCKS.finishes || []).some(f => f !== 'none')) cut.finishIds = LOCKS.finishes.filter(f => f !== 'none');
+  // --finish-ids: the filters to time, said outright (Studio sends them with every timing, so a lock left out as
+  // unchanged never keeps an older choice)
+  const fi = opt('finish-ids');
+  if (typeof fi === 'string') { const ids = fi.split(',').map(x => x.trim()).filter(x => x && x !== 'none'); if (ids.length) cut.finishIds = ids; else delete cut.finishIds; }
   const held = segs.some(x => 'heldTransition' in x || 'heldFinish' in x) || Array.isArray(cut.heldHits) || 'heldFinish' in cut || !!cut.finishWhen;
   if (!always && !cut.transitionsWhen && !held && !segs.some(x => x.section)) return false;
   const words = require('./spoken.cjs').timeline(segs, build);
@@ -157,6 +161,7 @@ function sectionsPass(build, cut, { always = false } = {}) {
   if (n) console.log(`transitions ${cut.transitionsWhen.replace('-', ' and ')} only: ${n} seam${n === 1 ? '' : 's'} made a plain cut`);
   const nf = SEC.applyFinishWhen(cut);
   if (nf) console.log(`filters ${cut.finishWhen === 'whole' ? 'on the whole video' : 'on the ' + cut.finishWhen.replace('-', ' and ') + ' only'}: ${cut.finishIds.join(', ')} on ${nf} piece${nf === 1 ? '' : 's'}`);
+  else if (cut.finishWhen && (cut.finishIds || []).length) console.log(`filters on the ${cut.finishWhen.replace('-', ' and ')} only: we found no ${cut.finishWhen === 'cta' ? 'call to action' : 'hook or call to action'} in what you say, so no piece has a filter`);
   return true;
 }
 // captions.js keyWords from --key-words (off removes it, so the captions are what they always were)
@@ -959,9 +964,9 @@ try { sh(process.execPath, [path.join(KIT, 'check.mjs'), build, '--warn-only'], 
 // base.mp4 (the graded picture alone, BASEONLY) is made once per picture: the face zone and the person mask both read it,
 // and a rebuild that only changes captions, titles, sounds or layers reuses it (base.sig: the cut without those keys)
 const LAYER_KEYS = new Set(['overlay', 'titles', 'mask', 'maskModel', 'person', 'panels', 'headMask', 'sfx', 'sfxHits', 'sfxMap', 'sfxCap', 'bed', 'bedStart', 'bedVol', 'bedNoFade', 'bedFadeOut', 'export', 'behindMax', 'maskClear']);
-const baseSig = () => { const c = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8')); const pic = Object.fromEntries(Object.entries(c).filter(([k]) => !LAYER_KEYS.has(k) && !['transitionsWhen', 'heldHits'].includes(k)));
+const baseSig = () => { const c = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8')); const pic = Object.fromEntries(Object.entries(c).filter(([k]) => !LAYER_KEYS.has(k) && !['transitionsWhen', 'heldHits', 'heldFinish', 'finishWhen', 'finishIds'].includes(k)));
   // section tags and what a transition timing kept aside are notes, not picture (the transitions they change are)
-  if (Array.isArray(pic.segs)) pic.segs = pic.segs.map(({ section, heldTransition, ...x }) => x);
+  if (Array.isArray(pic.segs)) pic.segs = pic.segs.map(({ section, heldTransition, heldFinish, timedFinish, ...x }) => x);
   const files = [...new Set([...(c.segs || []), ...(c.inserts || [])].map(s => s.file).filter(Boolean))].map(f => { try { const st = fs.statSync(path.resolve(build, f)); return [f, st.size, Math.round(st.mtimeMs)]; } catch { return [f]; } });
   return require('crypto').createHash('sha1').update(JSON.stringify([pic, files])).digest('hex'); };
 const ensureBase = () => { const bf = path.join(build, 'base.mp4'), sf = path.join(build, 'base.sig'), sig = baseSig();
