@@ -234,8 +234,11 @@ try {
     const { patch, plan } = VP.pacePatch(p, 'calm', 'lively'); assert.deepStrictEqual(patch.picks, {}); assert.ok(!plan.touched.includes('music.beatSync') || plan.music.beatSync === true);
   });
   await t('only a pace you picked counts as the last pace, never one stored with a draft', () => {
-    assert.strictEqual(VP.lastPace({ videoPlan: VP.normalize({ pace: 'high' }) }), null, 'a guessed pace is not a choice');
-    assert.strictEqual(VP.lastPace({ videoPlan: VP.normalize({ pace: 'high', touched: ['pace'] }) }), 'high'); assert.strictEqual(VP.lastPace({}), null);
+    assert.strictEqual(VP.lastPace({ videoPlan: { ...VP.normalize({ pace: 'high' }), guessed: true } }), null, 'a guessed pace is not a choice');
+    assert.strictEqual(VP.lastPace({ videoPlan: VP.normalize({ pace: 'high' }) }), 'high', 'a full plan saved without marks still counts'); assert.strictEqual(VP.lastPace({}), null);
+    // a full high plan, then calm: the high defaults follow the pace, none of them read as yours
+    const hi = VP.defaults('high'), { plan: calm } = VP.pacePatch(hi, 'calm', VP.lastPace({ videoPlan: hi }));
+    assert.deepStrictEqual([calm.music.energy, calm.music.beatSync, calm.transitions.when], ['low', false, 'topic']);
   });
   await t('a filter picked with no timing control puts timing back to the look; the builder always sends its timing', () => {
     const s = fresh(); apply(s, { finishWhen: 'hook', picks: { 'finish:mono': 'allow' } }); assert.strictEqual(s.finishWhen, 'hook');
