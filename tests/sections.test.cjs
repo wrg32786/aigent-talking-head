@@ -59,4 +59,15 @@ t('a call to action asks: "this will save you hours" is not one, "check out the 
   assert.strictEqual(SEC.bounds([...W(0, 'Build it once.'), ...W(4, 'Check out the link below.')], 8).ctaStart, 4);
   assert.strictEqual(SEC.bounds([...W(0, 'Build it once.'), ...W(4, 'If you want more, follow me.')], 8).ctaStart, 4);
 });
+t('filters on the hook only: the hook pieces get them, the rest none, the job-wide finish is set aside and comes back', () => {
+  const c = cut(); c.finish = 'warm'; c.segs[4].finish = 'grain'; SEC.tag(c, words); const before = JSON.stringify(c);
+  c.finishWhen = 'hook'; c.finishIds = ['mono'];
+  assert.strictEqual(SEC.applyFinishWhen(c), 2);
+  assert.strictEqual(c.finish, undefined, 'never the whole video through cut.finish');
+  assert.deepStrictEqual(c.segs.map(s => s.finish || null), ['mono', 'mono', null, null, null, null]);
+  c.finishWhen = 'hook-cta'; c.finishIds = ['mono', 'grain']; SEC.applyFinishWhen(c);
+  assert.deepStrictEqual(c.segs.map(s => s.finish || null), ['mono', 'grain', null, null, null, 'mono']);
+  delete c.finishWhen; delete c.finishIds; SEC.applyFinishWhen(c);
+  assert.deepStrictEqual(c, JSON.parse(before), 'no timing is the draft again');
+});
 console.log(`\nsections: ${n} tests passed`);

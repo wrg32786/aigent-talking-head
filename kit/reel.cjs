@@ -130,7 +130,7 @@ if (!process.env.PYTHONUTF8) process.env.PYTHONUTF8 = '1';
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['style-look', 'key-words', 'transitions-when', 'motion', 'goal', 'words', 'scenes', 'scenes-off', 'pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'title-effect', 'title-exit', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
+const VALUED = new Set(['style-look', 'key-words', 'transitions-when', 'finish-when', 'motion', 'goal', 'words', 'scenes', 'scenes-off', 'pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'title-effect', 'title-exit', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
 
 // cut.json sections (kit/sections.cjs: hook, body, cta on each segment) and --transitions-when, which keeps named
 // transitions only on the seams it names (every-cut, topic, hook-cta); the rest become plain hard cuts. The timing is
@@ -138,7 +138,13 @@ const VALUED = new Set(['style-look', 'key-words', 'transitions-when', 'motion',
 function sectionsPass(build, cut, { always = false } = {}) {
   const SEC = require('./sections.cjs'), tw = opt('transitions-when'), segs = cut.segs || [];
   if (tw) { if (!SEC.WHEN.includes(tw)) die(`--transitions-when must be one of ${SEC.WHEN.join(', ')}`); if (tw === 'every-cut') delete cut.transitionsWhen; else cut.transitionsWhen = tw; }
-  const held = segs.some(x => 'heldTransition' in x) || Array.isArray(cut.heldHits);
+  // --finish-when: the filters are the finishes the locks allow (--lock finishes=...), kept in cut.json for a rebuild
+  const fw = opt('finish-when');
+  if (fw === 'none') { delete cut.finishWhen; delete cut.finishIds; }
+  else if (fw) { if (!SEC.FINISH_WHEN.includes(fw)) die(`--finish-when must be one of ${SEC.FINISH_WHEN.join(', ')}, or none`);
+    const ids = (LOCKS.finishes || []).filter(f => f !== 'none'); cut.finishWhen = fw; if (ids.length) cut.finishIds = ids; }
+  if (opt('lock') && cut.finishWhen && (LOCKS.finishes || []).some(f => f !== 'none')) cut.finishIds = LOCKS.finishes.filter(f => f !== 'none');
+  const held = segs.some(x => 'heldTransition' in x || 'heldFinish' in x) || Array.isArray(cut.heldHits) || 'heldFinish' in cut || !!cut.finishWhen;
   if (!always && !cut.transitionsWhen && !held && !segs.some(x => x.section)) return false;
   const words = require('./spoken.cjs').timeline(segs, build);
   // no word times (an edited job whose clips moved): the tags it had stay
@@ -149,6 +155,8 @@ function sectionsPass(build, cut, { always = false } = {}) {
     const c = cache[cj].find(c => path.basename(c.file || '') === path.basename(f)); return c && c.take ? c.take : null; };
   const n = SEC.applyTransitionsWhen(cut, { takeOf, window: Math.max(0.15, B.windowOf ? +B.windowOf(cut) || 0 : 0) });
   if (n) console.log(`transitions ${cut.transitionsWhen.replace('-', ' and ')} only: ${n} seam${n === 1 ? '' : 's'} made a plain cut`);
+  const nf = SEC.applyFinishWhen(cut);
+  if (nf) console.log(`filters ${cut.finishWhen === 'whole' ? 'on the whole video' : 'on the ' + cut.finishWhen.replace('-', ' and ') + ' only'}: ${cut.finishIds.join(', ')} on ${nf} piece${nf === 1 ? '' : 's'}`);
   return true;
 }
 // captions.js keyWords from --key-words (off removes it, so the captions are what they always were)

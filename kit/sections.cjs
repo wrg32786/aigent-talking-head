@@ -91,6 +91,29 @@ function applyTransitionsWhen(cut, { takeOf, window = 0.15 } = {}) {
   return n;
 }
 
+// Filter timing (--finish-when whole|hook|cta|hook-cta, spec 8.2 and 14.1): the chosen filters (cut.finishIds) go on
+// the segments of those sections, one after another, and nowhere else. The job-wide cut.finish is left unset (it would
+// cover the whole video), and a finish a recipe, preset or pack set on a segment gives way. What it replaced is kept
+// (seg.heldFinish, cut.heldFinish) so a later timing, or none, brings it back.
+const FINISH_WHEN = ['whole', 'hook', 'cta', 'hook-cta'], FINISH_WHEN_FLAG = [...FINISH_WHEN, 'none'];
+function restoreFinish(cut) {
+  for (const s of cut.segs || []) if ('heldFinish' in s) { if (s.heldFinish == null) delete s.finish; else s.finish = s.heldFinish; delete s.heldFinish; }
+  if ('heldFinish' in cut) { if (cut.heldFinish == null) delete cut.finish; else cut.finish = cut.heldFinish; delete cut.heldFinish; }
+}
+function applyFinishWhen(cut) {
+  restoreFinish(cut);
+  const when = cut.finishWhen, ids = (cut.finishIds || []).filter(f => f && f !== 'none');
+  if (!when || !FINISH_WHEN.includes(when) || !ids.length) return 0;
+  const want = when === 'whole' ? null : when === 'hook-cta' ? ['hook', 'cta'] : [when];
+  cut.heldFinish = cut.finish ?? null; delete cut.finish;
+  let k = 0, n = 0;
+  for (const s of cut.segs || []) {
+    s.heldFinish = s.finish ?? null;
+    if (!want || want.includes(s.section)) { s.finish = ids[k++ % ids.length]; n++; } else delete s.finish;
+  }
+  return n;
+}
+
 // the [start, end] windows of the reel in the given sections (adjacent ones merged)
 function windows(cut, want) {
   const segs = cut.segs || [], tt = times(segs), out = [];
@@ -98,4 +121,4 @@ function windows(cut, want) {
   return out;
 }
 
-module.exports = { isCta, WHEN, sentences, times, bounds, tag, seamAllowed, restore, applyTransitionsWhen, windows };
+module.exports = { FINISH_WHEN, FINISH_WHEN_FLAG, restoreFinish, applyFinishWhen, isCta, WHEN, sentences, times, bounds, tag, seamAllowed, restore, applyTransitionsWhen, windows };
