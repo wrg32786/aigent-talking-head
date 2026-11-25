@@ -1,3 +1,5 @@
 {
- "effect:orbit": {}
+ "effect:tape-label": {
+  "q": 60
+ }
 }

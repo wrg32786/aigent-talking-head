@@ -153,7 +153,8 @@ export function buildSounds() {
 // STEP levels, at the clearest frame. A grey finish keeps the brightness and grain keeps the average, so an average
 // difference misses both; a share does not
 export const MEAN = 6, SPREAD = 4, THRESHOLD = 10, STRONG = 32, STRONG_AREA = 0.5;
-// the webp quality each preview needed to stay small (docs/menu/demos.json). Below LOW_Q the encoder itself shifts block
+// the webp quality each preview needed to stay small (docs/menu/demos.json, written by each render; previews made before
+// it are checked at their starting quality, and the ones that went lower pass on strong change). Below LOW_Q the encoder itself shifts block
 // colours (a plain plate at q0 scores about 30% broad), so such a preview has to pass on strong change alone
 export const MANIFEST = join(MENU, 'demos.json'), LOW_Q = 24;
 export const manifest = () => { try { return JSON.parse(readFileSync(MANIFEST, 'utf8')); } catch { return {}; } };
@@ -207,7 +208,7 @@ export async function scores(files, mean = MEAN, spread = SPREAD) {
 export async function check(list = items()) {
   const made = list.filter(({ kind, it }) => existsSync(demoPath(kind, it.id))), sc = await scores(made.map(({ kind, it }) => demoPath(kind, it.id)));
   const man = manifest();
-  return list.map(({ kind, it }) => { const f = demoPath(kind, it.id), q = (man[`${kind}:${it.id}`] || {}).q ?? 60; return { kind, id: it.id, made: f in sc, score: sc[f] || null, q, ok: visible(sc[f], q) }; });
+  return list.map(({ kind, it }) => { const f = demoPath(kind, it.id), q = (man[`${kind}:${it.id}`] || {}).q ?? QUALITY[`${kind}:${it.id}`] ?? 60; return { kind, id: it.id, made: f in sc, score: sc[f] || null, q, ok: visible(sc[f], q) }; });
 }
 
 async function main() {
@@ -236,7 +237,7 @@ async function main() {
       try {
         const mp4 = kind === 'effect' ? await effect(work, it) : kind === 'graphic' ? await graphic(work, it) : kind === 'finish' ? finish(work, it.id) : titleLayer(work, it);
         const { size, q } = toWebp(mp4, demoPath(kind, it.id), QUALITY[`${kind}:${it.id}`]);
-        const man = manifest(); man[`${kind}:${it.id}`] = { q }; writeFileSync(MANIFEST, JSON.stringify(man, Object.keys(man).sort(), 1) + '\n');
+        const man = manifest(); man[`${kind}:${it.id}`] = { q }; writeFileSync(MANIFEST, JSON.stringify(Object.fromEntries(Object.entries(man).sort(([a], [b]) => a.localeCompare(b))), null, 1) + '\n');
         console.log(`${n}/${list.length} ${kind} ${it.id} ${Math.round(size / 1024)} KB`);
       } catch (e) { failed.push(it.id); console.log(`${n}/${list.length} ${kind} ${it.id} failed: ${e.message.split('\n')[0]}`); }
     }
