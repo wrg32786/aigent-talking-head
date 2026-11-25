@@ -7,7 +7,10 @@
 //                           { transitions } { presenter } { graphics } { filters } { music } { notes } the same for
 //                           Between shots, You on screen, Extras, Look, Sound and Your notes (notes is the text)
 //   GET  /api/wizard/steps  the builder steps (kit/studio/wizard/steps.json)
-//   POST /api/templates     { name? } save the plan as it is now as a template (kit/studio/templates.mjs); no notes
+//   GET  /api/templates     the Template Library (kit/studio/templates.mjs list)
+//   POST /api/templates     { name? } save the plan as it is now as a template; no notes
+//   POST /api/templates/use { name, edit? } start this video's plan from a template (edit: a look's choices as your own)
+//   POST /api/templates/rename { name, label }, /duplicate { name }, /delete { name }
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -25,6 +28,24 @@ export const planView = (s, cat) => { const plan = planOf(s, cat); return { plan
 export function mount({ C, json, readBody, view, pushState }) {
   async function route(p, M, u, req, res) {
     if (p === '/api/wizard/steps' && M === 'GET') { json(res, 200, stepsOf()); return true; }
+    if (p === '/api/templates' && M === 'GET') { json(res, 200, { templates: TPL.list(C.catalog()) }); return true; }
+    const tm = p.match(/^\/api\/templates\/(use|rename|duplicate|delete)$/);
+    if (tm && M === 'POST') {
+      const b = (await readBody(req)) || {}, cat = C.catalog();
+      try {
+        if (tm[1] === 'use') {
+          // a reference (Influence, Recreate or Copy the look, broken down or still being read) would win over the template,
+          // so it steps aside first, with its own clean-up, and the template goes on after (picking it again brings it back)
+          const plan = TPL.planFor(b.name, cat, { edit: b.edit === true }), s = C.load(), ref = s.reference || {}, aside = !!(ref.mode && ref.mode !== 'off' && (ref.extracted || ref.url || ref.file));
+          if (aside) { const off = C.applyPatch(s, { reference: { mode: 'off' }, from: 'ui' }); if (off.errs.length) { json(res, 400, { error: off.errs.join(' '), errs: off.errs }); return true; } }
+          const r = C.applyPatch(s, { videoPlan: plan, from: 'ui' }); if (aside) r.log.unshift('the reference steps aside so the template is used');
+          if (r.errs.length) { json(res, 400, { error: r.errs.join(' '), errs: r.errs }); return true; }
+          C.save(s); pushState(); json(res, 200, { ...view(s), ...planView(s, cat), log: r.log }); return true;
+        }
+        const out = tm[1] === 'rename' ? TPL.rename(b.name, b.label, cat) : tm[1] === 'duplicate' ? TPL.duplicate(b.name, cat) : TPL.remove(b.name, cat);
+        json(res, 200, { ok: true, template: out === true ? null : out, templates: TPL.list(cat) }); return true;
+      } catch (e) { json(res, typeof e.code === 'number' ? e.code : 500, { error: e.message }); return true; }
+    }
     if (p === '/api/templates' && M === 'POST') {
       const b = await readBody(req), s = C.load(), cat = C.catalog();
       try { json(res, 200, { template: TPL.save(b && typeof b.name === 'string' ? b.name : '', { plan: planOf(s, cat), from: { kind: 'builder' }, cat }) }); }

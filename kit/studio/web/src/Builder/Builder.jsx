@@ -78,7 +78,7 @@ export function Builder({ s: st, CAT, V: appV, apply, patch, go, page, setPage }
     })());
   };
   if (!known) return null;
-  if (page === 'start') return <Start s={st} apply={apply} onBuild={() => open('pace')} headRef={startHead} />;
+  if (page === 'start') return <Start s={st} apply={apply} onBuild={() => open('pace')} onTemplate={() => open('notes')} headRef={startHead} />;
   if (err && !view) return <p className="fine" role="alert">The builder could not load: {err}</p>;
   if (!steps || !view) return <p className="fine" role="status">Loading the builder</p>;
   const plan = view.plan, w = mergeWords(plan.words, shown && shown.words), pace = (shown && shown.pace) || plan.pace;

@@ -803,7 +803,7 @@ A double-click app with no installer at all is planned: [docs/desktop-app-plan.m
 
 The New video tab has a step by step builder beside the classic steps. Open it from **Build it one choice at a time** on the Start step, or with `#build=start`.
 
-- **Start screen**: your clip (Use a recording, Upload a video, Paste a link; a take made in the last hour shows "From Recording"), then **Build my own**. Use a template arrives with the Template Library.
+- **Start screen**: your clip (Use a recording, Upload a video, Paste a link; a take made in the last hour shows "From Recording"), then **Build my own** or **Use a template** (the Template Library below; picking one sets your plan and opens Your notes with its choices, each with Change).
 - **Pacing** (`#build=pace`): Let the Look decide, Calm, Steady, Lively or High energy. Each card plays the cut speed on our sample presenter (`docs/menu/paces/`, made by `node kit/demos.mjs --only pace`). The frame shows which part of the video the step changes (Applies to, and a small map of the frame).
 - Every choice is saved in the video plan (`POST /api/video-plan`) and turned into today's settings at once, so a draft from Review works at any point. Sections not built yet say Coming soon, and plan choices the engine cannot draw yet are listed under the step as Coming soon.
 - **Words on screen** (`#build=captionType` and on): Caption type (Just captions or Kinetic words), the caption look, how words come in (kinetic only), big titles with how they come in, an effect and an exit (kinetic only), where words sit (a caption band and the places a title may take; never your face), text colors (a theme, then your own text, key word and outline colors with the contrast shown), the font pairing, key words (Off, Subtle, Strong or Dramatic, kinetic only), then **Preview and lock**. Steps that do not fit your caption type are skipped.
@@ -816,6 +816,16 @@ The New video tab has a step by step builder beside the classic steps. Open it f
 - **Sound** (`#build=music`, last of the style steps): We pick, No music, a track you heard here (play to listen, Use this to choose), or your own file; then how lively, Cut on the beat, and Sounds on the cuts.
 - **Your notes** (`#build=notes`): "Anything else for the agent?" with four example lines to add, your plan so far with **Change** on each row (it opens only that step, and its button says Back to your notes), and **All options**, every layer's tiles with a tab per layer and a search box, so any pick is one click from here. Your notes reach the agent: `studio_get_state` has `notes`, and `get_video_plan` has them in the plan.
 - **Make it** (`#build=make`): **Save as a template** (the name is optional; it is saved as `looks/local/<name>/template.json`, without your notes, and a name already used is never written over) and **Make my video**, which sets the plan, starts the draft (writing `jobs/<job>/build/video-plan.json` beside it) and opens Review.
+
+## Template Library
+
+On the **Teardowns** tab, under the breakdown, and on New video's **Use a template**. A card for each template: its picture (the starters' moving previews), name, where it came from (Built by you, From a link, From a file, Your copy, Starter), the date and the pace.
+
+- **Your templates**: the ones you saved at the end of the builder, the ones you saved after a teardown (**Save as template** with a name), and every look you saved before this (they show as From a teardown, with their choices read from the look).
+- **Starter templates**: the six packs that ship with the kit. Read only: Duplicate one to change it.
+- Each card's menu: **Use for a new video** (sets the plan, opens Your notes), **Edit in builder** (a saved look's choices become your own, one step each, from Pace), **Rename** (the name you see; the folder keeps its name), **Duplicate** (`<name>-copy`), **Delete** (asks first; removes the folder in `looks/local/`, look and all).
+- Files: `looks/local/<name>/template.json` next to an optional `look.json`, out of git. A template keeps no notes and no uploaded track. Routes: `GET /api/templates`, `POST /api/templates` (save the plan as it is now), `/api/templates/use|rename|duplicate|delete`, `/api/templates/from-teardown`. Agents: `list_templates`, `save_template` (see [mcp.md](mcp.md)).
+- Not yet: a rendered `preview.webp` for your own templates (they show a placeholder; starters use their own preview).
 
 ## New video
 

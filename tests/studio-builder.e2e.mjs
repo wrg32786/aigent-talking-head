@@ -1,10 +1,12 @@
 // The step by step builder (phase 4), in a real Chrome with no keys and no network:
 // - the classic Start step links to it; #build=start opens the start screen with the three clip cards and Build my own
-//   (Use a template is not shown yet)
+//   and Use a template (the Template Library, phase 8)
 // - Build my own opens Pacing: the zone map, the Applies to line, five pace cards with their moving strips
 // - picking a pace saves the plan (GET /api/video-plan) and today's pace setting (state.pace.tighten), and says what it does
 // - Look, Sound and Finish (phase 7): filters on the hook only, music, Your notes with Change and All options, Make it
 //   (Save as a template, Make my video); the old links still work
+// - the Template Library (phase 8): on Teardowns your saved template with Rename, Duplicate and Delete (asks first),
+//   the starters read only; New video's Use a template starts the video from one and opens Your notes
 // - no terminal text, both themes, phone width
 // Needs Chrome. Run: node tests/studio-builder.e2e.mjs [--shots <dir>]
 import assert from 'assert';
@@ -41,11 +43,10 @@ try {
   const pg = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const errs = []; pg.on('pageerror', e => errs.push(e.message));
 
-  await t('the classic Start step links to the builder; #build=start shows the clip cards and Build my own only', async () => {
+  await t('the classic Start step links to the builder; #build=start shows the clip cards, Build my own and Use a template', async () => {
     await open(pg, '#step=start'); await pg.waitForSelector('#build-open');
     await pg.click('#build-open'); await pg.waitForSelector('main[data-build="start"] #build-start');
-    for (const id of ['#build-src-recording', '#build-src-upload', '#build-src-link', '#build-own']) assert.ok(await pg.isVisible(id), id);
-    assert.strictEqual(await pg.$('#build-template'), null, 'Use a template waits for the Template Library');
+    for (const id of ['#build-src-recording', '#build-src-upload', '#build-src-link', '#build-own', '#build-template']) assert.ok(await pg.isVisible(id), id);
     assert.strictEqual(await pg.isVisible('#stepper'), false, 'the classic step bar steps aside');
     assert.strictEqual(await pg.$('#build-name'), null, 'a named video asks for no name');
     await pg.click('#build-src-link'); await pg.waitForSelector('#build-start #footage-link');
@@ -190,9 +191,38 @@ try {
     assert.doesNotMatch(made.err, /Failed to fetch|undefined/);
   });
 
+  await t('the Template Library: Rename, Duplicate and Delete on Teardowns, then Use a template on New video', async () => {
+    await open(pg, '#tab=teardowns'); await pg.waitForSelector('#template-library [data-template="builder-test"]');
+    const card = '#template-library li[data-template="builder-test"]';
+    assert.match(await pg.innerText(card), /Built by you/);
+    const starterName = (await api('/api/templates')).templates.find(x => x.readOnly).name; assert.ok(await pg.$(`#template-library li[data-template="${starterName}"]`), 'the starters are there');
+    await pg.click('#tpl-menu-builder-test'); await pg.click('#tpl-rename-builder-test');
+    await pg.fill('#tpl-name-builder-test', 'Hook in mono'); await pg.click(card + ' form button[type="submit"]');
+    await pg.waitForFunction(() => /Hook in mono/i.test(document.querySelector('#template-library li[data-template="builder-test"]').innerText));
+    await pg.click('#tpl-menu-builder-test'); await pg.click('#tpl-dup-builder-test');
+    await pg.waitForSelector('#template-library li[data-template="builder-test-copy"]');
+    await shot(pg, 'library-teardowns.png');
+    await pg.click('#tpl-menu-builder-test-copy'); await pg.click('#tpl-del-builder-test-copy');
+    await pg.waitForSelector('[role="alertdialog"]'); await pg.click('#tpl-del-yes-builder-test-copy');
+    await pg.waitForSelector('#template-library li[data-template="builder-test-copy"]', { state: 'detached' });
+    const starter = (await api('/api/templates')).templates.find(x => x.readOnly);
+    await pg.click(`#tpl-menu-${starter.name}`); assert.strictEqual(await pg.$(`#tpl-del-${starter.name}`), null, 'a starter cannot be deleted'); await pg.keyboard.press('Escape');
+    await noCmd(pg, 'the Template Library');
+    // New video: Use a template, pick it, land on Your notes with its choices
+    await api('/api/video-plan', { plan: (await import('../kit/studio/wizard/plan.mjs')).defaults('calm') });
+    await open(pg, '#build=start'); await pg.click('#build-template'); await pg.waitForSelector('#build-tlib [data-template="builder-test"]');
+    await pg.click('#build-tlib [data-template="builder-test"]'); await pg.waitForSelector('#build-notes-text');
+    assert.strictEqual(new URL(pg.url()).hash, '#build=notes');
+    assert.match(await pg.innerText('#build-summary [data-row="filters"]'), /mono, hook only/);
+    assert.strictEqual((await api('/api/state')).state.finishWhen, 'hook');
+    await shot(pg, 'library-picked-notes.png');
+  });
+
   await t('Just captions skip the kinetic-only steps and take key words away', async () => {
     await open(pg, '#build=captionType'); await pg.waitForSelector('#build-type');
     await pg.click('#build-type [data-opt="captions"]'); await pg.waitForSelector('#build-type [data-opt="captions"][aria-checked="true"]');
+    // the step list follows the saved state, which can land a moment after the tile shows picked
+    await pg.waitForFunction(() => /^Words, 1 of 6$/.test(document.querySelector('#build-count')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
     assert.match(await pg.textContent('#build-count'), /^Words, 1 of 6$/);
     assert.strictEqual((await api('/api/state')).state.keyWords, 'off');
     await open(pg, '#build=keyWords'); await pg.waitForSelector('#build-wordsPreview, #build-place, #build-colors', { timeout: 10000 });

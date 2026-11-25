@@ -1,28 +1,41 @@
-// The Teardowns tab: break down a video you like (Reference.jsx: paste a link or upload a file, then the breakdown), and
-// the Template Library below it. For now the library lists the looks you saved from earlier teardowns and the starter
-// looks that ship with the kit, read only; picking a template to start a video comes with the template step later.
-import { useEffect } from 'react';
+// The Teardowns tab: break down a video you like (Reference.jsx: paste a link or upload a file, then the breakdown),
+// Save as template once it is broken down, and the Template Library below (Library.jsx, the same grid New video's
+// Use a template shows).
+import { useState } from 'react';
 import { Reference } from './Reference.jsx';
-import { Icon, cap1 } from './lib.jsx';
+import { api, toast } from './lib.jsx';
+import { Library, useTemplates } from './Library.jsx';
 
-export function TemplateLibrary({ CAT, looks }) {
-  useEffect(() => { if (looks && !looks.on) looks.reload(); }, []);
-  const saved = (looks && looks.list) || [], starters = (CAT.packs || []).filter(p => p.shipped && !/^ref-/.test(p.name));
+function SaveTemplate({ s, T, looks }) {
+  const [name, setName] = useState(''), [busy, setBusy] = useState(false), [err, setErr] = useState('');
+  const r = s.reference || {};
+  if (!r.extracted || !r.out) return null;
+  const save = async e => {
+    e.preventDefault(); setBusy(true); setErr('');
+    try { const j = await api('/api/templates/from-teardown', { name }); T.setList(j.templates); if (looks && looks.reload) looks.reload(); toast(`Saved as ${j.template.label}`); setName(''); }
+    catch (x) { setErr(x.message); } finally { setBusy(false); }
+  };
+  return <form className="tlib-save glass-card" id="tlib-save" onSubmit={save}>
+    <label htmlFor="tlib-save-name"><b>Save as template</b> <span className="fine">Use this look for your next videos.</span></label>
+    <div className="row"><input id="tlib-save-name" value={name} maxLength={60} placeholder="Name it, like my podcast look" onChange={e => setName(e.target.value)} />
+      <button type="submit" className="btn sm" id="tlib-save-go" disabled={busy || !name.trim()}>Save as template</button></div>
+    {err && <p className="fine" role="alert" id="tlib-save-err">{err}</p>}
+  </form>;
+}
+
+export function TemplateLibrary({ s, apply, looks }) {
+  const T = useTemplates();
+  const go = (edit, fresh) => { location.hash = edit ? '#build=pace' : fresh ? '#build=start' : '#build=notes'; }; // a new video starts with its clip
   return <section className="tlib" id="template-library" aria-labelledby="tlib-h">
-    <header className="sh"><h2 id="tlib-h">Template Library</h2><p className="sub">Starter looks, and the looks you saved from your teardowns.</p></header>
-    <h3 className="lbl" id="tlib-saved-h">Saved from your teardowns</h3>
-    {saved.length ? <ul className="tlib-list" aria-labelledby="tlib-saved-h">{saved.map(x => <li key={x.name} className="tlib-card glass-card" data-look={x.name}>
-      <Icon n="spark" /><span><b>{x.name}</b>{x.from && <span className="fine">From {x.from}</span>}</span></li>)}</ul>
-      : <p className="fine" id="tlib-saved-empty">None yet. Break down a video above, then save its look.</p>}
-    <h3 className="lbl" id="tlib-start-h">Starter templates</h3>
-    <ul className="tlib-list" aria-labelledby="tlib-start-h">{starters.map(p => <li key={p.name} className="tlib-card glass-card" data-pack={p.name}>
-      <Icon n="film" /><span><b>{cap1(p.name)}</b>{(p.label || p.description) && <span className="fine">{p.label || p.description}</span>}</span></li>)}</ul>
+    <header className="sh"><h2 id="tlib-h">Template Library</h2><p className="sub">Your templates and our starters. Use one for a new video, or open it in the builder to change it.</p></header>
+    <SaveTemplate s={s} T={T} looks={looks} />
+    <Library T={T} mode="manage" apply={apply} onUse={go} />
   </section>;
 }
 
 export function Teardowns(ctx) {
   return <div className="teardowns" id="s-teardowns">
     <Reference {...ctx} />
-    <TemplateLibrary CAT={ctx.CAT} looks={ctx.looks} />
+    <TemplateLibrary s={ctx.s} apply={ctx.apply} looks={ctx.looks} />
   </div>;
 }

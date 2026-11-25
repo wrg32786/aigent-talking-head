@@ -4,10 +4,12 @@ import { api, Icon } from '../lib.jsx';
 import { cleanJob } from '../NewVideo.jsx';
 import { Dropzone, FootageLink } from '../Footage.jsx';
 import { Recordings } from '../Recording.jsx';
+import { Library, useTemplates } from '../Library.jsx';
 
-// The New video start screen (spec 2.1): your clip, then how to build it. Use a template waits for the Template Library
-// and Your notes (spec 14.11), so only Build my own shows for now.
-export const TEMPLATES_READY = false;
+// The New video start screen (spec 2.1): your clip, then how to build it: Use a template (the Template Library grid;
+// picking one sets the plan and goes straight to Your notes) or Build my own.
+// StyleX's className with the shared fine-print class kept beside it
+const fine = st => { const p = stylex.props(st); return { ...p, className: ['fine', p.className].filter(Boolean).join(' ') }; };
 const s = stylex.create({
   cards: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 },
   card: { display: 'grid', gap: 6, justifyItems: 'start', textAlign: 'left', padding: 16, borderRadius: 14, borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--border)', backgroundColor: 'var(--card)', color: 'inherit', cursor: 'pointer' },
@@ -23,11 +25,13 @@ const ago = iso => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000
 // the name Studio gives a new video you do not name (core.mjs switchVideo; a taken one gets -2, -3)
 const today = () => { const d = new Date(); return `video-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
-export function Start({ s: st, apply, onBuild, headRef }) {
+function Pick({ apply, onUse }) { const T = useTemplates(); return <div id="build-tlib"><Library T={T} mode="pick" apply={apply} onUse={onUse} /></div>; }
+
+export function Start({ s: st, apply, onBuild, onTemplate, headRef }) {
   const n = (st.footage || []).length;
   // the newest take made in the last hour: its card starts chosen
   const fresh = (st.takes || []).filter(t => t.status === 'ready' && t.file && t.at && ago(t.at)).sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).pop();
-  const [src, setSrc] = useState(() => (fresh ? 'recording' : null)), [name, setName] = useState('');
+  const [src, setSrc] = useState(() => (fresh ? 'recording' : null)), [name, setName] = useState(''), [pick, setPick] = useState(false);
   // a clip needs a video to go in: an unnamed one is started with the name you typed (refused when it is taken) or
   // today's date (Studio adds -2 when that is taken). Returns the state to upload into, or null.
   const named = async () => { if (st.job) return st; try { const v = apply(await api('/api/videos/new', { name: cleanJob(name) || '', keepLook: true })); return v && v.state; } catch { return null; } };
@@ -48,15 +52,16 @@ export function Start({ s: st, apply, onBuild, headRef }) {
     </div>
     {src === 'recording' && <Recordings s={st} apply={apply} toNew={() => setSrc(null)} idp="build-" />}
     {src === 'link' && <FootageLink s={st} apply={apply} prepare={named} />}
-    <p id="build-have" className="fine" role="status" {...stylex.props(s.have)}>
+    <p id="build-have" role="status" {...fine(s.have)}>
       {n ? `${n} clip${n === 1 ? '' : 's'} in this video.` : 'No clip yet. You can also add one later.'}
       {fresh && <> <span id="build-fresh" {...stylex.props(s.chip)}>From Recording, {ago(fresh.at)}: {(fresh.script && fresh.script.title) || 'your newest take'}</span></>}
     </p>
     <h3 {...stylex.props(s.h3)}>How do you want to build it?</h3>
     <div {...stylex.props(s.cards)}>
-      {TEMPLATES_READY && <button type="button" id="build-template" {...stylex.props(s.card, s.big)}><Icon n="spark" /><strong>Use a template</strong><span className="fine">Pick a look from your Template Library and go straight to your notes</span></button>}
+      <button type="button" id="build-template" aria-expanded={pick} onClick={() => setPick(!pick)} {...stylex.props(s.card, s.big, pick && s.chosen)}><Icon n="spark" /><strong>Use a template</strong><span className="fine">Pick one from your Template Library and go straight to your notes</span></button>
       <button type="button" id="build-own" onClick={onBuild} {...stylex.props(s.card, s.big)}>
         <Icon n="right" /><strong>Build my own</strong><span className="fine">One choice per screen, starting with the pace</span></button>
     </div>
+    {pick && <Pick apply={apply} onUse={edit => (edit ? onBuild() : onTemplate())} />}
   </section>;
 }
