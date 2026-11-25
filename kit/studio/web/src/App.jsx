@@ -14,7 +14,7 @@ import { Recording } from './Recording.jsx';
 import { TabGroup, TabList, Tab } from '@headlessui/react';
 import { Cut } from './Cut.jsx';
 import { Outputs } from './Outputs.jsx';
-import { AskAgent, Wizards } from './Agent.jsx';
+import { AskAgent } from './Agent.jsx';
 import { Picture, TextStep, Music, BrollLayer } from './Style.jsx';
 import { Render, ReviewStep, RunFoot, useRun } from './Render.jsx';
 import { Post } from './Post.jsx';
@@ -59,6 +59,8 @@ export function App() {
   const [CAT, setCat] = useState(null);
   const [V, setV] = useState(null);
   const [step, setStep] = useState(firstStep);
+  // an old #wizards link opens the builder, which took their place
+  if (/wizards/.test(location.hash) && !buildOf()) history.replaceState(null, '', '#build=start');
   const [build, setBuild] = useState(buildOf); // the step by step builder page, or null for the classic steps
   const buildRef = useRef(build); buildRef.current = build;
   const [tab, setTab] = useState(hashMenu() || null);
@@ -86,7 +88,6 @@ export function App() {
   const [setupOpen, setSetupOpen] = useState(/setup/.test(location.hash));
   const [videoMode, setVideoMode] = useState(/new-video/.test(location.hash) ? 'new' : null);
   const [outputsOpen, setOutputsOpen] = useState(/outputs/.test(location.hash));
-  const [wizOpen, setWizOpen] = useState(/wizards/.test(location.hash));
   // the Vault panel: null when closed, { beat } when open (the B-roll spot it was opened for, or null from the top bar)
   const [vault, setVault] = useState(null);
   const [log, setLog] = useState('');
@@ -152,7 +153,7 @@ export function App() {
       es.addEventListener('error', () => { fetch('/api/state', { cache: 'no-store' }).then(r => { if (r.ok) setOffline(false); }).catch(() => setOffline(true)); });
       es.addEventListener('open', () => { if (isOffline()) { setOffline(false); api('/api/state').then(apply).catch(() => {}); } });
     })();
-    const onHash = () => { const b = buildOf(); if (b) { setBuild(b); setArea('new', false); return; } if (!location.hash || location.hash === '#' || hashArea() === 'new') setBuild(null); const a = hashArea(), m = hashMenu(), st = hashStep(); if (a && a !== 'new') setArea(a, false); else if (m) pickTab(m); else if (st && STEPS.includes(stepOf(st))) go(st, true); else if (a) setArea(a, false); };
+    const onHash = () => { if (/wizards/.test(location.hash) && !buildOf()) history.replaceState(null, '', '#build=start'); const b = buildOf(); if (b) { setBuild(b); setArea('new', false); return; } if (!location.hash || location.hash === '#' || hashArea() === 'new') setBuild(null); const a = hashArea(), m = hashMenu(), st = hashStep(); if (a && a !== 'new') setArea(a, false); else if (m) pickTab(m); else if (st && STEPS.includes(stepOf(st))) go(st, true); else if (a) setArea(a, false); };
     // "/" searches every option: from Picture or Text and graphics it stays there, from anywhere else it opens Picture
     const onKey = e => {
       if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); if (!document.getElementById('filter')) go('picture'); setTimeout(() => document.getElementById('filter')?.focus(), 30); }
@@ -214,7 +215,6 @@ export function App() {
             { id: 'more-open-video', label: 'Past videos', icon: 'film', onClick: () => setVideoMode('open') },
             { id: 'more-setup', label: 'Setup check', icon: 'check', onClick: openSetup },
             { id: 'more-keys', label: 'API keys', icon: 'link', onClick: openKeys },
-            { id: 'more-wizards', label: 'Wizards', hint: 'A guided start', icon: 'spark', onClick: () => setWizOpen(true) },
             { id: 'more-outputs', label: 'Outputs', hint: 'Every render', icon: 'film', onClick: () => setOutputsOpen(true) },
             narrow && { id: 'more-theme', label: theme === 'dark' ? 'Light theme' : 'Dark theme', icon: theme === 'dark' ? 'sun' : 'moon', onClick: () => setTheme(theme === 'dark' ? 'light' : 'dark') },
           ]} />
@@ -266,7 +266,6 @@ export function App() {
       <Keys {...ctx} open={keysOpen} setOpen={setKeysOpen} />
       <NewVideo {...ctx} mode={videoMode} setMode={setVideoMode} />
       <Outputs {...ctx} open={outputsOpen} setOpen={setOutputsOpen} />
-      <Wizards {...ctx} open={wizOpen} setOpen={setWizOpen} />
       <Vault at={vault} close={() => setVault(null)} apply={apply} />
       <StudioOffline onBack={apply} prompt={V.env.restart} />
       <Toast V={V} />

@@ -3,6 +3,7 @@ import * as stylex from '@stylexjs/stylex';
 import { Field, Label, Textarea } from '@headlessui/react';
 import { Fold } from '../../ui.jsx';
 import { Layers } from '../../AllOptions.jsx';
+import { NOTE_LINES } from '../../../../wizards.mjs';
 
 // Step 17: anything else for the agent (saved as plan.notes, which studio_get_state and get_video_plan show), four
 // examples that add a line, the plan so far with Change on each row (opens only that step, then comes back here), and
@@ -16,8 +17,8 @@ const s = stylex.create({
   sec: { fontWeight: 600 },
   fold: { marginTop: 16 },
 });
-// what the old guided starts asked for, as one line each (grow, sell, teach, clean)
-export const NOTE_CHIPS = ['Hook in the first line, short and punchy.', 'End with one clear ask: follow, sign up or buy.', 'Keep every step in, in order. Clear over fast.', 'Keep the whole take, only retakes and fillers out.'];
+// what the old guided starts asked for, one line per goal (grow, sell, teach, clean; kit/studio/wizards.mjs)
+export const NOTE_CHIPS = NOTE_LINES;
 export const MAX_NOTES = 2000;
 export function Notes({ CAT, plan, V, save, busy, rows, onChange, st, appV, patch }) {
   const [text, setText] = useState(plan.notes || ''), saved = useRef(plan.notes || ''), [tab, setTab] = useState(null);

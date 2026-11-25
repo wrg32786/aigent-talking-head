@@ -1,10 +1,11 @@
-// The wizards (1.17.0): three guided starts that set what the steps would, in a few clicks. The page, POST
-// /api/wizard and MCP run_wizard all use these, so a goal means the same output everywhere.
+// The wizards (1.17.0): guided starts that set what the steps would. The page no longer shows them (Phase 7: the
+// builder asks one thing per screen); POST /api/wizard and MCP run_wizard still use these, and a goal also sets the
+// builder plan: its pace and one line in Your notes (the same lines the Your notes step offers as examples).
 export const GOALS = {
-  grow: { label: 'Grow followers', sub: 'One short reel, hook first', out: { format: 'short', kind: 'full', length: 'short', goal: 'organic' } },
-  sell: { label: 'Sell or sign up', sub: 'Short, with 15 s and 30 s ad cuts', out: { format: 'short', kind: 'full', length: 'short', goal: 'ad', adCuts: true } },
-  teach: { label: 'Teach one thing', sub: 'A little longer, every step kept', out: { format: 'short', kind: 'full', length: 'medium', goal: 'organic' } },
-  clean: { label: 'Full clean take', sub: 'Everything, retakes and fillers out', out: { format: 'long', kind: 'full', length: 'long', goal: 'organic' } },
+  grow: { label: 'Grow followers', sub: 'One short reel, hook first', pace: 'lively', note: 'Hook in the first line, short and punchy.', out: { format: 'short', kind: 'full', length: 'short', goal: 'organic' } },
+  sell: { label: 'Sell or sign up', sub: 'Short, with 15 s and 30 s ad cuts', pace: 'high', note: 'End with one clear ask: follow, sign up or buy.', out: { format: 'short', kind: 'full', length: 'short', goal: 'ad', adCuts: true } },
+  teach: { label: 'Teach one thing', sub: 'A little longer, every step kept', pace: 'steady', note: 'Keep every step in, in order. Clear over fast.', out: { format: 'short', kind: 'full', length: 'medium', goal: 'organic' } },
+  clean: { label: 'Full clean take', sub: 'Everything, retakes and fillers out', pace: 'calm', note: 'Keep the whole take, only retakes and fillers out.', out: { format: 'long', kind: 'full', length: 'long', goal: 'organic' } },
 };
 export const WIZARDS = {
   reel: { title: 'Make a reel from a long take', sub: 'Pick the goal and a Look; AI picks the lines; you check it in Review.' },
@@ -12,6 +13,8 @@ export const WIZARDS = {
   clips: { title: 'Clips and ads from one take', sub: 'Several short clips, plus ad cuts if you sell.' },
 };
 export const CLIP_COUNTS = [3, 5, 8];
+// the example lines on Your notes, one per goal, in goal order
+export const NOTE_LINES = Object.values(GOALS).map(g => g.note);
 // what a wizard call asks for, checked: { errs, wizard, goal, look, choose, clips, ads, url }
 export function plan(b = {}, packs = []) {
   const errs = [], w = b.wizard;

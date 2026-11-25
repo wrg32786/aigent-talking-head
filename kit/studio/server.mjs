@@ -46,6 +46,7 @@ import { mount as mountPublish } from './publish-api.mjs';
 import * as SIZES from './sizes.mjs';
 import { mount as mountRefTitles } from './ref-titles.mjs';
 import { mount as mountPlan, planOf } from './wizard/api.mjs';
+import * as VP from './wizard/plan.mjs';
 import * as PREVIEWS from './previews.mjs';
 import * as LIVE from './preview.mjs';
 
@@ -1475,7 +1476,12 @@ async function api(req, res, u) {
     const rel = cutSource(s0, b.path), done = []; let next = null, pending = null, note = null;
     if ((w.wizard !== 'reference') && !rel) return json(res, 400, { error: 'add footage first, on the Start step' });
     const setOut = o => { const r = CUT.normalize(outputOf(C.load()), o); if (r.errs.length) throw new Error(r.errs.join('; ')); update(x => { x.output = r.output; if (!x.cut || x.cut.source !== rel) x.cut = { source: rel, candidates: [], scoredBy: null }; }); };
-    if (w.goal) { setOut(WIZ.GOALS[w.goal].out); done.push(`goal: ${WIZ.GOALS[w.goal].label}`); next = 'look'; }
+    if (w.goal) { setOut(WIZ.GOALS[w.goal].out); done.push(`goal: ${WIZ.GOALS[w.goal].label}`); next = 'look';
+      // the goal is a plan too: its pace (what you made yours stays), and its line in Your notes once
+      const G = WIZ.GOALS[w.goal], s1 = C.load(), cat = C.catalog(), { plan, patch } = VP.pacePatch(planOf(s1, cat), G.pace, s1.videoPlan && s1.videoPlan.pace);
+      plan.notes = plan.notes.includes(G.note) ? plan.notes : ((plan.notes.trim() ? plan.notes.trim() + '\n' : '') + G.note).slice(0, 2000);
+      update(x => { const r = C.applyPatch(x, { ...patch, from: 'assistant' }); if (!r.errs.length) x.videoPlan = VP.normalize(plan); });
+      done.push(`pace: ${VP.PACES[G.pace].label}`); }
     if (w.look) { update(x => { C.applyPatch(x, { pack: w.look }); }); done.push(`look: ${w.look}`); next = 'choose'; }
     if (w.choose) {
       if (!(await linesOf(rel))) { if (!MEDIA.transcript(rel)) startTranscribe(rel, () => findCuts(rel, 'auto').catch(e => console.error(e.message))); pending = 'transcript'; next = 'cut'; note = 'Reading the words of the take first. Use our best lines on Cut when it is ready.'; }

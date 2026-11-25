@@ -104,7 +104,8 @@ export function pacePatch(plan, pace, last = null) {
   if (p.transitions.when !== was.transitionsWhen) p = touch(p, 'transitions.when');
   const next = touch(applyPace(p, pace), 'pace'), P = Object.hasOwn(PACES, next.pace) ? PACES[next.pace] : PACES.look, bs = next.music.beatSync;
   const patch = { transitionsWhen: Array.isArray(next.transitions.ids) && !next.transitions.ids.length ? 'every-cut' : next.transitions.when, music: { energy: next.music.energy }, pace: { tighten: next.advanced.tighten ?? P.tighten, punch: next.presenter.some(x => x.id === 'punch') ? 'on' : 'off' },
-    picks: bs === null ? { 'beatSync:beat-sync': 'clear', 'beatSync:no-beat-sync': 'clear' } : { [`beatSync:${bs ? 'beat-sync' : 'no-beat-sync'}`]: 'allow' } };
+    // with no music there is no beat to cut on, so a pace never asks for beat sync then
+    picks: next.music.bed === 'none' && bs !== false ? {} : bs === null ? { 'beatSync:beat-sync': 'clear', 'beatSync:no-beat-sync': 'clear' } : { [`beatSync:${bs ? 'beat-sync' : 'no-beat-sync'}`]: 'allow' } };
   return { plan: next, patch };
 }
 // The smallest session patch that turns prev into next: picks the two plans set differently, and only the session
@@ -258,7 +259,7 @@ export function toState(plan, cat = null) {
   if (p.graphics.cards !== null) pick('editing', 'cards-auto', p.graphics.cards ? 'allow' : 'deny');
   // no filters: every finish forbidden (the catalog has the list)
   if (Array.isArray(p.filters.ids)) { if (p.filters.ids.length) for (const id of p.filters.ids) pick('finish', id); else for (const id of finishIds(cat)) pick('finish', id, 'deny'); }
-  if (p.music.beatSync !== null) pick('beatSync', p.music.beatSync ? 'beat-sync' : 'no-beat-sync');
+  if (p.music.beatSync === false || (p.music.beatSync === true && p.music.bed !== 'none')) pick('beatSync', p.music.beatSync ? 'beat-sync' : 'no-beat-sync');
   Object.assign(picks, p.advanced.picks);
   return patch;
 }

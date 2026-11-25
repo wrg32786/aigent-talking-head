@@ -1068,7 +1068,7 @@ try {
       ['Studio saved look and title checks in Chrome: no saved look line in a Recreate, the line with one button on Picture and the breakdown after Back to my look, Undo, Check this text with Save (tests/studio-reflook.e2e.mjs)', 'studio-reflook.e2e.mjs'],
       ['Studio Look in Chrome: one row of Looks, the reference card, 9 layers with every option once, REF, LOOK and YOU badges, Music and sounds as one layer, Clear reference as one undo, Save as a Look (tests/studio-look.e2e.mjs)', 'studio-look.e2e.mjs'],
       ['Studio settings that rule out others in Chrome: Single word captions turn off a caption entrance with one line and Undo, greyed tiles say why, one click switches, a Look with no titles, No music (tests/studio-conflicts.e2e.mjs)', 'studio-conflicts.e2e.mjs'],
-      ['Studio agent and review in Chrome: drag to select on whole words, Note for my agent, Ask my agent with the step, Apply on a suggested change, a note on a stretch of the reel, the wizards, light theme and the phone (tests/studio-agent-ux.e2e.mjs)', 'studio-agent-ux.e2e.mjs'],
+      ['Studio agent and review in Chrome: drag to select on whole words, Note for my agent, Ask my agent with the step, Apply on a suggested change, a note on a stretch of the reel, an old #wizards link opens the builder and run_wizard goals set the plan, light theme and the phone (tests/studio-agent-ux.e2e.mjs)', 'studio-agent-ux.e2e.mjs'],
       ['Studio folder fields in Chrome: Browse, the folder list, New folder, Use this folder, Open folder, Reset, the one-line install in Connect agent (tests/studio-folders.e2e.mjs)', 'studio-folders.e2e.mjs'],
       ['Studio polish in Chrome: the top bar fits at five widths, the More menu by keyboard, hints, theme, reduced motion (tests/studio-polish.e2e.mjs)', 'studio-polish.e2e.mjs'],
       ['Studio Post step in Chrome: Connect (Buffer key, R2 host), channels with length limits, drafts by default, post now needs a tick, against mocks (tests/studio-post.e2e.mjs)', 'studio-post.e2e.mjs'],
@@ -1084,7 +1084,7 @@ try {
       ['Studio builder in Chrome: the start screen, Pacing with its zone map and moving strips, the plan and pace saved, on to the classic steps, both themes and a phone (tests/studio-builder.e2e.mjs)', 'studio-builder.e2e.mjs'],
       ['Studio whose look is in use, in Chrome: a saved look with the reference Off says so with one button, the button sets the board from the reference alone, a pick after it is yours with no line (tests/studio-leak.e2e.mjs)', 'studio-leak.e2e.mjs'],
       ['Studio small fixes in Chrome: Close on the chat at every width and the button that brings it back, the switch for hard-to-read words, the vision pass line on a reference (tests/studio-small-fixes.e2e.mjs)', 'studio-small-fixes.e2e.mjs'],
-      ['Studio stopping and the wizards in Chrome: Copy a reference opens its link screen, the Studio stopped bar with Copy for my agent, the wizards say Studio is not running with Try again, both come back when Studio does (tests/studio-offline.e2e.mjs)', 'studio-offline.e2e.mjs'],
+      ['Studio stopping in Chrome: the Studio stopped bar with Copy for my agent, and it goes when Studio comes back (tests/studio-offline.e2e.mjs)', 'studio-offline.e2e.mjs'],
     ];
     const jobs = Math.max(1, +process.env.SMOKE_E2E_JOBS || 2), out = new Array(E2E.length);
     const one = k => new Promise(done => { const t0 = Date.now(), c = spawn(node, [join(dirname(KIT), 'tests', E2E[k][1])], { cwd: dirname(KIT), stdio: ['ignore', 'pipe', 'pipe'], env: process.env });
