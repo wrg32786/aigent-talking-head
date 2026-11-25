@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex';
-import { Switch } from '@headlessui/react';
+import { Field, Label, Switch } from '@headlessui/react';
 
 // An on or off switch with its label (Headless UI Switch), as on the Big titles step.
 const s = stylex.create({
@@ -10,6 +10,6 @@ const s = stylex.create({
   knobOn: { transform: 'translateX(18px)' },
 });
 export function Toggle({ id, checked, onChange, disabled, children }) {
-  return <label {...stylex.props(s.sw)}><Switch checked={checked} id={id} disabled={disabled} onChange={onChange} {...stylex.props(s.track, checked && s.trackOn)}>
-    <span {...stylex.props(s.knob, checked && s.knobOn)} /></Switch><span>{children}</span></label>;
+  return <Field disabled={disabled} {...stylex.props(s.sw)}><Switch checked={checked} id={id} onChange={onChange} {...stylex.props(s.track, checked && s.trackOn)}>
+    <span {...stylex.props(s.knob, checked && s.knobOn)} /></Switch><Label>{children}</Label></Field>;
 }

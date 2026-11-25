@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex';
-import { Switch } from '@headlessui/react';
+import { Toggle } from './Toggle.jsx';
 import { Tiles, itemsOf } from './Tiles.jsx';
 
 // Step 4 (kinetic words only): big title words over you. On or off; when on, how they come in (one or several, taken in
@@ -15,8 +15,7 @@ const s = stylex.create({
 export function Titles({ CAT, step, words, save, busy, setHover }) {
   const t = words.titles, on = t.on !== false;
   return <>
-    <label {...stylex.props(s.sw)}><Switch checked={on} id="build-titles-on" disabled={busy} onChange={v => save({ titles: { on: v ? null : false } })} {...stylex.props(s.track, on && s.trackOn)}>
-      <span {...stylex.props(s.knob, on && s.knobOn)} /></Switch><span>Big title words</span></label>
+    <Toggle id="build-titles-on" checked={on} disabled={busy} onChange={v => save({ titles: { on: v ? null : false } })}>Big title words</Toggle>
     {on && <>
       <section aria-labelledby="build-ti-h"><h3 id="build-ti-h" {...stylex.props(s.h)}>How they come in</h3>
         <Tiles id="build-ti" label="How titles come in" multi items={itemsOf(CAT, ['entrance'])} featured={step.featured} value={t.entrances} allowNone noneLabel="We pick" disabled={busy}

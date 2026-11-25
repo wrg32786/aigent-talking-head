@@ -6375,6 +6375,10 @@
       font-weight: 650;
     }
 
+    .x1xlr1w8 {
+      font-weight: 700;
+    }
+
     .x1gf0zcd {
       grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
     }
@@ -6407,8 +6411,20 @@
       opacity: .8;
     }
 
+    .x5uitqu {
+      outline-color: var(--primary);
+    }
+
     .x1hl8ikr {
       outline-offset: 2px;
+    }
+
+    .x1t137rt {
+      outline-style: none;
+    }
+
+    .x1de99jn {
+      outline-width: 2px;
     }
 
     .x47corl {
@@ -6473,6 +6489,18 @@
 
     .xa9119d {
       z-index: 50;
+    }
+
+    .x1bvvbcr[data-checked] {
+      background-color: var(--primary);
+    }
+
+    .x1u4adua[data-checked] {
+      color: var(--primary-foreground, #fff);
+    }
+
+    .x9v5kkp:focus-visible {
+      outline-style: solid;
     }
   }
 

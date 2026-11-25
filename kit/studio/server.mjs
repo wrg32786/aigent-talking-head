@@ -334,7 +334,13 @@ function renderSteps(s) {
   if (comp.effects.length && env().effectsReady) {
     // presenter effect timing from the builder plan (hook, key moments or the whole video)
     const when = Object.fromEntries(((s.videoPlan && s.videoPlan.presenter) || []).filter(x => x && String(x.id).startsWith('effect:')).map(x => [x.id.slice(7), x.when]));
-    const ch = readChoices(s); fx = C.fxPlan(ch, comp.effects, when);
+    const ch = readChoices(s);
+    // a draft from before sections: tag its beats from the cut as it is now (kit/sections.cjs), so Hook and Key moments work
+    if (Object.values(when).some(w => w !== 'whole') && ch && Array.isArray(ch.beats) && ch.beats.some(b => !b.section)) {
+      try { const SEC = require('../sections.cjs'), SP = require('../spoken.cjs'), b = join(ROOT, 'jobs', s.job, 'build'), cut = JSON.parse(readFileSync(join(b, 'cut.json'), 'utf8'));
+        const tags = SEC.tag(cut, SP.timeline(cut.segs, b)); if (tags.length === ch.beats.length) ch.beats.forEach((x, i) => { x.section = tags[i]; }); } catch (e) { console.error('sections: ' + e.message); }
+    }
+    fx = C.fxPlan(ch, comp.effects, when);
     if (fx.plan.effects.length) { const p = join('jobs', s.job, 'fx.json'); writeFileSync(join(ROOT, p), JSON.stringify(fx.plan, null, 2)); steps.push(['kit/fx.cjs', ['--name', s.job, '--plan', p]]); }
   }
   return { steps, fx, effects: comp.effects };
@@ -1360,7 +1366,7 @@ async function api(req, res, u) {
     if (b.memory === 'light') r.steps[0][1].push('--mask', 'mediapipe');
     if (b.memory === 'anyway') r.steps[0][2] = { ...(r.steps[0][2] || {}), MASK_FORCE: '1' };
     runTask('render', () => [...r.steps, ...xs.steps], () => { const st = C.load(), outputs = C.outputsOf(st); saveSettings(st); const cuts = xs.plan.map(y => ({ ...y, outputs: C.outputsOf({ job: y.job }) })); return { outputs, cuts, plain: xs.plain || [], copiedTo: copyRenders([...outputs, ...cuts.flatMap(y => y.outputs.slice(0, 1))]), fx: r.fx, effects: r.effects }; });
-    return json(res, 202, { ...view(C.load()), exports: fin, plan: xs.plan, fx: r.fx, effectsSkipped: r.effects.length && !r.fx ? 'Effects are not set up on this computer, so this reel renders without them.' : null, ...(r.effects.length && !r.fx ? { fix: ['effects'] } : {}) });
+    return json(res, 202, { ...view(C.load()), exports: fin, plan: xs.plan, fx: r.fx, effectsUnplaced: r.fx && r.fx.unplaced.length ? `Not placed, there was no room in the part of the video you chose: ${r.fx.unplaced.map(x => x.replace(/-/g, ' ')).join(', ')}.` : null, effectsSkipped: r.effects.length && !r.fx ? 'Effects are not set up on this computer, so this reel renders without them.' : null, ...(r.effects.length && !r.fx ? { fix: ['effects'] } : {}) });
   }
   // Edit this reel: the build behind a finished reel back into build/ (kit/snapshots.cjs); the build it replaces is saved
   if (p === '/api/reopen' && M === 'POST') {

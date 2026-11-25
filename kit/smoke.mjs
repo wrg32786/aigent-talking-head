@@ -604,9 +604,10 @@ try {
     if (Math.abs(d - 3.3) > 0.25) fail('reel duration ' + d);
     if (/"keyWords"/.test(dcap)) fail('a draft without --key-words wrote keyWords');
     // key words chosen after the draft reach the render on a rebuild (spec 14.3)
-    run(node, [join(KIT, 'reel.cjs'), '--rebuild', '--jobs', join(work, 'jobs'), '--name', 'smoke-reel', '--mask', 'mediapipe', '--key-words', 'strong'], work);
+    run(node, [join(KIT, 'reel.cjs'), '--rebuild', '--jobs', join(work, 'jobs'), '--name', 'smoke-reel', '--mask', 'mediapipe', '--key-words', 'strong', '--transitions-when', 'hook-cta'], work);
     if (!existsSync(join(work, 'jobs', 'smoke-reel', 'reel-v2.mp4'))) fail('--rebuild did not write reel-v2.mp4');
     if (!/"keyWords": "strong"/.test(readFileSync(join(work, 'jobs', 'smoke-reel', 'build', 'captions.js'), 'utf8'))) fail('--rebuild --key-words strong did not reach captions.js');
+    { const c = JSON.parse(readFileSync(join(work, 'jobs', 'smoke-reel', 'build', 'cut.json'), 'utf8')); if (c.transitionsWhen !== 'hook-cta' || !c.segs.every(x => x.section)) fail('--rebuild --transitions-when hook-cta: cut.json should keep the timing and tag every segment'); }
   });
   // --- Muse edit rules: multi-take picking, zoom punch, kinetic titles, pills, named transitions, sound rules, check, verify
   step('clip.py multi-take: best take per sentence across files (word times given, no Whisper)', () => {

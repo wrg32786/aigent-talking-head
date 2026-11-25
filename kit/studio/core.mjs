@@ -205,7 +205,7 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
     if ('boost' in u) s.boost = u.boost;
     if (u.titles) s.titles = u.titles;
     if (u.keyWords) s.keyWords = u.keyWords;
-    if (u.transitionsWhen) s.transitionsWhen = u.transitionsWhen;
+    if (u.transitionsWhen) { if (u.transitionsWhen === 'every-cut' && !s.transitionsWhen) delete s.transitionsWhen; else s.transitionsWhen = u.transitionsWhen; }
     delete s.lastChange; log.push('undid the last change'); return { errs, log, noop: false };
   }
   if (p.useReferenceLook) {
@@ -506,9 +506,12 @@ export function fxPlan(choices, effects, when = {}) {
   const usable = effects.filter(id => by[id] && !(by[id].required || []).length && !by[id].needsCustomText);
   const skipped = effects.filter(id => !usable.includes(id));
   const beats = (choices && choices.beats || []).filter(b => b.end - b.start >= 1.2);
-  const fits = (b, k, w) => (w === 'hook' ? b.section === 'hook' : w === 'key-moments' ? ['hook', 'cta'].includes(b.section) || !!b.bigPunch : k > 0);
+  const fits = (b, k, w) => (w === 'hook' ? b.section === 'hook' : w === 'cta' ? b.section === 'cta' : w === 'hook-cta' ? ['hook', 'cta'].includes(b.section)
+    : w === 'key-moments' ? ['hook', 'cta'].includes(b.section) || !!b.bigPunch : k > 0);
+  // the narrowest timings first, so an effect for the whole video never takes the only hook beat; all whole = as before
+  const RANK = { hook: 0, cta: 1, 'hook-cta': 2, 'key-moments': 3 }, order = usable.map((id, i) => [id, i]).sort((a, b) => (RANK[when[a[0]]] ?? 9) - (RANK[when[b[0]]] ?? 9) || a[1] - b[1]).map(x => x[0]);
   const out = [], used = new Set(), unplaced = [];
-  for (const id of usable) {
+  for (const id of order) {
     const w = when[id] || 'whole', k = beats.findIndex((b, j) => !used.has(j) && fits(b, j, w));
     if (k < 0) { unplaced.push(id); continue; }
     used.add(k); const b = beats[k], e = by[id], d = Math.min(Math.max(e.duration ? e.duration[0] : 2, 1), b.end - b.start - 0.2);

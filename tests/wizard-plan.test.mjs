@@ -82,6 +82,10 @@ try {
     assert.ok(!reel(b).args.includes('--transitions-when'));
     assert.strictEqual(VP.fromState(a, null, cat).transitions.when, 'topic');
     const calm = VP.pacePatch(VP.normalize({}), 'calm'); assert.strictEqual(calm.patch.transitionsWhen, 'topic');
+    const mine = VP.pacePatch(VP.normalize({ transitions: { ids: ['whip'], when: 'hook-cta' } }), 'high'); assert.strictEqual(mine.patch.transitionsWhen, 'hook-cta', 'a timing set elsewhere stays');
+    const sc = apply(fresh(), { videoPlan: VP.normalize({ transitions: { ids: [], when: 'hook-cta' } }) }); assert.strictEqual(VP.fromState(sc, sc.videoPlan, cat).transitions.when, 'hook-cta');
+    const g = VP.withPart(VP.normalize({ graphics: { agent: false, nameTag: true, numbers: true, stickers: true, cta: true, cards: null }, advanced: { picks: { 'graphic:stat-callout': 'deny' } } }), 'graphics', { cta: false });
+    assert.deepStrictEqual(g.advanced.picks, { 'graphic:stat-callout': 'deny' }, 'turning off the call to action keeps a numbers pick');
   });
   await t('a Between shots, You on screen or Extras choice wins over All options picks it speaks for', () => {
     const base = VP.normalize({ advanced: { picks: { 'transition:film': 'allow', 'effect:lean-in': 'deny', 'graphic:lower-third': 'allow', 'font:anton': 'allow' } } });
@@ -207,7 +211,7 @@ try {
     const p = FL.planFromLook(look, cat);
     assert.ok(VP.validate(p, cat).ok, VP.validate(p, cat).errs.join('; '));
     assert.strictEqual(p.pace, 'lively'); assert.strictEqual(p.words.type, 'captions'); assert.deepStrictEqual(p.words.titles.entrances, ['slam']);
-    assert.deepStrictEqual(p.transitions.ids, ['whip']); assert.deepStrictEqual(p.filters.ids, ['warm']); assert.ok(p.presenter.some(x => x.id === 'behind-head' && x.when === 'hook'));
+    assert.deepStrictEqual(p.transitions.ids, ['whip']); assert.deepStrictEqual(p.filters.ids, ['warm']); assert.ok(p.presenter.some(x => x.id === 'behind-head' && x.when === 'key-moments'));
     assert.strictEqual(FL.planFromLook({ pace: { shotMean: 6 }, music: { present: false } }, cat).music.bed, 'none');
     const tp = VP.fromTemplate({ kind: 'pack', name: 'cinematic' });
     assert.deepStrictEqual(tp.template, { kind: 'pack', name: 'cinematic' }); assert.strictEqual(tp.transitions.ids, null);

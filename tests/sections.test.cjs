@@ -15,7 +15,7 @@ t('the hook runs to the end of the first sentence after 3 s, the CTA from the li
   assert.deepStrictEqual(SEC.windows(c, ['hook']), [[0, 4]]); assert.deepStrictEqual(SEC.windows(c, ['hook', 'cta']), [[0, 4], [10, 12]]);
 });
 t('no words: the first 3 s are the hook, nothing is a CTA', () => {
-  const c = cut(); assert.deepStrictEqual(SEC.tag(c, []), ['hook', 'hook', 'body', 'body', 'body', 'body']);
+  const c = cut(); assert.deepStrictEqual(SEC.tag(c, []), ['hook', 'body', 'body', 'body', 'body', 'body']);
 });
 t('hook and CTA only: named transitions stay on hook and CTA seams, the rest are plain cuts without the shake', () => {
   const c = cut(); SEC.tag(c, words); c.transitionsWhen = 'hook-cta';
@@ -23,8 +23,9 @@ t('hook and CTA only: named transitions stay on hook and CTA seams, the rest are
   assert.deepStrictEqual(c.segs.map(s => s.transition || null), [null, 'whip', 'whip', 'cut', 'cut', 'whip']);
   assert.deepStrictEqual(c.hits.map(h => h[0]), [2, 4, 10]);
 });
-t('topic: transitions only where a new take or a new section starts', () => {
-  const c = cut(); SEC.tag(c, words); c.transitionsWhen = 'topic'; SEC.applyTransitionsWhen(c);
+t('topic: transitions only where another recording or a new section starts (one clip file per segment, as clip.py writes)', () => {
+  const c = cut(); c.segs.forEach((x, i) => { x.file = `clip-00${i}.mp4`; }); SEC.tag(c, words); c.transitionsWhen = 'topic';
+  SEC.applyTransitionsWhen(c, { takeOf: x => (+x.file.slice(5, 8) < 3 ? 'take1.mp4' : 'take2.mp4') });
   assert.deepStrictEqual(c.segs.map(s => s.transition || null), [null, 'cut', 'whip', 'whip', 'cut', 'whip']);
 });
 t('every cut, or no timing, changes nothing; a tightened pause is left as it was', () => {
@@ -33,5 +34,29 @@ t('every cut, or no timing, changes nothing; a tightened pause is left as it was
   assert.strictEqual(JSON.stringify(c), before);
   const j = cut(); j.segs[3].jump = true; delete j.segs[3].transition; SEC.tag(j, words); j.transitionsWhen = 'hook-cta'; SEC.applyTransitionsWhen(j);
   assert.strictEqual(j.segs[3].transition, undefined);
+});
+t('a later timing brings back what an earlier one took away: transitions and shakes', () => {
+  const c = cut(); c.segs[3].transition = 'film'; SEC.tag(c, words); const before = JSON.stringify(c);
+  c.transitionsWhen = 'hook-cta'; SEC.applyTransitionsWhen(c); assert.strictEqual(c.segs[3].transition, 'cut'); assert.ok(!c.hits.some(h => h[0] === 6));
+  c.transitionsWhen = 'topic'; SEC.applyTransitionsWhen(c, { takeOf: x => x.file });
+  assert.deepStrictEqual(c.segs.map(s => s.transition || null), [null, 'cut', 'whip', 'film', 'cut', 'whip']);
+  c.transitionsWhen = 'every-cut'; SEC.applyTransitionsWhen(c); delete c.transitionsWhen;
+  assert.strictEqual(JSON.stringify(c), before, 'every cut is the draft again');
+});
+t('seams you set yourself, a tightened pause and a recreated seam keep their transition', () => {
+  const c = cut(); c.edited = { transitions: [3] }; c.segs[4].recut = true; SEC.tag(c, words); c.transitionsWhen = 'hook-cta'; SEC.applyTransitionsWhen(c);
+  assert.deepStrictEqual(c.segs.map(s => s.transition || null), [null, 'whip', 'whip', 'whip', 'whip', 'whip']);
+});
+t('a long segment: the CTA it holds is still found, and the hook does not swallow it', () => {
+  const c = { segs: [{ file: 'a', in: 0, out: 4 }, { file: 'a', in: 4, out: 16 }] };
+  const ws = [...W(0.1, 'Here is the thing.'), ...W(3.5, 'It works on any phone.'), ...W(13, 'Follow for part two.')];
+  assert.deepStrictEqual(SEC.tag(c, ws), ['hook', 'cta']);
+  const d = { segs: [{ file: 'a', in: 0, out: 2.9 }, { file: 'a', in: 2.9, out: 14 }, { file: 'a', in: 14, out: 16 }] };
+  assert.deepStrictEqual(SEC.tag(d, ws), ['hook', 'body', 'cta']);
+});
+t('a call to action asks: "this will save you hours" is not one, "check out the link" and "follow" are', () => {
+  assert.strictEqual(SEC.bounds([...W(0, 'Build it once.'), ...W(4, 'This will save you hours.'), ...W(6, 'That is it.')], 8).ctaStart, null);
+  assert.strictEqual(SEC.bounds([...W(0, 'Build it once.'), ...W(4, 'Check out the link below.')], 8).ctaStart, 4);
+  assert.strictEqual(SEC.bounds([...W(0, 'Build it once.'), ...W(4, 'If you want more, follow me.')], 8).ctaStart, 4);
 });
 console.log(`\nsections: ${n} tests passed`);

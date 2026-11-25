@@ -136,11 +136,18 @@ const VALUED = new Set(['style-look', 'key-words', 'transitions-when', 'motion',
 // transitions only on the seams it names (every-cut, topic, hook-cta); the rest become plain hard cuts. The timing is
 // kept in cut.json (transitionsWhen), so a rebuild applies it again after any lock.
 function sectionsPass(build, cut, { always = false } = {}) {
-  const SEC = require('./sections.cjs'), tw = opt('transitions-when');
+  const SEC = require('./sections.cjs'), tw = opt('transitions-when'), segs = cut.segs || [];
   if (tw) { if (!SEC.WHEN.includes(tw)) die(`--transitions-when must be one of ${SEC.WHEN.join(', ')}`); if (tw === 'every-cut') delete cut.transitionsWhen; else cut.transitionsWhen = tw; }
-  if (!always && !cut.transitionsWhen && !(cut.segs || []).some(x => x.section)) return false;
-  SEC.tag(cut, require('./spoken.cjs').timeline(cut.segs, build));
-  const n = SEC.applyTransitionsWhen(cut);
+  const held = segs.some(x => 'heldTransition' in x) || Array.isArray(cut.heldHits);
+  if (!always && !cut.transitionsWhen && !held && !segs.some(x => x.section)) return false;
+  const words = require('./spoken.cjs').timeline(segs, build);
+  // no word times (an edited job whose clips moved): the tags it had stay
+  if (words.length || !segs.some(x => x.section)) SEC.tag(cut, words);
+  // the recording each piece comes from (clips.json "take" next to the clip), for "topic changes only"
+  const cache = {}, takeOf = sg => { const f = path.resolve(build, sg.file || ''), cj = path.join(path.dirname(f), 'clips.json');
+    if (!(cj in cache)) { try { cache[cj] = JSON.parse(fs.readFileSync(cj, 'utf8')).clips || []; } catch { cache[cj] = []; } }
+    const c = cache[cj].find(c => path.basename(c.file || '') === path.basename(f)); return c && c.take ? c.take : null; };
+  const n = SEC.applyTransitionsWhen(cut, { takeOf, window: Math.max(0.15, B.windowOf ? +B.windowOf(cut) || 0 : 0) });
   if (n) console.log(`transitions ${cut.transitionsWhen.replace('-', ' and ')} only: ${n} seam${n === 1 ? '' : 's'} made a plain cut`);
   return true;
 }
@@ -843,6 +850,8 @@ if (!flag('rebuild')) {
   // theme's hero words, stickers, number tiles and cards, unless you named a theme yourself
   const accent = recipe && !opt('theme') ? RC.accentFor(preset) : null;
   if (accent) { RC.writeAccent(build, accent); console.log(`theme: ${path.basename(th, '.js')}, accent ${accent} from the reference`); }
+  // sections and the transition timing, before the plan and match reports read the cut
+  { const cutF = path.join(build, 'cut.json'), cj = JSON.parse(fs.readFileSync(cutF, 'utf8')); if (sectionsPass(build, cj, { always: true })) fs.writeFileSync(cutF, JSON.stringify(cj, null, 1)); }
   // build/plan.json: what this draft took from the recipe, for other tools (kit/recreate.cjs; docs/reel-md.md)
   if (recipe) {
     const cutNow = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8')), capsNow = R.readCaptions(path.join(build, 'captions.js'));
@@ -854,7 +863,6 @@ if (!flag('rebuild')) {
       console.log(FID.line(m));
     } else FID.drop(build);
   } else { RC.dropPlan(build); FID.drop(build); }
-  { const cutF = path.join(build, 'cut.json'), cj = JSON.parse(fs.readFileSync(cutF, 'utf8')); if (sectionsPass(build, cj, { always: true })) fs.writeFileSync(cutF, JSON.stringify(cj, null, 1)); }
   // what was picked, per beat, and why: jobs/<name>/choices.json to edit (kit/choices.cjs)
   try {
     const x = CH.explain(build);
@@ -934,7 +942,9 @@ try { sh(process.execPath, [path.join(KIT, 'check.mjs'), build, '--warn-only'], 
 // base.mp4 (the graded picture alone, BASEONLY) is made once per picture: the face zone and the person mask both read it,
 // and a rebuild that only changes captions, titles, sounds or layers reuses it (base.sig: the cut without those keys)
 const LAYER_KEYS = new Set(['overlay', 'titles', 'mask', 'maskModel', 'person', 'panels', 'headMask', 'sfx', 'sfxHits', 'sfxMap', 'sfxCap', 'bed', 'bedStart', 'bedVol', 'bedNoFade', 'bedFadeOut', 'export', 'behindMax', 'maskClear']);
-const baseSig = () => { const c = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8')); const pic = Object.fromEntries(Object.entries(c).filter(([k]) => !LAYER_KEYS.has(k)));
+const baseSig = () => { const c = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8')); const pic = Object.fromEntries(Object.entries(c).filter(([k]) => !LAYER_KEYS.has(k) && !['transitionsWhen', 'heldHits'].includes(k)));
+  // section tags and what a transition timing kept aside are notes, not picture (the transitions they change are)
+  if (Array.isArray(pic.segs)) pic.segs = pic.segs.map(({ section, heldTransition, ...x }) => x);
   const files = [...new Set([...(c.segs || []), ...(c.inserts || [])].map(s => s.file).filter(Boolean))].map(f => { try { const st = fs.statSync(path.resolve(build, f)); return [f, st.size, Math.round(st.mtimeMs)]; } catch { return [f]; } });
   return require('crypto').createHash('sha1').update(JSON.stringify([pic, files])).digest('hex'); };
 const ensureBase = () => { const bf = path.join(build, 'base.mp4'), sf = path.join(build, 'base.sig'), sig = baseSig();

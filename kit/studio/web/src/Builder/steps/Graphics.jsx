@@ -11,7 +11,7 @@ function Row({ id, label, line, checked, onChange, disabled }) {
 export function Graphics({ plan, save, busy }) {
   const g = plan.graphics;
   return <>
-    <Row id="agent" label="Let the agent choose" line="We add what fits what you say" checked={g.agent} disabled={busy} onChange={agent => save({ agent })} />
+    <Row id="agent" label="Let the agent choose" line="We add what fits what you say" checked={g.agent} disabled={busy} onChange={agent => save(agent ? { agent, cards: null } : { agent })} />
     {!g.agent && <div {...stylex.props(s.list)} role="group" aria-label="Kinds of graphics">
       {KINDS.map(([k, label, line]) => <Row key={k} id={k} label={label} line={line} checked={k === 'cards' ? g.cards !== false : g[k]} disabled={busy}
         onChange={on => save({ [k]: on })} />)}

@@ -95,7 +95,7 @@ export function Render({ CAT, V, s, apply, patch, hidden, go, run, openOutputs, 
   // the numbers and the ways out, shown here: titles in front, the lighter mask, or try anyway
   const doRender = memory => { run.clear(); setMem(null);
     fetch('/api/render', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(memory ? { memory } : {}) })
-      .then(async r => { const j = await r.json().catch(() => ({})); if (r.status === 409 && j.memory) return setMem(j.memory); if (!r.ok) return toast(j.error || `request failed (${r.status})`, false, j.fix); apply(j); if (j.effectsSkipped) toast(j.effectsSkipped, false, j.fix); })
+      .then(async r => { const j = await r.json().catch(() => ({})); if (r.status === 409 && j.memory) return setMem(j.memory); if (!r.ok) return toast(j.error || `request failed (${r.status})`, false, j.fix); apply(j); if (j.effectsSkipped) toast(j.effectsSkipped, false, j.fix); else if (j.effectsUnplaced) toast(j.effectsUnplaced, false); })
       .catch(e => toast(String(e.message || e))); };
   const bites = useBites(V, s);
   const reopen = o => api('/api/reopen', { reel: o }).then(j => { apply(j); run.loadChoices(); toast(`${o.split('/').pop()} is back in the editor. Render makes the next version.`, true); }).catch(() => {});
