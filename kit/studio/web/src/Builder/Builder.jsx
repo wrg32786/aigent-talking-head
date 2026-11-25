@@ -20,6 +20,7 @@ import { Presenter } from './steps/Presenter.jsx';
 import { Graphics } from './steps/Graphics.jsx';
 import { Filters, FilterTiming, FILTER_SAYS } from './steps/Filters.jsx';
 import { Music, MUSIC_SAYS } from './steps/Music.jsx';
+import { Content, CONTENT_SAYS } from './steps/Content.jsx';
 import { Notes } from './steps/Notes.jsx';
 import { Make } from './steps/Make.jsx';
 
@@ -27,10 +28,10 @@ import { Make } from './steps/Make.jsx';
 // { pace } or { words }: the server reads the plan from the session as it is right then and changes only the picks
 // that choice moves, so a choice made on a classic step, in the chat or by an agent is never written over. Past the
 // last step, Make it starts the draft and Review shows it.
-const STEPS = { pace: null, captionType: CaptionType, captionLook: CaptionLook, wordsIn: WordsIn, titles: Titles, place: Place, colors: Colors, fonts: Fonts, keyWords: KeyWords, wordsPreview: WordsPreview, transitions: Transitions, presenter: Presenter, graphics: Graphics, filters: Filters, filterTiming: FilterTiming, music: Music, notes: Notes, make: Make };
+const STEPS = { pace: null, captionType: CaptionType, captionLook: CaptionLook, wordsIn: WordsIn, titles: Titles, place: Place, colors: Colors, fonts: Fonts, keyWords: KeyWords, wordsPreview: WordsPreview, transitions: Transitions, presenter: Presenter, graphics: Graphics, filters: Filters, filterTiming: FilterTiming, content: Content, music: Music, notes: Notes, make: Make };
 export const BUILT = Object.keys(STEPS);   // builder steps with their own screen so far
-const READY = ['pace', 'words', 'shots', 'you', 'extras', 'look', 'sound', 'finish']; // sections that can be opened
-const PARTS = ['transitions', 'presenter', 'graphics', 'filters', 'music', 'notes'];  // steps saved as { <part>: value }
+const READY = ['pace', 'words', 'shots', 'you', 'extras', 'look', 'content', 'sound', 'finish']; // sections that can be opened
+const PARTS = ['transitions', 'presenter', 'graphics', 'filters', 'content', 'music', 'notes'];  // steps saved as { <part>: value }
 const SAVES = { filterTiming: 'filters' }; // a step that saves under another step's part
 const LIVE = ['captionLook', 'wordsIn', 'titles', 'place', 'colors', 'fonts', 'keyWords']; // steps with the live preview beside them
 export const buildOf = () => { const m = location.hash.match(/build=([A-Za-z]+)/); return m ? m[1] : null; };
@@ -60,9 +61,9 @@ export function Builder({ s: st, CAT, V: appV, apply, patch, go, page, setPage }
   // the latest of each is sent) and are sent in order. Returns when the queue is empty.
   const [shown, setShown] = useState(null), queue = useRef([]), drain = useRef(null);
   const kindOf = b => Object.keys(b)[0];
-  // two choices of the same kind in a row become one: words merge, transitions, graphics, filters and music fields merge,
+  // two choices of the same kind in a row become one: words merge, transitions, graphics, filters, content and music fields merge,
   // the rest (pace, presenter, notes) replace
-  const join = (k, a, b) => (k === 'words' ? mergeWords(a || {}, b) : ['transitions', 'graphics', 'filters', 'music'].includes(k) ? { ...(a || {}), ...b } : b);
+  const join = (k, a, b) => (k === 'words' ? mergeWords(a || {}, b) : ['transitions', 'graphics', 'filters', 'content', 'music'].includes(k) ? { ...(a || {}), ...b } : b);
   const send = body => {
     const q = queue.current, last = q[q.length - 1], k = kindOf(body);
     if (last && kindOf(last) === k) q[q.length - 1] = { [k]: join(k, last[k], body[k]) }; else q.push(body);
@@ -97,6 +98,7 @@ export function Builder({ s: st, CAT, V: appV, apply, patch, go, page, setPage }
     : step.id === 'presenter' ? 'Pick none, one or several, and when each one plays.' : step.id === 'graphics' ? (now.graphics.agent ? 'We add the graphics that fit what you say.' : 'Only the kinds you leave on can show up.')
     : step.id === 'filters' ? (now.filters.ids === null ? 'The look picks the filters.' : !now.filters.ids.length ? 'No filter, the picture as it is.' : FILTER_SAYS[now.filters.when] || '')
     : step.id === 'filterTiming' ? ((now.filters.ids || []).length ? FILTER_SAYS[now.filters.when] || '' : '')
+    : step.id === 'content' ? (now.content.repoFeature ? CONTENT_SAYS[now.content.takeovers] || '' : 'A regular video, just you.')
     : step.id === 'music' ? (MUSIC_SAYS[now.music.bed] || 'This track under your voice.')
     : ['wordsPreview', 'notes', 'make'].includes(step.id) ? '' : (rows.find(r => r.step === 'captionType') || {}).text || '';
   const pending = (view.pending || []).filter(x => x.field.startsWith(step.id === 'place' ? 'words.place' : step.id === 'colors' ? 'words.colors' : step.id === 'keyWords' ? 'words.keyWords' : step.id === 'presenter' ? 'presenter.' : '\u0000'));
@@ -112,7 +114,7 @@ export function Builder({ s: st, CAT, V: appV, apply, patch, go, page, setPage }
   // Change on Filters goes on to When filters show before coming back
   const back = ret && step.id !== ret && !(step.id === 'filters' && (now.filters.ids || []).length), goOn = id => open(back ? ret : id, !back && !!ret);
   const lock = step.lock, next = step.id === 'make' ? null : lock ? () => send({ words: {} }).then(ok => { if (ok) (back || nextStep ? goOn(nextStep && nextStep.id) : toClassic()); }) : back || nextStep ? () => goOn(nextStep && nextStep.id) : toClassic;
-  const doneSecs = [['pace', 'pace'], ['words', 'words'], ['transitions', 'shots'], ['presenter', 'you'], ['graphics', 'extras'], ['filters', 'look'], ['music', 'sound'], ['notes', 'finish']].filter(([f]) => plan.touched.includes(f)).map(([, sec]) => sec);
+  const doneSecs = [['pace', 'pace'], ['words', 'words'], ['transitions', 'shots'], ['presenter', 'you'], ['graphics', 'extras'], ['filters', 'look'], ['content', 'content'], ['music', 'sound'], ['notes', 'finish']].filter(([f]) => plan.touched.includes(f)).map(([, sec]) => sec);
   return <div id="builder" {...stylex.props(s.wrap)}>
     <SectionBar sections={steps.sections} current={step.section} done={doneSecs} ready={READY} onOpen={id => open(visible.find(x => x.section === id).id)} />
     <StepFrame step={step} count={`${sec.label}, ${k} of ${inSec.length}`} does={does} back={() => open(prevStep ? prevStep.id : 'start')} headRef={head} face={step.id === 'place'}

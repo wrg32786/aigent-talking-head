@@ -7,6 +7,7 @@
 //   (Save as a template, Make my video); the old links still work
 // - the Template Library (phase 8): on Teardowns your saved template with Rename, Duplicate and Delete (asks first),
 //   the starters read only; New video's Use a template starts the video from one and opens Your notes
+// - Repo or tool feature (phase 9): links checked before they are saved, full screen moments
 // - no terminal text, both themes, phone width
 // Needs Chrome. Run: node tests/studio-builder.e2e.mjs [--shots <dir>]
 import assert from 'assert';
@@ -60,8 +61,7 @@ try {
     assert.ok(await pg.$('#build-pace svg[role="img"]'), 'the zone map');
     assert.deepStrictEqual(await pg.$$eval('#build-paces [data-pace]', e => e.map(x => x.dataset.pace)), ['look', 'calm', 'steady', 'lively', 'high']);
     assert.match(await pg.textContent('#build-count'), /^Pace, 1 of 1$/);
-    assert.ok(await pg.$('#build-sections [data-section="content"][disabled]'), 'sections not built yet say Coming soon');
-    assert.match(await pg.innerText('#build-sections [data-section="content"]'), /Soon/, 'and say so where you can see it');
+    assert.strictEqual(await pg.$('#build-sections [data-section][disabled]'), null, 'every section opens (Content came in phase 9)');
     for (const id of ['calm', 'steady', 'lively', 'high']) assert.match(await pg.getAttribute(`#build-paces [data-pace="${id}"] img`, 'src'), new RegExp(`paces/${id}\\.webp$`));
   });
 
@@ -159,6 +159,25 @@ try {
     assert.match(await pg.textContent('#build-does'), /first lines/);
     const cv = await api('/api/state'); assert.ok(cv.compose.args.join(' ').includes('--finish-when hook'), 'the hook-only filter reaches the draft');
     await shot(pg, 'builder-filter-timing.png');
+    // Repo or tool feature (phase 9): off by default; a link that is not a repo is said at once and never saved
+    await pg.click('#build-next'); await pg.waitForSelector('#build-repo-on');
+    assert.match(await pg.textContent('#build-does'), /just you/);
+    await pg.click('#build-repo-on'); await pg.waitForSelector('#build-repo-0');
+    assert.ok(await pg.isVisible('#build-repo-need'), 'asks for a link first');
+    await pg.fill('#build-repo-0', 'https://gitlab.com/a/b'); assert.ok(!(await pg.$('#build-repo-0-err')), 'no error while typing'); await pg.click('#build-repo-layout');
+    await pg.waitForSelector('#build-repo-0-err'); assert.strictEqual((await api('/api/video-plan')).plan.content.repoFeature, false, 'a bad link is never saved');
+    await pg.fill('#build-repo-0', 'https://github.com/wrg32786/aigent-talking-head'); await pg.click('#build-repo-layout');
+    await pg.waitForFunction(async () => (await (await fetch('/api/video-plan')).json()).plan.content.repoFeature === true);
+    await pg.click('#build-repo-take [data-opt="off"]'); await pg.waitForFunction(async () => (await (await fetch('/api/video-plan')).json()).plan.content.takeovers === 'off');
+    assert.match(await pg.textContent('#build-does'), /Split on every line in the middle/);
+    await pg.fill('#build-repo-example', 'not a link'); await pg.press('#build-repo-example', 'Enter'); await pg.waitForSelector('#build-repo-example-err');
+    await pg.fill('#build-repo-example', 'https://www.youtube.com/watch?v=abc'); await pg.press('#build-repo-example', 'Enter');
+    await pg.waitForFunction(async () => (await (await fetch('/api/video-plan')).json()).plan.content.example === 'https://www.youtube.com/watch?v=abc');
+    await noCmd(pg, 'Repo or tool feature'); await shot(pg, 'builder-repo.png');
+    // clearing the only link takes the repos out of the plan (no old repo renders)
+    await pg.fill('#build-repo-0', ''); await pg.press('#build-repo-0', 'Enter');
+    await pg.waitForFunction(async () => { const c = (await (await fetch('/api/video-plan')).json()).plan.content; return c.repoFeature === false && !c.repos.length; });
+    await pg.click('#build-repo-on'); await pg.waitForFunction(async () => (await (await fetch('/api/video-plan')).json()).plan.content.repoFeature === false);
     await pg.click('#build-next'); await pg.waitForSelector('#build-mu');
     assert.ok(await pg.$('#build-mu-beds .snd-tile'), 'tracks to hear');
     await pg.click('#build-mu [data-opt="none"]');

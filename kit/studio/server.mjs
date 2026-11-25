@@ -268,7 +268,16 @@ function refWait(s) {
   const what = it ? (it.status === 'tearing' ? 'being broken down' : 'downloading') : r.status === 'running' ? 'being broken down' : null;
   return what ? `The reference is still ${what}. ${r.mode === 'look' ? 'Copy the look' : 'Recreate'} needs it: draft again when it is ready, or set the reference to Off to draft without it.` : null;
 }
+// repo or tool feature mode on the draft too (kit/repo-broll.mjs), after the reel has written cut.json, so Review's
+// draft already holds the split and full screen spots; the render applies it again on the cut as it is then
+const repoOn = s => !!(s.videoPlan && s.videoPlan.content && s.videoPlan.content.repoFeature);
+const repoStep = s => ['kit/repo-broll.mjs', ['apply', '--name', s.job, '--plan', join('jobs', s.job, 'build', 'video-plan.json')]];
 function draftSteps(s) {
+  const d = draftSteps0(s);
+  if (repoOn(s)) d.steps = [...d.steps, repoStep(s)];
+  return d;
+}
+function draftSteps0(s) {
   if (!s.job) throw Object.assign(new Error('name the job first'), { code: 400 });
   if (!s.footage.length && !s.clips) throw Object.assign(new Error('add footage first'), { code: 400 });
   const wait = refWait(s); if (wait) throw Object.assign(new Error(wait), { code: 409 });
@@ -316,7 +325,9 @@ function startDraft(d, done) {
 }
 // the builder plan beside the draft, for the agent and the plan check (docs/specs/studio-builder.md section 10)
 function writePlanFile(s) {
-  if (!s.job || !s.videoPlan) return;
+  if (!s.job) return;
+  // no plan any more: its file goes too, so nothing reads an old one (the repo step then takes its inserts out)
+  if (!s.videoPlan) { try { rmSync(join(ROOT, 'jobs', s.job, 'build', 'video-plan.json'), { force: true }); } catch {} return; }
   try { const d = join(ROOT, 'jobs', s.job, 'build'); mkdirSync(d, { recursive: true }); writeFileSync(join(d, 'video-plan.json'), JSON.stringify(planOf(s, C.catalog()), null, 1)); } catch (e) { console.error(e.message); }
 }
 function renderSteps(s) {
@@ -333,6 +344,11 @@ function renderSteps(s) {
   // the b-roll lane goes into cut.json first (kit/studio/broll-run.mjs), with credits.txt for the clips it uses
   const bp = BRL.plan(s), steps = [];
   if (bp) { const f = join('jobs', s.job, 'broll.json'); writeFileSync(join(ROOT, f), JSON.stringify(bp, null, 1)); steps.push(['kit/studio/broll-run.mjs', ['apply', '--name', s.job, '--plan', f]]); }
+  // repo or tool feature mode (kit/repo-broll.mjs): the README's pictures as split and full screen b-roll, after the
+  // lane so a spot it uses keeps its clip; it also clears its own inserts when the mode is turned off
+  // (with no plan any more, it still runs when cut.json holds repo spots, to take them out)
+  const hasRepo = () => { try { const c = JSON.parse(readFileSync(join(ROOT, 'jobs', s.job, 'build', 'cut.json'), 'utf8')); return (c.inserts || []).some(x => x.repo) || !!c.repoTakeovers; } catch { return false; } };
+  if (s.videoPlan || hasRepo()) { writePlanFile(s); steps.push(repoStep(s)); }
   steps.push([process.env.STUDIO_REEL || 'kit/reel.cjs', args, { STUDIO_DRAFT_KEY: draftKey(s), STUDIO_FOOTAGE_KEY: C.footageKey(s) }]);
   let fx = null;
   if (comp.effects.length && env().effectsReady) {

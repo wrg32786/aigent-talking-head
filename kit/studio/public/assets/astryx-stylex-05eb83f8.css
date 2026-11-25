@@ -6077,6 +6077,10 @@
       border-color: var(--border);
     }
 
+    .x65an5p {
+      border-color: var(--danger, #e5484d);
+    }
+
     .xnu7srt {
       border-color: var(--primary);
     }
@@ -6623,6 +6627,10 @@
 
     .x14vqqas {
       margin-top: 12px;
+    }
+
+    .x1hmvnq2 {
+      margin-top: 14px;
     }
 
     .xw7yly9 {
