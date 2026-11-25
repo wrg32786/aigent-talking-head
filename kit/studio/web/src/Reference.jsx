@@ -12,7 +12,8 @@ import { RefTitles } from './RefTitles.jsx';
 
 export function Reference({ CAT, V, s, apply, patch }) {
   const r = s.reference, env = V.env, q = r.queue || [], t = env.tools || {};
-  const [urls, setUrls] = useState('');
+  // a link handed over from the builder (Content: Example video) waits in the box, ready to add
+  const [urls, setUrls] = useState(() => { try { const v = sessionStorage.getItem('ath-ref-prefill') || ''; sessionStorage.removeItem('ath-ref-prefill'); return v; } catch { return ''; } });
   const ta = useRef(null), fileIn = useRef(null);
   const running = V.task && V.task.status === 'running';
   const addLinks = text => {

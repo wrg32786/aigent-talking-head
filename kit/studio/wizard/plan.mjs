@@ -140,6 +140,8 @@ export function withWords(plan, words) {
 }
 // a builder step's Between shots, You on screen or Extras choice laid over the plan: transitions and graphics change
 // only the fields given, presenter is the whole list. A choice here wins over All options picks it speaks for.
+// a public GitHub repo link: https://github.com/owner/repo (never . or .. as a name); shared with the Content step
+export const REPO_RE = /^https:\/\/github\.com\/(?!\.\.?\/)[\w.-]+\/(?!\.\.?\/?$)[\w.-]+?(?:\.git)?\/?$/;
 export const PARTS = ['transitions', 'presenter', 'graphics', 'filters', 'content', 'music', 'notes'];
 export function withPart(plan, part, value) {
   const p = normalize(plan), before = clone(p);
@@ -222,7 +224,7 @@ export function validate(plan, cat = null) {
   need(FILTER_WHEN.includes(p.filters.when), `When filters show: ${FILTER_WHEN.join(', ')}.`);
   const c = p.content;
   need(typeof c.repoFeature === 'boolean', 'Repo feature: on or off.');
-  need(Array.isArray(c.repos) && c.repos.length <= 3 && c.repos.every(u => /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/?$/.test(u)), 'Repos: up to 3 links like https://github.com/owner/repo.');
+  need(Array.isArray(c.repos) && c.repos.length <= 3 && c.repos.every(u => REPO_RE.test(u)), 'Repos: up to 3 links like https://github.com/owner/repo.');
   if (c.repoFeature) need(c.repos.length > 0, 'Repo feature: add at least one repo link.');
   need(['split'].includes(c.layout) && ['auto', 'off'].includes(c.takeovers), 'Repo feature: layout split, takeovers auto or off.');
   need(c.example === null || (typeof c.example === 'string' && /^https?:\/\/\S+$/.test(c.example) && c.example.length <= 500), 'Example video: a link, or leave it empty.');

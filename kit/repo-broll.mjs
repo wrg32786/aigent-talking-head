@@ -4,20 +4,24 @@
 //
 // fetch: the README (GitHub's public API, default branch) and its pictures and videos in the order they appear, with
 // the heading each sits under and its alt text. Badges, tiny logos, SVGs and anything that is not a picture or a video
-// are left out. They land in assets/web/<owner>-<repo>/ (gitignored) with meta.json. With nothing usable, the repo page
-// is captured instead (kit/capture.mjs: the top of the README). The repo's name, stars and description are kept as its
-// header card (meta.header) and its social preview picture leads.
+// are left out; a GIF becomes a looping MP4 and an animated WebP is skipped. They land in assets/web/<owner>--<repo>/
+// (gitignored) with meta.json. A failed fetch is not cached. With nothing usable, the repo page is captured instead
+// (kit/capture.mjs: the top of the README). The repo's name, stars and description are kept in meta.header; the
+// picture shown for them is GitHub's social preview card, which leads.
 //
-// Network rules (spec 14.10, stricter than capture.mjs): http(s) only; every URL and every redirect hop is checked by
-// DNS and the connection is pinned to the address that was checked (no private, loopback or link-local address, no
-// .local or localhost name); no cookies and no login are sent; at most 25 MB per file; pictures and videos only (and
-// the README and repo facts as text). Nothing is sent anywhere else.
+// Network rules for the fetches made here (spec 14.10): http(s) only, no logins in links; every URL and every redirect
+// hop is checked (an IP address in the link, IPv6 included, or each DNS answer: only public addresses, no .local or
+// localhost name) and the connection uses the address that was checked; no cookies are sent; at most 25 MB per file,
+// 30 tries per repo and 60 s per file; pictures and videos only (and the README and repo facts as text). The page
+// capture fallback is kit/capture.mjs, which uses its own, simpler public-page checks.
 //
 // apply: the plan's layout for each line of what you say. Split (repo on top, you below, kit/split.cjs "top", or the
 // framed cards "frame" when Frame breakout is picked) on the body; the repo full screen on a line that points at it
 // ("look at this", "right here") or names a matched heading; you full screen on the hook, the punch lines and the CTA.
-// Takeovers off: Split on the whole body. Captions sit in the seam band (split.cjs capY), never on the face.
-import { createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, statSync } from 'fs';
+// Takeovers off: Split on every body line, you full screen on the hook and the CTA. Short gaps are held over so you
+// don't flash back. Captions follow split.cjs's own placement (as with any split b-roll).
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs';
+import { execFileSync } from 'child_process';
 import { lookup as dnsLookup } from 'dns';
 import { isIP } from 'net';
 import http from 'http';
@@ -29,19 +33,29 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 export const MAX_BYTES = 25 * 1024 * 1024;
-export const REPO_RE = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/;
-export const parseRepo = u => { const m = String(u || '').trim().match(REPO_RE); return m && !['.', '..'].includes(m[1]) && !['.', '..'].includes(m[2]) ? { owner: m[1], repo: m[2], url: `https://github.com/${m[1]}/${m[2]}` } : null; };
+const RE = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/;
+export const parseRepo = u => { const m = String(u || '').trim().match(RE); return m && !['.', '..'].includes(m[1]) && !['.', '..'].includes(m[2]) ? { owner: m[1], repo: m[2], url: `https://github.com/${m[1]}/${m[2]}` } : null; };
 export const assetsRoot = () => process.env.ATH_ASSETS || join(ROOT, 'assets', 'web');
-export const dirFor = r => join(assetsRoot(), `${r.owner}-${r.repo}`.toLowerCase().replace(/[^a-z0-9.-]+/g, '-'));
+// owner--repo (GitHub names never hold two hyphens in a row at the owner's end, and meta.json is checked too)
+export const dirFor = r => join(assetsRoot(), `${r.owner}--${r.repo}`.toLowerCase().replace(/[^a-z0-9.-]+/g, '-'));
 
 // ---------- the network ----------
 // private, loopback, link-local, carrier-grade NAT, multicast and other non-public addresses (as capture.mjs)
 export function privateIp(ip) {
   if (isIP(ip) === 4) { const [a, b] = ip.split('.').map(Number); return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || a >= 224; }
-  if (isIP(ip) === 6) { const x = ip.toLowerCase(); if (x.startsWith('::ffff:')) return privateIp(x.slice(7)); return x === '::' || x === '::1' || /^f[cd]/.test(x) || /^fe[89ab]/.test(x) || /^ff/.test(x); }
+  // IPv6: only global unicast (2000::/3), less 6to4 (2002::/16), Teredo (2001::/32) and documentation (2001:db8::/32);
+  // an IPv4-mapped address is judged as IPv4. NAT64, site-local, unique-local and the rest count as private.
+  if (isIP(ip) === 6) {
+    const x = ip.toLowerCase().replace(/^\[|\]$/g, ''), m = x.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/); if (m) return privateIp(m[1]);
+    const mh = x.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/); if (mh) { const [p, q] = [parseInt(mh[1], 16), parseInt(mh[2], 16)]; return privateIp(`${p >> 8}.${p & 255}.${q >> 8}.${q & 255}`); }
+    const h = x.split(':'), first = parseInt(h[0] || '0', 16), second = parseInt(h[1] || '0', 16);
+    if (first < 0x2000 || first > 0x3fff) return true;
+    return first === 0x2002 || (first === 0x2001 && (second === 0 || second === 0xdb8));
+  }
   return true;
 }
-const badName = h => !h || /^(localhost|.*\.local|.*\.internal|.*\.localhost)$/i.test(h) || (isIP(h) && privateIp(h));
+const bare = h => String(h || '').replace(/^\[|\]$/g, ''); // URL.hostname keeps an IPv6 address in brackets
+const badName = h0 => { const h = bare(h0); return !h || /^(localhost|.*\.local|.*\.internal|.*\.localhost)$/i.test(h) || (isIP(h) ? privateIp(h) : /^[\d.]+$/.test(h)); };
 // a DNS lookup that refuses a private answer; handed to the request as its lookup, so the socket connects to exactly
 // the address that was checked (no second lookup in between)
 export function safeLookup(resolver = dnsLookup) {
@@ -60,31 +74,40 @@ export function safeLookup(resolver = dnsLookup) {
 const TEXT = /^(text\/|application\/(json|vnd\.github))/i, MEDIA = /^(image\/(png|jpeg|gif|webp)|video\/(mp4|webm|quicktime))/i;
 // GET one public URL, every redirect hop checked the same way. kind: text (the README, the repo facts) or media.
 // o.request (tests) replaces the network: (url, { lookup }) => Promise<{ status, headers, body: Buffer | AsyncIterable }>
-export async function safeGet(url, { kind = 'media', max = MAX_BYTES, hops = 5, headers = {}, request = null, resolver } = {}) {
+export async function safeGet(url, { kind = 'media', max = MAX_BYTES, hops = 5, headers = {}, request = null, resolver, deadline = 60000 } = {}) {
   let u = String(url);
   for (let hop = 0; hop <= hops; hop++) {
     let p; try { p = new URL(u); } catch { throw new Error(`not a link: ${u}`); }
     if (!/^https?:$/.test(p.protocol)) throw new Error(`only http and https: ${u}`);
     if (p.username || p.password) throw new Error(`no logins in links: ${p.host}`);
-    if (badName(p.hostname)) throw new Error(`${p.hostname} is not a public host`);
+    if (badName(p.hostname)) throw new Error(`${bare(p.hostname)} is not a public host`);
     const lookup = safeLookup(resolver);
-    const r = await (request ? request(u, { lookup }) : nodeGet(p, lookup, { 'user-agent': 'aigent-talking-head repo-broll', accept: kind === 'text' ? 'application/vnd.github.raw, text/plain, application/json' : 'image/*, video/*', ...headers }, max));
-    if (r.status !== 200 && r.abort) r.abort(); // a redirect or an error page: its body is never read
-    if ([301, 302, 303, 307, 308].includes(r.status)) { const to = r.headers.location; if (!to) throw new Error(`a redirect with nowhere to go: ${u}`); u = new URL(to, u).href; continue; }
+    const r = await (request ? request(u, { lookup }) : nodeGet(p, lookup, { 'user-agent': 'aigent-talking-head repo-broll', accept: kind === 'text' ? 'application/vnd.github.raw, text/plain, application/json' : 'image/*, video/*', ...headers }, deadline));
+    try { return await readOne(r, u, kind, max); } catch (e) { if (r.abort) r.abort(); if (e.redirect) { u = new URL(e.redirect, u).href; continue; } throw e; }
+  }
+  throw new Error(`too many redirects: ${url}`);
+}
+// one answer: a redirect (thrown with where it goes), an error, or the body, read only while it stays under the cap
+async function readOne(r, u, kind, max) {
+  {
+    if ([301, 302, 303, 307, 308].includes(r.status)) { const to = r.headers.location; if (!to) throw new Error(`a redirect with nowhere to go: ${u}`); throw Object.assign(new Error('redirect'), { redirect: to }); }
     if (r.status !== 200) throw new Error(`${r.status} for ${u}`);
     const type = String(r.headers['content-type'] || '').split(';')[0].trim();
     if (!(kind === 'text' ? TEXT : MEDIA).test(type)) throw new Error(`not ${kind === 'text' ? 'text' : 'a picture or a video'} (${type || 'no type'}): ${u}`);
     const len = +r.headers['content-length'] || 0; if (len > max) throw new Error(`over ${Math.round(max / 1048576)} MB: ${u}`);
     const chunks = []; let n = 0;
     for await (const c of (Buffer.isBuffer(r.body) ? [r.body] : r.body)) { n += c.length; if (n > max) { if (r.abort) r.abort(); throw new Error(`over ${Math.round(max / 1048576)} MB: ${u}`); } chunks.push(c); }
+    if (r.abort) r.abort();
     return { url: u, type, body: Buffer.concat(chunks) };
   }
-  throw new Error(`too many redirects: ${url}`);
 }
-function nodeGet(p, lookup, headers, max) {
+// the real request: our checked lookup on the socket, a fresh agent (no keep-alive, nothing shared), no cookies sent,
+// 20 s with nothing arriving or the whole deadline (60 s) and the connection is closed
+export function nodeGet(p, lookup, headers, deadline = 60000) {
   return new Promise((ok, bad) => {
-    const req = (p.protocol === 'https:' ? https : http).get(p, { lookup, headers, agent: false, timeout: 20000 }, res => ok({ status: res.statusCode, headers: res.headers, body: res, abort: () => req.destroy() }));
-    req.on('timeout', () => req.destroy(new Error(`timed out: ${p.href}`))); req.on('error', bad);
+    const req = (p.protocol === 'https:' ? https : http).get(p, { lookup, headers, agent: false, timeout: 20000 }, res => { ok({ status: res.statusCode, headers: res.headers, body: res, abort: () => { clearTimeout(all); req.destroy(); } }); });
+    const all = setTimeout(() => req.destroy(new Error(`took too long: ${p.href}`)), deadline); all.unref && all.unref();
+    req.on('timeout', () => req.destroy(new Error(`timed out: ${p.href}`))); req.on('error', e => { clearTimeout(all); bad(e); }); req.on('close', () => clearTimeout(all));
   });
 }
 
@@ -136,39 +159,76 @@ export function sizeOf(buf) {
 const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' };
 
 // fetch one repo: { owner, repo, url, dir, header, assets: [{ file, kind, alt, heading, source, w, h }], skipped, fallback }
-export async function fetchRepo(link, { request = null, resolver, capture = null, max = 12, force = false, log = () => {} } = {}) {
+// an animated WebP (VP8X with the animation bit): FFmpeg reads only stills, so it is left out
+export const animatedWebp = b => b.length > 21 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 12, 16) === 'VP8X' && !!(b[20] & 2);
+// a GIF becomes a looping 12 second MP4 (the render trims video, it never loops a GIF); a video's length is read so no
+// insert runs past its end. Both use FFmpeg and can be swapped in tests.
+export function gifToMp4(src, out) {
+  execFileSync('ffmpeg', ['-v', 'error', '-y', '-stream_loop', '-1', '-i', src, '-t', '12', '-an', '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=24', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out], { stdio: 'ignore', timeout: 120000 });
+}
+export function videoSeconds(file) {
+  const v = parseFloat(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file], { encoding: 'utf8', timeout: 30000 }));
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+
+// fetch one repo's pictures into assets/web/<owner>--<repo>/ (01.png, 02.mp4 ... and meta.json). A good fetch is cached;
+// a failed one (no README read, nothing usable) is never cached, so trying again online works, and an older good
+// folder stays in place until a new one is complete.
+export async function fetchRepo(link, { request = null, resolver, capture = null, max = 12, tries = 30, force = false, log = () => {}, convert = gifToMp4, seconds = videoSeconds } = {}) {
   const r = parseRepo(link); if (!r) throw new Error(`not a GitHub repo link: ${link}`);
   const dir = dirFor(r), mf = join(dir, 'meta.json');
-  if (!force && existsSync(mf)) { try { const m = JSON.parse(readFileSync(mf, 'utf8')); if (m.assets && m.assets.every(a => existsSync(join(dir, a.file)))) return { ...m, dir, cached: true }; } catch {} }
+  if (!force && existsSync(mf)) {
+    try {
+      const m = JSON.parse(readFileSync(mf, 'utf8'));
+      if (String(m.owner).toLowerCase() === r.owner.toLowerCase() && String(m.repo).toLowerCase() === r.repo.toLowerCase() && m.assets && m.assets.length && m.assets.every(a => existsSync(join(dir, a.file)))) return { ...m, dir, cached: true };
+    } catch {}
+  }
   const get = (u, kind) => safeGet(u, { kind, request, resolver });
   const api = `https://api.github.com/repos/${r.owner}/${r.repo}`;
   let facts = {}; try { facts = JSON.parse((await get(api, 'text')).body.toString('utf8')); } catch (e) { log(`repo facts: ${e.message}`); }
   const branch = facts.default_branch || 'HEAD';
   const header = { name: facts.full_name || `${r.owner}/${r.repo}`, stars: Number.isFinite(+facts.stargazers_count) ? +facts.stargazers_count : null, description: facts.description || '', url: r.url };
-  let md = ''; try { md = (await get(api + '/readme', 'text')).body.toString('utf8'); } catch (e) { log(`README: ${e.message}`); }
+  let md = '', readOk = false; try { md = (await get(api + '/readme', 'text')).body.toString('utf8'); readOk = true; } catch (e) { log(`README: ${e.message}`); }
   const found = readmeAssets(md, `https://raw.githubusercontent.com/${r.owner}/${r.repo}/${branch}/`);
-  // the social preview leads: the repo's own picture of itself
+  // the social preview leads: GitHub's own card for the repo (its name, description and stars, drawn by GitHub)
   const cands = [{ url: `https://opengraph.githubassets.com/1/${r.owner}/${r.repo}`, alt: header.name, heading: '', kind: 'image', width: null, height: null, header: true }, ...found];
-  rmSync(dir, { recursive: true, force: true }); mkdirSync(dir, { recursive: true });
-  const assets = [], skipped = [];
+  const tmp = `${dir}.part-${process.pid}`; rmSync(tmp, { recursive: true, force: true }); mkdirSync(tmp, { recursive: true });
+  const assets = [], skipped = []; let tried = 0;
   for (const a of cands) {
     if (assets.length >= max) break;
     if (!usable(a)) { skipped.push({ url: a.url, why: 'badge, logo or not a picture' }); continue; }
+    if (++tried > tries) { skipped.push({ url: a.url, why: `stopped after ${tries} tries` }); continue; }
     try {
-      const g = await get(a.url, 'media'), kind = g.type.startsWith('video/') ? 'video' : 'image', sz = kind === 'image' ? sizeOf(g.body) : null;
+      const g = await get(a.url, 'media'); let kind = g.type.startsWith('video/') ? 'video' : 'image';
+      const sz = kind === 'image' ? sizeOf(g.body) : null;
       if (sz && (sz.h < 40 || ((sz.w < 200 || sz.h < 200) && !a.header))) { skipped.push({ url: a.url, why: `too small (${sz.w}x${sz.h})` }); continue; }
-      const file = `${String(assets.length + 1).padStart(2, '0')}.${EXT[g.type] || 'bin'}`;
-      writeFileSync(join(dir, file), g.body);
-      assets.push({ file, kind, alt: a.alt, heading: a.heading, source: g.url, ...(sz ? { w: sz.w, h: sz.h } : {}), ...(a.header ? { header: true } : {}) });
-    } catch (e) { skipped.push({ url: a.url, why: e.message }); }
+      if (g.type === 'image/webp' && animatedWebp(g.body)) { skipped.push({ url: a.url, why: 'an animated WebP' }); continue; }
+      const n = String(assets.length + 1).padStart(2, '0'); let file = `${n}.${EXT[g.type] || 'bin'}`;
+      writeFileSync(join(tmp, file), g.body);
+      if (g.type === 'image/gif') { const mp4 = `${n}.mp4`; convert(join(tmp, file), join(tmp, mp4)); rmSync(join(tmp, file), { force: true }); file = mp4; kind = 'video'; }
+      const secs = kind === 'video' ? seconds(join(tmp, file)) : null;
+      if (kind === 'video' && !secs) throw new Error('a video with no length');
+      assets.push({ file, kind, alt: a.alt, heading: a.heading, source: g.url, ...(sz ? { w: sz.w, h: sz.h } : {}), ...(secs ? { seconds: +secs.toFixed(2) } : {}), ...(a.header ? { header: true } : {}) });
+    } catch (e) { rmSync(join(tmp, `${String(assets.length + 1).padStart(2, '0')}.gif`), { force: true }); skipped.push({ url: a.url, why: e.message }); }
   }
   let fallback = false;
   if (!assets.filter(a => !a.header).length && capture) {
-    // nothing usable in the README: the top of the repo page instead (kit/capture.mjs, its own public-page checks)
-    try { const c = await capture(r.url); if (c && c.image) { const file = 'page.png'; writeFileSync(join(dir, file), readFileSync(c.image)); assets.push({ file, kind: 'image', alt: header.name, heading: '', source: r.url, capture: true }); fallback = true; } } catch (e) { log(`capture: ${e.message}`); }
+    // nothing usable in the README: the top of the repo page instead (kit/capture.mjs: a headless browser with its own
+    // public-page checks, which judge names without the pinned lookup used here)
+    try { const c = await capture(r.url); if (c && c.image) { const file = 'page.png'; writeFileSync(join(tmp, file), readFileSync(c.image)); assets.push({ file, kind: 'image', alt: header.name, heading: '', source: r.url, capture: true }); fallback = true; } } catch (e) { log(`capture: ${e.message}`); }
   }
   const meta = { owner: r.owner, repo: r.repo, url: r.url, header, assets, skipped, fallback, fetchedAt: new Date().toISOString() };
-  writeFileSync(mf, JSON.stringify(meta, null, 1) + '\n');
+  const good = (readOk || fallback) && assets.some(a => !a.header);
+  if (!good) {
+    // not cached: an older good folder (which a cut may point at) stays as it is
+    rmSync(tmp, { recursive: true, force: true });
+    if (existsSync(mf)) { try { const m = JSON.parse(readFileSync(mf, 'utf8')); return { ...m, dir, cached: true, stale: true }; } catch {} }
+    return { ...meta, assets: [], dir, failed: true };
+  }
+  writeFileSync(join(tmp, 'meta.json'), JSON.stringify(meta, null, 1) + '\n');
+  const old = `${dir}.old-${process.pid}`;
+  if (existsSync(dir)) renameSync(dir, old);
+  renameSync(tmp, dir); rmSync(old, { recursive: true, force: true });
   return { ...meta, dir };
 }
 
@@ -195,10 +255,17 @@ export function planRepo(lines, assets, { takeovers = 'auto', breakout = false, 
     if (l.section !== 'body' || (punch && takeovers === 'auto')) { if (takeovers === 'auto') who.push({ at: l.start, dur, who: 'you', why: l.section === 'body' ? 'punch line' : l.section }); continue; }
     const { a, named } = pick(l.text); used.set(a.path, (used.get(a.path) || 0) + 1);
     const full = takeovers === 'auto' && (POINT.test(l.text) || named);
-    const at = +(l.start + 0.1).toFixed(2), d = +Math.max(0.8, dur - 0.2).toFixed(2);
-    inserts.push({ file: a.path, at, dur: d, in: 0, place: full ? 'full' : split, image: a.kind === 'image', repo: true, line: l.text.slice(0, 80), ...(full ? {} : { fit: 'whole' }) });
+    const at = +l.start.toFixed(2), d = +Math.min(dur, a.kind === 'video' && a.seconds ? a.seconds : Infinity).toFixed(2);
+    inserts.push({ file: a.path, at, dur: d, in: 0, place: full ? 'full' : split, image: a.kind === 'image', repo: true, line: l.text.slice(0, 80), ...(full ? {} : { fit: 'whole' }), ...(a.seconds ? { seconds: a.seconds } : {}) });
     if (full) who.push({ at, dur: d, who: 'repo', why: named ? `names ${a.heading || a.alt}` : 'points at it' });
   }
+  // no flashes back to you: a short gap (a pause, a short line) between two inserts of the same layout is closed by
+  // holding the first one longer, as far as a video's own length allows
+  for (let i = 0; i + 1 < inserts.length; i++) {
+    const p = inserts[i], q = inserts[i + 1], gap = q.at - (p.at + p.dur);
+    if (p.place === q.place && gap > 0 && gap < 1.5) { const d = +(q.at - p.at).toFixed(2); if (!(p.seconds && d > p.seconds)) p.dur = d; }
+  }
+  inserts.forEach(x => delete x.seconds);
   return { inserts, takeovers: who };
 }
 // the reel's lines with their section, from a drafted job's cut.json and its words (kit/sections.cjs)
@@ -218,23 +285,26 @@ if (isMain) {
       const out = []; for (const u of a.slice(1).filter(x => !x.startsWith('--'))) { const m = await fetchRepo(u, { force: a.includes('--force'), log: x => console.error(x) }); out.push({ repo: m.url, dir: relative(ROOT, m.dir), assets: m.assets.length, skipped: m.skipped.length, fallback: m.fallback }); }
       console.log(a.includes('--json') ? JSON.stringify(out) : out.map(x => `${x.repo}: ${x.assets} pictures and videos in ${x.dir}${x.fallback ? ' (the page, the README had none)' : ''}`).join('\n')); return;
     }
-    if (a[0] !== 'apply' || !opt('name') || !opt('plan')) { console.error('usage: repo-broll.mjs fetch <repo url> [...] | apply --name <job> --plan <video-plan.json>'); process.exit(2); }
+    if (a[0] !== 'apply' || !opt('name')) { console.error('usage: repo-broll.mjs fetch <repo url> [...] | apply --name <job> [--plan <video-plan.json>]'); process.exit(2); }
     const build = join(opt('jobs') ? resolve(opt('jobs')) : join(ROOT, 'jobs'), opt('name'), 'build'), cutF = join(build, 'cut.json');
     if (!existsSync(cutF)) { console.error('make a draft first: no build/cut.json'); process.exit(1); }
-    const planF = isAbsolute(opt('plan')) ? opt('plan') : resolve(ROOT, opt('plan'));
-    const plan = JSON.parse(readFileSync(planF, 'utf8')), c = (plan && plan.content) || {}, cut = JSON.parse(readFileSync(cutF, 'utf8'));
+    // no plan file (the plan was cleared) counts as repo mode off: our own inserts are taken out again
+    const planF = opt('plan') ? (isAbsolute(opt('plan')) ? opt('plan') : resolve(ROOT, opt('plan'))) : null;
+    const plan = planF && existsSync(planF) ? JSON.parse(readFileSync(planF, 'utf8')) : {}, c = (plan && plan.content) || {}, cut = JSON.parse(readFileSync(cutF, 'utf8'));
     const others = (cut.inserts || []).filter(x => !x.repo);
-    if (!c.repoFeature || !(c.repos || []).length) { if ((cut.inserts || []).some(x => x.repo)) { cut.inserts = others; if (!others.length) delete cut.inserts; writeFileSync(cutF, JSON.stringify(cut, null, 1)); } console.log(JSON.stringify({ ok: true, repo: false })); return; }
+    const clear = () => { cut.inserts = others; if (!others.length) delete cut.inserts; delete cut.repoTakeovers; writeFileSync(cutF, JSON.stringify(cut, null, 1)); };
+    if (!c.repoFeature || !(c.repos || []).length) { if ((cut.inserts || []).some(x => x.repo) || cut.repoTakeovers) clear(); console.log(JSON.stringify({ ok: true, repo: false })); return; }
     let capture = null; try { const CAP = await import('./capture.mjs'); capture = async u => { const r = await CAP.capture(u, { imageOnly: true }); return { image: join(r.dir, 'shot.png') }; }; } catch {}
     const assets = [];
     for (const u of c.repos) { try { const m = await fetchRepo(u, { capture, log: x => console.log(`repo: ${x}`) }); for (const x of m.assets) assets.push({ ...x, path: join(m.dir, x.file) }); } catch (e) { console.log(`repo: ${u}: ${e.message}`); } }
-    if (!assets.length) { console.log('repo: we could not get any pictures from the repo, so you stay on screen (check the link, or try again online)'); cut.inserts = others; if (!others.length) delete cut.inserts; writeFileSync(cutF, JSON.stringify(cut, null, 1)); console.log(JSON.stringify({ ok: true, repo: true, inserts: 0 })); return; }
+    if (!assets.length) { console.log('repo: we could not get any pictures from the repo, so you stay on screen (check the link, or try again online)'); clear(); console.log(JSON.stringify({ ok: true, repo: true, inserts: 0 })); return; }
     const breakout = (plan.presenter || []).some(x => x && x.id === 'frame-breakout');
     const { inserts, takeovers } = planRepo(linesOf(cut, build), assets, { takeovers: c.takeovers === 'off' ? 'off' : 'auto', breakout });
     // a spot the b-roll lane already uses keeps its clip
     const free = inserts.filter(x => !others.some(o => x.at < +o.at + +o.dur && +o.at < x.at + x.dur)).map(x => ({ ...x, file: relative(build, x.file).split(sep).join('/') }));
     cut.inserts = [...others, ...free].sort((p, q) => p.at - q.at); if (!cut.inserts.length) delete cut.inserts;
-    cut.repoTakeovers = takeovers;
+    // what happened, per line: you full screen, and the repo full screen only where its insert was kept
+    cut.repoTakeovers = takeovers.filter(t => t.who === 'you' || free.some(x => x.place === 'full' && x.at === t.at));
     writeFileSync(cutF, JSON.stringify(cut, null, 1));
     console.log(`repo: ${free.filter(x => x.place !== 'full').length} split, ${free.filter(x => x.place === 'full').length} repo full screen, ${takeovers.filter(x => x.who === 'you').length} you full screen`);
     console.log(JSON.stringify({ ok: true, repo: true, inserts: free.length }));

@@ -5,7 +5,7 @@
 // names a heading, you on the hook, punch lines and CTA; takeovers off; frame breakout.
 // Run: node tests/repo-broll.test.mjs   (npm run check runs it)
 import assert from 'assert';
-import { mkdtempSync, readFileSync, existsSync, rmSync } from 'fs';
+import { mkdtempSync, readFileSync, existsSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -51,9 +51,16 @@ try {
     await assert.rejects(ask('https://example.com/hop.png'), /private address/, 'a redirect to a private address is stopped');
     routes['https://example.com/hop2.png'] = { status: 302, headers: { location: 'http://127.0.0.1:8080/x' }, body: Buffer.alloc(0) };
     await assert.rejects(ask('https://example.com/hop2.png'), /not a public host/);
+    for (const h of ['[::1]', '[fd00::1]', '[::ffff:127.0.0.1]', '[64:ff9b::a00:1]', '[2002::1]', '[fec0::1]', '[fe80::1]', '[::]']) await assert.rejects(ask(`http://${h}:8080/x.png`), /not a public host/, h);
+    assert.ok(!RB.privateIp('2606:4700::1111') && RB.privateIp('2001:db8::1') && RB.privateIp('2001::1') && RB.privateIp('::ffff:7f00:1'), 'IPv6: global unicast only');
     let lk = null; RB.safeLookup(resolver)('example.com', {}, (e, addr) => { lk = [e, addr]; }); assert.deepStrictEqual(lk, [null, '140.82.112.3'], 'the socket gets the checked address');
     routes['https://example.com/loop.png'] = { status: 302, headers: { location: 'https://example.com/loop.png' }, body: Buffer.alloc(0) };
     await assert.rejects(ask('https://example.com/loop.png'), /too many redirects/);
+  });
+  await t('the real request asks our lookup on its socket: a name that resolves to a private address never connects', async () => {
+    const seen = []; const priv = (host, o, cb) => { seen.push(host); cb(null, [{ address: '127.0.0.1', family: 4 }]); };
+    await assert.rejects(RB.safeGet('http://pin.test:9/x.png', { resolver: priv }), /private address/);
+    assert.deepStrictEqual(seen, ['pin.test'], 'the socket used the checked lookup (no request swapped in)');
   });
   await t('pictures and videos only, at most 25 MB, checked while it downloads too', async () => {
     const ask = (u, o = {}) => RB.safeGet(u, { request, resolver, ...o });
@@ -61,13 +68,18 @@ try {
     await assert.rejects(ask('https://example.com/page.png'), /not a picture or a video/);
     routes['https://example.com/big.mp4'] = R('video/mp4', Buffer.alloc(10), { 'content-length': String(RB.MAX_BYTES + 1) });
     await assert.rejects(ask('https://example.com/big.mp4'), /over 25 MB/);
-    async function* chunks() { for (let i = 0; i < 30; i++) yield Buffer.alloc(1024); }
-    routes['https://example.com/liar.mp4'] = () => R('video/mp4', chunks());
-    await assert.rejects(ask('https://example.com/liar.mp4', { max: 16 * 1024 }), /over 0 MB|over/, 'a file bigger than it said stops at the cap');
+    let read = 0, aborted = 0; async function* chunks() { for (let i = 0; i < 3000; i++) { read++; yield Buffer.alloc(1024); } }
+    routes['https://example.com/liar.mp4'] = () => ({ ...R('video/mp4', chunks()), abort: () => { aborted++; } });
+    await assert.rejects(ask('https://example.com/liar.mp4', { max: 1048576 }), /over 1 MB/, 'a file bigger than it said stops at the cap');
+    assert.ok(read <= 1026 && aborted >= 1, `reading stops and the connection is closed (${read} read, ${aborted} aborts)`);
+    let ab2 = 0; routes['https://example.com/huge.png'] = () => ({ ...R('image/png', Buffer.alloc(1), { 'content-length': String(RB.MAX_BYTES * 2) }), abort: () => { ab2++; } });
+    await assert.rejects(ask('https://example.com/huge.png'), /over 25 MB/); assert.ok(ab2 >= 1, 'a too-big answer is closed unread');
+    let ab3 = 0; routes['https://example.com/wrong.png'] = () => ({ ...R('text/html', Buffer.alloc(1)), abort: () => { ab3++; } });
+    await assert.rejects(ask('https://example.com/wrong.png'), /not a picture/); assert.ok(ab3 >= 1, 'a wrong type is closed unread');
     routes['https://example.com/ok.png'] = R('image/png', png(1280, 720));
     assert.strictEqual((await ask('https://example.com/ok.png')).body.length, 40);
   });
-  await t('a repo is fetched to assets/web/<owner>-<repo> with meta.json; the social preview leads; bad files are skipped and said', async () => {
+  await t('a repo is fetched to assets/web/<owner>--<repo> with meta.json; a GIF becomes a looping MP4; the social preview leads; bad files are skipped and said', async () => {
     const raw = 'https://raw.githubusercontent.com/demo/tool/main/';
     routes['https://api.github.com/repos/demo/tool'] = R('application/json', Buffer.from(JSON.stringify({ full_name: 'demo/tool', stargazers_count: 1234, description: 'Notes into videos', default_branch: 'main' })));
     routes['https://api.github.com/repos/demo/tool/readme'] = R('application/vnd.github.raw', Buffer.from(README));
@@ -78,14 +90,22 @@ try {
     routes['https://github.com/user-attachments/assets/0f1e2d3c-aaaa-bbbb-cccc-123456789abc'] = { status: 302, headers: { location: 'https://objects.example.com/clip.mp4' }, body: Buffer.alloc(0) };
     routes['https://objects.example.com/clip.mp4'] = R('video/mp4', Buffer.from('mp4b'));
     routes[raw + 'docs/dot.png'] = R('image/png', png(16, 16));
-    const m = await RB.fetchRepo('https://github.com/demo/tool', { request, resolver });
-    assert.strictEqual(m.dir, join(TMP, 'demo-tool'));
+    const conv = (src, out) => (writeFileSync(out, 'mp4 from gif')), secs = () => 6;
+    const m = await RB.fetchRepo('https://github.com/demo/tool', { request, resolver, convert: conv, seconds: secs });
+    assert.strictEqual(m.dir, join(TMP, 'demo--tool'));
     assert.deepStrictEqual(m.header, { name: 'demo/tool', stars: 1234, description: 'Notes into videos', url: 'https://github.com/demo/tool' });
-    assert.deepStrictEqual(m.assets.map(a => [a.file, a.kind, a.heading]), [['01.png', 'image', ''], ['02.png', 'image', 'Live preview'], ['03.gif', 'image', 'Batch export'], ['04.mp4', 'video', 'Install'], ['05.mp4', 'video', 'Install']]);
+    assert.deepStrictEqual(m.assets.map(a => [a.file, a.kind, a.heading]), [['01.png', 'image', ''], ['02.png', 'image', 'Live preview'], ['03.mp4', 'video', 'Batch export'], ['04.mp4', 'video', 'Install'], ['05.mp4', 'video', 'Install']]);
     assert.ok(m.assets[0].header); assert.strictEqual(m.assets[4].source, 'https://objects.example.com/clip.mp4', 'where it really came from');
     assert.ok(m.skipped.some(x => /dot\.png/.test(x.url) && /too small/.test(x.why)) && m.skipped.some(x => /shields/.test(x.url)));
-    const meta = JSON.parse(readFileSync(join(m.dir, 'meta.json'), 'utf8')); assert.strictEqual(meta.assets.length, 5); assert.ok(existsSync(join(m.dir, '03.gif')));
+    const meta = JSON.parse(readFileSync(join(m.dir, 'meta.json'), 'utf8')); assert.strictEqual(meta.assets.length, 5); assert.ok(existsSync(join(m.dir, '03.mp4')) && !existsSync(join(m.dir, '03.gif'))); assert.strictEqual(m.assets[2].seconds, 6);
     assert.strictEqual((await RB.fetchRepo('https://github.com/demo/tool', { request: () => { throw new Error('no network'); }, resolver })).cached, true, 'a second time reads the cache');
+    // a failed fetch (README unreachable) is not cached and leaves the good folder alone
+    const down = (u, o) => u.endsWith('/readme') ? Promise.resolve({ status: 503, headers: {}, body: Buffer.alloc(0) }) : request(u, o);
+    const again = await RB.fetchRepo('https://github.com/demo/tool', { request: down, resolver, force: true, convert: conv, seconds: secs });
+    assert.ok(again.stale && existsSync(join(m.dir, '02.png')) && JSON.parse(readFileSync(join(m.dir, 'meta.json'), 'utf8')).assets.length === 5, 'the older good folder stays');
+    const none = await RB.fetchRepo('https://github.com/demo/gone', { request, resolver });
+    assert.ok(none.failed && !existsSync(join(TMP, 'demo--gone', 'meta.json')), 'nothing cached for a repo we could not read');
+    const webp = Buffer.alloc(30); webp.write('RIFF', 0); webp.write('WEBP', 8); webp.write('VP8X', 12); webp[20] = 2; assert.ok(RB.animatedWebp(webp));
     assert.throws(() => { if (!RB.parseRepo('https://github.com/../x')) throw new Error('refused'); }, /refused/); assert.strictEqual(RB.parseRepo('https://gitlab.com/a/b'), null);
   });
   await t('a README with nothing usable falls back to a capture of the repo page', async () => {
@@ -116,7 +136,7 @@ try {
     assert.deepStrictEqual(RB.planRepo(lines, []).inserts, []);
   });
   await t('apply: a drafted job gets split and full screen repo inserts from the cached repo, you on the hook and CTA; off clears them', async () => {
-    const { mkdirSync, writeFileSync } = await import('fs'), { execFileSync } = await import('child_process');
+    const { mkdirSync } = await import('fs'), { execFileSync } = await import('child_process');
     const jobs = join(TMP, 'jobs'), build = join(jobs, 'rj', 'build'), clips = join(TMP, 'clips'); mkdirSync(build, { recursive: true }); mkdirSync(clips, { recursive: true });
     const L = [...lines.slice(0, 4), { start: 14, end: 18, text: 'It sorts every file in the folder for you.' }, { start: 18, end: 20, text: 'It is wild!' }, { start: 20, end: 24, text: 'Follow for more tools like this.' }];
     const words = []; for (const l of L) { const ws = l.text.split(' '), step = (l.end - l.start) / ws.length; ws.forEach((w, i) => words.push([+(l.start + i * step).toFixed(2), +(l.start + (i + 0.8) * step).toFixed(2), w])); }
@@ -131,7 +151,10 @@ try {
     const you = cut.repoTakeovers.filter(x => x.who === 'you').map(x => x.why); assert.ok(you[0] === 'hook' && you.includes('punch line') && you[you.length - 1] === 'cta', you.join());
     assert.ok(rep.every(x => !x.file.startsWith('/')), 'files relative to build, as the lane writes them');
     run({ content: { repoFeature: false, repos: [] } }); const off = JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8'));
-    assert.ok(!(off.inserts || []).some(x => x.repo) && off.inserts.some(x => x.studio), 'turning it off takes only its own inserts away');
+    assert.ok(!(off.inserts || []).some(x => x.repo) && off.inserts.some(x => x.studio) && !off.repoTakeovers, 'turning it off takes only its own inserts away');
+    run({ content: { repoFeature: true, repos: ['https://github.com/demo/tool'], takeovers: 'auto' }, presenter: [] }); rmSync(plan);
+    execFileSync(process.execPath, [join(ROOT, 'kit', 'repo-broll.mjs'), 'apply', '--name', 'rj', '--plan', plan, '--jobs', jobs], { env: { ...process.env, ATH_ASSETS: TMP }, encoding: 'utf8' });
+    const gone = JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8')); assert.ok(!(gone.inserts || []).some(x => x.repo) && !gone.repoTakeovers, 'a cleared plan clears its inserts too');
   });
   console.log(`\nrepo broll: ${n} tests passed`);
 } finally { rmSync(TMP, { recursive: true, force: true }); }

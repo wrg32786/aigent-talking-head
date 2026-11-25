@@ -164,13 +164,19 @@ try {
     assert.match(await pg.textContent('#build-does'), /just you/);
     await pg.click('#build-repo-on'); await pg.waitForSelector('#build-repo-0');
     assert.ok(await pg.isVisible('#build-repo-need'), 'asks for a link first');
-    await pg.fill('#build-repo-0', 'https://gitlab.com/a/b'); await pg.click('#build-repo-layout');
+    await pg.fill('#build-repo-0', 'https://gitlab.com/a/b'); assert.ok(!(await pg.$('#build-repo-0-err')), 'no error while typing'); await pg.click('#build-repo-layout');
     await pg.waitForSelector('#build-repo-0-err'); assert.strictEqual((await api('/api/video-plan')).plan.content.repoFeature, false, 'a bad link is never saved');
     await pg.fill('#build-repo-0', 'https://github.com/wrg32786/aigent-talking-head'); await pg.click('#build-repo-layout');
     await pg.waitForFunction(async () => (await (await fetch('/api/video-plan')).json()).plan.content.repoFeature === true);
     await pg.click('#build-repo-take [data-opt="off"]'); await pg.waitForFunction(async () => (await (await fetch('/api/video-plan')).json()).plan.content.takeovers === 'off');
-    assert.match(await pg.textContent('#build-does'), /Split the whole way/);
+    assert.match(await pg.textContent('#build-does'), /Split on every line in the middle/);
+    await pg.fill('#build-repo-example', 'not a link'); await pg.press('#build-repo-example', 'Enter'); await pg.waitForSelector('#build-repo-example-err');
+    await pg.fill('#build-repo-example', 'https://www.youtube.com/watch?v=abc'); await pg.press('#build-repo-example', 'Enter');
+    await pg.waitForFunction(async () => (await (await fetch('/api/video-plan')).json()).plan.content.example === 'https://www.youtube.com/watch?v=abc');
     await noCmd(pg, 'Repo or tool feature'); await shot(pg, 'builder-repo.png');
+    // clearing the only link takes the repos out of the plan (no old repo renders)
+    await pg.fill('#build-repo-0', ''); await pg.press('#build-repo-0', 'Enter');
+    await pg.waitForFunction(async () => { const c = (await (await fetch('/api/video-plan')).json()).plan.content; return c.repoFeature === false && !c.repos.length; });
     await pg.click('#build-repo-on'); await pg.waitForFunction(async () => (await (await fetch('/api/video-plan')).json()).plan.content.repoFeature === false);
     await pg.click('#build-next'); await pg.waitForSelector('#build-mu');
     assert.ok(await pg.$('#build-mu-beds .snd-tile'), 'tracks to hear');
