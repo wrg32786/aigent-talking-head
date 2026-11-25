@@ -16,6 +16,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import * as VP from './plan.mjs';
 import * as TPL from '../templates.mjs';
+const lastPace = s => VP.lastPace(s);
 
 export const STEPS_FILE = join(dirname(fileURLToPath(import.meta.url)), 'steps.json');
 export const stepsOf = () => JSON.parse(readFileSync(STEPS_FILE, 'utf8'));
@@ -53,7 +54,7 @@ export function mount({ C, json, readBody, view, pushState }) {
       const b = await readBody(req);
       if (b && typeof b.pace === 'string' && !('plan' in b)) {
         if (!Object.hasOwn(VP.PACES, b.pace)) { json(res, 400, { error: `pace: one of ${Object.keys(VP.PACES).join(', ')}` }); return true; }
-        const s = C.load(), cat = C.catalog(), { plan, patch } = VP.pacePatch(planOf(s, cat), b.pace, s.videoPlan && s.videoPlan.pace), r = C.applyPatch(s, { ...patch, from: 'ui' });
+        const s = C.load(), cat = C.catalog(), { plan, patch } = VP.pacePatch(planOf(s, cat), b.pace, lastPace(s)), r = C.applyPatch(s, { ...patch, from: 'ui' });
         if (r.errs.length) { json(res, 400, { error: r.errs.join(' '), errs: r.errs }); return true; }
         delete plan.goalPace; // a pace you pick here is yours: a run_wizard goal leaves it alone
         s.videoPlan = plan; C.save(s); pushState();

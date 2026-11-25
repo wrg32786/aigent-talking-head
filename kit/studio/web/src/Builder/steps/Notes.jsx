@@ -22,11 +22,11 @@ export const NOTE_CHIPS = NOTE_LINES;
 export const MAX_NOTES = 2000;
 export function Notes({ CAT, plan, save, rows, onChange, st, appV, patch, apply }) {
   const [text, setText] = useState(plan.notes || ''), [tab, setTab] = useState(null);
-  // dirty: typed and not yet confirmed by the server. A note set elsewhere (the chat, an agent) shows here only while
-  // you are not typing; a save that fails stays dirty, so leaving the field tries again
+  // dirty: typed and not yet confirmed by the server. A note set elsewhere (the chat, an agent) shows here whenever you
+  // have nothing unsaved; a save that fails stays dirty, so leaving the field tries again. Nothing typed, nothing saved
   const live = useRef(text), dirty = useRef(false), area = useRef(null);
-  useEffect(() => { if (!dirty.current && document.activeElement !== area.current && (plan.notes || '') !== live.current) { live.current = plan.notes || ''; setText(plan.notes || ''); } }, [plan.notes]);
-  const keep = t => { const v = t.slice(0, MAX_NOTES); if (!dirty.current && v === (plan.notes || '')) return Promise.resolve(true);
+  useEffect(() => { if (!dirty.current && (plan.notes || '') !== live.current) { live.current = plan.notes || ''; setText(plan.notes || ''); } }, [plan.notes]);
+  const keep = t => { const v = t.slice(0, MAX_NOTES); if (!dirty.current) return Promise.resolve(true);
     return Promise.resolve(save(v)).then(ok => { if (ok !== false && live.current === v) dirty.current = false; return ok; }); };
   const type = v => { live.current = v; dirty.current = true; setText(v); };
   // leaving the step (Next, Back, a link) saves what you typed

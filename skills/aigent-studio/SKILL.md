@@ -76,7 +76,7 @@ The user can film takes on the Start step (Record now). A saved take is already 
 
 ## Wizards
 
-The Wizards dialog is gone (the page asks one thing per screen in the builder now). `run_wizard` still runs the guided starts, and a `goal` also sets the plan's pace and a line in Your notes: `{ wizard: reel, goal: grow | sell | teach | clean, look, choose: true }` (any of them, in one call or one at a time), `{ wizard: clips, clips, ads }` (finds them on whole words), `{ wizard: reference, url }` (Recreate). When the user presses **Let my agent decide** in a wizard, you get a message asking you to make that choice: make it with `run_wizard` or suggest it with `studio_reply suggest`.
+The Wizards dialog is gone (the page asks one thing per screen in the builder now). `run_wizard` still runs the guided starts, and a `goal` also sets the plan's pace and a line in Your notes: `{ wizard: reel, goal: grow | sell | teach | clean, look, choose: true }` (any of them, in one call or one at a time), `{ wizard: clips, clips, ads }` (finds them on whole words), `{ wizard: reference, url }` (Recreate). When the user asks you to choose for them, make the choice with `run_wizard` or `set_video_plan`, or suggest it with `studio_reply suggest`.
 
 ## Rules
 

@@ -96,6 +96,9 @@ export function defaults(pace = 'look') { return applyPace(blank(), pace); }
 // applyPatch that sets only what a pace changes (no clearing of picks, so nothing else moves).
 // last: the pace saved last time (s.videoPlan.pace), or none: then the session never had a pace picked and starts from
 // Let the Look decide. The plan's own pace is only a guess from the pause length, so it is not used here.
+// the pace picked last (the builder, a goal), never one read from the classic steps or stored with a draft, so a guess
+// never makes the defaults look like your own choices
+export const lastPace = s => (s && s.videoPlan && Array.isArray(s.videoPlan.touched) && s.videoPlan.touched.includes('pace') && s.videoPlan.pace) || null;
 export function pacePatch(plan, pace, last = null) {
   let p = normalize(plan); const lp = last || 'look', was = Object.hasOwn(PACES, lp) ? PACES[lp] : PACES.look;
   if (p.music.energy !== was.energy) p = touch(p, 'music.energy');

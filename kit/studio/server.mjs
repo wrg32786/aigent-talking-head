@@ -1491,13 +1491,15 @@ async function api(req, res, u) {
     const setOut = o => { const r = CUT.normalize(outputOf(C.load()), o); if (r.errs.length) throw new Error(r.errs.join('; ')); update(x => { x.output = r.output; if (!x.cut || x.cut.source !== rel) x.cut = { source: rel, candidates: [], scoredBy: null }; }); };
     if (w.goal) { setOut(WIZ.GOALS[w.goal].out); done.push(`goal: ${WIZ.GOALS[w.goal].label}`); next = 'look';
       // the goal is a plan too: its pace, unless you picked one yourself in the builder, and its line in Your notes
-      // (another goal's line goes; a note that would not fit is left out and said)
+      // (the line an earlier goal added goes, never one you added yourself; a note that would not fit is left out and said)
       const G = WIZ.GOALS[w.goal], s1 = C.load(), cat = C.catalog(), prev = planOf(s1, cat), mine = !!(s1.videoPlan && s1.videoPlan.touched && s1.videoPlan.touched.includes('pace') && !s1.videoPlan.goalPace);
-      const { plan, patch } = mine ? { plan: prev, patch: {} } : VP.pacePatch(prev, G.pace, s1.videoPlan && s1.videoPlan.pace);
-      const kept = plan.notes.split('\n').filter(l => !WIZ.NOTE_LINES.includes(l.trim())).join('\n').trim(), joined = (kept ? kept + '\n' : '') + G.note;
-      if (joined.length <= 2000) plan.notes = joined; else done.push('note: your notes are full, so the goal line was left out');
+      const { plan, patch } = mine ? { plan: prev, patch: {} } : VP.pacePatch(prev, G.pace, VP.lastPace(s1));
+      const was = s1.videoPlan && s1.videoPlan.goalNote, lines = plan.notes.split('\n'), at = was ? lines.findIndex(l => l.trim() === was) : -1;
+      if (at >= 0) lines.splice(at, 1);
+      const kept = lines.join('\n').trim(), have = kept.split('\n').some(l => l.trim() === G.note), joined = have ? kept : (kept ? kept + '\n' : '') + G.note;
+      let added = !have; if (joined.length <= 2000) plan.notes = joined; else { added = false; done.push('note: your notes are full, so the goal line was left out'); }
       let errs = [];
-      update(x => { const r = C.applyPatch(x, { ...patch, from: 'assistant' }); errs = r.errs; if (!r.errs.length) x.videoPlan = { ...VP.normalize(plan), ...(mine ? {} : { goalPace: true }) }; });
+      update(x => { const r = C.applyPatch(x, { ...patch, from: 'assistant' }); errs = r.errs; if (!r.errs.length) { x.videoPlan = { ...VP.normalize(plan), ...(mine ? {} : { goalPace: true }) }; if (added) x.videoPlan.goalNote = G.note; else delete x.videoPlan.goalNote; } });
       done.push(errs.length ? `pace: not set (${errs.join(' ')})` : mine ? `pace: kept yours (${(VP.PACES[plan.pace] || {}).label || plan.pace})` : `pace: ${VP.PACES[G.pace].label}`); }
     if (w.look) { update(x => { C.applyPatch(x, { pack: w.look }); }); done.push(`look: ${w.look}`); next = 'choose'; }
     if (w.choose) {
