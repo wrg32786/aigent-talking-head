@@ -39,7 +39,7 @@ export function Tiles({ id, label, items, featured = [], value, multi = false, a
   const shown = all ? sorted : sorted.filter(x => top.includes(x) || (multi ? chosen.includes(x.id) : chosen === x.id));
   const hover = x => ({ onMouseEnter: () => onHover(x), onFocus: () => onHover(x), onMouseLeave: () => onHover(null), onBlur: () => onHover(null) });
   const body = x => <>{x.id === null ? <span {...stylex.props(s.none)} aria-hidden="true">{noneLabel}</span> : <Media it={x} />}
-    {(multi ? x.id === null ? !chosen.length : chosen.includes(x.id) : chosen === x.id) && <span aria-hidden="true" {...stylex.props(s.mark)}><Icon n="check" /></span>}
+    {(multi ? x.id === null ? value !== null && !chosen.length : chosen.includes(x.id) : chosen === x.id) && <span aria-hidden="true" {...stylex.props(s.mark)}><Icon n="check" /></span>}
     <span {...stylex.props(s.name)}>{x.id === null ? noneLabel : x.name}</span></>;
   const list = [...(allowNone ? [{ id: null, name: noneLabel }] : []), ...shown];
   const more = sorted.length > top.length && <button type="button" id={id + '-all'} aria-expanded={all} onClick={() => setAll(a => !a)} {...withClass('btn ghost sm', s.more)}>{all ? 'Show fewer' : `See all ${sorted.length}`}</button>;
@@ -48,7 +48,7 @@ export function Tiles({ id, label, items, featured = [], value, multi = false, a
   </RadioGroup>{more}</div>;
   const toggle = x => { if (disabled) return; if (x.id === null) return onChange([]); onChange(chosen.includes(x.id) ? chosen.filter(v => v !== x.id) : [...chosen, x.id]); };
   return <div><div role="group" aria-label={label} id={id} {...stylex.props(s.grid)}>
-    {list.map(x => { const on = x.id === null ? !chosen.length : chosen.includes(x.id);
+    {list.map(x => { const on = x.id === null ? value !== null && !chosen.length : chosen.includes(x.id);
       return <button key={String(x.id)} type="button" data-opt={x.id ?? 'none'} aria-pressed={on} aria-label={x.id === null ? noneLabel : x.name} onClick={() => toggle(x)} {...hover(x)} {...stylex.props(s.tile, on && s.on)}>{body(x)}</button>; })}
   </div>{more}</div>;
 }

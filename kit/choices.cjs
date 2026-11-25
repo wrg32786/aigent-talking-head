@@ -179,6 +179,8 @@ function lockJob(b, locks) {
   const errs = L.validate(locks);
   if (errs.length) throw new Error(errs.join('; '));
   const cut = readCut(b), caps = readCaps(b);
+  // a transition timing's plain cuts go back first, so the lock sees the real seams (the rebuild applies the timing again)
+  require('./sections.cjs').restore(cut);
   const log = [...L.applyCut(locks, cut, { weights: cut.weights }), ...L.applyCaptions(locks, caps)];
   writeCut(b, cut); writeCaps(b, caps);
   return log;

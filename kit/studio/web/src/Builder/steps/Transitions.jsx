@@ -17,7 +17,7 @@ export function Transitions({ CAT, step, plan, save, busy, setHover }) {
       <Toggle id="build-tr-ours" checked={ours} disabled={busy} onChange={on => { setOpen(!on); if (on) save({ ids: null }); }}>Let the look pick the transitions</Toggle>
     </div>
     {!ours && <section aria-labelledby="build-tr-h"><h3 id="build-tr-h" {...stylex.props(s.h)}>Which ones</h3>
-      <Tiles id="build-tr" label="Transitions" items={items} featured={step.featured || []} value={t.ids || []} multi allowNone noneLabel="Straight cuts only" disabled={busy}
+      <Tiles id="build-tr" label="Transitions" items={items} featured={step.featured || []} value={t.ids} multi allowNone noneLabel="Straight cuts only" disabled={busy}
         onChange={ids => { setOpen(false); save({ ids }); }} onHover={setHover} /></section>}
     {(ours || (t.ids || []).length > 0) && <section aria-labelledby="build-tw-h"><h3 id="build-tw-h" {...stylex.props(s.h)}>How often</h3>
       <Tiles id="build-tw" label="How often transitions play" items={WHEN} value={t.when} disabled={busy} onChange={when => save({ when })} /></section>}

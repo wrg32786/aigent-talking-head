@@ -6,9 +6,9 @@
 // Words are reel-time [{ start, end, word }] (kit/spoken.cjs timeline). Without words the first 3 s are the hook.
 // a call to action: a strong asking verb anywhere, or a common verb that starts the sentence or follows "and", "so",
 // "now", "just", "go" ("check out", "get the free guide"), so "this will save you hours" is not one
-const CTA_STRONG = /^(follow|subscribe|comment|join|download|visit|dm|message|click|tap|install)$/;
-const CTA_SOFT = /^(try|grab|check|sign|book|share|save|get|star|link|hit|drop)$/;
-const LEADS = new Set(['and', 'so', 'now', 'just', 'go', 'then', 'please', 'to']);
+const CTA_STRONG = /^(follow|subscribe|download|dm|install)$/;
+const CTA_SOFT = /^(try|grab|check|sign|book|share|save|get|star|link|hit|drop|comment|join|visit|message|click|tap)$/;
+const LEADS = new Set(['and', 'so', 'now', 'just', 'go', 'then', 'please']);
 const isCta = (ws, k) => { const w = low(ws[k].word); return CTA_STRONG.test(w) || (CTA_SOFT.test(w) && (k === 0 || LEADS.has(low(ws[k - 1].word)))); };
 const WHEN = ['every-cut', 'topic', 'hook-cta'];
 const r3 = x => +(+x).toFixed(3);
@@ -66,7 +66,8 @@ function seamAllowed(segs, i, when, takeOf = () => null) {
 // the shakes it took off come back (cut.heldHits). Returns true when anything was held.
 function restore(cut) {
   let any = false;
-  for (const s of cut.segs || []) if ('heldTransition' in s) { if (s.heldTransition == null) delete s.transition; else s.transition = s.heldTransition; delete s.heldTransition; any = true; }
+  // only a seam still a plain cut gets its transition back: one you changed since (choices --apply, cut.json) stays yours
+  for (const s of cut.segs || []) if ('heldTransition' in s) { if (s.transition === 'cut') { if (s.heldTransition == null) delete s.transition; else s.transition = s.heldTransition; } delete s.heldTransition; any = true; }
   if (Array.isArray(cut.heldHits)) { cut.hits = [...(cut.hits || []), ...cut.heldHits].sort((a, b) => (Array.isArray(a) ? a[0] : a) - (Array.isArray(b) ? b[0] : b)); delete cut.heldHits; any = true; }
   return any;
 }
