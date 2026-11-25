@@ -877,7 +877,16 @@ if (flag('rebuild') && !L.isEmpty(LOCKS)) { try { CH.lockJob(build, LOCKS).forEa
 // 5. beat-sync (optional), then render + assemble
 let cut = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8'));
 // --motion on a rebuild: the camera moves already on the pieces are sized again
-if (flag('rebuild') && sectionsPass(build, cut)) fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
+if (flag('rebuild')) {
+  const was = JSON.stringify((cut.segs || []).map(x => x.transition ?? null));
+  if (sectionsPass(build, cut)) {
+    fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
+    // the seams changed (a timing or a lock): choices.json says what is there now, so applying it later saves no stale picks
+    if (was !== JSON.stringify((cut.segs || []).map(x => x.transition ?? null)) || (!L.isEmpty(LOCKS) && LOCKS.transitions)) {
+      try { fs.writeFileSync(path.join(job, 'choices.json'), JSON.stringify(CH.explain(build), null, 1) + '\n'); } catch (e) { console.warn('note: could not update choices.json: ' + e.message); }
+    }
+  }
+}
 // --key-words on a rebuild too, so a change made after the draft reaches the render (Studio passes it once you choose)
 if (flag('rebuild') && opt('key-words')) keyWordsInto(build);
 if (flag('rebuild') && opt('motion')) {

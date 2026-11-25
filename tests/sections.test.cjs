@@ -59,4 +59,15 @@ t('a call to action asks: "this will save you hours" is not one, "check out the 
   assert.strictEqual(SEC.bounds([...W(0, 'Build it once.'), ...W(4, 'Check out the link below.')], 8).ctaStart, 4);
   assert.strictEqual(SEC.bounds([...W(0, 'Build it once.'), ...W(4, 'If you want more, follow me.')], 8).ctaStart, 4);
 });
+t('a seam you changed while it was held stays yours; a lock sees the real seams first', () => {
+  const c = cut(); SEC.tag(c, words); c.transitionsWhen = 'hook-cta'; SEC.applyTransitionsWhen(c);
+  c.segs[3].transition = 'film'; // changed by hand or by choices --apply while held
+  c.transitionsWhen = 'every-cut'; SEC.applyTransitionsWhen(c);
+  assert.strictEqual(c.segs[3].transition, 'film'); assert.strictEqual(c.segs[4].transition, 'whip'); assert.ok(!c.segs.some(x => 'heldTransition' in x));
+  const d = cut(); SEC.tag(d, words); d.transitionsWhen = 'hook-cta'; SEC.applyTransitionsWhen(d); SEC.restore(d);
+  assert.ok(d.segs.slice(1).every(x => x.transition === 'whip') && !d.heldHits, 'restore puts every seam and shake back before a lock');
+});
+t('"I want to share a story" and "that is the message" are not calls to action', () => {
+  assert.strictEqual(SEC.bounds([...W(0, 'Build it once.'), ...W(4, 'I want to share a story.'), ...W(6, 'That is the message.')], 8).ctaStart, null);
+});
 console.log(`\nsections: ${n} tests passed`);
