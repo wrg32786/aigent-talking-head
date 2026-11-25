@@ -19,13 +19,16 @@ const readJson = f => { try { return JSON.parse(readFileSync(f, 'utf8')); } catc
 const writeJson = (f, j) => { mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, JSON.stringify(j, null, 2) + '\n'); };
 const envObj = PY ? { PYTHON: PY } : {};
 
+const claudeRun = (args, o) => process.platform === 'win32'
+  ? spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/c', 'claude', ...args], o)
+  : spawnSync('claude', args, o);
 function claude(user, hooks) {
   if (onPath('claude')) {
-    const has = spawnSync('claude', ['mcp', 'get', NAME], { encoding: 'utf8', shell: process.platform === 'win32' });
+    const has = claudeRun(['mcp', 'get', NAME], { encoding: 'utf8', shell: false });
     if (has.status === 0) say(`Claude Code: ${NAME} is already registered`);
     else {
       const args = ['mcp', 'add', NAME, ...(user ? ['-s', 'user'] : []), ...(PY ? ['-e', `PYTHON=${PY}`] : []), '--', NODE, MCP];
-      const r = spawnSync('claude', args, { stdio: 'inherit', shell: process.platform === 'win32', cwd: ROOT });
+      const r = claudeRun(args, { stdio: 'inherit', shell: false, cwd: ROOT });
       say(r.status === 0 ? `Claude Code: registered ${NAME}` : `Claude Code: claude mcp add failed; run it yourself: claude ${args.join(' ')}`);
     }
   } else say(`Claude Code CLI not found on PATH. Register by hand:\n  claude mcp add ${NAME}${user ? ' -s user' : ''}${PY ? ` -e PYTHON=${PY}` : ''} -- ${NODE} ${MCP}`);

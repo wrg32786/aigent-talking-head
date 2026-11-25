@@ -31,8 +31,8 @@ def main():
         if not post.is_video:
             sys.exit(f"post {shortcode} has no video")
         L.download_post(post, target=shortcode)
-    except (instaloader.exceptions.LoginRequiredException, instaloader.exceptions.ConnectionException,
-            instaloader.exceptions.QueryReturnedBadRequestException) as e:
+    except instaloader.exceptions.InstaloaderException as e:
+        # InstaloaderException is the base (BadResponseException included). Print the plain refusal, no traceback.
         sys.exit(f"Instagram refused the anonymous download ({type(e).__name__}: {e}). "
                  "This helper does not log in. Download the video yourself where you have the rights, then pass the file.")
     vids = sorted(f for f in os.listdir(out_dir) if f.startswith(shortcode) and f.endswith(".mp4"))

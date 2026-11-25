@@ -3,7 +3,10 @@
 // same ids, same credits). docs/specs/broll-sourcing.md, section 2.
 //
 // It is <kit>/vault/ by default (git ignores it), or the folder in Settings, or STUDIO_VAULT (STUDIO_BROLL_LIBRARY
-// still works). Layout:
+// still works). If the old broll-library/ is a junction or symlink to another drive (for example
+// D:\AIgent Studio\broll-library), the default Vault is created next to that real folder so the clips stay
+// on the same drive, unless <kit>/vault already has an index (a previous move), in which case that vault is kept. A scratch session with STUDIO_DIR set (not the install's jobs/.studio) keeps its vault
+// under that session folder and does not move the install's library. Layout:
 //   vault.json                 the index: { version, items: [...], trash: [...] }
 //   items/<id>/item.json       the same record beside its files
 //   items/<id>/<its name>      an uploaded file (it keeps its own name)   items/<id>/thumb.jpg, frames/000.jpg ... (up to 12)
@@ -15,7 +18,7 @@
 // Reference only items (links to other people's videos and posts) are never placed in a reel.
 // shortcut: tags are one flat list and search is by words, until the local picture model lands (phase 3 of the spec).
 import { spawnSync } from 'child_process';
-import { closeSync, copyFileSync, cpSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmSync, rmdirSync, statSync, writeFileSync } from 'fs';
+import { closeSync, copyFileSync, cpSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, realpathSync, renameSync, rmSync, rmdirSync, statSync, writeFileSync } from 'fs';
 import { basename, dirname, extname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { createHash, randomBytes } from 'crypto';
@@ -46,10 +49,28 @@ const bad = (m, code = 400, extra) => Object.assign(new Error(m), { code }, extr
 
 // ---------- where it lives, and the old library moving in ----------
 const MOVED = new Set();
+const realOr = p => { try { return existsSync(p) ? realpathSync(p) : resolve(p); } catch { return resolve(p); } };
+const DEFAULT_STATE = root => join(root, 'jobs', '.studio');
+// Where the Vault should live, and which old-library folders to move in. `root` is the kit (tests pass a temp one).
+export function resolveDir(env = process.env, root = ROOT, settings) {
+  const st = settings || S.loadFile();
+  const own = env.STUDIO_VAULT || env.STUDIO_BROLL_LIBRARY || (st.broll && st.broll.library) || null;
+  if (own) { const p = resolve(own); return { dir: p, from: [p] }; }
+  // a scratch session (STUDIO_DIR pointed away from the install state) must not touch the install library
+  if (env.STUDIO_DIR && resolve(env.STUDIO_DIR) !== resolve(DEFAULT_STATE(root))) {
+    const p = resolve(join(env.STUDIO_DIR, 'vault')); return { dir: p, from: [p] };
+  }
+  const lib = join(root, 'broll-library'), fallback = resolve(join(root, 'vault'));
+  if (!existsSync(lib)) return { dir: fallback, from: [fallback] };
+  const realLib = realOr(lib), elsewhere = dirname(realLib) !== realOr(dirname(resolve(lib)));
+  // if the kit vault already has an index (a previous move landed there), keep it; do not hide those clips
+  const p = elsewhere && !existsSync(join(fallback, 'vault.json')) ? resolve(join(dirname(realLib), 'vault')) : fallback;
+  return { dir: p, from: [p, realLib] };
+}
 export function dir(env = process.env) {
-  const st = S.loadFile(), own = env.STUDIO_VAULT || env.STUDIO_BROLL_LIBRARY || (st.broll && st.broll.library) || null, p = resolve(own || join(ROOT, 'vault'));
+  const { dir: p, from } = resolveDir(env);
   mkdirSync(p, { recursive: true });
-  if (!MOVED.has(p)) { MOVED.add(p); for (const from of [p, ...(own ? [] : [join(ROOT, 'broll-library')])]) { try { migrate(from, p); } catch (e) { console.error('vault: the old library did not move in: ' + e.message); } } }
+  if (!MOVED.has(p)) { MOVED.add(p); for (const src of from) { try { migrate(src, p); } catch (e) { console.error('vault: the old library did not move in: ' + e.message); } } }
   return p;
 }
 const idxPath = d => join(d || dir(), 'vault.json');
@@ -88,7 +109,7 @@ export function migrate(from, to) {
   }
   save(v, to); renameSync(f, join(from, 'library.migrated.json'));
   for (const d of ['.thumbs', ...SOURCES]) { try { rmdirSync(join(from, d)); } catch {} } // only the folders the move left empty
-  if (n) console.error(`vault: ${n} clip${n === 1 ? '' : 's'} moved in from your B-roll library, credits kept`);
+  if (n) console.error(`vault: ${n} clip${n === 1 ? '' : 's'} moved in from your B-roll library, credits kept, now in ${realOr(to)}`);
   return n;
 }
 
