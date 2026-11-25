@@ -63,6 +63,7 @@ function explain(b) {
     row.finishWhy = fin == null ? 'none' : s.finish == null ? 'the job finish (' + (typeof fin === 'string' ? fin : 'custom') + ')'
       : (you.finishes || []).includes(i) ? 'you' : locks.finishes ? 'locked (' + locks.finishes.join(', ') + ')' : (ps.finishPool || []).includes(s.finish) ? (sn || 'style') + ' finish pool' : 'set in cut.json';
     row.bigPunch = !!s.bigPunch;
+    if (s.section) row.section = s.section; // hook, body or cta (kit/sections.cjs)
     if (s.jump) row.jump = true;
     beats.push(row);
     t += len;

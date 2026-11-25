@@ -324,6 +324,7 @@ function renderSteps(s) {
   if (comp.lockString && comp.lockString !== s.lockedAtDraft) args.push('--lock', comp.lockString);
   if (C.MOTIONS.includes(s.pace && s.pace.motion)) args.push('--motion', s.pace.motion);
   if (s.keyWords) args.push('--key-words', s.keyWords); // a key words change after the draft reaches the render
+  if (s.transitionsWhen) args.push('--transitions-when', s.transitionsWhen); // and a transition timing change
   { const ex = SIZES.exportArg(s); if (ex) args.push('--export', ex); }
   // the b-roll lane goes into cut.json first (kit/studio/broll-run.mjs), with credits.txt for the clips it uses
   const bp = BRL.plan(s), steps = [];
@@ -331,7 +332,9 @@ function renderSteps(s) {
   steps.push([process.env.STUDIO_REEL || 'kit/reel.cjs', args, { STUDIO_DRAFT_KEY: draftKey(s), STUDIO_FOOTAGE_KEY: C.footageKey(s) }]);
   let fx = null;
   if (comp.effects.length && env().effectsReady) {
-    const ch = readChoices(s); fx = C.fxPlan(ch, comp.effects);
+    // presenter effect timing from the builder plan (hook, key moments or the whole video)
+    const when = Object.fromEntries(((s.videoPlan && s.videoPlan.presenter) || []).filter(x => x && String(x.id).startsWith('effect:')).map(x => [x.id.slice(7), x.when]));
+    const ch = readChoices(s); fx = C.fxPlan(ch, comp.effects, when);
     if (fx.plan.effects.length) { const p = join('jobs', s.job, 'fx.json'); writeFileSync(join(ROOT, p), JSON.stringify(fx.plan, null, 2)); steps.push(['kit/fx.cjs', ['--name', s.job, '--plan', p]]); }
   }
   return { steps, fx, effects: comp.effects };

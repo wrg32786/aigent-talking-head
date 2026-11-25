@@ -130,8 +130,20 @@ if (!process.env.PYTHONUTF8) process.env.PYTHONUTF8 = '1';
 const argv = process.argv.slice(2);
 const flag = k => argv.includes('--' + k);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d; };
-const VALUED = new Set(['style-look', 'key-words', 'motion', 'goal', 'words', 'scenes', 'scenes-off', 'pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'title-effect', 'title-exit', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
+const VALUED = new Set(['style-look', 'key-words', 'transitions-when', 'motion', 'goal', 'words', 'scenes', 'scenes-off', 'pack', 'lock', 'aliases', 'export', 'caption-position', 'caption-color', 'caption-outline', 'caption-shadow', 'caption-case', 'caption-layer', 'panel-layer', 'caption-entrance', 'title-effect', 'title-exit', 'recipe', 'clip', 'theme', 'cropx', 'model', 'name', 'clips', 'bed', 'logo', 'jobs', 'hook', 'style', 'look', 'fonts', 'sfx', 'bed-start', 'mask', 'broll', 'finish', 'preset', 'title-layer', 'tighten', 'music-energy', 'cards', 'cleanup', 'glossary', 'brands', 'order', 'keep-pauses']);
 
+// cut.json sections (kit/sections.cjs: hook, body, cta on each segment) and --transitions-when, which keeps named
+// transitions only on the seams it names (every-cut, topic, hook-cta); the rest become plain hard cuts. The timing is
+// kept in cut.json (transitionsWhen), so a rebuild applies it again after any lock.
+function sectionsPass(build, cut, { always = false } = {}) {
+  const SEC = require('./sections.cjs'), tw = opt('transitions-when');
+  if (tw) { if (!SEC.WHEN.includes(tw)) die(`--transitions-when must be one of ${SEC.WHEN.join(', ')}`); if (tw === 'every-cut') delete cut.transitionsWhen; else cut.transitionsWhen = tw; }
+  if (!always && !cut.transitionsWhen && !(cut.segs || []).some(x => x.section)) return false;
+  SEC.tag(cut, require('./spoken.cjs').timeline(cut.segs, build));
+  const n = SEC.applyTransitionsWhen(cut);
+  if (n) console.log(`transitions ${cut.transitionsWhen.replace('-', ' and ')} only: ${n} seam${n === 1 ? '' : 's'} made a plain cut`);
+  return true;
+}
 // captions.js keyWords from --key-words (off removes it, so the captions are what they always were)
 function keyWordsInto(build) {
   const v = String(opt('key-words')).toLowerCase(); if (!R.KEY_WORDS.includes(v)) die(`--key-words must be one of ${R.KEY_WORDS.join(', ')}`);
@@ -842,6 +854,7 @@ if (!flag('rebuild')) {
       console.log(FID.line(m));
     } else FID.drop(build);
   } else { RC.dropPlan(build); FID.drop(build); }
+  { const cutF = path.join(build, 'cut.json'), cj = JSON.parse(fs.readFileSync(cutF, 'utf8')); if (sectionsPass(build, cj, { always: true })) fs.writeFileSync(cutF, JSON.stringify(cj, null, 1)); }
   // what was picked, per beat, and why: jobs/<name>/choices.json to edit (kit/choices.cjs)
   try {
     const x = CH.explain(build);
@@ -856,6 +869,7 @@ if (flag('rebuild') && !L.isEmpty(LOCKS)) { try { CH.lockJob(build, LOCKS).forEa
 // 5. beat-sync (optional), then render + assemble
 let cut = JSON.parse(fs.readFileSync(path.join(build, 'cut.json'), 'utf8'));
 // --motion on a rebuild: the camera moves already on the pieces are sized again
+if (flag('rebuild') && sectionsPass(build, cut)) fs.writeFileSync(path.join(build, 'cut.json'), JSON.stringify(cut, null, 1));
 // --key-words on a rebuild too, so a change made after the draft reaches the render (Studio passes it once you choose)
 if (flag('rebuild') && opt('key-words')) keyWordsInto(build);
 if (flag('rebuild') && opt('motion')) {

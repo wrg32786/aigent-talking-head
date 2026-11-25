@@ -188,14 +188,14 @@ export const KIT_BRANDS = ['kit/example/skool-logo.svg'];
 // and makes the one change it needs (the page's one click switch on a greyed option).
 //   useReferenceLook: true sets the board from the reference alone (kit/studio/reference.mjs useReferenceLook): an
 //   earlier look that was in use is set aside, your picks since the reference go. The same one Undo puts it back.
-const SETTLE_KEYS = ['pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'reference', 'switchFor', 'keyWords', 'titles'];
+const SETTLE_KEYS = ['pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'reference', 'switchFor', 'keyWords', 'titles', 'transitionsWhen'];
 const lookSnap = s => JSON.parse(JSON.stringify({ pack: s.pack || null, picks: s.picks || {}, music: s.music, sound: s.sound, pace: s.pace,
-  reference: s.reference ? { mode: s.reference.mode, added: s.reference.added, prev: s.reference.prev, auto: s.reference.auto, applied: s.reference.applied, lookFor: s.reference.lookFor || null, prevLook: s.reference.prevLook || null, fontFor: s.reference.fontFor || null, prevFont: s.reference.prevFont || null, copyMode: s.reference.copyMode || null } : null, entranceLock: !!s.entranceLock, fontLock: !!s.fontLock, boost: s.boost ?? null, titles: s.titles || 'auto', keyWords: s.keyWords || 'off' }));
+  reference: s.reference ? { mode: s.reference.mode, added: s.reference.added, prev: s.reference.prev, auto: s.reference.auto, applied: s.reference.applied, lookFor: s.reference.lookFor || null, prevLook: s.reference.prevLook || null, fontFor: s.reference.fontFor || null, prevFont: s.reference.prevFont || null, copyMode: s.reference.copyMode || null } : null, entranceLock: !!s.entranceLock, fontLock: !!s.fontLock, boost: s.boost ?? null, titles: s.titles || 'auto', keyWords: s.keyWords || 'off', transitionsWhen: s.transitionsWhen || 'every-cut' }));
 export const effectsReady = () => existsSync(join(ROOT, 'effects', '.venv'));
 export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
   const errs = [], log = [];
   if (!p || typeof p !== 'object') return { errs: ['patch must be an object'], log, noop: false };
-  const known = ['keyWords', 'job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands', 'finish', 'switchFor', 'undoChange', 'useReferenceLook', 'styleLook', 'point', 'sizes', 'boost', 'videoPlan', 'titles'];
+  const known = ['keyWords', 'transitionsWhen', 'job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands', 'finish', 'switchFor', 'undoChange', 'useReferenceLook', 'styleLook', 'point', 'sizes', 'boost', 'videoPlan', 'titles'];
   for (const k of Object.keys(p)) if (!known.includes(k)) errs.push(`unknown field "${k}" (${known.join(', ')})`);
   if (p.undoChange) {
     const u = s.lastChange && s.lastChange.undo; if (!u) { errs.push('undoChange: nothing to undo'); return { errs, log, noop: false }; }
@@ -205,6 +205,7 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
     if ('boost' in u) s.boost = u.boost;
     if (u.titles) s.titles = u.titles;
     if (u.keyWords) s.keyWords = u.keyWords;
+    if (u.transitionsWhen) s.transitionsWhen = u.transitionsWhen;
     delete s.lastChange; log.push('undid the last change'); return { errs, log, noop: false };
   }
   if (p.useReferenceLook) {
@@ -281,6 +282,8 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
   // big titles: auto (the Look decides) or off (none at all, the builder's "no big titles")
   // how big the strongest word of a kinetic caption line gets (reel.cjs --key-words); off is the size it always had
   if (p.keyWords !== undefined) { if (!['off', 'subtle', 'strong', 'dramatic'].includes(p.keyWords)) errs.push('keyWords: off, subtle, strong or dramatic'); else if (p.keyWords !== (s.keyWords || 'off')) { s.keyWords = p.keyWords; log.push(`key words ${p.keyWords}`); } }
+  // which seams keep a named transition (reel.cjs --transitions-when, kit/sections.cjs); every-cut is how it always was
+  if (p.transitionsWhen !== undefined) { if (!['every-cut', 'topic', 'hook-cta'].includes(p.transitionsWhen)) errs.push('transitionsWhen: every-cut, topic or hook-cta'); else if (p.transitionsWhen !== (s.transitionsWhen || 'every-cut')) { s.transitionsWhen = p.transitionsWhen; log.push(`transitions ${p.transitionsWhen === 'every-cut' ? 'on every cut' : p.transitionsWhen === 'topic' ? 'on topic changes only' : 'on the hook and CTA only'}`); } }
   if (p.titles !== undefined) { if (!['auto', 'off'].includes(p.titles)) errs.push('titles: auto or off'); else if (p.titles !== (s.titles || 'auto')) { s.titles = p.titles; log.push(p.titles === 'off' ? 'no big titles' : 'big titles: the Look decides'); } }
   if (p.export !== undefined) { if (p.export && !cat.exports.includes(p.export)) errs.push(`export: ${cat.exports.join(', ')}`); else if (SZ.EXTRA.includes(p.export)) { s.sizes = SZ.sizesOf({ sizes: s.sizes, export: p.export }); log.push(`sizes 9:16, ${s.sizes.join(', ')}`); } else { s.export = p.export || null; log.push(`export ${s.export}`); } }
   // sizes: the versions a render makes beside the 9:16 reel (kit/studio/sizes.mjs)
@@ -411,6 +414,7 @@ export function compose(s, { refPack = null } = {}) {
   if (one('titleEffect')) args.push('--title-effect', one('titleEffect'));
   if (one('titleExit')) args.push('--title-exit', one('titleExit'));
   if (s.keyWords && s.keyWords !== 'off') args.push('--key-words', s.keyWords);
+  if (s.transitionsWhen && s.transitionsWhen !== 'every-cut') args.push('--transitions-when', s.transitionsWhen);
   // fonts: yours, unless a reference's style is being copied (Recreate, Copy the look, a saved look) and you have not
   // picked a font since. Then the font the teardown matched is used and an older pick is never sent.
   { const mine = (s.picks.font && s.picks.font.allow) || [], fonts = mine.filter(f => f !== 'theme'), copied = copiesStyle(s.reference) || (!!s.styleLook && !(s.reference && s.reference.mode !== 'off' && s.reference.extracted));
@@ -493,20 +497,25 @@ export function fitStyle(pack) {
 
 // ---------- effects pass plan ----------
 // Picked effects that need no copy of their own, one per beat window after the hook, in the order picked.
-export function fxPlan(choices, effects) {
+// when (the builder's presenter timing, { <effect id>: 'whole' | 'hook' | 'key-moments' }) keeps an effect to the beats
+// of those sections (choices.json beats carry the kit/sections.cjs tag): hook = the hook's beats, key moments = the
+// hook, the call to action and the big punches. An effect with no beat left in its sections is left unplaced.
+export function fxPlan(choices, effects, when = {}) {
   const cat = catalog(), fxcat = JSON.parse(readFileSync(join(ROOT, 'effects', 'catalog.json'), 'utf8'));
   const by = Object.fromEntries(fxcat.effects.map(e => [e.name, e]));
   const usable = effects.filter(id => by[id] && !(by[id].required || []).length && !by[id].needsCustomText);
   const skipped = effects.filter(id => !usable.includes(id));
   const beats = (choices && choices.beats || []).filter(b => b.end - b.start >= 1.2);
-  const out = [];
-  let i = 0;
-  for (const b of beats.slice(1)) {
-    if (i >= usable.length) break;
-    const e = by[usable[i]], d = Math.min(Math.max(e.duration ? e.duration[0] : 2, 1), b.end - b.start - 0.2);
-    out.push({ fx: usable[i], start: +(b.start + 0.1).toFixed(2), end: +(b.start + 0.1 + d).toFixed(2) }); i++;
+  const fits = (b, k, w) => (w === 'hook' ? b.section === 'hook' : w === 'key-moments' ? ['hook', 'cta'].includes(b.section) || !!b.bigPunch : k > 0);
+  const out = [], used = new Set(), unplaced = [];
+  for (const id of usable) {
+    const w = when[id] || 'whole', k = beats.findIndex((b, j) => !used.has(j) && fits(b, j, w));
+    if (k < 0) { unplaced.push(id); continue; }
+    used.add(k); const b = beats[k], e = by[id], d = Math.min(Math.max(e.duration ? e.duration[0] : 2, 1), b.end - b.start - 0.2);
+    out.push({ fx: id, start: +(b.start + 0.1).toFixed(2), end: +(b.start + 0.1 + d).toFixed(2), ...(w !== 'whole' ? { when: w } : {}) });
   }
-  return { plan: { effects: out }, skipped, unplaced: usable.slice(i), cat: !!cat };
+  out.sort((a, b) => a.start - b.start);
+  return { plan: { effects: out }, skipped, unplaced, cat: !!cat };
 }
 
 // ---------- vibes: plain words to picks, without a model ----------
@@ -576,7 +585,7 @@ export function outputsOf(s) {
 // it again puts you back where you were. What carries over: your words (glossary) and the counters; with
 // keepLook, the look too (pack, picks, music, sound, pace, export, brand logos, the saved style look). Keys, settings and the agent
 // connection live in other files and are never touched here.
-export const LOOK_KEYS = ['pack', 'picks', 'music', 'sound', 'pace', 'export', 'sizes', 'brands', 'styleLook', 'boost', 'titles', 'keyWords', 'videoPlan'];
+export const LOOK_KEYS = ['pack', 'picks', 'music', 'sound', 'pace', 'export', 'sizes', 'brands', 'styleLook', 'boost', 'titles', 'keyWords', 'transitionsWhen', 'videoPlan'];
 const KEEP_KEYS = ['format', 'version', 'rev', 'updated', 'chatSeq', 'refSeq', 'importSeq', 'commentSeq', 'videoSeq', 'glossary'];
 const VIDEO_EXT = /\.(mp4|mov|m4v|webm|mkv)$/i;
 export const videosDir = () => join(stateDir(), 'videos');

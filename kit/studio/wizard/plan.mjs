@@ -102,7 +102,7 @@ export function pacePatch(plan, pace, last = null) {
   if (p.music.beatSync !== was.beatSync) p = touch(p, 'music.beatSync');
   if (p.presenter.some(x => x.id === 'punch') !== was.punch) p = touch(p, 'presenter');
   const next = touch(applyPace(p, pace), 'pace'), P = Object.hasOwn(PACES, next.pace) ? PACES[next.pace] : PACES.look, bs = next.music.beatSync;
-  const patch = { music: { energy: next.music.energy }, pace: { tighten: next.advanced.tighten ?? P.tighten, punch: next.presenter.some(x => x.id === 'punch') ? 'on' : 'off' },
+  const patch = { transitionsWhen: Array.isArray(next.transitions.ids) && !next.transitions.ids.length ? 'every-cut' : next.transitions.when, music: { energy: next.music.energy }, pace: { tighten: next.advanced.tighten ?? P.tighten, punch: next.presenter.some(x => x.id === 'punch') ? 'on' : 'off' },
     picks: bs === null ? { 'beatSync:beat-sync': 'clear', 'beatSync:no-beat-sync': 'clear' } : { [`beatSync:${bs ? 'beat-sync' : 'no-beat-sync'}`]: 'allow' } };
   return { plan: next, patch };
 }
@@ -114,7 +114,7 @@ export function diffPatch(prev, next, cat = null) {
   for (const ref of Object.keys(a.picks)) if (!(ref in b.picks)) picks[ref] = 'clear';
   for (const [ref, how] of Object.entries(b.picks)) if (a.picks[ref] !== how) picks[ref] = how;
   const patch = Object.keys(picks).length ? { picks } : {};
-  for (const k of ['pack', 'styleLook', 'titles', 'keyWords', 'music', 'sound', 'pace']) if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) patch[k] = b[k];
+  for (const k of ['pack', 'styleLook', 'titles', 'keyWords', 'transitionsWhen', 'music', 'sound', 'pace']) if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) patch[k] = b[k];
   return patch;
 }
 // a builder step's words choices laid over the plan (only the fields given change)
@@ -209,7 +209,8 @@ export function toState(plan, cat = null) {
   const patch = { clearPicks: true, picks, pack: p.template && p.template.kind === 'pack' ? p.template.name : null,
     styleLook: p.template && p.template.kind === 'look' ? p.template.name : null, titles: w.titles.on === false || (w.type === 'captions' && p.touched.includes('words')) ? 'off' : 'auto',
     music: { bed: p.music.bed, energy: p.music.energy }, sound: { sfx: p.music.sfx ? 'on' : 'off' },
-    pace: { tighten: p.advanced.tighten ?? P.tighten, punch: p.presenter.some(x => x.id === 'punch') ? 'on' : 'off' }, keyWords: w.keyWords.level };
+    pace: { tighten: p.advanced.tighten ?? P.tighten, punch: p.presenter.some(x => x.id === 'punch') ? 'on' : 'off' }, keyWords: w.keyWords.level,
+    transitionsWhen: Array.isArray(p.transitions.ids) && !p.transitions.ids.length ? 'every-cut' : p.transitions.when };
   const look = w.look || (w.type === 'captions' ? 'classic' : w.type === 'kinetic' ? 'kinetic' : null);
   if (look) pick('captionStyle', look);
   if (w.entrance && w.type !== 'captions') pick('captionEntrance', w.entrance);
@@ -238,10 +239,8 @@ export function pending(plan) {
   if (w.place.captions || w.place.titles.length) add('words.place', 'Where words sit');
   if (w.colors.text || w.colors.accent || w.colors.outline) add('words.colors', 'Your own text colors');
   if (w.keyWords.level !== 'off' && (w.keyWords.color !== 'accent' || w.keyWords.maxPerLine !== 1)) add('words.keyWords', 'Key word color and how many per line');
-  if (Array.isArray(p.transitions.ids) && p.transitions.ids.length && p.transitions.when !== 'every-cut') add('transitions.when', 'Transitions only at some cuts');
   for (const x of p.presenter) {
     if (x.id === 'frame-breakout') add('presenter.frame-breakout', 'Frame breakout');
-    else if (String(x.id).startsWith('effect:') && x.when !== 'whole') add('presenter.when', 'Presenter effects at set moments');
   }
   if (Array.isArray(p.filters.ids) && p.filters.ids.length && p.filters.when !== 'whole') add('filters.when', 'Filters only on the hook or CTA');
   if (p.content.repoFeature) add('content', 'Repo or tool feature');
@@ -277,6 +276,7 @@ export function fromState(s, prev = null, cat = null) {
   w.fonts = allow('font')[0] || null; if (w.fonts) take('font', w.fonts);
   const tr = allow('transition');
   if (tr.length) { p.transitions.ids = tr.length === 1 && tr[0] === 'cut' ? [] : tr; for (const id of tr) take('transition', id); } else p.transitions.ids = null;
+  p.transitions.when = s.transitionsWhen || 'every-cut';
   const wasWhen = id => (base.presenter.find(x => x.id === id) || {}).when;
   const pres = [];
   if (!(s.pace && s.pace.punch === 'off')) pres.push({ id: 'punch', when: 'whole' });
