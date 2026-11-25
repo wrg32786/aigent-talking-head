@@ -176,7 +176,7 @@ try {
     assert.deepStrictEqual(now.filters.ids.sort(), ['mono', 'warm']);
     assert.strictEqual(now.filters.when, 'whole', 'a filter picked where there is no timing control goes back to the look\'s way'); assert.strictEqual(now.notes, 'Hook with big red words.');
     assert.strictEqual(now.content.repos.length, 1);
-    assert.deepStrictEqual(VP.pending(now).map(x => x.field).sort(), ['content']); assert.strictEqual(s.finishWhen, undefined);
+    assert.deepStrictEqual(VP.pending(now).map(x => x.field).sort(), ['content']); assert.strictEqual(s.finishWhen, 'none', 'none, so a rebuild clears the old timing');
     // a pause length set by hand on Cut survives a read and a set
     apply(s, { pace: { tighten: 1.2 } }); const again = apply(fresh(), { videoPlan: API.planOf(s, cat) });
     assert.strictEqual(again.pace.tighten, 1.2);
@@ -233,9 +233,13 @@ try {
     const prev = VP.normalize({ music: { bed: 'none', beatSync: true } }), p = VP.fromState(s, prev, cat); assert.strictEqual(p.music.beatSync, true);
     const { patch, plan } = VP.pacePatch(p, 'calm', 'lively'); assert.deepStrictEqual(patch.picks, {}); assert.ok(!plan.touched.includes('music.beatSync') || plan.music.beatSync === true);
   });
+  await t('only a pace you picked counts as the last pace, never one stored with a draft', () => {
+    assert.strictEqual(VP.lastPace({ videoPlan: VP.normalize({ pace: 'high' }) }), null, 'a guessed pace is not a choice');
+    assert.strictEqual(VP.lastPace({ videoPlan: VP.normalize({ pace: 'high', touched: ['pace'] }) }), 'high'); assert.strictEqual(VP.lastPace({}), null);
+  });
   await t('a filter picked with no timing control puts timing back to the look; the builder always sends its timing', () => {
     const s = fresh(); apply(s, { finishWhen: 'hook', picks: { 'finish:mono': 'allow' } }); assert.strictEqual(s.finishWhen, 'hook');
-    apply(s, { picks: { 'finish:grain': 'allow' } }); assert.strictEqual(s.finishWhen, undefined, 'a classic filter is not hook only');
+    apply(s, { picks: { 'finish:grain': 'allow' } }); assert.strictEqual(s.finishWhen, 'none', 'a classic filter is not hook only');
     const a = VP.normalize({ filters: { ids: ['mono'], when: 'hook' }, touched: ['filters'] }), b = VP.withPart(a, 'filters', { ids: ['mono', 'grain'] });
     assert.strictEqual(VP.diffPatch(a, b).finishWhen, 'hook');
   });

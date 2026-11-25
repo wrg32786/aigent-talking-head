@@ -49,11 +49,13 @@ export function Builder({ s: st, CAT, V: appV, apply, patch, go, page, setPage }
   useEffect(() => { const k = ++ask.current; api('/api/video-plan').then(v => { if (k === ask.current) { setView(v); setErr(''); } }).catch(e => { if (k === ask.current) setErr(e.message); }); }, [st.rev, st.videoSeq]);
   // a link to a step that has no screen yet starts at the beginning
   useEffect(() => { if (!known) { history.replaceState(null, '', '#build=start'); setPage('start'); } }, [known, setPage]);
-  useEffect(() => { setHover(null); setSaveErr(''); }, [page]);
+  // a move made with the browser's Back or a typed link (not open) forgets the way back to Your notes too
+  const viaOpen = useRef(false);
+  useEffect(() => { setHover(null); setSaveErr(''); if (!viaOpen.current) setRet(null); viaOpen.current = false; }, [page]);
   // focus the new screen's heading after a move inside the builder, not on first load
   useEffect(() => { if (!moved.current) return; window.scrollTo({ top: 0 }); const h = page === 'start' ? startHead.current : head.current; if (h) h.focus({ preventScroll: true }); }, [page, !!view]);
   // keepRet: a Change link from Your notes (its Next comes back there); any other move forgets it
-  const open = (p, keepRet = false) => { moved.current = true; if (!keepRet) setRet(null); setPage(p); history.replaceState(null, '', '#build=' + p); };
+  const open = (p, keepRet = false) => { moved.current = true; viaOpen.current = true; if (!keepRet) setRet(null); setPage(p); history.replaceState(null, '', '#build=' + p); };
   // A choice shows at once; choices made while one is saving wait in a queue (choices of the same kind merge, so only
   // the latest of each is sent) and are sent in order. Returns when the queue is empty.
   const [shown, setShown] = useState(null), queue = useRef([]), drain = useRef(null);

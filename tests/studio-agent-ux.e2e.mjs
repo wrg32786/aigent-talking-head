@@ -147,6 +147,11 @@ try {
     const out = (await api('/api/cut')).output; assert.strictEqual(out.goal, 'ad'); assert.strictEqual(out.adCuts, true);
     const V = await api('/api/video-plan'); assert.strictEqual(V.plan.pace, 'high'); assert.match(V.plan.notes, /one clear ask/);
     await api('/api/wizard', { wizard: 'reel', goal: 'sell' }); assert.strictEqual((await api('/api/video-plan')).plan.notes.match(/one clear ask/g).length, 1, 'the note is added once');
+    // the next goal swaps only the line a goal added; a line you added yourself stays
+    await api('/api/video-plan', { notes: (await api('/api/video-plan')).plan.notes + '\nHook in the first line, short and punchy.' });
+    await api('/api/wizard', { wizard: 'reel', goal: 'teach' }); const N = (await api('/api/video-plan')).plan.notes;
+    assert.ok(!/one clear ask/.test(N) && /Clear over fast/.test(N) && /short and punchy/.test(N), N);
+    await api('/api/wizard', { wizard: 'reel', goal: 'grow' }); assert.strictEqual((await api('/api/video-plan')).plan.notes.match(/short and punchy/g).length, 1, 'never twice');
     await api('/api/wizard', { wizard: 'clips', clips: 3, ads: true });
     const c = await until(async () => { const v = await api('/api/cut'); return v.candidates && v.candidates.length ? v : null; }); assert.strictEqual(c.output.kind, 'clips'); assert.strictEqual(c.output.clips, 3); assert.strictEqual(c.output.adCuts, true);
     await open(pg, '#step=cut');

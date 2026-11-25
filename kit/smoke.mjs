@@ -612,6 +612,10 @@ try {
     run(node, [join(KIT, 'reel.cjs'), '--rebuild', '--jobs', join(work, 'jobs'), '--name', 'smoke-reel', '--mask', 'mediapipe', '--lock', 'finishes=mono', '--finish-when', 'hook'], work);
     { const c = JSON.parse(readFileSync(join(work, 'jobs', 'smoke-reel', 'build', 'cut.json'), 'utf8')), hook = c.segs.filter(x => x.section === 'hook');
       if (c.finishWhen !== 'hook' || c.finish || !hook.length || !hook.every(x => x.finish === 'mono') || c.segs.some(x => x.section !== 'hook' && x.finish)) fail('--rebuild --finish-when hook: the filter should be on the hook pieces only: ' + JSON.stringify(c.segs.map(x => [x.section, x.finish || null]))); }
+    // a classic filter pick after that sends --finish-when none: the old timing goes and the pieces get their filters back
+    run(node, [join(KIT, 'reel.cjs'), '--rebuild', '--jobs', join(work, 'jobs'), '--name', 'smoke-reel', '--mask', 'mediapipe', '--finish-when', 'none'], work);
+    { const c = JSON.parse(readFileSync(join(work, 'jobs', 'smoke-reel', 'build', 'cut.json'), 'utf8'));
+      if (c.finishWhen || c.finishIds || c.segs.some(x => 'heldFinish' in x || x.timedFinish)) fail('--rebuild --finish-when none: the hook-only timing should be gone: ' + JSON.stringify({ finishWhen: c.finishWhen, finishIds: c.finishIds, segs: c.segs.map(x => [x.section, x.finish || null]) })); }
   });
   // --- Muse edit rules: multi-take picking, zoom punch, kinetic titles, pills, named transitions, sound rules, check, verify
   step('clip.py multi-take: best take per sentence across files (word times given, no Whisper)', () => {
