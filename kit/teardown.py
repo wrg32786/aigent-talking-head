@@ -647,6 +647,8 @@ def caption_layer(video, cues, seg):
         off = (~mb) & rows[:, None]
         if off.sum() < 30:
             off = ~mb
+        if not off.any():  # the whole box is on the person: nothing beside it to compare, and a mean of nothing is NaN, which breaks the JSON
+            continue
         out.append({"t0": c["t0"], "text": c["text"], "on_n": int(mb.sum()), "text_on_person": round(float(tb[mb].mean()), 3), "text_off_person": round(float(tb[off].mean()), 3)})
     return out
 
