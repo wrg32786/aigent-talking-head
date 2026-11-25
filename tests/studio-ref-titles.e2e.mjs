@@ -41,7 +41,7 @@ const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { metho
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const until = async (fn, ms = 20000) => { const end = Date.now() + ms; for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) throw new Error('timed out'); await wait(150); } };
 const theme = async (pg, th) => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#ref-titles'); };
-const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); };
+const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#areas'); };
 const shot = async (pg, name) => { if (!shots) return; await pg.$eval('#ref-titles', e => e.scrollIntoView({ block: 'center' })); await pg.waitForTimeout(400); await pg.screenshot({ path: join(shots, name) }); };
 const text = async (pg, sel) => (await pg.textContent(sel)).replace(/\s+/g, ' ').trim();
 const buttons = pg => pg.$$eval('#ref-titles button', x => x.map(e => e.textContent.trim()));

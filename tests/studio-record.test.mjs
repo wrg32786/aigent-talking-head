@@ -2,7 +2,7 @@
 // MediaRecorder output) is sent to /api/record in numbered chunks, with a retried chunk and an out-of-order chunk;
 // finish converts it to an H.264/AAC mp4 with a thumbnail, the take joins the footage, Studio posts the
 // "New take recorded" note, and keep, unkeep and discard work. The MCP side (studio_takes) reads the same list.
-// Without ffmpeg only the chunk checks run. Run: node tests/studio-record.test.mjs   (npm run check runs it too)
+// With no video open a take still starts and is held for the Recording tab. Without ffmpeg only the chunk checks run. Run: node tests/studio-record.test.mjs   (npm run check runs it too)
 import assert from 'assert';
 import { spawn, spawnSync } from 'child_process';
 import { mkdtempSync, rmSync, existsSync, readFileSync, statSync } from 'fs';
@@ -34,8 +34,10 @@ const until = async (fn, ms = 30000) => { const end = Date.now() + ms; for (;;) 
 
 let client;
 try {
-  await t('start needs a job name', async () => {
-    assert.strictEqual((await req('/api/record/start', { mime: 'video/webm' })).status, 400);
+  await t('with no video open a take still starts (it is held for the Recording tab), and aborting it leaves nothing', async () => {
+    const st = await req('/api/record/start', { mime: 'video/webm' }); assert.strictEqual(st.status, 200);
+    const tk = st.j.state.takes.find(x => x.id === st.j.id); assert.ok(tk && tk.held, JSON.stringify(tk));
+    assert.ok(!(await req('/api/record/abort', { id: st.j.id })).j.state.takes.some(x => x.id === st.j.id));
     await req('/api/state', { job: JOB });
   });
   await t('chunks: in order, a retried chunk is ignored, a gap is refused with the next seq, an unknown take is 404', async () => {

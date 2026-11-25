@@ -310,6 +310,7 @@ if (target) {
     results.push({ label: 'Studio step map tests (tests/studio-steps.test.mjs: the 8 steps, old step names land, one step per layer, menu links, match chips)', errs: sterrs, warns: [] });
     for (const [f, what] of [
       ['wizard-steps.test.mjs', 'Studio builder step map (tests/wizard-steps.test.mjs: one decision per screen, every option owned by one step or All options, featured options real, plain copy)'],
+      ['studio-recordings.test.mjs', 'Studio recordings (tests/studio-recordings.test.mjs: takes from every video and the holding folder, Use in a video moves a held take and copies another video\'s, no clashing take numbers, plain refusals)'],
       ['wizard-plan.test.mjs', 'Studio builder plan (tests/wizard-plan.test.mjs: defaults per pace, plain errors, a plan sets the same picks as the classic clicks, classic changes read back, no titles and no filters as locks, the route and MCP tools)'],
       ['studio-cut-server.test.mjs', 'Studio Cut server tests (tests/studio-cut-server.test.mjs: the Cut routes, the point, topics, Pacing and the stitched previews over HTTP)'],
       ['studio-stages.test.mjs', 'Studio stage status tests (tests/studio-stages.test.mjs: teardown log lines to the stage line, the list and the bar)'],

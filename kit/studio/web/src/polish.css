@@ -266,3 +266,37 @@ main[data-step="render"][data-view="main"] { animation: step-in-10 var(--motion-
 .size-opt.locked input:disabled { opacity: 1; accent-color: var(--primary); filter: saturate(.7) opacity(.75); }
 /* Start: smaller footage thumbnails, so the choice under them is on screen at first load */
 @media (min-width: 901px) { #footage.clips { grid-template-columns: repeat(auto-fill, minmax(92px, 104px)); margin-top: 12px; } }
+
+/* ---------- the three tabs in the top bar: New video, Teardowns, Recording (App.jsx); the steps sit under them ---------- */
+.areas { flex: none; margin: 0 auto; }
+.areas-list { display: inline-flex; gap: 2px; }
+.areas-list button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 5px 14px; min-height: 36px; font-size: 13.5px; white-space: nowrap; }
+.areas-list button[aria-selected="true"] { background: var(--seg-on-bg, var(--card)); color: var(--seg-on-fg, var(--foreground)); box-shadow: var(--seg-on-shadow, 0 1px 2px rgba(0, 0, 0, .25)); }
+.areas-list button:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.stepbar { position: sticky; top: var(--top); z-index: 15; margin: -8px 0 14px; padding: 8px 0; background: color-mix(in srgb, var(--background) 88%, transparent); backdrop-filter: blur(10px); }
+main:not([data-area="new"]) { padding-bottom: 32px; }
+@media (max-width: 900px) { .areas .al { display: none; } .areas-list button { padding: 5px 10px; } }
+@media (max-width: 640px) { .areas { order: 3; flex-basis: 100%; display: flex; } .areas-list { width: 100%; } .areas-list button { flex: 1; justify-content: center; } .areas .al { display: inline; } }
+@media (pointer: coarse) { .areas-list button { min-height: 44px; } }
+
+/* ---------- Recording tab: your recordings across videos (Recording.jsx) ---------- */
+#s-recording .sources { grid-template-columns: 1fr; }
+#s-recording .drop.big { min-height: 200px; }
+.recs { margin-top: 18px; display: flex; flex-direction: column; gap: 8px; }
+.rec-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rec-item { display: grid; grid-template-columns: 56px 1fr auto; align-items: center; gap: 12px; padding: 8px; border-radius: 12px; }
+.rec-thumb { position: relative; width: 56px; height: 72px; border-radius: 8px; overflow: hidden; background: #000; display: grid; place-items: center; color: #888; }
+.rec-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.rec-ov { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; opacity: 0; background: rgba(0, 0, 0, .35); transition: opacity .15s; }
+.rec-thumb:hover .rec-ov, .rec-thumb:focus-visible .rec-ov { opacity: 1; }
+.rec-meta { display: flex; flex-direction: column; min-width: 0; } .rec-meta b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rec-act { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.rec-in { display: inline-flex; align-items: center; gap: 4px; margin: 0; }
+@media (max-width: 640px) { .rec-item { grid-template-columns: 56px 1fr; } .rec-act { grid-column: 1 / -1; justify-content: flex-start; } }
+
+/* ---------- Teardowns tab: the Template Library (Teardowns.jsx) ---------- */
+.tlib { margin-top: 28px; display: flex; flex-direction: column; gap: 8px; }
+.tlib-list { list-style: none; margin: 0 0 10px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.tlib-card { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 12px; }
+.tlib-card > span { display: flex; flex-direction: column; min-width: 0; }
+.tlib-card .fine { margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

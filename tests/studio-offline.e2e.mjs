@@ -34,11 +34,11 @@ try {
   pg.on('pageerror', e => errs.push(e.message));
   await pg.goto(url + '/#step=footage', { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#more-open');
 
-  await t('wizards: Copy a reference opens the link screen, Let my agent decide works', async () => {
+  await t('wizards: Copy a reference is gone (Teardowns has it), the clips screen opens, Let my agent decide works', async () => {
     await pg.click('#more-open'); await pg.click('#more-wizards'); await pg.waitForSelector('#wz-list');
-    await pg.click('.wz-pick[data-wizard="reference"]');
-    await pg.waitForSelector('#wz-url-in');
-    assert.strictEqual(await pg.$('#wz-clips-go'), null, 'Copy a reference shows the clips screen');
+    assert.strictEqual(await pg.$('.wz-pick[data-wizard="reference"]'), null, 'Copy a reference is still in Wizards');
+    await pg.click('.wz-pick[data-wizard="clips"]');
+    await pg.waitForSelector('#wz-clips-go');
     await pg.click('#wizards .wz-agent'); await pg.waitForFunction(() => !document.getElementById('wizards').open);
     assert.deepStrictEqual(errs, []);
   });

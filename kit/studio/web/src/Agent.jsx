@@ -45,12 +45,13 @@ export function AskAgent({ step, apply, openChat }) {
 }
 
 // ---------- wizards ----------
-// the wizards, their goals and clip counts come from the server (kit/studio/wizards.mjs), so MCP run_wizard matches
-const WIZ_ORDER = ['reel', 'reference', 'clips'];
+// the wizards, their goals and clip counts come from the server (kit/studio/wizards.mjs), so MCP run_wizard matches.
+// Copy a reference is the Teardowns tab now, so only the reel and clips wizards show here
+const WIZ_ORDER = ['reel', 'clips'];
 
 export function Wizards({ CAT, V, s, apply, patch, go, open, setOpen, openChat }) {
   const ref = useRef(null), [w, setW] = useState(null), [n, setN] = useState(0), [busy, setBusy] = useState(false), [err, setErr] = useState('');
-  const [url, setUrl] = useState(''), [clips, setClips] = useState(5), [ads, setAds] = useState(false), [goal, setGoal] = useState(null), [W, setWdef] = useState(null);
+  const [clips, setClips] = useState(5), [ads, setAds] = useState(false), [goal, setGoal] = useState(null), [W, setWdef] = useState(null);
   // the wizards load from the server; if Studio was stopped, Try again (or Studio coming back) loads them
   const [tries, setTries] = useState(0);
   useEffect(() => onOffline(v => { if (!v) setTries(k => k + 1); }), []);
@@ -63,7 +64,7 @@ export function Wizards({ CAT, V, s, apply, patch, go, open, setOpen, openChat }
   // one wizard step on the server; the last one closes the wizard and opens the step it says comes next
   const step = (body, last) => run(async () => { const j = await api('/api/wizard', body); apply(j); const z = j.wizard || {};
     if (last || z.pending) { close(); if (z.next && z.next !== 'choose' && z.next !== 'look' && z.next !== 'picture') go(z.next, true); if (z.note) toast(z.note, true); } return j; });
-  const deciders = { reel: ['Pick the goal for this take and set the output.', 'Pick a Look that fits this take.', 'Choose the lines for my clip.'], reference: ['Find a reference reel that fits what I am making.'], clips: ['Pick the best clips from this take, and say if ad cuts make sense.'] };
+  const deciders = { reel: ['Pick the goal for this take and set the output.', 'Pick a Look that fits this take.', 'Choose the lines for my clip.'], clips: ['Pick the best clips from this take, and say if ad cuts make sense.'] };
   const Decide = ({ k }) => <Button className="wz-agent" variant="ghost" size="sm" label="Let my agent decide" icon={<Icon n="spark" />} isDisabled={busy} onClick={() => agent(deciders[w][k] || deciders[w][0])} />;
   const body = () => {
     if (!W) return err ? <div className="row"><Button id="wz-retry" variant="ghost" size="sm" label="Try again" onClick={() => { setErr(''); setTries(k => k + 1); }} /></div> : <p className="fine">Loading</p>;
@@ -79,10 +80,6 @@ export function Wizards({ CAT, V, s, apply, patch, go, open, setOpen, openChat }
       return <><h3 className="wz-q">Use our best lines</h3><p className="fine">It picks a hook first and the call to action last, on whole words, to fit the length. You check the draft on Review.</p>
         <div className="row"><Button id="wz-choose" variant="primary" label="Use our best lines" isLoading={busy} onClick={() => step({ wizard: 'reel', choose: true }, true)} /><Decide k={2} /></div></>;
     }
-    if (w === 'reference') return <><h3 className="wz-q">Paste a reel you like</h3><p className="fine">A link from Instagram, TikTok, YouTube or a file link. Studio reads its titles, colors, cuts and sound.</p>
-      <form className="wz-url" onSubmit={e => { e.preventDefault(); if (!url.trim()) { setErr('Paste a link first.'); return; } step({ wizard: 'reference', url: url.trim() }, true); }}>
-        <label className="sr" htmlFor="wz-url-in">Reference link</label><input id="wz-url-in" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://www.instagram.com/reel/..." />
-        <Button id="wz-ref-go" type="submit" variant="primary" size="sm" label="Add this video" isLoading={busy} /></form><Decide k={0} /></>;
     return <><h3 className="wz-q">How many clips?</h3>
       <div className="seg" role="radiogroup" aria-label="Clips">{W.clipCounts.map(k => <button key={k} type="button" role="radio" aria-checked={clips === k ? 'true' : 'false'} onClick={() => setClips(k)}>{k}</button>)}</div>
       <label className="lbl-in"><input type="checkbox" id="wz-ads" checked={ads} onChange={e => setAds(e.target.checked)} /> Add 15 s and 30 s ad cuts</label>

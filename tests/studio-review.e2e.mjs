@@ -64,7 +64,7 @@ const asCurrentDraft = async (job, version = 1) => {
   }
 };
 // a fresh load of a link: via about:blank, because a new hash alone does not reload the page
-const open = async (page, hash) => { await page.goto('about:blank'); await page.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await page.waitForSelector('#stepper'); };
+const open = async (page, hash) => { await page.goto('about:blank'); await page.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await page.waitForSelector('#areas'); };
 const c3 = c => c.segs.filter(s => /clip-003/.test(s.file));
 // a screenshot of one panel, scrolled below the sticky header
 const shot = async (page, sel, name) => {
@@ -86,7 +86,7 @@ try {
 
   await t('what to swap: parts with times; a time seeks the reference; Use picks the look', async () => {
     await open(pg, '#step=reference'); await pg.waitForSelector('#s-ref');
-    assert.strictEqual(await pg.$eval('main', m => m.dataset.step + ' ' + m.dataset.view), 'picture reference');
+    assert.strictEqual(await pg.$eval('main', m => m.dataset.area), 'teardowns');
     await pg.waitForSelector('#ref-byhand > summary'); assert.strictEqual(await pg.$eval('#ref-byhand', e => e.open), false, 'Pick parts by hand starts closed'); await pg.click('#ref-byhand > summary');
     await pg.waitForSelector('#swap .sw-list li');
     const rows = await pg.$$eval('#swap .sw-list li .sw-k', x => x.map(e => e.textContent));

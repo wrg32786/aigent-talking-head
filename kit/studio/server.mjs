@@ -19,6 +19,7 @@ import * as CH from './channel.mjs';
 import * as AG from './agui.mjs';
 import * as RV from './review.mjs';
 import * as REC from './record.mjs';
+import * as RECS from './recordings.mjs';
 import * as SC from './scripts.mjs';
 import * as AGT from './agents.mjs';
 import * as CL from './cloud.mjs';
@@ -1049,6 +1050,18 @@ async function api(req, res, u) {
   if (p === '/api/record/abort' && M === 'POST') { const b = await readBody(req); const s = update(st => { REC.abort(st, +b.id); }); return json(res, 200, view(s)); }
   if (p === '/api/record/take' && M === 'POST') { const b = await readBody(req); try { const s = update(st => { REC.act(st, +b.id, b.action); }); return json(res, 200, view(s)); } catch (e) { return json(res, e.code || 500, { error: e.message }); } }
   if (p === '/api/record/takes' && M === 'GET') return json(res, 200, { takes: REC.list(C.load()) });
+  // the Recording tab: every take across videos, and Use in this video / Use in a new video (kit/studio/recordings.mjs)
+  if (p === '/api/recordings' && M === 'GET') return json(res, 200, { recordings: RECS.list(C.load()) });
+  if (p === '/api/recordings/use' && M === 'POST') {
+    const b = await readBody(req);
+    try {
+      RECS.found(b.file);
+      const busy = !b.newVideo && busyWith(C.load()); if (busy) return json(res, 409, { error: `${busy}. Let it finish, then add the take.` });
+      if (b.newVideo) switchVideo({ name: b.name || '', keepLook: true });
+      const s = update(st => { RECS.use(st, b.file); });
+      return json(res, 200, view(s));
+    } catch (e) { return json(res, e.code || 500, { error: e.message }); }
+  }
   // Scripts (kit/studio/scripts.mjs): per job, in jobs/.studio/scripts/<job>/
   if (p.startsWith('/api/scripts')) {
     const job = C.load().job, touch = () => update(st => { st.scriptsAt = Date.now(); });
@@ -1555,7 +1568,7 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === '/api/agui' && req.method === 'POST') return await aguiRun(req, res);
     if (u.pathname.startsWith('/api/')) {
       // Requests which await work may still write the old edit when they finish. Do not switch underneath them.
-      const changing = req.method !== 'GET' && !u.pathname.startsWith('/api/videos/') && u.pathname !== '/api/task/cancel';
+      const changing = req.method !== 'GET' && !u.pathname.startsWith('/api/videos/') && u.pathname !== '/api/recordings/use' && u.pathname !== '/api/task/cancel'; // a video switch (Use in a new video too) checks for the others, so it is not one
       if (changing) activeRequests++;
       try { return await api(req, res, u); } finally { if (changing) activeRequests--; }
     }
