@@ -11,6 +11,7 @@ import { fileURLToPath } from 'url';
 import { findChrome } from '../kit/chrome.mjs';
 import * as LIVE from '../kit/studio/preview.mjs';
 import * as OF from '../kit/overlay-files.mjs';
+import { listPairings } from '../kit/fonts.mjs';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 let n = 0; const t = async (name, fn) => { await fn(); n++; console.log('ok ' + name); };
@@ -38,6 +39,13 @@ await t('the sample follows the words: look, key words, place, colors, titles of
   assert.strictEqual(plain.captionStyle, 'pill'); assert.ok(!plain.flips.some(f => f.mode === 7), 'plain captions have no big title'); assert.ok(!plain.keyWords);
 });
 
+await t('the preview takes only a font pairing the kit knows, never a file path or a list', () => {
+  assert.strictEqual(LIVE.pairingOf('/etc/passwd.json'), 'theme'); assert.strictEqual(LIVE.pairingOf('../x.json'), 'theme');
+  assert.strictEqual(LIVE.pairingOf('druk,modern'), 'theme'); assert.strictEqual(LIVE.pairingOf({}), 'theme');
+  const one = Object.keys(listPairings())[0]; assert.strictEqual(LIVE.pairingOf(one), one);
+  assert.ok(!/passwd/.test(LIVE.file(LIVE.keyOf({ fonts: '/etc/passwd.json' }), 'fonts.js').body));
+});
+
 let chrome = null;
 try { chrome = findChrome(); } catch (e) { if (process.env.CHROME_PATH || process.env.GITHUB_ACTIONS) throw e; }
 if (!chrome) console.log('skip the face check: Chrome is not on this computer');
@@ -47,6 +55,10 @@ else {
   for (const look of ['classic', 'pill', 'hormozi', 'karaoke', 'one-word', 'oneword']) for (const cap of [null, 'chest', 'lower']) combos.push({ type: look === 'oneword' ? 'kinetic' : 'captions', look, place: { captions: cap, titles: [] } });
   for (const level of ['off', 'subtle', 'strong', 'dramatic']) for (const cap of [null, 'chest', 'lower']) for (const tp of [null, 'left', 'right', 'above'])
     combos.push({ type: 'kinetic', look: 'kinetic', keyWords: { level }, place: { captions: cap, titles: tp ? [tp] : [] } });
+  // the one-word look with each key words level, and other font pairings and themes
+  for (const level of ['subtle', 'dramatic']) for (const cap of [null, 'lower']) combos.push({ type: 'kinetic', look: 'oneword', keyWords: { level }, place: { captions: cap, titles: ['right'] } });
+  const pairs = Object.keys(listPairings()).filter(k => !k.startsWith('_')).slice(0, 6);
+  for (const [i, fonts] of pairs.entries()) combos.push({ type: 'kinetic', look: 'kinetic', fonts, colors: { theme: ['aigent', 'magazine', 'neutral'][i % 3] }, keyWords: { level: 'dramatic' }, place: { captions: i % 2 ? 'lower' : 'chest', titles: ['above'] } });
   const browser = await chromium.launch({ executablePath: chrome, args: ['--no-sandbox'] });
   try {
     const pg = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
@@ -67,7 +79,7 @@ else {
       if (process.env.PREVIEW_FACE_OUT) (await import('fs')).writeFileSync(process.env.PREVIEW_FACE_OUT, JSON.stringify(bad, null, 1));
       assert.deepStrictEqual(bad, []);
     });
-    await t('key words: none and off draw the same caption; subtle, strong and dramatic grow the key word in turn', async () => {
+    await t('key words: none and off draw the same caption; subtle, strong and dramatic each grow the key word more', async () => {
       let doc = null;
       await pg.route('https://raw.local/**', r => { const name = new URL(r.request().url()).pathname.slice(1);
         if (name === 'captions.js') return r.fulfill({ contentType: 'text/javascript', body: 'window.CAPTIONS=' + JSON.stringify(doc) + ';' });
@@ -77,7 +89,7 @@ else {
         return pg.evaluate(() => { const l = window.__lockups()[0]; return { size: l.heroSize, box: l.box }; }); };
       const none = await size(null), off = await size('off'), sub = await size('subtle'), strong = await size('strong'), dram = await size('dramatic');
       assert.deepStrictEqual(off, none, 'off is the size it always had');
-      assert.ok(sub.size < none.size && none.size < strong.size && strong.size <= dram.size, JSON.stringify({ sub, none, strong, dram }));
+      assert.ok(none.size < sub.size && sub.size < strong.size && strong.size < dram.size, JSON.stringify({ none, sub, strong, dram }));
     });
   } finally { await browser.close(); }
 }
