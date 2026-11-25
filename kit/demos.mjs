@@ -7,6 +7,7 @@
 // as a left to right reveal so the change is visible. Words behind the head use the presenter's person mask.
 //   node kit/demos.mjs                   every demo        --only effect,finish   some kinds   --ids moody,mono   some ids
 //   node kit/demos.mjs --missing         only the ones not made yet (Studio's Make missing previews runs this)
+//   node kit/demos.mjs --sounds          only the waveforms of the music beds and sounds (docs/menu/sounds.json)
 //   node kit/demos.mjs --check           the visible-change check on every demo (tests/demos-visible.test.mjs runs it)
 // Output: docs/menu/<effects|graphics|finishes|title-layers>/<id>.webp and docs/menu/demo-plate.webp (the plain plate).
 // Effects need the effects add-on (npm run effects:setup); without it they are skipped with a note.
@@ -119,6 +120,24 @@ export function items() {
     ...sec('finishes').map(it => ({ kind: 'finish', it })), ...['front', 'behind', 'auto'].map(id => ({ kind: 'titleLayer', it: { id } }))];
 }
 
+// ---- sounds: a small waveform (48 bars, 0..100) for every music bed and sound, so the sound tiles can show their shape
+// without loading the audio. Written to docs/menu/sounds.json; the tiles play the file itself only when asked
+export const SOUNDS = join(MENU, 'sounds.json');
+export function peaks(file, n = 48) {
+  const raw = sh('ffmpeg', ['-v', 'error', '-i', file, '-ac', '1', '-ar', '8000', '-f', 's16le', '-']), pcm = new Int16Array(raw.buffer, raw.byteOffset, raw.length >> 1);
+  const step = Math.max(1, Math.floor(pcm.length / n)), out = [];
+  for (let i = 0; i < n; i++) { let m = 0; for (let j = i * step; j < Math.min(pcm.length, (i + 1) * step); j++) m = Math.max(m, Math.abs(pcm[j])); out.push(m); }
+  const top = Math.max(1, ...out); return out.map(v => Math.round(100 * v / top));
+}
+export function buildSounds() {
+  const beds = JSON.parse(readFileSync(join(KIT, 'music', 'beds.json'), 'utf8')), sfx = JSON.parse(readFileSync(join(KIT, 'sfx', 'sfx.json'), 'utf8')).sounds;
+  const out = { beds: {}, sfx: {} };
+  for (const [id, b] of Object.entries(beds)) out.beds[id] = peaks(join(KIT, 'music', b.file));
+  for (const x of sfx) out.sfx[x.id] = peaks(join(KIT, 'sfx', x.file));
+  writeFileSync(SOUNDS, JSON.stringify(out) + '\n');
+  return Object.keys(out.beds).length + Object.keys(out.sfx).length;
+}
+
 // ---- the visible-change check: each demo against the plain plate, frame by frame. ffmpeg cannot read animated webp, so
 // Chrome decodes them (ImageDecoder). The score is the share of the picture (percent) where some colour moved by at least
 // STEP levels, at the clearest frame. A grey finish keeps the brightness and grain keeps the average, so an average
@@ -176,6 +195,7 @@ async function main() {
     console.log(bad.length ? `These demos do not show a visible change yet: ${bad.map(r => r.id).join(', ')}` : `All ${rows.length} demos show a visible change.`);
     process.exit(bad.length ? 1 : 0);
   }
+  if (argv.includes('--sounds') || !existsSync(SOUNDS)) { console.log(`Sound waveforms: ${buildSounds()} sounds.`); if (argv.includes('--sounds')) return; }
   if (argv.includes('--missing')) list = list.filter(x => !existsSync(demoPath(x.kind, x.it.id)));
   if (!fxReady() && list.some(x => x.kind === 'effect')) { console.log('Effects previews need the effects add-on; skipping them.'); list = list.filter(x => x.kind !== 'effect'); }
   const work = mkdtempSync(join(tmpdir(), 'demos-'));

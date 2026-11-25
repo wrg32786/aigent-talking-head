@@ -30,7 +30,7 @@ export const KIND_MODE = {
   titleEffect: 'one', titleExit: 'one', // one Effect and one Exit for the titles of the reel (1.29.0)
 };
 const EDIT_TOGGLES = ['punch', 'tighten', 'cards-auto', 'colour-card', 'chapter-card', 'sfx-cap', 'sfx-map'];
-const ANIMATED = { transition: 'transitions', entrance: 'titles', titleEffect: 'title-effects', titleExit: 'title-effects', captionEntrance: 'caption-entrances', captionStyle: 'caption-styles' };
+const ANIMATED = { transition: 'transitions', entrance: 'titles', effect: 'effects', graphic: 'graphics', finish: 'finishes', titleLayer: 'title-layers', titleEffect: 'title-effects', titleExit: 'title-effects', captionEntrance: 'caption-entrances', captionStyle: 'caption-styles' };
 const STILL = { transition: 'transition', effect: 'effect', graphic: 'graphic', finish: 'finish', entrance: 'entrance', captionStyle: 'caption', look: 'look', titleLayer: 'titleLayer', theme: 'theme', beatSync: 'beatSync', bed: 'bed', sfx: 'sfx', font: 'font', preset: 'preset' };
 const rel = p => relative(ROOT, p).split('\\').join('/');
 
@@ -116,7 +116,11 @@ export function catalog({ fresh = false } = {}) {
   const packs = K.list().map(p => ({ name: p.name, label: p.label, description: p.description, version: p.version, shipped: !!p.shipped, locks: L.describe(p.locks || {}), sets: setsOf(p),
     preview: p.dir && existsSync(join(p.dir, 'preview.webp')) ? rel(join(p.dir, 'preview.webp')) : null }));
   const beds = JSON.parse(readFileSync(join(KIT, 'music', 'beds.json'), 'utf8'));
-  cached = { categories, layers, items, packs, candidates: map.candidates || [], beds: Object.entries(beds).map(([id, b]) => ({ id, title: b.title, seconds: b.seconds, energy: b.energy, file: rel(join(KIT, 'music', b.file)) })),
+  // the sound tiles: every bed and sound with its waveform (docs/menu/sounds.json, made by kit/demos.mjs --sounds)
+  const wave = (() => { try { return JSON.parse(readFileSync(join(ROOT, 'docs', 'menu', 'sounds.json'), 'utf8')); } catch { return { beds: {}, sfx: {} }; } })();
+  const sfxTitle = id => { const w = id.replace(/^\d+-/, '').split('-'); const s = w.map(x => x.length === 1 || x === 'ui' ? x.toUpperCase() : x).join(' '); return s[0].toUpperCase() + s.slice(1); };
+  const sfx = JSON.parse(readFileSync(join(KIT, 'sfx', 'sfx.json'), 'utf8')).sounds.map(x => ({ id: x.id, title: sfxTitle(x.id), category: x.category, seconds: x.duration, file: rel(join(KIT, 'sfx', x.file)), peaks: wave.sfx[x.id] || null }));
+  cached = { categories, layers, items, packs, candidates: map.candidates || [], beds: Object.entries(beds).map(([id, b]) => ({ id, title: b.title, seconds: b.seconds, energy: b.energy, file: rel(join(KIT, 'music', b.file)), peaks: wave.beds[id] || null })), sfx,
     exports: menu.items.filter(i => i.section === 'exports').map(i => i.id), errs };
   cachedScenes = { sig, c: addScenes(cached) };
   return cachedScenes.c;

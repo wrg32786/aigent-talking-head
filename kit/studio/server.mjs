@@ -46,6 +46,7 @@ import { mount as mountPublish } from './publish-api.mjs';
 import * as SIZES from './sizes.mjs';
 import { mount as mountRefTitles } from './ref-titles.mjs';
 import { mount as mountPlan, planOf } from './wizard/api.mjs';
+import * as PREVIEWS from './previews.mjs';
 
 const require = createRequire(import.meta.url);
 const SNAP = require('../snapshots.cjs');
@@ -63,7 +64,7 @@ const HOST = '127.0.0.1';
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.svg': 'image/svg+xml',
   '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.ttf': 'font/ttf', '.md': 'text/markdown; charset=utf-8' };
 // what the page may load from the repo
-const SERVE = ['inbox/studio/', 'teardown-in/studio/', 'docs/menu/', 'showcase/media/', 'packs/', 'kit/music/', 'kit/fonts/', 'jobs/', 'teardown/', 'docs/studio/'];
+const SERVE = ['inbox/studio/', 'teardown-in/studio/', 'docs/menu/', 'showcase/media/', 'packs/', 'kit/music/', 'kit/sfx/', 'kit/fonts/', 'jobs/', 'teardown/', 'docs/studio/'];
 const VIDEO = ['.mp4', '.mov', '.m4v', '.webm', '.mkv'], AUDIO = ['.mp3', '.wav', '.m4a', '.aac', '.flac'];
 
 // ---------- live updates ----------
@@ -991,7 +992,7 @@ function serveFile(req, res, file) {
 
 async function api(req, res, u) {
   const p = u.pathname, M = req.method;
-  if (p === '/api/catalog' && M === 'GET') return json(res, 200, C.catalog());
+  if (p === '/api/catalog' && M === 'GET') return json(res, 200, C.catalog(u.searchParams.get('fresh') === '1')); // fresh: after new previews were made
   if (p.startsWith('/api/scenes')) { const r = await sceneApi(req, res, p, M); if (r !== false) return r; }
   if (p === '/api/state' && M === 'GET') return json(res, 200, view(C.load()));
   if (p === '/api/state' && M === 'POST') {
@@ -1051,6 +1052,9 @@ async function api(req, res, u) {
   if (p === '/api/record/take' && M === 'POST') { const b = await readBody(req); try { const s = update(st => { REC.act(st, +b.id, b.action); }); return json(res, 200, view(s)); } catch (e) { return json(res, e.code || 500, { error: e.message }); } }
   if (p === '/api/record/takes' && M === 'GET') return json(res, 200, { takes: REC.list(C.load()) });
   // the Recording tab: every take across videos, and Use in this video / Use in a new video (kit/studio/recordings.mjs)
+  // the menu's animated previews: how many are missing, and Make missing previews (kit/studio/previews.mjs)
+  if (p === '/api/previews' && M === 'GET') return json(res, 200, PREVIEWS.status());
+  if (p === '/api/previews/make' && M === 'POST') return json(res, 200, PREVIEWS.start());
   if (p === '/api/recordings' && M === 'GET') return json(res, 200, { recordings: RECS.list(C.load()) });
   if (p === '/api/recordings/use' && M === 'POST') {
     const b = await readBody(req);
