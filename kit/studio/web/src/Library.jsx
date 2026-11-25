@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Dialog, DialogBackdrop, DialogPanel, DialogTitle, Description } from '@headlessui/react';
 import * as stylex from '@stylexjs/stylex';
 import { api, file, toast, Icon } from './lib.jsx';
 import { MoreMenu } from './ui.jsx';
@@ -31,7 +32,10 @@ export const useTemplates = () => {
 
 function Card({ x, mode, act, busy }) {
   const [renaming, setRenaming] = useState(false), [label, setLabel] = useState(x.label), [asking, setAsking] = useState(false);
-  const pic = x.preview ? <img src={file(x.preview)} alt="" loading="lazy" {...stylex.props(s.img)} /> : <span {...stylex.props(s.ph)} aria-hidden="true"><Icon n="spark" /></span>;
+  // Keep it (or Escape) puts focus back on this template's options button: the menu item that opened the dialog is gone by then
+  const keep = () => { setAsking(false); setTimeout(() => { const b = document.getElementById(`tpl-menu-${x.name}`); if (b) b.focus(); }, 0); };
+  const src = x.thumb || (x.preview ? file(x.preview) : null);
+  const pic = src ? <img src={src} alt="" loading="lazy" {...stylex.props(s.img)} /> : <span {...stylex.props(s.ph)} aria-hidden="true"><Icon n="spark" /></span>;
   const meta = [x.source, when(x.createdAt), PACE[x.pace] || null].filter(Boolean).join(', ');
   const body = <>{pic}<span {...stylex.props(s.name)}>{x.label}</span><span className="fine">{meta}</span>{x.line && <span className="fine">{x.line}</span>}</>;
   if (mode === 'pick') return <li><button type="button" data-template={x.name} disabled={busy} onClick={() => act('use', x)} {...cardProps(s.card, s.pick)} aria-label={`Use ${x.label}: ${meta}`}>{body}</button></li>;
@@ -48,8 +52,18 @@ function Card({ x, mode, act, busy }) {
     {renaming && <form {...stylex.props(s.row)} onSubmit={e => { e.preventDefault(); act('rename', x, label).then(ok => { if (ok) setRenaming(false); }); }}>
       <input aria-label="New name" id={`tpl-name-${x.name}`} value={label} maxLength={60} autoFocus onChange={e => setLabel(e.target.value)} {...stylex.props(s.input)} />
       <button type="submit" className="btn sm" disabled={busy}>Save</button><button type="button" className="btn sm ghost" onClick={() => { setLabel(x.label); setRenaming(false); }}>Cancel</button></form>}
-    {asking && <div role="alertdialog" aria-label={`Delete ${x.label}?`} onKeyDown={e => { if (e.key === 'Escape') setAsking(false); }} {...stylex.props(s.row)}><span className="fine">Delete {x.label}?{x.look ? ' Its saved look goes too.' : ''} This cannot be undone.</span>
-      <button type="button" className="btn sm" id={`tpl-del-yes-${x.name}`} disabled={busy} onClick={() => act('delete', x)}>Delete</button><button type="button" className="btn sm ghost" autoFocus onClick={() => setAsking(false)}>Keep it</button></div>}
+    {/* asks first, in a real dialog: focus moves into it, Escape or Keep it closes it and focus goes back to the menu */}
+    <Dialog open={asking} onClose={keep} className="tpl-dlg-wrap" role="alertdialog">
+      <DialogBackdrop className="tpl-dlg-back" />
+      <DialogPanel className="tpl-dlg glass-card" id={`tpl-del-dlg-${x.name}`}>
+        <DialogTitle as="h3">Delete {x.label}?</DialogTitle>
+        <Description className="fine">{x.look ? 'Its saved look goes too. ' : ''}This cannot be undone.</Description>
+        <div {...stylex.props(s.row)}>
+          <button type="button" className="btn sm ghost" data-autofocus onClick={keep}>Keep it</button>
+          <button type="button" className="btn sm" id={`tpl-del-yes-${x.name}`} disabled={busy} onClick={() => act('delete', x).then(ok => { if (ok) setAsking(false); })}>Delete</button>
+        </div>
+      </DialogPanel>
+    </Dialog>
   </li>;
 }
 
@@ -65,14 +79,18 @@ export function Library({ T, mode = 'manage', apply, onUse }) {
         apply(await api('/api/templates/use', { name: x.name, edit: what === 'edit' })); onUse(what === 'edit', mode === 'manage' && what === 'use'); return true;
       }
       const j = await api('/api/templates/' + what, what === 'rename' ? { name: x.name, label } : { name: x.name });
-      T.setList(j.templates); if (what === 'duplicate' && j.template) toast(`Made ${j.template.label}`); return true;
+      T.setList(j.templates); if (what === 'duplicate' && j.template) toast(`Made ${j.template.label}`);
+      // the card it came from is gone: focus lands on the list heading, not the top of the page
+      if (what === 'delete') { toast(`Deleted ${x.label}`, true); requestAnimationFrame(() => { const h = document.getElementById(`tlib-yours-h-${mode}`); if (h) h.focus(); }); }
+      return true;
     } catch (e) { toast(e.message, false); return false; } finally { setBusy(false); }
   };
-  if (T.err && !T.list) return <p className="fine" role="alert">The library could not load: {T.err}</p>;
+  if (T.err && !T.list) return <div role="alert" id={`tlib-err-${mode}`} {...stylex.props(s.row)}><p className="fine">The library could not load: {T.err}</p>
+    <button type="button" className="btn sm outline" id={`tlib-retry-${mode}`} onClick={() => T.reload()}>Try again</button></div>;
   if (!T.list) return <p className="fine" role="status">Loading your templates</p>;
   const yours = T.list.filter(x => !x.readOnly), starters = T.list.filter(x => x.readOnly);
   return <>
-    <h3 {...stylex.props(s.h)} id={`tlib-yours-h-${mode}`}>Your templates</h3>
+    <h3 {...stylex.props(s.h)} id={`tlib-yours-h-${mode}`} tabIndex={-1}>Your templates</h3>
     {yours.length ? <ul {...stylex.props(s.grid)} aria-labelledby={`tlib-yours-h-${mode}`}>{yours.map(x => <Card key={x.name} x={x} mode={mode} act={act} busy={busy} />)}</ul>
       : <p className="fine" id={`tlib-empty-${mode}`}>None yet. Break down a video on the Teardowns tab and save it, or save one at the end of the builder.</p>}
     <h3 {...stylex.props(s.h)} id={`tlib-start-h-${mode}`}>Starter templates</h3>

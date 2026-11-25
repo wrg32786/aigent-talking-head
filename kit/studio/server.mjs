@@ -1474,10 +1474,27 @@ async function api(req, res, u) {
     pushState(true); return json(res, 200, { ok: true, name: r.name, looks: SLK.list() });
   }
   // a teardown saved as a named template (its look, and a template.json with the plan derived from it)
+  // is there a call to action in what you say? (Make's warning: a CTA card or a filter timed for it needs one).
+  // After a draft it reads the cut (kit/plan-check.mjs sections); before, the transcripts of your clips.
+  if (p === '/api/plan/cta' && M === 'GET') {
+    const s = C.load(); let heard = null;
+    try {
+      const build = s.job ? join(ROOT, 'jobs', s.job, 'build') : null, cutF = build && join(build, 'cut.json');
+      if (cutF && existsSync(cutF) && s.drafted) { const PC = await import('../plan-check.mjs'), cut = JSON.parse(readFileSync(cutF, 'utf8')), x = PC.sections(cut, build); if (x.words.length) heard = x.b.ctaStart != null; }
+      if (heard == null) {
+        const SEC = createRequire(import.meta.url)('../sections.cjs'); let t0 = 0; const words = [];
+        for (const f of s.footage || []) { const tx = MEDIA.transcript(f); if (!tx || !Array.isArray(tx.words) || !tx.words.length) { words.length = 0; break; } for (const [a, b, w] of tx.words) words.push({ start: t0 + a, end: t0 + b, word: w }); t0 = words[words.length - 1].end + 0.6; }
+        if (words.length) heard = SEC.bounds(words, words[words.length - 1].end).ctaStart != null;
+      }
+    } catch {}
+    return json(res, 200, { heard });
+  }
   if (p === '/api/templates/from-teardown' && M === 'POST') {
     const b = await readBody(req).catch(() => ({})), s = C.load(); let r;
     try { if (TPL.taken(b.name, C.catalog())) throw Object.assign(new Error('You already have a template or look with that name. Pick another name.'), { code: 409 });
-      const L = SLK.saveCurrent(s, ROOT, b.name), ref = s.reference || {}; r = TPL.saveFromLook(L.name, { kind: ref.url ? 'teardown-url' : 'teardown-file', url: ref.url || null, file: ref.file || null, teardown: ref.out || null }, C.catalog(), b.name); }
+      const L = SLK.saveCurrent(s, ROOT, b.name), ref = s.reference || {}; r = TPL.saveFromLook(L.name, { kind: ref.url ? 'teardown-url' : 'teardown-file', url: ref.url || null, file: ref.file || null, teardown: ref.out || null }, C.catalog(), b.name);
+      // its picture: a still from the reference video it was broken down from
+      if (ref.file) { try { TPL.setThumb(L.name, resolve(ROOT, ref.file)); } catch {} } }
     catch (e) { return json(res, typeof e.code === 'number' ? e.code : 500, { error: e.message }); }
     pushState(true); return json(res, 200, { ok: true, template: r, templates: TPL.list(C.catalog()), looks: SLK.list() });
   }

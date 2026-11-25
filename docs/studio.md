@@ -820,11 +820,21 @@ The New video tab has a step by step builder beside the classic steps. Open it f
 - **Your notes** (`#build=notes`): "Anything else for the agent?" with four example lines to add, your plan so far with **Change** on each row (it opens only that step, and its button says Back to your notes), and **All options**, every layer's tiles with a tab per layer and a search box, so any pick is one click from here. Your notes reach the agent: `studio_get_state` has `notes`, and `get_video_plan` has them in the plan.
 - **Make it** (`#build=make`): **Save as a template** (the name is optional; it is saved as `looks/local/<name>/template.json`, without your notes, and a name already used is never written over) and **Make my video**, which sets the plan, starts the draft (writing `jobs/<job>/build/video-plan.json` beside it) and opens Review.
 
+
+**Your call to action.** The Make it step says so when we did not hear a call to action in your takes (like "follow for more") and your plan needs one: the call to action card is on, or a filter is timed for the call to action. It links to the filter timing or to Extras. It shows once your takes are transcribed (Cut or a draft does it) and is the same thing the Plan check's call to action row says after the draft (`GET /api/plan/cta`: `{ heard: true | false | null }`, null while we do not know).
+
+**Which pace wins.** The last one you set. Picking a pace in the builder resets the pause length to that pace's. A change on the classic Cut step after that (how long a pause stays) is kept and wins over the pace. A goal sent with `run_wizard` sets the pace only when you have not picked one yourself, and the pace Make guesses is never taken as yours.
+
+**Cut on the beat.** With No music, "off" is saved as it is. "On" waits in the plan and comes back when music does, from the builder's Sound step or a pick on the classic Music step.
+
+**The step dots.** The builder is the default path and has no numbered step dots across the top. They show only on the classic steps (`#step=` links), which still work, as do saved sessions.
+
 ## Template Library
 
-On the **Teardowns** tab, under the breakdown, and on New video's **Use a template**. A card for each template: its picture (the starters' moving previews), name, where it came from (Built by you, From a link, From a file, Your copy, Starter), the date and the pace.
+On the **Teardowns** tab, under the breakdown, and on New video's **Use a template**. A card for each template: its picture (the starters' moving previews; a template saved after a teardown keeps a still from that video, and one saved from the builder a still from your newest render, `looks/local/<name>/preview.jpg`, served by `GET /api/templates/preview/<name>`), name, where it came from (Built by you, From a link, From a file, Your copy, Starter), the date and the pace.
 
 - **Your templates**: the ones you saved at the end of the builder, the ones you saved after a teardown (**Save as template** with a name), and every look you saved before this (they show as From a teardown, with their choices read from the look).
+- **Delete** asks first in a dialog (Keep it is picked, Escape keeps it too) and focus goes back to the card's menu, or to the Your templates heading after a delete. If the library does not load, it says so with **Try again**.
 - **Starter templates**: the six packs that ship with the kit. Read only: Duplicate one to change it.
 - Each card's menu: **Use for a new video** (sets the plan, opens Your notes), **Edit in builder** (a saved look's choices become your own, one step each, from Pace), **Rename** (the name you see; the folder keeps its name), **Duplicate** (`<name>-copy`), **Delete** (asks first; removes the folder in `looks/local/`, look and all).
 - Files: `looks/local/<name>/template.json` next to an optional `look.json`, out of git. A template keeps no notes and no uploaded track. Routes: `GET /api/templates`, `POST /api/templates` (save the plan as it is now), `/api/templates/use|rename|duplicate|delete`, `/api/templates/from-teardown`. Agents: `list_templates`, `save_template` (see [mcp.md](mcp.md)).
