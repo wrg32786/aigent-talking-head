@@ -86,9 +86,10 @@ try {
     routes['https://opengraph.githubassets.com/1/demo/tool'] = R('image/png', png(1200, 600));
     routes[raw + 'docs/preview.png'] = R('image/png', png(1600, 900));
     routes['https://example.com/batch.gif'] = R('image/gif', gif(800, 450));
-    routes['https://example.com/install.mp4'] = R('video/mp4', Buffer.from('mp4'));
+    const mp4 = tag => Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypisom' + tag)]);
+    routes['https://example.com/install.mp4'] = R('video/mp4', mp4('a'));
     routes['https://github.com/user-attachments/assets/0f1e2d3c-aaaa-bbbb-cccc-123456789abc'] = { status: 302, headers: { location: 'https://objects.example.com/clip.mp4' }, body: Buffer.alloc(0) };
-    routes['https://objects.example.com/clip.mp4'] = R('video/mp4', Buffer.from('mp4b'));
+    routes['https://objects.example.com/clip.mp4'] = R('video/mp4', mp4('b'));
     routes[raw + 'docs/dot.png'] = R('image/png', png(16, 16));
     const conv = (src, out) => (writeFileSync(out, 'mp4 from gif')), secs = () => 6;
     const m = await RB.fetchRepo('https://github.com/demo/tool', { request, resolver, convert: conv, seconds: secs });
@@ -105,6 +106,12 @@ try {
     assert.ok(again.stale && existsSync(join(m.dir, '02.png')) && JSON.parse(readFileSync(join(m.dir, 'meta.json'), 'utf8')).assets.length === 5, 'the older good folder stays');
     const none = await RB.fetchRepo('https://github.com/demo/gone', { request, resolver });
     assert.ok(none.failed && !existsSync(join(TMP, 'demo--gone', 'meta.json')), 'nothing cached for a repo we could not read');
+    // a file that is not what its label says never reaches FFmpeg (a playlist called a video)
+    assert.ok(!RB.magicOk('video/mp4', Buffer.from('#EXTM3U\n#EXTINF:1,\nfile:///etc/passwd')) && RB.magicOk('video/mp4', mp4('c')) && !RB.magicOk('image/gif', Buffer.from('<html>')));
+    // a partial fetch (one file timed out) does not replace the fuller folder
+    const slow = (u, o) => /preview\.png|install\.mp4/.test(u) ? Promise.reject(new Error('timed out: ' + u)) : request(u, o);
+    const part = await RB.fetchRepo('https://github.com/demo/tool', { request: slow, resolver, force: true, convert: conv, seconds: secs });
+    assert.ok(part.stale && JSON.parse(readFileSync(join(m.dir, 'meta.json'), 'utf8')).assets.length === 5, 'the fuller folder stays');
     const webp = Buffer.alloc(30); webp.write('RIFF', 0); webp.write('WEBP', 8); webp.write('VP8X', 12); webp[20] = 2; assert.ok(RB.animatedWebp(webp));
     assert.throws(() => { if (!RB.parseRepo('https://github.com/../x')) throw new Error('refused'); }, /refused/); assert.strictEqual(RB.parseRepo('https://gitlab.com/a/b'), null);
   });
@@ -129,6 +136,13 @@ try {
     assert.deepStrictEqual(p.inserts.map(x => [x.line.slice(0, 12), x.place, x.file]), [['It reads you', 'top', '/a/01.png'], ['The live pre', 'full', '/a/02.png'], ['Look at this', 'full', '/a/03.gif']]);
     assert.deepStrictEqual(p.takeovers.filter(x => x.who === 'you').map(x => x.why), ['hook', 'punch line', 'cta']);
     assert.ok(p.inserts.every(x => x.repo && x.image && x.at >= 3 && x.at + x.dur <= 16), 'never on the hook or the CTA');
+  });
+  await t('a short gap is held over, but never across a punch line that is yours', () => {
+    const L2 = [{ start: 3, end: 7, text: 'It reads your notes and makes a draft video.', section: 'body' }, { start: 7.1, end: 8, text: 'Wild!', section: 'body' }, { start: 8.1, end: 12, text: 'And the output keeps every word you said.', section: 'body' }, { start: 12.5, end: 16, text: 'It sorts every file in the folder for you.', section: 'body' }];
+    const p = RB.planRepo(L2, assets.slice(0, 1), { minDur: 0.5 });
+    assert.ok(p.takeovers.some(x => x.why === 'punch line' && x.at === 7.1));
+    assert.ok(p.inserts.every(x => !(x.at < 8 && x.at + x.dur > 7.1)), 'the punch line stays yours: ' + JSON.stringify(p.inserts.map(x => [x.at, x.dur])));
+    const second = p.inserts.find(x => x.at === 8.1); assert.ok(second && Math.abs(second.at + second.dur - 12.5) < 0.01, 'the pause before the next line is held over');
   });
   await t('takeovers off: split on the whole body; frame breakout uses the framed cards', () => {
     const off = RB.planRepo(lines, assets, { takeovers: 'off' }); assert.ok(off.inserts.length === 4 && off.inserts.every(x => x.place === 'top')); assert.strictEqual(off.takeovers.length, 0);
@@ -155,6 +169,13 @@ try {
     run({ content: { repoFeature: true, repos: ['https://github.com/demo/tool'], takeovers: 'auto' }, presenter: [] }); rmSync(plan);
     execFileSync(process.execPath, [join(ROOT, 'kit', 'repo-broll.mjs'), 'apply', '--name', 'rj', '--plan', plan, '--jobs', jobs], { env: { ...process.env, ATH_ASSETS: TMP }, encoding: 'utf8' });
     const gone = JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8')); assert.ok(!(gone.inserts || []).some(x => x.repo) && !gone.repoTakeovers, 'a cleared plan clears its inserts too');
+  });
+  await t('a real GIF becomes a 12 second looping MP4 (skipped without FFmpeg)', async () => {
+    const { execFileSync } = await import('child_process');
+    try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); } catch { console.log('  (no FFmpeg here: skipped)'); return; }
+    const g = join(TMP, 'real.gif'), o = join(TMP, 'real.mp4');
+    execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=s=320x180:d=1:r=10', g]);
+    RB.gifToMp4(g, o); const secs = RB.videoSeconds(o); assert.ok(secs > 11 && secs < 13, String(secs));
   });
   console.log(`\nrepo broll: ${n} tests passed`);
 } finally { rmSync(TMP, { recursive: true, force: true }); }

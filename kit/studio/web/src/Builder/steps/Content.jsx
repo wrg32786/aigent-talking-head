@@ -55,7 +55,7 @@ export function Content({ plan, save, busy }) {
         <Label className="sr">Example video link</Label>
         <Input id="build-repo-example" type="url" value={example} placeholder="A video made this way, to copy its look" invalid={exBad}
           onChange={e => { setExample(e.target.value); setExBad(false); }} onBlur={saveExample} onKeyDown={enter(saveExample)} {...stylex.props(s.input, exBad && s.bad)} />
-        {exBad && <Description className="fine" role="alert" id="build-repo-example-err">Use a link that starts with https://.</Description>}
+        {exBad && <Description className="fine" role="alert" id="build-repo-example-err">Use a web link, like https://www.youtube.com/watch?v=...</Description>}
         {example.trim() && !exBad && <a className="btn sm outline" id="build-repo-example-go" href="#tab=teardowns" onClick={() => { saveExample(); try { sessionStorage.setItem('ath-ref-prefill', example.trim()); } catch {} }}>Break it down on Teardowns</a>}
       </Field>
     </>}
