@@ -1309,7 +1309,7 @@ async function api(req, res, u) {
     // { plan: true } from the builder's Make my video: a session with no plan of its own keeps the plan read from it, as
     // it is (nothing is applied again, so classic picks keep who made them), and the draft writes it beside the cut
     const b = await readBody(req).catch(() => ({}));
-    if (b && b.plan === true) update(x => { if (!x.videoPlan) x.videoPlan = VP.normalize(planOf(x, C.catalog())); });
+    if (b && b.plan === true) update(x => { if (!x.videoPlan) x.videoPlan = { ...VP.normalize(planOf(x, C.catalog())), guessed: true }; });
     const s = C.load(); const d = draftSteps(s); // checks the footage first, so an empty job says that before a missing tool
     const miss = needFor('draft'); if (miss) return json(res, 400, miss);
     startDraft(d, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; delete st.draftStale; }); BRL.autoPick(s.job); return { choices: !!readChoices(C.load()), note: DRAFT_DONE, from: d.from }; });
@@ -1491,7 +1491,7 @@ async function api(req, res, u) {
       const kept = lines.join('\n').trim(), have = kept.split('\n').some(l => l.trim() === G.note), joined = have ? kept : (kept ? kept + '\n' : '') + G.note;
       let added = !have; if (joined.length <= 2000) plan.notes = joined; else { added = false; done.push('note: your notes are full, so the goal line was left out'); }
       let errs = [];
-      update(x => { const r = C.applyPatch(x, { ...patch, from: 'assistant' }); errs = r.errs; if (!r.errs.length) { x.videoPlan = { ...VP.normalize(plan), ...(mine ? {} : { goalPace: true }) }; if (added) x.videoPlan.goalNote = G.note; else delete x.videoPlan.goalNote; } });
+      update(x => { const r = C.applyPatch(x, { ...patch, from: 'assistant' }); errs = r.errs; if (!r.errs.length) { x.videoPlan = { ...VP.normalize(plan), ...(mine ? {} : { goalPace: true }) }; if (added) x.videoPlan.goalNote = G.note; else delete x.videoPlan.goalNote; delete x.videoPlan.guessed; } });
       done.push(errs.length ? `pace: not set (${errs.join(' ')})` : mine ? `pace: kept yours (${(VP.PACES[plan.pace] || {}).label || plan.pace})` : `pace: ${VP.PACES[G.pace].label}`); }
     if (w.look) { update(x => { C.applyPatch(x, { pack: w.look }); }); done.push(`look: ${w.look}`); next = 'choose'; }
     if (w.choose) {
