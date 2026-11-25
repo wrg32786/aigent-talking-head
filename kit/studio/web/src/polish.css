@@ -318,3 +318,13 @@ main:not([data-area="new"]) { padding-bottom: 32px; }
 .build-cta:hover, .build-cta:focus-visible { border-color: var(--primary); }
 .tlib-save { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 14px; }
 .tlib-save .row { display: flex; gap: 8px; flex-wrap: wrap; } .tlib-save input { flex: 1; min-width: 200px; font: inherit; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--border); background: transparent; color: inherit; }
+
+/* Review: Plan check (PlanCheck.jsx) */
+.pc-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.pc-row { display: grid; grid-template-columns: 54px minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 13px; line-height: 1.45; }
+.pc-row img { width: 54px; height: 96px; object-fit: cover; border-radius: 8px; }
+.pc-mark { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; justify-self: center; }
+.pc-row.ok .pc-mark { background: color-mix(in srgb, var(--success, #2f9e6b) 18%, transparent); color: var(--success, #2f9e6b); }
+.pc-row.warn .pc-mark { background: color-mix(in srgb, var(--warning, #d9822b) 20%, transparent); color: var(--warning, #d9822b); }
+@media (max-width: 560px) { .pc-row { grid-template-columns: 54px minmax(0, 1fr); } .pc-row .pc-ask { grid-column: 2; justify-self: start; } }
+.pc-row.wait .pc-mark { background: color-mix(in srgb, var(--muted-foreground, #888) 18%, transparent); color: var(--muted-foreground, #888); }

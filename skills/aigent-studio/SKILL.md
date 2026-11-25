@@ -78,6 +78,18 @@ The user can film takes on the Start step (Record now). A saved take is already 
 
 The Wizards dialog is gone (the page asks one thing per screen in the builder now). `run_wizard` still runs the guided starts, and a `goal` also sets the plan's pace and a line in Your notes: `{ wizard: reel, goal: grow | sell | teach | clean, look, choose: true }` (any of them, in one call or one at a time), `{ wizard: clips, clips, ads }` (finds them on whole words), `{ wizard: reference, url }` (Recreate). When the user asks you to choose for them, make the choice with `run_wizard` or `set_video_plan`, or suggest it with `studio_reply suggest`.
 
+## The plan check (after a draft or a render)
+
+When the user built the video in the builder (`get_video_plan`), check that the video does what the plan says, in rounds:
+
+1. `check_frames` runs the measured checks. Read the failures.
+2. `check_frames { fix: true }` fixes what it can (filters in the wrong sections, transitions not picked or in the wrong places, key words, leftover repo shots), up to 3 rounds. If it fixed anything, `render` again.
+3. `plan_checkpoints` lists the moments to look at. Pull those frames from the newest render and look at each one: does this frame show the selection the way its demo does, and does it follow the notes?
+4. `report_plan_check` with one row per selection you looked at (`ok`, and a short plain note when it is off).
+5. Something still off after 3 rounds: stop, tell the user what is off and where, in plain words. Never cut their words to make a check pass.
+
+With no agent connected, Review still runs the measured checks; the looked-at checks need you.
+
 ## Rules
 
 - Only names from the Studio menu (`studio_get_state` with `catalog: true`); the tools refuse anything else.

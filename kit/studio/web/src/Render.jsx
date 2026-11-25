@@ -5,6 +5,7 @@ import { NeedFix } from './Fix.jsx';
 import { copyText } from './Connect.jsx';
 import { api, file, toast, fmtS, cap1, Icon, matchChips } from './lib.jsx';
 import { Compare, Cleanup, Receipt } from './Review.jsx';
+import { PlanCheck } from './PlanCheck.jsx';
 import { Fold, Hint } from './ui.jsx';
 import { TitleCheckLine } from './RefCard.jsx';
 import { PublishKit } from './PublishKit.jsx';
@@ -79,6 +80,7 @@ export function ReviewStep({ CAT, V, s, apply, patch, go, hidden, run }) {
     </div>
     {(isDrafted || drafted) && <>
       <Receipt r={run.receipt} />
+      <PlanCheck V={V} s={s} drafted={s.drafted} apply={apply} />
       <Cleanup V={V} s={s} apply={apply} drafted={drafted} />
       <details className="fold glass-card" id="choices-fold"><summary>Every pick and why</summary>
         <div id="choices" className="choices"><Choices CAT={CAT} x={run.choices} setX={run.setChoices} setReceipt={run.setReceipt} dirty={run.dirty} setDirty={run.setDirty} s={s} patch={patch} /></div></details>
