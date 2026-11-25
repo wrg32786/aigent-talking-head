@@ -39,9 +39,9 @@ const lossless = ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '8', '-pix_
 export const QUALITY = { 'finish:grain': 92 };
 export function toWebp(src, dest, q = 60) {
   mkdirSync(dirname(dest), { recursive: true });
-  for (let qq = q; ; qq -= 12) {
+  for (let qq = q; ; qq = Math.max(0, qq - 12)) {
     ff(['-i', src, '-t', String(DUR), '-vf', `scale=${W}:${H}:flags=lanczos,fps=${FPS}`, '-an', '-c:v', 'libwebp_anim', '-lossless', '0', '-q:v', String(qq), '-compression_level', '6', '-loop', '0', dest]);
-    if (statSync(dest).size <= 100e3 || qq <= 24) return statSync(dest).size;
+    if (statSync(dest).size <= 100e3 || qq <= 0) return statSync(dest).size;
   }
 }
 

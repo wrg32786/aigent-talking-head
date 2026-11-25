@@ -2082,7 +2082,10 @@ def fx_tape_label(c, e):
         d.rectangle([o, o, w + o - 1, h + o - 1], fill=(17, 17, 17, 255)); d.rectangle([0, 0, w - 1, h - 1], fill=TAPE + (255,))
         im.alpha_composite(t, ((w - t.width) // 2, (h - t.height) // 2)); return im
     im = cached(e, 'tape', tape)
-    place(c, im, c.W / 2, clamp(c.fy + c.fw * 1.6, c.H * 0.45, c.H * 0.68), 0.85 + 0.15 * k, 0, clamp(k * 1.5), guard=True)
+    # a close presenter's face guard reaches past 68% height and hid the whole strip; drop it just under the guard then
+    # (never past 80%, the caption band is off for this window)
+    y = max(clamp(c.fy + c.fw * 1.6, c.H * 0.45, c.H * 0.68), min(c.H * 0.8, c.fy + c.fw * 1.5 + im.height * 0.55))
+    place(c, im, c.W / 2, y, 0.85 + 0.15 * k, 0, clamp(k * 1.5), guard=True)
 
 
 @effect('select-resize', 'a blue selection box grabs your number and a cursor drags it bigger')

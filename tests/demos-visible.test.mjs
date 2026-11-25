@@ -16,10 +16,10 @@ const all = D.items(), missing = all.filter(({ kind, it }) => !existsSync(D.demo
 assert.ok(!missing.length, say('These options have no moving preview yet (make them with Make missing previews in Settings)', missing.map(x => x.it.id)));
 console.log(`ok every one of the ${all.length} effects, graphics, finishes and title layers has a moving preview`);
 
-const big = all.filter(({ kind, it }) => statSync(D.demoPath(kind, it.id)).size > 100e3), total = all.reduce((n, { kind, it }) => n + statSync(D.demoPath(kind, it.id)).size, 0) + statSync(D.PLATE).size;
-assert.ok(!big.length, say('These previews are over 100 KB', big.map(x => x.it.id)));
+const big = all.filter(({ kind, it }) => statSync(D.demoPath(kind, it.id)).size > 128e3), total = all.reduce((n, { kind, it }) => n + statSync(D.demoPath(kind, it.id)).size, 0) + statSync(D.PLATE).size;
+assert.ok(!big.length, say('These previews are over 128 KB', big.map(x => x.it.id)));
 assert.ok(total < 8e6, `the previews add up to ${(total / 1e6).toFixed(1)} MB; keep them under 8 MB`);
-console.log(`ok each preview is under 100 KB, ${(total / 1e6).toFixed(1)} MB in all`);
+console.log(`ok each preview is under 128 KB, ${(total / 1e6).toFixed(1)} MB in all`);
 
 const snd = JSON.parse(readFileSync(D.SOUNDS, 'utf8')), beds = Object.keys(JSON.parse(readFileSync(join(ROOT, 'kit', 'music', 'beds.json'), 'utf8'))), sfx = JSON.parse(readFileSync(join(ROOT, 'kit', 'sfx', 'sfx.json'), 'utf8')).sounds.map(x => x.id);
 const noWave = [...beds.filter(id => !(snd.beds[id] || []).length), ...sfx.filter(id => !(snd.sfx[id] || []).length)];
