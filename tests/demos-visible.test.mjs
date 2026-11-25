@@ -26,11 +26,21 @@ const noWave = [...beds.filter(id => !(snd.beds[id] || []).length), ...sfx.filte
 assert.ok(!noWave.length, say('These sounds have no waveform (node kit/demos.mjs --sounds)', noWave));
 console.log(`ok every music bed and sound has a waveform`);
 
-let chrome = null; try { chrome = findChrome(); } catch {}
+// Chrome decodes the loops. On GitHub Actions it must be there; a CHROME_PATH that points at nothing always fails;
+// on a computer without Chrome the decode is skipped with a note
+let chrome = null;
+try { chrome = findChrome(); } catch (e) { if (process.env.CHROME_PATH || process.env.GITHUB_ACTIONS) throw e; }
 if (!chrome) console.log('skip the visible-change decode: Chrome is not on this computer');
 else {
-  const rows = await D.check(all), flat = rows.filter(r => r.score < D.THRESHOLD);
-  assert.ok(!flat.length, say('These previews do not show a visible change against the plain picture', flat.map(r => `${r.id} (${r.score}%)`)));
-  console.log(`ok all ${rows.length} previews visibly change the picture (at least ${D.THRESHOLD}% of it)`);
+  // the control: the plain plate re-encoded (tests/fixtures/demo-noise-q30.webp at quality 30, -q0 at quality 0) must
+  // not count as a change, so encoder noise can never pass for an effect
+  const noise = await D.scores([join(ROOT, 'tests', 'fixtures', 'demo-noise-q30.webp'), join(ROOT, 'tests', 'fixtures', 'demo-noise-q0.webp')]);
+  const [n30, n0] = Object.values(noise);
+  assert.ok(!D.visible(n30, 30), `encoder noise at quality 30 reads as a change: ${JSON.stringify(n30)}`);
+  assert.ok(!D.visible(n0, 0), `encoder noise at quality 0 reads as a change: ${JSON.stringify(n0)}`);
+  console.log('ok encoder noise alone does not count as a change');
+  const rows = await D.check(all), flat = rows.filter(r => !r.ok);
+  assert.ok(!flat.length, say('These previews do not show a visible change against the plain picture', flat.map(r => `${r.id} (${JSON.stringify(r.score)}, q${r.q})`)));
+  console.log(`ok all ${rows.length} previews visibly change the picture`);
 }
 console.log('\ndemos visible tests passed');

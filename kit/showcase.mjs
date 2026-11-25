@@ -5,7 +5,7 @@
 // brand portraits. Titles are composited behind the head with the person mask.
 // Regenerates the committed gallery; keep the folder modest.
 import { execFileSync } from 'child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, readdirSync, statSync } from 'fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync, readdirSync, statSync } from 'fs';
 import { tmpdir } from 'os';
 import { dirname, join, relative, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -850,7 +850,8 @@ This folder is GitHub Pages-ready (\`.nojekyll\`). Repo settings and workflows a
 }
 
 // run only as a script: kit/demos.mjs imports fxRow and fxImages
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+const isMain = () => { try { return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(resolve(process.argv[1])); } catch { return false; } };
+if (process.argv[1] && isMain()) {
   if (process.argv.includes('--from-stills') || process.argv.includes('--graphics-only')) rebuildFromStills();
   else main();
 }

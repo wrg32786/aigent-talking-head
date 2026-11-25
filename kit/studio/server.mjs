@@ -992,7 +992,7 @@ function serveFile(req, res, file) {
 
 async function api(req, res, u) {
   const p = u.pathname, M = req.method;
-  if (p === '/api/catalog' && M === 'GET') return json(res, 200, C.catalog(u.searchParams.get('fresh') === '1')); // fresh: after new previews were made
+  if (p === '/api/catalog' && M === 'GET') return json(res, 200, C.catalog({ fresh: u.searchParams.get('fresh') === '1' })); // fresh: after new previews were made
   if (p.startsWith('/api/scenes')) { const r = await sceneApi(req, res, p, M); if (r !== false) return r; }
   if (p === '/api/state' && M === 'GET') return json(res, 200, view(C.load()));
   if (p === '/api/state' && M === 'POST') {
@@ -1054,7 +1054,7 @@ async function api(req, res, u) {
   // the Recording tab: every take across videos, and Use in this video / Use in a new video (kit/studio/recordings.mjs)
   // the menu's animated previews: how many are missing, and Make missing previews (kit/studio/previews.mjs)
   if (p === '/api/previews' && M === 'GET') return json(res, 200, PREVIEWS.status());
-  if (p === '/api/previews/make' && M === 'POST') return json(res, 200, PREVIEWS.start());
+  if (p === '/api/previews/make' && M === 'POST') return json(res, 200, PREVIEWS.start(() => C.catalog({ fresh: true }))); // new previews show without a restart
   if (p === '/api/recordings' && M === 'GET') return json(res, 200, { recordings: RECS.list(C.load()) });
   if (p === '/api/recordings/use' && M === 'POST') {
     const b = await readBody(req);

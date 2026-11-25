@@ -12,7 +12,7 @@
 // Output: docs/menu/<effects|graphics|finishes|title-layers>/<id>.webp and docs/menu/demo-plate.webp (the plain plate).
 // Effects need the effects add-on (npm run effects:setup); without it they are skipped with a note.
 import { execFileSync } from 'child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -28,6 +28,11 @@ export const PLATE = join(MENU, 'demo-plate.webp');
 const PRESENTER = join(ROOT, 'showcase', 'source', 'presenter.jpg'), MASK = join(ROOT, 'showcase', 'source', 'presenter-mask.png');
 const FX_PY = join(ROOT, 'effects', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python'), RUNNER = join(ROOT, 'effects', 'fx_runner.py');
 const FW = 1080, FH = 1920, W = 270, H = 480, FPS = 15, DUR = 3;
+export const LOCK = join(ROOT, 'jobs', '.studio', 'previews.lock');
+// the pid of a live run that is making previews, or null (a lock left by a run that died does not count)
+export function lockHolder() {
+  try { const pid = +readFileSync(LOCK, 'utf8'); if (!pid || pid === process.pid) return null; process.kill(pid, 0); return pid; } catch { return null; }
+}
 export const demoPath = (kind, id) => join(MENU, DIRS[kind], id + '.webp');
 export const fxReady = () => existsSync(FX_PY) && existsSync(RUNNER);
 
@@ -37,12 +42,17 @@ const lossless = ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '8', '-pix_
 // a finished clip to the small looping webp; q drops (never frames) if a file is too big. Fine noise is what lossy webp
 // throws away first, so the grain demo starts higher or it would look like the plain plate
 export const QUALITY = { 'finish:grain': 92 };
+// written beside the target and renamed at the end, so a stopped run never leaves half a preview that counts as made
 export function toWebp(src, dest, q = 60) {
   mkdirSync(dirname(dest), { recursive: true });
-  for (let qq = q; ; qq = Math.max(0, qq - 12)) {
-    ff(['-i', src, '-t', String(DUR), '-vf', `scale=${W}:${H}:flags=lanczos,fps=${FPS}`, '-an', '-c:v', 'libwebp_anim', '-lossless', '0', '-q:v', String(qq), '-compression_level', '6', '-loop', '0', dest]);
-    if (statSync(dest).size <= 100e3 || qq <= 0) return statSync(dest).size;
-  }
+  const tmp = dest + '.part.webp'; let used = q;
+  try {
+    for (let qq = q; ; qq = Math.max(0, qq - 12)) {
+      ff(['-i', src, '-t', String(DUR), '-vf', `scale=${W}:${H}:flags=lanczos,fps=${FPS}`, '-an', '-c:v', 'libwebp_anim', '-lossless', '0', '-q:v', String(qq), '-compression_level', '6', '-loop', '0', tmp]);
+      if (statSync(tmp).size <= 100e3 || qq <= 0) { used = qq; break; }
+    }
+    renameSync(tmp, dest); return { size: statSync(dest).size, q: used };
+  } finally { rmSync(tmp, { force: true }); }
 }
 
 // ---- the plate: the presenter as a clip (effects draw on it) and as the plain demo the check compares to
@@ -142,9 +152,14 @@ export function buildSounds() {
 // Chrome decodes them (ImageDecoder). The score is the share of the picture (percent) where some colour moved by at least
 // STEP levels, at the clearest frame. A grey finish keeps the brightness and grain keeps the average, so an average
 // difference misses both; a share does not
-export const STEP = 6, THRESHOLD = 10;
+export const MEAN = 6, SPREAD = 4, THRESHOLD = 10, STRONG = 32, STRONG_AREA = 0.5;
+// the webp quality each preview needed to stay small (docs/menu/demos.json). Below LOW_Q the encoder itself shifts block
+// colours (a plain plate at q0 scores about 30% broad), so such a preview has to pass on strong change alone
+export const MANIFEST = join(MENU, 'demos.json'), LOW_Q = 24;
+export const manifest = () => { try { return JSON.parse(readFileSync(MANIFEST, 'utf8')); } catch { return {}; } };
+export const visible = (sc, q = 60) => !!sc && (sc.strong >= STRONG_AREA || (q >= LOW_Q && sc.broad >= THRESHOLD));
 const toB64 = f => readFileSync(f).toString('base64');
-export async function scores(files) {
+export async function scores(files, mean = MEAN, spread = SPREAD) {
   const { chromium } = await import('playwright-core'), { findChrome } = await import('./chrome.mjs');
   const browser = await chromium.launch({ executablePath: findChrome(), args: ['--no-sandbox'] });
   try {
@@ -168,21 +183,31 @@ export async function scores(files) {
       window.decodeAll = frames; window.plate = await frames(plate);
     }, toB64(PLATE));
     const out = {};
-    for (const f of files) out[f] = await pg.evaluate(async ([b64, STEP]) => {
-      const a = await window.decodeAll(b64), p = window.plate; let best = 0;
+    for (const f of files) out[f] = await pg.evaluate(async ([b64, M, S, STRONG]) => {
+      // 10x10 pixel blocks, per colour: the average (a grade, a label, a word) and the spread (grain, scan lines).
+      // Compression noise is fine detail that mostly cancels inside a block, so it does not count as a change
+      const stats = fr => { const W = 270, B = 10, out = []; for (let by = 0; by < 48; by++) for (let bx = 0; bx < 27; bx++) { const s = [0, 0, 0], q = [0, 0, 0];
+        for (let y = by * B; y < by * B + B; y++) for (let x = bx * B; x < bx * B + B; x++) { const k = (y * W + x) * 3; for (let c = 0; c < 3; c++) { const v = fr[k + c]; s[c] += v; q[c] += v * v; } }
+        const n = B * B; out.push(s.map((v, c) => [v / n, Math.sqrt(Math.max(0, q[c] / n - (v / n) ** 2))])); } return out; };
+      window.plateStats = window.plateStats || window.plate.map(stats);
+      const a = await window.decodeAll(b64), p = window.plateStats; let broad = 0, strong = 0;
       for (let i = 0; i < a.length; i++) {
-        const x = a[i], y = p[i % p.length]; let n = 0;
-        for (let j = 0; j < x.length; j += 3) if (Math.max(Math.abs(x[j] - y[j]), Math.abs(x[j + 1] - y[j + 1]), Math.abs(x[j + 2] - y[j + 2])) >= STEP) n++;
-        best = Math.max(best, 300 * n / x.length);
+        const x = stats(a[i]), y = p[i % p.length]; let n = 0, k = 0;
+        for (let b = 0; b < x.length; b++) {
+          if ([0, 1, 2].some(c => Math.abs(x[b][c][0] - y[b][c][0]) >= M || x[b][c][1] - y[b][c][1] >= S)) n++;
+          if ([0, 1, 2].some(c => Math.abs(x[b][c][0] - y[b][c][0]) >= STRONG)) k++;
+        }
+        broad = Math.max(broad, 100 * n / x.length); strong = Math.max(strong, 100 * k / x.length);
       }
-      return Math.round(best * 10) / 10;
-    }, [toB64(f), STEP]);
+      return { broad: Math.round(broad * 10) / 10, strong: Math.round(strong * 10) / 10 };
+    }, [toB64(f), mean, spread, STRONG]);
     return out;
   } finally { await browser.close(); }
 }
 export async function check(list = items()) {
   const made = list.filter(({ kind, it }) => existsSync(demoPath(kind, it.id))), sc = await scores(made.map(({ kind, it }) => demoPath(kind, it.id)));
-  return list.map(({ kind, it }) => { const f = demoPath(kind, it.id); return { kind, id: it.id, made: f in sc, score: sc[f] || 0 }; });
+  const man = manifest();
+  return list.map(({ kind, it }) => { const f = demoPath(kind, it.id), q = (man[`${kind}:${it.id}`] || {}).q ?? 60; return { kind, id: it.id, made: f in sc, score: sc[f] || null, q, ok: visible(sc[f], q) }; });
 }
 
 async function main() {
@@ -190,28 +215,34 @@ async function main() {
   const kinds = opt('only') ? opt('only').split(',') : Object.keys(DIRS), ids = opt('ids') ? new Set(opt('ids').split(',')) : null;
   let list = items().filter(x => kinds.includes(x.kind) && (!ids || ids.has(x.it.id)));
   if (argv.includes('--check')) {
-    const rows = await check(list), bad = rows.filter(r => !r.made || r.score < THRESHOLD);
-    for (const r of rows) console.log(`${r.kind} ${r.id}: ${r.made ? r.score : 'missing'}`);
+    const rows = await check(list), bad = rows.filter(r => !r.made || !r.ok);
+    for (const r of rows) console.log(`${r.kind} ${r.id}: ${r.made ? `broad ${r.score.broad}%, strong ${r.score.strong}%, q${r.q}${r.ok ? '' : '  NOT VISIBLE'}` : 'missing'}`);
     console.log(bad.length ? `These demos do not show a visible change yet: ${bad.map(r => r.id).join(', ')}` : `All ${rows.length} demos show a visible change.`);
     process.exit(bad.length ? 1 : 0);
   }
   if (argv.includes('--sounds') || !existsSync(SOUNDS)) { console.log(`Sound waveforms: ${buildSounds()} sounds.`); if (argv.includes('--sounds')) return; }
   if (argv.includes('--missing')) list = list.filter(x => !existsSync(demoPath(x.kind, x.it.id)));
   if (!fxReady() && list.some(x => x.kind === 'effect')) { console.log('Effects previews need the effects add-on; skipping them.'); list = list.filter(x => x.kind !== 'effect'); }
+  // one run at a time: Studio's Make missing previews reads this lock, so a run that outlived a Studio restart still counts
+  if (lockHolder()) { console.log('Previews are already being made.'); process.exitCode = 1; return; }
+  mkdirSync(dirname(LOCK), { recursive: true }); writeFileSync(LOCK, String(process.pid));
   const work = mkdtempSync(join(tmpdir(), 'demos-'));
   try {
-    if (!existsSync(PLATE) || argv.includes('--plate')) toWebp(plate(work), PLATE);
+    if (!existsSync(PLATE) || argv.includes('--plate')) toWebp(plate(work), PLATE, 60);
     let n = 0, failed = [];
     for (const { kind, it } of list) {
       n++;
+      console.log(`making ${n}/${list.length} ${kind} ${it.id}`); // the page's progress line (kit/studio/previews.mjs)
       try {
         const mp4 = kind === 'effect' ? await effect(work, it) : kind === 'graphic' ? await graphic(work, it) : kind === 'finish' ? finish(work, it.id) : titleLayer(work, it);
-        const size = toWebp(mp4, demoPath(kind, it.id), QUALITY[`${kind}:${it.id}`]);
+        const { size, q } = toWebp(mp4, demoPath(kind, it.id), QUALITY[`${kind}:${it.id}`]);
+        const man = manifest(); man[`${kind}:${it.id}`] = { q }; writeFileSync(MANIFEST, JSON.stringify(man, Object.keys(man).sort(), 1) + '\n');
         console.log(`${n}/${list.length} ${kind} ${it.id} ${Math.round(size / 1024)} KB`);
       } catch (e) { failed.push(it.id); console.log(`${n}/${list.length} ${kind} ${it.id} failed: ${e.message.split('\n')[0]}`); }
     }
     console.log(failed.length ? `Done. These did not render: ${failed.join(', ')}` : `Done: ${list.length} demos.`);
     process.exitCode = failed.length ? 1 : 0;
-  } finally { rmSync(work, { recursive: true, force: true }); }
+  } finally { rmSync(work, { recursive: true, force: true }); rmSync(LOCK, { force: true }); }
 }
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) await main();
+const isMain = () => { try { return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(resolve(process.argv[1])); } catch { return false; } };
+if (process.argv[1] && isMain()) await main();

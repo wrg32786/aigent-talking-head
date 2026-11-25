@@ -4,7 +4,7 @@ import { Fold } from './ui.jsx';
 
 // Sound tiles: hear a music bed or a sound before you choose. One player for the whole page, so starting one tile stops
 // the last. The waveform is drawn from docs/menu/sounds.json; the audio loads only when you press play.
-const secs = n => n < 60 ? `${Math.round(n * 10) / 10 < 10 ? Math.round(n * 10) / 10 : Math.round(n)} s` : `${Math.floor(n / 60)} min ${Math.round(n % 60)} s`;
+const secs = n => { if (n < 9.95) return `${Math.round(n * 10) / 10} s`; const r = Math.round(n); return r < 60 ? `${r} s` : `${Math.floor(r / 60)} min ${r % 60} s`; };
 const CAT_NAME = { hit: 'Hits', riser: 'Build ups', release: 'Releases', whoosh: 'Whooshes', swipe: 'Swipes', pop: 'Pops', ui: 'Clicks and taps', glitch: 'Glitches', camera: 'Camera', paper: 'Paper', counter: 'Counters', sub: 'Low drops', shimmer: 'Sparkles' };
 
 function Wave({ peaks, at }) {
@@ -15,17 +15,38 @@ function Wave({ peaks, at }) {
   </svg>;
 }
 
+// one player for the whole page: a tile in Music stops a tile in Sounds, and the Music play button stops both
+let shared = null; const subs = new Set();
+const player = () => {
+  if (shared) return shared;
+  const el = new Audio(); el.preload = 'none';
+  shared = { el, cur: null, at: 0 };
+  const tell = () => subs.forEach(f => f({ cur: shared.cur, at: shared.at }));
+  // the pause event arrives after a switch to the next tile has already started it, so it only clears a player that is
+  // still paused
+  el.addEventListener('timeupdate', () => {
+    // a fold closed or the step left: the playing tile is no longer on screen, so it stops
+    const on = document.querySelector('.snd-tile.playing'); if (on && on.checkVisibility && !on.checkVisibility()) { el.pause(); return; }
+    shared.at = el.duration ? el.currentTime / el.duration : 0; tell();
+  });
+  const end = () => { if (el.paused || el.ended) { shared.cur = null; shared.at = 0; tell(); } };
+  el.addEventListener('ended', end); el.addEventListener('pause', end);
+  shared.tell = tell;
+  return shared;
+};
+export function stopTiles() { if (shared) shared.el.pause(); }
 function usePlayer() {
-  const a = useRef(null), [cur, setCur] = useState(null), [at, setAt] = useState(0);
-  useEffect(() => { const el = new Audio(); el.preload = 'none'; a.current = el;
-    // the pause event arrives after a switch to the next tile has already started it, so it only clears a player that is
-    // still paused
-    const tick = () => setAt(el.duration ? el.currentTime / el.duration : 0), end = () => { if (el.paused || el.ended) { setCur(null); setAt(0); } };
-    el.addEventListener('timeupdate', tick); el.addEventListener('ended', end); el.addEventListener('pause', end);
-    return () => { el.pause(); el.removeAttribute('src'); };
-  }, []);
-  const toggle = x => { const el = a.current; if (cur === x.file) { el.pause(); return; } el.pause(); document.querySelectorAll('audio').forEach(o => o.pause()); el.src = file(x.file); setCur(x.file); setAt(0); el.play().catch(() => setCur(null)); };
-  return { cur, at, toggle };
+  const [v, setV] = useState({ cur: null, at: 0 });
+  useEffect(() => { const p = player(); subs.add(setV); setV({ cur: p.cur, at: p.at }); return () => { subs.delete(setV); if (!subs.size) p.el.pause(); }; }, []);
+  const toggle = x => {
+    const p = player(), el = p.el;
+    if (p.cur === x.file) { el.pause(); return; }
+    el.pause(); document.querySelectorAll('audio').forEach(o => o.pause());
+    el.src = file(x.file); p.cur = x.file; p.at = 0; p.tell();
+    // a quick switch to another tile aborts this play(); only a real failure clears it, and only if it is still this one
+    el.play().catch(e => { if (e && e.name === 'AbortError') return; if (p.cur === x.file) { p.cur = null; p.tell(); } });
+  };
+  return { ...v, toggle };
 }
 
 function Tile({ x, sub, p, chosen, onChoose }) {
@@ -37,7 +58,7 @@ function Tile({ x, sub, p, chosen, onChoose }) {
       <Wave peaks={x.peaks} at={on ? p.at : null} />
       <span className="fine snd-sub">{sub}</span>
     </div>
-    {onChoose && <button type="button" className={'btn sm ' + (chosen ? '' : 'outline')} aria-pressed={!!chosen} onClick={onChoose}>{chosen ? 'Chosen' : 'Use this'}</button>}
+    {onChoose && <button type="button" className={'btn sm ' + (chosen ? '' : 'outline')} aria-label={(chosen ? 'Chosen: ' : 'Use this: ') + x.title} aria-current={chosen ? 'true' : undefined} onClick={onChoose}>{chosen ? 'Chosen' : 'Use this'}</button>}
   </div>;
 }
 
@@ -55,7 +76,7 @@ export function SfxTiles({ CAT }) {
   for (const x of CAT.sfx || []) { let g = groups.find(y => y.id === x.category); if (!g) groups.push(g = { id: x.category, items: [] }); g.items.push(x); }
   if (!groups.length) return null;
   return <Fold id="sfx-tiles" title="Hear the sounds">
-    <p className="fine">Studio places these on the cuts for you. Listen here to know what you will hear.</p>
+    <p className="fine">Listen to the sounds Studio can use. With Sounds on the cuts on, Studio picks from these for the strong moments.</p>
     {groups.map(g => <div key={g.id} className="snd-group" role="group" aria-label={CAT_NAME[g.id] || g.id}>
       <h4 className="lbl">{CAT_NAME[g.id] || g.id}</h4>
       <div className="snd-grid">{g.items.map(x => <Tile key={x.id} x={x} p={p} sub={secs(x.seconds)} />)}</div>

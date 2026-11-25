@@ -3,7 +3,7 @@ import { Drawer } from '@astryxdesign/core/Drawer';
 import { Button } from '@astryxdesign/core/Button';
 import { Switch } from '@astryxdesign/core/Switch';
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
-import { api, toast, IconBtn } from './lib.jsx';
+import { api, toast, IconBtn, showName, KIND_NAME } from './lib.jsx';
 import { FolderField } from './Folders.jsx';
 
 const BACKENDS = [
@@ -86,27 +86,30 @@ export function Settings({ V, apply, open, setOpen, theme, setTheme, glass, setG
 }
 
 // the menu's moving previews: how many are missing, and one button that makes them on this computer, with progress
+const nameOf = x => `${showName(x.id)} (${KIND_NAME[x.kind] || showName(x.kind)})`;
 function Previews({ open, reloadCat }) {
   const [st, setSt] = useState(null), [err, setErr] = useState('');
   const load = () => api('/api/previews').then(x => { setSt(x); setErr(''); return x; }).catch(e => { setErr(e.message); return null; });
   useEffect(() => { if (open) load(); }, [open]);
-  const running = st && st.job && st.job.status === 'running';
+  const running = !!(st && st.job && st.job.status === 'running');
   useEffect(() => {
     if (!running) return;
-    const t = setInterval(async () => { const x = await load(); if (x && !(x.job && x.job.status === 'running') && reloadCat) api('/api/catalog?fresh=1').then(() => reloadCat()).catch(() => {}); }, 1500);
+    const t = setInterval(async () => { const x = await load(); if (x && !(x.job && x.job.status === 'running') && reloadCat) reloadCat().catch(() => {}); }, 1500);
     return () => clearInterval(t);
   }, [running]);
   if (!st) return <p className="fine" id="previews-msg" role="status">{err || 'Checking the previews'}</p>;
-  const j = st.job, line = running ? `Making ${j.done || 1} of ${j.total}${j.now ? ': ' + j.now : ''}`
-    : j && j.status === 'failed' ? 'The previews stopped before they were done. Try again.'
-    : st.missing ? `${st.missing} option${st.missing === 1 ? ' has' : 's have'} no moving preview yet.` : 'Every option has a moving preview.';
+  const j = st.job, n = st.missing;
+  const line = running ? `Made ${j.done} of ${j.total}${j.now ? '. Now: ' + nameOf(j.now) : ''}`
+    : st.busyElsewhere ? 'Previews are being made in another window. This updates when they are done.'
+    : j && j.status === 'failed' ? (j.why === 'ffmpeg' ? 'The previews stopped: the video tools are missing. Open the Setup check to add them.' : 'The previews stopped before they were done. Try again.')
+    : n ? `${n} preview${n === 1 ? ' is' : 's are'} missing.` : 'Every option has a moving preview.';
   return <div className="col" id="previews">
     <div className="row">
-      <button type="button" id="make-previews" className="btn sm outline" disabled={running || !st.missing} onClick={() => api('/api/previews/make', {}).then(setSt).catch(e => setErr(e.message))}>{running ? 'Making previews' : 'Make missing previews'}</button>
+      <button type="button" id="make-previews" className="btn sm outline" disabled={running || st.busyElsewhere || !st.canMake} onClick={() => api('/api/previews/make', {}).then(setSt).catch(e => setErr(e.message))}>{running ? 'Making previews' : 'Make missing previews'}</button>
       <span className="fine" id="previews-msg" role="status">{line}</span>
     </div>
     {running && <progress id="previews-progress" max={j.total || 1} value={j.done || 0} aria-label="Previews made" />}
-    {j && !running && j.failed && j.failed.length > 0 && <p className="fine">These did not work: {j.failed.map(x => x.replace(/-/g, ' ')).join(', ')}.</p>}
+    {j && !running && j.failed && j.failed.length > 0 && <p className="fine">Could not make these previews: {j.failed.map(nameOf).join(', ')}.</p>}
     {st.effectsNeedAddon && <p className="fine">Effect previews need the effects add-on. Add it from the Setup check.</p>}
     {err && <p className="fine">{err}</p>}
   </div>;

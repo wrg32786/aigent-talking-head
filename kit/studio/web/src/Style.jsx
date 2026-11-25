@@ -5,7 +5,7 @@ import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/Segme
 import { api, quiet, file, toast, pickState, isPaused, Icon, IconBtn, KIND_NAME, RM, showName, STEP_LAYERS, LAYER_STEP, LAYER_LABEL, layerOf, stepName } from './lib.jsx';
 import { RefMode, RefNotice, RefParts, RefPlan, REF_LABEL, MADE_LABEL, refName, refBrought, LookChips, SavedLookNote, TitleCheckLine } from './RefCard.jsx';
 import { Fold } from './ui.jsx';
-import { BedTiles, SfxTiles } from './SoundTiles.jsx';
+import { BedTiles, SfxTiles, stopTiles } from './SoundTiles.jsx';
 import { upload } from './upload.js';
 import { WordsBrands } from './Brands.jsx';
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react';
@@ -283,7 +283,7 @@ function Sound({ CAT, s, apply, patch, ctx }) {
           <option value="auto">Picked for you</option><option value="none">No music</option><option value="upload" disabled={!s.music.upload}>My upload</option>
           {CAT.beds.map(x => <option key={x.id} value={x.id}>{x.title} ({x.energy}, {Math.round(x.seconds)} s)</option>)}
         </select>
-        <IconBtn id="bed-play" n={playing ? 'pause' : 'play'} label={playing ? 'Pause the music' : 'Play the music'} disabled={!src} onClick={() => { const a = audio.current; if (a.paused) a.play().catch(() => {}); else a.pause(); }} />
+        <IconBtn id="bed-play" n={playing ? 'pause' : 'play'} label={playing ? 'Pause the music' : 'Play the music'} disabled={!src} onClick={() => { const a = audio.current; if (a.paused) stopTiles(); if (a.paused) a.play().catch(() => {}); else a.pause(); }} />
         <audio id="bed-audio" ref={audio} preload="none" hidden onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} />
         <Button id="drop-music" variant="ghost" size="sm" label="Your own" icon={<Icon n="upload" />} onClick={() => musicIn.current.click()} />
         <input type="file" id="file-music" ref={musicIn} accept="audio/*" hidden onChange={e => { upload('music', [...e.target.files], s, apply); e.target.value = ''; }} />
