@@ -325,6 +325,7 @@ function renderSteps(s) {
   if (C.MOTIONS.includes(s.pace && s.pace.motion)) args.push('--motion', s.pace.motion);
   if (s.keyWords) args.push('--key-words', s.keyWords); // a key words change after the draft reaches the render
   if (s.transitionsWhen) args.push('--transitions-when', s.transitionsWhen); // and a transition timing change
+  if (s.finishWhen) args.push('--finish-when', s.finishWhen); // and where filters show
   { const ex = SIZES.exportArg(s); if (ex) args.push('--export', ex); }
   // the b-roll lane goes into cut.json first (kit/studio/broll-run.mjs), with credits.txt for the clips it uses
   const bp = BRL.plan(s), steps = [];

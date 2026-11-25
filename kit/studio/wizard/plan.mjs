@@ -115,7 +115,7 @@ export function diffPatch(prev, next, cat = null) {
   for (const ref of Object.keys(a.picks)) if (!(ref in b.picks)) picks[ref] = 'clear';
   for (const [ref, how] of Object.entries(b.picks)) if (a.picks[ref] !== how) picks[ref] = how;
   const patch = Object.keys(picks).length ? { picks } : {};
-  for (const k of ['pack', 'styleLook', 'titles', 'keyWords', 'transitionsWhen', 'music', 'sound', 'pace']) if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) patch[k] = b[k];
+  for (const k of ['pack', 'styleLook', 'titles', 'keyWords', 'transitionsWhen', 'finishWhen', 'music', 'sound', 'pace']) if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) patch[k] = b[k];
   return patch;
 }
 // a builder step's words choices laid over the plan (only the fields given change)
@@ -234,7 +234,10 @@ export function toState(plan, cat = null) {
     styleLook: p.template && p.template.kind === 'look' ? p.template.name : null, titles: w.titles.on === false || (w.type === 'captions' && p.touched.includes('words')) ? 'off' : 'auto',
     music: { bed: p.music.bed, energy: p.music.energy }, sound: { sfx: p.music.sfx ? 'on' : 'off' },
     pace: { tighten: p.advanced.tighten ?? P.tighten, punch: p.presenter.some(x => x.id === 'punch') ? 'on' : 'off' }, keyWords: w.keyWords.level,
-    transitionsWhen: Array.isArray(p.transitions.ids) && !p.transitions.ids.length ? 'every-cut' : p.transitions.when };
+    transitionsWhen: Array.isArray(p.transitions.ids) && !p.transitions.ids.length ? 'every-cut' : p.transitions.when,
+    // filters chosen in the builder (or given a timing) show where you said, on their own pieces; filters only
+    // allowed on a classic step, or none chosen, leave it to the look as before
+    finishWhen: Array.isArray(p.filters.ids) && p.filters.ids.length && (p.touched.includes('filters') || p.filters.when !== 'whole') ? p.filters.when : 'none' };
   const look = w.look || (w.type === 'captions' ? 'classic' : w.type === 'kinetic' ? 'kinetic' : null);
   if (look) pick('captionStyle', look);
   if (w.entrance && w.type !== 'captions') pick('captionEntrance', w.entrance);
@@ -266,7 +269,6 @@ export function pending(plan) {
   for (const x of p.presenter) {
     if (x.id === 'frame-breakout') add('presenter.frame-breakout', 'Frame breakout');
   }
-  if (Array.isArray(p.filters.ids) && p.filters.ids.length && p.filters.when !== 'whole') add('filters.when', 'Filters only on the hook or CTA');
   if (p.content.repoFeature) add('content', 'Repo or tool feature');
   return out.filter((x, i, a) => a.findIndex(y => y.field === x.field) === i);
 }
@@ -326,6 +328,7 @@ export function fromState(s, prev = null, cat = null) {
   if (fa.length) { p.filters.ids = fa; for (const id of fa) take('finish', id); }
   else if (fd.length && cat && finishIds(cat).every(id => fd.includes(id))) { p.filters.ids = []; for (const id of fd) take('finish', id); }
   else p.filters.ids = null;
+  p.filters.when = s.finishWhen && s.finishWhen !== 'none' ? s.finishWhen : base.filters.when;
   p.music.bed = (s.music && s.music.bed) || 'auto'; p.music.energy = (s.music && s.music.energy) || 'auto';
   const bs = allow('beatSync')[0]; p.music.beatSync = bs === 'beat-sync' ? true : bs === 'no-beat-sync' ? false : null; if (bs) take('beatSync', bs);
   p.music.sfx = !(s.sound && s.sound.sfx === 'off');

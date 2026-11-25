@@ -188,14 +188,14 @@ export const KIT_BRANDS = ['kit/example/skool-logo.svg'];
 // and makes the one change it needs (the page's one click switch on a greyed option).
 //   useReferenceLook: true sets the board from the reference alone (kit/studio/reference.mjs useReferenceLook): an
 //   earlier look that was in use is set aside, your picks since the reference go. The same one Undo puts it back.
-const SETTLE_KEYS = ['pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'reference', 'switchFor', 'keyWords', 'titles', 'transitionsWhen'];
+const SETTLE_KEYS = ['pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'reference', 'switchFor', 'keyWords', 'titles', 'transitionsWhen', 'finishWhen'];
 const lookSnap = s => JSON.parse(JSON.stringify({ pack: s.pack || null, picks: s.picks || {}, music: s.music, sound: s.sound, pace: s.pace,
-  reference: s.reference ? { mode: s.reference.mode, added: s.reference.added, prev: s.reference.prev, auto: s.reference.auto, applied: s.reference.applied, lookFor: s.reference.lookFor || null, prevLook: s.reference.prevLook || null, fontFor: s.reference.fontFor || null, prevFont: s.reference.prevFont || null, copyMode: s.reference.copyMode || null } : null, entranceLock: !!s.entranceLock, fontLock: !!s.fontLock, boost: s.boost ?? null, titles: s.titles || 'auto', keyWords: s.keyWords || 'off', transitionsWhen: s.transitionsWhen || 'every-cut' }));
+  reference: s.reference ? { mode: s.reference.mode, added: s.reference.added, prev: s.reference.prev, auto: s.reference.auto, applied: s.reference.applied, lookFor: s.reference.lookFor || null, prevLook: s.reference.prevLook || null, fontFor: s.reference.fontFor || null, prevFont: s.reference.prevFont || null, copyMode: s.reference.copyMode || null } : null, entranceLock: !!s.entranceLock, fontLock: !!s.fontLock, boost: s.boost ?? null, titles: s.titles || 'auto', keyWords: s.keyWords || 'off', transitionsWhen: s.transitionsWhen || 'every-cut', finishWhen: s.finishWhen || 'none' }));
 export const effectsReady = () => existsSync(join(ROOT, 'effects', '.venv'));
 export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
   const errs = [], log = [];
   if (!p || typeof p !== 'object') return { errs: ['patch must be an object'], log, noop: false };
-  const known = ['keyWords', 'transitionsWhen', 'job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands', 'finish', 'switchFor', 'undoChange', 'useReferenceLook', 'styleLook', 'point', 'sizes', 'boost', 'videoPlan', 'titles'];
+  const known = ['keyWords', 'transitionsWhen', 'finishWhen', 'job', 'pack', 'picks', 'clearPicks', 'music', 'sound', 'pace', 'export', 'reference', 'say', 'reply', 'from', 'footage', 'clips', 'toAgent', 'replyTo', 'kind', 'attach', 'asIs', 'glossary', 'brands', 'finish', 'switchFor', 'undoChange', 'useReferenceLook', 'styleLook', 'point', 'sizes', 'boost', 'videoPlan', 'titles'];
   for (const k of Object.keys(p)) if (!known.includes(k)) errs.push(`unknown field "${k}" (${known.join(', ')})`);
   if (p.undoChange) {
     const u = s.lastChange && s.lastChange.undo; if (!u) { errs.push('undoChange: nothing to undo'); return { errs, log, noop: false }; }
@@ -205,6 +205,7 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
     if ('boost' in u) s.boost = u.boost;
     if (u.titles) s.titles = u.titles;
     if (u.keyWords) s.keyWords = u.keyWords;
+    if (u.finishWhen) { if (u.finishWhen === 'none' && !s.finishWhen) delete s.finishWhen; else s.finishWhen = u.finishWhen; }
     if (u.transitionsWhen) { if (u.transitionsWhen === 'every-cut' && !s.transitionsWhen) delete s.transitionsWhen; else s.transitionsWhen = u.transitionsWhen; }
     delete s.lastChange; log.push('undid the last change'); return { errs, log, noop: false };
   }
@@ -284,6 +285,8 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
   if (p.keyWords !== undefined) { if (!['off', 'subtle', 'strong', 'dramatic'].includes(p.keyWords)) errs.push('keyWords: off, subtle, strong or dramatic'); else if (p.keyWords !== (s.keyWords || 'off')) { s.keyWords = p.keyWords; log.push(`key words ${p.keyWords}`); } }
   // which seams keep a named transition (reel.cjs --transitions-when, kit/sections.cjs); every-cut is how it always was
   if (p.transitionsWhen !== undefined) { if (!['every-cut', 'topic', 'hook-cta'].includes(p.transitionsWhen)) errs.push('transitionsWhen: every-cut, topic or hook-cta'); else if (p.transitionsWhen !== (s.transitionsWhen || 'every-cut')) { s.transitionsWhen = p.transitionsWhen; log.push(`transitions ${p.transitionsWhen === 'every-cut' ? 'on every cut' : p.transitionsWhen === 'topic' ? 'on topic changes only' : 'on the hook and CTA only'}`); } }
+  // where the filters show (reel.cjs --finish-when): on their own pieces of the video; none is how it always was
+  if (p.finishWhen !== undefined) { if (!['none', 'whole', 'hook', 'cta', 'hook-cta'].includes(p.finishWhen)) errs.push('finishWhen: none, whole, hook, cta or hook-cta'); else if (p.finishWhen !== (s.finishWhen || 'none')) { s.finishWhen = p.finishWhen; log.push(p.finishWhen === 'none' ? 'filters: the look decides where' : `filters on ${p.finishWhen === 'whole' ? 'the whole video' : 'the ' + p.finishWhen.replace('-', ' and ') + ' only'}`); } }
   if (p.titles !== undefined) { if (!['auto', 'off'].includes(p.titles)) errs.push('titles: auto or off'); else if (p.titles !== (s.titles || 'auto')) { s.titles = p.titles; log.push(p.titles === 'off' ? 'no big titles' : 'big titles: the Look decides'); } }
   if (p.export !== undefined) { if (p.export && !cat.exports.includes(p.export)) errs.push(`export: ${cat.exports.join(', ')}`); else if (SZ.EXTRA.includes(p.export)) { s.sizes = SZ.sizesOf({ sizes: s.sizes, export: p.export }); log.push(`sizes 9:16, ${s.sizes.join(', ')}`); } else { s.export = p.export || null; log.push(`export ${s.export}`); } }
   // sizes: the versions a render makes beside the 9:16 reel (kit/studio/sizes.mjs)
@@ -415,6 +418,7 @@ export function compose(s, { refPack = null } = {}) {
   if (one('titleExit')) args.push('--title-exit', one('titleExit'));
   if (s.keyWords && s.keyWords !== 'off') args.push('--key-words', s.keyWords);
   if (s.transitionsWhen && s.transitionsWhen !== 'every-cut') args.push('--transitions-when', s.transitionsWhen);
+  if (s.finishWhen && s.finishWhen !== 'none') args.push('--finish-when', s.finishWhen);
   // fonts: yours, unless a reference's style is being copied (Recreate, Copy the look, a saved look) and you have not
   // picked a font since. Then the font the teardown matched is used and an older pick is never sent.
   { const mine = (s.picks.font && s.picks.font.allow) || [], fonts = mine.filter(f => f !== 'theme'), copied = copiesStyle(s.reference) || (!!s.styleLook && !(s.reference && s.reference.mode !== 'off' && s.reference.extracted));
@@ -588,7 +592,7 @@ export function outputsOf(s) {
 // it again puts you back where you were. What carries over: your words (glossary) and the counters; with
 // keepLook, the look too (pack, picks, music, sound, pace, export, brand logos, the saved style look). Keys, settings and the agent
 // connection live in other files and are never touched here.
-export const LOOK_KEYS = ['pack', 'picks', 'music', 'sound', 'pace', 'export', 'sizes', 'brands', 'styleLook', 'boost', 'titles', 'keyWords', 'transitionsWhen', 'videoPlan'];
+export const LOOK_KEYS = ['pack', 'picks', 'music', 'sound', 'pace', 'export', 'sizes', 'brands', 'styleLook', 'boost', 'titles', 'keyWords', 'transitionsWhen', 'finishWhen', 'videoPlan'];
 const KEEP_KEYS = ['format', 'version', 'rev', 'updated', 'chatSeq', 'refSeq', 'importSeq', 'commentSeq', 'videoSeq', 'glossary'];
 const VIDEO_EXT = /\.(mp4|mov|m4v|webm|mkv)$/i;
 export const videosDir = () => join(stateDir(), 'videos');

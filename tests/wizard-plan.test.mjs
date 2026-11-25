@@ -52,7 +52,7 @@ try {
       [{ words: { type: 'kinetic', entrance: 'pop' } }, { picks: { 'captionStyle:kinetic': 'allow', 'captionEntrance:pop': 'allow' } }],
       [{ words: { type: 'captions', look: 'pill', fonts: 'druk', colors: { theme: 'magazine' } } }, { picks: { 'captionStyle:pill': 'allow', 'font:druk': 'allow', 'theme:magazine': 'allow' }, titles: 'off' }], // just captions: no big titles (spec 14.2)
       [{ transitions: { ids: ['whip', 'glitch'], when: 'every-cut' } }, { picks: { 'transition:whip': 'allow', 'transition:glitch': 'allow' } }],
-      [{ filters: { ids: ['mono'], when: 'whole' }, music: { beatSync: false } }, { picks: { 'finish:mono': 'allow', 'beatSync:no-beat-sync': 'allow' } }],
+      [{ filters: { ids: ['mono'], when: 'whole' }, music: { beatSync: false } }, { picks: { 'finish:mono': 'allow', 'beatSync:no-beat-sync': 'allow' }, finishWhen: 'whole' }], // filters chosen in the builder show (spec 14.1)
       [{ presenter: [{ id: 'punch', when: 'whole' }, { id: 'behind-head', when: 'whole' }, { id: 'effect:slow-push', when: 'whole' }] }, { picks: { 'titleLayer:behind': 'allow', 'effect:slow-push': 'allow' } }],
       [{ graphics: { agent: false, nameTag: false, numbers: true, stickers: true, cta: true, cards: false } }, { picks: { 'graphic:lower-third': 'deny', 'editing:cards-auto': 'deny' } }],
     ];
@@ -176,7 +176,7 @@ try {
     assert.deepStrictEqual(now.filters.ids.sort(), ['mono', 'warm']);
     assert.strictEqual(now.filters.when, 'hook'); assert.strictEqual(now.notes, 'Hook with big red words.');
     assert.strictEqual(now.content.repos.length, 1);
-    assert.deepStrictEqual(VP.pending(now).map(x => x.field).sort(), ['content', 'filters.when']);
+    assert.deepStrictEqual(VP.pending(now).map(x => x.field).sort(), ['content'], 'filter timing now reaches the render'); assert.strictEqual(s.finishWhen, 'hook');
     // a pause length set by hand on Cut survives a read and a set
     apply(s, { pace: { tighten: 1.2 } }); const again = apply(fresh(), { videoPlan: API.planOf(s, cat) });
     assert.strictEqual(again.pace.tighten, 1.2);
