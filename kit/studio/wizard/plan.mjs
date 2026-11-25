@@ -132,10 +132,11 @@ export function withWords(plan, words) {
 }
 // a builder step's Between shots, You on screen or Extras choice laid over the plan: transitions and graphics change
 // only the fields given, presenter is the whole list. A choice here wins over All options picks it speaks for.
-export const PARTS = ['transitions', 'presenter', 'graphics'];
+export const PARTS = ['transitions', 'presenter', 'graphics', 'filters', 'music', 'notes'];
 export function withPart(plan, part, value) {
   const p = normalize(plan), before = clone(p);
   if (part === 'presenter') p.presenter = clone(value);
+  else if (part === 'notes') p.notes = typeof value === 'string' ? value : '';
   else p[part] = { ...p[part], ...clone(value) };
   // only the All options picks for what this choice changed
   let speaks = () => false;
@@ -150,8 +151,12 @@ export function withPart(plan, part, value) {
     const moved = new Set([...before.presenter.filter(x => !b.has(key(x))), ...p.presenter.filter(x => !a.has(key(x)))].map(x => x.id));
     speaks = (k, id) => (k === 'titleLayer' && moved.has('behind-head')) || (k === 'effect' && moved.has('effect:' + id));
   }
+  if (part === 'filters' && value && 'ids' in value) speaks = k => k === 'finish';
+  if (part === 'music' && value) speaks = k => ('beatSync' in value && k === 'beatSync') || ('bed' in value && k === 'music');
   for (const r of Object.keys(p.advanced.picks)) { const i = r.indexOf(':'); if (speaks(r.slice(0, i), r.slice(i + 1))) delete p.advanced.picks[r]; }
-  return touch(p, part === 'transitions' && value && 'when' in value ? 'transitions.when' : part, part);
+  const extra = part === 'transitions' && value && 'when' in value ? ['transitions.when'] : part === 'filters' && value && 'when' in value ? ['filters.when']
+    : part === 'music' && value ? ['energy', 'beatSync'].filter(k => k in value).map(k => 'music.' + k) : [];
+  return touch(p, ...extra, part);
 }
 // mark a field as yours, so a later pace change leaves it alone
 export function touch(plan, ...keys) { const p = normalize(plan); for (const k of keys) if (!p.touched.includes(k)) p.touched.push(k); return p; }
