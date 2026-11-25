@@ -31,7 +31,7 @@ In the kit folder:
 npm run setup:all -- --yes
 ```
 
-It installs what is missing and skips what is there: Node packages, the Python venv and requirements, yt-dlp and instaloader (reference links), ffmpeg and ffprobe, Chrome, the Whisper model (small.en, about 470 MB), the effects pass and the person mask weights, the humanizer skill and the Studio page. It is safe to run again or stop halfway. It ends with a summary and a list of anything only the user can do.
+It installs what is missing and skips what is there: Node packages, the Python venv and requirements, yt-dlp and instaloader (reference links), ffmpeg and ffprobe, Chrome, the Whisper model (small.en, about 470 MB), the effects pass and the person mask weights, the humanizer skill and the Studio page. It is safe to run again or stop halfway. It ends with a summary, a list of anything only the user can do, and a line to restart Studio if it is already running.
 
 ## 4. Connect yourself over MCP
 

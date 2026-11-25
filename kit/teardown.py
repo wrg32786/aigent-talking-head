@@ -647,6 +647,9 @@ def caption_layer(video, cues, seg):
         off = (~mb) & rows[:, None]
         if off.sum() < 30:
             off = ~mb
+        # the whole box can sit on the person: mean-of-empty is NaN, and that used to write invalid extras.json
+        if not off.any():
+            continue
         out.append({"t0": c["t0"], "text": c["text"], "on_n": int(mb.sum()), "text_on_person": round(float(tb[mb].mean()), 3), "text_off_person": round(float(tb[off].mean()), 3)})
     return out
 
@@ -872,7 +875,7 @@ def cmd_extras(a):
                   + f"; glow {lk['glow'] or 'none'}, picture dim {lk['dim'] or 'none'}")
     except Exception as e:
         print(f"note: title look not read: {e}")
-    json.dump(out, open(a.out, "w", encoding="utf-8"), indent=1)
+    json.dump(out, open(a.out, "w", encoding="utf-8"), indent=1, allow_nan=False)
     sys.stdout.flush()
     print(f"graphics: {sum(g['type'] == 'ordinal-sticker' for g in gx)} ordinal stickers, {sum(g['type'] == 'app-label' for g in gx)} app labels, {sum(g['type'] == 'screen-card' for g in gx)} screen cards")
     print(f"extras: {len(out['shots'])} shots measured, {len(out['titles'])} title layers ({'MediaPipe mask' if seg else 'no person mask; layers not estimated'})")

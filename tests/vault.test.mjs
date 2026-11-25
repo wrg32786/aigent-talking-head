@@ -10,9 +10,9 @@
 import assert from 'assert';
 import { spawn } from 'child_process';
 import { createServer } from 'http';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -20,7 +20,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 const require = createRequire(import.meta.url);
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const BB = require('../kit/broll-brief.cjs'), BS = require('../kit/broll-slots.cjs'), RM = require('../kit/reelmd.cjs'), RC = require('../kit/recreate.cjs');
-const STATE = mkdtempSync(join(tmpdir(), 'vault-test-')), LIB = join(STATE, 'lib'), JOB = 'vault-test-' + process.pid;
+const STATE = realpathSync(mkdtempSync(join(tmpdir(), 'vault-test-'))), LIB = join(STATE, 'lib'), JOB = 'vault-test-' + process.pid;
 process.env.STUDIO_DIR = join(STATE, 'studio'); process.env.STUDIO_BROLL_LIBRARY = LIB; delete process.env.STUDIO_VAULT;
 let n = 0; const t = async (name, fn) => { await fn(); n++; console.log('ok ' + name); };
 const NO_DASH = s => assert.ok(!/[–—]/.test(String(s)), 'no dash: ' + s);
@@ -84,6 +84,47 @@ try {
     assert.throws(() => V.migrate(mf, mt), 'the third clip cannot be read, as if Studio stopped there');
     const got = V.load(mt).items; assert.deepStrictEqual(got.map(x => [x.id, x.author.name, x.usedIn[0], x.file]), [['brhalf0001', 'Bo', 'reel-1', 'items/brhalf0001/a.mp4'], ['brwait0002', 'Cy', 'reel-1', 'items/brwait0002/b.mp4']], 'what moved before the stop is in the index');
     assert.ok(existsSync(join(mf, 'library.json')), 'the old index stays until the move is whole');
+  });
+  await t('a scratch STUDIO_DIR keeps the vault in the session and does not move the install library', () => {
+    const kit = join(STATE, 'install-kit'), scratch = join(STATE, 'scratch-session');
+    mkdirSync(join(kit, 'broll-library'), { recursive: true });
+    writeFileSync(join(kit, 'broll-library', 'library.json'), JSON.stringify({ clips: [{ id: 'brkeep0001', file: 'x.mp4' }] }));
+    const none = { broll: { library: null } };
+    const r = V.resolveDir({ STUDIO_DIR: scratch }, kit, none);
+    assert.strictEqual(r.dir, resolve(join(scratch, 'vault')));
+    assert.ok(!r.from.some(f => resolve(f) === resolve(join(kit, 'broll-library'))), 'the install library is not a source');
+    assert.ok(existsSync(join(kit, 'broll-library', 'library.json')), 'the install library was not touched');
+    // the install default (no STUDIO_DIR) still points at the kit vault and would move that library
+    const dft = V.resolveDir({}, kit, none);
+    assert.strictEqual(dft.dir, resolve(join(kit, 'vault')));
+    assert.ok(dft.from.some(f => resolve(f) === resolve(join(kit, 'broll-library'))));
+  });
+  await t('when the old library is a junction or symlink, the vault stays next to the real folder and the move prints that path', () => {
+    const kit = join(STATE, 'kit-link'), drive = join(STATE, 'drive-d', 'AIgent Studio');
+    const realLib = join(drive, 'broll-library');
+    mkdirSync(join(realLib, 'pexels'), { recursive: true }); mkdirSync(kit, { recursive: true });
+    writeFileSync(join(realLib, 'pexels', 'clip.mp4'), 'linked clip');
+    writeFileSync(join(realLib, 'library.json'), JSON.stringify({ clips: [{ id: 'brlink0001', file: 'pexels/clip.mp4', name: 'linked', source: 'upload', kind: 'video', tags: [] }] }));
+    symlinkSync(realLib, join(kit, 'broll-library'), 'junction');
+    const r = V.resolveDir({}, kit, { broll: { library: null } });
+    assert.strictEqual(r.dir, resolve(join(drive, 'vault')));
+    assert.ok(r.from.some(f => { try { return realpathSync(f) === realpathSync(realLib); } catch { return false; } }));
+    mkdirSync(r.dir, { recursive: true });
+    const logs = []; const err = console.error; console.error = (...a) => logs.push(a.join(' '));
+    let nMoved;
+    try { nMoved = V.migrate(realLib, r.dir); } finally { console.error = err; }
+    assert.strictEqual(nMoved, 1);
+    assert.ok(existsSync(join(r.dir, 'items', 'brlink0001', 'clip.mp4')));
+    assert.ok(logs.some(m => m.includes('now in') && m.includes(r.dir)), 'the exact destination is printed: ' + logs.join(' | '));
+    NO_DASH(logs.join(' '));
+  });
+  await t('a linked library leaves an existing kit vault in place so earlier clips stay visible', () => {
+    const kit = join(STATE, 'kit-existing'), drive = join(STATE, 'drive-e', 'AIgent Studio');
+    mkdirSync(join(drive, 'broll-library'), { recursive: true }); mkdirSync(join(kit, 'vault'), { recursive: true });
+    symlinkSync(join(drive, 'broll-library'), join(kit, 'broll-library'), 'junction');
+    writeFileSync(join(kit, 'vault', 'vault.json'), JSON.stringify({ version: 1, items: [{ id: 'bralready1', name: 'already here' }], trash: [] }) + '\n');
+    const r = V.resolveDir({}, kit, { broll: { library: null } });
+    assert.strictEqual(r.dir, resolve(join(kit, 'vault')));
   });
   await t('add: the file keeps its name beside item.json, is yours by default, and the same file is added once', () => {
     own = V.add(file('My Pricing Page.png', 'png one'), { title: 'Pricing page', tags: ['Pricing'], brand: ['Acme'] });

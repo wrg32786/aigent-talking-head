@@ -345,7 +345,15 @@ if (target) {
     { const ve = [];
       try { execFileSync(process.execPath, [join(ROOT, 'tests', 'vault.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
       catch (e) { ve.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
-      results.push({ label: 'Asset Vault tests (tests/vault.test.mjs: the brief rules and an agent rewrite, the old library moves in with its credits, add, the same file once, delete with Undo, rights and reference only never placed, links and captures, search and filters, limits, matching and ranking with reasons, the tool schemas, the Vault routes, MCP add_to_vault, capture_link, search_vault, set_broll_brief)', errs: ve, warns: [] }); }
+      results.push({ label: 'Asset Vault tests (tests/vault.test.mjs: the brief rules and an agent rewrite, the old library moves in with its credits, add, the same file once, delete with Undo, rights and reference only never placed, links and captures, search and filters, limits, matching and ranking with reasons, the tool schemas, the Vault routes, MCP add_to_vault, capture_link, search_vault, set_broll_brief, a scratch STUDIO_DIR does not move the install library, a linked library keeps the vault on that drive unless a kit vault already exists)', errs: ve, warns: [] }); }
+    { const xe = [];
+      try { execFileSync(process.execPath, [join(ROOT, 'tests', 'teardown-extras.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+      catch (e) { xe.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+      results.push({ label: 'Teardown extras tests (tests/teardown-extras.test.mjs: a word box entirely on the person writes valid JSON, a corrupt extras.json drops layer hints, ig_fetch prints a plain refusal with no traceback)', errs: xe, warns: [] }); }
+    { const se = [];
+      try { execFileSync(process.execPath, [join(ROOT, 'tests', 'setup-all.test.mjs')], { cwd: ROOT, stdio: 'pipe' }); }
+      catch (e) { se.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+      results.push({ label: 'Setup tests (tests/setup-all.test.mjs: setup:all does not pass args with shell:true, and ends with a line to restart Studio if it is already running)', errs: se, warns: [] }); }
     const rparts = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-recreate-parts.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { rparts.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
