@@ -2,6 +2,18 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.31.0 (unreleased)
+
+Release notes: [docs/releases/v1.31.0.md](docs/releases/v1.31.0.md).
+
+A guided builder in Studio, repo feature mode with a breakout starter, and the verify and mask follow-ups from main.
+
+- **Guided builder in Studio.** Studio has three tabs. Recording is its own section (film a take with a teleprompter, then Use in a new video). New video walks through one choice per screen: pace, how text enters, where it sits, ordinary captions or kinetic text, colors, fonts, larger keywords when kinetic text is on, transitions, presenter effects, filters (including black and white) and when they show, optional repo feature mode, your notes for the agent, and music last. A combined preview shows the text settings. Teardowns is its own area with the Template Library: start from a saved template or build a custom one, and save a look from a finished plan. Before Make, and again on Review, a Plan check compares the draft with your picks (`needed()` for required actions such as a missing repo link; `pending()` for choices that are not drawn yet). An old Wizards link opens the builder. Tests: `tests/studio-builder.e2e.mjs`, `tests/studio-first-run.e2e.mjs`, `tests/wizard-plan.test.mjs`.
+
+- **Repo feature mode.** Paste one to three GitHub links. Images and GIFs from each README become B-roll; if a repo has none, the README itself is shown. The default layout is a 45/10/45 banded frame (rounded repo card with a stronger shadow on top, captions in the middle band kept off the face, you in a rounded box at the bottom with your head over the top edge). Frame breakout is on by default in this mode and can be turned off. Full-screen takeovers last 2 to 5 seconds; pictures change every 2 to 4 seconds. Those timings and bands live on the plan so a template can change them. Make, draft, a clean-up redraft, and a reel render wait for a GitHub link. The Template Library ships a starter, Repo feature (breakout), with word-by-word captions; it can wait for a link. No third-party branding is copied. A persistent headline with a highlighted keyword can be stored on the plan but is not drawn yet. Tests: `tests/split-panel.test.mjs`, `tests/repo-broll.test.mjs`, `tests/wizard-plan.test.mjs`, `tests/studio-builder.e2e.mjs`.
+
+- **Flash count, mask crop, and room note.** Verify counts flashes in the finished reel, including a strobe on every frame and halves that flip against each other, and names the worst second. More than three flashes in a second fails (WCAG 2.3.1). The person mask can crop to the person when that gives the model more detail, and it checks free memory before it runs. Verify can flag a patch of the matte that looks like the room. Style packs can set `captionOutline` and `splitPlace`. The README hero is the Studio ad. Tests: `tests/flash-count.test.cjs`, `tests/test_matte_crop.py`, `tests/test_matte_memory.py`, `tests/test_matte_room.py`, `tests/packs.test.cjs`, `tests/face-matte.test.mjs`.
+
 ## 1.30.0 (unreleased)
 
 Release notes: [docs/releases/v1.30.0.md](docs/releases/v1.30.0.md).
