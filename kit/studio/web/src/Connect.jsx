@@ -17,7 +17,7 @@ export function CopyBlock({ code, label, id }) {
 
 export function connState(a) {
   if (a && a.listening) return { k: 'on', dot: 'success', text: `Connected: ${a.name || 'your agent'}, listening` };
-  if (a && a.connected) return { k: 'busy', dot: 'warning', text: `Connected: ${a.name || 'your agent'}, busy in the terminal` };
+  if (a && a.connected) return { k: 'busy', dot: 'warning', text: `Connected: ${a.name || 'your agent'}, busy with another task` };
   return { k: 'off', dot: 'neutral', text: 'Waiting for your agent' };
 }
 

@@ -5,9 +5,9 @@
 // brand portraits. Titles are composited behind the head with the person mask.
 // Regenerates the committed gallery; keep the folder modest.
 import { execFileSync } from 'child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, readdirSync, statSync } from 'fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync, readdirSync, statSync } from 'fs';
 import { tmpdir } from 'os';
-import { dirname, join, relative } from 'path';
+import { dirname, join, relative, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { loadMenu, demoFields, sourceCatalogIds, showcaseHas } from './menu.mjs';
@@ -306,19 +306,32 @@ function expectedStillName(dstPng, t, fps) {
   return dstPng.replace('.png', `_${nameT}.png`);
 }
 
+// one effect's plan row for the showcase and the animated demos (kit/demos.mjs): its demo fields, neutral profile and
+// text, and the placeholder images when it needs some
+export const FX_PROFILE = { name: 'Showcase', handle: '@showcase' };
+export function fxRow(e, imgs, start, end) {
+  const row = { ...demoFields(e), start: +start.toFixed(2), end: +end.toFixed(2) };
+  const ce = FX_CAT[e.id] || {}, prof = FX_PROFILE;
+  const tok = { '$profile.name': prof.name, '$profile.handle': prof.handle, '$job': 'showcase', '$day': 'MON', '$date': '1', '$issue': 'ISSUE  ·  SHOWCASE' };
+  for (const k of ce.fromProfile || []) row[k] = prof[k === 'text' ? 'handle' : k];
+  for (const [k, v] of Object.entries(ce.neutral || {})) if (row[k] === undefined) row[k] = tok[v] ?? v;
+  if (e.id === 'glass-widgets' && row.pill === undefined) row.pill = '';   // the upstream "Edited by Claude" pill is off unless asked for, as in fx.cjs
+  if ((e.required || []).includes('images') || (e.needs || []).includes('images')) row.images = imgs;
+  return row;
+}
+// six plain colour squares standing in for b-roll images (no third-party pictures)
+export function fxImages(imgs) {
+  mkdirSync(imgs, { recursive: true });
+  for (let i = 0; i < 6; i++) {
+    sh('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', `color=c=0x${['5cf9e2', 'f1e8dc', '3a2a22', '8899aa', 'cc7744', '226688'][i]}:s=640x640:d=0.1`,
+      '-frames:v', '1', join(imgs, `i${i}.jpg`)]);
+  }
+  return imgs;
+}
+
 function runEffectBatch(fxPy, runner, person, imgs, batch, work, fps) {
   const slot = 1.2;
-  const plan = { profile: { name: 'Showcase', handle: '@showcase' }, effects: [] };
-  batch.forEach((e, i) => {
-    const row = { ...demoFields(e), start: +(i * slot).toFixed(2), end: +((i + 1) * slot).toFixed(2) };
-    const ce = FX_CAT[e.id] || {}, prof = plan.profile;
-    const tok = { '$profile.name': prof.name, '$profile.handle': prof.handle, '$job': 'showcase', '$day': 'MON', '$date': '1', '$issue': 'ISSUE  ·  SHOWCASE' };
-    for (const k of ce.fromProfile || []) row[k] = prof[k === 'text' ? 'handle' : k];
-    for (const [k, v] of Object.entries(ce.neutral || {})) if (row[k] === undefined) row[k] = tok[v] ?? v;
-    if (e.id === 'glass-widgets' && row.pill === undefined) row.pill = '';   // the upstream "Edited by Claude" pill is off unless asked for, as in fx.cjs
-    if ((e.required || []).includes('images') || (e.needs || []).includes('images')) row.images = imgs;
-    plan.effects.push(row);
-  });
+  const plan = { profile: FX_PROFILE, effects: batch.map((e, i) => fxRow(e, imgs, i * slot, (i + 1) * slot)) };
   const dur = batch.length * slot + 0.2;
   const dir = mkdtempSync(join(work, 'fx-'));
   const clip = join(dir, 'fxsrc.mp4');
@@ -407,12 +420,7 @@ async function main() {
   const effects = menu.sections.find(s => s.id === 'effects').items;
   if (!skipEffects && existsSync(fxPy) && existsSync(runner)) {
     console.log('effects (' + effects.length + ')');
-    const imgs = join(work, 'broll');
-    mkdirSync(imgs, { recursive: true });
-    for (let i = 0; i < 6; i++) {
-      sh('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', `color=c=0x${['5cf9e2', 'f1e8dc', '3a2a22', '8899aa', 'cc7744', '226688'][i]}:s=640x640:d=0.1`,
-        '-frames:v', '1', join(imgs, `i${i}.jpg`)]);
-    }
+    const imgs = fxImages(join(work, 'broll'));
     const BATCH = 6;
     const fps = 24;
     for (let i = 0; i < effects.length; i += BATCH) {
@@ -683,13 +691,13 @@ function renderTitleLayerStills(py, work, stills, put) {
 // Graphics (kit/graphics.json): each one after its entrance settles, on the presenter, with the neutral placeholder
 // art (no third-party screenshots; icons are Tabler, MIT). The ordinal burst goes behind the head with the person mask; graphics
 // on the panel layer go under the crown mask. The others use their kit/graphics.json example.
-const GFX_DEMO = {
+export const GFX_DEMO = {
   'ordinal-sticker': [{ start: 0, end: 3, mode: 9, text: 'First', layer: 'behind' }],
   'app-label': [{ start: 0, end: 3, mode: 10, text: 'Your App', y: 0.52 }],
   'screen-card': [{ start: 0, end: 3, mode: 11, border: '#ff7a45' }],
 };
 // when each tile is taken: after the entrance, with a checklist half ticked, a quote fully in and the code typed
-const GFX_AT = { checklist: 1.3, 'quote-card': 1.8, 'price-tag': 1.4, 'code-card': 2.0 };
+export const GFX_AT = { checklist: 1.3, 'quote-card': 1.8, 'price-tag': 1.4, 'code-card': 2.0 };
 // one still per transition, mid-blend from an accent plate to the presenter (only: limit to some ids)
 function renderTransitionStills(work, person, put, menu, only) {
   const transJson = JSON.parse(readFileSync(join(KIT, 'transitions.json'), 'utf8'));
@@ -841,5 +849,9 @@ This folder is GitHub Pages-ready (\`.nojekyll\`). Repo settings and workflows a
   console.log('rebuilt gallery from stills');
 }
 
-if (process.argv.includes('--from-stills') || process.argv.includes('--graphics-only')) rebuildFromStills();
-else main();
+// run only as a script: kit/demos.mjs imports fxRow and fxImages
+const isMain = () => { try { return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(resolve(process.argv[1])); } catch { return false; } };
+if (process.argv[1] && isMain()) {
+  if (process.argv.includes('--from-stills') || process.argv.includes('--graphics-only')) rebuildFromStills();
+  else main();
+}

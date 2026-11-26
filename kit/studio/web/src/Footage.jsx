@@ -3,32 +3,34 @@ import { Button } from '@astryxdesign/core/Button';
 import { ProgressBar } from '@astryxdesign/core/ProgressBar';
 import { api, file, toast, Icon, IconBtn } from './lib.jsx';
 import { upload } from './upload.js';
-import { Recorder } from './Recorder.jsx';
-import { Scripts } from './Scripts.jsx';
 import { Player, clock } from './Player.jsx';
 import { Toggle, Hint } from './ui.jsx';
 import { StartMode } from './RecreateStart.jsx';
 
-export function Dropzone({ id, inputId, kind, s, apply, accept, multiple, big, children, label }) {
+// prepare: an optional async step before the upload that returns the state to upload into (the builder names an
+// unnamed video there); null stops the upload
+export function Dropzone({ id, inputId, kind, s, apply, accept, multiple, big, children, label, prepare }) {
   const input = useRef(null); const [over, setOver] = useState(false);
+  const send = async files => { const st = prepare ? await prepare() : s; if (st) upload(kind, files, st, apply); };
   const pick = () => input.current.click();
   return <div className={'drop' + (big ? ' big' : '') + (over ? ' over' : '')} id={id} tabIndex={0} role="button" aria-label={label}
     onClick={pick} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } }}
     onDragOver={e => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
-    onDrop={e => { e.preventDefault(); setOver(false); upload(kind, [...e.dataTransfer.files], s, apply); }}>
+    onDrop={e => { e.preventDefault(); setOver(false); send([...e.dataTransfer.files]); }}>
     {children}
-    <input type="file" id={inputId} ref={input} accept={accept} multiple={multiple} hidden onClick={e => e.stopPropagation()} onChange={e => { upload(kind, [...e.target.files], s, apply); e.target.value = ''; }} />
+    <input type="file" id={inputId} ref={input} accept={accept} multiple={multiple} hidden onClick={e => e.stopPropagation()} onChange={e => { const files = [...e.target.files]; e.target.value = ''; send(files); }} />
   </div>;
 }
 
 const SITES = { dropbox: 'Dropbox', drive: 'Google Drive', direct: 'Link' };
 export const bytes = n => n == null ? '' : n >= 1e9 ? (n / 1e9).toFixed(2) + ' GB' : n >= 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1e3)) + ' KB';
 // paste a public Dropbox or Google Drive share link, or a direct video URL; the server downloads it into the footage
-export function FootageLink({ s, apply }) {
+export function FootageLink({ s, apply, prepare }) {
   const [url, setUrl] = useState(''), [busy, setBusy] = useState(false);
   const add = async ev => {
     ev.preventDefault(); const u = url.trim(); if (!u) return;
-    if (!s.job) { toast('Name the reel first (top left)'); document.getElementById('job')?.focus(); return; }
+    const st = prepare ? await prepare() : s; if (!st) return;
+    if (!st.job) { toast('Name the reel first (top left)'); document.getElementById('job')?.focus(); return; }
     setBusy(true); try { apply(await api('/api/footage/url', { url: u })); setUrl(''); } catch {} finally { setBusy(false); }
   };
   const items = (s.imports || []).slice().reverse();
@@ -53,31 +55,24 @@ export function FootageLink({ s, apply }) {
   </div>;
 }
 
-export function Footage({ V, s, apply, patch, go, hidden, onLive, looks }) {
-  const [readId, setReadId] = useState(null);
+export function Footage({ V, s, apply, patch, go, hidden, looks, openRecording }) {
   const [playing, setPlaying] = useState(null), drag = useRef(null), [over, setOver] = useState(null);
   // reorder in place: drag a clip onto another, or the arrow buttons; the draft uses this order
   const move = (f, to) => api('/api/footage/move', { path: f, to }).then(apply).catch(() => {});
   const secs = Object.fromEntries(((V.cut && V.cut.footage) || []).map(x => [x.path, x.seconds]));
   const showing = playing && s.footage.includes(playing) ? playing : null;
-  const [rec, setRec] = useState(() => localStorage.getItem('studio.rec.open') === '1' || /record/.test(location.hash));
-  const open = v => { localStorage.setItem('studio.rec.open', v ? '1' : '0'); setRec(v); };
-  const needJob = () => { if (s.job) return false; toast('Name the reel first (top left)'); document.getElementById('job')?.focus(); return true; };
-  // Scripts stay folded until you have one or ask for them, so Start is footage first
-  const [scriptsOn, setScriptsOn] = useState(() => localStorage.getItem('studio.scripts.show') === '1');
-  const showScripts = scriptsOn || (V.scripts || []).length > 0;
   return <section className="step" id="s-footage" data-step="start" aria-labelledby="h-footage" hidden={hidden}>
-    <header className="sh"><h2 id="h-footage">Start</h2><p className="sub">Add your footage or film it now. Then say if a video you like should guide the edit.</p></header>
-    {rec ? <Recorder V={V} s={s} apply={apply} onClose={() => open(false)} onLive={onLive} visible={!hidden} scriptId={readId} />
-      : <div className={'sources' + (s.footage.length || s.clips ? ' compact' : '')}>
+    <header className="sh"><h2 id="h-footage">Start</h2><p className="sub">Add your footage or use a recording. Then say if a video you like should guide the edit.</p></header>
+    <div className={'sources' + (s.footage.length || s.clips ? ' compact' : '')}>
         <Dropzone id="drop-footage" inputId="file-footage" kind="footage" s={s} apply={apply} big multiple accept="video/*,.mov,.mp4,.m4v,.webm,.mkv" label="Add footage: drop video files or press Enter to choose">
           <Icon n="upload" className="di" /><strong>Drop video here</strong><span>or click to choose</span>
         </Dropzone>
-        <button type="button" className="drop big recsrc" id="record-now" onClick={() => { if (!needJob()) open(true); }}>
-          <Icon n="camera" className="di" /><strong>Record now</strong><span>Camera and mic on this computer</span>
+        <button type="button" className="drop big recsrc" id="use-recording" onClick={openRecording}>
+          <Icon n="camera" className="di" /><strong>Use a recording</strong><span>Film one now or pick a take you made</span>
         </button>
-      </div>}
-    {!rec && <FootageLink s={s} apply={apply} />}
+      </div>
+    <FootageLink s={s} apply={apply} />
+    <a className="build-cta glass-card" id="build-open" href="#build=start"><strong>Build it one choice at a time</strong><span className="fine">Pace first, then words, shots and sound. Your picks carry over here.</span></a>
     {showing && <Player apply={apply} path={showing} tx={(s.tx || {})[showing]} onClose={() => setPlaying(null)} />}
     <ul id="footage" className="clips">
       {s.clips && <li className="note">Using the clips folder {s.clips}</li>}
@@ -100,11 +95,8 @@ export function Footage({ V, s, apply, patch, go, hidden, onLive, looks }) {
       </li>)}
     </ul>
     {s.footage.length > 0 && !s.clips && <div className="as-is"><Toggle id="as-is" label="My clips are already trimmed" description="Use each file as it is, in this order." checked={!!s.asIs} onChange={v => api('/api/state', { asIs: v }).then(apply).catch(() => {})} /></div>}
-    {((V.highlights && V.highlights.offer) || s.footage.some(f => (secs[f] || 0) >= 180)) && !rec && <button type="button" className="rs-open glass-card" id="hl-open" onClick={() => go('highlights', true)}>
+    {((V.highlights && V.highlights.offer) || s.footage.some(f => (secs[f] || 0) >= 180)) && <button type="button" className="rs-open glass-card" id="hl-open" onClick={() => go('highlights', true)}>
       <Icon n="spark" /><span className="rs-t"><b>Find highlights</b><span className="fine">Pick the best moments from a long talk as your take</span></span><Icon n="right" className="rs-go" /></button>}
-    {!rec && <StartMode s={s} apply={apply} patch={patch} go={go} looks={looks} />}
-    {!showScripts ? <button type="button" className="rs-open glass-card" id="scripts-open" onClick={() => { localStorage.setItem('studio.scripts.show', '1'); setScriptsOn(true); }}>
-      <Icon n="script" /><span className="rs-t"><b>Scripts</b><span className="fine">Write what you will say, or ask your agent to</span></span><Icon n="right" className="rs-go" /></button>
-    : <Scripts V={V} s={s} apply={apply} onRead={id => { if (needJob()) return; setReadId(id); open(true); requestAnimationFrame(() => document.getElementById('recorder')?.scrollIntoView({ block: 'start', behavior: 'smooth' })); }} />}
+    <StartMode s={s} apply={apply} patch={patch} go={go} looks={looks} />
   </section>;
 }

@@ -45,8 +45,8 @@ const env = { ...process.env, CI: '1', STUDIO_DIR: SDIR, STUDIO_CHAT: '', STUDIO
 const srv = spawn(process.execPath, [join(ROOT, 'kit', 'studio', 'server.mjs'), '--port', '0', '--no-open'], { cwd: ROOT, env });
 const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data', d => { out += d; const m = out.match(/Studio: (http:\/\/127\.0\.0\.1:\d+)/); if (m) ok(m[1]); }); srv.stderr.on('data', d => { out += d; }); srv.on('close', c => bad(new Error('server exited ' + c + ': ' + out))); });
 const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json();
-const theme = async (pg, th) => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); };
-const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#stepper'); };
+const theme = async (pg, th) => { await pg.evaluate(x => localStorage.setItem('studio.theme', x), th); await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#areas'); };
+const open = async (pg, hash) => { await pg.goto('about:blank'); await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#areas'); };
 const shot = async (pg, name, sel) => { if (!shots) return; await pg.evaluate(() => scrollTo(0, 0)); if (sel) await pg.$eval(sel, e => e.scrollIntoView({ block: 'center' })); await pg.waitForTimeout(400); await pg.screenshot({ path: join(shots, name) }); };
 const text = async (pg, sel) => (await pg.textContent(sel)).replace(/\s+/g, ' ').trim();
 const SAYS = "Your saved look is in use, not the reference's";
@@ -69,7 +69,7 @@ try {
     await pg.click('#stepper [data-step="start"]'); await pg.waitForSelector('#recreate-card'); assert.strictEqual(await pg.$('#recreate-card .saved-look'), null);
     await pg.click('#stepper [data-step="review"]'); await pg.waitForSelector('#draft-title-check');
     assert.strictEqual(await text(pg, '#draft-title-check'), '2 titles may be misread. Check them before you draft.');
-    await pg.click('#draft-title-check-go'); await pg.waitForSelector('main[data-step="picture"][data-view="reference"] #title-checks');
+    await pg.click('#draft-title-check-go'); await pg.waitForSelector('main[data-area="teardowns"] #title-checks');
   });
   await t('the breakdown lists the titles to check, each with the reason, a field and Save', async () => {
     assert.strictEqual(await text(pg, '#title-checks-h'), 'Check this text'); assert.strictEqual(await pg.$('#saved-look-td'), null);
@@ -87,7 +87,7 @@ try {
     await pg.fill('#tc-3', '347 Days'); await pg.press('#tc-3', 'Enter'); await pg.waitForSelector('#title-checks', { state: 'detached' });
     assert.ok(readFileSync(FILE, 'utf8').includes('#03 24.3-26.5 | entrance stagger-rise | layer auto | text 347 Days\n'));
     assert.deepStrictEqual((await api('/api/state')).state.reference.extracted.checks, []);
-    await pg.click('#look-sub-style'); await pg.waitForSelector('#ref-card'); assert.strictEqual(await pg.$('#title-check-line'), null, 'nothing left to check');
+    await pg.click('#tab-new'); await pg.click('#stepper button[data-step="picture"]'); await pg.waitForSelector('#ref-card'); assert.strictEqual(await pg.$('#title-check-line'), null, 'nothing left to check');
   });
   await t('Back to my look: the reference card and the breakdown say the saved look is in use, with one button', async () => {
     await api('/api/state', { reference: { mode: 'off' } });

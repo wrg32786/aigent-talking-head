@@ -44,7 +44,7 @@ assert.deepStrictEqual(bareReads([
 // effects/vendor is third-party code, pinned and not ours to edit
 const files = ['kit', 'tests', 'effects'].flatMap((dir) => readdirSync(join(ROOT, dir), { recursive: true })
   .map((f) => (dir + '/' + f).replace(/\\/g, '/'))
-  .filter((f) => f.endsWith('.py') && !f.startsWith('effects/vendor/') && !f.includes('node_modules/')));
+  .filter((f) => f.endsWith('.py') && !f.startsWith('effects/vendor/') && !f.includes('node_modules/') && !f.includes('/.venv/')));
 assert.ok(files.includes('kit/teardown.py'), 'the scan found the kit');
 const hits = files.flatMap((f) => bareReads(readFileSync(join(ROOT, f), 'utf8')).map((n) => f + ':' + n));
 assert.deepStrictEqual(hits, [], 'a text read without encoding="utf-8"');

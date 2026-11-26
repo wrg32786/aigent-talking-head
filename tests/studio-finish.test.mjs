@@ -41,7 +41,7 @@ try {
     assert.strictEqual((render.match(/<Button id="draft"/g) || []).length, 1, 'one Draft button');
     for (const id of ['fin-from', 'exp-reel', 'exp-clips', 'exp-plain', 'match-chips']) assert.ok(render.includes(`id="${id}"`) || render.includes(`id={'${id}'}`), id);
     assert.ok(/<YourEdit /.test(app) && /<ViewSwitch /.test(app) && /<ReviewStep /.test(app) && /<Music /.test(app));
-    assert.ok(!/\u2014/.test(render + app + steps + src('Edit.jsx') + src('Style.jsx') + src('RecreateStart.jsx') + src('RefCard.jsx')), 'no em dashes in the page copy');
+    assert.ok(!/\u2014/.test(render + app + steps + src('Edit.jsx') + src('Style.jsx') + src('AllOptions.jsx') + src('RecreateStart.jsx') + src('RefCard.jsx')), 'no em dashes in the page copy');
     const built = readFileSync(join(ROOT, 'kit', 'studio', 'public', 'assets', 'app.js'), 'utf8');
     assert.ok(built.includes('your-edit') && built.includes('fin-exports'), 'the built page has Review, Render and Your edit (npm run studio:build)');
   });

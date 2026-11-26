@@ -5,29 +5,30 @@
 //   files: inbox/studio/<job>/takes/take-<n>.mp4 and take-<n>.jpg (gitignored, like every Studio upload)
 //   state: s.takes = [{ id, file, thumb, seconds, status: recording | converting | ready | failed, kept, error, at }]
 import { spawn } from 'child_process';
-import { appendFileSync, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'fs';
+import { appendFileSync, existsSync, mkdirSync, renameSync, rmSync, statSync, writeFileSync } from 'fs';
 import { join, sep } from 'path';
 import * as C from './core.mjs';
+import * as R from './recordings.mjs';
 
 const { ROOT } = C;
 export const MAX_CHUNK = 64 * 1024 * 1024;      // one chunk; the page sends about one per second
 export const MAX_TAKE = 8 * 1024 * 1024 * 1024; // 8 GB, about an hour at high quality
 const live = new Map();                          // id -> { raw, next, bytes, mime }
 const relOf = p => p.split(sep).join('/');
-export const takesDir = s => join('inbox', 'studio', s.job, 'takes');
+// with no video named yet a take waits in the holding folder (recordings.mjs) and joins a video from the Recording tab
+export const takesDir = s => join('inbox', 'studio', s.job || R.HOLD, 'takes');
 const extFor = mime => /mp4/i.test(mime || '') ? '.mp4' : /x-matroska/i.test(mime || '') ? '.mkv' : '.webm';
 const fmt = sec => { const s = Math.round(sec); return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`; };
 
 // start a take: returns its id; chunks follow with seq 0, 1, 2 ...
 export function start(s, { mime, script } = {}) {
-  if (!s.job) throw Object.assign(new Error('name the reel first'), { code: 400 });
   const dir = takesDir(s); mkdirSync(join(ROOT, dir), { recursive: true });
   s.takes = s.takes || [];
-  const id = Math.max(0, ...s.takes.map(t => t.id)) + 1;
+  const id = R.nextId(s, dir);
   const raw = relOf(join(dir, `take-${id}.part${extFor(mime)}`));
   writeFileSync(join(ROOT, raw), '');
   live.set(id, { raw, next: 0, bytes: 0, mime: String(mime || '') });
-  s.takes.push({ id, raw, file: null, thumb: null, seconds: null, status: 'recording', kept: true, error: null, at: new Date().toISOString(), mime: String(mime || ''),
+  s.takes.push({ id, raw, file: null, thumb: null, seconds: null, status: 'recording', kept: !!s.job, held: !s.job, error: null, at: new Date().toISOString(), mime: String(mime || ''),
     // the script it was read from, as it was when filmed: the draft hands it to Whisper so captions spell its words
     script: script && typeof script.text === 'string' && script.text.trim() ? { id: script.id ? String(script.id).slice(0, 64) : null, title: String(script.title || '').slice(0, 120), text: script.text.slice(0, 20000) } : null });
   return id;
@@ -59,25 +60,26 @@ export function finish(id, { seconds } = {}, save) {
   if (!t) throw Object.assign(new Error(`take ${id} is not recording`), { code: 404 });
   live.delete(id);
   if (!t.bytes) { rmSync(join(ROOT, t.raw), { force: true }); save(s => { s.takes = (s.takes || []).filter(x => x.id !== id); }); throw Object.assign(new Error('the take is empty'), { code: 400 }); }
-  const base = t.raw.replace(/\.part\.[a-z0-9]+$/, ''), mp4 = base + '.mp4', jpg = base + '.jpg';
+  const base = t.raw.replace(/\.part\.[a-z0-9]+$/, ''), mp4 = base + '.mp4', jpg = base + '.jpg', tmp = base + '.tmp.mp4'; // the mp4 appears only when whole
   save(s => { const x = (s.takes || []).find(y => y.id === id); if (x) x.status = 'converting'; });
   return (async () => {
     try {
       const src = join(ROOT, t.raw);
       await run('ffmpeg', ['-y', '-v', 'error', '-fflags', '+genpts', '-i', src, '-map', '0:v:0', '-map', '0:a:0?', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p',
-        '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-r', '30', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-movflags', '+faststart', join(ROOT, mp4)]);
+        '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-r', '30', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-movflags', '+faststart', join(ROOT, tmp)]);
+      renameSync(join(ROOT, tmp), join(ROOT, mp4));
       const dur = (await probe(join(ROOT, mp4))) || +seconds || 0;
       await run('ffmpeg', ['-y', '-v', 'error', '-ss', String(Math.min(1, dur / 2)), '-i', join(ROOT, mp4), '-frames:v', '1', '-vf', 'scale=320:-2', join(ROOT, jpg)]).catch(() => {});
       rmSync(src, { force: true });
       save(s => {
         const x = (s.takes || []).find(y => y.id === id); if (!x) return;
         Object.assign(x, { status: 'ready', file: relOf(mp4), thumb: existsSync(join(ROOT, jpg)) ? relOf(jpg) : null, seconds: Math.round(dur * 10) / 10, bytes: statSync(join(ROOT, mp4)).size });
-        if (x.kept) {
-          const radd = C.addFootage(s, x.file);
-          C.applyPatch(s, { reply: radd.reset ? radd.note : `New take recorded: ${fmt(dur)} (take ${id}).`, from: 'Studio', kind: 'action' });
-        } else C.applyPatch(s, { reply: `New take recorded: ${fmt(dur)} (take ${id}).`, from: 'Studio', kind: 'action' });
+        R.writeSide(x.file, { seconds: x.seconds, at: x.at, script: x.script ? { title: x.script.title, text: x.script.text } : null });
+        const radd = x.kept && !x.held ? C.addFootage(s, x.file) : null;
+        C.applyPatch(s, { reply: radd && radd.reset ? radd.note : `New take recorded: ${fmt(dur)} (take ${id}).`, from: 'Studio', kind: 'action' });
       });
     } catch (e) {
+      rmSync(join(ROOT, tmp), { force: true });
       save(s => { const x = (s.takes || []).find(y => y.id === id); if (x) Object.assign(x, { status: 'failed', error: e.message.slice(0, 400) }); });
     }
   })();
@@ -86,14 +88,14 @@ export function finish(id, { seconds } = {}, save) {
 export function act(s, id, action) {
   const x = (s.takes || []).find(y => y.id === id);
   if (!x) throw Object.assign(new Error(`no take ${id}`), { code: 404 });
-  if (action === 'keep') { x.kept = true; if (x.status === 'ready' && x.file) C.addFootage(s, x.file); return; }
+  if (action === 'keep') { if (x.held) { if (x.status !== 'ready') throw Object.assign(new Error('wait until the take is saved'), { code: 409 }); R.use(s, x.file); return; } x.kept = true; if (x.status === 'ready' && x.file) C.addFootage(s, x.file); return; }
   if (action === 'unkeep') { x.kept = false; const n = (s.footage || []).length, stamp = C.draftStamp(s); s.footage = s.footage.filter(f => f !== x.file); if (s.footage.length !== n) C.onFootageListChanged(s, { stamp }); return; }
   if (action === 'discard') {
     if (x.status === 'recording' || x.status === 'converting') throw Object.assign(new Error('wait until the take is saved'), { code: 409 });
     const n = (s.footage || []).length, stamp = C.draftStamp(s);
     s.footage = s.footage.filter(f => f !== x.file);
     if (s.footage.length !== n) C.onFootageListChanged(s, { stamp });
-    for (const f of [x.file, x.thumb, x.status === 'failed' ? x.raw : null]) if (f) rmSync(join(ROOT, f), { force: true });
+    for (const f of [x.file, x.file && R.sideOf(x.file), x.thumb, x.status === 'failed' ? x.raw : null]) if (f) rmSync(join(ROOT, f), { force: true });
     s.takes = s.takes.filter(y => y.id !== id); return;
   }
   throw Object.assign(new Error('action: keep, unkeep or discard'), { code: 400 });
@@ -105,4 +107,4 @@ export function abort(s, id) {
   s.takes = (s.takes || []).filter(y => !(y.id === id && y.status === 'recording'));
 }
 // for MCP and the agent: what was recorded this session
-export const list = s => (s.takes || []).map(({ id, file, thumb, seconds, status, kept, error, at, script }) => ({ id, file, thumb, seconds, status, kept, inFootage: !!file && s.footage.includes(file), error, at, script: script ? { id: script.id, title: script.title, text: script.text } : null }));
+export const list = s => (s.takes || []).map(({ id, file, thumb, seconds, status, kept, held, error, at, script }) => ({ id, file, thumb, seconds, status, kept, held: !!held, inFootage: !!file && s.footage.includes(file), error, at, script: script ? { id: script.id, title: script.title, text: script.text } : null }));

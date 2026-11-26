@@ -309,6 +309,14 @@ if (target) {
     catch (e) { sterrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio step map tests (tests/studio-steps.test.mjs: the 8 steps, old step names land, one step per layer, menu links, match chips)', errs: sterrs, warns: [] });
     for (const [f, what] of [
+      ['wizard-steps.test.mjs', 'Studio builder step map (tests/wizard-steps.test.mjs: one decision per screen, every option owned by one step or All options, featured options real, plain copy)'],
+      ['studio-recordings.test.mjs', 'Studio recordings (tests/studio-recordings.test.mjs: takes from every video and the holding folder, Use in a video moves a held take and copies another video\'s, no clashing take numbers, plain refusals)'],
+      ['demos-visible.test.mjs', 'Menu previews (tests/demos-visible.test.mjs: every effect, graphic, finish and title layer has a small moving preview that visibly changes the picture, every sound has a waveform)'],
+      ['preview-face.test.mjs', 'Live text preview (tests/preview-face.test.mjs: the preview serves the render own overlay files, no sample word lands on the face in any combination, key words grow in turn and off changes nothing)'],
+      ['sections.test.cjs', 'Reel sections (tests/sections.test.cjs: hook, body and CTA on each segment, transitions only on the seams a timing keeps)'],
+      ['plan-check.test.mjs', 'Plan check (tests/plan-check.test.mjs: a Hook only filter over the whole video caught and fixed in round 2, transitions picked and timed, key words, titles, repo shots, call to action, moments to look at, the render checks, looked-at checks)'],
+      ['repo-broll.test.mjs', 'Repo or tool feature mode (tests/repo-broll.test.mjs: README pictures in order with headings, no badges or tiny logos, every URL and redirect hop DNS checked and pinned, 25 MB cap, pictures and videos only, split and takeover plan)'],
+      ['wizard-plan.test.mjs', 'Studio builder plan (tests/wizard-plan.test.mjs: defaults per pace, plain errors, a plan sets the same picks as the classic clicks, classic changes read back, no titles and no filters as locks, the route and MCP tools, the Template Library)'],
       ['studio-cut-server.test.mjs', 'Studio Cut server tests (tests/studio-cut-server.test.mjs: the Cut routes, the point, topics, Pacing and the stitched previews over HTTP)'],
       ['studio-stages.test.mjs', 'Studio stage status tests (tests/studio-stages.test.mjs: teardown log lines to the stage line, the list and the bar)'],
       ['studio-ref-clear.test.mjs', 'Studio reference clear tests (tests/studio-ref-clear.test.mjs: a stopped breakdown\'s line goes when the reference is cleared or replaced)'],

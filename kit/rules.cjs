@@ -37,6 +37,8 @@ const TITLE_ENTER = 0.45; // seconds until a title has settled
 // lines stack and older ones go grey, blur and fade. decode: random glyphs settle into the word. split-flap: the same
 // on a flap board.
 const TITLE_EFFECTS = tableIds('effect');
+// how big the strongest word of a kinetic caption line gets (reel.cjs --key-words, captions.js keyWords, kit/overlay.html)
+const KEY_WORDS = ['off', 'subtle', 'strong', 'dramatic'];
 // A title's exit that is also the transition at the cut it ends on: "exit" on a flip, Reel.md "| exit polaroid".
 const TITLE_EXITS = tableIds('exit');
 // How a phrase title builds when it has no effect: word by word as said, letter by letter, or line by line.
@@ -268,4 +270,4 @@ const dupWords = (plan, caps, hidden = []) => {
   }
   return out;
 };
-module.exports = { BEDS, isBed, bedFile, ENERGIES, bedsByEnergy, scriptEnergy, pickBed, SFX, CUT_SOUNDS, sfxHits, ENTRANCES, TITLE_ENTER, TITLE_EFFECTS, TITLE_EXITS, TITLE_BUILDS, TITLE_EXIT_MOVES, TITLE_TABLE, titleRow, titleExitSeams, TITLE_MODE, TITLE_LAYERS, normalizeLayer, PUNCH, TRANSITIONS, xfadeMode, timeline, lintCopy, scriptShape, readCaptions, resolveTitles, maskSpec, MASK_MODELS, captionLayer, PANEL_LAYERS, PANEL_MODES, panelLayer, panelsBehind, dupWords };
+module.exports = { BEDS, isBed, bedFile, ENERGIES, bedsByEnergy, scriptEnergy, pickBed, SFX, CUT_SOUNDS, sfxHits, ENTRANCES, TITLE_ENTER, TITLE_EFFECTS, KEY_WORDS, TITLE_EXITS, TITLE_BUILDS, TITLE_EXIT_MOVES, TITLE_TABLE, titleRow, titleExitSeams, TITLE_MODE, TITLE_LAYERS, normalizeLayer, PUNCH, TRANSITIONS, xfadeMode, timeline, lintCopy, scriptShape, readCaptions, resolveTitles, maskSpec, MASK_MODELS, captionLayer, PANEL_LAYERS, PANEL_MODES, panelLayer, panelsBehind, dupWords };

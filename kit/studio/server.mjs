@@ -19,6 +19,7 @@ import * as CH from './channel.mjs';
 import * as AG from './agui.mjs';
 import * as RV from './review.mjs';
 import * as REC from './record.mjs';
+import * as RECS from './recordings.mjs';
 import * as SC from './scripts.mjs';
 import * as AGT from './agents.mjs';
 import * as CL from './cloud.mjs';
@@ -37,6 +38,7 @@ import { pointLine } from './point.mjs';
 import * as WIZ from './wizards.mjs';
 import * as STG from './stages.mjs';
 import * as SLK from './stylelooks.mjs';
+import * as TPL from './templates.mjs';
 import { mount as mountFolders } from './folders.mjs';
 import { mountScenes } from './scene-routes.mjs';
 import { mount as mountPost } from './post-api.mjs';
@@ -44,6 +46,10 @@ import { mount as mountHighlights } from './highlights-api.mjs';
 import { mount as mountPublish } from './publish-api.mjs';
 import * as SIZES from './sizes.mjs';
 import { mount as mountRefTitles } from './ref-titles.mjs';
+import { mount as mountPlan, planOf } from './wizard/api.mjs';
+import * as VP from './wizard/plan.mjs';
+import * as PREVIEWS from './previews.mjs';
+import * as LIVE from './preview.mjs';
 
 const require = createRequire(import.meta.url);
 const SNAP = require('../snapshots.cjs');
@@ -61,7 +67,7 @@ const HOST = '127.0.0.1';
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.svg': 'image/svg+xml',
   '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.ttf': 'font/ttf', '.md': 'text/markdown; charset=utf-8' };
 // what the page may load from the repo
-const SERVE = ['inbox/studio/', 'teardown-in/studio/', 'docs/menu/', 'showcase/media/', 'packs/', 'kit/music/', 'kit/fonts/', 'jobs/', 'teardown/', 'docs/studio/'];
+const SERVE = ['inbox/studio/', 'teardown-in/studio/', 'docs/menu/', 'showcase/media/', 'showcase/source/', 'packs/', 'kit/music/', 'kit/sfx/', 'kit/fonts/', 'jobs/', 'teardown/', 'docs/studio/'];
 const VIDEO = ['.mp4', '.mov', '.m4v', '.webm', '.mkv'], AUDIO = ['.mp3', '.wav', '.m4a', '.aac', '.flac'];
 
 // ---------- live updates ----------
@@ -141,7 +147,7 @@ function env() {
 const BOOT = Date.now().toString(36); let viewSeq = 0;
 // natural, tight or very: an ad with no pacing chosen is Very tight, as its draft is
 function pacingFor(cut, comp) { const ad = cut.output && cut.output.goal === 'ad' && !comp.args.includes('--tighten') && !comp.args.includes('--no-tighten'); return PACING.pacingOf(ad ? [...comp.args, '--tighten', '0.25'] : comp.args).id; }
-let PUB = null;
+let PUB = null, PLAN = null;
 function view(s) {
 
   let comp; try { comp = C.compose(s, { refPack: refPackName(s) }); } catch (e) { comp = { args: [], errs: [e.message], notes: [] }; }
@@ -262,9 +268,23 @@ function refWait(s) {
   const what = it ? (it.status === 'tearing' ? 'being broken down' : 'downloading') : r.status === 'running' ? 'being broken down' : null;
   return what ? `The reference is still ${what}. ${r.mode === 'look' ? 'Copy the look' : 'Recreate'} needs it: draft again when it is ready, or set the reference to Off to draft without it.` : null;
 }
+// repo or tool feature mode on the draft too (kit/repo-broll.mjs), after the reel has written cut.json, so Review's
+// draft already holds the split and full screen spots; the render applies it again on the cut as it is then
+const repoOn = s => !!(s.videoPlan && s.videoPlan.content && s.videoPlan.content.repoFeature);
+const repoStep = s => ['kit/repo-broll.mjs', ['apply', '--name', s.job, '--plan', join('jobs', s.job, 'build', 'video-plan.json')]];
+function neededErr(s) {
+  const wait = VP.needed(planOf(s, C.catalog()));
+  if (wait.length) throw Object.assign(new Error(wait.map(x => x.text).join('. ') + ' on the Content step first.'), { code: 400 });
+}
 function draftSteps(s) {
+  const d = draftSteps0(s);
+  if (repoOn(s)) d.steps = [...d.steps, repoStep(s)];
+  return d;
+}
+function draftSteps0(s) {
   if (!s.job) throw Object.assign(new Error('name the job first'), { code: 400 });
   if (!s.footage.length && !s.clips) throw Object.assign(new Error('add footage first'), { code: 400 });
+  neededErr(s);
   const wait = refWait(s); if (wait) throw Object.assign(new Error(wait), { code: 409 });
   const recreate = C.recreateRecipe(s, ROOT); // Recreate: the reference's Reel.md, your take re-cut to it (kit/studio/reference.mjs)
   const ref = recreate ? null : writeRefPack(s);
@@ -304,8 +324,16 @@ function startDraft(d, done) {
   const sl = d.styleLook;
   const tk = runTask('draft', () => d.steps, done); // first: it refuses while something else runs, and a refused draft changes nothing
   update(st => { st.lockedAtDraft = d.lockString || ''; st.drafted = null; if (sl && sl.clear) st.styleLook = null; C.dropAutoIdeas(st); /* ideas we made for the older draft go: their search words came from its cut */ });
+  writePlanFile(C.load());
   if (sl && sl.note) { tk.lines.push(sl.note); send('log', { id: tk.id, line: sl.note }); }
   return tk;
+}
+// the builder plan beside the draft, for the agent and the plan check (docs/specs/studio-builder.md section 10)
+function writePlanFile(s) {
+  if (!s.job) return;
+  // no plan any more: its file goes too, so nothing reads an old one (the repo step then takes its inserts out)
+  if (!s.videoPlan) { try { rmSync(join(ROOT, 'jobs', s.job, 'build', 'video-plan.json'), { force: true }); } catch {} return; }
+  try { const d = join(ROOT, 'jobs', s.job, 'build'); mkdirSync(d, { recursive: true }); writeFileSync(join(d, 'video-plan.json'), JSON.stringify(planOf(s, C.catalog()), null, 1)); } catch (e) { console.error(e.message); }
 }
 function renderSteps(s) {
   if (!s.job || !existsSync(join(ROOT, 'jobs', s.job, 'build', 'cut.json'))) throw Object.assign(new Error('make a draft first'), { code: 400 });
@@ -313,14 +341,31 @@ function renderSteps(s) {
   const args = ['--rebuild', '--name', s.job, '--json'];
   if (comp.lockString && comp.lockString !== s.lockedAtDraft) args.push('--lock', comp.lockString);
   if (C.MOTIONS.includes(s.pace && s.pace.motion)) args.push('--motion', s.pace.motion);
+  if (s.keyWords) args.push('--key-words', s.keyWords); // a key words change after the draft reaches the render
+  if (s.transitionsWhen) args.push('--transitions-when', s.transitionsWhen); // and a transition timing change
+  if (s.finishWhen) { args.push('--finish-when', s.finishWhen); // and where filters show, with which filters said outright
+    if (s.finishWhen !== 'none') args.push('--finish-ids', ((s.picks.finish && s.picks.finish.allow) || []).join(',') || 'none'); }
   { const ex = SIZES.exportArg(s); if (ex) args.push('--export', ex); }
   // the b-roll lane goes into cut.json first (kit/studio/broll-run.mjs), with credits.txt for the clips it uses
   const bp = BRL.plan(s), steps = [];
   if (bp) { const f = join('jobs', s.job, 'broll.json'); writeFileSync(join(ROOT, f), JSON.stringify(bp, null, 1)); steps.push(['kit/studio/broll-run.mjs', ['apply', '--name', s.job, '--plan', f]]); }
+  // repo or tool feature mode (kit/repo-broll.mjs): the README's pictures as split and full screen b-roll, after the
+  // lane so a spot it uses keeps its clip; it also clears its own inserts when the mode is turned off
+  // (with no plan any more, it still runs when cut.json holds repo spots, to take them out)
+  const hasRepo = () => { try { const c = JSON.parse(readFileSync(join(ROOT, 'jobs', s.job, 'build', 'cut.json'), 'utf8')); return (c.inserts || []).some(x => x.repo) || !!c.repoTakeovers; } catch { return false; } };
+  if (s.videoPlan || hasRepo()) { writePlanFile(s); steps.push(repoStep(s)); }
   steps.push([process.env.STUDIO_REEL || 'kit/reel.cjs', args, { STUDIO_DRAFT_KEY: draftKey(s), STUDIO_FOOTAGE_KEY: C.footageKey(s) }]);
   let fx = null;
   if (comp.effects.length && env().effectsReady) {
-    const ch = readChoices(s); fx = C.fxPlan(ch, comp.effects);
+    // presenter effect timing from the builder plan (hook, key moments or the whole video)
+    const when = Object.fromEntries(((s.videoPlan && s.videoPlan.presenter) || []).filter(x => x && String(x.id).startsWith('effect:')).map(x => [x.id.slice(7), x.when]));
+    const ch = readChoices(s);
+    // a draft from before sections: tag its beats from the cut as it is now (kit/sections.cjs), so Hook and Key moments work
+    if (Object.values(when).some(w => w !== 'whole') && ch && Array.isArray(ch.beats) && ch.beats.some(b => !b.section)) {
+      try { const SEC = require('../sections.cjs'), SP = require('../spoken.cjs'), b = join(ROOT, 'jobs', s.job, 'build'), cut = JSON.parse(readFileSync(join(b, 'cut.json'), 'utf8'));
+        const tags = SEC.tag(cut, SP.timeline(cut.segs, b)); if (tags.length === ch.beats.length) ch.beats.forEach((x, i) => { x.section = tags[i]; }); } catch (e) { console.error('sections: ' + e.message); }
+    }
+    fx = C.fxPlan(ch, comp.effects, when);
     if (fx.plan.effects.length) { const p = join('jobs', s.job, 'fx.json'); writeFileSync(join(ROOT, p), JSON.stringify(fx.plan, null, 2)); steps.push(['kit/fx.cjs', ['--name', s.job, '--plan', p]]); }
   }
   return { steps, fx, effects: comp.effects };
@@ -796,7 +841,7 @@ async function adaptScript(s, id, topic) {
     update(x => { C.applyPatch(x, { say: line, from: 'ui', toAgent: true, attach: { kind: 'adapt', script: sc.id, topic } }); });
     return { via: 'agent', queued: true, agent: a };
   }
-  if (!LLM.provider(KEYS.envWithKeys(), st.chat)) throw Object.assign(new Error('Adapting a script needs your terminal agent, an API key or a local model (Settings).'), { code: 400 });
+  if (!LLM.provider(KEYS.envWithKeys(), st.chat)) throw Object.assign(new Error('Adapting a script needs your agent, an API key or a local model (Settings).'), { code: 400 });
   const r = await LLM.complete('You rewrite talking-head scripts. ' + SC.SCRIPT_FORMAT + ' Write it so it sounds human: ' + SC.HUMANIZER_RULES.join(' ') + ' Reply with JSON only: {"title": "...", "text": "..."}.',
     `${ADAPT_RULES}\nNew topic: ${topic}\nScript:\n${sc.text}`, KEYS.envWithKeys(), st.chat, { maxTokens: 2500 });
   let j; try { j = JSON.parse(String(r.text).match(/\{[\s\S]*\}/)[0]); } catch { throw Object.assign(new Error('the model did not send a script back'), { code: 502 }); }
@@ -889,7 +934,7 @@ function copyRenders(outputs) {
 
 // one Studio chat turn from the page or an AG-UI run: queue it for the terminal agent, or answer with a model or keywords
 const SCRIPT_ASK = /\b(script|rewrite|teleprompter)\b/i;
-const SCRIPT_NOTE = 'Writing scripts needs your terminal agent, an API key or a local model (Settings). Keywords mode only changes effects.';
+const SCRIPT_NOTE = 'Writing scripts needs your agent, an API key or a local model (Settings). Keywords mode only changes effects.';
 async function chatTurn(text, offline, attach) {
   const st = S.load(), backend = offline ? 'keywords' : st.chat.backend;
   if (backend === 'agent') {
@@ -911,7 +956,7 @@ async function chatTurn(text, offline, attach) {
   } else {
     const v = C.vibes(text, s, cat); patch = v.patch; via = 'keywords';
     if (SCRIPT_ASK.test(text) && !v.said.length) { const s3 = C.load(); C.applyPatch(s3, { reply: SCRIPT_NOTE, from: 'keywords' }); C.save(s3); pushState(); return { reply: SCRIPT_NOTE, via, ...view(s3) }; }
-    reply = v.said.length ? `Changed: ${v.said.join('; ')}.` : 'I did not catch an effect or vibe there. Try words like calm, punchy, cinematic, clean, names like "no glitch" or "typewriter titles", or "the transitions from the reference". For a real conversation, connect your terminal agent (Settings, Chat).';
+    reply = v.said.length ? `Changed: ${v.said.join('; ')}.` : 'I did not catch an effect or vibe there. Try words like calm, punchy, cinematic, clean, names like "no glitch" or "typewriter titles", or "the transitions from the reference". For a real conversation, connect your agent (Settings, Chat).';
     if (backend !== 'keywords' && !prov) reply = `No ${backend === 'auto' ? 'API key' : backend} backend is ready, so I used keywords. ` + reply;
   }
   const s2 = C.load(), r = C.applyPatch(s2, patch || {});
@@ -934,6 +979,7 @@ const FOLDERS = mountFolders({ ROOT, json, readBody, extraFolders: () => { const
 const POSTR = mountPost({ ROOT, C, json, readBody });
 HL = mountHighlights({ ROOT, C, update, json, readBody, view, startTranscribe, okFootage, durOf, runTask, pushState });
 PUB = mountPublish({ ROOT, C, json, readBody, view });
+PLAN = mountPlan({ C, json, readBody, view, pushState });
 // sizes: make the 4:5 or 1:1 of a finished reel (kit/studio/sizes.mjs)
 const SIZER = SIZES.mount({ ROOT, C, json, readBody, runTask: (...a) => runTask(...a), needFor: k => needFor(k) });
 // the reference's b-roll parts, on its own clock as a fraction of its length, become spots (kit/studio/lane.mjs spots)
@@ -982,7 +1028,7 @@ function serveFile(req, res, file) {
 
 async function api(req, res, u) {
   const p = u.pathname, M = req.method;
-  if (p === '/api/catalog' && M === 'GET') return json(res, 200, C.catalog());
+  if (p === '/api/catalog' && M === 'GET') return json(res, 200, C.catalog({ fresh: u.searchParams.get('fresh') === '1' })); // fresh: after new previews were made
   if (p.startsWith('/api/scenes')) { const r = await sceneApi(req, res, p, M); if (r !== false) return r; }
   if (p === '/api/state' && M === 'GET') return json(res, 200, view(C.load()));
   if (p === '/api/state' && M === 'POST') {
@@ -1041,6 +1087,22 @@ async function api(req, res, u) {
   if (p === '/api/record/abort' && M === 'POST') { const b = await readBody(req); const s = update(st => { REC.abort(st, +b.id); }); return json(res, 200, view(s)); }
   if (p === '/api/record/take' && M === 'POST') { const b = await readBody(req); try { const s = update(st => { REC.act(st, +b.id, b.action); }); return json(res, 200, view(s)); } catch (e) { return json(res, e.code || 500, { error: e.message }); } }
   if (p === '/api/record/takes' && M === 'GET') return json(res, 200, { takes: REC.list(C.load()) });
+  // the Recording tab: every take across videos, and Use in this video / Use in a new video (kit/studio/recordings.mjs)
+  // the menu's animated previews: how many are missing, and Make missing previews (kit/studio/previews.mjs)
+  if (p.startsWith('/api/preview/overlay/') && LIVE.route(p, M, res)) return; // the live text preview (kit/studio/preview.mjs)
+  if (p === '/api/previews' && M === 'GET') return json(res, 200, PREVIEWS.status());
+  if (p === '/api/previews/make' && M === 'POST') return json(res, 200, PREVIEWS.start(() => C.catalog({ fresh: true }))); // new previews show without a restart
+  if (p === '/api/recordings' && M === 'GET') return json(res, 200, { recordings: RECS.list(C.load()) });
+  if (p === '/api/recordings/use' && M === 'POST') {
+    const b = await readBody(req);
+    try {
+      RECS.found(b.file);
+      const busy = !b.newVideo && busyWith(C.load()); if (busy) return json(res, 409, { error: `${busy}. Let it finish, then add the take.` });
+      if (b.newVideo) switchVideo({ name: b.name || '', keepLook: true });
+      const s = update(st => { RECS.use(st, b.file); });
+      return json(res, 200, view(s));
+    } catch (e) { return json(res, e.code || 500, { error: e.message }); }
+  }
   // Scripts (kit/studio/scripts.mjs): per job, in jobs/.studio/scripts/<job>/
   if (p.startsWith('/api/scripts')) {
     const job = C.load().job, touch = () => update(st => { st.scriptsAt = Date.now(); });
@@ -1131,6 +1193,7 @@ async function api(req, res, u) {
   if (await POSTR.route(p, M, u, req, res)) return;
   if (await HL.route(p, M, u, req, res)) return;
   if (PUB && await PUB.route(p, M, u, req, res)) return;
+  if (PLAN && await PLAN.route(p, M, u, req, res)) return;
   if (await SIZER.route(p, M, u, req, res)) return;
   if (await RTI.route(p, M, u, req, res)) return;
   if (p === '/api/lines' && M === 'GET') return json(res, 200, await linesView(C.load(), u.searchParams.get('path')));
@@ -1265,7 +1328,12 @@ async function api(req, res, u) {
     return json(res, 200, { ...view(s), log: r.log, errs: r.errs });
   }
   if (p === '/api/draft' && M === 'POST') {
-    const s = C.load(); const d = draftSteps(s); // checks the footage first, so an empty job says that before a missing tool
+    // { plan: true } from the builder's Make my video: a session with no plan of its own keeps the plan read from it, as
+    // it is (nothing is applied again, so classic picks keep who made them), and the draft writes it beside the cut
+    const b = await readBody(req).catch(() => ({}));
+    if (b && b.plan === true) update(x => { if (!x.videoPlan) x.videoPlan = { ...VP.normalize(planOf(x, C.catalog())), guessed: true }; });
+    const s = C.load();
+    const d = draftSteps(s); // footage first, then a missing repo link, so an empty job says that before a missing tool
     const miss = needFor('draft'); if (miss) return json(res, 400, miss);
     startDraft(d, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; delete st.draftStale; }); BRL.autoPick(s.job); return { choices: !!readChoices(C.load()), note: DRAFT_DONE, from: d.from }; });
     return json(res, 202, { ...view(C.load()), from: d.from });
@@ -1319,7 +1387,8 @@ async function api(req, res, u) {
       runTask('render', () => x.steps, () => ({ cuts: x.plan.map(y => ({ ...y, outputs: C.outputsOf({ job: y.job }) })), plain: x.plain || [], copiedTo: copyRenders(x.plan.flatMap(y => C.outputsOf({ job: y.job }).slice(0, 1))) }));
       return json(res, 202, { ...view(C.load()), exports: fin, plan: x.plan });
     }
-    const s = s0; const r = renderSteps(s), xs = exportSteps(s, combo, fin);
+    const s = s0; neededErr(s);
+    const r = renderSteps(s), xs = exportSteps(s, combo, fin);
     // memory for the person mask (kit/memcheck.cjs): short, the page says so and offers titles in front or the lighter mask
     const mem = MC.renderCheck(join(ROOT, 'jobs', s.job, 'build'));
     if (mem.needed && !mem.ok && !['front', 'light', 'anyway'].includes(b.memory)) return json(res, 409, { error: mem.message, memory: mem });
@@ -1328,7 +1397,7 @@ async function api(req, res, u) {
     if (b.memory === 'light') r.steps[0][1].push('--mask', 'mediapipe');
     if (b.memory === 'anyway') r.steps[0][2] = { ...(r.steps[0][2] || {}), MASK_FORCE: '1' };
     runTask('render', () => [...r.steps, ...xs.steps], () => { const st = C.load(), outputs = C.outputsOf(st); saveSettings(st); const cuts = xs.plan.map(y => ({ ...y, outputs: C.outputsOf({ job: y.job }) })); return { outputs, cuts, plain: xs.plain || [], copiedTo: copyRenders([...outputs, ...cuts.flatMap(y => y.outputs.slice(0, 1))]), fx: r.fx, effects: r.effects }; });
-    return json(res, 202, { ...view(C.load()), exports: fin, plan: xs.plan, fx: r.fx, effectsSkipped: r.effects.length && !r.fx ? 'Effects are not set up on this computer, so this reel renders without them.' : null, ...(r.effects.length && !r.fx ? { fix: ['effects'] } : {}) });
+    return json(res, 202, { ...view(C.load()), exports: fin, plan: xs.plan, fx: r.fx, effectsUnplaced: r.fx && r.fx.unplaced.length ? `Not placed, there was no room in the part of the video you chose: ${r.fx.unplaced.map(x => x.replace(/-/g, ' ')).join(', ')}.` : null, effectsSkipped: r.effects.length && !r.fx ? 'Effects are not set up on this computer, so this reel renders without them.' : null, ...(r.effects.length && !r.fx ? { fix: ['effects'] } : {}) });
   }
   // Edit this reel: the build behind a finished reel back into build/ (kit/snapshots.cjs); the build it replaces is saved
   if (p === '/api/reopen' && M === 'POST') {
@@ -1374,6 +1443,7 @@ async function api(req, res, u) {
     const sil = b.silence != null ? +b.silence : undefined;
     if (sil !== undefined && !(sil >= 0.3 && sil <= 3)) return json(res, 400, { error: 'silence: 0.3 to 3 seconds' });
     const dec = {}; for (const [k, v] of Object.entries(b.decisions || {})) if (/^[\w:.-]{1,80}$/.test(k)) dec[k] = !!v;
+    if (b.redraft !== false) neededErr(s0);
     const cj = JSON.parse(readFileSync(clipsJsonPath(s0), 'utf8')), items = RV.cleanup(cj, { silence: sil || (s0.cleanup && s0.cleanup.silence) || 0.7 });
     const pl = RV.plan(items, dec, cj);
     writeFileSync(join(ROOT, cleanupFile(s0)), JSON.stringify(pl, null, 1) + '\n');
@@ -1411,6 +1481,31 @@ async function api(req, res, u) {
     try { r = SLK.saveCurrent(C.load(), ROOT, b.name); } catch (e) { return json(res, e.code || 500, { error: e.message }); }
     pushState(true); return json(res, 200, { ok: true, name: r.name, looks: SLK.list() });
   }
+  // a teardown saved as a named template (its look, and a template.json with the plan derived from it)
+  // is there a call to action in what you say? (Make's warning: a CTA card or a filter timed for it needs one).
+  // After a draft it reads the cut (kit/plan-check.mjs sections); before, the transcripts of your clips.
+  if (p === '/api/plan/cta' && M === 'GET') {
+    const s = C.load(); let heard = null;
+    try {
+      const build = s.job ? join(ROOT, 'jobs', s.job, 'build') : null, cutF = build && join(build, 'cut.json');
+      if (cutF && existsSync(cutF) && s.drafted) { const PC = await import('../plan-check.mjs'), cut = JSON.parse(readFileSync(cutF, 'utf8')), x = PC.sections(cut, build); if (x.words.length) heard = x.b.ctaStart != null; }
+      if (heard == null) {
+        const SEC = createRequire(import.meta.url)('../sections.cjs'); let t0 = 0; const words = [];
+        for (const f of s.footage || []) { const tx = MEDIA.transcript(f); if (!tx || !Array.isArray(tx.words) || !tx.words.length) { words.length = 0; break; } for (const [a, b, w] of tx.words) words.push({ start: t0 + a, end: t0 + b, word: w }); t0 = words[words.length - 1].end + 0.6; }
+        if (words.length) heard = SEC.bounds(words, words[words.length - 1].end).ctaStart != null;
+      }
+    } catch {}
+    return json(res, 200, { heard });
+  }
+  if (p === '/api/templates/from-teardown' && M === 'POST') {
+    const b = await readBody(req).catch(() => ({})), s = C.load(); let r;
+    try { if (TPL.taken(b.name, C.catalog())) throw Object.assign(new Error('You already have a template or look with that name. Pick another name.'), { code: 409 });
+      const L = SLK.saveCurrent(s, ROOT, b.name), ref = s.reference || {}; r = TPL.saveFromLook(L.name, { kind: ref.url ? 'teardown-url' : 'teardown-file', url: ref.url || null, file: ref.file || null, teardown: ref.out || null }, C.catalog(), b.name);
+      // its picture: a still from the reference video it was broken down from
+      if (ref.file) TPL.setThumb(L.name, resolve(ROOT, ref.file)).catch(() => {}); }
+    catch (e) { return json(res, typeof e.code === 'number' ? e.code : 500, { error: e.message }); }
+    pushState(true); return json(res, 200, { ok: true, template: r, templates: TPL.list(C.catalog()), looks: SLK.list() });
+  }
   if (p === '/api/pack/save' && M === 'POST') {
     const b = await readBody(req), s = C.load(), name = String(b.name || '').toLowerCase();
     if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(name)) return json(res, 400, { error: 'pack name: lowercase letters, numbers and dashes' });
@@ -1436,7 +1531,18 @@ async function api(req, res, u) {
     const rel = cutSource(s0, b.path), done = []; let next = null, pending = null, note = null;
     if ((w.wizard !== 'reference') && !rel) return json(res, 400, { error: 'add footage first, on the Start step' });
     const setOut = o => { const r = CUT.normalize(outputOf(C.load()), o); if (r.errs.length) throw new Error(r.errs.join('; ')); update(x => { x.output = r.output; if (!x.cut || x.cut.source !== rel) x.cut = { source: rel, candidates: [], scoredBy: null }; }); };
-    if (w.goal) { setOut(WIZ.GOALS[w.goal].out); done.push(`goal: ${WIZ.GOALS[w.goal].label}`); next = 'look'; }
+    if (w.goal) { setOut(WIZ.GOALS[w.goal].out); done.push(`goal: ${WIZ.GOALS[w.goal].label}`); next = 'look';
+      // the goal is a plan too: its pace, unless you picked one yourself in the builder, and its line in Your notes
+      // (the line an earlier goal added goes, never one you added yourself; a note that would not fit is left out and said)
+      const G = WIZ.GOALS[w.goal], s1 = C.load(), cat = C.catalog(), prev = planOf(s1, cat), mine = !!(s1.videoPlan && s1.videoPlan.touched && s1.videoPlan.touched.includes('pace') && !s1.videoPlan.goalPace);
+      const { plan, patch } = mine ? { plan: prev, patch: {} } : VP.pacePatch(prev, G.pace, VP.lastPace(s1));
+      const was = s1.videoPlan && s1.videoPlan.goalNote, lines = plan.notes.split('\n'), at = was ? lines.findIndex(l => l.trim() === was) : -1;
+      if (at >= 0) lines.splice(at, 1);
+      const kept = lines.join('\n').trim(), have = kept.split('\n').some(l => l.trim() === G.note), joined = have ? kept : (kept ? kept + '\n' : '') + G.note;
+      let added = !have; if (joined.length <= 2000) plan.notes = joined; else { added = false; done.push('note: your notes are full, so the goal line was left out'); }
+      let errs = [];
+      update(x => { const r = C.applyPatch(x, { ...patch, from: 'assistant' }); errs = r.errs; if (!r.errs.length) { x.videoPlan = { ...VP.normalize(plan), ...(mine ? {} : { goalPace: true }) }; if (added) x.videoPlan.goalNote = G.note; else delete x.videoPlan.goalNote; delete x.videoPlan.guessed; } });
+      done.push(errs.length ? `pace: not set (${errs.join(' ')})` : mine ? `pace: kept yours (${(VP.PACES[plan.pace] || {}).label || plan.pace})` : `pace: ${VP.PACES[G.pace].label}`); }
     if (w.look) { update(x => { C.applyPatch(x, { pack: w.look }); }); done.push(`look: ${w.look}`); next = 'choose'; }
     if (w.choose) {
       if (!(await linesOf(rel))) { if (!MEDIA.transcript(rel)) startTranscribe(rel, () => findCuts(rel, 'auto').catch(e => console.error(e.message))); pending = 'transcript'; next = 'cut'; note = 'Reading the words of the take first. Use our best lines on Cut when it is ready.'; }
@@ -1546,7 +1652,7 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === '/api/agui' && req.method === 'POST') return await aguiRun(req, res);
     if (u.pathname.startsWith('/api/')) {
       // Requests which await work may still write the old edit when they finish. Do not switch underneath them.
-      const changing = req.method !== 'GET' && !u.pathname.startsWith('/api/videos/') && u.pathname !== '/api/task/cancel';
+      const changing = req.method !== 'GET' && !u.pathname.startsWith('/api/videos/') && u.pathname !== '/api/recordings/use' && u.pathname !== '/api/task/cancel'; // a video switch (Use in a new video too) checks for the others, so it is not one
       if (changing) activeRequests++;
       try { return await api(req, res, u); } finally { if (changing) activeRequests--; }
     }

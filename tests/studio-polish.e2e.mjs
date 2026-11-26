@@ -2,7 +2,7 @@
 // Music and sounds, Review, Render, and the Post view of Render):
 // - the top bar fits on one line at desktop, laptop and tablet widths, and on two rows on a phone; Settings stays on screen
 // - the More menu (Headless UI Menu) opens with the keyboard, moves with arrow keys and runs Setup check; on a phone it
-//   also carries Wizards, Outputs and the theme
+//   also carries Outputs and the theme
 // - hints (Headless UI Popover) open on click with the longer text and close with Escape
 // - the theme button swaps its icons; reduced motion turns the step entrance off
 // Needs Chrome. Run: node tests/studio-polish.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
@@ -64,7 +64,7 @@ try {
     await pg.keyboard.press('Enter');
     await pg.waitForSelector('#more-setup'); if (shots) { await pg.waitForTimeout(300); await pg.screenshot({ path: join(shots, 'more-menu.png'), clip: { x: 560, y: 0, width: 720, height: 280 } }); }
     const items = await pg.$$eval('.menu-item span', x => x.map(e => e.textContent));
-    assert.deepStrictEqual(items, ['Past videos', 'Setup check', 'API keys', 'Wizards', 'Outputs'], 'Wizards and Outputs are in More, with words; New video, Connect agent and the theme are in the top bar');
+    assert.deepStrictEqual(items, ['Past videos', 'Setup check', 'API keys', 'Outputs'], 'Outputs is in More, with words (the Wizards are gone: the builder took their place); New video, Connect agent and the theme are in the top bar');
     for (const id of ['#new-video-open', '#connect-open', '#theme']) assert.ok(await pg.isVisible(id), id + ' is on the page');
     for (const id of ['#outputs-open', '#wizards-open']) assert.strictEqual(await pg.$(id), null, id + ' is not a bare icon in the top bar');
     const active = () => pg.evaluate(() => document.querySelector('.menu-item[data-focus]')?.id); // the menu keeps focus and points at the item
@@ -77,8 +77,8 @@ try {
     const vp = pg.viewportSize(); await pg.setViewportSize({ width: 390, height: 844 });
     const before = await pg.evaluate(() => document.documentElement.dataset.theme || 'dark');
     await pg.click('#more-open'); await pg.waitForSelector('#more-theme');
-    assert.deepStrictEqual(await pg.$$eval('.menu-item span', x => x.map(e => e.textContent)), ['Past videos', 'Setup check', 'API keys', 'Wizards', 'Outputs', before === 'dark' ? 'Light theme' : 'Dark theme']);
-    for (const id of ['#more-wizards', '#more-outputs']) assert.ok(await pg.isVisible(id), id);
+    assert.deepStrictEqual(await pg.$$eval('.menu-item span', x => x.map(e => e.textContent)), ['Past videos', 'Setup check', 'API keys', 'Outputs', before === 'dark' ? 'Light theme' : 'Dark theme']);
+    for (const id of ['#more-outputs']) assert.ok(await pg.isVisible(id), id);
     for (const id of ['#theme']) assert.ok(!(await pg.isVisible(id)), id + ' is in More on a phone');
     await pg.click('#more-theme');
     assert.notStrictEqual(await pg.evaluate(() => document.documentElement.dataset.theme), before);

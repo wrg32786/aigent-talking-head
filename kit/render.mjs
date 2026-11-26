@@ -2,7 +2,7 @@ import { chromium } from 'playwright-core';
 import { mkdirSync, rmSync, existsSync, copyFileSync, writeFileSync, readFileSync, readdirSync, statSync, renameSync } from 'fs';
 import { execFileSync } from 'child_process';
 import { createHash } from 'crypto';
-import { resolveFonts } from './fonts.mjs';
+import * as OF from './overlay-files.mjs';
 import { createRequire } from 'module';
 import { dirname, join, isAbsolute } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
@@ -34,9 +34,8 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
   const CAP = createRequire(import.meta.url)('./rules.cjs').readCaptions(join(ROOT, 'captions.js'));
   const want = process.env.FONTS || CAP.fonts;
   if (want || !existsSync(join(ROOT, 'fonts.js'))) {
-    const names = (Array.isArray(want) ? want : String(want || 'theme').split(',')).map(s => String(s).trim()).filter(Boolean);
-    const sets = names.map(n => resolveFonts(n) || { name: 'theme' }), fp = resolveFonts(names[0]);
-    writeFileSync(join(ROOT, 'fonts.js'), 'window.FONTS=' + JSON.stringify(fp) + ';\n' + (sets.length > 1 ? 'window.FONTSETS=' + JSON.stringify(sets) + ';\n' : ''));
+    const { sets, fp, text } = OF.fontsDoc(want);
+    writeFileSync(join(ROOT, 'fonts.js'), text);
     // Pairing rule (Will, 2026-11-18): a pair is bold with thin, the contrast is the pair. "contrast": "low" marks thin-with-thin pairs.
     for (const s of sets) if (s && s.contrast === 'low') console.warn(`note: font pairing "${s.name}" is thin with thin (low contrast); pair a bold face with a thin one, and set a script on top of a big bold word`);
     if (sets.length > 1) console.log('font cycle', sets.map(s => s.name).join(' > '));
@@ -113,10 +112,7 @@ if (!existsSync(join(ROOT, 'theme.js'))) {
         if (size > budget) continue;
         budget -= size; a.frames = a.frames.map(u => u.startsWith('file:') ? dataUrl(fileURLToPath(u)) || u : u);
       } }
-    const F = join(KIT, 'fonts');
-    const GJ = JSON.parse(readFileSync(join(KIT, 'graphics.json'), 'utf8'));
-    const defaults = Object.fromEntries(GJ.graphics.map(g => [g.mode, g.defaults || {}])), panelModes = GJ.graphics.filter(g => g.mode >= 11).map(g => g.mode);
-    writeFileSync(join(ROOT, 'gfx.js'), 'window.GFX=' + JSON.stringify({ fonts: { serif: url(join(F, 'InstrumentSerif-Italic.ttf')), label: url(join(F, 'ArchivoBlack-Regular.ttf')), mono: url(join(F, 'RedHatMono-VF.ttf')), slam: url(join(F, 'Anton-Regular.ttf')), code: url(join(F, 'JetBrainsMono-VF.ttf')) }, defaults, autoBehindY: GJ.autoBehindY, panelModes, assets }) + ';\nwindow.DATAURLS=' + JSON.stringify(DATAURLS) + ';\n');
+    writeFileSync(join(ROOT, 'gfx.js'), 'window.GFX=' + JSON.stringify(OF.gfxDoc(assets, url)) + ';\nwindow.DATAURLS=' + JSON.stringify(DATAURLS) + ';\n');
     if (Object.keys(assets).length) console.log('graphics assets', Object.keys(assets).length);
   }
 }

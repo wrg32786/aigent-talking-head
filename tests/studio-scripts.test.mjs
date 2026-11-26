@@ -70,7 +70,7 @@ try {
   await t('keywords mode: a script request gets the one-line note; from-reference needs a breakdown', async () => {
     await req('/api/settings', { chat: { backend: 'keywords' } });
     const c = await req('/api/chat', { text: 'write a 30 second script about coffee' });
-    assert.ok(/needs your terminal agent, an API key or a local model/.test(c.j.reply), c.j.reply);
+    assert.ok(/needs your agent, an API key or a local model/.test(c.j.reply), c.j.reply);
     assert.strictEqual((await req('/api/scripts/from-reference', {})).status, 400);
   });
   await t('local model: writes a script from the chat with the humanizer rules in the prompt; it is saved without em dashes', async () => {

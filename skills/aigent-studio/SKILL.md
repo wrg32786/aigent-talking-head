@@ -76,7 +76,19 @@ The user can film takes on the Start step (Record now). A saved take is already 
 
 ## Wizards
 
-`run_wizard` does what the Wizards dialog does: `{ wizard: reel, goal: grow | sell | teach | clean, look, choose: true }` (any of them, in one call or one at a time), `{ wizard: clips, clips, ads }` (finds them on whole words), `{ wizard: reference, url }` (Recreate). When the user presses **Let my agent decide** in a wizard, you get a message asking you to make that choice: make it with `run_wizard` or suggest it with `studio_reply suggest`.
+The Wizards dialog is gone (the page asks one thing per screen in the builder now). `run_wizard` still runs the guided starts, and a `goal` also sets the plan's pace and a line in Your notes: `{ wizard: reel, goal: grow | sell | teach | clean, look, choose: true }` (any of them, in one call or one at a time), `{ wizard: clips, clips, ads }` (finds them on whole words), `{ wizard: reference, url }` (Recreate). When the user asks you to choose for them, make the choice with `run_wizard` or `set_video_plan`, or suggest it with `studio_reply suggest`. If they turn on repo feature mode, Frame breakout is on by default. You can turn repo mode on and send back the plan you just read; breakout is added for you. To turn it off while repo mode stays on, drop it from `presenter` after it was on, or put `presenter.frame-breakout` in `touched`. Using a non-repo template does not turn it off. Repo mode's default look is a rounded repo card on about the top 45%, word-by-word captions in a middle band off the face, and you in a rounded box with your head over the edge, plus 2 to 5 second full screen takeovers and pictures that change every 2 to 4 seconds. Those values live on the plan (`bands`, `takeoverSec`, `swapSec`, `frameBg`) so a template can change them. The Template Library starter **Repo feature (breakout)** starts from that look; if they pick it, ask for a GitHub link before Make. Do not copy a creator's branding (blueprint grids, mascots, or their headline wording).
+
+## The plan check (after a draft or a render)
+
+When the user built the video in the builder (`get_video_plan`), check that the video does what the plan says, in rounds:
+
+1. `check_frames` runs the measured checks. Read the failures.
+2. `check_frames { fix: true }` fixes what it can (filters in the wrong sections, transitions not picked or in the wrong places, key words, leftover repo shots), up to 3 rounds. If it fixed anything, `render` again.
+3. `plan_checkpoints` lists the moments to look at. Pull those frames from the newest render and look at each one: does this frame show the selection the way its demo does, and does it follow the notes?
+4. `report_plan_check` with one row per selection you looked at (`ok`, and a short plain note when it is off).
+5. Something still off after 3 rounds: stop, tell the user what is off and where, in plain words. Never cut their words to make a check pass.
+
+With no agent connected, Review still runs the measured checks; the looked-at checks need you.
 
 ## Rules
 

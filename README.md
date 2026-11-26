@@ -63,7 +63,7 @@ Made a reel? [Star the repo](https://github.com/wrg32786/aigent-talking-head) an
 
 ## Studio: edit in a browser, with your agent in the chat
 
-Studio is a local page for making a reel without memorising commands. It walks you through eight steps, shown as numbered dots across the top: **Start** (drop in clips, paste a link or film it right there, and say if a video you like should guide the edit), **Cut** (say what to make and keep the clips you want), **Picture** (one Look, then color, motion, transitions and layout), **Text and graphics**, **B-roll**, **Music and sounds**, **Review** (draft and check) and **Render** (make the video and post it). The chat on the page is answered by your own agent (Claude Code, Codex, Cursor or any MCP client), so it can change the edit for you while you watch. Everything runs on your computer. Full guide: [docs/studio.md](docs/studio.md).
+Studio is a local page for making a reel without memorising commands. It has three tabs. **Recording** films a take with a teleprompter; pick **Use in a new video** on it. **New video** builds the video one choice at a time: pace, words on screen, transitions, effects on you, filters, extras, a repo if you feature one, music and your notes, then **Make it** and **Review** with a Plan check that compares the draft with your picks. **Teardowns** breaks down a video you like and keeps it as a template with its own picture. Your first video, step by step: [docs/guide.md](docs/guide.md#your-first-video-in-studio). The chat on the page is answered by your own agent (Claude Code, Codex, Cursor or any MCP client), so it can change the edit for you while you watch. Everything runs on your computer. Full guide: [docs/studio.md](docs/studio.md).
 
 **Set it up by telling your agent:**
 
@@ -143,9 +143,7 @@ Your agent installs everything up front (Python, the downloaders, the Whisper mo
 
 <img src="docs/studio/ask-agent.png" width="440" alt="Ask my agent open on the Cut step: three suggested asks, a box for your own words and Send"> <img src="docs/studio/apply.png" width="210" alt="The chat: the ask marked Answered and Claude Code's reply with Use cinematic and Show me"> <img src="docs/studio/apply-light.png" width="210" alt="The same reply in the light theme">
 
-**Wizards.** **Wizards** in the More menu walks you through a whole job in two or three questions: make a reel from a long take, copy a reference, or clips and ads from one take. Each answer sets the steps for you, and **Let my agent decide** hands the choice to your agent.
-
-<img src="docs/studio/wizards.png" width="400" alt="The Make a reel from a long take wizard in dark: What is this reel for, with Grow followers, Sell or sign up, Teach one thing and Full clean take"> <img src="docs/studio/wizards-light.png" width="400" alt="The same wizard in the light theme">
+**The builder.** A new video asks one thing per screen: how fast it moves, the words on screen, the key words, between shots, you on screen, filters and when they show, music last, then anything else for your agent. Every screen has **Let the look decide**, and **Change** on Your notes opens just that step. An old Wizards link opens the builder. **Use a template** starts from the Template Library on the Teardowns tab: your saved templates and looks, six starter looks, and the Repo feature (breakout) starter.
 **Settings.** Dark by default, with a light theme. The chat, step bar and settings are frosted glass panels; a switch turns them solid on older computers. Choose who answers the chat (your terminal agent by default, or a local model through Ollama, LM Studio or llama.cpp, the Claude or OpenAI API, or keywords only), where reference downloads go, and where finished reels are copied.
 
 <img src="docs/studio/settings.png" width="720" alt="Studio settings in a side sheet: who answers the chat, the terminal note switch, API keys and providers, and the reference downloads and finished reels folders with Browse">
@@ -430,7 +428,7 @@ The CLI may print a one-line star reminder after your first successful render, a
 
 ## Cite this
 
-> Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.30.0) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
+> Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.31.0) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
 
 Machine-readable metadata is in [CITATION.cff](CITATION.cff), and GitHub shows it under "Cite this repository".
 

@@ -602,8 +602,20 @@ try {
     const out = join(work, 'jobs', 'smoke-reel', 'reel-v1.mp4'); if (!existsSync(out)) fail('no reel-v1.mp4');
     const d = +run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', out]).trim();
     if (Math.abs(d - 3.3) > 0.25) fail('reel duration ' + d);
-    run(node, [join(KIT, 'reel.cjs'), '--rebuild', '--jobs', join(work, 'jobs'), '--name', 'smoke-reel', '--mask', 'mediapipe'], work);
+    if (/"keyWords"/.test(dcap)) fail('a draft without --key-words wrote keyWords');
+    // key words chosen after the draft reach the render on a rebuild (spec 14.3)
+    run(node, [join(KIT, 'reel.cjs'), '--rebuild', '--jobs', join(work, 'jobs'), '--name', 'smoke-reel', '--mask', 'mediapipe', '--key-words', 'strong', '--transitions-when', 'hook-cta'], work);
     if (!existsSync(join(work, 'jobs', 'smoke-reel', 'reel-v2.mp4'))) fail('--rebuild did not write reel-v2.mp4');
+    if (!/"keyWords": "strong"/.test(readFileSync(join(work, 'jobs', 'smoke-reel', 'build', 'captions.js'), 'utf8'))) fail('--rebuild --key-words strong did not reach captions.js');
+    { const c = JSON.parse(readFileSync(join(work, 'jobs', 'smoke-reel', 'build', 'cut.json'), 'utf8')); if (c.transitionsWhen !== 'hook-cta' || !c.segs.every(x => x.section)) fail('--rebuild --transitions-when hook-cta: cut.json should keep the timing and tag every segment'); }
+    // filters on the hook only (spec 14.1): the hook pieces get the filter, the rest none, and never the job-wide cut.finish
+    run(node, [join(KIT, 'reel.cjs'), '--rebuild', '--jobs', join(work, 'jobs'), '--name', 'smoke-reel', '--mask', 'mediapipe', '--lock', 'finishes=mono', '--finish-when', 'hook'], work);
+    { const c = JSON.parse(readFileSync(join(work, 'jobs', 'smoke-reel', 'build', 'cut.json'), 'utf8')), hook = c.segs.filter(x => x.section === 'hook');
+      if (c.finishWhen !== 'hook' || c.finish || !hook.length || !hook.every(x => x.finish === 'mono') || c.segs.some(x => x.section !== 'hook' && x.finish)) fail('--rebuild --finish-when hook: the filter should be on the hook pieces only: ' + JSON.stringify(c.segs.map(x => [x.section, x.finish || null]))); }
+    // a classic filter pick after that sends --finish-when none: the old timing goes and the pieces get their filters back
+    run(node, [join(KIT, 'reel.cjs'), '--rebuild', '--jobs', join(work, 'jobs'), '--name', 'smoke-reel', '--mask', 'mediapipe', '--finish-when', 'none'], work);
+    { const c = JSON.parse(readFileSync(join(work, 'jobs', 'smoke-reel', 'build', 'cut.json'), 'utf8'));
+      if (c.finishWhen || c.finishIds || c.segs.some(x => 'heldFinish' in x || x.timedFinish)) fail('--rebuild --finish-when none: the hook-only timing should be gone: ' + JSON.stringify({ finishWhen: c.finishWhen, finishIds: c.finishIds, segs: c.segs.map(x => [x.section, x.finish || null]) })); }
   });
   // --- Muse edit rules: multi-take picking, zoom punch, kinetic titles, pills, named transitions, sound rules, check, verify
   step('clip.py multi-take: best take per sentence across files (word times given, no Whisper)', () => {
@@ -986,7 +998,7 @@ try {
     await cl.connect(new StdioClientTransport({ command: node, args: [join(KIT, 'mcp.mjs')], cwd: dirname(KIT), stderr: 'ignore', env: { ...process.env, STUDIO_DIR: studioDir } }));
     try {
       const names = (await cl.listTools()).tools.map(t => t.name).join(',');
-      if (names !== 'menu,list_effects,list_packs,get_pack,draft,explain,set_locks,plan,validate,render,verify,studio_get_state,studio_set_selections,studio_run,get_edit,studio_start,studio_wait_for_message,studio_get_pending,studio_reply,studio_make_scene,clear_reference,save_look,run_wizard,studio_add_reference_url,studio_get_reference_teardown,set_reference_titles,studio_settings,studio_takes,list_scripts,get_script,write_script,set_output,get_cuts,set_cuts,render_cuts,find_highlights,get_highlights,score_highlights,pick_highlights,get_lines,set_bites,render_bites,list_broll,add_broll,suggest_broll,fill_slot,clear_broll,pick_broll,add_spot,add_testimonial,get_pieces,set_combo,choose_combo,list_outputs,add_to_vault,capture_link,search_vault,set_broll_brief,broll_providers,buffer_channels,buffer_post_reel,get_publish_kit,set_post_copy,make_publish_kit,reopen_reel,list_videos,new_video,open_video,cut_range,find_noises,setup_status') fail('MCP tools: ' + names);
+      if (names !== 'menu,list_effects,list_packs,get_pack,draft,explain,set_locks,plan,validate,render,verify,studio_get_state,studio_set_selections,studio_run,get_edit,studio_start,studio_wait_for_message,studio_get_pending,studio_reply,studio_make_scene,clear_reference,save_look,run_wizard,studio_add_reference_url,studio_get_reference_teardown,set_reference_titles,studio_settings,get_video_plan,set_video_plan,list_templates,save_template,use_template,plan_checkpoints,check_frames,report_plan_check,studio_takes,list_scripts,get_script,write_script,set_output,get_cuts,set_cuts,render_cuts,find_highlights,get_highlights,score_highlights,pick_highlights,get_lines,set_bites,render_bites,list_broll,add_broll,suggest_broll,fill_slot,clear_broll,pick_broll,add_spot,add_testimonial,get_pieces,set_combo,choose_combo,list_outputs,add_to_vault,capture_link,search_vault,set_broll_brief,broll_providers,buffer_channels,buffer_post_reel,get_publish_kit,set_post_copy,make_publish_kit,reopen_reel,list_videos,new_video,open_video,cut_range,find_noises,setup_status') fail('MCP tools: ' + names);
       const lp = await cl.callTool({ name: 'list_packs', arguments: {} });
       if (lp.isError || !lp.structuredContent || !lp.structuredContent.packs.some(p => p.name === 'magazine')) fail('MCP list_packs: ' + JSON.stringify(lp).slice(0, 300));
       const gp = await cl.callTool({ name: 'get_pack', arguments: { pack: 'cinematic' } });
@@ -1071,7 +1083,7 @@ try {
       ['Studio saved look and title checks in Chrome: no saved look line in a Recreate, the line with one button on Picture and the breakdown after Back to my look, Undo, Check this text with Save (tests/studio-reflook.e2e.mjs)', 'studio-reflook.e2e.mjs'],
       ['Studio Look in Chrome: one row of Looks, the reference card, 9 layers with every option once, REF, LOOK and YOU badges, Music and sounds as one layer, Clear reference as one undo, Save as a Look (tests/studio-look.e2e.mjs)', 'studio-look.e2e.mjs'],
       ['Studio settings that rule out others in Chrome: Single word captions turn off a caption entrance with one line and Undo, greyed tiles say why, one click switches, a Look with no titles, No music (tests/studio-conflicts.e2e.mjs)', 'studio-conflicts.e2e.mjs'],
-      ['Studio agent and review in Chrome: drag to select on whole words, Note for my agent, Ask my agent with the step, Apply on a suggested change, a note on a stretch of the reel, the wizards, light theme and the phone (tests/studio-agent-ux.e2e.mjs)', 'studio-agent-ux.e2e.mjs'],
+      ['Studio agent and review in Chrome: drag to select on whole words, Note for my agent, Ask my agent with the step, Apply on a suggested change, a note on a stretch of the reel, an old #wizards link opens the builder and run_wizard goals set the plan, light theme and the phone (tests/studio-agent-ux.e2e.mjs)', 'studio-agent-ux.e2e.mjs'],
       ['Studio folder fields in Chrome: Browse, the folder list, New folder, Use this folder, Open folder, Reset, the one-line install in Connect agent (tests/studio-folders.e2e.mjs)', 'studio-folders.e2e.mjs'],
       ['Studio polish in Chrome: the top bar fits at five widths, the More menu by keyboard, hints, theme, reduced motion (tests/studio-polish.e2e.mjs)', 'studio-polish.e2e.mjs'],
       ['Studio Post step in Chrome: Connect (Buffer key, R2 host), channels with length limits, drafts by default, post now needs a tick, against mocks (tests/studio-post.e2e.mjs)', 'studio-post.e2e.mjs'],
@@ -1084,9 +1096,11 @@ try {
       ['Studio Cut layers in Chrome: Raw take, Best lines and Clips, the point of the video, topics, one Pacing control, stitched Play, the kept clips move on (tests/studio-cut-layers.e2e.mjs)', 'studio-cut-layers.e2e.mjs'],
       ['Studio stage status in Chrome: one live line under a reference bar, the folded list with checks, a reload keeps the stage, a stopped stage with Try again (tests/studio-stages.e2e.mjs)', 'studio-stages.e2e.mjs'],
       ['Studio steps in Chrome: the eight steps, Copy the look on Start, old links land, layers per step (tests/studio-steps.e2e.mjs)', 'studio-steps.e2e.mjs'],
+      ['Studio first run in Chrome: a waiting recording into a new video, Build my own, Next through every step, Make, Review with its Plan check, a teardown template picture, Delete in a dialog and Try again, no terminal words or em dashes (tests/studio-first-run.e2e.mjs)', 'studio-first-run.e2e.mjs'],
+      ['Studio builder in Chrome: the start screen, Pacing with its zone map and moving strips, the plan and pace saved, on to the classic steps, both themes and a phone (tests/studio-builder.e2e.mjs)', 'studio-builder.e2e.mjs'],
       ['Studio whose look is in use, in Chrome: a saved look with the reference Off says so with one button, the button sets the board from the reference alone, a pick after it is yours with no line (tests/studio-leak.e2e.mjs)', 'studio-leak.e2e.mjs'],
       ['Studio small fixes in Chrome: Close on the chat at every width and the button that brings it back, the switch for hard-to-read words, the vision pass line on a reference (tests/studio-small-fixes.e2e.mjs)', 'studio-small-fixes.e2e.mjs'],
-      ['Studio stopping and the wizards in Chrome: Copy a reference opens its link screen, the Studio stopped bar with Copy for my agent, the wizards say Studio is not running with Try again, both come back when Studio does (tests/studio-offline.e2e.mjs)', 'studio-offline.e2e.mjs'],
+      ['Studio stopping in Chrome: the Studio stopped bar with Copy for my agent, and it goes when Studio comes back (tests/studio-offline.e2e.mjs)', 'studio-offline.e2e.mjs'],
     ];
     const jobs = Math.max(1, +process.env.SMOKE_E2E_JOBS || 2), out = new Array(E2E.length);
     const one = k => new Promise(done => { const t0 = Date.now(), c = spawn(node, [join(dirname(KIT), 'tests', E2E[k][1])], { cwd: dirname(KIT), stdio: ['ignore', 'pipe', 'pipe'], env: process.env });

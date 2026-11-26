@@ -73,6 +73,18 @@ try {
     assert.deepStrictEqual(r.plan.effects.map(e => e.fx), ['lean-in', 'slow-push']);
     assert.ok(r.plan.effects.every(e => e.start >= 2 && e.end > e.start));
   });
+  await t('effects pass plan: an effect set to the hook lands only in hook beats, key moments in the hook, CTA or a big punch', () => {
+    const ch = { beats: [{ start: 0, end: 2, section: 'hook' }, { start: 2, end: 4, section: 'hook' }, { start: 4, end: 6, section: 'body' }, { start: 6, end: 8, section: 'body', bigPunch: true }, { start: 8, end: 10, section: 'cta' }] };
+    const r = C.fxPlan(ch, ['lean-in', 'slow-push', 'orbit'], { 'lean-in': 'hook', 'slow-push': 'key-moments' });
+    const at = id => r.plan.effects.find(e => e.fx === id);
+    assert.ok(at('lean-in').start < 2 && at('lean-in').when === 'hook');
+    assert.ok([2, 6, 8].some(x => Math.abs(at('slow-push').start - x - 0.1) < 0.01), JSON.stringify(r.plan));
+    const order = C.fxPlan({ beats: [{ start: 0, end: 2, section: 'hook' }, { start: 2, end: 4, section: 'body' }, { start: 4, end: 6, section: 'cta' }] }, ['slow-push', 'lean-in', 'orbit'], { 'lean-in': 'hook', orbit: 'cta' });
+    assert.deepStrictEqual(order.plan.effects.map(e => e.fx), ['lean-in', 'slow-push', 'orbit'], 'a whole-video effect does not take the hook beat');
+    assert.strictEqual(order.plan.effects.find(e => e.fx === 'orbit').when, 'cta');
+    const hookOnly = C.fxPlan({ beats: [{ start: 0, end: 2, section: 'body' }, { start: 2, end: 4, section: 'body' }] }, ['lean-in'], { 'lean-in': 'hook' });
+    assert.deepStrictEqual(hookOnly.plan.effects, []); assert.deepStrictEqual(hookOnly.unplaced, ['lean-in']);
+  });
   await t('llm: prompt lists only engine names; replies parse, em dashes removed', () => {
     const sp = LLM.systemPrompt(C.defaultState(), C.catalog());
     assert.ok(sp.includes('whip') && sp.includes('magazine'));

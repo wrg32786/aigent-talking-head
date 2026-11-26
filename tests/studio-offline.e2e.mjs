@@ -1,8 +1,6 @@
-// The wizards and Studio stopping while the page is open (1.27.2), in a real Chrome, with no keys and no network:
-// - Copy a reference opens its own link screen (it used to show the clips screen), and Let my agent decide works there
-// - Studio stops: the Studio stopped bar shows with Copy for my agent, and the wizards say Studio is not running with
-//   Try again, not the browser's bare "Failed to fetch"
-// - Studio starts again on the same port: the bar goes by itself and the wizards load
+// Studio stopping while the page is open (1.27.2), in a real Chrome, with no keys and no network:
+// - Studio stops: the Studio stopped bar shows with Copy for my agent
+// - Studio starts again on the same port: the bar goes by itself
 // Needs Chrome. Run: node tests/studio-offline.e2e.mjs   (npm run smoke runs it)
 import assert from 'assert';
 import { spawn } from 'child_process';
@@ -34,16 +32,7 @@ try {
   pg.on('pageerror', e => errs.push(e.message));
   await pg.goto(url + '/#step=footage', { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#more-open');
 
-  await t('wizards: Copy a reference opens the link screen, Let my agent decide works', async () => {
-    await pg.click('#more-open'); await pg.click('#more-wizards'); await pg.waitForSelector('#wz-list');
-    await pg.click('.wz-pick[data-wizard="reference"]');
-    await pg.waitForSelector('#wz-url-in');
-    assert.strictEqual(await pg.$('#wz-clips-go'), null, 'Copy a reference shows the clips screen');
-    await pg.click('#wizards .wz-agent'); await pg.waitForFunction(() => !document.getElementById('wizards').open);
-    assert.deepStrictEqual(errs, []);
-  });
-
-  await t('Studio stops: the bar with Copy for my agent, the wizards say Studio is not running with Try again', async () => {
+  await t('Studio stops: the bar with Copy for my agent', async () => {
     await stop(srv);
     await pg.waitForSelector('#studio-offline', { timeout: 15000 });
     assert.match(await pg.textContent('#studio-offline'), /Studio stopped/);
@@ -51,16 +40,11 @@ try {
     await pg.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
   });
 
-  await t('Studio starts again: the bar goes by itself and the wizards load', async () => {
+  await t('Studio starts again: the bar goes by itself', async () => {
     const back = start(port); srv = back.srv; await back.url;
     await pg.goto(url + '/#step=footage', { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#more-open');
-    await stop(srv);
-    await pg.click('#more-open'); await pg.click('#more-wizards'); await pg.waitForSelector('#wz-retry', { timeout: 10000 });
-    const said = await pg.textContent('#wz-err');
-    assert.match(said, /Studio is not running/); assert.doesNotMatch(said, /Failed to fetch/);
+    await stop(srv); await pg.waitForSelector('#studio-offline', { timeout: 15000 });
     const again = start(port); srv = again.srv; await again.url;
-    await pg.waitForSelector('#wz-list', { timeout: 15000 });
-    await pg.keyboard.press('Escape');
     await pg.waitForSelector('#studio-offline', { state: 'detached', timeout: 15000 });
     assert.deepStrictEqual(errs, []);
   });

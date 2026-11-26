@@ -4,6 +4,28 @@ The depth behind the [README](../README.md) quick start.
 
 **See every option move:** the [effects menu](effects.md) shows each transition, title entrance, caption entrance and caption style as a looping preview with its exact name. `npm run list -- <kind>` prints the same list.
 
+## Your first video in Studio
+
+No commands needed. Open Studio and follow these steps.
+
+1. **Film a take.** On the **Recording** tab, read your script from the teleprompter and stop. Your take waits there. Pick **Use in a new video** on it.
+
+   ![A take waiting in Recording, with Use in a new video](studio/first-run-recording.png)
+
+2. **Build my own.** Studio opens the builder. Pick a pace first (Steady is a good start). Each step after that is one choice: the words on screen, transitions, effects on you, filters, extras, a repo if your video features one, music, then your notes for the agent. Press **Next** to keep the choice Studio made for you.
+
+   ![Pacing, the first step](studio/first-run-pacing.png)
+
+3. **Make it.** The last step shows your plan. If we did not hear a call to action in your take (like "follow for more"), it says so here, with a link to change the timing or turn the call to action off. Press **Make my video**.
+
+   ![Make it, with the note about a missing call to action](studio/first-run-make.png)
+
+4. **Review.** Your draft plays here. **Check the plan** compares the draft with what you picked and points at anything that does not match. If your agent is connected, **Ask the agent to fix this** sends it the list. Render when you are happy.
+
+   ![Review with the Plan check](studio/first-run-review.png)
+
+Like a look you saw somewhere? Break it down on the **Teardowns** tab and save it as a template. It keeps a picture from that video, and you can use it for your next one.
+
 ## What you get
 
 Record yourself on your phone, drop the file in `inbox/`, and ask Claude (or any coding agent) to make the reel:

@@ -5,6 +5,7 @@ import { NeedFix } from './Fix.jsx';
 import { copyText } from './Connect.jsx';
 import { api, file, toast, fmtS, cap1, Icon, matchChips } from './lib.jsx';
 import { Compare, Cleanup, Receipt } from './Review.jsx';
+import { PlanCheck } from './PlanCheck.jsx';
 import { Fold, Hint } from './ui.jsx';
 import { TitleCheckLine } from './RefCard.jsx';
 import { PublishKit } from './PublishKit.jsx';
@@ -79,6 +80,7 @@ export function ReviewStep({ CAT, V, s, apply, patch, go, hidden, run }) {
     </div>
     {(isDrafted || drafted) && <>
       <Receipt r={run.receipt} />
+      <PlanCheck V={V} s={s} drafted={s.drafted} apply={apply} />
       <Cleanup V={V} s={s} apply={apply} drafted={drafted} />
       <details className="fold glass-card" id="choices-fold"><summary>Every pick and why</summary>
         <div id="choices" className="choices"><Choices CAT={CAT} x={run.choices} setX={run.setChoices} setReceipt={run.setReceipt} dirty={run.dirty} setDirty={run.setDirty} s={s} patch={patch} /></div></details>
@@ -95,7 +97,7 @@ export function Render({ CAT, V, s, apply, patch, hidden, go, run, openOutputs, 
   // the numbers and the ways out, shown here: titles in front, the lighter mask, or try anyway
   const doRender = memory => { run.clear(); setMem(null);
     fetch('/api/render', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(memory ? { memory } : {}) })
-      .then(async r => { const j = await r.json().catch(() => ({})); if (r.status === 409 && j.memory) return setMem(j.memory); if (!r.ok) return toast(j.error || `request failed (${r.status})`, false, j.fix); apply(j); if (j.effectsSkipped) toast(j.effectsSkipped, false, j.fix); })
+      .then(async r => { const j = await r.json().catch(() => ({})); if (r.status === 409 && j.memory) return setMem(j.memory); if (!r.ok) return toast(j.error || `request failed (${r.status})`, false, j.fix); apply(j); if (j.effectsSkipped) toast(j.effectsSkipped, false, j.fix); else if (j.effectsUnplaced) toast(j.effectsUnplaced, false); })
       .catch(e => toast(String(e.message || e))); };
   const bites = useBites(V, s);
   const reopen = o => api('/api/reopen', { reel: o }).then(j => { apply(j); run.loadChoices(); toast(`${o.split('/').pop()} is back in the editor. Render makes the next version.`, true); }).catch(() => {});

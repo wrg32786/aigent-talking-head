@@ -1,10 +1,10 @@
-// Point-and-note review, waveform select, wizards, Ask my agent and Apply (1.17.0) in a real Chrome, with no keys and
+// Point-and-note review, waveform select, Ask my agent and Apply (1.17.0) in a real Chrome, with no keys and
 // no network:
 // - drag on the waveform: the stretch snaps to whole words, Play it, Note for my agent sends it with from and to
 // - Ask my agent on a step: prompts for that step, sent to the chat with the step, the chat opens
 // - an agent answer with a suggested change shows Apply; nothing changes until it is clicked, then it says Applied
 // - a note on a stretch of the reel on Render (in the closed Compare fold): Mark the end here
-// - the wizards: Make a reel (goal, Look, Let AI choose, then Review) and Clips and ads; on a phone they open from More
+// - the Wizards are gone (Phase 7): an old #wizards link opens the builder; run_wizard goals set the plan's pace and a note
 // - screenshots, dark and light, and the phone
 // Needs Chrome and ffmpeg. Run: node tests/studio-agent-ux.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
 import assert from 'assert';
@@ -140,26 +140,25 @@ try {
     const m = await lastUser(); assert.strictEqual(m.attach.t, 0); assert.ok(Math.abs(m.attach.end - 4) < 0.1, JSON.stringify(m.attach)); assert.match(m.text, /reel-v1\.mp4 from 0:00\.0 to 0:04\.0/);
   });
 
-  await t('wizards: Make a reel (goal, Look, Let AI choose, Review) and Clips and ads', async () => {
-    await open(pg, '#step=start'); await pg.waitForSelector('#s-footage:not([hidden])'); await pg.click('#more-open'); await pg.click('#more-wizards'); await pg.waitForSelector('#wz-list');
-    assert.deepStrictEqual(await pg.$$eval('#wz-list .wz-pick b', x => x.map(e => e.textContent)), ['Make a reel from a long take', 'Copy a reference', 'Clips and ads from one take']);
-    await shot(pg, '#wizards', 'redesign-wizards-dark.png');
-    await pg.click('.wz-pick[data-wizard="reel"]'); await pg.waitForSelector('.wz-opt[data-goal="sell"]');
-    await shot(pg, '#wizards', 'redesign-wizard-goal-dark.png');
-    await pg.click('.wz-opt[data-goal="sell"]'); await pg.waitForSelector('.wz-look');
+  await t('the Wizards are gone: an old #wizards link opens the builder, and run_wizard goals set the plan (pace and a note)', async () => {
+    await pg.goto('about:blank'); await pg.goto(url + '/#wizards', { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('#build-start'); assert.match(await pg.evaluate(() => location.hash), /build=start/);
+    assert.strictEqual(await pg.$('#wizards'), null, 'no Wizards dialog');
+    const r = await api('/api/wizard', { wizard: 'reel', goal: 'sell' }); assert.ok(!r.error, r.error);
     const out = (await api('/api/cut')).output; assert.strictEqual(out.goal, 'ad'); assert.strictEqual(out.adCuts, true);
-    await pg.click('.wz-look[data-look="magazine"]'); await pg.waitForSelector('#wz-choose');
-    await pg.click('#wz-choose'); await pg.waitForSelector('#s-review:not([hidden])'); await pg.waitForSelector('#stepper [data-step="review"][aria-current="step"]');
-    const P = await api('/api/pieces'); assert.ok(P.combo.ids.length >= 2, JSON.stringify(P.combo)); assert.strictEqual(P.combo.by, 'ai');
-    await pg.click('#more-open'); await pg.click('#more-wizards'); await pg.click('.wz-pick[data-wizard="clips"]'); await pg.click('#wizards .seg [role="radio"] >> text=3'); await pg.check('#wz-ads');
-    await pg.click('#wz-clips-go'); await pg.waitForSelector('[data-step="cut"][aria-current="step"]');
-    const c = await until(async () => { const v = await api('/api/cut'); return v.candidates && v.candidates.length ? v : null; }); assert.strictEqual(c.output.kind, 'clips'); assert.strictEqual(c.output.clips, 3);
+    const V = await api('/api/video-plan'); assert.strictEqual(V.plan.pace, 'high'); assert.match(V.plan.notes, /one clear ask/);
+    await api('/api/wizard', { wizard: 'reel', goal: 'sell' }); assert.strictEqual((await api('/api/video-plan')).plan.notes.match(/one clear ask/g).length, 1, 'the note is added once');
+    // the next goal swaps only the line a goal added; a line you added yourself stays
+    await api('/api/video-plan', { notes: (await api('/api/video-plan')).plan.notes + '\nHook in the first line, short and punchy.' });
+    await api('/api/wizard', { wizard: 'reel', goal: 'teach' }); const N = (await api('/api/video-plan')).plan.notes;
+    assert.ok(!/one clear ask/.test(N) && /Clear over fast/.test(N) && /short and punchy/.test(N), N);
+    await api('/api/wizard', { wizard: 'reel', goal: 'grow' }); assert.strictEqual((await api('/api/video-plan')).plan.notes.match(/short and punchy/g).length, 1, 'never twice');
+    await api('/api/wizard', { wizard: 'clips', clips: 3, ads: true });
+    const c = await until(async () => { const v = await api('/api/cut'); return v.candidates && v.candidates.length ? v : null; }); assert.strictEqual(c.output.kind, 'clips'); assert.strictEqual(c.output.clips, 3); assert.strictEqual(c.output.adCuts, true);
+    await open(pg, '#step=cut');
   });
 
   await t('light theme and the phone', async () => {
     await theme(pg, 'light');
-    await pg.click('#more-open'); await pg.click('#more-wizards'); await pg.click('.wz-pick[data-wizard="reel"]'); await pg.waitForSelector('.wz-opt'); await shot(pg, '#wizards', 'redesign-wizard-goal-light.png');
-    await pg.click('#wz-back'); await shot(pg, '#wizards', 'redesign-wizards-light.png'); await pg.keyboard.press('Escape');
     await pg.click('#ask-agent'); await pg.waitForSelector('#ask-pop'); await shot(pg, '#stepnav', 'redesign-ask-agent-light.png'); if (shots) await pg.screenshot({ path: join(shots, 'redesign-ask-agent-page-light.png') }); await pg.keyboard.press('Escape');
     if (await pg.isVisible('#chat-open')) await pg.click('#chat-open'); await pg.waitForSelector('#msgs .sg-done'); await shot(pg, '#chat', 'redesign-apply-light.png'); await pg.keyboard.press('Escape');
     await theme(pg, 'dark');
@@ -170,13 +169,6 @@ try {
     const over = await ph.evaluate(() => Math.max(...[...document.querySelectorAll('body *')].filter(e => e.offsetParent).map(e => e.getBoundingClientRect().right)) - innerWidth); assert.ok(over <= 1, 'no sideways scroll: ' + over);
     if (shots) await ph.screenshot({ path: join(shots, 'redesign-ask-agent-phone-dark.png') });
     await ph.keyboard.press('Escape'); await open(ph, '#step=start'); await ph.waitForSelector('#s-footage:not([hidden])');
-    // on a phone the Wizards button is in the More menu
-    assert.strictEqual(await ph.$('#wizards-open'), null, 'no Wizards button in the top bar');
-    await ph.click('#more-open'); await ph.click('#more-wizards'); await ph.waitForSelector('#wz-list');
-    const ow = await ph.evaluate(() => document.getElementById('wizards').getBoundingClientRect().right - innerWidth); assert.ok(ow <= 1, 'the wizard fits: ' + ow);
-    if (shots) await ph.screenshot({ path: join(shots, 'redesign-wizards-phone-dark.png') });
-    await ph.evaluate(() => localStorage.setItem('studio.theme', 'light')); await ph.reload({ waitUntil: 'domcontentloaded' }); await ph.waitForSelector('#s-footage:not([hidden])'); await ph.click('#more-open'); await ph.click('#more-wizards'); await ph.waitForSelector('#wz-list');
-    if (shots) await ph.screenshot({ path: join(shots, 'redesign-wizards-phone-light.png') });
     await ph.close();
     assert.deepStrictEqual(errs, []);
   });

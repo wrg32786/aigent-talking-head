@@ -6,7 +6,7 @@ import { api, toast, scriptStats, Icon, IconBtn } from './lib.jsx';
 
 const MARKS = [['[hook]', 'Hook'], ['[body]', 'Body'], ['[cta]', 'CTA'], ['[pause]', 'Pause']];
 export const canWrite = env => env.backend === 'agent' || !!env.llm;
-export const NO_WRITER = 'Writing scripts needs your terminal agent, an API key or a local model (Settings).';
+export const NO_WRITER = 'Writing scripts needs your agent, an API key or a local model (Settings).';
 const secs = n => n < 60 ? `${n} s` : `${Math.floor(n / 60)} min ${n % 60} s`;
 
 export function Scripts({ V, s, apply, onRead }) {

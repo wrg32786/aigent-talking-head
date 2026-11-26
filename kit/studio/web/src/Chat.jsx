@@ -33,15 +33,15 @@ export function Chat({ V, s, apply, go, open, setOpen, close, agentState, openCo
   };
   const waiting = s.chat.filter(m => m.role === 'user' && m.to === 'agent' && m.status !== 'answered');
   const empty = backend === 'agent' && !a.connected
-    ? <li className="empty"><Icon n="plug" /><p>Connect your terminal agent to chat with it here.</p><Button id="chat-connect" variant="primary" size="sm" label="Connect agent" onClick={openConnect} /></li>
+    ? <li className="empty"><Icon n="plug" /><p>Connect your agent to chat with it here.</p><Button id="chat-connect" variant="primary" size="sm" label="Connect agent" onClick={openConnect} /></li>
     : <li className="empty"><Icon n="chat" /><p>{backend === 'agent' ? `${name} is here. Say what you want.` : 'Describe the vibe.'}</p><p className="fine">"Calm and cinematic, no glitch"</p></li>;
   return <aside className={'chat glass' + (open ? ' open' : '')} id="chat" aria-labelledby="h-chat">
     <header className="ch"><h2 id="h-chat">Chat</h2>
-      <div id="agentbar" className={'agentbar ' + agentState} role="status" aria-live="polite" title={agentState === 'busy' ? 'Busy in the terminal. Messages wait for its next step.' : undefined}>
+      <div id="agentbar" className={'agentbar ' + agentState} role="status" aria-live="polite" title={agentState === 'busy' ? 'Busy with another task. Messages wait for its next step.' : undefined}>
         <StatusDot variant={DOT[agentState]} label={label} isPulsing={agentState === "on"} /><span aria-hidden="true">{label}</span></div>
       <IconBtn id="chat-close" n="x" label="Close chat" onClick={() => { close(); setTimeout(() => document.getElementById('chat-open')?.focus({ preventScroll: true }), 0); }} />
     </header>
-    <p id="chatmode" className="sr">{backend === 'agent' ? 'Separate from your terminal conversation.' : ''}</p>
+    <p id="chatmode" className="sr">{backend === 'agent' ? 'Separate from your agent\'s own conversation.' : ''}</p>
     <ol id="msgs" className="msgs" aria-live="polite" ref={ol} onScroll={ev => { const o = ev.currentTarget; atBottom.current = o.scrollHeight - o.scrollTop - o.clientHeight < 40; }}>
       {s.chat.length ? s.chat.map((m, i) => m.kind === 'action' ? <li key={i} className="action">{m.text}</li>
         : m.role === 'user' ? <li key={i} className={'user' + (m.attach && m.attach.kind === 'comment' ? ' comment' : '')}>{m.attach && m.attach.kind === 'comment' ? <>

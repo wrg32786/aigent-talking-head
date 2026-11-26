@@ -1,13 +1,13 @@
-// Record now, on the Start step, in a real Chrome with a fake camera and mic (--use-fake-device-for-media-stream gives a moving test
+// Record now, on the Recording tab, in a real Chrome with a fake camera and mic (--use-fake-device-for-media-stream gives a moving test
 // pattern and a beep; --use-fake-ui-for-media-stream answers the permission prompt). Turns the camera on, films a
 // take with the 3, 2, 1 countdown, stops, and checks the take was cropped to 9:16, converted to mp4 and added to the
-// footage. Also checks the Scripts panel on Start (it shows by itself once the job has a script), the blocked-camera message
-// and that the phone layout does not scroll sideways.
+// footage. Also checks the Scripts panel on Recording, the blocked-camera message, that the phone layout does not scroll
+// sideways, Use a recording on Start, and a take filmed before any video is named going into a new video in one click.
 // FAKE_VIDEO=<file.y4m> swaps the test pattern for a calmer clip (used for the docs screenshots).
 // Needs Chrome and ffmpeg. Run: node tests/studio-record.e2e.mjs [--shots <dir>]   (npm run smoke runs it)
 import assert from 'assert';
 import { spawn, spawnSync } from 'child_process';
-import { mkdtempSync, rmSync } from 'fs';
+import { existsSync, mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -24,7 +24,8 @@ const url = await new Promise((ok, bad) => { let out = ''; srv.stdout.on('data',
 const api = async (p, b) => (await fetch(url + p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })).json();
 // Studio keeps a live connection, so the page never goes network idle: wait for the stepper, and for the step a link names
 const STEP_OF = { reference: 'picture', post: 'render' };
-const ready = async (pg, hash = '') => { await pg.waitForSelector('#stepper'); const st = (hash.match(/step=([a-z]+)/) || [])[1]; if (st) await pg.waitForSelector(`#stepper [aria-current="step"][data-step="${STEP_OF[st] || st}"]`); };
+let newJob = null, held0 = null;
+const ready = async (pg, hash = '') => { if (/tab=/.test(hash)) return pg.waitForSelector(`main[data-area="${hash.match(/tab=([a-z]+)/)[1]}"]`); await pg.waitForSelector('#stepper'); const st = (hash.match(/step=([a-z]+)/) || [])[1]; if (st) await pg.waitForSelector(`#stepper [aria-current="step"][data-step="${STEP_OF[st] || st}"]`); };
 const open = async (pg, hash) => { await pg.goto(url + '/' + hash, { waitUntil: 'domcontentloaded' }); await ready(pg, hash); };
 let n = 0; const t = async (name, fn) => { await fn(); n++; console.log('ok ' + name); };
 
@@ -35,6 +36,9 @@ try {
     const pg = await browser.newPage({ viewport: { width: 1280, height: 860 } }), errs = [];
     pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
     await open(pg, '#step=start');
+    // Start sends you to the Recording tab
+    await pg.click('#use-recording'); await pg.waitForSelector('#s-recording:not([hidden])');
+    assert.ok(/#tab=recording/.test(pg.url()), pg.url());
     await pg.click('#record-now');
     await pg.click('#rec-enable');
     await pg.waitForFunction(() => { const v = document.querySelector('#recorder video'); return v && v.videoWidth > 0 && !v.paused; }, null, { timeout: 15000 });
@@ -61,13 +65,15 @@ try {
     assert.ok(Math.abs(v.width / v.height - 9 / 16) < 0.02, `${v.width}x${v.height}`);
     const dur = +pj.format.duration; assert.ok(dur > 2.5 && dur < 6, 'duration ' + dur);
     assert.ok(s.chat.some(m => m.kind === 'action' && /New take recorded/.test(m.text)));
-    assert.ok(await pg.$('#footage video[aria-label="' + take.file + '"]'), 'footage list shows the take');
     await pg.waitForTimeout(400);
     if (shots) { await pg.locator('#takes').scrollIntoViewIfNeeded(); await pg.evaluate(() => scrollBy(0, 120)); await pg.screenshot({ path: join(shots, 'record-takes.png') }); }
-    // switching steps while idle turns the camera off
-    await pg.click('#next'); await pg.waitForTimeout(300);
-    assert.ok(await pg.evaluate(() => !document.querySelector('#recorder video').srcObject), 'camera stopped off the step');
-    await pg.click('#prev');
+    // the take is in Your recordings, marked as in this video
+    await pg.waitForSelector(`#recordings li[data-file="${take.file}"] .rec-in`);
+    // switching tab while idle turns the camera off; the take is in the footage on Start
+    await pg.click('#tab-new'); await pg.waitForSelector('#s-footage:not([hidden])');
+    assert.ok(await pg.evaluate(() => !document.querySelector('#recorder video').srcObject), 'camera stopped off the tab');
+    assert.ok(await pg.$('#footage video[aria-label="' + take.file + '"]'), 'footage list shows the take');
+    await pg.click('#tab-recording'); await pg.waitForSelector('#s-recording:not([hidden])');
     assert.deepStrictEqual(errs.filter(e => !/favicon/.test(e)), []);
     await pg.close();
   });
@@ -75,7 +81,7 @@ try {
     await api('/api/scripts', { title: 'Morning reels', wpm: 160, text: '[hook]\nI film every reel before my first coffee.\n[body]\nThe light is soft, the house is quiet [pause] and nobody needs me yet.\nTwenty minutes gets me three takes.\n[cta]\nTry it tomorrow and tell me how it went.' });
     const pg = await browser.newPage({ viewport: { width: 1280, height: 900 } }), errs = [];
     pg.on('pageerror', e => errs.push(e.message));
-    await open(pg, '#step=start');
+    await open(pg, '#tab=recording');
     if (await pg.$('#recorder')) await pg.click('#recorder .rec-head .icon-btn');
     await pg.click('.sc-item:has-text("Morning reels")');
     await pg.waitForFunction(() => /\d+ words, about/.test(document.querySelector('#script-stats')?.textContent || ''));
@@ -105,7 +111,7 @@ try {
   await t('a blocked camera shows one clear line and a retry', async () => {
     const pg = await browser.newPage({ viewport: { width: 1280, height: 860 } });
     await pg.addInitScript(() => { navigator.mediaDevices.getUserMedia = () => Promise.reject(Object.assign(new Error('denied'), { name: 'NotAllowedError' })); });
-    await open(pg, '#step=start');
+    await open(pg, '#tab=recording');
     if (!(await pg.$('#recorder'))) await pg.click('#record-now');
     await pg.click('#rec-enable');
     await pg.waitForSelector('text=Camera or mic blocked');
@@ -114,7 +120,7 @@ try {
   });
   await t('phone layout: the recorder fits without sideways scroll', async () => {
     const pg = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
-    await open(pg, '#step=start');
+    await open(pg, '#tab=recording');
     if (!(await pg.$('#recorder'))) await pg.click('#record-now');
     await pg.click('#rec-enable');
     await pg.waitForFunction(() => { const v = document.querySelector('#recorder video'); return v && v.videoWidth > 0; }, null, { timeout: 15000 });
@@ -131,8 +137,33 @@ try {
     if (shots) await pg.screenshot({ path: join(shots, 'scripts-phone.png') });
     await pg.close();
   });
+  await t('a take filmed before any video is named waits, then Use in a new video starts one with it', async () => {
+    await api('/api/videos/new', { name: JOB + '-a' }); await api('/api/state', { job: null });
+    const pg = await browser.newPage({ viewport: { width: 1280, height: 900 } }), errs = [];
+    pg.on('pageerror', e => errs.push(e.message));
+    await open(pg, '#tab=recording');
+    if (!(await pg.$('#recorder'))) await pg.click('#record-now');
+    await pg.click('#rec-enable');
+    await pg.waitForFunction(() => { const v = document.querySelector('#recorder video'); return v && v.videoWidth > 0; }, null, { timeout: 15000 });
+    const cd = pg.getByRole('switch', { name: '3, 2, 1 countdown' }); if (await cd.isChecked()) await cd.click();
+    await pg.click('#rec-start'); await pg.waitForSelector('#rec-stop'); await pg.waitForTimeout(2500); await pg.click('#rec-stop');
+    await pg.waitForSelector('.take .tstate >> text=Not in a video yet', { timeout: 30000 });
+    const held = (await api('/api/recordings')).recordings.find(x => x.job === null && /_recordings/.test(x.file));
+    assert.ok(held, 'the take is in the holding folder'); held0 = held.file;
+    assert.deepStrictEqual((await api('/api/state')).state.footage, [], 'no video, no footage');
+    await pg.click(`#recordings li[data-file="${held.file}"] .rec-new`);
+    await pg.waitForSelector('#s-footage:not([hidden])');
+    const s = (await api('/api/state')).state; newJob = s.job;
+    assert.ok(s.job && s.footage.length === 1 && s.footage[0].startsWith(`inbox/studio/${s.job}/takes/`), JSON.stringify(s.footage));
+    assert.ok(!existsSync(join(ROOT, held.file)), 'the held take moved, not copied');
+    assert.ok(existsSync(join(ROOT, s.footage[0])) && existsSync(join(ROOT, s.footage[0].replace(/\.mp4$/, '.json'))));
+    assert.deepStrictEqual(errs, []);
+    await pg.close();
+  });
 } finally {
   await browser.close(); srv.kill();
+  for (const j of [JOB + '-a', newJob]) if (j) rmSync(join(ROOT, 'inbox', 'studio', j), { recursive: true, force: true });
+  if (held0) for (const ext of ['.mp4', '.jpg', '.json']) rmSync(join(ROOT, held0.replace(/\.mp4$/, ext)), { force: true });
   rmSync(STATE, { recursive: true, force: true });
   rmSync(join(ROOT, 'inbox', 'studio', JOB), { recursive: true, force: true });
 }
