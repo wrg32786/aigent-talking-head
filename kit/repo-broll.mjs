@@ -260,8 +260,15 @@ export function score(line, a) { const lw = new Set(toks(line).filter(w => !STOP
 export const REPO_STYLE = { bands: { repo: 0.45, captions: 0.10, you: 0.45 }, takeoverSec: [2, 5], swapSec: [2, 4], frameBg: ['#e8eaed', '#dfe3e8'] };
 const pair = (v, fb) => (Array.isArray(v) && v.length === 2 && v.every(n => typeof n === 'number' && n > 0) && v[0] <= v[1] ? v : fb);
 const chunks = (start, end, [lo, hi]) => {
-  const dur = end - start; if (dur <= hi) return [[start, end]];
+  const dur = end - start; if (dur <= hi + 0.05) return [[start, end]];
   const n = Math.max(2, Math.ceil(dur / hi)), step = dur / n, out = [];
+  if (step + 0.01 < lo) {
+    // keep pieces at the long end; a short leftover stays on the last piece if it is under a second
+    let a = start;
+    while (end - a > hi + 0.05) { const b = +(a + hi).toFixed(2); out.push([a, b]); a = b; }
+    if (out.length && end - a < 1) out[out.length - 1][1] = end; else out.push([a, end]);
+    return out;
+  }
   for (let i = 0; i < n; i++) out.push([+(start + i * step).toFixed(2), +(i === n - 1 ? end : start + (i + 1) * step).toFixed(2)]);
   return out;
 };
@@ -276,11 +283,24 @@ export function planRepo(lines, assets, { takeovers = 'auto', breakout = false, 
     swapSec: pair(swapSec, REPO_STYLE.swapSec),
     frameBg: Array.isArray(frameBg) ? frameBg : (breakout ? REPO_STYLE.frameBg : null),
   };
-  const pick = text => {
+  const pick = (text, avoid = null) => {
     let best = null, bs = 0;
-    for (const a of assets) { const s = score(text, a) - (used.get(a.path) || 0) * 0.5; if (s > bs && score(text, a) >= 1) { best = a; bs = s; } }
+    for (const a of assets) {
+      if (avoid && a.path === avoid) continue;
+      const s = score(text, a) - (used.get(a.path) || 0) * 0.5; if (s > bs && score(text, a) >= 1) { best = a; bs = s; }
+    }
     if (best) return { a: best, named: true };
-    const a = assets[next % assets.length]; next++; return { a, named: false };
+    const pool = avoid && assets.length > 1 ? assets.filter(x => x.path !== avoid) : assets;
+    const a = pool[next % pool.length]; next++; return { a, named: false };
+  };
+  const fullUsed = at => {
+    let usedFor = 0, t = at;
+    for (let i = inserts.length - 1; i >= 0; i--) {
+      const x = inserts[i]; if (x.place !== 'full') break;
+      if (t - (x.at + x.dur) >= 1.5) break;
+      usedFor += x.dur; t = x.at;
+    }
+    return usedFor;
   };
   const push = (l, a, named, at, end, full) => {
     let d = +(end - at).toFixed(2);
@@ -304,22 +324,32 @@ export function planRepo(lines, assets, { takeovers = 'auto', breakout = false, 
     // first pick decides a named full-screen takeover for the opening chunk; later chunks cycle the pictures
     const first = pick(l.text); used.set(first.a.path, (used.get(first.a.path) || 0) + 1);
     const full0 = takeovers === 'auto' && (POINT.test(l.text) || first.named);
-    const parts = chunks(l.start, l.end, style.swapSec);
+    // one still does not swap against itself; a second picture is needed to change the visual
+    const parts = assets.length > 1 ? chunks(l.start, l.end, style.swapSec) : [[l.start, l.end]];
+    let prevPath = null;
     parts.forEach((span, i) => {
-      const { a, named } = i === 0 ? first : pick(l.text);
+      const { a, named } = i === 0 ? first : pick(l.text, prevPath);
       if (i) used.set(a.path, (used.get(a.path) || 0) + 1);
-      const full = i === 0 && full0;
-      const end = span[1];
-      // leftover after a capped takeover becomes a split shot
+      let full = i === 0 && full0;
+      const room = +(span[1] - span[0]).toFixed(2);
+      const [lo, hi] = style.takeoverSec;
       if (full) {
-        const hi = style.takeoverSec[1], room = +(span[1] - span[0]).toFixed(2);
-        const cap = Math.min(room, hi);
-        push(l, a, named, span[0], span[0] + cap, true);
-        if (room - cap >= minDur) {
-          const more = pick(l.text); used.set(more.a.path, (used.get(more.a.path) || 0) + 1);
-          push(l, more.a, false, span[0] + cap, span[1], false);
+        const left = +(hi - fullUsed(span[0])).toFixed(2);
+        if (room < lo - 0.05 || left < lo - 0.05) full = false;
+        else {
+          const cap = Math.min(room, hi, Math.max(left, 0));
+          push(l, a, named, span[0], span[0] + cap, true);
+          prevPath = a.path;
+          if (room - cap >= minDur) {
+            const more = pick(l.text, a.path); used.set(more.a.path, (used.get(more.a.path) || 0) + 1);
+            push(l, more.a, false, span[0] + cap, span[1], false);
+            prevPath = more.a.path;
+          }
+          return;
         }
-      } else push(l, a, named, span[0], end, false);
+      }
+      push(l, a, named, span[0], span[1], false);
+      prevPath = a.path;
     });
   }
   // no flashes back to you: a short gap (a pause, a short line) between two inserts of the same layout is closed by
@@ -328,7 +358,16 @@ export function planRepo(lines, assets, { takeovers = 'auto', breakout = false, 
   for (let i = 0; i + 1 < inserts.length; i++) {
     const p = inserts[i], q = inserts[i + 1], gap = q.at - (p.at + p.dur), end = p.at + p.dur;
     const yours = who.some(w => w.who === 'you' && w.at < q.at && w.at + w.dur > end);
-    if (p.place === q.place && gap > 0 && gap < 1.5 && !yours) { const d = +(q.at - p.at).toFixed(2); if (!(p.seconds && d > p.seconds)) { p.own = p.own || p.dur; p.dur = d; } }
+    if (p.place === q.place && gap > 0 && gap < 1.5 && !yours) {
+      let d = +(q.at - p.at).toFixed(2); if (p.seconds && d > p.seconds) continue;
+      if (p.place === 'full') { const hi = style.takeoverSec[1]; if (d > hi) d = hi; }
+      if (d > p.dur) { p.own = p.own || p.dur; p.dur = d; }
+    }
+  }
+  for (const w of who) {
+    if (w.who !== 'repo') continue;
+    const ins = inserts.find(x => x.place === 'full' && Math.abs(x.at - w.at) < 0.05);
+    if (ins) w.dur = ins.dur;
   }
   inserts.forEach(x => delete x.seconds);
   return { inserts, takeovers: who };

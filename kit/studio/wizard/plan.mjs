@@ -326,12 +326,18 @@ export function pending(plan) {
   if (w.place.captions || w.place.titles.length) add('words.place', 'Where words sit');
   if (w.colors.text || w.colors.accent || w.colors.outline) add('words.colors', 'Your own text colors');
   if (w.keyWords.level !== 'off' && (w.keyWords.color !== 'accent' || w.keyWords.maxPerLine !== 1)) add('words.keyWords', 'Key word color and how many per line');
-  if (p.content.repoFeature && !(p.content.repos || []).length) add('content.repos', 'Add a repo link');
   if (p.content.headline) add('content.headline', 'A short title at the top with one highlighted word');
   for (const x of p.presenter) {
     if (x && x.id === 'frame-breakout' && !p.content.repoFeature) add('presenter.frame-breakout', 'Frame breakout');
   }
   return out.filter((x, i, a) => a.findIndex(y => y.field === x.field) === i);
+}
+
+// what the plan still needs from you before Make (a starter can turn repo mode on with no link yet)
+export function needed(plan) {
+  const p = normalize(plan), out = [];
+  if (p.content.repoFeature && !(p.content.repos || []).length) out.push({ field: 'content.repos', text: 'Add a repo link', step: 'content' });
+  return out;
 }
 
 // ---------- session -> plan ----------

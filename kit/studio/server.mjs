@@ -1327,7 +1327,10 @@ async function api(req, res, u) {
     // it is (nothing is applied again, so classic picks keep who made them), and the draft writes it beside the cut
     const b = await readBody(req).catch(() => ({}));
     if (b && b.plan === true) update(x => { if (!x.videoPlan) x.videoPlan = { ...VP.normalize(planOf(x, C.catalog())), guessed: true }; });
-    const s = C.load(); const d = draftSteps(s); // checks the footage first, so an empty job says that before a missing tool
+    const s = C.load();
+    const wait = VP.needed(planOf(s, C.catalog()));
+    if (wait.length) return json(res, 400, { error: wait.map(x => x.text).join('. ') + ' on the Content step first.' });
+    const d = draftSteps(s); // checks the footage first, so an empty job says that before a missing tool
     const miss = needFor('draft'); if (miss) return json(res, 400, miss);
     startDraft(d, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; delete st.draftStale; }); BRL.autoPick(s.job); return { choices: !!readChoices(C.load()), note: DRAFT_DONE, from: d.from }; });
     return json(res, 202, { ...view(C.load()), from: d.from });

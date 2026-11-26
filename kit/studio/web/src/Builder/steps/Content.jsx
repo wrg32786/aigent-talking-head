@@ -29,7 +29,7 @@ export function Content({ plan, save, busy }) {
   // saved links follow the boxes: the good ones, or an empty list while the mode stays on (a starter waits for a link)
   const keep = ls => { const g = [...new Set(ls.map(u => u.trim()).filter(ok).map(u => u.replace(/\/$/, '')))]; save({ repoFeature: true, repos: g }); };
   const leave = i => { setSeen(x => ({ ...x, [i]: true })); keep(links); };
-  const flip = v => { setOn(v); if (!v) save({ repoFeature: false, repos: [] }); else keep(links); };
+  const flip = v => { setOn(v); if (!v) save({ repoFeature: false }); else keep(links); };
   const saveExample = () => { const v = example.trim(); const bad = !!v && !LINK.test(v); setExBad(bad); if (!bad && v !== (c.example || '')) save({ example: v || null }); };
   const enter = f => e => { if (e.key === 'Enter') { e.preventDefault(); f(); } };
   const breakout = (plan.presenter || []).some(x => x.id === 'frame-breakout');

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import * as stylex from '@stylexjs/stylex';
 import { Field, Label, Input } from '@headlessui/react';
 import { api, toast } from '../../lib.jsx';
+import { needed } from '../../../../wizard/plan.mjs';
 
 // Step 18: save the plan as a template (the name is optional) and make the video: the plan is kept as the session's
 // own, the draft starts (it writes jobs/<job>/build/video-plan.json beside the cut), and Review shows it coming in.
@@ -18,7 +19,7 @@ const s = stylex.create({
 });
 // a call to action the plan leans on (the CTA card, or filters timed for it) but we did not hear one in your clip
 export const ctaNeeds = plan => { const f = (plan && plan.filters) || {}, g = (plan && plan.graphics) || {}; const fil = ['cta', 'hook-cta'].includes(f.when) && Array.isArray(f.ids) && f.ids.length > 0; return { card: g.cta !== false, filter: fil, hookToo: f.when === 'hook-cta' }; };
-export function Make({ apply, go, flush, plan }) {
+export function Make({ apply, go, open, flush, plan }) {
   const [heard, setHeard] = useState(null);
   // (asked again every few seconds while the words are still being heard, up to about a minute)
   useEffect(() => { let live = true, n = 0, tm = null; const ask = () => api('/api/plan/cta').then(j => { if (!live) return; setHeard(j.heard); if (j.heard == null && ++n < 20) tm = setTimeout(ask, 3000); }).catch(() => {}); ask(); return () => { live = false; clearTimeout(tm); }; }, []);
@@ -46,8 +47,12 @@ export function Make({ apply, go, flush, plan }) {
     {heard === false && (need.card || need.filter) && <p className="fine" role="note" id="build-make-cta">
       We did not hear a call to action in your clip, like "follow for more". {need.filter ? (need.hookToo ? 'The filter you timed for it shows only on the hook' : 'The filter you timed for it has nowhere to go') : 'The call to action card has nowhere to go'}. Say one at the end of a take, or{' '}
       <a href={need.filter ? '#build=filterTiming' : '#build=graphics'}>{need.filter ? 'pick another filter timing' : 'turn the call to action off'}</a>.</p>}
+    {needed(plan).length > 0 && <p className="fine" role="status" id="build-make-need">
+      Add a repo link on the Content step before you make the video.{' '}
+      <button type="button" className="btn sm outline" id="build-make-need-go" onClick={() => (open || go)('content')}>Go to Content</button>
+    </p>}
     <div {...stylex.props(s.go)}>
-      <button type="button" className="btn" id="build-make-go" disabled={making} onClick={make}>{making ? 'Starting' : 'Make my video'}</button>
+      <button type="button" className="btn" id="build-make-go" disabled={making || needed(plan).length > 0} onClick={make}>{making ? 'Starting' : 'Make my video'}</button>
     </div>
     {err && <p className="fine" role="alert" id="build-make-err">{err}</p>}
   </>;

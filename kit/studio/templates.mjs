@@ -45,6 +45,8 @@ function loadBundled(name) {
 }
 export function load(name) {
   try { const t = JSON.parse(readFileSync(fileOf(name), 'utf8')); if (t && t.format === FORMAT) return t; } catch {}
+  // a local folder of this name (a look, or a broken template) stays yours; the shipped starter is not used over it
+  if (existsSync(join(SL.dirOf(), name))) return null;
   return loadBundled(name);
 }
 // a short name from the plan when you give none: "lively kinetic", then "lively kinetic 2" and so on

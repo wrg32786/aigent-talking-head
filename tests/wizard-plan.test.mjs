@@ -48,7 +48,8 @@ try {
     assert.match(VP.validate({ format: 'aigent-video-plan', presenter: [{ id: 'punch', when: 'hook' }] }, cat).errs.join(' '), /whole video/);
     const emptyRepo = VP.normalize({ content: { repoFeature: true } });
     assert.ok(VP.validate(emptyRepo, cat).ok, 'a starter can turn repo mode on before you add a link');
-    assert.deepStrictEqual(VP.pending(emptyRepo).filter(x => x.field === 'content.repos').map(x => x.text), ['Add a repo link']);
+    assert.deepStrictEqual(VP.needed(emptyRepo).map(x => x.text), ['Add a repo link']);
+    assert.ok(!VP.pending(emptyRepo).some(x => x.field === 'content.repos'), 'a missing link is not listed as coming soon');
     assert.ok(!VP.validate(VP.normalize({ content: { bands: { repo: 0.9, captions: 0.1, you: 0.1 } } }), cat).ok, 'band shares have to add up');
   });
 
@@ -279,7 +280,8 @@ try {
     assert.strictEqual(plan.words.type, 'kinetic'); assert.strictEqual(plan.words.look, 'oneword');
     assert.strictEqual(plan.words.keyWords.level, 'strong');
     assert.ok(plan.presenter.some(x => x.id === 'frame-breakout'));
-    assert.deepStrictEqual(VP.pending(plan).map(x => x.field), ['content.repos']);
+    assert.deepStrictEqual(VP.pending(plan).map(x => x.field), []);
+    assert.deepStrictEqual(VP.needed(plan).map(x => x.field), ['content.repos']);
     assert.ok(TPL.taken('repo-feature-breakout', cat), 'its name is reserved');
   });
 
