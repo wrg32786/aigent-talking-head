@@ -152,13 +152,32 @@ MATTE_MB = {'birefnet-general-lite': 214, 'birefnet-general': 928, 'birefnet-por
 # prepacking off), measured as peak RSS on Linux: lite 6.6 GB, portrait and general 7.5 GB. Almost all of it is the
 # Swin attention activations, so the lighter model saves little memory; the MediaPipe preview needs about 0.3 GB.
 # With ONNX Runtime's defaults (arena on, what rembg's new_session uses) the same frame grew past 15 GB and was killed on
-# a 16 GB machine, and about 25 GB was seen on Windows. Need = peak + 0.8 GB for the decoder, encoder and cleanup.
+# a 16 GB machine. Need = peak + 0.8 GB for the decoder, encoder and cleanup.
 # the whole mask.py run (session + flow + cleanup + ffmpeg pipes) peaked at 8.0 GB with portrait on real footage, about
 # 0.5 GB above the one-frame number, so the table is the full run (lite by the same margin)
-MATTE_PEAK_GB = {'birefnet-general-lite': 7.1, 'birefnet-general': 8.0, 'birefnet-portrait': 8.0}
-def matte_need_gb(model):
+MATTE_PEAK_GB = {
+    'cpu': {'birefnet-general-lite': 7.1, 'birefnet-general': 8.0, 'birefnet-portrait': 8.0},
+    # shortcut: only birefnet-portrait was measured on DirectML (21.3 GB and about 25 GB, Intel Arc, shared memory); the other two take its number until measured
+    'dml': {'birefnet-general-lite': 25.0, 'birefnet-general': 25.0, 'birefnet-portrait': 25.0},
+}
+
+def matte_providers():
+    try:
+        import onnxruntime as ort
+    except ImportError:
+        return ['CPUExecutionProvider']
+    have = ort.get_available_providers()
+    return [p for p in ('CUDAExecutionProvider', 'DmlExecutionProvider', 'CoreMLExecutionProvider', 'CPUExecutionProvider') if p in have]
+
+def matte_need_gb(model, provider=None):
     name = MATTE_MODELS.get(model)
-    return round(MATTE_PEAK_GB[name] + 0.8, 1) if name else 0.5
+    if not name:
+        return 0.5
+    if provider is None:
+        provider = matte_providers()[0]
+    # CUDA and CoreML have not been measured and use the CPU peaks.
+    peaks = MATTE_PEAK_GB['dml' if provider == 'DmlExecutionProvider' else 'cpu']
+    return round(peaks[name] + 0.8, 1)
 
 def avail_gb():
     """Memory the OS can hand out now, in GB (Linux MemAvailable, Windows ullAvailPhys, macOS free + inactive), or None."""
@@ -215,12 +234,12 @@ class Matter:
     """BiRefNet on ONNX Runtime, on the GPU when ONNX Runtime has a provider for it (DirectML, CUDA, CoreML), else the CPU.
     Our own pre and post step instead of rembg's predict(): rembg stretches every frame's matte to its own min and max,
     which makes the matte breathe from frame to frame when the person fills more or less of the shot; here it is the
-    plain sigmoid. Memory settings below keep one frame under 7.5 GB (MATTE_PEAK_GB)."""
+    plain sigmoid. One portrait frame peaked at 7.5 GB on the CPU with the memory settings below."""
     def __init__(self, model='birefnet-portrait'):
         import onnxruntime as ort
+        self.passes = 0
         self.model = MATTE_MODELS[model]
-        have = ort.get_available_providers()
-        prov = [p for p in ('CUDAExecutionProvider', 'DmlExecutionProvider', 'CoreMLExecutionProvider', 'CPUExecutionProvider') if p in have]
+        prov = matte_providers()
         so = ort.SessionOptions()
         so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         # memory: no arena (it kept every activation size ever seen and grew past 15 GB), no memory pattern, and no
@@ -234,6 +253,7 @@ class Matter:
     def provider(self):
         return self.inner_session.get_providers()[0]
     def raw(self, rgb):
+        self.passes += 1
         x = cv2.resize(rgb, (1024, 1024), interpolation=cv2.INTER_AREA).astype(np.float32) / 255
         x = ((x - _MEAN) / _STD).transpose(2, 0, 1)[None]
         o = self.inner_session.run(None, {self.input: np.ascontiguousarray(x)})[0][0, 0]
@@ -248,6 +268,93 @@ def matte_session(model='birefnet'):
     On an Intel Arc B390 through DirectML (earlier measurement through rembg): lite 0.98 s, portrait 1.94 s."""
     return Matter(model)
 
+def person_box(alpha):
+    """Padded person bounds in frame pixels, with the right and bottom ends excluded."""
+    h, w = alpha.shape
+    x, y, bw, bh = cv2.boundingRect((alpha > 0.5).astype(np.uint8))
+    if not bw:
+        return None
+    # Leave 15% on each side for motion. A 16 px floor keeps a small head's hair in view.
+    dx, dy = max(16, round(bw * 0.15)), max(16, round(bh * 0.15))
+    return max(0, x - dx), max(0, y - dy), min(w, x + bw + dx), min(h, y + bh + dy)
+
+def matte_raw_boxed(session, rgb, box=None):
+    """Use the previous frame's box when it still contains the person."""
+    h, w = rgb.shape[:2]
+    whole = None
+    if box is None:
+        whole = session.raw(rgb)
+        box = person_box(whole)
+    for attempt in range(2):
+        if box is None:
+            break
+        x0, y0, x1, y1 = box
+        # The long axis loses the most detail in the model's square.
+        share = (y1 - y0) / h if h >= w else (x1 - x0) / w
+        if share > 1 / 1.25:
+            break
+        crop = session.raw(np.ascontiguousarray(rgb[y0:y1, x0:x1]))
+        x, y, bw, bh = cv2.boundingRect((crop > 0.5).astype(np.uint8))
+        # Three pixels leave room for a soft edge. The frame's own edge is safe.
+        touches = ((x0 > 0 and x < 3) or (y0 > 0 and y < 3) or
+                   (x1 < w and x + bw > x1 - x0 - 3) or (y1 < h and y + bh > y1 - y0 - 3))
+        alpha = np.zeros((h, w), crop.dtype)
+        alpha[y0:y1, x0:x1] = crop
+        padded = person_box(alpha)
+        if bw and not touches:
+            return alpha, padded
+        if attempt:
+            break
+        if whole is None:
+            whole = session.raw(rgb)
+        found = person_box(whole)
+        if not bw:
+            box = found  # The person may have moved entirely clear of the old crop.
+        else:
+            boxes = [box, padded] + ([found] if found else [])
+            left, top, right, bottom = zip(*boxes)
+            box = min(left), min(top), max(right), max(bottom)
+    if whole is None:
+        whole = session.raw(rgb)
+    return whole, person_box(whole)
+
 def matte_raw(session, rgb):
     """Float 0..1 matte for one RGB frame, at the frame's size, before any cleanup."""
-    return session.raw(rgb)
+    return matte_raw_boxed(session, rgb)[0]
+
+def room_patches(frames, alphas):
+    """Inspect one window at 270 x 480. RGB is uint8. Alpha is float 0..1 or uint8 0..255.
+    Return frame indices, boxes in frame fractions and areas in analysis pixels."""
+    if len(frames) < 5:
+        return []
+    h, w = alphas[0].shape
+    plate = np.zeros((h, w, 3), np.float32)
+    seen = np.zeros((h, w), np.int32)
+    low = np.full((h, w, 3), 255, np.uint8)
+    high = np.zeros_like(low)
+    scale = 255 if alphas[0].dtype == np.uint8 else 1
+    for rgb, alpha in zip(frames, alphas):
+        clear = cv2.erode((alpha < 0.05 * scale).astype(np.uint8), K3).astype(bool)
+        seen += clear
+        plate += rgb * clear[..., None]
+        np.minimum(low, rgb, out=low, where=clear[..., None])
+        np.maximum(high, rgb, out=high, where=clear[..., None])
+    # A single clear view from a different shot can spoil the mean. Check the full range in each channel.
+    valid = (seen >= 5) & ((high.astype(np.int16) - low).max(axis=2) <= 16)
+    plate /= np.maximum(seen, 1)[..., None]
+    flagged = []
+    for i, (rgb, alpha) in enumerate(zip(frames, alphas)):
+        inside = alpha > 0.5 * scale
+        # Allow small colour shifts from compression. Keep patches touching the silhouette.
+        match = inside & valid & (np.abs(rgb - plate).mean(axis=2) <= 9)
+        n, labels, stats, _ = cv2.connectedComponentsWithStats(match.astype(np.uint8), connectivity=8)
+        edge = cv2.dilate((~inside).astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool)
+        touching = set(np.unique(labels[edge]))
+        patches = []
+        for j in range(1, n):
+            x, y, bw, bh, size = map(int, stats[j])
+            if size >= 96 and j in touching:  # About 1,500 source pixels at 1080 x 1920.
+                patches.append({"box": [x / w, y / h, (x + bw) / w, (y + bh) / h], "size": size})
+        if patches:
+            flagged.append({"frame": i, "patches": patches})
+    return flagged

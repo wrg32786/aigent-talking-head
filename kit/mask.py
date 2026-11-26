@@ -25,6 +25,12 @@
 #   keyframe mattes warped onto them with optical flow and blended by distance; a frame that moved too much for the flow
 #   to be trusted (mean warp error over the person above --max-err) gets its own BiRefNet pass. --key-every 1 runs
 #   BiRefNet on every frame.
+# BiRefNet crops to the person's padded box to keep fine hair visible. Each model frame passes its box to the next.
+# A person who reaches a crop edge gets a fresh whole-frame check. Something that enters the frame outside the box,
+# and never touches it, is first seen at the start of the next window.
+#
+# The room check sees only frames inside title windows. A spot covered for the whole window has no background plate.
+# Dark clothing can match a dark room, so a match is a note for review.
 # - Cache: every BiRefNet matte is saved under --cache (default build/maskcache/<model>/), keyed by a hash of the frame's
 #   pixels and the model, so a rebuild with new captions, titles or windows reuses every frame it already did.
 # Then kit/mask_refine.py: hole fill, speck removal, guided edge refine, flow-guided temporal smoothing plus an EMA on
@@ -37,7 +43,7 @@
 #   CLI --model and MASK_MODEL override. --no-mask on npm run reel skips this step.
 # - Writes mask.json next to the mask: per window, frames, share of frames with a person, mean coverage, and the
 #   mean alpha in the title band, plus the backend, seconds per BiRefNet frame, keyframes, cache hits and wall time.
-# - Memory: BiRefNet needs about 8.8 GB free (8.0 GB peak for a whole run, 7.5 GB for one frame, kit/mask_refine.py MATTE_PEAK_GB). With less, the
+# - Memory: the portrait mask needs about 8.8 GB free on CPU and 25.8 GB on DirectML. With less, the
 #   default falls back to the MediaPipe preview with a warning; an explicit --model exits with code 3 and says how to get
 #   out (titles in front, or --mask mediapipe). MASK_FORCE=1 tries anyway.
 #   Judge quality on composited stills, by eye.
@@ -115,9 +121,11 @@ def resolve_model(requested, allow_download):
             raise SystemExit(f"{want} weights are not cached and downloads are off (--no-download or MASK_NODL). Run: npm run effects:setup -- --birefnet")
         return "mediapipe", f"{want} weights are not cached and downloads are off, so this mask is the MediaPipe preview. Run: npm run effects:setup -- --birefnet"
     # memory (Will's Windows session, 2026-11-19: a BiRefNet mask was killed with 10 to 12 GB free): check before loading
-    need, free = R.matte_need_gb(want), R.avail_gb()
+    provider = R.matte_providers()[0]
+    need, free = R.matte_need_gb(want, provider), R.avail_gb()
     if free is not None and free < need and os.environ.get("MASK_FORCE") not in ("1", "true"):
-        msg = (f"not enough free memory for the {want} mask: it needs about {need:.1f} GB and {free:.1f} GB is free. "
+        where = "on DirectML (the graphics chip) " if provider == "DmlExecutionProvider" else ""
+        msg = (f"not enough free memory for the {want} mask: {where}it needs about {need:.1f} GB and {free:.1f} GB is free. "
                "Close other apps, or put the titles in front (--no-mask, or Title layer: front), or use the lighter mask (--mask mediapipe). "
                "MASK_FORCE=1 tries anyway.")
         if requested:
@@ -171,8 +179,8 @@ if model == "mediapipe":
         fb = next((m for m in ("birefnet-portrait", "birefnet-lite") if have_rembg() and R.cached_weights(m)), None)
         if not fb:
             raise SystemExit(f"MediaPipe could not load ({e}). Run: npm run effects:setup -- --birefnet")
-        print(f"note: MediaPipe could not load ({e}); using {fb} instead", flush=True)
-        model = fb
+        model, _ = resolve_model(fb, allow_dl)
+        print(f"note: MediaPipe could not load ({e}); using {model} instead", flush=True)
 if model != "mediapipe":
     t_load = time.time()
     matter = R.matte_session(model)
@@ -182,20 +190,27 @@ cache_dir = os.path.join(a.cache, R.MATTE_MODELS.get(model, model)) if (a.cache 
 if cache_dir:
     os.makedirs(cache_dir, exist_ok=True)
 KEY = max(1, a.key_every) if model != "mediapipe" else 1
-perf = {"infer": 0, "infer_s": 0.0, "cache": 0, "flow": 0, "flow_fallback": 0}
+perf = {"infer": 0, "extra_passes": 0, "infer_s": 0.0, "cache": 0, "flow": 0, "flow_fallback": 0}
+next_box = None
 
 def birefnet(rgb, buf):
     """Raw matte for one frame: from the cache, else BiRefNet (then cached)."""
+    global next_box
     h = None
     if cache_dir:
-        h = hashlib.sha1(buf).hexdigest()
+        h = "boxed-v1-" + hashlib.sha1(buf).hexdigest()
         f = os.path.join(cache_dir, h + ".png")
         if os.path.exists(f):
             m = cv2.imread(f, cv2.IMREAD_UNCHANGED)
             if m is not None and m.shape == (OH, OW):
                 perf["cache"] += 1
-                return m.astype(np.float32) / (65535 if m.dtype == np.uint16 else 255)
-    t = time.time(); raw = matter.raw(rgb); perf["infer_s"] += time.time() - t; perf["infer"] += 1
+                raw = m.astype(np.float32) / (65535 if m.dtype == np.uint16 else 255)
+                next_box = R.person_box(raw)
+                return raw
+    t = time.time(); passes = matter.passes
+    raw, next_box = R.matte_raw_boxed(matter, rgb, next_box)
+    perf["infer_s"] += time.time() - t; perf["infer"] += 1
+    perf["extra_passes"] += matter.passes - passes - 1
     if cache_dir:
         tmp = os.path.join(cache_dir, h + ".tmp.png")
         cv2.imwrite(tmp, np.clip(raw * 65535 + 0.5, 0, 65535).astype(np.uint16)); os.replace(tmp, os.path.join(cache_dir, h + ".png"))
@@ -229,7 +244,9 @@ if person_path:
 
 zero = np.zeros((OH, OW), np.uint8)
 zero_bgra = np.zeros((OH, OW, 4), np.uint8)
-stats = [{"window": [round(x, 2), round(y, 2)], "frames": 0, "person": 0, "coverage": 0.0, "band": 0.0} for x, y in W]
+stats = [{"window": [round(x, 2), round(y, 2)], "frames": 0, "person": 0, "coverage": 0.0, "band": 0.0,
+          "room": {"frames": 0, "worst": None}} for x, y in W]
+room_frames, room_alphas = [], []
 state = {"prev_a": None, "prev_g": None, "grid": None, "ema": None}
 t0 = time.time()
 
@@ -243,9 +260,28 @@ def emit(raw, rgb, wi):
     s["frames"] += 1; s["person"] += int(on.mean() > 0.02); s["coverage"] += float(on.mean())
     s["band"] += float(mu[int(OH * 0.22):int(OH * 0.36)].mean() / 255)
     enc.stdin.write(mu.tobytes())
+    if (s["frames"] - 1) % room_step(wi) == 0:
+        room_frames.append(cv2.resize(rgb, (270, 480), interpolation=cv2.INTER_AREA))
+        room_alphas.append(cv2.resize(mu, (270, 480), interpolation=cv2.INTER_AREA))
     if penc:
         prgb, pa = R.decontaminate(rgb, alpha)
         penc.stdin.write(np.ascontiguousarray(np.dstack([prgb[..., 2], prgb[..., 1], prgb[..., 0], pa])).tobytes())
+
+def room_step(wi):
+    """Every how many frames the room check keeps one. A long window is thinned to about 240 frames: the model already
+    holds most of the memory, and 240 small frames are about 125 MB."""
+    return max(1, -(-int((W[wi][1] - W[wi][0]) * a.fps + 1) // 240))
+
+def finish_room(wi, end_frame):
+    room = stats[wi]["room"]
+    first, step = end_frame - stats[wi]["frames"], room_step(wi)
+    for hit in R.room_patches(room_frames, room_alphas):
+        room["frames"] += 1
+        patch = max(hit["patches"], key=lambda p: p["size"])
+        if room["worst"] is None or patch["size"] > room["worst"]["size"]:
+            room["worst"] = dict(patch, time=(first + hit["frame"] * step) / a.fps)
+    room_frames.clear()
+    room_alphas.clear()
 
 def win_of(t):
     return next((i for i, (x, y) in enumerate(W) if x <= t <= y), None)
@@ -287,7 +323,8 @@ while True:
             last = pending.pop()  # the window's last frame is always a keyframe
             lk = {"k": last[0], "g": last[3], "a": birefnet(last[1], last[2]) if model != "mediapipe" else None}
             flush(pending, key0, lk, cur_w); emit(lk["a"], last[1], cur_w)
-        pending, key0 = [], None
+        finish_room(cur_w, k)
+        pending, key0, next_box = [], None, None
     if end:
         break
     if wi is None:
@@ -332,11 +369,14 @@ masked = sum(s["frames"] for s in stats)
 meta = {"src": a.src, "frames": written, "size": [OW, OH], "model": model,
         "session": R.MATTE_MODELS.get(model, "selfie_segmenter"), "key_every": KEY,
         "s_per_frame": spf, "masked_frames": masked, "birefnet_frames": perf["infer"], "cached_frames": perf["cache"],
-        "flow_frames": perf["flow"], "flow_fallback": perf["flow_fallback"], "wall_s": wall,
+        "extra_passes": perf["extra_passes"], "flow_frames": perf["flow"], "flow_fallback": perf["flow_fallback"], "wall_s": wall,
         "windows": stats, "clear": clear, "person": person_path, "note": note}
 json.dump(meta, open(os.path.splitext(a.out)[0] + ".json", "w", encoding="utf-8"), indent=1)
 for s in stats:
     print(f"mask {s['window'][0]:.2f}-{s['window'][1]:.2f}s: person in {s['person'] * 100:.0f}% of frames, coverage {s['coverage'] * 100:.1f}%, title band alpha {s['band']:.2f}")
+    if s["room"]["frames"]:
+        worst = s["room"]["worst"]
+        print(f"Room match in {s['room']['frames']} frames. Largest at {worst['time']:.2f}s in box {[round(v, 3) for v in worst['box']]} ({worst['size']} analysis pixels). It may be room kept as part of the person.")
 print(f"wrote {a.out} [{model}: {masked} frames masked, {perf['infer']} {'MediaPipe' if model == 'mediapipe' else 'BiRefNet'} at {spf if spf is not None else 'n/a'} s/frame, {perf['cache']} from the cache, {perf['flow']} by flow; {wall}s]")
 if person_path:
     print("wrote", person_path)

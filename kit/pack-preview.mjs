@@ -42,6 +42,7 @@ export function previewPlan(pack) {
   const titles = st.titles !== false && st.look !== 'classic' && lk.maxTitles !== 0;
   return {
     theme: st.theme || 'aigent', fonts: st.fonts || 'theme', captionStyle: st.captionStyle || 'kinetic',
+    captionOutline: st.captionOutline,
     titleEntrance: titles ? ((lk.titles && lk.titles[0]) || (st.entranceOrder && st.entranceOrder[0]) || 'stagger-rise') : null,
     captionEntrance: lk.captionEntrance || null,
     card: (st.cards === 'auto' && lk.cards !== false) ? ((st.cardPalette && st.cardPalette[0]) || 'olive') : null,
@@ -57,7 +58,7 @@ function overlayDoc(pl) {
   if (pl.titleEntrance) flips.push({ start: 0.15, end: 1.3, text: 'Make it yours', mode: 7, hero: [2], entrance: pl.titleEntrance, flicker: false, layer: 'front' });
   flips.push({ start: capAt, end: A_LEN, text: WORDS.join(' '), mode: 0, words: WORDS.map((w, k) => [+(capAt + 0.05 + k * 0.18).toFixed(2), +(capAt + 0.23 + k * 0.18).toFixed(2), w]), hero: 'record', ...(pl.captionEntrance ? { entrance: pl.captionEntrance } : {}) });
   if (pl.card) flips.push({ start: 2.05, end: 2.6, mode: 8, text: '', bg: pl.card, chapter: '1' });
-  return { captionStyle: pl.captionStyle, layout: false, ...(pl.captionEntrance ? { captionEntrance: pl.captionEntrance } : {}), flips };
+  return { captionStyle: pl.captionStyle, captionOutline: pl.captionOutline, layout: false, ...(pl.captionEntrance ? { captionEntrance: pl.captionEntrance } : {}), flips };
 }
 
 function renderPack(pack, work) {
@@ -98,7 +99,7 @@ function renderPack(pack, work) {
   return { pack: pack.name, plan: pl, webp, png };
 }
 
-export function writePacksDoc(packs = K.list().filter(p => p.shipped)) {
+export function packsDoc(packs = K.shipped()) {
   const lines = [
     '# Style packs',
     '',
@@ -154,7 +155,7 @@ export function writePacksDoc(packs = K.list().filter(p => p.shipped)) {
     '| `format`, `formatVersion` | `aigent-style-pack`, `1`. A breaking change to the format bumps the version, and the kit refuses versions it does not know. |',
     '| `name`, `version`, `label` | The folder name, the pack\'s own semver, and a one-line label. |',
     '| `extends` | A preset in `kit/presets` to start from. |',
-    '| `style` | Any preset key on top: theme, look, captionStyle, fonts, titles, finish, finishPool, transition, glitch, punch, tighten, cards, cardPalette, musicEnergy, bed, sfxMap, sfxCap, titlePlaces, entranceOrder, titleLayer, effectsFavourites, beatSync. |',
+    '| `style` | Any preset key on top: theme, look, captionStyle, captionOutline (`none`, `thin`, `thick`), fonts, titles, finish, finishPool, transition, glitch, punch, tighten, cards, cardPalette, musicEnergy, bed, sfxMap, sfxCap, titlePlaces, entranceOrder, titleLayer, splitPlace (`top` or `frame`, default `top` for split B-roll slots without their own place), effectsFavourites, beatSync. |',
     '| `locks` | Pinned choices: transitions, titles, maxTitles, captionEntrance, graphics `{ allow, deny }`, finishes, cards, sfx, punch. |',
     '| `weights.transitions` | How often each allowed transition comes up, e.g. `{ "crossfade": 3, "dissolve": 1 }`. |',
     '| `preview` | The preview files, `{ "webp": "preview.webp", "png": "preview.png" }`. |',
@@ -164,14 +165,25 @@ export function writePacksDoc(packs = K.list().filter(p => p.shipped)) {
     '',
     'Got a pack worth showing? Open a "Show your reel" issue with the pack folder and a reel made with it.',
     '',
+    'Prefer clicking? [Studio](studio.md) shows the packs as a gallery, turns your picks from its effects menu into locks, and saves them as a new pack.',
+    '',
   );
-  writeFileSync(join(ROOT, 'docs', 'packs.md'), lines.join('\n'));
+  return lines.join('\n');
+}
+
+export function writePacksDoc(packs) {
+  writeFileSync(join(ROOT, 'docs', 'packs.md'), packsDoc(packs));
+}
+
+export function shouldWritePacksDoc(packs, docsOnly) {
+  return docsOnly || packs.some(p => p.shipped); // the gallery lists shipped packs only: a local pack, or one passed by path, never rewrites it
 }
 
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (isMain) {
   const packs = names.length ? names.map(n => { const p = K.load(n); if (!p) { console.error(`No pack ${n}`); process.exit(1); } return p; }) : K.list();
-  if (!argv.includes('--docs-only')) {
+  const docsOnly = argv.includes('--docs-only');
+  if (!docsOnly) {
     if (!existsSync(PRESENTER)) throw new Error('missing ' + PRESENTER);
     const work = mkdtempSync(join(tmpdir(), 'ath-packs-'));
     const made = [];
@@ -184,6 +196,8 @@ if (isMain) {
       }
     } finally { if (!process.env.PACK_PREVIEW_KEEP) rmSync(work, { recursive: true, force: true }); else console.log("kept " + work); }
   }
-  writePacksDoc();
-  console.log('wrote docs/packs.md');
+  if (shouldWritePacksDoc(packs, docsOnly)) {
+    writePacksDoc();
+    console.log('wrote docs/packs.md');
+  }
 }

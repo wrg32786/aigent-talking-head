@@ -637,6 +637,7 @@ if (!flag('rebuild')) {
     {
       const words = S.timeline(segs, build), len = RC.lengthOf(segs);
       BROLL = LOOK ? BS.forLook(LOOK.broll, { len, words, log: console.log }) : BS.forRecreate(refSlots, { k: RECUT && SCALE ? SCALE.k : 1, len, words, refLen: SCALE ? SCALE.ref : null, log: console.log });
+      for (const slot of BROLL) if (slot.kind === 'split') slot.place = BS.placeOf(slot, preset?.splitPlace);
       BROLL = BROLL.filter(x => !x.file || fs.existsSync(x.file) || (console.warn(`b-roll: slot ${x.n}: no file ${x.file}; the slot stays empty`), Object.assign(x, { state: 'needs' }), delete x.file, true));
       if (BROLL.length) {
         gfx.push(...BROLL.filter(x => x.kind === 'panel').map(BS.flipOf));

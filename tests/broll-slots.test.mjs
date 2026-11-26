@@ -101,6 +101,26 @@ try {
     assert.ok(many.some(x => /312|dashboard/i.test(x.line)), 'a number or a thing named first: ' + many.map(x => x.line).join(' | '));
     assert.deepStrictEqual(BS.forLook({ perMin: 0, slots: [] }, { len: LEN, words: WORDS }), [], 'a look with no B-roll adds none');
   });
+  await t('split slots use the top panel by default and keep the chosen place in Studio', async () => {
+    const slot = { n: 1, kind: 'split', start: 0, end: 2, file: 'clip.mp4' };
+    assert.strictEqual(BS.insertOf(slot).place, 'top');
+    const lane = await import('../kit/studio/lane.mjs');
+    for (const [planned, picked, expected] of [[undefined, undefined, 'top'], ['frame', undefined, 'frame'], ['frame', 'top', 'top'], ['top', 'frame', 'frame']]) {
+      const beat = { n: 1, start: 0, seconds: 2, ref: { slot: { ...slot, place: planned } } };
+      const [insert] = lane.inserts({ 1: { clip: 'clip', place: picked } }, [beat], id => ({ id }), () => slot.file);
+      assert.strictEqual(insert.place, expected);
+    }
+    assert.match(BS.brief(slot).shape, /top half/);
+    assert.match(BS.brief({ ...slot, place: 'frame' }).shape, /card/);
+  });
+  await t('only split slots follow the split place: full, panel and pip inserts keep their place', async () => {
+    const insert = kind => BS.insertOf({ n: 1, kind, start: 0, end: 2, file: 'clip.mp4' }).place;
+    assert.deepStrictEqual(['full', 'panel', 'pip'].map(insert), ['full', 'full', 'pip']);
+    const lane = await import('../kit/studio/lane.mjs');
+    const beat = { n: 1, start: 0, seconds: 2, ref: { slot: { n: 1, kind: 'panel', start: 0, end: 2 } } };
+    const [unplaced] = lane.inserts({ 1: { clip: 'clip' } }, [beat], id => ({ id }), () => 'clip.mp4');
+    assert.strictEqual(unplaced.place, 'full');
+  });
   await t('drawing: a panel is a screen card with the slot effects, a full slot an insert; a panel never sits on the face', () => {
     const p = PLAN.broll[1], f = BS.flipOf(p);
     assert.deepStrictEqual([f.mode, f.slot, f.enter, f.exit, f.glitch, f.border, !!f.need, f.src], [11, 2, 'pop', 'slide-down', true, '#d87b5b', true, undefined]); assert.ok(/^1 \.5 \.5; 1\.15/.test(f.cam));
