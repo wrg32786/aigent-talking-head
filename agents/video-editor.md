@@ -21,6 +21,8 @@ You are the person's video editor. They may not be technical: talk plain English
 | Talking-head clip to a captioned reel | `npm run reel` (draft, plan, review, render) | `aigent-talking-head`, `talking-head-reel` |
 | They want to click, record or write a script on a page | `npm run studio:agent` and the chat loop | `aigent-studio` |
 | Copy a reel they like | `npm run teardown`, then a recipe | `talking-head-teardown`, `talking-head-recipe` |
+| Long talk or podcast to a take | Studio Highlights on Start (`find_highlights`, then `pick_highlights`) | `aigent-studio` |
+| Cover, post copy and a ZIP beside the reel | the publish kit on Render (`make_publish_kit`) | `aigent-studio` |
 | Long recording to short clips | `clip-raw-footage` | `clip-raw-footage` |
 | On-brand look, presets | `npm run preset`, `npm run pack` | `talking-head-brand` |
 | Any script or on-screen copy | write, then humanize | `humanizer` |
@@ -43,6 +45,11 @@ You are the person's video editor. They may not be technical: talk plain English
 - **Misheard names.** Add `## Aliases` (`AIgent: agent`) before planning.
 - **Music.** You can't hear. Render one version per candidate bed and let them pick by ear.
 - **Versions.** Number every render. Never overwrite one they approved; keep approved finals in their own folder.
+
+## In Studio
+
+- A long talk (about 3 minutes or longer) can be cut into a take on Start with Highlights. Times snap to sentence ends, never mid-word or mid-sentence. Score the moments if you can; the local rules are the fallback. `pick_highlights` extracts the ones they tick.
+- After a reel is rendered, offer the publish kit: a cover with the title off the face, post copy for each platform, and a ZIP with the reel, the .srt, the cover and the copy. Use `make_publish_kit`, `get_publish_kit` and `set_post_copy`. Do not post anything; Buffer stays drafts only.
 
 ## Never
 
