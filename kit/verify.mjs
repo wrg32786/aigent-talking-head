@@ -12,20 +12,20 @@
 //   caption or title that sits on another one fails (the layout pass in overlay.html moves or hides captions and titles).
 //   ffprobe: 1080x1920, the frame rate, H.264 + AAC at 48 kHz, duration = the cut's length.
 //   Loudness: integrated LUFS and true peak (target -14 LUFS, peak <= -1 dBTP).
-//   Picture, measured (kit/picturecheck.cjs): a frozen picture or black frames outside what the edit does on purpose FAIL;
-//   flicker, clipping, a soft picture and the cut count are notes. When these numbers and a read of the stills disagree
+//   Picture: more than three luminance or red flashes in any second fails, including across effects (WCAG 2.3.1).
+//   Freeze and black outside planned holds and dips fail. Flicker, clipping, blur and cut count are notes. When the measurements and stills disagree
 //   about motion, a freeze or black, the numbers win.
 //   Joins (kit/joins.cjs): every cut as a pair of frames; a cut that hardly changes the picture or a colour jump the plan
 //   does not declare is a note with both stills (verify/join-*.png, joins.json), never a FAIL.
 //   Titles: every frame from two before a title's start to five after, and the same at its end, read from the drawn text
 //   layer (build/ovl): no caption word in the bar while a title is up, none of its own words in the bar outside it.
-//   Mask (when cut.json has one): alpha measured from the mask file at each title, never judged by eye.
+//   Mask: measure alpha at each title. A patch that matches the room gets a note and a still for review.
 //   Copy lint: the same check as `npm run check`.
 // Exit 1 on any failure. Then READ every still: titles readable and behind the head only, pills legible, punch frames
 // framed, end card clean. A probe proves the file is right; your eye on the stills proves it looks right.
 import { execFileSync, spawnSync } from 'child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync, statSync } from 'fs';
-import { join, resolve, dirname, basename } from 'path';
+import { join, resolve, dirname, basename, parse } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 const R = createRequire(import.meta.url)('./rules.cjs');
@@ -87,7 +87,7 @@ else {
   ok(Number.isNaN(TP) || TP <= -0.5, `true peak ${Number.isNaN(TP) ? '?' : TP.toFixed(1)} dBTP (<= -1 target)`);
 }
 
-// 2b. picture, measured: freeze and black FAIL outside what the edit does on purpose; the rest are notes
+// 2b. Flash counts cover the whole reel. Freeze and black have planned exceptions.
 { const pj = PIC.judge(PIC.measure(file, dur), PIC.exempt(C, CAP), { fxPass: /^reel-fx-/.test(basename(file)) });
   pj.fails.forEach(m => ok(false, m)); pj.oks.forEach(m => ok(true, m)); pj.notes.forEach(m => notes.push(m)); }
 
@@ -204,6 +204,22 @@ if (C.titles && mask.file) {
   if (!existsSync(mf)) notes.push(`no mask file (${mask.file}): titles are in front of the speaker. npm run effects:setup, then rebuild.`);
   else {
     if (mask.model) lines.push(`ok    mask model ${mask.model}`);
+    const { dir, name } = parse(mf), sidecar = join(dir, name + '.json');
+    if (existsSync(sidecar)) {
+      let windows = [];
+      try { windows = JSON.parse(readFileSync(sidecar, 'utf8')).windows || []; }
+      catch { notes.push('Could not read the room check from the mask report.'); }
+      for (const [i, w] of windows.entries()) {
+        const patch = w.room?.worst;
+        if (!patch || patch.time >= dur) continue;
+        const t = patch.time, label = 'possible room in the matte', png = join(vdir, `mask-room-${i + 1}.png`);
+        const msg = `At ${t.toFixed(2)} s, box [${patch.box.map(x => x.toFixed(3)).join(', ')}] may be room kept as part of the person or clothing in shadow.`;
+        const frame = spawnSync('ffmpeg', ['-v', 'error', '-ss', String(Math.max(0, t - 0.005)), '-i', file, '-frames:v', '1', '-vf', `scale=${SW}:${SH}`, png]);
+        const saved = frame.status === 0 && existsSync(png);
+        if (saved) stills.push({ t, label, file: png });
+        notes.push(msg + (saved ? ` Look at the still ${basename(png)}.` : ' The still could not be saved. Check this frame in the reel.') + ' In cut.json, "maskClear" takes a box out.');
+      }
+    }
     for (const t of titles) {
     const tm = Math.min(t.start + R.TITLE_ENTER + 0.2, t.end - 0.05);
     const buf = execFileSync('ffmpeg', ['-v', 'error', '-ss', tm.toFixed(3), '-i', mf, '-frames:v', '1', '-vf', 'scale=270:480', '-f', 'rawvideo', '-pix_fmt', 'gray', '-']);

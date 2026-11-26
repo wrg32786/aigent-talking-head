@@ -627,6 +627,13 @@ try {
     const py = process.env.PYTHON || (process.platform === 'win32' ? 'py' : 'python3');
     run(py, [join(dirname(KIT), 'tests', 'test_clip.py')], work);
   });
+  step('flash count on painted frames and finished clips', () => run(node, [join(dirname(KIT), 'tests', 'flash-count.test.cjs')], work));
+  for (const file of ['test_matte_crop.py', 'test_matte_room.py']) {
+    step(file, () => {
+      const py = process.env.PYTHON || (existsSync(fxPy) ? fxPy : process.platform === 'win32' ? 'py' : 'python3');
+      run(py, [join(dirname(KIT), 'tests', file)], work);
+    });
+  }
   step('cut accuracy on synthetic speech (tests/cut-accuracy/synthetic.mjs): 0 mid-word cuts, lead-in >= 60 ms, tail >= 120 ms on every path', () => {
     const py = process.env.PYTHON || (process.platform === 'win32' ? 'py' : 'python3');
     run(node, [join(dirname(KIT), 'tests', 'cut-accuracy', 'synthetic.mjs')], dirname(KIT), { PYTHON: py });
