@@ -4,3 +4,4 @@
 /.github export-ignore
 # The recipe parser expects LF after fenced-block openers.
 /examples/recipes/*.Reel.md text eol=lf
+/docs/packs.md text eol=lf

@@ -91,6 +91,18 @@
             "one-word"
           ]
         },
+        "splitPlace": {
+          "enum": ["top", "frame"],
+          "default": "top",
+          "description": "The layout for split B-roll slots without an explicit place."
+        },
+        "captionOutline": {
+          "enum": [
+            "none",
+            "thin",
+            "thick"
+          ]
+        },
         "fonts": {
           "type": "string"
         },

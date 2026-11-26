@@ -110,7 +110,7 @@ packs/local/my-look/
 | `format`, `formatVersion` | `aigent-style-pack`, `1`. A breaking change to the format bumps the version, and the kit refuses versions it does not know. |
 | `name`, `version`, `label` | The folder name, the pack's own semver, and a one-line label. |
 | `extends` | A preset in `kit/presets` to start from. |
-| `style` | Any preset key on top: theme, look, captionStyle, fonts, titles, finish, finishPool, transition, glitch, punch, tighten, cards, cardPalette, musicEnergy, bed, sfxMap, sfxCap, titlePlaces, entranceOrder, titleLayer, effectsFavourites, beatSync. |
+| `style` | Any preset key on top: theme, look, captionStyle, captionOutline (`none`, `thin`, `thick`), fonts, titles, finish, finishPool, transition, glitch, punch, tighten, cards, cardPalette, musicEnergy, bed, sfxMap, sfxCap, titlePlaces, entranceOrder, titleLayer, splitPlace (`top` or `frame`, default `top` for split B-roll slots without their own place), effectsFavourites, beatSync. |
 | `locks` | Pinned choices: transitions, titles, maxTitles, captionEntrance, graphics `{ allow, deny }`, finishes, cards, sfx, punch. |
 | `weights.transitions` | How often each allowed transition comes up, e.g. `{ "crossfade": 3, "dissolve": 1 }`. |
 | `preview` | The preview files, `{ "webp": "preview.webp", "png": "preview.png" }`. |
