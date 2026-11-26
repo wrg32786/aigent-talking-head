@@ -222,7 +222,7 @@ export function applyPatch(s, p, cat = catalog(), { nested = false } = {}) {
   if (p.videoPlan !== undefined) {
     if (p.videoPlan === null) { if (s.videoPlan) { s.videoPlan = null; s.titles = 'auto'; log.push('no builder plan'); } }
     else { const v = VP.validate(p.videoPlan, cat); if (!v.ok) return { errs: v.errs, log, noop: false };
-      const { videoPlan, ...rest } = p; p = { ...VP.toState(videoPlan, cat), ...rest }; s.videoPlan = VP.normalize(videoPlan); log.push('builder plan set'); }
+      const { videoPlan, ...rest } = p; const next = VP.adoptBreakout(s.videoPlan, videoPlan); p = { ...VP.toState(next, cat), ...rest }; s.videoPlan = next; log.push('builder plan set'); }
   }
   const touches = !nested && SETTLE_KEYS.some(k => p[k] !== undefined), before = touches ? lookSnap(s) : null;
   let switched = '';

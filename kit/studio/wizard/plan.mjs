@@ -68,12 +68,17 @@ function rawNormalize(p) {
   return merge(blank(), isObj(p) ? p : {});
 }
 export function normalize(p) {
-  const out = rawNormalize(p);
-  // an explicit presenter list without Frame breakout, on a repo-feature plan, means it was turned off
-  if (isObj(p) && Object.hasOwn(p, 'presenter') && out.content.repoFeature && !(out.presenter || []).some(x => x.id === 'frame-breakout') && !out.touched.includes(BREAKOUT_OFF)) {
-    out.touched = [...out.touched, BREAKOUT_OFF];
-  }
-  return withRepoBreakout(out);
+  return withRepoBreakout(rawNormalize(p));
+}
+// when a whole plan is applied (set_video_plan, POST /api/video-plan): mark breakout off only if the previous plan
+// had it and this one does not. Otherwise a get-then-set that turns repo mode on still gets the default.
+export function adoptBreakout(prev, next) {
+  const p = rawNormalize(next);
+  const had = !!(prev && (prev.presenter || []).some(x => x && x.id === 'frame-breakout'));
+  const has = p.presenter.some(x => x && x.id === 'frame-breakout');
+  if (has) p.touched = p.touched.filter(k => k !== BREAKOUT_OFF);
+  else if (had && !p.touched.includes(BREAKOUT_OFF)) p.touched.push(BREAKOUT_OFF);
+  return withRepoBreakout(p);
 }
 function shapeErrs(p, base = blank(), path = '') {
   const errs = [];
@@ -175,10 +180,10 @@ export function withPart(plan, part, value) {
   const extra = part === 'transitions' && value && 'when' in value ? ['transitions.when'] : part === 'filters' && value && 'when' in value ? ['filters.when']
     : part === 'music' && value ? ['energy', 'beatSync'].filter(k => k in value).map(k => 'music.' + k) : [];
   if (part === 'presenter') {
-    const on = p.presenter.some(x => x.id === 'frame-breakout'), was = before.presenter.some(x => x.id === 'frame-breakout');
+    const on = p.presenter.some(x => x && x.id === 'frame-breakout'), was = before.presenter.some(x => x && x.id === 'frame-breakout');
     if (on) {
       p.touched = p.touched.filter(k => k !== BREAKOUT_OFF);
-      p.presenter = p.presenter.map(x => { if (x.id !== 'frame-breakout' || !x.auto) return x; const { auto, ...rest } = x; return rest; });
+      if (!was) p.presenter = p.presenter.map(x => { if (!x || x.id !== 'frame-breakout' || !x.auto) return x; const { auto, ...rest } = x; return rest; });
     } else if (was || p.content.repoFeature) { if (!p.touched.includes(BREAKOUT_OFF)) p.touched.push(BREAKOUT_OFF); }
   }
   return touch(withRepoBreakout(p), ...extra, part);
@@ -189,11 +194,11 @@ export const BREAKOUT_OFF = 'presenter.frame-breakout';
 export function withRepoBreakout(plan) {
   const p = clone(plan);
   if (!p.content || !Array.isArray(p.presenter)) return p;
-  const has = p.presenter.some(x => x.id === 'frame-breakout');
+  const has = p.presenter.some(x => x && x.id === 'frame-breakout');
   if (p.content.repoFeature && !has && !p.touched.includes(BREAKOUT_OFF)) {
     p.presenter = [...p.presenter, { id: 'frame-breakout', when: 'whole', auto: true }];
   }
-  if (!p.content.repoFeature) p.presenter = p.presenter.filter(x => !(x.id === 'frame-breakout' && x.auto));
+  if (!p.content.repoFeature) p.presenter = p.presenter.filter(x => !(x && x.id === 'frame-breakout' && x.auto));
   return p;
 }
 // mark a field as yours, so a later pace change leaves it alone
@@ -313,7 +318,7 @@ export function pending(plan) {
   if (w.colors.text || w.colors.accent || w.colors.outline) add('words.colors', 'Your own text colors');
   if (w.keyWords.level !== 'off' && (w.keyWords.color !== 'accent' || w.keyWords.maxPerLine !== 1)) add('words.keyWords', 'Key word color and how many per line');
   for (const x of p.presenter) {
-    if (x.id === 'frame-breakout' && !p.content.repoFeature) add('presenter.frame-breakout', 'Frame breakout');
+    if (x && x.id === 'frame-breakout' && !p.content.repoFeature) add('presenter.frame-breakout', 'Frame breakout');
   }
   return out.filter((x, i, a) => a.findIndex(y => y.field === x.field) === i);
 }

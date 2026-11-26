@@ -76,7 +76,7 @@ The user can film takes on the Start step (Record now). A saved take is already 
 
 ## Wizards
 
-The Wizards dialog is gone (the page asks one thing per screen in the builder now). `run_wizard` still runs the guided starts, and a `goal` also sets the plan's pace and a line in Your notes: `{ wizard: reel, goal: grow | sell | teach | clean, look, choose: true }` (any of them, in one call or one at a time), `{ wizard: clips, clips, ads }` (finds them on whole words), `{ wizard: reference, url }` (Recreate). When the user asks you to choose for them, make the choice with `run_wizard` or `set_video_plan`, or suggest it with `studio_reply suggest`. If they turn on repo feature mode, Frame breakout is on by default. Leave it in `presenter` unless they ask you to turn it off (an explicit presenter list without it, or `touched` including `presenter.frame-breakout`, keeps it off).
+The Wizards dialog is gone (the page asks one thing per screen in the builder now). `run_wizard` still runs the guided starts, and a `goal` also sets the plan's pace and a line in Your notes: `{ wizard: reel, goal: grow | sell | teach | clean, look, choose: true }` (any of them, in one call or one at a time), `{ wizard: clips, clips, ads }` (finds them on whole words), `{ wizard: reference, url }` (Recreate). When the user asks you to choose for them, make the choice with `run_wizard` or `set_video_plan`, or suggest it with `studio_reply suggest`. If they turn on repo feature mode, Frame breakout is on by default. You can turn repo mode on and send back the plan you just read; breakout is added for you. To turn it off, drop it from `presenter` after it was on, or put `presenter.frame-breakout` in `touched`.
 
 ## The plan check (after a draft or a render)
 

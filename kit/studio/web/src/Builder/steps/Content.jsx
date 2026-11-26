@@ -32,6 +32,7 @@ export function Content({ plan, save, busy }) {
   const saveExample = () => { const v = example.trim(); const bad = !!v && !LINK.test(v); setExBad(bad); if (!bad && v !== (c.example || '')) save({ example: v || null }); };
   const enter = f => e => { if (e.key === 'Enter') { e.preventDefault(); f(); } };
   const breakout = (plan.presenter || []).some(x => x.id === 'frame-breakout');
+  const showOff = !breakout && (c.repoFeature || (plan.touched || []).includes('presenter.frame-breakout'));
   return <>
     <Toggle id="build-repo-on" checked={on} disabled={busy} onChange={flip}>This video features a GitHub repo or tool</Toggle>
     {on && <>
@@ -51,7 +52,7 @@ export function Content({ plan, save, busy }) {
       <p className="fine" id="build-repo-take-says">{CONTENT_SAYS[c.takeovers === 'off' ? 'off' : 'auto']}</p>
       {breakout
         ? <p className="fine" id="build-repo-breakout">Frame breakout is on (You on screen): the repo sits in a card and your head breaks out over it. Turn it off there if you want.</p>
-        : <p className="fine" id="build-repo-breakout-off">Frame breakout is off. You can turn it on in the You on screen step if you want your head to break out over the repo card.</p>}
+        : showOff && <p className="fine" id="build-repo-breakout-off">Frame breakout is off. You can turn it on in the You on screen step if you want your head to break out over the repo card.</p>}
       <h3 {...stylex.props(s.h)}>Example video (optional)</h3>
       <Field {...stylex.props(s.row)}>
         <Label className="sr">Example video link</Label>
