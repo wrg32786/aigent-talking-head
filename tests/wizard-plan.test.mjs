@@ -196,6 +196,21 @@ try {
     const g = apply(fresh(), { videoPlan: VP.normalize({ graphics: { agent: false } }) }); assert.strictEqual(API.planOf(g, cat).graphics.agent, false);
   });
 
+  await t('repo mode turns Frame breakout on; you can turn it off and it stays off', () => {
+    const plan = VP.normalize({ content: { repoFeature: true, repos: ['https://github.com/wrg32786/aigent-talking-head'] } });
+    assert.ok(plan.presenter.some(x => x.id === 'frame-breakout' && x.when === 'whole'), 'breakout is on for the whole video');
+    const off = VP.withPart(plan, 'presenter', plan.presenter.filter(x => x.id !== 'frame-breakout'));
+    assert.ok(!off.presenter.some(x => x.id === 'frame-breakout'));
+    const still = VP.withPart(off, 'content', { takeovers: 'off' });
+    assert.ok(!still.presenter.some(x => x.id === 'frame-breakout'), 'a later content change does not put it back');
+    const repos = off.content.repos; const again = VP.withPart(VP.withPart(still, 'content', { repoFeature: false, repos: [] }), 'content', { repoFeature: true, repos });
+    assert.ok(again.presenter.some(x => x.id === 'frame-breakout' && x.when === 'whole'), 'turning the mode on again brings it back');
+    const kept = VP.normalize({ content: { repoFeature: true, repos: ['https://github.com/wrg32786/aigent-talking-head'] }, presenter: [{ id: 'punch', when: 'whole' }, { id: 'frame-breakout', when: 'key-moments' }] });
+    assert.strictEqual(kept.presenter.find(x => x.id === 'frame-breakout').when, 'key-moments', 'a when you already set is kept');
+    const custom = VP.normalize({ content: { repoFeature: true, repos: ['https://github.com/wrg32786/aigent-talking-head'] }, presenter: [{ id: 'punch', when: 'whole' }], touched: ['presenter'] });
+    assert.ok(!custom.presenter.some(x => x.id === 'frame-breakout'), 'a plan that already set presenter without it stays off');
+  });
+
   await t('no big titles and no filters reach the reel as locks; none for transitions is straight cuts', () => {
     const s = apply(fresh(), { videoPlan: VP.normalize({ words: { titles: { on: false } }, filters: { ids: [], when: 'whole' }, transitions: { ids: [], when: 'every-cut' } }) });
     const c = C.compose(s);

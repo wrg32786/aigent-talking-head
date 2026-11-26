@@ -58,7 +58,7 @@ Every step screen has the same frame (section 6): a title in plain words, an **A
 | 12 | Extras | **Graphics** (one screen, defaults on "Let the agent choose") | Small graphics over the frame | toggles: Name tag, Numbers and lists, Stickers and callouts, Call to action, Colour and chapter cards | `plan.cjs` proposes graphics from what you say; 30 `graphic` + data effects. Added by us, Will did not list it; it keeps today's graphics from disappearing |
 | 13 | Look | **Filters** | The whole picture | none, or one or more | 10 `finish` values (grain, vignette, chroma, scan-lines, warm, cool, teal, crushed, mono = Black and white, bleach) |
 | 14 | | **When filters show** | Time | Whole video, Hook only, CTA only, Hook and CTA | per-segment `finish` in `cut.json` (`assemble.cjs` line 132) + new section tags (section 8) |
-| 15 | Content style | **Repo or tool feature** (checkbox) | Layout of the whole video | off / on; 1 to 3 GitHub URLs; layout: Split (repo top, you bottom), takeovers auto, frame breakout if picked in step 11 | `capture.mjs` (README screenshot + scroll), `split.cjs` top/frame, person mask. See section 9 |
+| 15 | Content style | **Repo or tool feature** (checkbox) | Layout of the whole video | off / on; 1 to 3 GitHub URLs; layout: Split (repo top, you bottom), takeovers auto, frame breakout on by default (turn off in step 11) | `capture.mjs` (README screenshot + scroll), `split.cjs` top/frame, person mask. See section 9 |
 | 16 | Sound | **Music** (last, as Will asked) | Sound | bed (or none / your own), energy, beat-sync, sound effects on/off | `music.bed`, `music.energy`, `beat-sync`, `sound.sfx`, `sound.cap` |
 | 17 | Finish | **Your notes for the agent** | Anything | free text, plus 4 example chips ("Hook with big red words", "Keep it calm", "No sound effects", "Show the repo early") | New. Stored as `plan.notes`, given to the agent verbatim |
 | 18 | | **Make it** | | `Save as a template` (optional name), `Make my video` | Agent build + frame check loop (section 10), then Review and Render as today |
@@ -247,7 +247,7 @@ Checkbox on step 15. When on:
 **Layout.**
 - Default: **Split**, repo on top, you on the bottom (`split.cjs` `"top"`, with the person mask so your head sits over the panel edge).
 - **Takeovers**: full-screen repo when you point at a feature ("look at this", "here", "this part", or a line that names the matched heading) and full-screen you on the hook, the punch lines and the CTA. `takeovers: auto | off`.
-- **Frame breakout** (`split.cjs` `"frame"`, head breaking out of the card) if picked in step 11.
+- **Frame breakout** (`split.cjs` `"frame"`, head breaking out of the card) is on by default in repo mode (the whole video). Turn it off in step 11 if you want the plain split instead.
 - Captions move into the seam band (`capY` in `split.cjs`), never on the face, never on the repo's key text.
 
 ## 10. The agent: build, then check frame by frame

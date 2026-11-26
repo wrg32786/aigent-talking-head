@@ -168,6 +168,8 @@ try {
     await pg.waitForSelector('#build-repo-0-err'); assert.strictEqual((await api('/api/video-plan')).plan.content.repoFeature, false, 'a bad link is never saved');
     await pg.fill('#build-repo-0', 'https://github.com/wrg32786/aigent-talking-head'); await pg.click('#build-repo-layout');
     await pg.waitForFunction(async () => (await (await fetch('/api/video-plan')).json()).plan.content.repoFeature === true);
+    assert.ok((await api('/api/video-plan')).plan.presenter.some(x => x.id === 'frame-breakout'), 'Frame breakout is on by default in repo mode');
+    await pg.waitForSelector('#build-repo-breakout');
     await pg.click('#build-repo-take [data-opt="off"]'); await pg.waitForFunction(async () => (await (await fetch('/api/video-plan')).json()).plan.content.takeovers === 'off');
     assert.match(await pg.textContent('#build-does'), /Split on every line in the middle/);
     await pg.fill('#build-repo-example', 'not a link'); await pg.press('#build-repo-example', 'Enter'); await pg.waitForSelector('#build-repo-example-err');

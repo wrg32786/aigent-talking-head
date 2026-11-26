@@ -17,11 +17,11 @@ const s = stylex.create({
     backgroundColor: { default: 'transparent', ':is([data-checked])': 'var(--primary)' }, color: { default: 'inherit', ':is([data-checked])': 'var(--primary-foreground, #fff)' } },
   onText: { fontWeight: 700 },
 });
-const OWN = [['behind-head', 'Words behind your head'], ['punch', 'Zoom punch'], ['frame-breakout', 'Frame breakout (coming soon)']];
+const OWN = [['behind-head', 'Words behind your head'], ['punch', 'Zoom punch'], ['frame-breakout', 'Frame breakout']];
 const WHEN = [['hook', 'Hook'], ['key-moments', 'Key moments'], ['whole', 'Whole video']];
 // words behind your head: where it fits (the agent picks the titles), or every title
 const BEHIND = [['key-moments', 'Where it fits'], ['whole', 'Every title']];
-// what each item may be set to (Zoom punch is the whole video for now; frame breakout does not render yet)
+// what each item may be set to (Zoom punch is the whole video for now; frame breakout in repo mode uses the framed cards)
 const optsFor = id => (id === 'punch' || id === 'frame-breakout' ? [] : id === 'behind-head' ? BEHIND : WHEN);
 const nameOf = (id, items) => (OWN.find(o => o[0] === id) || [0, (items.find(x => x.id === id) || {}).name || id])[1];
 
