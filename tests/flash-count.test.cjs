@@ -65,6 +65,39 @@ test('a second at 24 fps excludes the fourth flash', () => {
   assert.equal(pic.flashCount(series, 24).luminance.count, 6);
   assert.equal(pic.flashCount(series, 30).luminance.count, 8);
 });
+// On a strobe an up and a down sit on neighbouring frames. Each one is a transition of its own.
+test('a strobe that flips every frame counts every flip', () => {
+  const white = pic.flashCount(paint(t => t % 2), 30).luminance.count;
+  assert.ok(white >= 29, String(white));
+  const red = pic.flashCount(paint(t => t % 2, 144, true), 30).red.count;
+  assert.ok(red >= 29, String(red));
+});
+// Two halves that swap on every frame: as many cells go up as go down, so the picture has no one direction,
+// yet every cell flashes fifteen times a second.
+test('two halves flipping against each other count as flashing', () => {
+  const series = paint(() => 0);
+  for (let t = 0; t < 60; t++) series[t].y.fill(1, t % 2 ? 0 : 72, t % 2 ? 72 : 144);
+  const { count } = pic.flashCount(series, 30).luminance;
+  assert.ok(count >= 29, String(count));
+});
+test('a fifth of the picture flashing on its own stays under the area', () => {
+  const series = paint(() => 0);
+  for (let t = 0; t < 60; t++) if (t % 2) series[t].y.fill(1, 0, 29);
+  assert.ok(pic.flashCount(series, 30).luminance.count < 5);
+});
+test('a flip every second frame counts every flip', () => {
+  const { count } = pic.flashCount(paint(t => +(t % 4 < 2)), 30).luminance;
+  assert.ok(count >= 14 && count <= 16, String(count));
+});
+test('a swing spread over two frames is one transition', () => {
+  // A fifth of the cells change on one frame and a fifth on the next. Either alone is under the quarter.
+  const series = paint(() => 0);
+  for (let t = 0; t < 60; t++) {
+    if (t >= 10 && t < 40) series[t].y.fill(1, 0, 29);
+    if (t >= 11 && t < 40) series[t].y.fill(1, 29, 58);
+  }
+  assert.equal(pic.flashCount(series, 30).luminance.count, 2);
+});
 test('bright swings and unsaturated red stay below the limit', () => {
   const series = paint(t => +lit(t, 4), 144, true);
   for (const frame of series) {

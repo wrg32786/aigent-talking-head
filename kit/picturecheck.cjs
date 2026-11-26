@@ -58,28 +58,35 @@ function flashChannel(series, times, channel) {
   const n = series.length, cells = series[0][channel].length;
   const up = new Uint16Array(n + 1), down = new Uint16Array(n + 1);
   const red = channel === 'r', threshold = red ? T.redSwing : T.lumSwing;
+  const own = []; // each cell's own transitions: the frame, negative for a swing down
   for (let i = 0; i < cells; i++) {
     if (red && !series.some(f => f.s[i] >= T.saturated)) continue;
     let lo = series[0][channel][i], hi = lo, dir = 0;
+    const mine = [];
     for (let t = 1; t < n; t++) {
       const v = series[t][channel][i];
       if (dir !== 1 && v - lo >= threshold) {
-        if (red || lo < T.darker) up[t]++;
+        if (red || lo < T.darker) { up[t]++; mine.push(t); }
         dir = 1; hi = v;
       } else if (dir !== -1 && hi - v >= threshold) {
-        if (red || v < T.darker) down[t]++;
+        if (red || v < T.darker) { down[t]++; mine.push(-t); }
         dir = -1; lo = v;
       }
       lo = Math.min(lo, v); hi = Math.max(hi, v);
     }
+    if (mine.length) own.push(mine);
   }
-  // Read a frame with its successor for swings that take two frames. Spend that pair once.
+  // One transition a frame at most, in the direction more cells took, so a cut that brightens one part and darkens
+  // another is one transition. A swing can take two frames: cells that swung on the frame before, and were too few
+  // to count, are added once. A frame never borrows from the one after it. That pairing spent the down of a strobe
+  // with its up, and fifteen flashes a second read as one transition.
   const hits = [], need = cells * T.flashArea;
+  let carryUp = 0, carryDown = 0;
   for (let t = 1; t < n; t++) {
-    const u = up[t] + up[t + 1], d = down[t] + down[t + 1];
-    if (Math.max(u, d) < need) continue;
+    const u = up[t] + carryUp, d = down[t] + carryDown;
+    if (Math.max(u, d) < need) { carryUp = up[t]; carryDown = down[t]; continue; }
     hits.push({ t: times[t], dir: u >= d ? 1 : -1 });
-    t++;
+    carryUp = carryDown = 0;
   }
   // Slide a half-open second over the hits. Keep one count per run of the same direction.
   let count = 0, best = 0, time = 0, left = 0;
@@ -90,6 +97,23 @@ function flashChannel(series, times, channel) {
       left++;
     }
     if (count > best) { best = count; time = hits[left].t / 1000000; }
+  }
+  // The same count for each cell alone, over the second that starts on each frame. A quarter of the cells flashing
+  // through one second counts whichever way each cell goes: two halves that flip against each other have no one
+  // direction as a picture, and every cell of them flashes.
+  const per = own.map(mine => {
+    const run = [0]; // goes up by one each time the cell's direction changes
+    for (let k = 1; k < mine.length; k++) run.push(run[k - 1] + (mine[k] > 0 !== mine[k - 1] > 0 ? 1 : 0));
+    return { at: mine.map(Math.abs), run, a: 0, z: 0 };
+  });
+  const kth = Math.ceil(need) - 1;
+  if (per.length > kth) for (let f = 1; f < n; f++) {
+    const inSecond = per.map(c => {
+      while (c.a < c.at.length && c.at[c.a] < f) c.a++;
+      while (c.z < c.at.length && times[c.at[c.z]] < times[f] + 1000000) c.z++;
+      return c.z > c.a ? c.run[c.z - 1] - c.run[c.a] + 1 : 0;
+    }).sort((x, y) => y - x);
+    if (inSecond[kth] > best) { best = inSecond[kth]; time = times[f] / 1000000; }
   }
   return { count: best, time };
 }
