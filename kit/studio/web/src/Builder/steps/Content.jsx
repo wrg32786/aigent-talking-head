@@ -50,8 +50,8 @@ export function Content({ plan, save, busy }) {
       <Tiles id="build-repo-take" label="Full screen moments" items={TAKE} value={c.takeovers} disabled={busy || !good.length} onChange={takeovers => save({ takeovers })} />
       <p className="fine" id="build-repo-take-says">{CONTENT_SAYS[c.takeovers === 'off' ? 'off' : 'auto']}</p>
       {breakout
-        ? <p className="fine" id="build-repo-breakout">Frame breakout is on by default here (You on screen): the repo sits in a card and your head breaks out over it. Turn it off there if you want.</p>
-        : <p className="fine" id="build-repo-breakout-off">Frame breakout is off. Turn it on on You on screen if you want your head to break out over the repo card.</p>}
+        ? <p className="fine" id="build-repo-breakout">Frame breakout is on (You on screen): the repo sits in a card and your head breaks out over it. Turn it off there if you want.</p>
+        : <p className="fine" id="build-repo-breakout-off">Frame breakout is off. You can turn it on in the You on screen step if you want your head to break out over the repo card.</p>}
       <h3 {...stylex.props(s.h)}>Example video (optional)</h3>
       <Field {...stylex.props(s.row)}>
         <Label className="sr">Example video link</Label>

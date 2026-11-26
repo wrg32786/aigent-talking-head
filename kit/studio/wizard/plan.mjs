@@ -68,8 +68,12 @@ function rawNormalize(p) {
   return merge(blank(), isObj(p) ? p : {});
 }
 export function normalize(p) {
-  // a repo-feature plan that never set presenter gets Frame breakout (withRepoBreakout)
-  return withRepoBreakout(rawNormalize(p), { raw: p });
+  const out = rawNormalize(p);
+  // an explicit presenter list without Frame breakout, on a repo-feature plan, means it was turned off
+  if (isObj(p) && Object.hasOwn(p, 'presenter') && out.content.repoFeature && !(out.presenter || []).some(x => x.id === 'frame-breakout') && !out.touched.includes(BREAKOUT_OFF)) {
+    out.touched = [...out.touched, BREAKOUT_OFF];
+  }
+  return withRepoBreakout(out);
 }
 function shapeErrs(p, base = blank(), path = '') {
   const errs = [];
@@ -170,18 +174,26 @@ export function withPart(plan, part, value) {
   for (const r of Object.keys(p.advanced.picks)) { const i = r.indexOf(':'); if (speaks(r.slice(0, i), r.slice(i + 1))) delete p.advanced.picks[r]; }
   const extra = part === 'transitions' && value && 'when' in value ? ['transitions.when'] : part === 'filters' && value && 'when' in value ? ['filters.when']
     : part === 'music' && value ? ['energy', 'beatSync'].filter(k => k in value).map(k => 'music.' + k) : [];
-  // repo mode turns Frame breakout on (the whole video) unless you already have it, or you just turned it off
-  if (part === 'content' && p.content.repoFeature && !before.content.repoFeature) return touch(withRepoBreakout(p, { chosen: true }), ...extra, part);
-  return touch(p, ...extra, part);
+  if (part === 'presenter') {
+    const on = p.presenter.some(x => x.id === 'frame-breakout'), was = before.presenter.some(x => x.id === 'frame-breakout');
+    if (on) {
+      p.touched = p.touched.filter(k => k !== BREAKOUT_OFF);
+      p.presenter = p.presenter.map(x => { if (x.id !== 'frame-breakout' || !x.auto) return x; const { auto, ...rest } = x; return rest; });
+    } else if (was || p.content.repoFeature) { if (!p.touched.includes(BREAKOUT_OFF)) p.touched.push(BREAKOUT_OFF); }
+  }
+  return touch(withRepoBreakout(p), ...extra, part);
 }
-// Frame breakout is on by default when the video features a repo. chosen: the mode was just turned on, so add it even
-// if you already picked other presenter effects. Otherwise a plan that never set presenter also gets it, and one
-// where you took it off (presenter is touched, or the list is given without it) stays off.
-export function withRepoBreakout(plan, { chosen = false, raw = null } = {}) {
+// Frame breakout is on by default when the video features a repo (tagged auto, so turning the mode off takes only
+// that one off). touched "presenter.frame-breakout" means you turned it off: it stays off until you turn it on again.
+export const BREAKOUT_OFF = 'presenter.frame-breakout';
+export function withRepoBreakout(plan) {
   const p = clone(plan);
-  if (!p.content || !p.content.repoFeature || !Array.isArray(p.presenter) || p.presenter.some(x => x.id === 'frame-breakout')) return p;
-  if (!chosen && p.touched.includes('presenter')) return p;
-  p.presenter = [...p.presenter, { id: 'frame-breakout', when: 'whole' }];
+  if (!p.content || !Array.isArray(p.presenter)) return p;
+  const has = p.presenter.some(x => x.id === 'frame-breakout');
+  if (p.content.repoFeature && !has && !p.touched.includes(BREAKOUT_OFF)) {
+    p.presenter = [...p.presenter, { id: 'frame-breakout', when: 'whole', auto: true }];
+  }
+  if (!p.content.repoFeature) p.presenter = p.presenter.filter(x => !(x.id === 'frame-breakout' && x.auto));
   return p;
 }
 // mark a field as yours, so a later pace change leaves it alone

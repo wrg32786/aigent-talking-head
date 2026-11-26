@@ -197,18 +197,36 @@ try {
   });
 
   await t('repo mode turns Frame breakout on; you can turn it off and it stays off', () => {
-    const plan = VP.normalize({ content: { repoFeature: true, repos: ['https://github.com/wrg32786/aigent-talking-head'] } });
-    assert.ok(plan.presenter.some(x => x.id === 'frame-breakout' && x.when === 'whole'), 'breakout is on for the whole video');
+    const repo = ['https://github.com/wrg32786/aigent-talking-head'];
+    const plan = VP.normalize({ content: { repoFeature: true, repos: repo } });
+    const bo = plan.presenter.find(x => x.id === 'frame-breakout');
+    assert.ok(bo && bo.when === 'whole' && bo.auto, 'breakout is on, marked as the repo default');
     const off = VP.withPart(plan, 'presenter', plan.presenter.filter(x => x.id !== 'frame-breakout'));
     assert.ok(!off.presenter.some(x => x.id === 'frame-breakout'));
+    assert.ok(off.touched.includes(VP.BREAKOUT_OFF));
     const still = VP.withPart(off, 'content', { takeovers: 'off' });
     assert.ok(!still.presenter.some(x => x.id === 'frame-breakout'), 'a later content change does not put it back');
-    const repos = off.content.repos; const again = VP.withPart(VP.withPart(still, 'content', { repoFeature: false, repos: [] }), 'content', { repoFeature: true, repos });
-    assert.ok(again.presenter.some(x => x.id === 'frame-breakout' && x.when === 'whole'), 'turning the mode on again brings it back');
-    const kept = VP.normalize({ content: { repoFeature: true, repos: ['https://github.com/wrg32786/aigent-talking-head'] }, presenter: [{ id: 'punch', when: 'whole' }, { id: 'frame-breakout', when: 'key-moments' }] });
+    // clearing the link turns the mode off, then adding it back must not restore breakout once you turned it off
+    const cleared = VP.withPart(still, 'content', { repoFeature: false, repos: [] });
+    assert.ok(!cleared.presenter.some(x => x.id === 'frame-breakout'));
+    const again = VP.withPart(cleared, 'content', { repoFeature: true, repos: repo });
+    assert.ok(!again.presenter.some(x => x.id === 'frame-breakout'), 'turning the mode on again leaves it off');
+    // an agent posting a plan with presenter listed and no breakout also turns it off
+    const posted = VP.normalize({ content: { repoFeature: true, repos: repo }, presenter: [{ id: 'punch', when: 'whole' }] });
+    assert.ok(!posted.presenter.some(x => x.id === 'frame-breakout') && posted.touched.includes(VP.BREAKOUT_OFF), 'an explicit list without it stays off');
+    const kept = VP.normalize({ content: { repoFeature: true, repos: repo }, presenter: [{ id: 'punch', when: 'whole' }, { id: 'frame-breakout', when: 'key-moments' }] });
     assert.strictEqual(kept.presenter.find(x => x.id === 'frame-breakout').when, 'key-moments', 'a when you already set is kept');
-    const custom = VP.normalize({ content: { repoFeature: true, repos: ['https://github.com/wrg32786/aigent-talking-head'] }, presenter: [{ id: 'punch', when: 'whole' }], touched: ['presenter'] });
-    assert.ok(!custom.presenter.some(x => x.id === 'frame-breakout'), 'a plan that already set presenter without it stays off');
+    // another presenter change does not block the default
+    const zoom = VP.withPart(VP.normalize({}), 'presenter', [{ id: 'punch', when: 'whole' }]);
+    const withRepo = VP.withPart(zoom, 'content', { repoFeature: true, repos: repo });
+    assert.ok(withRepo.presenter.some(x => x.id === 'frame-breakout' && x.auto), 'breakout is still added after you changed zoom');
+    // turning the mode off takes only the automatic one away; one you picked stays
+    const manual = VP.withPart(withRepo, 'presenter', withRepo.presenter);
+    assert.ok(manual.presenter.some(x => x.id === 'frame-breakout' && !x.auto));
+    const closed = VP.withPart(manual, 'content', { repoFeature: false, repos: [] });
+    assert.ok(closed.presenter.some(x => x.id === 'frame-breakout'), 'a breakout you picked stays when the mode goes off');
+    const onlyAuto = VP.withPart(plan, 'content', { repoFeature: false, repos: [] });
+    assert.ok(!onlyAuto.presenter.some(x => x.id === 'frame-breakout'), 'the automatic one goes with the mode');
   });
 
   await t('no big titles and no filters reach the reel as locks; none for transitions is straight cuts', () => {

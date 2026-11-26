@@ -40,7 +40,7 @@ export function Presenter({ CAT, step, plan, save, busy, setHover, V, apply }) {
         <span {...stylex.props(s.name)} id={`build-pw-${x.id.replace(':', '-')}`}>{nameOf(x.id, items)}</span>
         {optsFor(x.id).length ? <RadioGroup value={x.id === 'behind-head' && x.when === 'hook' ? 'key-moments' : x.when} onChange={w => setWhen(x.id, w)} aria-labelledby={`build-pw-${x.id.replace(':', '-')}`} disabled={busy} data-when-for={x.id} {...stylex.props(s.seg)}>
           {optsFor(x.id).map(([id, label]) => <Radio key={id} value={id} data-when={id} {...stylex.props(s.opt)}>{({ checked }) => <span {...stylex.props(checked && s.onText)}>{checked ? <span aria-hidden="true">{'\u2713 '}</span> : ''}{label}</span>}</Radio>)}
-        </RadioGroup> : <span className="fine">{x.id === 'punch' ? 'The whole video' : 'Kept in your plan. It does not show in your video yet.'}</span>}
+        </RadioGroup> : <span className="fine">{x.id === 'punch' ? 'The whole video' : x.id === 'frame-breakout' && plan.content && plan.content.repoFeature ? 'On the repo split shots' : 'Kept in your plan. It does not show in your video yet.'}</span>}
       </div>)}
     </section>}
     {fx && !ready && V && <NeedFix V={V} ids={['effects']} what="The camera and room effects" apply={apply} />}
