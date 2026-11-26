@@ -1,9 +1,9 @@
-// Measured picture checks for npm run verify (1.29.0): a frozen picture, black frames, flicker, clipping, a soft
-// picture and the number of hard cuts, read from the finished reel with ffmpeg filters only (no model, three passes at
-// 540 px wide or less, about 12 s for a 25 s reel; at 270 px a speaker sitting still reads as frozen). What we do on
+// Measured picture checks for npm run verify. Four ffmpeg reads cover freeze, black, flicker, clipping, blur, cuts
+// and flashes. The flash count covers every frame, including effects. More than three luminance or red flashes
+// in any second fails (WCAG 2.3.1). At 270 px a speaker sitting still reads as frozen. What we do on
 // purpose is exempt, from cut.json and captions.js: the fade in, dips to black, cards and inserts (which may hold still
 // or be dark), the tail hold, a padded segment, and the frames round every seam and hit.
-// Freeze and black outside those are FAIL lines; the rest are notes until the numbers are tuned on our own reels.
+// Freeze and black outside those windows also fail.
 // When these numbers and a read of the stills disagree about motion, a freeze or black, the numbers win.
 // idea and starting thresholds from mojomast/open-higgsfield-skills skills/shot-qc (MIT); cut-count rule from HyperKut-Studio export_qc (MIT)
 'use strict';
@@ -12,7 +12,8 @@ const R = require('./rules.cjs');
 
 // clipping is read from YLOW and YHIGH (the 10th and 90th percentile), not YMIN and YMAX as the pack does: our captions
 // are white with a black outline, so every frame has a pure black and a pure white pixel
-const T = { freezeN: 0.003, freezeD: 0.5, blackD: 0.1, blackPix: 0.10, flicker: 12, clipShare: 0.05, clipHi: 250, clipLo: 5, soft: 8, scene: 0.35 };
+const T = { freezeN: 0.003, freezeD: 0.5, blackD: 0.1, blackPix: 0.10, flicker: 12, clipShare: 0.05, clipHi: 250, clipLo: 5, soft: 8, scene: 0.35,
+  lumSwing: 0.1, darker: 0.80, redSwing: 20, saturated: 0.8, flashArea: 0.25, flashNote: 5, flashFail: 7 };
 
 const ff = (file, vf) => { const r = spawnSync('ffmpeg', ['-hide_banner', '-nostats', '-v', 'error', '-i', file, '-an', '-vf', vf, '-f', 'null', '-'], { encoding: 'utf8', maxBuffer: 512 << 20 }); return { out: String(r.stdout || ''), err: String(r.stderr || ''), ok: r.status === 0 }; };
 // metadata=print text -> [{ t, key: value, ... }], one per frame that carries a key
@@ -32,7 +33,83 @@ function spans(fr, a, z, dur) {
   return out;
 }
 
-// Read the file. { dur, freezes, blacks, yavg: [[t, v]], ylow, yhigh, blur (median or null), cuts: [t] }
+const linear = Array.from({ length: 256 }, (_, i) => { const v = i / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+function flashCells(rgb) {
+  const y = new Float64Array(144), r = new Float64Array(144), s = new Float64Array(144);
+  for (let cell = 0; cell < 144; cell++) {
+    const start = (Math.floor(cell / 9) * 900 + cell % 9 * 10) * 3;
+    let lum = 0, red = 0, sat = 0;
+    for (let row = 0; row < 10; row++) {
+      let p = start + row * 270;
+      for (let col = 0; col < 10; col++, p += 3) {
+        const rv = rgb[p], gv = rgb[p + 1], bv = rgb[p + 2];
+        lum += 0.2126 * linear[rv] + 0.7152 * linear[gv] + 0.0722 * linear[bv];
+        red += Math.max(0, rv - gv - bv);
+        sat += rv / (rv + gv + bv || 1);
+      }
+    }
+    y[cell] = lum / 100; r[cell] = red / 100 * (320 / 255); s[cell] = sat / 100;
+  }
+  return { y, r, s };
+}
+
+// Count cells at the threshold crossing. A slow fade has just one swing.
+function flashChannel(series, times, channel) {
+  const n = series.length, cells = series[0][channel].length;
+  const up = new Uint16Array(n + 1), down = new Uint16Array(n + 1);
+  const red = channel === 'r', threshold = red ? T.redSwing : T.lumSwing;
+  for (let i = 0; i < cells; i++) {
+    if (red && !series.some(f => f.s[i] >= T.saturated)) continue;
+    let lo = series[0][channel][i], hi = lo, dir = 0;
+    for (let t = 1; t < n; t++) {
+      const v = series[t][channel][i];
+      if (dir !== 1 && v - lo >= threshold) {
+        if (red || lo < T.darker) up[t]++;
+        dir = 1; hi = v;
+      } else if (dir !== -1 && hi - v >= threshold) {
+        if (red || v < T.darker) down[t]++;
+        dir = -1; lo = v;
+      }
+      lo = Math.min(lo, v); hi = Math.max(hi, v);
+    }
+  }
+  // Read a frame with its successor for swings that take two frames. Spend that pair once.
+  const hits = [], need = cells * T.flashArea;
+  for (let t = 1; t < n; t++) {
+    const u = up[t] + up[t + 1], d = down[t] + down[t + 1];
+    if (Math.max(u, d) < need) continue;
+    hits.push({ t: times[t], dir: u >= d ? 1 : -1 });
+    t++;
+  }
+  // Slide a half-open second over the hits. Keep one count per run of the same direction.
+  let count = 0, best = 0, time = 0, left = 0;
+  for (let i = 0; i < hits.length; i++) {
+    if (i === left || hits[i].dir !== hits[i - 1].dir) count++;
+    while (hits[i].t >= hits[left].t + 1000000) {
+      if (hits[left].dir !== hits[left + 1].dir) count--;
+      left++;
+    }
+    if (count > best) { best = count; time = hits[left].t / 1000000; }
+  }
+  return { count: best, time };
+}
+
+// Decoded frame times also handle clips with uneven spacing. Painted frames can supply a frame rate.
+function flashCount(series, clock) {
+  const times = series.map((_, i) => Math.round(1e6 * (typeof clock === 'number' ? i / clock : clock[i])));
+  return { luminance: flashChannel(series, times, 'y'), red: flashChannel(series, times, 'r') };
+}
+function readFlashes(file, stats) {
+  const bytes = 90 * 160 * 3;
+  const r = spawnSync('ffmpeg', ['-v', 'error', '-i', file, '-an', '-vf', 'scale=90:160:flags=area', '-vsync', '0',
+    '-pix_fmt', 'rgb24', '-f', 'rawvideo', '-'], { maxBuffer: 512 << 20 }); // 43,200 bytes a frame: about 6 minutes at 30 fps
+  if (r.status !== 0 || r.error) return { error: r.error?.message || String(r.stderr).trim().split('\n')[0] || 'ffmpeg stopped' };
+  if (!stats.length || r.stdout.length !== stats.length * bytes) return { error: 'RGB frames and frame times did not match' };
+  const series = stats.map((_, i) => flashCells(r.stdout.subarray(i * bytes, (i + 1) * bytes)));
+  return flashCount(series, stats.map(f => f.t));
+}
+
+// Read the finished picture and keep the start time of each channel's worst second.
 function measure(file, dur) {
   const a = ff(file, `scale=540:-2,freezedetect=n=${T.freezeN}:d=${T.freezeD},blackdetect=d=${T.blackD}:pix_th=${T.blackPix},signalstats,metadata=print:file=-`);
   if (!a.ok) return { error: a.err.split('\n')[0] || 'ffmpeg did not run' };
@@ -40,7 +117,7 @@ function measure(file, dur) {
   const c = ff(file, `scale=270:-2,select='gt(scene,${T.scene})',metadata=print:file=-`);
   const b = ff(file, 'fps=2,scale=540:-2,blurdetect,metadata=print:file=-'); // no blurdetect in an older ffmpeg: skipped
   const bl = b.ok ? frames(b.out).map(f => f['blur']).filter(Number.isFinite).sort((x, y) => x - y) : [];
-  return { dur, freezes: spans(fr, 'freezedetect.freeze_start', 'freezedetect.freeze_end', dur), blacks: spans(fr, 'black_start', 'black_end', dur),
+  return { dur, flash: readFlashes(file, st), freezes: spans(fr, 'freezedetect.freeze_start', 'freezedetect.freeze_end', dur), blacks: spans(fr, 'black_start', 'black_end', dur),
     stats: st.map(f => ({ t: f.t, yavg: f['signalstats.YAVG'], ylow: f['signalstats.YLOW'], yhigh: f['signalstats.YHIGH'] })),
     blur: bl.length ? bl[Math.floor(bl.length / 2)] : null, cuts: c.ok ? frames(c.out).map(f => f.t) : null };
 }
@@ -80,7 +157,14 @@ const inAny = (t, wins) => wins.some(([a, z]) => t >= a && t <= z);
 // exempt() does not read), so a freeze there is a note, never a FAIL.
 function judge(M, X, { fxPass = false } = {}) {
   const fails = [], oks = [], notes = [], s2 = x => x.toFixed(2);
-  if (M.error) return { fails, oks, notes: ['picture checks did not run: ' + M.error] };
+  if (M.error) return { fails, oks, notes: ['picture and flash checks did not run: ' + M.error] };
+  if (!M.flash || M.flash.error) notes.push('Flash count unavailable. ' + (M.flash?.error || 'No frame read.'));
+  else for (const [name, { count, time }] of Object.entries(M.flash)) {
+    const line = `${name} flash count: ${count} alternating transitions in the second from ${s2(time)} s`;
+    if (count >= T.flashFail) fails.push(line + '. Over the WCAG 2.3.1 limit of three flashes.');
+    else if (count >= T.flashNote) notes.push(line + '. At the WCAG 2.3.1 limit of three flashes.');
+    else oks.push(line);
+  }
   const fz = M.freezes.filter(([a, z]) => uncovered(a, z, X.still) >= T.freezeD), bk = M.blacks.filter(([a, z]) => uncovered(a, z, X.dark) >= T.blackD);
   (!fz.length ? oks : fxPass ? notes : fails).push(fz.length ? `picture frozen for half a second or more: ${fz.map(([a, z]) => `${s2(a)} to ${s2(z)} s`).join(', ')}${fxPass ? ' (the effects pass may hold it on purpose)' : ''}` : `no frozen picture (${M.freezes.length} hold${M.freezes.length === 1 ? '' : 's'} on purpose)`);
   (bk.length ? fails : oks).push(bk.length ? `black frames outside a dip or a card: ${bk.map(([a, z]) => `${s2(a)} to ${s2(z)} s`).join(', ')}` : `no black frames outside a dip or a card (${M.blacks.length} on purpose)`);
@@ -97,4 +181,4 @@ function judge(M, X, { fxPass = false } = {}) {
   return { fails, oks, notes };
 }
 
-module.exports = { T, frames, spans, measure, exempt, uncovered, judge };
+module.exports = { T, frames, spans, flashCells, flashCount, measure, exempt, uncovered, judge };

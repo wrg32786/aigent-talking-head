@@ -124,7 +124,8 @@ t('picture: exemptions come from the cut (fade in, dips, seams, hits, pads, inse
   assert.strictEqual(X.cuts, 4, '2 seams and both ends of the insert');
   assert.strictEqual(+P.uncovered(0, 10, [[2, 4], [3, 6]]).toFixed(3), 6);
   const st = Array.from({ length: 100 }, (_, i) => ({ t: i / 24, yavg: i % 2 ? 100 : 130, ylow: 2, yhigh: 252 }));
-  const j = P.judge({ freezes: [], blacks: [], stats: st, blur: 12, cuts: Array(9).fill(1) }, { still: [], dark: [], noisy: [], cuts: 2 });
+  const flash = { luminance: { count: 0, time: 0 }, red: { count: 0, time: 0 } };
+  const j = P.judge({ freezes: [], blacks: [], stats: st, blur: 12, cuts: Array(9).fill(1), flash }, { still: [], dark: [], noisy: [], cuts: 2 });
   assert.deepStrictEqual(j.fails, []); assert.strictEqual(j.notes.length, 4, JSON.stringify(j.notes));
   assert.ok(/flicker/.test(j.notes[0]) && /clipping/.test(j.notes[1]) && /soft/.test(j.notes[2]) && /9 hard cuts seen, the plan has 2/.test(j.notes[3]));
 });
