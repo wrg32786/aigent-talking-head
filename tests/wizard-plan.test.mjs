@@ -215,6 +215,10 @@ try {
     const got = VP.normalize({});
     const fromGet = VP.adoptBreakout(got, { ...got, content: { repoFeature: true, repos: repo } });
     assert.ok(fromGet.presenter.some(x => x.id === 'frame-breakout' && x.auto), 'an agent who turns repo mode on and sends the plan back still gets breakout');
+    const afterTpl = VP.adoptBreakout(plan, VP.normalize({}));
+    assert.ok(!afterTpl.touched.includes(VP.BREAKOUT_OFF), 'a non-repo template does not count as turning breakout off');
+    const backOn = VP.withPart(afterTpl, 'content', { repoFeature: true, repos: repo });
+    assert.ok(backOn.presenter.some(x => x.id === 'frame-breakout' && x.auto), 'turning repo mode on after a template still gets breakout');
     // a plan that had breakout, then is sent back without it, is off
     const removed = VP.adoptBreakout(plan, { ...plan, presenter: plan.presenter.filter(x => x.id !== 'frame-breakout') });
     assert.ok(!removed.presenter.some(x => x.id === 'frame-breakout') && removed.touched.includes(VP.BREAKOUT_OFF), 'removing it from a full plan turns it off');

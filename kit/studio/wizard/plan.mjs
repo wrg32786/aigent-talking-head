@@ -77,7 +77,7 @@ export function adoptBreakout(prev, next) {
   const had = !!(prev && (prev.presenter || []).some(x => x && x.id === 'frame-breakout'));
   const has = p.presenter.some(x => x && x.id === 'frame-breakout');
   if (has) p.touched = p.touched.filter(k => k !== BREAKOUT_OFF);
-  else if (had && !p.touched.includes(BREAKOUT_OFF)) p.touched.push(BREAKOUT_OFF);
+  else if (had && p.content.repoFeature && !p.touched.includes(BREAKOUT_OFF)) p.touched.push(BREAKOUT_OFF);
   return withRepoBreakout(p);
 }
 function shapeErrs(p, base = blank(), path = '') {
