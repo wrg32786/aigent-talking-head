@@ -10,9 +10,9 @@ If it saves you an edit, a ⭐ helps other creators find it.
 
 [Quick start](#quick-start) · [Studio](#studio-edit-in-a-browser-with-your-agent-in-the-chat) · [Install](#install) · [Features](#features) · [How it compares](#how-it-compares) · [FAQ](#faq) · [Show your reel](#show-your-reel) · [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) · [Guide](docs/guide.md) · [Full gallery](showcase/GALLERY.md) · [Get guidance](#get-guidance)
 
-![Before and after: a plain phone clip on the left, the finished reel with kinetic captions and graphics on the right](kit/example/demo-reel/before-after.gif)
+<a href="https://github.com/wrg32786/aigent-talking-head/releases/download/v1.30.0/AIgent-ad-studio-v1-9x16.mp4"><img src="kit/example/studio-ad/preview.webp" width="360" alt="A Studio ad: large kinetic titles sit behind the speaker, and phone-style clips fly around him"></a>
 
-Phone clip on the left, finished reel on the right. [Watch the 40-second demo reel](kit/example/demo-reel/demo-reel.mp4) (20 effects) or read [the plan files behind it](kit/example/demo-reel/).
+Our 58-second Studio ad. [Watch the full video](https://github.com/wrg32786/aigent-talking-head/releases/download/v1.30.0/AIgent-ad-studio-v1-9x16.mp4) (9:16). For a side-by-side of a plain take and a finished reel, see the [40-second demo](kit/example/demo-reel/demo-reel.mp4) (20 effects) or [the plan files behind it](kit/example/demo-reel/).
 
 ## What it does
 
