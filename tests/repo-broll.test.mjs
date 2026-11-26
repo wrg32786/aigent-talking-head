@@ -171,6 +171,14 @@ try {
     const span = full.length ? (full[full.length - 1].at + full[full.length - 1].dur) - full[0].at : 0;
     assert.ok(span <= 5.05, 'two matching lines in a row stay within 5 s full screen: ' + JSON.stringify(two.inserts));
     assert.ok(two.takeovers.filter(x => x.who === 'repo').every(x => x.dur <= 5.05), 'takeover notes match the cap');
+    const gapped = RB.planRepo([
+      { start: 3, end: 5.5, text: 'Look at this, the first look.', section: 'body' },
+      { start: 6.9, end: 9.4, text: 'Look at this, the second look.', section: 'body' },
+    ], assets, { breakout: true, swapSec: [8, 10] });
+    const gf = gapped.inserts.filter(x => x.place === 'full');
+    const gEnd = gf.length ? Math.max(...gf.map(x => x.at + x.dur)) : 0;
+    const gStart = gf.length ? Math.min(...gf.map(x => x.at)) : 0;
+    assert.ok(gEnd - gStart <= 5.05, 'a held gap does not stretch a full-screen run past 5 s: ' + JSON.stringify(gapped.inserts));
   });
   await t('apply: a drafted job gets split and full screen repo inserts from the cached repo, you on the hook and CTA; off clears them', async () => {
     const { mkdirSync } = await import('fs'), { execFileSync } = await import('child_process');

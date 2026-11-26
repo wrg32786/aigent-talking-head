@@ -293,14 +293,15 @@ export function planRepo(lines, assets, { takeovers = 'auto', breakout = false, 
     const pool = avoid && assets.length > 1 ? assets.filter(x => x.path !== avoid) : assets;
     const a = pool[next % pool.length]; next++; return { a, named: false };
   };
-  const fullUsed = at => {
-    let usedFor = 0, t = at;
+  // clock time from the start of this continuous full-screen run (including gaps the hold loop may later fill)
+  const runStart = at => {
+    let t = at, start = at;
     for (let i = inserts.length - 1; i >= 0; i--) {
       const x = inserts[i]; if (x.place !== 'full') break;
       if (t - (x.at + x.dur) >= 1.5) break;
-      usedFor += x.dur; t = x.at;
+      start = x.at; t = x.at;
     }
-    return usedFor;
+    return start;
   };
   const push = (l, a, named, at, end, full) => {
     let d = +(end - at).toFixed(2);
@@ -322,11 +323,11 @@ export function planRepo(lines, assets, { takeovers = 'auto', breakout = false, 
     const words = toks(l.text).length, punch = l.section === 'body' && (/!\s*$/.test(l.text) || words <= 4);
     if (l.section !== 'body' || (punch && takeovers === 'auto')) { if (takeovers === 'auto') who.push({ at: l.start, dur, who: 'you', why: l.section === 'body' ? 'punch line' : l.section }); continue; }
     // first pick decides a named full-screen takeover for the opening chunk; later chunks cycle the pictures
-    const first = pick(l.text); used.set(first.a.path, (used.get(first.a.path) || 0) + 1);
+    const first = pick(l.text, inserts.length ? inserts[inserts.length - 1].file : null); used.set(first.a.path, (used.get(first.a.path) || 0) + 1);
     const full0 = takeovers === 'auto' && (POINT.test(l.text) || first.named);
     // one still does not swap against itself; a second picture is needed to change the visual
     const parts = assets.length > 1 ? chunks(l.start, l.end, style.swapSec) : [[l.start, l.end]];
-    let prevPath = null;
+    let prevPath = inserts.length ? inserts[inserts.length - 1].file : null;
     parts.forEach((span, i) => {
       const { a, named } = i === 0 ? first : pick(l.text, prevPath);
       if (i) used.set(a.path, (used.get(a.path) || 0) + 1);
@@ -334,13 +335,13 @@ export function planRepo(lines, assets, { takeovers = 'auto', breakout = false, 
       const room = +(span[1] - span[0]).toFixed(2);
       const [lo, hi] = style.takeoverSec;
       if (full) {
-        const left = +(hi - fullUsed(span[0])).toFixed(2);
+        const left = +(hi - (span[0] - runStart(span[0]))).toFixed(2);
         if (room < lo - 0.05 || left < lo - 0.05) full = false;
         else {
           const cap = Math.min(room, hi, Math.max(left, 0));
           push(l, a, named, span[0], span[0] + cap, true);
           prevPath = a.path;
-          if (room - cap >= minDur) {
+          if (room - cap >= minDur && assets.length > 1) {
             const more = pick(l.text, a.path); used.set(more.a.path, (used.get(more.a.path) || 0) + 1);
             push(l, more.a, false, span[0] + cap, span[1], false);
             prevPath = more.a.path;

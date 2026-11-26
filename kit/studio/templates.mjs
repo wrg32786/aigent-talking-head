@@ -91,7 +91,7 @@ export function list(cat = null) {
   out.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
   const seen = new Set(out.map(x => x.name));
   for (const n of bundledNames()) {
-    if (seen.has(n)) continue;
+    if (seen.has(n) || existsSync(join(SL.dirOf(), n))) continue;
     const t = loadBundled(n); if (!t) continue;
     seen.add(n);
     out.push({ name: n, label: t.label || n.replace(/-/g, ' '), line: t.line || '', kind: 'template', source: 'Starter', from: null, createdAt: null, pace: (t.plan && t.plan.pace) || 'look', preview: t.preview || null, thumb: null, readOnly: true });
