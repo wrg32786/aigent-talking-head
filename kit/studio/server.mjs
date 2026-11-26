@@ -272,6 +272,10 @@ function refWait(s) {
 // draft already holds the split and full screen spots; the render applies it again on the cut as it is then
 const repoOn = s => !!(s.videoPlan && s.videoPlan.content && s.videoPlan.content.repoFeature);
 const repoStep = s => ['kit/repo-broll.mjs', ['apply', '--name', s.job, '--plan', join('jobs', s.job, 'build', 'video-plan.json')]];
+function neededErr(s) {
+  const wait = VP.needed(planOf(s, C.catalog()));
+  if (wait.length) throw Object.assign(new Error(wait.map(x => x.text).join('. ') + ' on the Content step first.'), { code: 400 });
+}
 function draftSteps(s) {
   const d = draftSteps0(s);
   if (repoOn(s)) d.steps = [...d.steps, repoStep(s)];
@@ -280,6 +284,7 @@ function draftSteps(s) {
 function draftSteps0(s) {
   if (!s.job) throw Object.assign(new Error('name the job first'), { code: 400 });
   if (!s.footage.length && !s.clips) throw Object.assign(new Error('add footage first'), { code: 400 });
+  neededErr(s);
   const wait = refWait(s); if (wait) throw Object.assign(new Error(wait), { code: 409 });
   const recreate = C.recreateRecipe(s, ROOT); // Recreate: the reference's Reel.md, your take re-cut to it (kit/studio/reference.mjs)
   const ref = recreate ? null : writeRefPack(s);
@@ -1327,7 +1332,8 @@ async function api(req, res, u) {
     // it is (nothing is applied again, so classic picks keep who made them), and the draft writes it beside the cut
     const b = await readBody(req).catch(() => ({}));
     if (b && b.plan === true) update(x => { if (!x.videoPlan) x.videoPlan = { ...VP.normalize(planOf(x, C.catalog())), guessed: true }; });
-    const s = C.load(); const d = draftSteps(s); // checks the footage first, so an empty job says that before a missing tool
+    const s = C.load();
+    const d = draftSteps(s); // footage first, then a missing repo link, so an empty job says that before a missing tool
     const miss = needFor('draft'); if (miss) return json(res, 400, miss);
     startDraft(d, () => { update(st => { st.drafted = { key: d.key, from: d.from, pieces: d.pieces || 0, at: Date.now() }; delete st.draftStale; }); BRL.autoPick(s.job); return { choices: !!readChoices(C.load()), note: DRAFT_DONE, from: d.from }; });
     return json(res, 202, { ...view(C.load()), from: d.from });
@@ -1381,7 +1387,8 @@ async function api(req, res, u) {
       runTask('render', () => x.steps, () => ({ cuts: x.plan.map(y => ({ ...y, outputs: C.outputsOf({ job: y.job }) })), plain: x.plain || [], copiedTo: copyRenders(x.plan.flatMap(y => C.outputsOf({ job: y.job }).slice(0, 1))) }));
       return json(res, 202, { ...view(C.load()), exports: fin, plan: x.plan });
     }
-    const s = s0; const r = renderSteps(s), xs = exportSteps(s, combo, fin);
+    const s = s0; neededErr(s);
+    const r = renderSteps(s), xs = exportSteps(s, combo, fin);
     // memory for the person mask (kit/memcheck.cjs): short, the page says so and offers titles in front or the lighter mask
     const mem = MC.renderCheck(join(ROOT, 'jobs', s.job, 'build'));
     if (mem.needed && !mem.ok && !['front', 'light', 'anyway'].includes(b.memory)) return json(res, 409, { error: mem.message, memory: mem });
@@ -1436,6 +1443,7 @@ async function api(req, res, u) {
     const sil = b.silence != null ? +b.silence : undefined;
     if (sil !== undefined && !(sil >= 0.3 && sil <= 3)) return json(res, 400, { error: 'silence: 0.3 to 3 seconds' });
     const dec = {}; for (const [k, v] of Object.entries(b.decisions || {})) if (/^[\w:.-]{1,80}$/.test(k)) dec[k] = !!v;
+    if (b.redraft !== false) neededErr(s0);
     const cj = JSON.parse(readFileSync(clipsJsonPath(s0), 'utf8')), items = RV.cleanup(cj, { silence: sil || (s0.cleanup && s0.cleanup.silence) || 0.7 });
     const pl = RV.plan(items, dec, cj);
     writeFileSync(join(ROOT, cleanupFile(s0)), JSON.stringify(pl, null, 1) + '\n');

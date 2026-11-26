@@ -31,7 +31,7 @@ export const stepsOf = () => JSON.parse(readFileSync(STEPS_FILE, 'utf8'));
 // the plan for a session, read from its picks as they are now (a classic step, the chat or an agent may have changed
 // them), with the choices only the plan holds (notes, timings, repo links) kept from the plan as it was set
 export const planOf = (s, cat) => VP.fromState(s, s.videoPlan || null, cat);
-export const planView = (s, cat) => { const plan = planOf(s, cat); return { plan, summary: VP.summary(plan, cat), pending: VP.pending(plan), paces: VP.PACES, own: !!s.videoPlan }; };
+export const planView = (s, cat) => { const plan = planOf(s, cat); return { plan, summary: VP.summary(plan, cat), pending: VP.pending(plan), needed: VP.needed(plan), paces: VP.PACES, own: !!s.videoPlan }; };
 
 export function mount({ C, json, readBody, view, pushState }) {
   async function route(p, M, u, req, res) {

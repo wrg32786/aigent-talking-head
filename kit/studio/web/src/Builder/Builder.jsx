@@ -107,7 +107,7 @@ export function Builder({ s: st, CAT, V: appV, apply, patch, go, page, setPage }
   const changeTo = id => (visible.some(x => x.id === id) ? () => { setRet('notes'); open(id, true); } : null);
   const flush = () => (drain.current || Promise.resolve(true));
   const Body = STEPS[step.id], props = { CAT, step, words: w, plan: now, V: view, apply, save: PARTS.includes(part) ? v => send({ [part]: v }) : words => send({ words }), busy: false, setHover,
-    st, appV, patch, go, rows, onChange: changeTo, flush };
+    st, appV, patch, go, open, rows, onChange: changeTo, flush };
   const body = step.id === 'pace' ? <Pacing paces={view.paces} value={pace} onPick={p => send({ pace: p })} />
     : step.id === 'wordsPreview' ? <WordsPreview words={w} behind={behindOf(plan)} summary={(rows.find(r => r.step === 'captionType') || {}).text || ''} />
     : LIVE.includes(step.id) ? <WithPreview words={w} hover={hover} behind={behindOf(plan)}><Body {...props} /></WithPreview> : <Body {...props} />;
@@ -123,6 +123,7 @@ export function Builder({ s: st, CAT, V: appV, apply, patch, go, page, setPage }
       {saveErr && <p className="fine" role="alert" id="build-save-err">We could not save that choice: {saveErr}</p>}
       {pending.length > 0 && <p className="fine" id="build-step-soon">{LIVE.includes(step.id) ? 'Shows in the preview now. ' : ''}Coming soon in your rendered video: {pending.map(x => x.text).join(', ')}.</p>}
     </StepFrame>
+    {view.needed && view.needed.length > 0 && <p className="fine" id="build-needed" role="status">Before you make the video: {view.needed.map(x => x.text).join(', ')}. <a href="#build=content" id="build-needed-go" onClick={e => { e.preventDefault(); open('content'); }}>Go to Content</a></p>}
     {view.pending && view.pending.length > 0 && <p className="fine" id="build-pending">Coming soon, kept in your plan for later: {view.pending.map(x => x.text).join(', ')}.</p>}
   </div>;
 }

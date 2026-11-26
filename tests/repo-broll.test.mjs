@@ -131,9 +131,9 @@ try {
     { start: 16, end: 20, text: 'Follow for more tools like this.', section: 'cta' },
   ];
   const assets = [{ path: '/a/01.png', kind: 'image', heading: '', alt: 'demo/tool', header: true }, { path: '/a/02.png', kind: 'image', heading: 'Live preview', alt: 'The live preview window' }, { path: '/a/03.gif', kind: 'image', heading: 'Batch export', alt: 'Exporting ten clips at once' }];
-  await t('the plan: split on the body, the repo full screen when a line points at it or names a heading, you on the hook, punch lines and CTA', () => {
+  await t('the plan: split on the body, the repo full screen when a line points at it or names a heading (and a run stays within 5 s), you on the hook, punch lines and CTA', () => {
     const p = RB.planRepo(lines, assets);
-    assert.deepStrictEqual(p.inserts.map(x => [x.line.slice(0, 12), x.place, x.file]), [['It reads you', 'top', '/a/01.png'], ['The live pre', 'full', '/a/02.png'], ['Look at this', 'full', '/a/03.gif']]);
+    assert.deepStrictEqual(p.inserts.map(x => [x.line.slice(0, 12), x.place, x.file]), [['It reads you', 'top', '/a/01.png'], ['The live pre', 'full', '/a/02.png'], ['Look at this', 'top', '/a/03.gif']]);
     assert.deepStrictEqual(p.takeovers.filter(x => x.who === 'you').map(x => x.why), ['hook', 'punch line', 'cta']);
     assert.ok(p.inserts.every(x => x.repo && x.image && x.at >= 3 && x.at + x.dur <= 16), 'never on the hook or the CTA');
   });
@@ -148,6 +148,37 @@ try {
     const off = RB.planRepo(lines, assets, { takeovers: 'off' }); assert.ok(off.inserts.length === 4 && off.inserts.every(x => x.place === 'top')); assert.strictEqual(off.takeovers.length, 0);
     const fr = RB.planRepo(lines, assets, { breakout: true }); assert.strictEqual(fr.inserts[0].place, 'frame');
     assert.deepStrictEqual(RB.planRepo(lines, []).inserts, []);
+  });
+  await t('repo style: pictures change every 2 to 4 s, full screen stays 2 to 5 s, framed cards carry the bands', () => {
+    const long = [{ start: 3, end: 11, text: 'It reads your notes and makes a draft video with a longer walkthrough.', section: 'body' }];
+    const swapped = RB.planRepo(long, assets, { takeovers: 'off', breakout: true });
+    assert.ok(swapped.inserts.length >= 2 && swapped.inserts.every(x => x.place === 'frame' && x.dur <= 4.01 && x.dur >= 2), 'swaps: ' + JSON.stringify(swapped.inserts.map(x => [x.at, x.dur, x.place])));
+    assert.ok(new Set(swapped.inserts.map(x => x.file)).size >= 2, 'the pictures change');
+    for (let i = 1; i < swapped.inserts.length; i++) assert.notStrictEqual(swapped.inserts[i].file, swapped.inserts[i - 1].file, 'a swap does not repeat the last picture');
+    assert.ok(swapped.inserts.every(x => x.bands && x.bands.repo === 0.45 && x.frameBg), 'framed cards carry the default bands and backdrop');
+    const one = RB.planRepo(long, assets.slice(0, 1), { takeovers: 'off', breakout: true });
+    assert.strictEqual(one.inserts.length, 1, 'one still is not split against itself');
+    const named = [{ start: 3, end: 10, text: 'The live preview shows every change as you type in this longer look.', section: 'body' }];
+    const cap = RB.planRepo(named, assets, { breakout: true, swapSec: [8, 10] });
+    assert.strictEqual(cap.inserts[0].place, 'full'); assert.strictEqual(cap.inserts[0].dur, 5);
+    assert.ok(cap.inserts[1] && cap.inserts[1].place === 'frame' && Math.abs(cap.inserts[1].at - 8) < 0.05, 'leftover after the cap stays a split shot: ' + JSON.stringify(cap.inserts));
+    assert.notStrictEqual(cap.inserts[1].file, cap.inserts[0].file, 'the leftover shot is a different picture');
+    const two = RB.planRepo([
+      { start: 3, end: 8, text: 'The live preview shows every change as you type.', section: 'body' },
+      { start: 8, end: 13, text: 'Look at this, the live preview again.', section: 'body' },
+    ], assets, { breakout: true, swapSec: [8, 10] });
+    const full = two.inserts.filter(x => x.place === 'full');
+    const span = full.length ? (full[full.length - 1].at + full[full.length - 1].dur) - full[0].at : 0;
+    assert.ok(span <= 5.05, 'two matching lines in a row stay within 5 s full screen: ' + JSON.stringify(two.inserts));
+    assert.ok(two.takeovers.filter(x => x.who === 'repo').every(x => x.dur <= 5.05), 'takeover notes match the cap');
+    const gapped = RB.planRepo([
+      { start: 3, end: 5.5, text: 'Look at this, the first look.', section: 'body' },
+      { start: 6.9, end: 9.4, text: 'Look at this, the second look.', section: 'body' },
+    ], assets, { breakout: true, swapSec: [8, 10] });
+    const gf = gapped.inserts.filter(x => x.place === 'full');
+    const gEnd = gf.length ? Math.max(...gf.map(x => x.at + x.dur)) : 0;
+    const gStart = gf.length ? Math.min(...gf.map(x => x.at)) : 0;
+    assert.ok(gEnd - gStart <= 5.05, 'a held gap does not stretch a full-screen run past 5 s: ' + JSON.stringify(gapped.inserts));
   });
   await t('apply: a drafted job gets split and full screen repo inserts from the cached repo, you on the hook and CTA; off clears them', async () => {
     const { mkdirSync } = await import('fs'), { execFileSync } = await import('child_process');

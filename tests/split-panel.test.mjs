@@ -27,6 +27,23 @@ t('the head band covers the shadow under the seam (9:16, 4:5, 1:1)', () => {
   }
   assert.strictEqual(SPL.layout({ place: 'top' }, { crown: 400, cx: 540 }, { mask: false }).band, null, 'no mask, no band');
   const fr = SPL.layout({ place: 'frame' }, { crown: 400, cx: 540 }); assert.strictEqual(fr.band.y1, fr.card.y + SPL.FRAME.border + 2, 'the framed card has no shadow strip and keeps its band');
+  assert.strictEqual(fr.card.y, SPL.FRAME.card.y); assert.strictEqual(fr.capY, SPL.FRAME.capY);
+});
+
+t('banded repo layout: about 45/10/45, captions in the middle band and off the head, a stronger card shadow', () => {
+  const F = SPL.frameFromBands(SPL.REPO_BANDS);
+  assert.ok(Math.abs(F.top.h / 1920 - 0.45) < 0.12, 'repo card is about the top 45%');
+  assert.ok(Math.abs((1920 - F.card.y) / 1920 - 0.45) < 0.12, 'you sit in about the bottom 45%');
+  assert.ok(F.card.y - (F.top.y + F.top.h) >= 80, 'a caption band sits between the repo and you');
+  const g = SPL.layout({ place: 'frame', bands: SPL.REPO_BANDS, frameBg: ['#e8eaed', '#dfe3e8'] }, { crown: 400, cx: 540 });
+  const crown = F.card.y - F.breakout;
+  assert.ok(F.capY < crown - 24, `captions at ${F.capY} stay above the head at ${crown}`);
+  assert.ok(F.capY > F.top.y + F.top.h, 'captions sit in the middle band, not on the repo card');
+  assert.ok(crown < F.card.y && crown > F.capY, 'the head breaks out above the box into the caption band');
+  assert.ok(g.shadow, 'the repo card uses the stronger shadow');
+  assert.ok(g.card.r >= 32, 'the cards are rounded');
+  const plain = SPL.layout({ place: 'frame' }, { crown: 400, cx: 540 });
+  assert.ok(!plain.shadow, 'the default frame keeps its usual shadow');
 });
 
 t('fit: a wide clip is whole by default, the insert can say cover or whole', () => {
