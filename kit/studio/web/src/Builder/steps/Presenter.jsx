@@ -17,11 +17,11 @@ const s = stylex.create({
     backgroundColor: { default: 'transparent', ':is([data-checked])': 'var(--primary)' }, color: { default: 'inherit', ':is([data-checked])': 'var(--primary-foreground, #fff)' } },
   onText: { fontWeight: 700 },
 });
-const OWN = [['behind-head', 'Words behind your head'], ['punch', 'Zoom punch'], ['frame-breakout', 'Frame breakout (coming soon)']];
+const OWN = [['behind-head', 'Words behind your head'], ['punch', 'Zoom punch'], ['frame-breakout', 'Frame breakout']];
 const WHEN = [['hook', 'Hook'], ['key-moments', 'Key moments'], ['whole', 'Whole video']];
 // words behind your head: where it fits (the agent picks the titles), or every title
 const BEHIND = [['key-moments', 'Where it fits'], ['whole', 'Every title']];
-// what each item may be set to (Zoom punch is the whole video for now; frame breakout does not render yet)
+// what each item may be set to (Zoom punch is the whole video for now; frame breakout in repo mode uses the framed cards)
 const optsFor = id => (id === 'punch' || id === 'frame-breakout' ? [] : id === 'behind-head' ? BEHIND : WHEN);
 const nameOf = (id, items) => (OWN.find(o => o[0] === id) || [0, (items.find(x => x.id === id) || {}).name || id])[1];
 
@@ -40,7 +40,7 @@ export function Presenter({ CAT, step, plan, save, busy, setHover, V, apply }) {
         <span {...stylex.props(s.name)} id={`build-pw-${x.id.replace(':', '-')}`}>{nameOf(x.id, items)}</span>
         {optsFor(x.id).length ? <RadioGroup value={x.id === 'behind-head' && x.when === 'hook' ? 'key-moments' : x.when} onChange={w => setWhen(x.id, w)} aria-labelledby={`build-pw-${x.id.replace(':', '-')}`} disabled={busy} data-when-for={x.id} {...stylex.props(s.seg)}>
           {optsFor(x.id).map(([id, label]) => <Radio key={id} value={id} data-when={id} {...stylex.props(s.opt)}>{({ checked }) => <span {...stylex.props(checked && s.onText)}>{checked ? <span aria-hidden="true">{'\u2713 '}</span> : ''}{label}</span>}</Radio>)}
-        </RadioGroup> : <span className="fine">{x.id === 'punch' ? 'The whole video' : 'Kept in your plan. It does not show in your video yet.'}</span>}
+        </RadioGroup> : <span className="fine">{x.id === 'punch' ? 'The whole video' : x.id === 'frame-breakout' && plan.content && plan.content.repoFeature ? 'On the repo split shots' : 'Kept in your plan. It does not show in your video yet.'}</span>}
       </div>)}
     </section>}
     {fx && !ready && V && <NeedFix V={V} ids={['effects']} what="The camera and room effects" apply={apply} />}

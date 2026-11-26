@@ -7,7 +7,7 @@ import { REPO_RE } from '../../../../wizard/plan.mjs';
 
 // Step 15: is this video about a GitHub repo or a tool? When it is: 1 to 3 repo links (we take the pictures and videos
 // from each README, kit/repo-broll.mjs), Split (the repo on top, you below), takeovers (the repo full screen when you
-// point at it, you full screen on the hook, punch lines and CTA) or none, a note when Frame breakout is on, and an
+// point at it, you full screen on the hook, punch lines and CTA) or none, Frame breakout on by default (a note, and a way to turn it off on You on screen), and an
 // example video, handed to Teardowns to break down. A link that is not a repo link is said once you leave the box (or
 // press Enter) and never saved. Clearing every link saves none, which turns the mode off in the plan.
 const s = stylex.create({
@@ -32,6 +32,7 @@ export function Content({ plan, save, busy }) {
   const saveExample = () => { const v = example.trim(); const bad = !!v && !LINK.test(v); setExBad(bad); if (!bad && v !== (c.example || '')) save({ example: v || null }); };
   const enter = f => e => { if (e.key === 'Enter') { e.preventDefault(); f(); } };
   const breakout = (plan.presenter || []).some(x => x.id === 'frame-breakout');
+  const showOff = !breakout && (c.repoFeature || (plan.touched || []).includes('presenter.frame-breakout'));
   return <>
     <Toggle id="build-repo-on" checked={on} disabled={busy} onChange={flip}>This video features a GitHub repo or tool</Toggle>
     {on && <>
@@ -49,7 +50,9 @@ export function Content({ plan, save, busy }) {
       <h3 {...stylex.props(s.h)}>Full screen moments</h3>
       <Tiles id="build-repo-take" label="Full screen moments" items={TAKE} value={c.takeovers} disabled={busy || !good.length} onChange={takeovers => save({ takeovers })} />
       <p className="fine" id="build-repo-take-says">{CONTENT_SAYS[c.takeovers === 'off' ? 'off' : 'auto']}</p>
-      {breakout && <p className="fine" id="build-repo-breakout">Frame breakout is on (You on screen): the repo sits in a card and your head breaks out over it.</p>}
+      {breakout
+        ? <p className="fine" id="build-repo-breakout">Frame breakout is on (You on screen): the repo sits in a card and your head breaks out over it. Turn it off there if you want.</p>
+        : showOff && <p className="fine" id="build-repo-breakout-off">Frame breakout is off. You can turn it on in the You on screen step if you want your head to break out over the repo card.</p>}
       <h3 {...stylex.props(s.h)}>Example video (optional)</h3>
       <Field {...stylex.props(s.row)}>
         <Label className="sr">Example video link</Label>

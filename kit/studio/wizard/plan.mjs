@@ -58,7 +58,7 @@ export function blank() {
 
 // fill what a plan leaves out from blank(), keeping what it has (an older or partial plan still works)
 // A value of the wrong shape (null where a section goes, a word where a list goes) keeps the default; shapeErrs() names it.
-export function normalize(p) {
+function rawNormalize(p) {
   const merge = (base, x) => {
     if (x === undefined) return clone(base);
     if (isObj(base)) { if (!isObj(x)) return clone(base); const o = clone(base); for (const k of Object.keys(x)) o[k] = Object.hasOwn(base, k) ? merge(base[k], x[k]) : clone(x[k]); return o; }
@@ -66,6 +66,19 @@ export function normalize(p) {
     return clone(x);
   };
   return merge(blank(), isObj(p) ? p : {});
+}
+export function normalize(p) {
+  return withRepoBreakout(rawNormalize(p));
+}
+// when a whole plan is applied (set_video_plan, POST /api/video-plan): mark breakout off only if the previous plan
+// had it and this one does not. Otherwise a get-then-set that turns repo mode on still gets the default.
+export function adoptBreakout(prev, next) {
+  const p = rawNormalize(next);
+  const had = !!(prev && (prev.presenter || []).some(x => x && x.id === 'frame-breakout'));
+  const has = p.presenter.some(x => x && x.id === 'frame-breakout');
+  if (has) p.touched = p.touched.filter(k => k !== BREAKOUT_OFF);
+  else if (had && p.content.repoFeature && !p.touched.includes(BREAKOUT_OFF)) p.touched.push(BREAKOUT_OFF);
+  return withRepoBreakout(p);
 }
 function shapeErrs(p, base = blank(), path = '') {
   const errs = [];
@@ -144,7 +157,7 @@ export function withWords(plan, words) {
 export const REPO_RE = /^https:\/\/github\.com\/(?!\.\.?\/)[\w.-]+\/(?!\.\.?\/?$)[\w.-]+?(?:\.git)?\/?$/;
 export const PARTS = ['transitions', 'presenter', 'graphics', 'filters', 'content', 'music', 'notes'];
 export function withPart(plan, part, value) {
-  const p = normalize(plan), before = clone(p);
+  const p = rawNormalize(plan), before = clone(p);
   if (part === 'presenter') p.presenter = clone(value);
   else if (part === 'notes') p.notes = typeof value === 'string' ? value : '';
   else p[part] = { ...p[part], ...clone(value) };
@@ -166,10 +179,30 @@ export function withPart(plan, part, value) {
   for (const r of Object.keys(p.advanced.picks)) { const i = r.indexOf(':'); if (speaks(r.slice(0, i), r.slice(i + 1))) delete p.advanced.picks[r]; }
   const extra = part === 'transitions' && value && 'when' in value ? ['transitions.when'] : part === 'filters' && value && 'when' in value ? ['filters.when']
     : part === 'music' && value ? ['energy', 'beatSync'].filter(k => k in value).map(k => 'music.' + k) : [];
-  return touch(p, ...extra, part);
+  if (part === 'presenter') {
+    const on = p.presenter.some(x => x && x.id === 'frame-breakout'), was = before.presenter.some(x => x && x.id === 'frame-breakout');
+    if (on) {
+      p.touched = p.touched.filter(k => k !== BREAKOUT_OFF);
+      if (!was) p.presenter = p.presenter.map(x => { if (!x || x.id !== 'frame-breakout' || !x.auto) return x; const { auto, ...rest } = x; return rest; });
+    } else if (was || p.content.repoFeature) { if (!p.touched.includes(BREAKOUT_OFF)) p.touched.push(BREAKOUT_OFF); }
+  }
+  return touch(withRepoBreakout(p), ...extra, part);
+}
+// Frame breakout is on by default when the video features a repo (tagged auto, so turning the mode off takes only
+// that one off). touched "presenter.frame-breakout" means you turned it off: it stays off until you turn it on again.
+export const BREAKOUT_OFF = 'presenter.frame-breakout';
+export function withRepoBreakout(plan) {
+  const p = clone(plan);
+  if (!p.content || !Array.isArray(p.presenter)) return p;
+  const has = p.presenter.some(x => x && x.id === 'frame-breakout');
+  if (p.content.repoFeature && !has && !p.touched.includes(BREAKOUT_OFF)) {
+    p.presenter = [...p.presenter, { id: 'frame-breakout', when: 'whole', auto: true }];
+  }
+  if (!p.content.repoFeature) p.presenter = p.presenter.filter(x => !(x && x.id === 'frame-breakout' && x.auto));
+  return p;
 }
 // mark a field as yours, so a later pace change leaves it alone
-export function touch(plan, ...keys) { const p = normalize(plan); for (const k of keys) if (!p.touched.includes(k)) p.touched.push(k); return p; }
+export function touch(plan, ...keys) { const p = rawNormalize(plan); for (const k of keys) if (!p.touched.includes(k)) p.touched.push(k); return p; }
 
 // ---------- checking a plan ----------
 // cat: the Studio catalog (core.mjs catalog()); without it only the shape is checked. Errors are plain English.
@@ -285,7 +318,7 @@ export function pending(plan) {
   if (w.colors.text || w.colors.accent || w.colors.outline) add('words.colors', 'Your own text colors');
   if (w.keyWords.level !== 'off' && (w.keyWords.color !== 'accent' || w.keyWords.maxPerLine !== 1)) add('words.keyWords', 'Key word color and how many per line');
   for (const x of p.presenter) {
-    if (x.id === 'frame-breakout') add('presenter.frame-breakout', 'Frame breakout');
+    if (x && x.id === 'frame-breakout' && !p.content.repoFeature) add('presenter.frame-breakout', 'Frame breakout');
   }
   return out.filter((x, i, a) => a.findIndex(y => y.field === x.field) === i);
 }

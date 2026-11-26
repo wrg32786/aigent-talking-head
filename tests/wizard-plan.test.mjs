@@ -196,6 +196,51 @@ try {
     const g = apply(fresh(), { videoPlan: VP.normalize({ graphics: { agent: false } }) }); assert.strictEqual(API.planOf(g, cat).graphics.agent, false);
   });
 
+  await t('repo mode turns Frame breakout on; you can turn it off and it stays off', () => {
+    const repo = ['https://github.com/wrg32786/aigent-talking-head'];
+    const plan = VP.normalize({ content: { repoFeature: true, repos: repo } });
+    const bo = plan.presenter.find(x => x.id === 'frame-breakout');
+    assert.ok(bo && bo.when === 'whole' && bo.auto, 'breakout is on, marked as the repo default');
+    const off = VP.withPart(plan, 'presenter', plan.presenter.filter(x => x.id !== 'frame-breakout'));
+    assert.ok(!off.presenter.some(x => x.id === 'frame-breakout'));
+    assert.ok(off.touched.includes(VP.BREAKOUT_OFF));
+    const still = VP.withPart(off, 'content', { takeovers: 'off' });
+    assert.ok(!still.presenter.some(x => x.id === 'frame-breakout'), 'a later content change does not put it back');
+    // clearing the link turns the mode off, then adding it back must not restore breakout once you turned it off
+    const cleared = VP.withPart(still, 'content', { repoFeature: false, repos: [] });
+    assert.ok(!cleared.presenter.some(x => x.id === 'frame-breakout'));
+    const again = VP.withPart(cleared, 'content', { repoFeature: true, repos: repo });
+    assert.ok(!again.presenter.some(x => x.id === 'frame-breakout'), 'turning the mode on again leaves it off');
+    // a get-then-set that only turns repo mode on still gets the default (set_video_plan / adoptBreakout)
+    const got = VP.normalize({});
+    const fromGet = VP.adoptBreakout(got, { ...got, content: { repoFeature: true, repos: repo } });
+    assert.ok(fromGet.presenter.some(x => x.id === 'frame-breakout' && x.auto), 'an agent who turns repo mode on and sends the plan back still gets breakout');
+    const afterTpl = VP.adoptBreakout(plan, VP.normalize({}));
+    assert.ok(!afterTpl.touched.includes(VP.BREAKOUT_OFF), 'a non-repo template does not count as turning breakout off');
+    const backOn = VP.withPart(afterTpl, 'content', { repoFeature: true, repos: repo });
+    assert.ok(backOn.presenter.some(x => x.id === 'frame-breakout' && x.auto), 'turning repo mode on after a template still gets breakout');
+    // a plan that had breakout, then is sent back without it, is off
+    const removed = VP.adoptBreakout(plan, { ...plan, presenter: plan.presenter.filter(x => x.id !== 'frame-breakout') });
+    assert.ok(!removed.presenter.some(x => x.id === 'frame-breakout') && removed.touched.includes(VP.BREAKOUT_OFF), 'removing it from a full plan turns it off');
+    const opted = VP.normalize({ content: { repoFeature: true, repos: repo }, touched: [VP.BREAKOUT_OFF] });
+    assert.ok(!opted.presenter.some(x => x.id === 'frame-breakout'), 'touched presenter.frame-breakout keeps it off on a new plan');
+    const kept = VP.normalize({ content: { repoFeature: true, repos: repo }, presenter: [{ id: 'punch', when: 'whole' }, { id: 'frame-breakout', when: 'key-moments' }] });
+    assert.strictEqual(kept.presenter.find(x => x.id === 'frame-breakout').when, 'key-moments', 'a when you already set is kept');
+    // another presenter change does not block the default, and does not make the automatic one manual
+    const zoom = VP.withPart(VP.normalize({}), 'presenter', [{ id: 'punch', when: 'whole' }]);
+    const withRepo = VP.withPart(zoom, 'content', { repoFeature: true, repos: repo });
+    assert.ok(withRepo.presenter.some(x => x.id === 'frame-breakout' && x.auto), 'breakout is still added after you changed zoom');
+    const zoomed = VP.withPart(withRepo, 'presenter', withRepo.presenter.map(x => x.id === 'punch' ? x : x));
+    assert.ok(zoomed.presenter.some(x => x.id === 'frame-breakout' && x.auto), 'changing zoom keeps the automatic tag');
+    // turning it off and on again makes it yours; then repo mode off leaves it
+    const toggled = VP.withPart(VP.withPart(withRepo, 'presenter', withRepo.presenter.filter(x => x.id !== 'frame-breakout')), 'presenter', [...withRepo.presenter.filter(x => x.id !== 'frame-breakout'), { id: 'frame-breakout', when: 'whole' }]);
+    assert.ok(toggled.presenter.some(x => x.id === 'frame-breakout' && !x.auto), 'picking it yourself drops the automatic tag');
+    const closed = VP.withPart(toggled, 'content', { repoFeature: false, repos: [] });
+    assert.ok(closed.presenter.some(x => x.id === 'frame-breakout'), 'a breakout you picked stays when the mode goes off');
+    const onlyAuto = VP.withPart(plan, 'content', { repoFeature: false, repos: [] });
+    assert.ok(!onlyAuto.presenter.some(x => x.id === 'frame-breakout'), 'the automatic one goes with the mode');
+  });
+
   await t('no big titles and no filters reach the reel as locks; none for transitions is straight cuts', () => {
     const s = apply(fresh(), { videoPlan: VP.normalize({ words: { titles: { on: false } }, filters: { ids: [], when: 'whole' }, transitions: { ids: [], when: 'every-cut' } }) });
     const c = C.compose(s);
