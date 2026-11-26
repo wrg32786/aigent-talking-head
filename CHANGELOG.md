@@ -6,16 +6,19 @@ Each version below is one GitHub release. `npm run release:notes -- --version X.
 
 Release notes: [docs/releases/v1.30.0.md](docs/releases/v1.30.0.md).
 
-Highlights in a long talk, and a publish kit beside the finished reel.
+Highlights in a long talk, a publish kit beside the finished reel, and an editor agent.
 
+- **Flash count in verify.** Verify checks luminance and saturated red across the finished reel. It names the worst second for each. More than three flashes in a second fails (WCAG 2.3.1).
+- **Fine hair in the person mask.** BiRefNet crops to the person when the crop gives the model more detail. It checks the whole frame again if the person reaches a crop edge.
+- **Room inside the person mask.** Verify gives a time, a box and a still when part of the matte matches the visible room. Clothing in shadow can match too. Use the still to decide whether to clear the box.
 - **Highlights on Start.** `kit/highlights.mjs` finds complete moments in a long talk or podcast (about 3 minutes or longer): transcribe locally with the kit Whisper, split on sentence ends (never mid-word or mid-sentence), and score up to N moments (default 10, window 20 to 60 s) with a reason and a start time. Studio's Start step has a Highlights view (`#step=highlights`). The local rules always run first; an agent can rescore them. MCP: `find_highlights`, `get_highlights`, `score_highlights`, `pick_highlights`. The ones you tick are extracted as the take and already cut. Tests: `tests/studio-highlights.test.mjs`.
 - **Publish kit on Render.** After a reel is rendered, a card makes a cover still with the title kept off the face (`kit/publish-cover.py`, `kit/publish-kit.mjs`), post copy for each platform (title, description, hashtags), and a ZIP with the reel, the `.srt`, the cover and the copy, beside the reel. Nothing is posted. MCP: `get_publish_kit`, `set_post_copy`, `make_publish_kit`. Buffer posting stays drafts only. Tests: `tests/studio-publish.test.mjs`.
 - **AutoClip comparison.** The README How it compares section names [AutoClip](https://github.com/zhouxiaoka/autoclip) (MIT) as the closest open-source neighbor. THIRD_PARTY.md credits the idea. No AutoClip code is included.
 - **Studio report 6.** A teardown no longer stops when a caption word sits entirely on the person (that used to write invalid extras.json). Instagram download errors from instaloader, including a bad response, print the plain refusal, not a traceback. If your old B-roll library is a junction or symlink to another drive, the Vault stays next to that real folder and the move prints the exact destination; an existing kit vault is left in place so earlier clips stay visible. A session with `STUDIO_DIR` set (not the install's `jobs/.studio`) uses a vault in that session and does not move the install's library; set `STUDIO_VAULT` or the Vault folder in Settings to keep using the install vault. `npm run setup:all` no longer warns on Node 24 (DEP0190) and ends with a line to restart Studio if it is already running. Tests: `tests/teardown-extras.test.mjs`, `tests/test_teardown_extras.py`, `tests/test_ig_fetch.py`, the Vault path cases in `tests/vault.test.mjs`, `tests/setup-all.test.mjs`.
+- **Editor agent.** `agents/video-editor.md`, a Claude Code subagent that picks the right command for the job (reel, Studio, teardown, clip-raw-footage, Highlights on a long talk, the publish kit after Render), runs the draft, plan, review, render and verify loop, and carries fixes learned on real reels (captions off a low face, cutaways in the pause after a word, numbered versions, never posting for the person). Install steps in AGENTS.md.
+- **ffmpeg-skill comparison.** The README How it compares section names [kajisho5/ffmpeg-skill](https://github.com/kajisho5/ffmpeg-skill) next to AutoClip, and the opener says the kit stays on your machine: no cloud account, and any keys you add stay on your computer.
 
 ## 1.29.0 (unreleased)
-
-- **Editor agent.** `agents/video-editor.md`, a Claude Code subagent that picks the right command for the job (reel, Studio, teardown, clip-raw-footage), runs the draft, plan, review, render and verify loop, and carries fixes learned on real reels (captions off a low face, cutaways in the pause after a word, numbered versions, never posting for the person). Install steps in AGENTS.md.
 
 Release notes: [docs/releases/v1.29.0.md](docs/releases/v1.29.0.md).
 

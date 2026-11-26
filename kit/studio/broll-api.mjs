@@ -67,7 +67,7 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     // every B-roll slot of the plan has a brief (what it should show) and the Vault's best items for it, each with its
     // reason. The first is the suggestion, the next three are what Swap offers. Nothing here leaves the computer.
     const sb = d ? slotBriefs(s, d, b, byId) : { brief: {}, cands: {} };
-    const beats = d ? d.beats.map(bt => { const sl = b.slots[bt.n], c = sl && byId[sl.clip], br = sb.brief[bt.n]; return { ...bt, slot: sl && c ? { ...sl, ...LANE.timing(sl, bt, c), clip: clipBrief(c) } : null, idea: b.ideas[bt.n] ? { ...b.ideas[bt.n], clip: b.ideas[bt.n].clip ? clipBrief(byId[b.ideas[bt.n].clip]) : null } : null,
+    const beats = d ? d.beats.map(bt => { const sl = b.slots[bt.n], c = sl && byId[sl.clip], br = sb.brief[bt.n]; return { ...bt, slot: sl && c ? { ...sl, place: sl.place || BS.placeOf(bt.ref?.slot), ...LANE.timing(sl, bt, c), clip: clipBrief(c) } : null, idea: b.ideas[bt.n] ? { ...b.ideas[bt.n], clip: b.ideas[bt.n].clip ? clipBrief(byId[b.ideas[bt.n].clip]) : null } : null,
       ...(br ? { brief: { ...br, slot: bt.ref.slot.n, text: BB.text(br) }, candidates: (sb.cands[bt.n] || []).map(candOut) } : {}),
       ...(needOf(bt, sl && c, b, job, stockOn, br, sb.cands[bt.n]) || {}), ...(underOf(bt, d.beats) ? { under: underOf(bt, d.beats) } : {}) }; }) : [];
     const st = S.load();
@@ -123,7 +123,7 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     return update(s => { const b = jobState(s);
       if (!clipId) { delete b.slots[n]; return; }
       // on a reference B-roll slot the clip sits the way the reference's did, unless you pick another way
-      const rs = bt.ref && bt.ref.slot, prev = b.slots[n] || {}, place = LANE.PLACES.includes(o.place) ? o.place : prev.place || (rs && LANE.KIND_PLACE[rs.kind]) || 'full';
+      const rs = bt.ref && bt.ref.slot, prev = b.slots[n] || {}, place = LANE.PLACES.includes(o.place) ? o.place : prev.place || BS.placeOf(rs);
       if (rs) delete b.skips[rs.n];
       b.slots[n] = { clip: clipId, place, offset: o.offset != null ? +o.offset : prev.clip === clipId ? prev.offset : null, dur: o.dur != null ? +o.dur : prev.clip === clipId ? prev.dur : null, in: o.in != null ? Math.max(0, +o.in) : prev.clip === clipId ? prev.in || 0 : 0, by: o.by || 'you', why: o.why ? clean(o.why) : prev.clip === clipId ? prev.why || null : null };
       b.slots[n].at = +(bt.start + (b.slots[n].offset != null ? b.slots[n].offset : rs ? Math.max(0, +rs.start - bt.start) : 0.2)).toFixed(2);
@@ -159,7 +159,7 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
       const rs = bt.ref && bt.ref.slot, byBrief = rs && !rs.run, vp = byBrief ? ((va[bt.n] || [])[0] || null) : null;
       let hit = byBrief ? (vp && vp.ok && !used.has(vp.id) ? vp.item : null) : wq ? (BR.rank(wq + ' ' + what, { exclude: used }).find(c => c.matched >= 1) || null) : null;
       if (rs) { if (hit) used.add(hit.id); if (!hit) continue; // a plan slot with nothing over the bar stays "Needs B-roll", with the best guess as its suggestion
-        out.push({ beat: bt.n, at: +rs.start, offset: +Math.max(0, rs.start - bt.start).toFixed(2), dur: +(rs.end - rs.start).toFixed(2), idea: `${hit.name} from your Vault`, why: vp ? vp.reason : `It matches what this slot should show${rs.what ? ` (${rs.what})` : ''}.`, role, query: wq || null, card: null, clip: hit.id, place: LANE.KIND_PLACE[rs.kind] || 'full', source: 'vault' }); continue; }
+        out.push({ beat: bt.n, at: +rs.start, offset: +Math.max(0, rs.start - bt.start).toFixed(2), dur: +(rs.end - rs.start).toFixed(2), idea: `${hit.name} from your Vault`, why: vp ? vp.reason : `It matches what this slot should show${rs.what ? ` (${rs.what})` : ''}.`, role, query: wq || null, card: null, clip: hit.id, place: BS.placeOf(rs), source: 'vault' }); continue; }
       if (!hit) hit = p && p.query ? (BR.rank(p.query, { exclude: used })[0] || null) : null;
       if (!hit && bt.text) { const r = BR.rank(LANE.nounQuery(bt.text) + ' ' + bt.text, { exclude: used }).find(c => c.matched >= 2); if (r) hit = r; }
       if (!hit && want.length) hit = lib.find(c => want.includes(c.type) && !used.has(c.id) && !(c.raw && c.type === 'testimonial' && j.cutins.some(x => x.clip === c.id))) || null;
@@ -322,7 +322,7 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     briefOf: n => { const s = C.load(), d = draftOf(s.job, s), bt = d && d.beats.find(x => x.ref && x.ref.slot && x.ref.slot.n === +n); return bt ? briefFor(s, bt) : null; },
     // a capture made for a slot waits on it as an idea: nothing is placed until the user says yes
     offer: (n, it, by) => { const s = C.load(), d = draftOf(s.job, s), bt = d && d.beats.find(x => x.ref && x.ref.slot && x.ref.slot.n === +n); if (!bt || !V.placeable(it) || peek(s).slots[bt.n]) return;
-      saveIdeas([{ beat: bt.n, idea: `${it.name} from your Vault`, why: 'Captured for this slot. Look at it before you use it.', clip: it.id, place: LANE.KIND_PLACE[bt.ref.slot.kind] || 'full', source: 'vault' }], by ? CH.prettyName(String(by)) : 'your agent'); } };
+      saveIdeas([{ beat: bt.n, idea: `${it.name} from your Vault`, why: 'Captured for this slot. Look at it before you use it.', clip: it.id, place: BS.placeOf(bt.ref.slot), source: 'vault' }], by ? CH.prettyName(String(by)) : 'your agent'); } };
   const route = async (p, M, u, req, res) => (p.startsWith('/api/broll') || p.startsWith('/api/keys') || p.startsWith('/api/vault') ? (await handle(p, M, u, req, res)) !== false : false);
   async function handle(p, M, u, req, res) {
     const s = C.load(), q = k => u.searchParams.get(k);

@@ -10,9 +10,9 @@ If it saves you an edit, a ⭐ helps other creators find it.
 
 [Quick start](#quick-start) · [Studio](#studio-edit-in-a-browser-with-your-agent-in-the-chat) · [Install](#install) · [Features](#features) · [How it compares](#how-it-compares) · [FAQ](#faq) · [Show your reel](#show-your-reel) · [Agent skill and MCP](#how-agents-use-it-skill-and-mcp) · [Guide](docs/guide.md) · [Full gallery](showcase/GALLERY.md) · [Get guidance](#get-guidance)
 
-![Before and after: a plain phone clip on the left, the finished reel with kinetic captions and graphics on the right](kit/example/demo-reel/before-after.gif)
+<a href="https://github.com/wrg32786/aigent-talking-head/releases/download/v1.30.0/AIgent-ad-studio-v1-9x16.mp4"><img src="kit/example/studio-ad/preview.webp" width="360" alt="A Studio ad: large kinetic titles sit behind the speaker, and phone-style clips fly around him"></a>
 
-Phone clip on the left, finished reel on the right. [Watch the 40-second demo reel](kit/example/demo-reel/demo-reel.mp4) (20 effects) or read [the plan files behind it](kit/example/demo-reel/).
+Our 58-second Studio ad. [Watch the full video](https://github.com/wrg32786/aigent-talking-head/releases/download/v1.30.0/AIgent-ad-studio-v1-9x16.mp4) (9:16). For a side-by-side of a plain take and a finished reel, see the [40-second demo](kit/example/demo-reel/demo-reel.mp4) (20 effects) or [the plan files behind it](kit/example/demo-reel/).
 
 ## What it does
 
@@ -148,7 +148,7 @@ Your agent installs everything up front (Python, the downloaders, the Whisper mo
 
 <img src="docs/studio/settings.png" width="720" alt="Studio settings in a side sheet: who answers the chat, the terminal note switch, API keys and providers, and the reference downloads and finished reels folders with Browse">
 
-**B-roll that picks itself.** After every draft, Studio reads what you said and puts b-roll on spots about every 6 to 10 s: a number you say becomes a counter card, a quote a quote card, anything else a clip from your library (or free Pexels or Pixabay stock with your own key). Each spot says why, and you swap, change or remove any of it from your library, an upload, stock, a card, a screen recording or a generator with your own key (off until you allow it; every generate shows the cost and waits for your click). Uploads say what they are (testimonial, product demo, screen recording, lifestyle); raw ones are cut into pieces on whole words first, and a testimonial piece can play in your reel with its own sound. Pick full cutaway, split top panel or picture in picture; credits are written next to the reel.
+**B-roll that picks itself.** After every draft, Studio reads what you said and puts b-roll on spots about every 6 to 10 s: a number you say becomes a counter card, a quote a quote card, anything else a clip from your library (or free Pexels or Pixabay stock with your own key). Each spot says why, and you swap, change or remove any of it from your library, an upload, stock, a card, a screen recording or a generator with your own key (off until you allow it; every generate shows the cost and waits for your click). Uploads say what they are (testimonial, product demo, screen recording, lifestyle); raw ones are cut into pieces on whole words first, and a testimonial piece can play in your reel with its own sound. Split B-roll slots use the split top panel by default. You can also pick framed cards, full cutaway or picture in picture; credits are written next to the reel.
 
 <img src="docs/studio/broll-spots.png" width="420" alt="The B-roll step in dark: spots picked from what was said, a quote card and a counter card, with How it sits, Timing and Why this"> <img src="docs/studio/broll-spots-light.png" width="420" alt="The same B-roll step in the light theme">
 
@@ -428,7 +428,7 @@ The CLI may print a one-line star reminder after your first successful render, a
 
 ## Cite this
 
-> Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.29.0) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
+> Gwyn, W. (2026). *aigent-talking-head: an open-source talking-head video editor for coding agents* (Version 1.30.0) [Computer software]. The AIgent. https://github.com/wrg32786/aigent-talking-head
 
 Machine-readable metadata is in [CITATION.cff](CITATION.cff), and GitHub shows it under "Cite this repository".
 

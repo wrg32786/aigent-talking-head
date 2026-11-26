@@ -23,7 +23,9 @@ const KIT = __dirname, ROOT = path.dirname(KIT);
 const SHIPPED = path.join(ROOT, 'packs'), LOCAL = path.join(SHIPPED, 'local');
 const FORMAT = 'aigent-style-pack', FORMAT_VERSION = 1;
 const SEMVER = /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/;
-const STYLE_KEYS = ['theme', 'look', 'captionStyle', 'fonts', 'titles', 'finish', 'finishPool', 'transition', 'glitch', 'punch', 'tighten', 'cards', 'cardPalette', 'musicEnergy', 'bed', 'sfxMap', 'sfxCap', 'titlePlaces', 'entranceOrder', 'titleLayer', 'effectsFavourites', 'beatSync', 'glossary', 'brands'];
+const STYLE_KEYS = ['theme', 'look', 'captionStyle', 'captionOutline', 'fonts', 'titles', 'finish', 'finishPool', 'transition', 'glitch', 'punch', 'tighten', 'cards', 'cardPalette', 'musicEnergy', 'bed', 'sfxMap', 'sfxCap', 'titlePlaces', 'entranceOrder', 'titleLayer', 'splitPlace', 'effectsFavourites', 'beatSync', 'glossary', 'brands'];
+const { SPLIT_PLACES, KIND_PLACE } = require('./broll-slots.cjs');
+const OUTLINES = require('./reelmd.cjs').CAPTION_LOOK['caption-outline'][1];
 const TOP_KEYS = ['$schema', 'format', 'formatVersion', 'name', 'version', 'label', 'description', 'author', 'license', 'extends', 'style', 'locks', 'weights', 'preview', 'assets', 'notes'];
 const LICENSES = ['Apache-2.0', 'MIT', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', 'CC0-1.0', 'OFL-1.1'];
 
@@ -82,6 +84,8 @@ function validate(pack) {
   for (const k of ['label', 'description', 'notes']) if (typeof pack[k] === 'string' && pack[k].includes('\u2014')) errs.push(`${k} has an em dash`);
   if (pack.style != null && (typeof pack.style !== 'object' || Array.isArray(pack.style))) errs.push('style must be an object');
   for (const k of Object.keys(pack.style || {})) if (!STYLE_KEYS.includes(k)) errs.push(`style: unknown key "${k}" (${STYLE_KEYS.join(', ')})`);
+  if (pack.style?.captionOutline !== undefined && !OUTLINES.includes(pack.style.captionOutline)) errs.push(`style.captionOutline must be one of ${OUTLINES.join(', ')}`);
+  if (pack.style?.splitPlace !== undefined && !SPLIT_PLACES.includes(pack.style.splitPlace)) errs.push(`style.splitPlace must be one of ${SPLIT_PLACES.join(', ')}`);
   if (pack.style && pack.style.glossary != null) errs.push(...require('./glossary.cjs').validate(pack.style.glossary).map(e => 'style.' + e));
   if (pack.style && pack.style.brands != null) errs.push(...require('./brands.cjs').validate(pack.style.brands, pack.dir).map(e => 'style.' + e));
   if (pack.weights != null) {
@@ -153,6 +157,8 @@ function readme(pack) {
   return `# ${pack.name}\n\n${pack.label}\n\n${pack.description || ''}\n\n` +
     `Use it: \`npm run reel -- <clip> --pack ${pack.name}\`\n\n` +
     `Pinned choices (locks): ${L.describe(pack.locks)}\n\n` +
+    'Set `style.captionOutline` to `none`, `thin` or `thick` for the caption stroke.\n\n' +
+    'Set `style.splitPlace` to `top` (the default) or `frame` for split B-roll slots. A slot with its own place keeps it.\n\n' +
     `Edit \`pack.json\` (schema: packs/pack.schema.json), then:\n\n` +
     '```\n' + `npm run pack:validate -- ${pack.name}\nnpm run pack:preview -- ${pack.name}\n` + '```\n';
 }
@@ -166,6 +172,8 @@ function printList(rows) {
 
 function selfTest() {
   const errs = [];
+  const split = require('../packs/pack.schema.json').properties.style.properties.splitPlace;
+  if (split?.enum?.join(',') !== SPLIT_PLACES.join(',') || split.default !== KIND_PLACE.split) errs.push('splitPlace schema must match the split places and their default');
   for (const p of shipped()) { const e = validate(p); e.forEach(x => errs.push(`${p.origin}: ${x}`)); }
   if (!shipped().some(p => p.name === 'aigent')) errs.push('packs/aigent is missing (the default look as a pack)');
   const bad = { format: FORMAT, formatVersion: FORMAT_VERSION, name: 'x', version: '1', label: 'x', style: { nope: 1 }, locks: { transitions: ['nope'] } };

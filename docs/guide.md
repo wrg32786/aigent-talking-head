@@ -107,7 +107,7 @@ Words and titles stay out of the way of effects: where an effect's catalog entry
 
 **The person mask** (`kit/mask.py`) is what puts titles, captions and panels behind the head. BiRefNet comes in three tiers (all MIT, ZhengPeng7/BiRefNet; the ONNX files are hosted by rembg):
 
-| Tier | Model | Input | CPU time per frame (8 cores, no GPU) | Peak memory | Used |
+| Tier | Model | Input | CPU time per frame (8 cores, no GPU) | Peak memory on CPU | Used |
 |---|---|---|---|---|---|
 | 1, best and slowest | BiRefNet_HR / HR-matting | 2048x2048 | about 4x tier 2 | more than tier 2 | no |
 | 2 | **birefnet-portrait** (default), birefnet-general | 1024x1024, Swin-L | 9.0 s | 7.5 GB a frame, 8.0 GB a whole run | yes |
@@ -122,7 +122,7 @@ To keep a render quick:
 - every matte is cached in `build/maskcache/<model>/` by a hash of the frame, so a rebuild with new captions, titles or windows reuses it (a 2 s title window: 284 s the first time, 19 s after);
 - `base.mp4` is made once per picture and reused by the face zone and the mask.
 
-The cleanup (`kit/mask_refine.py`) fills holes, removes specks, refines the edge against the picture, smooths over time with optical flow plus an average on the solid inside (no flicker), and keeps hair strands soft instead of eroding them. Before it loads BiRefNet, `kit/mask.py` checks free memory (it needs about 8.8 GB): with less, the default falls back to the MediaPipe preview with a warning, and an explicit `--mask birefnet-portrait` stops with the two ways out. Studio's Render asks first: **Titles in front**, **Lighter mask** or **Try anyway**.
+The cleanup (`kit/mask_refine.py`) fills holes, removes specks, refines the edge against the picture, smooths over time with optical flow plus an average on the solid inside (no flicker), and keeps hair strands soft instead of eroding them. Before loading the portrait mask, `kit/mask.py` checks for about 8.8 GB of free memory on CPU or 25.8 GB on DirectML. With less, the default falls back to the MediaPipe preview with a warning, and an explicit `--mask birefnet-portrait` stops. Studio's Render offers **Titles in front**, **Lighter mask** or **Try anyway**.
 
 ## Edit rules
 

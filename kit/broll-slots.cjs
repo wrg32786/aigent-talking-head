@@ -3,8 +3,8 @@
 // A reference's B-roll is read by the teardown into the Reel.md "## B-roll" block (reel-broll), one line per slot:
 //   #01 3.33-15.92 | kind panel | y 0.68 | w 0.62 | h 0.21 | border #d87b5b | layer front | shows OmniRoute |
 //       shot screen recording | motion push | zoom 1.22 | shake off | glitch off | colour none | in pop | out slide-up
-// kind: full (it covers the frame), panel (a framed window over the speaker), split (it takes the top, the speaker the
-// bottom) or pip (a small box). The effects are measured from the picture by kit/broll_fx.py.
+// kind: full (it covers the frame), panel (a framed window over the speaker), split (two panes, B-roll above the
+// speaker) or pip (a small box). The effects are measured from the picture by kit/broll_fx.py.
 //
 // A draft from a recipe carries them into build/plan.json "broll" on your edit's clock:
 //   { n, start, end, kind, layer, y, w, h, border, fx: { motion, zoom, shake, glitch, colour, in, out }, what, shot,
@@ -16,6 +16,12 @@
 'use strict';
 
 const KINDS = ['full', 'panel', 'split', 'pip'];
+const SPLIT_PLACES = ['top', 'frame'];
+const KIND_PLACE = { full: 'full', panel: 'card', split: 'top', pip: 'pip' };
+function placeOf(slot, splitPlace = KIND_PLACE.split) {
+  if (slot?.place) return slot.place;
+  return slot?.kind === 'split' ? splitPlace : KIND_PLACE[slot?.kind] || 'full';
+}
 const MOTIONS = ['push', 'pull', 'drift', 'still'];
 const COLOURS = ['none', 'bw', 'muted', 'vivid', 'warm', 'cool'];
 const EDGES = ['cut', 'fade', 'pop', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'flash', 'zoom', 'glitch'];
@@ -110,6 +116,7 @@ function blockLines(slots) {
   return slots.map((s, i) => {
     const f = [`#${String(i + 1).padStart(2, '0')} ${s.start}-${s.end}`, `kind ${s.kind}`, `layer ${s.layer || 'front'}`];
     for (const k of ['y', 'w', 'h']) if (s[k] != null) f.push(`${k} ${s[k]}`);
+    if (s.place) f.push(`place ${s.place}`);
     if (s.border) f.push(`border ${s.border}`);
     if (s.shows) f.push(`shows~ ${one(s.shows)}`);
     if (s.shot) f.push(`shot ${one(s.shot)}`);
@@ -138,6 +145,7 @@ function fromRecipe(recipe) {
   const num = x => (x != null && x !== '' && Number.isFinite(+x) ? +x : null);
   if (Array.isArray(recipe.broll) && recipe.broll.length) {
     return recipe.broll.map((g, i) => ({ n: i + 1, start: +g.start, end: +g.end, kind: pick(v(g, 'kind'), KINDS, 'full'), layer: pick(v(g, 'layer'), ['front', 'behind'], 'front'),
+      ...(SPLIT_PLACES.includes(g.place) ? { place: g.place } : {}),
       ...Object.fromEntries(['y', 'w', 'h'].map(k => [k, num(v(g, k))]).filter(([, x]) => x != null)), ...(hexOK(v(g, 'border')) ? { border: String(v(g, 'border')).toLowerCase() } : {}),
       ...(v(g, 'shows') && v(g, 'shows') !== true ? { shows: String(v(g, 'shows')) } : {}), ...(v(g, 'shot') && v(g, 'shot') !== true ? { shot: String(v(g, 'shot')) } : {}),
       ...(v(g, 'source') && v(g, 'source') !== true ? { source: String(v(g, 'source')) } : {}), ...(g.src && g.src !== true ? { src: String(g.src) } : {}), ...(v(g, 'says') && v(g, 'says') !== true ? { says: String(v(g, 'says')) } : {}),
@@ -194,7 +202,7 @@ function wantScore(text) {
   sc += Math.min(2, ws.filter(w => w.length > 5 && !STOPW.has(w)).length * 0.5);
   return sc;
 }
-const slotOut = (s, a, b, words, extra = {}) => ({ n: 0, start: a, end: b, kind: s.kind, layer: s.layer || 'front', ...(s.y != null ? { y: s.y } : {}), ...(s.w != null ? { w: s.w } : {}), ...(s.h != null ? { h: s.h } : {}),
+const slotOut = (s, a, b, words, extra = {}) => ({ n: 0, start: a, end: b, kind: s.kind, ...(s.place ? { place: s.place } : {}), layer: s.layer || 'front', ...(s.y != null ? { y: s.y } : {}), ...(s.w != null ? { w: s.w } : {}), ...(s.h != null ? { h: s.h } : {}),
   ...(s.border ? { border: s.border } : {}), fx: { ...fxOf(s.fx) }, what: s.shows || null, shot: s.shot || (s.kind === 'panel' ? 'screen recording' : null), ...(s.source ? { source: s.source } : {}),
   ...(s.run ? { run: s.run, step: s.step } : {}), line: textUnder(words, a, b), ...extra, state: s.src ? 'filled' : 'needs', ...(s.src ? { file: s.src, by: 'recipe' } : {}) });
 const number = list => list.sort((p, q) => p.start - q.start).map((s, i) => ({ ...s, n: i + 1 }));
@@ -250,23 +258,24 @@ function forLook(lookBroll, { len, words = [], log = () => {} } = {}) {
 function lookSummary(refSlots, dur) {
   const total = refSlots.reduce((a, s) => a + (s.end - s.start), 0), by = k => refSlots.filter(s => s.kind === k).length;
   return { perMin: dur ? r2(refSlots.length * 60 / dur) : 0, share: dur ? r2(Math.min(1, total / dur)) : 0, kinds: Object.fromEntries(KINDS.map(k => [k, by(k)]).filter(([, n]) => n)),
-    slots: refSlots.slice(0, 12).map(s => ({ kind: s.kind, layer: s.layer || 'front', dur: r2(s.end - s.start), ...(s.y != null ? { y: s.y } : {}), ...(s.w != null ? { w: s.w } : {}), ...(s.h != null ? { h: s.h } : {}), ...(s.border ? { border: s.border } : {}), ...(s.shot ? { shot: s.shot } : {}), ...(s.run ? { run: s.run, step: s.step } : {}), fx: fxOf(s.fx) })) };
+    slots: refSlots.slice(0, 12).map(s => ({ kind: s.kind, ...(s.place ? { place: s.place } : {}), layer: s.layer || 'front', dur: r2(s.end - s.start), ...(s.y != null ? { y: s.y } : {}), ...(s.w != null ? { w: s.w } : {}), ...(s.h != null ? { h: s.h } : {}), ...(s.border ? { border: s.border } : {}), ...(s.shot ? { shot: s.shot } : {}), ...(s.run ? { run: s.run, step: s.step } : {}), fx: fxOf(s.fx) })) };
 }
 
 // ---------- what a slot needs, in plain words ----------
 const MOTION_WORDS = { push: 'slow push in', pull: 'slow pull out', drift: 'a gentle drift', still: 'held still' };
-const KIND_WORDS = { full: 'covers the whole frame', panel: 'a framed panel under your face', split: 'the top half, you below', pip: 'a small box in a corner' };
+const PLACE_WORDS = { full: 'covers the whole frame', card: 'a framed panel under your face', frame: 'a framed card above you', top: 'the top half, you below', pip: 'a small box in a corner' };
 const EDGE_WORDS = { cut: 'cuts in', fade: 'fades in', pop: 'pops in', 'slide-up': 'slides up', 'slide-down': 'slides down', 'slide-left': 'slides in from the right', 'slide-right': 'slides in from the left', flash: 'flashes in', zoom: 'zooms in', glitch: 'glitches in' };
 function brief(slot) {
   const secs = r2(slot.end - slot.start), shot = slot.shot || (slot.kind === 'panel' ? 'screen recording' : 'clip');
+  const shape = PLACE_WORDS[placeOf(slot)];
   const an = /^[aeiou]/i.test(shot) ? 'an' : 'a';
   // a fast run asks for several pictures, not one clip
-  if (slot.run) return { what: `a fast run of ${slot.run} clips or pictures${slot.what && slot.ref ? ` (the reference showed ${slot.what})` : ''}`, seconds: secs, shape: KIND_WORDS[slot.kind] || KIND_WORDS.full,
+  if (slot.run) return { what: `a fast run of ${slot.run} clips or pictures${slot.what && slot.ref ? ` (the reference showed ${slot.what})` : ''}`, seconds: secs, shape,
     treat: `one every ${(+slot.step || 0.25).toFixed(2)} s, on the beat`, line: slot.line || '', frame: 'any shape, each one is shown whole', run: slot.run, step: +slot.step || 0.25 };
   // the reference's own subject is a hint, not the answer: your words may be about something else
   const what = slot.what && slot.ref ? `${an} ${shot} (the reference showed ${slot.what})` : slot.what ? `${an} ${shot} of ${slot.what}` : slot.line ? `${an} ${shot} that fits "${slot.line.length > 70 ? slot.line.slice(0, 68).trim() + '...' : slot.line}"` : `${an} ${shot}`;
   const fx = slot.fx || fxOf(), treat = [MOTION_WORDS[fx.motion], fx.shake && 'a little shake', fx.glitch && 'a glitch', fx.colour !== 'none' && (fx.colour === 'bw' ? 'black and white' : fx.colour + ' colour'), EDGE_WORDS[fx.in]].filter(Boolean);
-  return { what, seconds: secs, shape: KIND_WORDS[slot.kind] || KIND_WORDS.full, treat: treat.join(', '), line: slot.line || '',
+  return { what, seconds: secs, shape, treat: treat.join(', '), line: slot.line || '',
     // 16:9 for a panel or the top of a split, upright for a full cutaway
     frame: slot.kind === 'full' ? 'upright 9:16' : 'wide 16:9' };
 }
@@ -298,7 +307,7 @@ function flipOf(slot) {
 // a full, split or pip slot with a clip as a cut.json insert (kit/assemble.cjs draws the fx)
 function insertOf(slot) {
   if (!slot.file) return null;
-  return { file: slot.file, at: slot.start, dur: r3(slot.end - slot.start), in: +slot.in || 0, place: slot.kind === 'split' ? 'top' : slot.kind === 'pip' ? 'pip' : 'full', fx: { ...fxOf(slot.fx) }, slot: slot.n };
+  return { file: slot.file, at: slot.start, dur: r3(slot.end - slot.start), in: +slot.in || 0, place: slot.kind === 'split' ? placeOf(slot) : slot.kind === 'pip' ? 'pip' : 'full', fx: { ...fxOf(slot.fx) }, slot: slot.n };
 }
 // a panel must not sit on the face: move it down (and make it smaller when the frame runs out) until its top edge is
 // under the chin. zones: build/facezone.json. Returns how many were moved.
@@ -320,4 +329,4 @@ function clearFaces(flips, fz, H = 1920) {
   return moved;
 }
 
-module.exports = { fastRuns, RUN, KINDS, MOTIONS, COLOURS, EDGES, BLOCK, BLOCK_NOTE, fxOf, kindOf, cleanWhat, detect, blockLines, appendBlock, fromRecipe, ownsCard, linesOf, snap, wantScore, forRecreate, forLook, lookSummary, brief, agentAsk, flipOf, insertOf, clearFaces };
+module.exports = { fastRuns, RUN, KINDS, SPLIT_PLACES, KIND_PLACE, placeOf, MOTIONS, COLOURS, EDGES, BLOCK, BLOCK_NOTE, fxOf, kindOf, cleanWhat, detect, blockLines, appendBlock, fromRecipe, ownsCard, linesOf, snap, wantScore, forRecreate, forLook, lookSummary, brief, agentAsk, flipOf, insertOf, clearFaces };
