@@ -149,6 +149,17 @@ try {
     const fr = RB.planRepo(lines, assets, { breakout: true }); assert.strictEqual(fr.inserts[0].place, 'frame');
     assert.deepStrictEqual(RB.planRepo(lines, []).inserts, []);
   });
+  await t('repo style: pictures change every 2 to 4 s, full screen stays 2 to 5 s, framed cards carry the bands', () => {
+    const long = [{ start: 3, end: 11, text: 'It reads your notes and makes a draft video with a longer walkthrough.', section: 'body' }];
+    const swapped = RB.planRepo(long, assets, { takeovers: 'off', breakout: true });
+    assert.ok(swapped.inserts.length >= 2 && swapped.inserts.every(x => x.place === 'frame' && x.dur <= 4.01 && x.dur >= 2), 'swaps: ' + JSON.stringify(swapped.inserts.map(x => [x.at, x.dur, x.place])));
+    assert.ok(new Set(swapped.inserts.map(x => x.file)).size >= 2, 'the pictures change');
+    assert.ok(swapped.inserts.every(x => x.bands && x.bands.repo === 0.45 && x.frameBg), 'framed cards carry the default bands and backdrop');
+    const named = [{ start: 3, end: 10, text: 'The live preview shows every change as you type in this longer look.', section: 'body' }];
+    const cap = RB.planRepo(named, assets, { breakout: true, swapSec: [8, 10] });
+    assert.strictEqual(cap.inserts[0].place, 'full'); assert.strictEqual(cap.inserts[0].dur, 5);
+    assert.ok(cap.inserts[1] && cap.inserts[1].place === 'frame' && Math.abs(cap.inserts[1].at - 8) < 0.05, 'leftover after the cap stays a split shot: ' + JSON.stringify(cap.inserts));
+  });
   await t('apply: a drafted job gets split and full screen repo inserts from the cached repo, you on the hook and CTA; off clears them', async () => {
     const { mkdirSync } = await import('fs'), { execFileSync } = await import('child_process');
     const jobs = join(TMP, 'jobs'), build = join(jobs, 'rj', 'build'), clips = join(TMP, 'clips'); mkdirSync(build, { recursive: true }); mkdirSync(clips, { recursive: true });

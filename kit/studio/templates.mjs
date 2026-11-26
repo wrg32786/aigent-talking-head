@@ -1,12 +1,13 @@
 // The Template Library store (docs/specs/studio-builder.md section 5): looks/local/<name>/template.json next to an
 // optional look.json, local and out of git (LOOKS_DIR), as style looks are.
-//   list(cat)              saved templates, saved looks with no template.json (their plan derived), the six starter packs
+//   list(cat)              saved templates, saved looks with no template.json (their plan derived), shipped plan starters and the starter packs
 //   save(name, { plan })   from the builder's Make it step; saveFromLook(name, look, from) after a teardown
 //   rename, duplicate, remove (the page asks first), planFor(name, cat) the plan a template starts a video with
 // Starters are read only: Duplicate one to make it yours. A look you saved stays a look: Rename only sets its label.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { execFile } from 'child_process';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import * as VP from './wizard/plan.mjs';
 import { planFromLook } from './wizard/from-look.mjs';
@@ -31,9 +32,21 @@ const thumbUrl = name => { const f = thumbOf(name); return f && existsSync(f) ? 
 export const exists = name => typeof name === 'string' && SL.NAME_RE.test(name) && existsSync(fileOf(name));
 // a name already used by a template or a look folder (a teardown save checks first, so nothing is written over)
 const packNames = cat => new Set(((cat && cat.packs) || []).map(p => p.name));
-const used = (n, cat) => existsSync(join(SL.dirOf(), n)) || packNames(cat).has(n); // a folder, or a starter's name
+const used = (n, cat) => existsSync(join(SL.dirOf(), n)) || packNames(cat).has(n) || !!loadBundled(n); // a folder, or a starter's name
 export const taken = (raw, cat = null) => { const n = SL.slug(String(raw || '')).replace(/^-+|-+$/g, ''); return !!n && used(n, cat); };
-export function load(name) { try { const t = JSON.parse(readFileSync(fileOf(name), 'utf8')); return t && t.format === FORMAT ? t : null; } catch { return null; } }
+const STARTERS_DIR = join(dirname(fileURLToPath(import.meta.url)), 'starters');
+function bundledNames() {
+  try { return readdirSync(STARTERS_DIR).filter(n => SL.NAME_RE.test(n) && existsSync(join(STARTERS_DIR, n, 'template.json'))); }
+  catch { return []; }
+}
+function loadBundled(name) {
+  try { const t = JSON.parse(readFileSync(join(STARTERS_DIR, name, 'template.json'), 'utf8')); return t && t.format === FORMAT && t.plan ? t : null; }
+  catch { return null; }
+}
+export function load(name) {
+  try { const t = JSON.parse(readFileSync(fileOf(name), 'utf8')); if (t && t.format === FORMAT) return t; } catch {}
+  return loadBundled(name);
+}
 // a short name from the plan when you give none: "lively kinetic", then "lively kinetic 2" and so on
 function nameFor(plan, cat) {
   const base = SL.slug([plan.pace !== 'look' ? plan.pace : 'my', plan.words.type === 'kinetic' ? 'kinetic' : plan.words.type === 'captions' ? 'captions' : 'video'].join(' '));
@@ -74,6 +87,13 @@ export function list(cat = null) {
     else if (look) out.push({ name: n, label: n.replace(/-/g, ' '), kind: 'look', look: true, source: 'From a teardown', from: (look.from && (look.from.reference || look.from.teardown)) || null, createdAt: look.created || null, pace: planFromLook(look, cat).pace, preview: null, thumb: thumbUrl(n), readOnly: false });
   }
   out.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  const seen = new Set(out.map(x => x.name));
+  for (const n of bundledNames()) {
+    if (seen.has(n)) continue;
+    const t = loadBundled(n); if (!t) continue;
+    seen.add(n);
+    out.push({ name: n, label: t.label || n.replace(/-/g, ' '), line: t.line || '', kind: 'template', source: 'Starter', from: null, createdAt: null, pace: (t.plan && t.plan.pace) || 'look', preview: t.preview || null, thumb: null, readOnly: true });
+  }
   for (const p of starters(cat)) out.push({ name: p.name, label: p.name.replace(/-/g, ' '), line: p.label || p.description || '', kind: 'pack', source: 'Starter', from: null, createdAt: null, pace: 'look', preview: p.preview || null, readOnly: true });
   return out;
 }

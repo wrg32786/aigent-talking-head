@@ -1,0 +1,49 @@
+{
+  "format": "aigent-template",
+  "version": 1,
+  "name": "repo-feature-breakout",
+  "label": "Repo feature (breakout)",
+  "line": "A GitHub repo on top, word-by-word captions in the middle, you in a rounded box with your head over the edge.",
+  "createdAt": null,
+  "from": { "kind": "starter" },
+  "preview": null,
+  "plan": {
+    "format": "aigent-video-plan",
+    "version": 1,
+    "template": { "kind": "starter", "name": "repo-feature-breakout" },
+    "pace": "lively",
+    "words": {
+      "type": "kinetic",
+      "look": "oneword",
+      "entrance": null,
+      "titles": { "on": null, "entrances": [], "effect": null, "exit": null },
+      "place": { "captions": null, "titles": [] },
+      "colors": { "theme": null, "text": null, "accent": null, "outline": null },
+      "fonts": null,
+      "keyWords": { "level": "strong", "color": "accent", "maxPerLine": 1 }
+    },
+    "transitions": { "ids": null, "when": "every-cut" },
+    "presenter": [
+      { "id": "punch", "when": "whole" },
+      { "id": "frame-breakout", "when": "whole", "auto": true }
+    ],
+    "graphics": { "agent": true, "nameTag": true, "numbers": true, "stickers": true, "cta": true, "cards": null },
+    "filters": { "ids": null, "when": "whole" },
+    "content": {
+      "repoFeature": true,
+      "repos": [],
+      "layout": "split",
+      "takeovers": "auto",
+      "example": null,
+      "bands": { "repo": 0.45, "captions": 0.10, "you": 0.45 },
+      "takeoverSec": [2, 5],
+      "swapSec": [2, 4],
+      "frameBg": ["#e8eaed", "#dfe3e8"],
+      "headline": false
+    },
+    "music": { "bed": "auto", "energy": "mid", "beatSync": true, "sfx": true },
+    "notes": "",
+    "advanced": { "picks": {}, "tighten": null },
+    "touched": ["pace", "words", "content"]
+  }
+}

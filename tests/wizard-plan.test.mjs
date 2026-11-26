@@ -16,6 +16,7 @@ const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const STATE = mkdtempSync(join(tmpdir(), 'wizard-plan-test-'));
 process.env.STUDIO_DIR = STATE;
 const VP = await import('../kit/studio/wizard/plan.mjs');
+const TPL = await import('../kit/studio/templates.mjs');
 const FL = await import('../kit/studio/wizard/from-look.mjs');
 const C = await import('../kit/studio/core.mjs');
 const API = await import('../kit/studio/wizard/api.mjs');
@@ -38,13 +39,17 @@ try {
     const bad = VP.normalize({ pace: 'zoomy', words: { type: 'captions', entrance: 'pop', look: 'kinetic' }, transitions: { ids: ['nope'] }, content: { repoFeature: true }, presenter: [{ id: 'fly', when: 'whole' }] });
     const v = VP.validate(bad, cat); assert.strictEqual(v.ok, false);
     const text = v.errs.join('\n');
-    for (const want of [/Pacing/, /only moves kinetic words/, /kinetic style/, /Transitions: we do not have one called nope/, /add at least one repo link/, /Presenter effects: we do not have one called fly/]) assert.match(text, want);
+    for (const want of [/Pacing/, /only moves kinetic words/, /kinetic style/, /Transitions: we do not have one called nope/, /Presenter effects: we do not have one called fly/]) assert.match(text, want);
     assert.ok(!/\u2014/.test(text), 'no em dash');
     assert.ok(!/allow|deny|captionStyle|flag/.test(v.errs.filter(e => !e.startsWith('All options')).join(' ')), 'no engine words');
     // a section of the wrong shape is a plain error, never a crash
     for (const junk of [{ words: null }, { content: 'x' }, { advanced: null }, { words: { titles: { entrances: 5 } } }, { presenter: {} }, { pace: 'constructor' }]) {
       const r = VP.validate({ format: 'aigent-video-plan', ...junk }, cat); assert.strictEqual(r.ok, false, JSON.stringify(junk)); }
     assert.match(VP.validate({ format: 'aigent-video-plan', presenter: [{ id: 'punch', when: 'hook' }] }, cat).errs.join(' '), /whole video/);
+    const emptyRepo = VP.normalize({ content: { repoFeature: true } });
+    assert.ok(VP.validate(emptyRepo, cat).ok, 'a starter can turn repo mode on before you add a link');
+    assert.deepStrictEqual(VP.pending(emptyRepo).filter(x => x.field === 'content.repos').map(x => x.text), ['Add a repo link']);
+    assert.ok(!VP.validate(VP.normalize({ content: { bands: { repo: 0.9, captions: 0.1, you: 0.1 } } }), cat).ok, 'band shares have to add up');
   });
 
   await t('a plan sets the same picks as the same clicks on the classic steps', () => {
@@ -260,6 +265,22 @@ try {
     assert.strictEqual(API.planOf(kept, cat).words.fonts, null, 'a font pick stays with its video, in the plan too');
     assert.strictEqual(kept.videoPlan && kept.videoPlan.pace, 'lively');
     assert.ok(!clean.videoPlan);
+  });
+
+  await t('the Repo feature (breakout) starter is in the library, valid, and asks for a repo link', () => {
+    const card = TPL.list(cat).find(x => x.name === 'repo-feature-breakout');
+    assert.ok(card && card.readOnly && card.label === 'Repo feature (breakout)' && card.source === 'Starter');
+    const plan = TPL.planFor('repo-feature-breakout', cat);
+    const v = VP.validate(plan, cat); assert.ok(v.ok, v.errs && v.errs.join('; '));
+    assert.ok(plan.content.repoFeature && plan.content.repos.length === 0);
+    assert.deepStrictEqual(plan.content.bands, VP.REPO_STYLE.bands);
+    assert.deepStrictEqual(plan.content.takeoverSec, [2, 5]);
+    assert.deepStrictEqual(plan.content.swapSec, [2, 4]);
+    assert.strictEqual(plan.words.type, 'kinetic'); assert.strictEqual(plan.words.look, 'oneword');
+    assert.strictEqual(plan.words.keyWords.level, 'strong');
+    assert.ok(plan.presenter.some(x => x.id === 'frame-breakout'));
+    assert.deepStrictEqual(VP.pending(plan).map(x => x.field), ['content.repos']);
+    assert.ok(TPL.taken('repo-feature-breakout', cat), 'its name is reserved');
   });
 
   await t('a saved look reads into a plan the check accepts; a template leaves choices to the look', () => {

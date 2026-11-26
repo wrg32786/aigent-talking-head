@@ -50,7 +50,7 @@ export function blank() {
     presenter: [{ id: 'punch', when: 'whole' }],
     graphics: { agent: true, nameTag: true, numbers: true, stickers: true, cta: true, cards: null },
     filters: { ids: null, when: 'whole' },
-    content: { repoFeature: false, repos: [], layout: 'split', takeovers: 'auto', example: null },
+    content: { repoFeature: false, repos: [], layout: 'split', takeovers: 'auto', example: null, bands: null, takeoverSec: null, swapSec: null, frameBg: null, headline: false },
     music: { bed: 'auto', energy: 'auto', beatSync: null, sfx: true },
     notes: '', advanced: { picks: {}, tighten: null }, touched: [],
   };
@@ -155,6 +155,8 @@ export function withWords(plan, words) {
 // only the fields given, presenter is the whole list. A choice here wins over All options picks it speaks for.
 // a public GitHub repo link: https://github.com/owner/repo (never . or .. as a name); shared with the Content step
 export const REPO_RE = /^https:\/\/github\.com\/(?!\.\.?\/)[\w.-]+\/(?!\.\.?\/?$)[\w.-]+?(?:\.git)?\/?$/;
+// repo-mode layout and timing (kit/repo-broll.mjs REPO_STYLE). null on the plan means use those defaults.
+export const REPO_STYLE = { bands: { repo: 0.45, captions: 0.10, you: 0.45 }, takeoverSec: [2, 5], swapSec: [2, 4], frameBg: ['#e8eaed', '#dfe3e8'] };
 export const PARTS = ['transitions', 'presenter', 'graphics', 'filters', 'content', 'music', 'notes'];
 export function withPart(plan, part, value) {
   const p = rawNormalize(plan), before = clone(p);
@@ -216,7 +218,7 @@ export function validate(plan, cat = null) {
   need(p.format === FORMAT, `format must be ${FORMAT}.`);
   need(Object.hasOwn(PACES, p.pace), `Pacing: pick ${Object.keys(PACES).join(', ')}.`);
   if (p.template !== null) {
-    need(isObj(p.template) && ['pack', 'look'].includes(p.template.kind) && typeof p.template.name === 'string' && p.template.name, 'Template: give its kind (pack or look) and its name.');
+    need(isObj(p.template) && ['pack', 'look', 'starter'].includes(p.template.kind) && typeof p.template.name === 'string' && p.template.name, 'Template: give its kind (pack, look or starter) and its name.');
     if (cat && p.template && p.template.kind === 'pack') need((cat.packs || []).some(x => x.name === p.template.name), `Template: no starter template called ${p.template.name}.`);
   }
   const w = p.words;
@@ -258,7 +260,14 @@ export function validate(plan, cat = null) {
   const c = p.content;
   need(typeof c.repoFeature === 'boolean', 'Repo feature: on or off.');
   need(Array.isArray(c.repos) && c.repos.length <= 3 && c.repos.every(u => REPO_RE.test(u)), 'Repos: up to 3 links like https://github.com/owner/repo.');
-  if (c.repoFeature) need(c.repos.length > 0, 'Repo feature: add at least one repo link.');
+  // a template can turn the mode on before you add a link; Make and repo-broll wait for one
+  const bandOk = b => isObj(b) && ['repo', 'captions', 'you'].every(k => typeof b[k] === 'number' && b[k] >= 0.06 && b[k] <= 0.7) && Math.abs(b.repo + b.captions + b.you - 1) <= 0.08;
+  const secOk = v => Array.isArray(v) && v.length === 2 && v.every(n => typeof n === 'number' && n >= 0.5 && n <= 12) && v[0] <= v[1];
+  need(c.bands === null || bandOk(c.bands), 'Repo layout: three shares for the repo, the captions and you, adding up to the whole frame.');
+  need(c.takeoverSec === null || secOk(c.takeoverSec), 'Full screen moments: a shortest and longest time, in seconds.');
+  need(c.swapSec === null || secOk(c.swapSec), 'How often the pictures change: a shortest and longest time, in seconds.');
+  need(c.frameBg === null || (Array.isArray(c.frameBg) && c.frameBg.length === 2 && c.frameBg.every(x => /^#[0-9a-f]{6}$/i.test(x))), 'Repo backdrop: two colours, or leave it.');
+  need(typeof c.headline === 'boolean', 'Headline: on or off.');
   need(['split'].includes(c.layout) && ['auto', 'off'].includes(c.takeovers), 'Repo feature: layout split, takeovers auto or off.');
   need(c.example === null || (typeof c.example === 'string' && /^https?:\/\/\S+$/.test(c.example) && c.example.length <= 500), 'Example video: a link, or leave it empty.');
   const m = p.music;
@@ -317,6 +326,8 @@ export function pending(plan) {
   if (w.place.captions || w.place.titles.length) add('words.place', 'Where words sit');
   if (w.colors.text || w.colors.accent || w.colors.outline) add('words.colors', 'Your own text colors');
   if (w.keyWords.level !== 'off' && (w.keyWords.color !== 'accent' || w.keyWords.maxPerLine !== 1)) add('words.keyWords', 'Key word color and how many per line');
+  if (p.content.repoFeature && !(p.content.repos || []).length) add('content.repos', 'Add a repo link');
+  if (p.content.headline) add('content.headline', 'A short title at the top with one highlighted word');
   for (const x of p.presenter) {
     if (x && x.id === 'frame-breakout' && !p.content.repoFeature) add('presenter.frame-breakout', 'Frame breakout');
   }
@@ -397,7 +408,7 @@ export function fromState(s, prev = null, cat = null) {
 export function fromTemplate(t) {
   if (!t) return defaults();
   if (t.plan) return normalize({ ...t.plan, template: t.template || t.plan.template || null });
-  if (t.kind === 'pack' || t.kind === 'look') return normalize({ template: { kind: t.kind, name: t.name } });
+  if (t.kind === 'pack' || t.kind === 'look' || t.kind === 'starter') return normalize({ template: { kind: t.kind, name: t.name } });
   return defaults();
 }
 
@@ -406,7 +417,7 @@ const nameOf = id => String(id).replace(/-/g, ' ');
 const list = xs => xs.length ? xs.join(', ') : 'none';
 export function summary(plan, cat = null) {
   const p = normalize(plan), w = p.words, rows = [], row = (section, step, text) => rows.push({ section, step, text });
-  if (p.template) row('Template', 'start', `${p.template.kind === 'pack' ? 'Starter template' : 'Your template'} ${p.template.name}`);
+  if (p.template) row('Template', 'start', `${p.template.kind === 'look' ? 'Your template' : 'Starter template'} ${p.template.name}`);
   row('Pace', 'pace', PACES[p.pace] ? PACES[p.pace].label : p.pace);
   const words = [w.type === 'kinetic' ? 'Kinetic words' : w.type === 'captions' ? 'Just captions' : 'Captions: we decide'];
   if (w.look && !(w.type === 'kinetic' && w.look === 'kinetic')) words.push(nameOf(w.look));
@@ -421,7 +432,7 @@ export function summary(plan, cat = null) {
   row('You on screen', 'presenter', list(p.presenter.map(x => `${PN[x.id] || String(x.id).replace(/^effect:/, '').replace(/-/g, ' ')}${x.when !== 'whole' ? ` (${x.when.replace(/-/g, ' ')})` : ''}`)));
   row('Graphics', 'graphics', p.graphics.agent ? 'The agent chooses' : list(Object.keys(GRAPHIC_GROUPS).filter(k => p.graphics[k]).map(k => ({ nameTag: 'name tag', numbers: 'numbers and lists', stickers: 'stickers', cta: 'call to action' })[k])));
   row('Filters', 'filters', p.filters.ids === null ? 'We pick' : p.filters.ids.length ? `${list(p.filters.ids)}${p.filters.when !== 'whole' ? `, ${p.filters.when.replace(/-/g, ' and ')} only` : ''}` : 'None');
-  if (p.content.repoFeature) row('Content', 'content', `Repo feature: ${list(p.content.repos.map(u => u.replace(/^https:\/\/github\.com\//, '')))}`);
+  if (p.content.repoFeature) row('Content', 'content', `Repo feature${p.content.repos.length ? ': ' + list(p.content.repos.map(u => u.replace(/^https:\/\/github\.com\//, ''))) : ' (add a repo link)'}`);
   row('Music', 'music', [p.music.bed === 'auto' ? 'we pick the track' : p.music.bed === 'none' ? 'no music' : p.music.bed, p.music.sfx ? 'sound effects on' : 'no sound effects'].join(', '));
   if (p.notes.trim()) row('Your notes', 'notes', p.notes.trim());
   return rows;

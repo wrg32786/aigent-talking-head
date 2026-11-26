@@ -58,7 +58,7 @@ Every step screen has the same frame (section 6): a title in plain words, an **A
 | 12 | Extras | **Graphics** (one screen, defaults on "Let the agent choose") | Small graphics over the frame | toggles: Name tag, Numbers and lists, Stickers and callouts, Call to action, Colour and chapter cards | `plan.cjs` proposes graphics from what you say; 30 `graphic` + data effects. Added by us, Will did not list it; it keeps today's graphics from disappearing |
 | 13 | Look | **Filters** | The whole picture | none, or one or more | 10 `finish` values (grain, vignette, chroma, scan-lines, warm, cool, teal, crushed, mono = Black and white, bleach) |
 | 14 | | **When filters show** | Time | Whole video, Hook only, CTA only, Hook and CTA | per-segment `finish` in `cut.json` (`assemble.cjs` line 132) + new section tags (section 8) |
-| 15 | Content style | **Repo or tool feature** (checkbox) | Layout of the whole video | off / on; 1 to 3 GitHub URLs; layout: Split (repo top, you bottom), takeovers auto, frame breakout on by default (turn off in step 11) | `capture.mjs` (README screenshot + scroll), `split.cjs` top/frame, person mask. See section 9 |
+| 15 | Content style | **Repo or tool feature** (checkbox) | Layout of the whole video | off / on; 0 to 3 GitHub URLs (a starter can wait for a link); layout: Split (about 45/10/45 with frame breakout), takeovers auto (2-5 s), pictures every 2-4 s, frame breakout on by default (turn off in step 11) | `capture.mjs` (README screenshot + scroll), `split.cjs` top/frame, person mask. See section 9 |
 | 16 | Sound | **Music** (last, as Will asked) | Sound | bed (or none / your own), energy, beat-sync, sound effects on/off | `music.bed`, `music.energy`, `beat-sync`, `sound.sfx`, `sound.cap` |
 | 17 | Finish | **Your notes for the agent** | Anything | free text, plus 4 example chips ("Hook with big red words", "Keep it calm", "No sound effects", "Show the repo early") | New. Stored as `plan.notes`, given to the agent verbatim |
 | 18 | | **Make it** | | `Save as a template` (optional name), `Make my video` | Agent build + frame check loop (section 10), then Review and Render as today |
@@ -151,7 +151,7 @@ The builder writes one JSON document. The page, the server, the MCP tools and th
   ],
   "graphics": { "agent": true, "nameTag": true, "numbers": true, "stickers": false, "cta": true, "cards": false },
   "filters": { "ids": ["mono"], "when": "whole | hook | cta | hook-cta" },
-  "content": { "repoFeature": false, "repos": [], "layout": "split", "takeovers": "auto", "example": null },
+  "content": { "repoFeature": false, "repos": [], "layout": "split", "takeovers": "auto", "example": null, "bands": null, "takeoverSec": null, "swapSec": null, "frameBg": null, "headline": false },
   "music": { "bed": "auto | none | <id> | upload", "energy": "auto | low | mid | high", "beatSync": true, "sfx": true },
   "notes": "Hook with big red words.",
   "advanced": { "picks": {} }
@@ -246,7 +246,9 @@ Checkbox on step 15. When on:
 
 **Layout.**
 - Default: **Split**, repo on top, you on the bottom (`split.cjs` `"top"`, with the person mask so your head sits over the panel edge).
-- **Takeovers**: full-screen repo when you point at a feature ("look at this", "here", "this part", or a line that names the matched heading) and full-screen you on the hook, the punch lines and the CTA. `takeovers: auto | off`.
+- **Takeovers**: full-screen repo when you point at a feature ("look at this", "here", "this part", or a line that names the matched heading) and full-screen you on the hook, the punch lines and the CTA. `takeovers: auto | off`. Full screen repo moments last `takeoverSec` (default 2 to 5 seconds) and hide you while the caption stays; leftover time goes back to the split. Pictures on a long line change every `swapSec` (default 2 to 4 seconds).
+- **Layout**: `bands` (default `{ repo: 0.45, captions: 0.10, you: 0.45 }`) is the 9:16 split for framed repo cards in `kit/split.cjs` `frameFromBands`. Null uses that default when frame breakout is on. `frameBg` is an optional two-colour backdrop (default a soft grey, not a branded grid). `headline` is an optional short title with one highlighted word; when on, `pending()` lists it until it can be drawn.
+- **Starter**: `kit/studio/starters/repo-feature-breakout/template.json`, labelled **Repo feature (breakout)** in the Template Library, is a shipped plan (repo mode on, empty `repos`, frame breakout, word-by-word captions). A plan may have `repoFeature: true` with no links; `pending()` asks for one, and `repo-broll` waits.
 - **Frame breakout** (`split.cjs` `"frame"`, head breaking out of the card) is on by default in repo mode (on the repo split shots). Turn it off in step 11 if you want the plain split instead.
 - Captions move into the seam band (`capY` in `split.cjs`), never on the face, never on the repo's key text.
 

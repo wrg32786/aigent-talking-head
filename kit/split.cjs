@@ -17,9 +17,26 @@ const PLACES = ['full', 'top', 'pip', 'frame'];
 const SPLIT = ['top', 'frame'];
 const FRAME = { top: { x: 54, y: 72, w: 972, h: 760, r: 40 }, card: { x: 96, y: 1110, w: 888, h: 740, r: 40 }, scale: 0.9, breakout: 60, border: 4, capY: 912 };
 const DEF_COLOR = '#3d8bff', DEF_BG = ['#f4ede3', '#e7e2f3'];
+// repo-mode breakout (plan.content.bands, kit/repo-broll.mjs REPO_STYLE): about 45% repo card, 10% caption band, 45% you
+const REPO_BANDS = { repo: 0.45, captions: 0.10, you: 0.45 };
 const SHADOW_H = 36;
 const even = n => Math.round(n / 2) * 2;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+function frameFromBands(bands, H = 1920, W = 1080) {
+  const b = bands && typeof bands === 'object' ? bands : REPO_BANDS;
+  const repo = clamp(+b.repo || REPO_BANDS.repo, 0.25, 0.65), cap = clamp(+b.captions || REPO_BANDS.captions, 0.06, 0.2);
+  const y1 = even(H * repo), y2 = even(H * (repo + cap)), r = b.radius != null ? clamp(+b.radius, 8, 80) : 36, pad = 48;
+  const br = b.breakout != null ? clamp(+b.breakout, 20, 200) : 88;
+  const topH = even(Math.max(120, y1 - pad - 16));
+  const cardH = even(Math.max(160, H - y2 - pad));
+  // captions sit in the free upper part of the middle band, above the head that breaks out of the box
+  const capY = even(y1 + Math.min(64, Math.max(32, (y2 - y1 - br) * 0.45)));
+  return {
+    top: { x: pad, y: even(Math.max(16, y1 - pad - topH)), w: W - pad * 2, h: topH, r },
+    card: { x: even(pad * 1.5), y: y2, w: W - even(pad * 3), h: cardH, r },
+    scale: 0.9, breakout: br, border: 4, capY,
+  };
+}
 const median = a => { if (!a.length) return null; const s = [...a].sort((p, q) => p - q); return s[Math.floor(s.length / 2)]; };
 
 // the face over an insert's span: median crown (top of the head) and face centre x, from facezone.json
@@ -48,7 +65,8 @@ function layout(ins, face, { mask = true, frame = null } = {}) {
     return { place, panel: { x: 0, y: fy, w: W, h: half }, seam, s: 1, dx: 0, dy, band: mask && over > 0 ? { y0: Math.max(fy, seam - over - 150), y1: Math.min(fy + fh, seam + SHADOW_H + 4) } : null, capY: Math.round(seam - Math.max(over, 0) - 110), mask };
   }
   const fit = r => (frame ? { ...r, y: Math.round(fy + r.y * k), h: even(r.h * k) } : r);
-  const F = { ...FRAME, top: fit(FRAME.top), card: fit(FRAME.card), capY: Math.round(fy + FRAME.capY * k) }, s = F.scale, sw = even(W * s), sh = even(H * s), c = F.card;
+  const base = ins && ins.bands ? frameFromBands(ins.bands, H, W) : FRAME;
+  const F = { ...base, top: fit(base.top), card: fit(base.card), capY: Math.round(fy + base.capY * k) }, s = F.scale, sw = even(W * s), sh = even(H * s), c = F.card;
   const cx = face && face.cx != null ? face.cx : W / 2;
   const dx = Math.round(clamp(W / 2 - cx * s, c.x + c.w - sw, c.x));
   const want = mask ? c.y - F.breakout : c.y + 36;
@@ -56,7 +74,8 @@ function layout(ins, face, { mask = true, frame = null } = {}) {
   const dy = Math.round(clamp(want - crown * s, c.y + c.h - (fy + fh) * s, c.y - fy * s));
   return { place, panel: { ...F.top }, card: { ...c }, s, sw, sh, dx, dy, band: mask ? { y0: Math.max(fy, c.y - F.breakout - 190), y1: c.y + F.border + 2 } : null, capY: F.capY,
     color: /^#[0-9a-f]{6}$/i.test(ins.frameColor || '') ? ins.frameColor : DEF_COLOR,
-    bg: Array.isArray(ins.frameBg) && ins.frameBg.every(x => /^#[0-9a-f]{6}$/i.test(x)) ? ins.frameBg.slice(0, 2) : DEF_BG, mask };
+    bg: Array.isArray(ins.frameBg) && ins.frameBg.every(x => /^#[0-9a-f]{6}$/i.test(x)) ? ins.frameBg.slice(0, 2) : DEF_BG,
+    shadow: !!(ins && ins.bands), mask };
 }
 
 // how a clip fills the split panel (report 4 item 21): the insert's own "fit" wins; else a wide clip (16:9 and wider,
@@ -90,7 +109,8 @@ function chromeGeq(g) {
     return `(hypot(max(abs(X-${cx})-${hw},0),max(abs(Y-${cy})-${hh},0))+min(max(abs(X-${cx})-${hw},abs(Y-${cy})-${hh}),0)-${r.r})`; };
   const d = `min(${sd(g.panel)},${sd(g.card)})`;
   // 0: distance, 1: border weight, 2: glow, 3: backdrop
-  const pre = `st(0,${d});st(1,clip(0.5-ld(0),0,1));st(2,0.42*exp(-max(ld(0),0)/26))`;
+  const glow = g.shadow ? '0.58*exp(-max(ld(0),0)/22)' : '0.42*exp(-max(ld(0),0)/26)';
+  const pre = `st(0,${d});st(1,clip(0.5-ld(0),0,1));st(2,${glow})`;
   const ch = k => `${pre};st(3,${T[k]}+(${Bt[k] - T[k]})*Y/H);ld(1)*${A[k]}+(1-ld(1))*(ld(3)*(1-ld(2))+${A[k]}*ld(2))`;
   return `geq=r='${ch(0)}':g='${ch(1)}':b='${ch(2)}':a='255*clip(${d}+${B}+0.5,0,1)'`;
 }
@@ -103,4 +123,4 @@ function lightBg(ins) {
 // a soft shadow under the split panel's lower edge (1080x36 RGBA), drawn under your head
 const shadowGeq = () => `geq=r=0:g=0:b=0:a='110*pow(1-Y/H,2)'`;
 
-module.exports = { PLACES, SPLIT, FRAME, SHADOW_H, WIDE, fitOf, wholeBox, faceOver, layout, mapZone, chromeGeq, shadowGeq, lightBg };
+module.exports = { PLACES, SPLIT, FRAME, REPO_BANDS, frameFromBands, SHADOW_H, WIDE, fitOf, wholeBox, faceOver, layout, mapZone, chromeGeq, shadowGeq, lightBg };

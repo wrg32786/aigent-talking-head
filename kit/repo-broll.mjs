@@ -255,26 +255,72 @@ const toks = s => String(s || '').toLowerCase().match(/[a-z0-9]{3,}/g) || [];
 const STOP = new Set(['the', 'and', 'for', 'with', 'you', 'your', 'this', 'that', 'how', 'what', 'are', 'from', 'into', 'about', 'use', 'using', 'can', 'all', 'our', 'get', 'out', 'now', 'just']);
 // how well a line names an asset's heading or alt text (0 none, 1 or more: words in common)
 export function score(line, a) { const lw = new Set(toks(line).filter(w => !STOP.has(w))); return [...new Set(toks(a.heading + ' ' + a.alt).filter(w => !STOP.has(w)))].filter(w => lw.has(w) || lw.has(w.replace(/s$/, ''))).length; }
+// repo-mode layout and timing (plan.content, or these defaults). Template-able: a starter or a saved plan can
+// set bands, takeoverSec and swapSec. About 45/10/45, full-screen takeovers 2-5 s, visuals every 2-4 s.
+export const REPO_STYLE = { bands: { repo: 0.45, captions: 0.10, you: 0.45 }, takeoverSec: [2, 5], swapSec: [2, 4], frameBg: ['#e8eaed', '#dfe3e8'] };
+const pair = (v, fb) => (Array.isArray(v) && v.length === 2 && v.every(n => typeof n === 'number' && n > 0) && v[0] <= v[1] ? v : fb);
+const chunks = (start, end, [lo, hi]) => {
+  const dur = end - start; if (dur <= hi) return [[start, end]];
+  const n = Math.max(2, Math.ceil(dur / hi)), step = dur / n, out = [];
+  for (let i = 0; i < n; i++) out.push([+(start + i * step).toFixed(2), +(i === n - 1 ? end : start + (i + 1) * step).toFixed(2)]);
+  return out;
+};
 // lines: [{ start, end, text, section: hook | body | cta }] on the reel timeline; assets with { path, kind, heading, alt }
 // -> { inserts: [{ file, at, dur, place, image, repo: true, line }], takeovers: [{ at, dur, who: repo | you }] }
-export function planRepo(lines, assets, { takeovers = 'auto', breakout = false, minDur = 1.2 } = {}) {
+export function planRepo(lines, assets, { takeovers = 'auto', breakout = false, minDur = 1.2, bands = null, takeoverSec = null, swapSec = null, frameBg = null } = {}) {
   const inserts = [], who = []; if (!assets.length) return { inserts, takeovers: who };
   const split = breakout ? 'frame' : 'top', used = new Map(); let next = 0;
+  const style = {
+    bands: bands || (breakout ? REPO_STYLE.bands : null),
+    takeoverSec: pair(takeoverSec, REPO_STYLE.takeoverSec),
+    swapSec: pair(swapSec, REPO_STYLE.swapSec),
+    frameBg: Array.isArray(frameBg) ? frameBg : (breakout ? REPO_STYLE.frameBg : null),
+  };
   const pick = text => {
     let best = null, bs = 0;
     for (const a of assets) { const s = score(text, a) - (used.get(a.path) || 0) * 0.5; if (s > bs && score(text, a) >= 1) { best = a; bs = s; } }
     if (best) return { a: best, named: true };
     const a = assets[next % assets.length]; next++; return { a, named: false };
   };
+  const push = (l, a, named, at, end, full) => {
+    let d = +(end - at).toFixed(2);
+    if (a.kind === 'video' && a.seconds) d = +Math.min(d, a.seconds).toFixed(2);
+    if (full) {
+      const hi = style.takeoverSec[1];
+      if (d > hi) d = hi;
+    }
+    const row = { file: a.path, at: +at.toFixed(2), dur: d, in: 0, place: full ? 'full' : split, image: a.kind === 'image', repo: true, line: l.text.slice(0, 80), ...(full ? {} : { fit: 'whole' }), ...(a.seconds ? { seconds: a.seconds } : {}) };
+    if (split === 'frame' && !full) {
+      if (style.bands) row.bands = style.bands;
+      if (style.frameBg) row.frameBg = style.frameBg;
+    }
+    inserts.push(row);
+    if (full) who.push({ at: row.at, dur: d, who: 'repo', why: named ? `names ${a.heading || a.alt}` : 'points at it' });
+  };
   for (const l of lines) {
     const dur = +(l.end - l.start).toFixed(2); if (dur < minDur) continue;
     const words = toks(l.text).length, punch = l.section === 'body' && (/!\s*$/.test(l.text) || words <= 4);
     if (l.section !== 'body' || (punch && takeovers === 'auto')) { if (takeovers === 'auto') who.push({ at: l.start, dur, who: 'you', why: l.section === 'body' ? 'punch line' : l.section }); continue; }
-    const { a, named } = pick(l.text); used.set(a.path, (used.get(a.path) || 0) + 1);
-    const full = takeovers === 'auto' && (POINT.test(l.text) || named);
-    const at = +l.start.toFixed(2), d = +Math.min(dur, a.kind === 'video' && a.seconds ? a.seconds : Infinity).toFixed(2);
-    inserts.push({ file: a.path, at, dur: d, in: 0, place: full ? 'full' : split, image: a.kind === 'image', repo: true, line: l.text.slice(0, 80), ...(full ? {} : { fit: 'whole' }), ...(a.seconds ? { seconds: a.seconds } : {}) });
-    if (full) who.push({ at, dur: d, who: 'repo', why: named ? `names ${a.heading || a.alt}` : 'points at it' });
+    // first pick decides a named full-screen takeover for the opening chunk; later chunks cycle the pictures
+    const first = pick(l.text); used.set(first.a.path, (used.get(first.a.path) || 0) + 1);
+    const full0 = takeovers === 'auto' && (POINT.test(l.text) || first.named);
+    const parts = chunks(l.start, l.end, style.swapSec);
+    parts.forEach((span, i) => {
+      const { a, named } = i === 0 ? first : pick(l.text);
+      if (i) used.set(a.path, (used.get(a.path) || 0) + 1);
+      const full = i === 0 && full0;
+      const end = span[1];
+      // leftover after a capped takeover becomes a split shot
+      if (full) {
+        const hi = style.takeoverSec[1], room = +(span[1] - span[0]).toFixed(2);
+        const cap = Math.min(room, hi);
+        push(l, a, named, span[0], span[0] + cap, true);
+        if (room - cap >= minDur) {
+          const more = pick(l.text); used.set(more.a.path, (used.get(more.a.path) || 0) + 1);
+          push(l, more.a, false, span[0] + cap, span[1], false);
+        }
+      } else push(l, a, named, span[0], end, false);
+    });
   }
   // no flashes back to you: a short gap (a pause, a short line) between two inserts of the same layout is closed by
   // holding the first one longer, as far as a video's own length allows
@@ -318,7 +364,7 @@ if (isMain) {
     for (const u of c.repos) { try { const m = await fetchRepo(u, { capture, log: x => console.log(`repo: ${x}`) }); for (const x of m.assets) assets.push({ ...x, path: join(m.dir, x.file) }); } catch (e) { console.log(`repo: ${u}: ${e.message}`); } }
     if (!assets.length) { console.log('repo: we could not get any pictures from the repo, so you stay on screen (check the link, or try again online)'); clear(); console.log(JSON.stringify({ ok: true, repo: true, inserts: 0 })); return; }
     const breakout = (plan.presenter || []).some(x => x && x.id === 'frame-breakout');
-    const { inserts, takeovers } = planRepo(linesOf(cut, build), assets, { takeovers: c.takeovers === 'off' ? 'off' : 'auto', breakout });
+    const { inserts, takeovers } = planRepo(linesOf(cut, build), assets, { takeovers: c.takeovers === 'off' ? 'off' : 'auto', breakout, bands: c.bands || null, takeoverSec: c.takeoverSec || null, swapSec: c.swapSec || null, frameBg: c.frameBg || null });
     // a spot the b-roll lane already uses keeps its clip
     // (an insert held over a gap is trimmed back to its own line first, rather than dropped)
     const hits = x => others.some(o => x.at < +o.at + +o.dur && +o.at < x.at + x.dur);

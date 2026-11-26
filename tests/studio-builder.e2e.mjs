@@ -165,7 +165,7 @@ try {
     await pg.click('#build-repo-on'); await pg.waitForSelector('#build-repo-0');
     assert.ok(await pg.isVisible('#build-repo-need'), 'asks for a link first');
     await pg.fill('#build-repo-0', 'https://gitlab.com/a/b'); assert.ok(!(await pg.$('#build-repo-0-err')), 'no error while typing'); await pg.click('#build-repo-layout');
-    await pg.waitForSelector('#build-repo-0-err'); assert.strictEqual((await api('/api/video-plan')).plan.content.repoFeature, false, 'a bad link is never saved');
+    await pg.waitForSelector('#build-repo-0-err'); assert.deepStrictEqual((await api('/api/video-plan')).plan.content.repos, [], 'a bad link is never saved');
     await pg.fill('#build-repo-0', 'https://github.com/wrg32786/aigent-talking-head'); await pg.click('#build-repo-layout');
     await pg.waitForFunction(async () => (await (await fetch('/api/video-plan')).json()).plan.content.repoFeature === true);
     assert.ok((await api('/api/video-plan')).plan.presenter.some(x => x.id === 'frame-breakout'), 'Frame breakout is on by default in repo mode');
@@ -176,9 +176,9 @@ try {
     await pg.fill('#build-repo-example', 'https://www.youtube.com/watch?v=abc'); await pg.press('#build-repo-example', 'Enter');
     await pg.waitForFunction(async () => (await (await fetch('/api/video-plan')).json()).plan.content.example === 'https://www.youtube.com/watch?v=abc');
     await noCmd(pg, 'Repo or tool feature'); await shot(pg, 'builder-repo.png');
-    // clearing the only link takes the repos out of the plan (no old repo renders)
+    // clearing the only link leaves the mode on (a starter can wait for a new link); no old repo stays in the plan
     await pg.fill('#build-repo-0', ''); await pg.press('#build-repo-0', 'Enter');
-    await pg.waitForFunction(async () => { const c = (await (await fetch('/api/video-plan')).json()).plan.content; return c.repoFeature === false && !c.repos.length; });
+    await pg.waitForFunction(async () => { const c = (await (await fetch('/api/video-plan')).json()).plan.content; return c.repoFeature === true && !c.repos.length; });
     await pg.click('#build-repo-on'); await pg.waitForFunction(async () => (await (await fetch('/api/video-plan')).json()).plan.content.repoFeature === false);
     await pg.click('#build-next'); await pg.waitForSelector('#build-mu');
     assert.ok(await pg.$('#build-mu-beds .snd-tile'), 'tracks to hear');
