@@ -93,8 +93,12 @@ export function ReviewStep({ CAT, V, s, apply, patch, go, hidden, run }) {
 export function Render({ CAT, V, s, apply, patch, hidden, go, run, openOutputs, openNewVideo, toPost }) {
   const { t, running, fin, n, isDrafted, stale, outputs, took, ticking } = standing(V, s, run), c = V.compose;
   const [mem, setMem] = useState(null), mine = running && t.kind === 'render';
-  // a render that needs the person mask checks free memory first (kit/memcheck.cjs); short, the server answers 409 with
-  // the numbers and the ways out, shown here: titles in front, the lighter mask, or try anyway
+  // a render that needs the person mask checks free memory first (kit/memcheck.cjs). The page shows the warning before
+  // you click Render when it can (V.memory); if you click anyway, a 409 returns the same numbers and the ways out:
+  // titles in front, the lighter mask, or try anyway. A render that fits only on the processor gets a note, not a stop.
+  const pre = V.memory || (V.env && V.env.memory) || null;
+  const shown = mem || (pre && pre.needed && !pre.ok ? pre : null);
+  const info = !shown && pre && pre.note ? pre : null;
   const doRender = memory => { run.clear(); setMem(null);
     fetch('/api/render', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(memory ? { memory } : {}) })
       .then(async r => { const j = await r.json().catch(() => ({})); if (r.status === 409 && j.memory) return setMem(j.memory); if (!r.ok) return toast(j.error || `request failed (${r.status})`, false, j.fix); apply(j); if (j.effectsSkipped) toast(j.effectsSkipped, false, j.fix); else if (j.effectsUnplaced) toast(j.effectsUnplaced, false); })
@@ -128,9 +132,10 @@ export function Render({ CAT, V, s, apply, patch, hidden, go, run, openOutputs, 
         <input type="checkbox" id={'size-' + z.id} checked={!!z.on} disabled={!!z.always || running} onChange={e => setSize(z.id, e.target.checked)} /><span>{z.label}</span></label>)}
       <Hint id="sizes-hint" label="About sizes">One render makes every size you tick. The Instagram Feed does not take 9:16, so the 4:5 (1080 by 1350) and the square are their own versions: the frame follows your face and the captions are laid out again to fit.</Hint>
     </div>}
-    {mem && !running && <div id="mem-short" className="notes glass-card" role="alert"><p>{mem.message}</p>
-      <div className="row">{(mem.options || []).map(o => <Button key={o.id} id={'mem-' + o.id} size="sm" variant={o.id === 'front' ? 'primary' : o.id === 'light' ? 'secondary' : 'ghost'} label={o.label} onClick={() => doRender(o.id)} />)}</div>
-      <p className="fine">{(mem.options || []).map(o => `${o.label}: ${o.detail}`).join(' ')}</p></div>}
+    {shown && !running && <div id="mem-short" className="notes glass-card" role="alert"><p>{shown.message}</p>
+      <div className="row">{(shown.options || []).map(o => <Button key={o.id} id={'mem-' + o.id} size="sm" variant={o.id === 'front' ? 'primary' : o.id === 'light' ? 'secondary' : 'ghost'} label={o.label} onClick={() => doRender(o.id)} />)}</div>
+      <p className="fine">{(shown.options || []).map(o => `${o.label}: ${o.detail}`).join(' ')}</p></div>}
+    {info && !running && <div id="mem-note" className="notes glass-card" role="status"><p>{info.note}</p></div>}
     {mine && <div id="progress"><ProgressBar label="Render running" isLabelHidden isIndeterminate /></div>}
     <div id="outputs" className="outputs">
       {outputs.length ? outputs.map(o => <figure key={o} className="glass-card" data-size={(SZ.files && SZ.files[o] && SZ.files[o].size) || '9:16'}><video src={file(o) + '?v=' + s.rev + '#t=1.2'} controls preload="metadata" aria-label={o} />

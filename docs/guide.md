@@ -122,7 +122,7 @@ To keep a render quick:
 - every matte is cached in `build/maskcache/<model>/` by a hash of the frame, so a rebuild with new captions, titles or windows reuses it (a 2 s title window: 284 s the first time, 19 s after);
 - `base.mp4` is made once per picture and reused by the face zone and the mask.
 
-The cleanup (`kit/mask_refine.py`) fills holes, removes specks, refines the edge against the picture, smooths over time with optical flow plus an average on the solid inside (no flicker), and keeps hair strands soft instead of eroding them. Before loading the portrait mask, `kit/mask.py` checks for about 8.8 GB of free memory on CPU or 25.8 GB on DirectML. With less, the default falls back to the MediaPipe preview with a warning, and an explicit `--mask birefnet-portrait` stops. Studio's Render offers **Titles in front**, **Lighter mask** or **Try anyway**.
+The cleanup (`kit/mask_refine.py`) fills holes, removes specks, refines the edge against the picture, smooths over time with optical flow plus an average on the solid inside (no flicker), and keeps hair strands soft instead of eroding them. Before loading the portrait mask, `kit/mask.py` checks for about 8.8 GB of free memory on the processor or 25.8 GB on the graphics chip (DirectML). If the graphics chip does not fit and the processor does, the kit uses the processor (slower, same quality). With less than the processor needs, the default falls back to the MediaPipe preview with a warning, and an explicit `--mask birefnet-portrait` stops. Studio shows a preflight warning on Render and in Setup check, and offers **Titles in front**, **Lighter mask** or **Try anyway**.
 
 ## Edit rules
 

@@ -3,7 +3,7 @@
 # no temporal state, so per-frame flicker has to be taken out here), a light erode + feather,
 # and edge decontamination of the person layer so a background rim does not ride over the type.
 # Guided filter uses a float guide and nan_to_num (a uint8 guide can leak NaNs into the EMA).
-import sys
+import os, sys
 import numpy as np, cv2
 
 K3 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
@@ -174,10 +174,19 @@ def matte_need_gb(model, provider=None):
     if not name:
         return 0.5
     if provider is None:
-        provider = matte_providers()[0]
+        provider = preferred_provider()
     # CUDA and CoreML have not been measured and use the CPU peaks.
     peaks = MATTE_PEAK_GB['dml' if provider == 'DmlExecutionProvider' else 'cpu']
     return round(peaks[name] + 0.8, 1)
+
+def _win_mem():
+    import ctypes
+    class MS(ctypes.Structure):
+        _fields_ = [('dwLength', ctypes.c_ulong), ('dwMemoryLoad', ctypes.c_ulong), ('ullTotalPhys', ctypes.c_ulonglong), ('ullAvailPhys', ctypes.c_ulonglong),
+                    ('ullTotalPageFile', ctypes.c_ulonglong), ('ullAvailPageFile', ctypes.c_ulonglong), ('ullTotalVirtual', ctypes.c_ulonglong),
+                    ('ullAvailVirtual', ctypes.c_ulonglong), ('ullAvailExtendedVirtual', ctypes.c_ulonglong)]
+    m = MS(); m.dwLength = ctypes.sizeof(MS); ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))
+    return m
 
 def avail_gb():
     """Memory the OS can hand out now, in GB (Linux MemAvailable, Windows ullAvailPhys, macOS free + inactive), or None."""
@@ -187,13 +196,7 @@ def avail_gb():
                 if line.startswith('MemAvailable:'):
                     return int(line.split()[1]) / 1048576
         elif sys.platform == 'win32':
-            import ctypes
-            class MS(ctypes.Structure):
-                _fields_ = [('dwLength', ctypes.c_ulong), ('dwMemoryLoad', ctypes.c_ulong), ('ullTotalPhys', ctypes.c_ulonglong), ('ullAvailPhys', ctypes.c_ulonglong),
-                            ('ullTotalPageFile', ctypes.c_ulonglong), ('ullAvailPageFile', ctypes.c_ulonglong), ('ullTotalVirtual', ctypes.c_ulonglong),
-                            ('ullAvailVirtual', ctypes.c_ulonglong), ('ullAvailExtendedVirtual', ctypes.c_ulonglong)]
-            m = MS(); m.dwLength = ctypes.sizeof(MS); ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))
-            return m.ullAvailPhys / 1073741824
+            return _win_mem().ullAvailPhys / 1073741824
         elif sys.platform == 'darwin':
             import subprocess, re
             out = subprocess.run(['vm_stat'], capture_output=True, text=True).stdout
@@ -203,6 +206,45 @@ def avail_gb():
     except Exception:
         return None
     return None
+
+def total_gb():
+    """Installed physical memory in GB, or None."""
+    try:
+        if sys.platform.startswith('linux'):
+            for line in open('/proc/meminfo', encoding="utf-8"):
+                if line.startswith('MemTotal:'):
+                    return int(line.split()[1]) / 1048576
+        elif sys.platform == 'win32':
+            return _win_mem().ullTotalPhys / 1073741824
+        elif sys.platform == 'darwin':
+            import subprocess
+            return int(subprocess.run(['sysctl', '-n', 'hw.memsize'], capture_output=True, text=True).stdout.strip()) / 1073741824
+    except Exception:
+        return None
+    return None
+
+def preferred_provider():
+    """The provider MASK_PROVIDER names, or the first one ONNX Runtime has."""
+    forced = os.environ.get('MASK_PROVIDER', '').strip().lower()
+    have = matte_providers()
+    if forced == 'dml' and 'DmlExecutionProvider' in have:
+        return 'DmlExecutionProvider'
+    if forced == 'cpu':
+        return 'CPUExecutionProvider'
+    return have[0] if have else 'CPUExecutionProvider'
+
+def pick_provider(model='birefnet-portrait', free=None):
+    """Provider to run the mask on: skip the graphics chip when there is not enough free memory and the processor fits."""
+    have = matte_providers() or ['CPUExecutionProvider']
+    forced = os.environ.get('MASK_PROVIDER', '').strip().lower()
+    if forced in ('dml', 'cpu'):
+        return preferred_provider()
+    if free is None:
+        free = avail_gb()
+    fits = [p for p in have if free is None or free >= matte_need_gb(model, p)]
+    if fits:
+        return fits[0]
+    return min(have, key=lambda p: matte_need_gb(model, p))
 _MEAN = np.array([0.485, 0.456, 0.406], np.float32)
 _STD = np.array([0.229, 0.224, 0.225], np.float32)
 
@@ -235,11 +277,14 @@ class Matter:
     Our own pre and post step instead of rembg's predict(): rembg stretches every frame's matte to its own min and max,
     which makes the matte breathe from frame to frame when the person fills more or less of the shot; here it is the
     plain sigmoid. One portrait frame peaked at 7.5 GB on the CPU with the memory settings below."""
-    def __init__(self, model='birefnet-portrait'):
+    def __init__(self, model='birefnet-portrait', provider=None):
         import onnxruntime as ort
         self.passes = 0
         self.model = MATTE_MODELS[model]
-        prov = matte_providers()
+        picked = provider or pick_provider(model)
+        # only the picked provider (CPU as a last resort when it is not already the pick), so a skipped graphics
+        # chip is not used anyway
+        prov = [picked] if picked == 'CPUExecutionProvider' else [picked, 'CPUExecutionProvider']
         so = ort.SessionOptions()
         so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         # memory: no arena (it kept every activation size ever seen and grew past 15 GB), no memory pattern, and no
@@ -249,6 +294,8 @@ class Matter:
         so.add_session_config_entry('session.disable_prepacking', '1')
         self.inner_session = ort.InferenceSession(matte_weights(model), so, providers=prov)
         self.input = self.inner_session.get_inputs()[0].name
+    def close(self):
+        self.inner_session = None
     @property
     def provider(self):
         return self.inner_session.get_providers()[0]
