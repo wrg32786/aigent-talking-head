@@ -1,10 +1,50 @@
 # Word timings for one long take, a chunk at a time, for Studio's footage player and Cut step.
 #   python3 kit/studio/tx_chunks.py <video> <out.json> [--chunk 120]
 # Prints "progress <done> <total>" after each chunk and saves after each one, so a stopped run picks up where it left
-# off. Words are [start, end, word] in seconds of the whole take. TX_MODEL picks the Whisper model (default small.en).
+# off. Words are [start, end, word] in seconds of the whole take. TX_MODEL picks the Whisper model (default small.en;
+# base.en or tiny.en when free memory is tight and TX_MODEL is unset).
 # Voice activity detection is on (VAD), so a long pause never becomes one 12 s word and sentence breaks are found;
 # a transcript made before VAD (no "vad" field) is redone once. clip.py reads the same words (one transcript per take).
 import json, os, subprocess, sys, tempfile
+
+def avail_gb():
+    """Memory the OS can hand out now, in GB, or None. Kept local so this file does not import OpenCV."""
+    try:
+        if sys.platform.startswith("linux"):
+            for line in open("/proc/meminfo", encoding="utf-8"):
+                if line.startswith("MemAvailable:"):
+                    return int(line.split()[1]) / 1048576
+        if sys.platform == "win32":
+            import ctypes
+            class MS(ctypes.Structure):
+                _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong), ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                            ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong), ("ullTotalVirtual", ctypes.c_ulonglong),
+                            ("ullAvailVirtual", ctypes.c_ulonglong), ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+            m = MS(); m.dwLength = ctypes.sizeof(MS); ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))
+            return m.ullAvailPhys / 1073741824
+        if sys.platform == "darwin":
+            import re
+            out = subprocess.run(["vm_stat"], capture_output=True, text=True).stdout
+            ps = int(re.search(r"page size of (\d+)", out).group(1))
+            pages = sum(int(re.search(k + r":\s+(\d+)", out).group(1)) for k in ("Pages free", "Pages inactive", "Pages speculative"))
+            return pages * ps / 1073741824
+    except Exception:
+        return None
+    return None
+
+def pick_tx_model():
+    """TX_MODEL when set; otherwise small.en, or a smaller model when free memory is tight."""
+    named = os.environ.get("TX_MODEL")
+    if named:
+        return named
+    free = avail_gb()
+    if free is not None and free < 1.5:
+        print(f"note: only {free:.1f} GB is free, so this transcript uses the tiny Whisper model (less accurate). Close other apps to use the usual model.", flush=True)
+        return "tiny.en"
+    if free is not None and free < 2.5:
+        print(f"note: only {free:.1f} GB is free, so this transcript uses the base Whisper model. Close other apps to use the usual model.", flush=True)
+        return "base.en"
+    return "small.en"
 
 # the VAD settings every transcript in the kit uses (kit/clip.py imports the same numbers): pauses over 0.7 s are
 # skipped, with 0.3 s of padding kept around speech so no soft first or last sound is lost
@@ -25,7 +65,7 @@ def main():
     if dur <= 0:
         print("error: could not read the length of " + src); sys.exit(1)
     n = max(1, int((dur + chunk - 0.001) // chunk))
-    model_name = os.environ.get("TX_MODEL", "small.en")
+    model_name = pick_tx_model()
     st = {"file": src, "duration": round(dur, 2), "chunk": chunk, "total": n, "done": [], "words": [], "model": model_name, "vad": VAD_VERSION}
     if os.path.exists(out):
         try:
@@ -52,6 +92,7 @@ def main():
         json.dump(st, open(out + ".tmp", "w", encoding="utf-8"))
         os.replace(out + ".tmp", out)
         print(f"progress {len(st['done'])} {n}", flush=True)
+    del m
 
 if __name__ == "__main__":
     main()

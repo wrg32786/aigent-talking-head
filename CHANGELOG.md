@@ -2,6 +2,10 @@
 
 Each version below is one GitHub release. `npm run release:notes -- --version X.Y.Z` drafts its plain-words notes from here; the edited notes live in `docs/releases/`.
 
+## 1.31.1 (unreleased)
+
+- **Studio memory on modest machines.** The high-quality person mask on Windows no longer needs 25.8 GB free just because the graphics chip is available. If that does not fit and about 8.8 GB is free, the kit uses the processor instead (slower, same quality) and says so in plain English. When even that does not fit, Studio warns on the Render page and in Setup check before you click Render, with the same ways out as before (titles in front, the lighter mask, or try anyway). A computer with very little free memory also gets a note to close other apps. Overlay render stays on one Chrome page when the machine has under 8 GB, and a transcript with under 2.5 GB free uses a smaller Whisper model unless you set `TX_MODEL`. The mask process drops the model once the last frame is encoded. Tests: `tests/face-matte.test.mjs`, `tests/test_matte_memory.py`, `tests/framecap.e2e.mjs`.
+
 ## 1.31.0 (unreleased)
 
 Release notes: [docs/releases/v1.31.0.md](docs/releases/v1.31.0.md).
