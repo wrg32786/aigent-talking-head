@@ -27,7 +27,7 @@ import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-export const GEN = 1; // bump when a scene's look changes, so cached renders are made again
+export const GEN = 2; // bump when a scene's look changes, so cached renders are made again
 export const SECONDS = 4, FPS = 24, VIEW = [600, 480]; // 5:4 at 2x: 1200x960, fits the repo card whole
 const MIN_FREE = 0.8 * 2 ** 30; // one Chrome page and FFmpeg; under this the README's own pictures are used instead
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -111,22 +111,46 @@ export function flow(desc) {
 
 // ---------- the scenes ----------
 const ACCENT = '#3d8bff';
+// the look (GEN 2, Will 2026-11-27 "more 3d and animated"): a camera on a perspective stage. The window flies in tilted
+// from depth on a springy curve, settles almost flat by about 1 s (so it reads), then orbits slowly and pushes in. Inside
+// the window things sit on layers at different depths (parallax as the camera turns): the panels just above the glass,
+// the selection box higher, the cursor highest. A soft ambient shadow and a tight contact shadow under the window, a rim
+// light on its top edge, a light sweep across the glass once things are in, and a dark backdrop with a slow glow for
+// contrast. CSS only (3D transforms, no WebGL), so it renders offline and costs about what the flat cards did.
 const BASE = `*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:Inter,'Helvetica Neue',Arial,sans-serif;color:#14161a}
-body{background:radial-gradient(120% 90% at 50% 40%,#f7f8fa 0%,#e6e9ee 100%)}
-.stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;animation:punch ${SECONDS}s cubic-bezier(.3,.1,.3,1) both}
-@keyframes punch{0%{transform:scale(.94) translateY(10px);opacity:0}10%{opacity:1}100%{transform:scale(1.04)}}
-.win{position:relative;background:#fff;border-radius:16px;box-shadow:0 18px 50px #1b23353a,0 2px 6px #1b233520;overflow:hidden}
-.bar{display:flex;align-items:center;gap:7px;height:30px;padding:0 12px;background:#f1f3f6;border-bottom:1px solid #e3e6eb;font-size:11px;color:#5b6270}
+body{background:radial-gradient(60% 22% at 50% 86%,#3a4b70 0%,transparent 100%),radial-gradient(85% 70% at 50% 38%,#2a3650 0%,#141b2b 55%,#090c14 100%)}
+body::before{content:'';position:absolute;width:520px;height:520px;left:40px;top:-120px;border-radius:50%;background:radial-gradient(closest-side,${ACCENT}55,transparent);animation:glow ${SECONDS}s ease-in-out both}
+@keyframes glow{from{transform:translate(-60px,0) scale(.9);opacity:.5}to{transform:translate(120px,60px) scale(1.1);opacity:.9}}
+body::after{content:'';position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 45%,transparent 55%,#0008 100%);pointer-events:none}
+.stage{position:absolute;inset:0;perspective:1100px;perspective-origin:50% 42%}
+.rig{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transform-style:preserve-3d;animation:cam ${SECONDS}s linear both}
+@keyframes cam{
+  0%{transform:translateZ(-420px) translateY(70px) rotateX(24deg) rotateY(calc(var(--o) * -28deg));opacity:0;animation-timing-function:cubic-bezier(.2,.9,.25,1)}
+  6%{opacity:1}
+  22%{transform:translateZ(14px) translateY(-4px) rotateX(-2deg) rotateY(calc(var(--o) * 3deg));animation-timing-function:cubic-bezier(.4,0,.3,1)}
+  32%{transform:translateZ(0) translateY(0) rotateX(5deg) rotateY(calc(var(--o) * -5deg));animation-timing-function:cubic-bezier(.45,0,.55,1)}
+  100%{transform:translateZ(36px) translateY(-6px) rotateX(3deg) rotateY(calc(var(--o) * 9deg))}}
+.win{position:relative;background:#fff;border-radius:16px;transform-style:preserve-3d;
+  box-shadow:0 1px 0 #ffffffb0 inset,0 0 0 1px #ffffff18,0 2px 4px #0006,0 14px 28px -8px #000a,0 46px 90px -24px #000c}
+.win div{transform-style:preserve-3d}
+.win::before{content:'';position:absolute;left:6%;right:6%;bottom:-26px;height:56px;border-radius:50%;background:radial-gradient(closest-side,#000e,#0008 45%,transparent);transform:translateZ(-60px) rotateX(70deg);pointer-events:none}
+.win::after{content:'';position:absolute;inset:0;border-radius:16px;pointer-events:none;transform:translateZ(1px);background:linear-gradient(105deg,transparent 35%,#ffffff66 47%,#ffffff1c 53%,transparent 62%) -300% 0/300% 100% no-repeat;animation:sweep 1.1s cubic-bezier(.4,0,.2,1) 1.25s both}
+@keyframes sweep{from{background-position:-300% 0}to{background-position:250% 0}}
+.bar{display:flex;align-items:center;gap:7px;height:30px;padding:0 12px;background:#f1f3f6;border-bottom:1px solid #e3e6eb;font-size:11px;color:#5b6270;border-radius:16px 16px 0 0;transform:translateZ(4px)}
 .bar i{width:10px;height:10px;border-radius:50%;background:#ff6058}.bar i:nth-child(2){background:#ffbd2e}.bar i:nth-child(3){background:#28c840}.bar>span{margin-left:8px;white-space:nowrap;overflow:hidden}
-.sel{position:absolute;border:2px solid ${ACCENT};border-radius:6px;pointer-events:none;opacity:0;animation:selin .35s ease-out forwards}
+.sel{position:absolute;border:2px solid ${ACCENT};border-radius:6px;pointer-events:none;opacity:0;translate:0 0 44px;box-shadow:0 0 0 4px ${ACCENT}22,0 10px 24px -6px ${ACCENT}88;animation:selin .5s cubic-bezier(.2,1.5,.35,1) forwards}
 .sel b{position:absolute;width:9px;height:9px;background:#fff;border:2px solid ${ACCENT};border-radius:2px}
 .sel b:nth-child(1){left:-6px;top:-6px}.sel b:nth-child(2){right:-6px;top:-6px}.sel b:nth-child(3){left:-6px;bottom:-6px}.sel b:nth-child(4){right:-6px;bottom:-6px}
-@keyframes selin{from{opacity:0;transform:scale(1.06)}to{opacity:1;transform:none}}
-.cur{position:absolute;width:22px;height:22px;z-index:9;filter:drop-shadow(0 2px 3px #0005)}
+@keyframes selin{from{opacity:0;transform:scale(1.14) translateZ(40px)}to{opacity:1;transform:none}}
+.cur{position:absolute;width:24px;height:24px;z-index:9;translate:0 0 110px;filter:drop-shadow(0 10px 8px #0007)}
 .cur svg{width:100%;height:100%}.cur::after{content:'';position:absolute;left:-8px;top:-8px;width:20px;height:20px;border-radius:50%;border:2px solid ${ACCENT};opacity:0;animation:ring .5s ease-out forwards;animation-delay:var(--click,9s)}
 @keyframes ring{0%{opacity:.9;transform:scale(.3)}100%{opacity:0;transform:scale(1.8)}}
-.pop{opacity:0;transform:scale(.6);animation:pop .4s cubic-bezier(.2,1.6,.4,1) forwards}@keyframes pop{to{opacity:1;transform:none}}
-.up{opacity:0;transform:translateY(8px);animation:up .35s ease-out forwards}@keyframes up{to{opacity:1;transform:none}}`;
+.pop{opacity:0;transform:scale(.5) translateZ(90px);translate:0 0 22px;animation:pop .6s cubic-bezier(.2,1.65,.35,1) forwards}@keyframes pop{to{opacity:1;transform:none}}
+.lf{animation-name:pop,lift;animation-duration:.6s,.55s;animation-timing-function:cubic-bezier(.2,1.65,.35,1),cubic-bezier(.2,1.6,.35,1);animation-fill-mode:forwards}
+.up.lf{animation-name:up,lift}
+@keyframes lift{to{translate:0 0 64px}}@keyframes lifts{to{translate:0 0 64px;box-shadow:0 28px 36px -14px ${ACCENT}aa,0 2px 4px #1b23351c}}
+.tl.lf{animation-name:pop,lifts}.up.lf.ab{animation-name:up,lifts}
+.up{opacity:0;transform:translateY(16px) translateZ(60px) rotateX(-35deg);translate:0 0 10px;animation:up .55s cubic-bezier(.2,1.45,.35,1) forwards}@keyframes up{to{opacity:1;transform:none}}`;
 const SEL = (x, y, w, h, delay) => `<div class="sel" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;animation-delay:${delay}s"><b></b><b></b><b></b><b></b></div>`;
 // the same box around its parent (which is position:relative), pad px outside it
 const SELIN = (pad, delay) => `<div class="sel" style="inset:${-pad}px;animation-delay:${delay}s"><b></b><b></b><b></b><b></b></div>`;
@@ -136,7 +160,9 @@ const CURSOR = (from, to, t0, t1) => { const n = 'mv' + (cid++); return `<style>
 // letters typed in one by one (each its own span, so a long command wraps instead of shrinking)
 const TYPE = (text, t0, per = 0.035) => [...String(text)].map((c, i) => `<span class="ch" style="animation-delay:${(t0 + i * per).toFixed(3)}s">${esc(c)}</span>`).join('');
 const TYPE_CSS = '.ch{opacity:0;animation:ch .01s linear forwards}@keyframes ch{to{opacity:1}}';
-const page = (css, body) => `<!doctype html><html><head><meta charset="utf-8"><style>${BASE}${TYPE_CSS}${css}</style></head><body><div class="stage">${body}</div></body></html>`;
+// --o: which way the camera orbits (one way or the other per card, from the card's own text, so cards cut together alternate)
+const page = (css, body) => { const o = [...body].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7) & 1 ? 1 : -1;
+  return `<!doctype html><html><head><meta charset="utf-8"><style>${BASE}${TYPE_CSS}${css}</style></head><body><div class="stage"><div class="rig" style="--o:${o}">${body}</div></div></body></html>`; };
 const fmt = n => (n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1).replace(/\.0$/, '') + 'k' : String(n));
 
 export function proofHtml(f) {
@@ -145,12 +171,12 @@ export function proofHtml(f) {
   const css = `.win{width:540px}.url{margin:0 0 0 10px;flex:1;height:20px;line-height:18px;white-space:nowrap;overflow:hidden;padding:0 10px;border-radius:10px;background:#fff;border:1px solid #dde1e7;font:11px ui-monospace,Menlo,monospace;color:#2b2f36}
     .pg{padding:18px 22px 22px}.nm{font-size:19px;font-weight:600;color:#1f2328;display:flex;align-items:center;gap:8px}.nm s{text-decoration:none;color:#0969da}.pub{font-size:10px;border:1px solid #d0d7de;border-radius:10px;padding:1px 7px;color:#59636e;font-weight:500}
     .row{display:flex;gap:8px;margin-top:12px}.btn{font-size:11px;border:1px solid #d0d7de;border-radius:6px;padding:4px 9px;background:#f6f8fa;color:#1f2328}
-    .ab{margin-top:16px;padding:12px 14px;border-radius:10px;background:#fbfcfd;border:1px solid #eef0f3}.ab h4{margin:0 0 6px;font-size:12px;color:#59636e}.ab p{margin:0;font-size:${fs}px;line-height:1.4;color:#1f2328}
+    .ab{margin-top:16px;padding:12px 14px;border-radius:10px;background:#fff;border:1px solid #eef0f3;box-shadow:0 2px 5px #1b233522}.ab h4{margin:0 0 6px;font-size:12px;color:#59636e}.ab p{margin:0;font-size:${fs}px;line-height:1.4;color:#1f2328}
     .tp{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}.tp em{font-style:normal;font-size:10.5px;color:#0969da;background:#ddf4ff;border-radius:10px;padding:2px 8px}`;
   const body = `<div class="win"><div class="bar"><i></i><i></i><i></i><div class="url">${TYPE(url, 0.05, Math.min(0.015, 0.3 / url.length))}</div></div>
     <div class="pg"><div class="nm up" style="animation-delay:.4s">${esc(f.owner)} / <s>${esc(f.repo)}</s> <span class="pub">Public</span></div>
     <div class="row up" style="animation-delay:.55s">${f.stars != null ? `<span class="btn">&#9734; Star <b>${esc(fmt(f.stars))}</b></span>` : ''}${f.forks != null ? `<span class="btn">Fork <b>${esc(fmt(f.forks))}</b></span>` : ''}${f.language ? `<span class="btn">${esc(f.language)}</span>` : ''}</div>
-    <div class="ab up" style="position:relative;animation-delay:.65s"><h4>About</h4><p>${esc(desc)}</p><div class="tp">${topics}</div>${SELIN(6, 1.1)}</div></div></div>
+    <div class="ab up lf" style="position:relative;animation-delay:.65s,1.05s"><h4>About</h4><p>${esc(desc)}</p><div class="tp">${topics}</div>${SELIN(6, 1.1)}</div></div></div>
     ${CURSOR([520, 440], [300, 300], 0.4, 1.1)}`;
   return page(css, body);
 }
@@ -171,7 +197,7 @@ export function terminalHtml(f, cmds) {
     for (const l of c.after) if (fits(l)) lines.push(out(l));
     if (cmds[1] && rows + Math.ceil((cmds[1].cmd.length + 2) / 52) <= 10) { lines.push(typed(cmds[1].cmd, 'cmd')); for (const l of cmds[1].after.slice(0, 2)) if (fits(l)) lines.push(out(l)); }
   }
-  const css = `.win{width:540px;background:#0e1116}.bar{background:#1a1e25;border-color:#252a33;color:#9aa3ae}
+  const css = `.win{width:540px;background:linear-gradient(180deg,#141820,#0b0e13);box-shadow:0 1px 0 #ffffff30 inset,0 0 0 1px #ffffff26,0 14px 28px -8px #000c,0 40px 90px -20px ${ACCENT}70}.bar{background:#1a1e25;border-color:#252a33;color:#9aa3ae}
     .tx{padding:16px 18px 20px;min-height:230px;font:14px/1.55 'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;color:#d6dbe1}
     .ln{white-space:pre-wrap;word-break:break-word}.ps{color:#5ee08f}.cmd{color:#f5f7fa}.out{color:#9aa3ae}
     .first{position:relative}.files{display:grid;grid-template-columns:repeat(2,1fr);gap:1px 14px;color:#8fb8ff;font-size:12px;overflow-wrap:anywhere}
@@ -191,20 +217,20 @@ export function featuresHtml(f, feat) {
     const R = 150, cx = 270, cy = 205;
     const pts = items.map((_, i) => { const a = -Math.PI / 2 + (i * 2 * Math.PI) / n; return [cx + R * Math.cos(a), cy + R * 0.82 * Math.sin(a)]; });
     const spokes = pts.map(([x, y], i) => `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" pathLength="1" style="animation-delay:${(0.2 + i * 0.13).toFixed(2)}s"/>`).join('');
-    const nodes = items.map((t, i) => `<div class="nd pop" style="left:${pts[i][0].toFixed(1)}px;top:${pts[i][1].toFixed(1)}px;animation-delay:${(0.3 + i * 0.13).toFixed(2)}s"><span class="g">${glyph(i)}</span><span class="t">${esc(t)}</span></div>`).join('');
+    const nodes = items.map((t, i) => `<div class="nd pop${i ? '' : ' lf'}" style="left:${pts[i][0].toFixed(1)}px;top:${pts[i][1].toFixed(1)}px;animation-delay:${(0.3 + i * 0.13).toFixed(2)}s${i ? '' : `,${(0.3 + n * 0.13 + 0.1).toFixed(2)}s`}"><span class="g">${glyph(i)}</span><span class="t">${esc(t)}</span></div>`).join('');
     const css = `.win{width:540px;height:430px}.wh{position:absolute;left:0;top:30px;width:540px;height:400px}
       svg.sp{position:absolute;inset:0}svg.sp line{stroke:${ACCENT};stroke-opacity:.45;stroke-width:2;stroke-dasharray:1;stroke-dashoffset:1;animation:draw .4s ease-out forwards}@keyframes draw{to{stroke-dashoffset:0}}
-      .hub{position:absolute;left:${cx}px;top:${cy}px;transform:translate(-50%,-50%);width:118px;height:118px;border-radius:50%;background:${ACCENT};color:#fff;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:700;font-size:${f.repo.length > 16 ? 11.5 : 14}px;padding:10px;box-shadow:0 8px 24px ${ACCENT}55;word-break:break-word}
+      .hub{position:absolute;left:${cx}px;top:${cy}px;transform:translate(-50%,-50%);width:118px;height:118px;border-radius:50%;background:radial-gradient(circle at 34% 28%,#9cc4ff 0%,${ACCENT} 45%,#1a4fb0 100%);translate:0 0 40px;color:#fff;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:700;font-size:${f.repo.length > 16 ? 11.5 : 14}px;padding:10px;box-shadow:0 18px 34px -8px ${ACCENT}aa,0 4px 10px #0b1a3a55,inset 0 -6px 14px #0b2a6a55;word-break:break-word}
       .nd{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:5px;width:130px;text-align:center}.nd.pop{transform:translate(-50%,-50%) scale(.6)}
-      @keyframes pop{to{opacity:1;transform:translate(-50%,-50%)}}.g{width:38px;height:38px;border-radius:11px;background:#fff;border:1.5px solid #dfe5ee;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px #1b233518}.g svg{width:22px;height:22px}
-      .t{font-size:12.5px;font-weight:600;line-height:1.2;background:#fff;padding:2px 6px;border-radius:6px}`;
+      @keyframes pop{to{opacity:1;transform:translate(-50%,-50%)}}.g{width:38px;height:38px;border-radius:11px;background:#fff;border:1.5px solid #dfe5ee;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 18px -6px #1b23354d,0 2px 3px #1b233522;background:linear-gradient(180deg,#fff,#eef2f8)}.g svg{width:22px;height:22px}
+      .t{font-size:12.5px;font-weight:650;line-height:1.2;background:#fff;padding:2px 6px;border-radius:6px;box-shadow:0 4px 10px -4px #1b233544}`;
     const [hx, hy] = pts[0];
     return page(css, `<div class="win"><div class="bar"><i></i><i></i><i></i><span>${esc(feat.heading || f.repo)}</span></div><div class="wh"><svg class="sp" viewBox="0 0 540 400">${spokes}</svg><div class="hub pop" style="animation-delay:.05s">${esc(f.repo)}</div>${nodes}${SEL(hx - 72, hy - 32, 144, 64, (0.3 + n * 0.13 + 0.15).toFixed(2))}</div></div>${CURSOR([560, 470], [hx + 60, hy + 80], 0.3, 0.3 + n * 0.13 + 0.2)}`);
   }
   const cols = 3, rows = Math.ceil(n / cols);
-  const tiles = items.map((t, i) => `<div class="tl pop" style="animation-delay:${(0.15 + i * 0.1).toFixed(2)}s"><span class="g">${glyph(i)}</span><span>${esc(t)}</span></div>`).join('');
+  const tiles = items.map((t, i) => `<div class="tl pop${i ? '' : ' lf'}" style="animation-delay:${(0.15 + i * 0.1).toFixed(2)}s${i ? '' : `,${(0.15 + n * 0.1 + 0.1).toFixed(2)}s`}"><span class="g">${glyph(i)}</span><span>${esc(t)}</span></div>`).join('');
   const css = `.win{width:540px}.gr{display:grid;grid-template-columns:repeat(${cols},1fr);gap:10px;padding:16px;position:relative}
-    .tl{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:12px;background:#f7f9fc;border:1.5px solid #e4e9f1;font-size:13px;font-weight:600;min-height:${rows > 2 ? 84 : 104}px}
+    .tl{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:12px;background:linear-gradient(180deg,#ffffff,#eef2f8);border:1.5px solid #e4e9f1;box-shadow:0 14px 22px -12px #1b233566,0 2px 4px #1b23351c;font-size:13px;font-weight:650;min-height:${rows > 2 ? 84 : 104}px}
     .g{width:32px;height:32px;border-radius:9px;background:#fff;border:1.5px solid #dfe5ee;display:flex;align-items:center;justify-content:center}.g svg{width:19px;height:19px}`;
   return page(css, `<div class="win"><div class="bar"><i></i><i></i><i></i><span>${esc(feat.heading || f.repo)}</span></div><div class="gr">${tiles}${SEL(12, 12, 166, rows > 2 ? 90 : 110, (0.15 + n * 0.1 + 0.15).toFixed(2))}</div></div>${CURSOR([560, 470], [150, 140], 0.3, 0.15 + n * 0.1 + 0.2)}`);
 }
