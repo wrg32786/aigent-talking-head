@@ -1,8 +1,8 @@
 // Repo mode, when the README has few good pictures (Will, 2026-11-27): animated mockups of what the repo does, drawn
 // from the repo's own facts and README, never made-up claims. Rendered on this computer with headless Chrome (JavaScript
 // off, no network, every CSS animation set to its time per frame, as kit/studio/broll-make.mjs) to short MP4s that
-// kit/repo-broll.mjs places in the repo card. Every scene sits in a window card with an editor-style selection box,
-// a moving cursor and a slow punch-in; nothing is ever plain text on its own.
+// kit/repo-broll.mjs places in the repo card. Every scene sits in a window card on a 3D stage, with an editor-style
+// selection box, a moving cursor and a camera move (see BASE); nothing is ever plain text on its own.
 //   node kit/repo-mockups.mjs <https://github.com/owner/repo> [--force] [--json]   fetch (cached) and render the scenes
 //
 // The scenes (each picks itself only when the facts it needs are there):
