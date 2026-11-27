@@ -7,7 +7,7 @@
 //   (Save as a template, Make my video); the old links still work
 // - the Template Library (phase 8): on Teardowns your saved template with Rename, Duplicate and Delete (asks first),
 //   the starters read only; New video's Use a template starts the video from one and opens Your notes
-// - Repo or tool feature (phase 9): links checked before they are saved, full screen moments
+// - Repo or tool feature (phase 9): links checked before they are saved, full screen moments (you, never the repo)
 // - no terminal text, both themes, phone width
 // Needs Chrome. Run: node tests/studio-builder.e2e.mjs [--shots <dir>]
 import assert from 'assert';
@@ -171,7 +171,7 @@ try {
     assert.ok((await api('/api/video-plan')).plan.presenter.some(x => x.id === 'frame-breakout'), 'Frame breakout is on by default in repo mode');
     await pg.waitForSelector('#build-repo-breakout');
     await pg.click('#build-repo-take [data-opt="off"]'); await pg.waitForFunction(async () => (await (await fetch('/api/video-plan')).json()).plan.content.takeovers === 'off');
-    assert.match(await pg.textContent('#build-does'), /Split on every line in the middle/);
+    assert.match(await pg.textContent('#build-does'), /The repo card on every line in the middle/);
     await pg.fill('#build-repo-example', 'not a link'); await pg.press('#build-repo-example', 'Enter'); await pg.waitForSelector('#build-repo-example-err');
     await pg.fill('#build-repo-example', 'https://www.youtube.com/watch?v=abc'); await pg.press('#build-repo-example', 'Enter');
     await pg.waitForFunction(async () => (await (await fetch('/api/video-plan')).json()).plan.content.example === 'https://www.youtube.com/watch?v=abc');

@@ -155,7 +155,8 @@ export function withWords(plan, words) {
 // only the fields given, presenter is the whole list. A choice here wins over All options picks it speaks for.
 // a public GitHub repo link: https://github.com/owner/repo (never . or .. as a name); shared with the Content step
 export const REPO_RE = /^https:\/\/github\.com\/(?!\.\.?\/)[\w.-]+\/(?!\.\.?\/?$)[\w.-]+?(?:\.git)?\/?$/;
-// repo-mode layout and timing (kit/repo-broll.mjs REPO_STYLE). null on the plan means use those defaults.
+// repo-mode layout and timing (kit/repo-broll.mjs REPO_STYLE). null on the plan means use those defaults. takeoverSec is
+// kept so old plans and templates still load; the repo is never full screen now (Will, 2026-11-27), so it changes nothing.
 export const REPO_STYLE = { bands: { repo: 0.45, captions: 0.10, you: 0.45 }, takeoverSec: [2, 5], swapSec: [2, 4], frameBg: ['#e8eaed', '#dfe3e8'] };
 export const PARTS = ['transitions', 'presenter', 'graphics', 'filters', 'content', 'music', 'notes'];
 export function withPart(plan, part, value) {

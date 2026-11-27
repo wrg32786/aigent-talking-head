@@ -13,6 +13,7 @@
 //   key words  the key words level reaches the captions
 //   titles     titles off means none; titles on means at least one
 //   repo       repo mode on means repo shots in the cut; off means none
+//   repo-rule  repo mode: the repo stays in its card, never full screen and never README or page text
 //   cta        when the plan keeps a call to action, the words have one to show it on
 //   face, text, contrast   from the render's own checks
 // --fix: each failed row that has a fix (filters, transitions, key words, repo shots left from an older plan) is
@@ -28,6 +29,7 @@ import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
+const RB = await import('./repo-broll.mjs');
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const SEC = require('./sections.cjs'), SP = require('./spoken.cjs');
 const r2 = x => +(+x).toFixed(2);
@@ -74,7 +76,7 @@ export function checkpoints(cut, caps, build) {
   flips.filter(f => f.mode === 7).forEach((f, k) => { add(`title-${k + 1}-in`, f.start + 0.15, `title "${String(f.text).slice(0, 40)}" coming in`); add(`title-${k + 1}`, Math.min(f.end, f.start + 0.8), `title "${String(f.text).slice(0, 40)}" settled`); });
   (cut.segs || []).forEach((s, i) => { if (i && s.transition && s.transition !== 'cut') add(`seam-${i}`, tt[i].start, `the ${s.transition} transition`); });
   (cut.segs || []).forEach((s, i) => { if (i && (s.finish || null) !== (cut.segs[i - 1].finish || null)) add(`filter-${i}`, tt[i].start + 0.2, `the filter ${s.finish ? 'starting' : 'ending'}`); });
-  (cut.inserts || []).filter(x => x.repo).forEach((x, k) => add(`repo-${k + 1}`, +x.at + 0.3, x.place === 'full' ? 'the repo full screen' : 'the repo split'));
+  (cut.inserts || []).filter(x => x.repo).forEach((x, k) => add(`repo-${k + 1}`, +x.at + 0.3, 'the repo card'));
   (cut.repoTakeovers || []).filter(x => x.who === 'you' && x.why === 'punch line').forEach((x, k) => add(`you-${k + 1}`, +x.at + 0.3, 'you full screen on a punch line'));
   return pts.sort((p, q) => p.time - q.time);
 }
@@ -148,7 +150,8 @@ export function check({ plan, cut, caps, build, state = null, since = 0 }) {
   if (caps && tOn === true) row('titles', 'Titles: on', titles.length > 0, titles.length ? `${titles.length} title${titles.length > 1 ? 's' : ''}.` : 'Titles are on but none were made: say a short line that can be one, or add one on Words.', {});
   // repo mode
   const c = plan.content || {}, rep = (cut.inserts || []).filter(x => x.repo);
-  if (c.repoFeature) row('repo', 'Repo feature', rep.length > 0, !(c.repos || []).length ? 'Add a repo link on the Content step.' : rep.length ? `${rep.filter(x => x.place !== 'full').length} split and ${rep.filter(x => x.place === 'full').length} full screen repo shots.` : 'No repo shots yet: check the links, or try again online.', { time: rep.length ? r2(+rep[0].at + 0.3) : null });
+  if (c.repoFeature) row('repo', 'Repo feature', rep.length > 0, !(c.repos || []).length ? 'Add a repo link on the Content step.' : rep.length ? `${rep.length} repo card shots.` : 'No repo shots yet: check the links, or try again online.', { time: rep.length ? r2(+rep[0].at + 0.3) : null });
+  if (c.repoFeature && rep.length) { const br = RB.repoRuleBreaks(rep); row('repo-rule', 'Repo shots stay in their card', !br.length, br.length ? `At ${(+br[0].at).toFixed(1)} s: ${br[0].why}. Make the draft again so the repo stays in its card.` : 'No full screen repo shots and no README or page text.', { time: br.length ? r2(+br[0].at + 0.3) : null }); }
   else if (rep.length) row('repo', 'Repo feature: off', false, 'Repo shots from an earlier plan are still in the cut.', { time: r2(+rep[0].at + 0.3), fix: { kind: 'repo-off' } });
   // a call to action to show the CTA card on
   if (plan.graphics && plan.graphics.cta !== false && (known || b.ctaStart != null)) row('cta', 'Call to action', b.ctaStart != null, b.ctaStart != null ? `Starts at ${b.ctaStart.toFixed(1)} s.` : 'We did not hear a call to action (like "follow for more"), so there is nowhere to show one. Say one at the end, or turn the call to action off on Extras.', { time: b.ctaStart != null ? r2(b.ctaStart + 0.4) : null });

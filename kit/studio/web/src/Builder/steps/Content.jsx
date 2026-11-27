@@ -6,8 +6,8 @@ import { Tiles } from './Tiles.jsx';
 import { REPO_RE } from '../../../../wizard/plan.mjs';
 
 // Step 15: is this video about a GitHub repo or a tool? When it is: 1 to 3 repo links (we take the pictures and videos
-// from each README, kit/repo-broll.mjs), Split (about 45/10/45: repo card, caption band, you), takeovers (the repo full
-// screen 2 to 5 s when you point at it, you full screen on the hook, punch lines and CTA) or none, Frame breakout on by
+// from each README, kit/repo-broll.mjs), Split (about 45/10/45: repo card, caption band, you; the repo is never full
+// screen), you full screen on the hook, punch lines and CTA (Automatic) or only the hook and CTA, Frame breakout on by
 // default (a note, and a way to turn it off on You on screen), and an example video, handed to Teardowns to break down.
 // A link that is not a repo link is said once you leave the box (or press Enter) and never saved. A starter can leave
 // the mode on with no link yet; clearing every link keeps the mode on so you can add one. Turn the toggle off to leave.
@@ -20,7 +20,7 @@ const s = stylex.create({
 });
 export { REPO_RE };
 const TAKE = [['auto', 'Automatic'], ['off', 'Off']].map(([id, name]) => ({ id, name, preview: null }));
-export const CONTENT_SAYS = { auto: 'Split on most lines; the repo full screen when you point at it, you full screen on the hook, punch lines and the call to action.', off: 'Split on every line in the middle; you full screen on the hook and the call to action.' };
+export const CONTENT_SAYS = { auto: 'The repo stays in its card on the lines in the middle; you full screen on the hook, punch lines and the call to action.', off: 'The repo card on every line in the middle; you full screen on the hook and the call to action.' };
 const LINK = /^https?:\/\/\S+$/;
 export function Content({ plan, save, busy }) {
   const c = plan.content, [on, setOn] = useState(c.repoFeature), [links, setLinks] = useState([...(c.repos.length ? c.repos : ['']), '', ''].slice(0, 3));

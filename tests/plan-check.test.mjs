@@ -64,6 +64,14 @@ try {
     const c3 = JSON.parse(readFileSync(join(b3, 'cut.json'), 'utf8')); c3.segs[2].transition = 'zoom'; c3.edited = { transitions: [2] }; writeFileSync(join(b3, 'cut.json'), JSON.stringify(c3));
     assert.ok(PC.run(b3, { fix: true }).checks.find(x => x.id === 'transitions').ok); assert.strictEqual(JSON.parse(readFileSync(join(b3, 'cut.json'), 'utf8')).segs[2].transition, 'zoom');
   });
+  await t('repo mode: a full screen repo shot or README text fails the repo rule row', () => {
+    const on = P(p => { p.content.repoFeature = true; p.content.repos = ['https://github.com/demo/tool']; });
+    const bad = job('rr', { plan: on, cut: { inserts: [{ file: 'x.png', at: 5, dur: 2, place: 'full', repo: true }, { file: 'y.png', at: 8, dur: 2, place: 'frame', repo: true }] } });
+    const r = PC.run(bad.build), row = r.checks.find(x => x.id === 'repo-rule');
+    assert.ok(row && !row.ok && /full screen/.test(row.note) && row.time === 5.3, JSON.stringify(row));
+    const good = job('rg', { plan: on, cut: { inserts: [{ file: 'y.png', at: 8, dur: 2, place: 'frame', repo: true }] } });
+    assert.ok(PC.run(good.build).checks.find(x => x.id === 'repo-rule').ok);
+  });
   await t('key words, titles, repo shots and the call to action', () => {
     const { build } = job('kw', { plan: P(p => { p.words.keyWords.level = 'strong'; p.words.titles.on = false; }), cut: { inserts: [{ file: 'x.png', at: 5, dur: 2, place: 'top', repo: true }] }, caps: { flips: [{ start: 0.2, end: 2, text: 'This tool', mode: 0 }, { start: 5, end: 7, text: 'Big title', mode: 7 }] } });
     const r1 = PC.run(build), by = id => r1.checks.find(x => x.id === id);
