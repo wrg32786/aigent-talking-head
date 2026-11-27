@@ -1,8 +1,8 @@
 // Repo or tool feature mode (kit/repo-broll.mjs, spec section 9 and 14.10), with a saved README and no network:
 // the README's pictures in order with their headings, badges and tiny logos left out, every URL and redirect hop
 // checked with the connection pinned to the checked address, no private address, the 25 MB cap, pictures and videos
-// only, the download with meta.json, and the plan: split on the body, the repo full screen when a line points at it or
-// names a heading, you on the hook, punch lines and CTA; takeovers off; frame breakout.
+// only, the download with meta.json, and the plan: the repo in its card on the body (never full screen, never README
+// or page text), you on the hook, punch lines and CTA; takeovers off; frame breakout.
 // Run: node tests/repo-broll.test.mjs   (npm run check runs it)
 import assert from 'assert';
 import { mkdtempSync, readFileSync, existsSync, rmSync, writeFileSync } from 'fs';
@@ -79,11 +79,10 @@ try {
     routes['https://example.com/ok.png'] = R('image/png', png(1280, 720));
     assert.strictEqual((await ask('https://example.com/ok.png')).body.length, 40);
   });
-  await t('a repo is fetched to assets/web/<owner>--<repo> with meta.json; a GIF becomes a looping MP4; the social preview leads; bad files are skipped and said', async () => {
+  await t('a repo is fetched to assets/web/<owner>--<repo> with meta.json; a GIF becomes a looping MP4; no text card of the repo; bad files are skipped and said', async () => {
     const raw = 'https://raw.githubusercontent.com/demo/tool/main/';
     routes['https://api.github.com/repos/demo/tool'] = R('application/json', Buffer.from(JSON.stringify({ full_name: 'demo/tool', stargazers_count: 1234, description: 'Notes into videos', default_branch: 'main' })));
     routes['https://api.github.com/repos/demo/tool/readme'] = R('application/vnd.github.raw', Buffer.from(README));
-    routes['https://opengraph.githubassets.com/1/demo/tool'] = R('image/png', png(1200, 600));
     routes[raw + 'docs/preview.png'] = R('image/png', png(1600, 900));
     routes['https://example.com/batch.gif'] = R('image/gif', gif(800, 450));
     const mp4 = tag => Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypisom' + tag)]);
@@ -95,15 +94,15 @@ try {
     const m = await RB.fetchRepo('https://github.com/demo/tool', { request, resolver, convert: conv, seconds: secs });
     assert.strictEqual(m.dir, join(TMP, 'demo--tool'));
     assert.deepStrictEqual(m.header, { name: 'demo/tool', stars: 1234, description: 'Notes into videos', url: 'https://github.com/demo/tool' });
-    assert.deepStrictEqual(m.assets.map(a => [a.file, a.kind, a.heading]), [['01.png', 'image', ''], ['02.png', 'image', 'Live preview'], ['03.mp4', 'video', 'Batch export'], ['04.mp4', 'video', 'Install'], ['05.mp4', 'video', 'Install']]);
-    assert.ok(m.assets[0].header); assert.strictEqual(m.assets[4].source, 'https://objects.example.com/clip.mp4', 'where it really came from');
+    assert.deepStrictEqual(m.assets.map(a => [a.file, a.kind, a.heading]), [['01.png', 'image', 'Live preview'], ['02.mp4', 'video', 'Batch export'], ['03.mp4', 'video', 'Install'], ['04.mp4', 'video', 'Install']]);
+    assert.ok(m.assets.every(a => !a.header && !a.capture), 'no social preview card and no page capture'); assert.strictEqual(m.assets[3].source, 'https://objects.example.com/clip.mp4', 'where it really came from');
     assert.ok(m.skipped.some(x => /dot\.png/.test(x.url) && /too small/.test(x.why)) && m.skipped.some(x => /shields/.test(x.url)));
-    const meta = JSON.parse(readFileSync(join(m.dir, 'meta.json'), 'utf8')); assert.strictEqual(meta.assets.length, 5); assert.ok(existsSync(join(m.dir, '03.mp4')) && !existsSync(join(m.dir, '03.gif'))); assert.strictEqual(m.assets[2].seconds, 6);
+    const meta = JSON.parse(readFileSync(join(m.dir, 'meta.json'), 'utf8')); assert.strictEqual(meta.assets.length, 4); assert.ok(existsSync(join(m.dir, '02.mp4')) && !existsSync(join(m.dir, '02.gif'))); assert.strictEqual(m.assets[1].seconds, 6);
     assert.strictEqual((await RB.fetchRepo('https://github.com/demo/tool', { request: () => { throw new Error('no network'); }, resolver })).cached, true, 'a second time reads the cache');
     // a failed fetch (README unreachable) is not cached and leaves the good folder alone
     const down = (u, o) => u.endsWith('/readme') ? Promise.resolve({ status: 503, headers: {}, body: Buffer.alloc(0) }) : request(u, o);
     const again = await RB.fetchRepo('https://github.com/demo/tool', { request: down, resolver, force: true, convert: conv, seconds: secs });
-    assert.ok(again.stale && existsSync(join(m.dir, '02.png')) && JSON.parse(readFileSync(join(m.dir, 'meta.json'), 'utf8')).assets.length === 5, 'the older good folder stays');
+    assert.ok(again.stale && existsSync(join(m.dir, '01.png')) && JSON.parse(readFileSync(join(m.dir, 'meta.json'), 'utf8')).assets.length === 4, 'the older good folder stays');
     const none = await RB.fetchRepo('https://github.com/demo/gone', { request, resolver });
     assert.ok(none.failed && !existsSync(join(TMP, 'demo--gone', 'meta.json')), 'nothing cached for a repo we could not read');
     // a file that is not what its label says never reaches FFmpeg (a playlist called a video)
@@ -111,16 +110,15 @@ try {
     // a partial fetch (one file timed out) does not replace the fuller folder
     const slow = (u, o) => /preview\.png|install\.mp4/.test(u) ? Promise.reject(new Error('timed out: ' + u)) : request(u, o);
     const part = await RB.fetchRepo('https://github.com/demo/tool', { request: slow, resolver, force: true, convert: conv, seconds: secs });
-    assert.ok(part.stale && JSON.parse(readFileSync(join(m.dir, 'meta.json'), 'utf8')).assets.length === 5, 'the fuller folder stays');
+    assert.ok(part.stale && JSON.parse(readFileSync(join(m.dir, 'meta.json'), 'utf8')).assets.length === 4, 'the fuller folder stays');
     const webp = Buffer.alloc(30); webp.write('RIFF', 0); webp.write('WEBP', 8); webp.write('VP8X', 12); webp[20] = 2; assert.ok(RB.animatedWebp(webp));
     assert.throws(() => { if (!RB.parseRepo('https://github.com/../x')) throw new Error('refused'); }, /refused/); assert.strictEqual(RB.parseRepo('https://gitlab.com/a/b'), null);
   });
-  await t('a README with nothing usable falls back to a capture of the repo page', async () => {
+  await t('a README with nothing usable is not captured as a page (README text is never a shot)', async () => {
     routes['https://api.github.com/repos/demo/bare'] = R('application/json', Buffer.from('{}'));
     routes['https://api.github.com/repos/demo/bare/readme'] = R('text/plain', Buffer.from('# Bare\n\n[![x](https://img.shields.io/x.svg)](x)'));
-    const shot = join(TMP, 'shot.png'); (await import('fs')).writeFileSync(shot, png(780, 515));
-    const m = await RB.fetchRepo('https://github.com/demo/bare', { request, resolver, capture: async () => ({ image: shot }) });
-    assert.strictEqual(m.fallback, true); assert.ok(m.assets.some(a => a.capture && a.file === 'page.png'));
+    const m = await RB.fetchRepo('https://github.com/demo/bare', { request, resolver });
+    assert.ok(m.failed && !m.assets.length, JSON.stringify(m.assets));
   });
   const lines = [
     { start: 0, end: 3, text: 'This tool saves me hours every week.', section: 'hook' },
@@ -131,56 +129,49 @@ try {
     { start: 16, end: 20, text: 'Follow for more tools like this.', section: 'cta' },
   ];
   const assets = [{ path: '/a/01.png', kind: 'image', heading: '', alt: 'demo/tool', header: true }, { path: '/a/02.png', kind: 'image', heading: 'Live preview', alt: 'The live preview window' }, { path: '/a/03.gif', kind: 'image', heading: 'Batch export', alt: 'Exporting ten clips at once' }];
-  await t('the plan: split on the body, the repo full screen when a line points at it or names a heading (and a run stays within 5 s), you on the hook, punch lines and CTA', () => {
+  await t('the plan: the repo in its card on the body (a named heading picks its picture), you on the hook, punch lines and CTA', () => {
     const p = RB.planRepo(lines, assets);
-    assert.deepStrictEqual(p.inserts.map(x => [x.line.slice(0, 12), x.place, x.file]), [['It reads you', 'top', '/a/01.png'], ['The live pre', 'full', '/a/02.png'], ['Look at this', 'top', '/a/03.gif']]);
-    assert.deepStrictEqual(p.takeovers.filter(x => x.who === 'you').map(x => x.why), ['hook', 'punch line', 'cta']);
+    assert.deepStrictEqual(p.inserts.map(x => [x.line.slice(0, 12), x.place, x.file]), [['It reads you', 'top', '/a/02.png'], ['The live pre', 'top', '/a/03.gif'], ['Look at this', 'top', '/a/02.png']], 'the picture changes on every line');
+    assert.strictEqual(RB.planRepo([lines[2]], [...assets].reverse()).inserts[0].file, '/a/02.png', 'a line that names a heading gets that picture');
+    assert.deepStrictEqual(p.takeovers.map(x => x.why), ['hook', 'punch line', 'cta']);
     assert.ok(p.inserts.every(x => x.repo && x.image && x.at >= 3 && x.at + x.dur <= 16), 'never on the hook or the CTA');
+  });
+  await t('the repo rule (Will, 2026-11-27): never full screen, never README or page text, whatever the line says', () => {
+    const pointy = [{ start: 3, end: 9, text: 'Look at this, right here, the live preview on screen.', section: 'body' }, { start: 9, end: 15, text: 'Check this out, batch export, as you can see.', section: 'body' }];
+    for (const o of [{}, { breakout: true }, { takeovers: 'off' }, { breakout: true, swapSec: [8, 10] }]) {
+      const p = RB.planRepo(pointy, assets, o);
+      assert.ok(p.inserts.length && p.inserts.every(x => ['top', 'frame'].includes(x.place)), JSON.stringify(p.inserts.map(x => x.place)));
+      assert.deepStrictEqual(RB.repoRuleBreaks(p.inserts), []);
+      assert.ok(!p.inserts.some(x => x.file === '/a/01.png'), 'the text card of the repo is never a shot');
+      assert.ok(p.takeovers.every(x => x.who === 'you'), 'only you go full screen');
+    }
+    const page = { path: '/a/page.png', kind: 'image', heading: '', alt: 'demo/tool', capture: true };
+    assert.deepStrictEqual(RB.planRepo(pointy, [page, assets[0]]).inserts, [], 'a page capture or a text card alone gives no shots');
+    assert.deepStrictEqual(RB.repoRuleBreaks([{ repo: true, at: 3, place: 'full' }, { repo: true, at: 5, place: 'frame', text: true }, { at: 7, place: 'full' }]).map(x => x.at), [3, 5], 'the check finds both kinds, and leaves lane clips alone');
   });
   await t('a short gap is held over, but never across a punch line that is yours', () => {
     const L2 = [{ start: 3, end: 7, text: 'It reads your notes and makes a draft video.', section: 'body' }, { start: 7.1, end: 8, text: 'Wild!', section: 'body' }, { start: 8.1, end: 12, text: 'And the output keeps every word you said.', section: 'body' }, { start: 12.5, end: 16, text: 'It sorts every file in the folder for you.', section: 'body' }];
-    const p = RB.planRepo(L2, assets.slice(0, 1), { minDur: 0.5 });
+    const p = RB.planRepo(L2, assets.slice(1, 2), { minDur: 0.5 });
     assert.ok(p.takeovers.some(x => x.why === 'punch line' && x.at === 7.1));
     assert.ok(p.inserts.every(x => !(x.at < 8 && x.at + x.dur > 7.1)), 'the punch line stays yours: ' + JSON.stringify(p.inserts.map(x => [x.at, x.dur])));
     const second = p.inserts.find(x => x.at === 8.1); assert.ok(second && Math.abs(second.at + second.dur - 12.5) < 0.01, 'the pause before the next line is held over');
   });
   await t('takeovers off: split on the whole body; frame breakout uses the framed cards', () => {
-    const off = RB.planRepo(lines, assets, { takeovers: 'off' }); assert.ok(off.inserts.length === 4 && off.inserts.every(x => x.place === 'top')); assert.strictEqual(off.takeovers.length, 0);
+    const off = RB.planRepo(lines, assets, { takeovers: 'off' }); assert.ok(off.inserts.length >= 4 && off.inserts.every(x => x.place === 'top'), JSON.stringify(off.inserts)); assert.strictEqual(off.takeovers.length, 0);
     const fr = RB.planRepo(lines, assets, { breakout: true }); assert.strictEqual(fr.inserts[0].place, 'frame');
     assert.deepStrictEqual(RB.planRepo(lines, []).inserts, []);
   });
-  await t('repo style: pictures change every 2 to 4 s, full screen stays 2 to 5 s, framed cards carry the bands', () => {
+  await t('repo style: pictures change every 2 to 4 s, framed cards carry the bands', () => {
     const long = [{ start: 3, end: 11, text: 'It reads your notes and makes a draft video with a longer walkthrough.', section: 'body' }];
     const swapped = RB.planRepo(long, assets, { takeovers: 'off', breakout: true });
     assert.ok(swapped.inserts.length >= 2 && swapped.inserts.every(x => x.place === 'frame' && x.dur <= 4.01 && x.dur >= 2), 'swaps: ' + JSON.stringify(swapped.inserts.map(x => [x.at, x.dur, x.place])));
     assert.ok(new Set(swapped.inserts.map(x => x.file)).size >= 2, 'the pictures change');
     for (let i = 1; i < swapped.inserts.length; i++) assert.notStrictEqual(swapped.inserts[i].file, swapped.inserts[i - 1].file, 'a swap does not repeat the last picture');
     assert.ok(swapped.inserts.every(x => x.bands && x.bands.repo === 0.45 && x.frameBg), 'framed cards carry the default bands and backdrop');
-    const one = RB.planRepo(long, assets.slice(0, 1), { takeovers: 'off', breakout: true });
+    const one = RB.planRepo(long, assets.slice(1, 2), { takeovers: 'off', breakout: true });
     assert.strictEqual(one.inserts.length, 1, 'one still is not split against itself');
-    const named = [{ start: 3, end: 10, text: 'The live preview shows every change as you type in this longer look.', section: 'body' }];
-    const cap = RB.planRepo(named, assets, { breakout: true, swapSec: [8, 10] });
-    assert.strictEqual(cap.inserts[0].place, 'full'); assert.strictEqual(cap.inserts[0].dur, 5);
-    assert.ok(cap.inserts[1] && cap.inserts[1].place === 'frame' && Math.abs(cap.inserts[1].at - 8) < 0.05, 'leftover after the cap stays a split shot: ' + JSON.stringify(cap.inserts));
-    assert.notStrictEqual(cap.inserts[1].file, cap.inserts[0].file, 'the leftover shot is a different picture');
-    const two = RB.planRepo([
-      { start: 3, end: 8, text: 'The live preview shows every change as you type.', section: 'body' },
-      { start: 8, end: 13, text: 'Look at this, the live preview again.', section: 'body' },
-    ], assets, { breakout: true, swapSec: [8, 10] });
-    const full = two.inserts.filter(x => x.place === 'full');
-    const span = full.length ? (full[full.length - 1].at + full[full.length - 1].dur) - full[0].at : 0;
-    assert.ok(span <= 5.05, 'two matching lines in a row stay within 5 s full screen: ' + JSON.stringify(two.inserts));
-    assert.ok(two.takeovers.filter(x => x.who === 'repo').every(x => x.dur <= 5.05), 'takeover notes match the cap');
-    const gapped = RB.planRepo([
-      { start: 3, end: 5.5, text: 'Look at this, the first look.', section: 'body' },
-      { start: 6.9, end: 9.4, text: 'Look at this, the second look.', section: 'body' },
-    ], assets, { breakout: true, swapSec: [8, 10] });
-    const gf = gapped.inserts.filter(x => x.place === 'full');
-    const gEnd = gf.length ? Math.max(...gf.map(x => x.at + x.dur)) : 0;
-    const gStart = gf.length ? Math.min(...gf.map(x => x.at)) : 0;
-    assert.ok(gEnd - gStart <= 5.05, 'a held gap does not stretch a full-screen run past 5 s: ' + JSON.stringify(gapped.inserts));
   });
-  await t('apply: a drafted job gets split and full screen repo inserts from the cached repo, you on the hook and CTA; off clears them', async () => {
+  await t('apply: a drafted job gets repo card inserts from the cached repo (never full screen), you on the hook and CTA; off clears them', async () => {
     const { mkdirSync } = await import('fs'), { execFileSync } = await import('child_process');
     const jobs = join(TMP, 'jobs'), build = join(jobs, 'rj', 'build'), clips = join(TMP, 'clips'); mkdirSync(build, { recursive: true }); mkdirSync(clips, { recursive: true });
     const L = [...lines.slice(0, 4), { start: 14, end: 18, text: 'It sorts every file in the folder for you.' }, { start: 18, end: 20, text: 'It is wild!' }, { start: 20, end: 24, text: 'Follow for more tools like this.' }];
@@ -190,7 +181,7 @@ try {
     const plan = join(build, 'video-plan.json'), run = p => { writeFileSync(plan, JSON.stringify(p)); return execFileSync(process.execPath, [join(ROOT, 'kit', 'repo-broll.mjs'), 'apply', '--name', 'rj', '--plan', plan, '--jobs', jobs], { env: { ...process.env, ATH_ASSETS: TMP }, encoding: 'utf8' }); };
     const out = run({ content: { repoFeature: true, repos: ['https://github.com/demo/tool'], takeovers: 'auto' }, presenter: [] });
     const cut = JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8')), rep = cut.inserts.filter(x => x.repo);
-    assert.ok(rep.some(x => x.place === 'top') && rep.some(x => x.place === 'full'), out + JSON.stringify(rep));
+    assert.ok(rep.length && rep.every(x => x.place === 'top'), out + JSON.stringify(rep)); assert.deepStrictEqual(RB.repoRuleBreaks(rep), []);
     assert.ok(rep.every(x => x.at >= 3 && x.at < 20), 'nothing on the hook or the CTA'); assert.ok(rep.every(x => !(x.at < 19.5 && x.at + x.dur > 18.5)), 'the lane keeps its spot');
     assert.ok(cut.inserts.some(x => x.studio), 'the lane insert stays');
     const you = cut.repoTakeovers.filter(x => x.who === 'you').map(x => x.why); assert.ok(you[0] === 'hook' && you.includes('punch line') && you[you.length - 1] === 'cta', you.join());

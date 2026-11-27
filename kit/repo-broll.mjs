@@ -5,21 +5,18 @@
 // fetch: the README (GitHub's public API, default branch) and its pictures and videos in the order they appear, with
 // the heading each sits under and its alt text. Badges, tiny logos, SVGs and anything that is not a picture or a video
 // are left out; a GIF becomes a looping MP4 and an animated WebP is skipped. They land in assets/web/<owner>--<repo>/
-// (gitignored) with meta.json. A failed fetch is not cached. With nothing usable, the repo page is captured instead
-// (kit/capture.mjs: the top of the README). The repo's name, stars and description are kept in meta.header; the
-// picture shown for them is GitHub's social preview card, which leads.
+// (gitignored) with meta.json. A failed fetch is not cached. The repo's name, stars and description are kept in
+// meta.header. No capture of the page and no text card: README text is never a shot (the repo rule, below).
 //
 // Network rules for the fetches made here (spec 14.10): http(s) only, no logins in links; every URL and every redirect
 // hop is checked (an IP address in the link, IPv6 included, or each DNS answer: only public addresses, no .local or
 // localhost name) and the connection uses the address that was checked; no cookies are sent; at most 25 MB per file,
-// 30 tries per repo and 60 s per file; pictures and videos only (and the README and repo facts as text). The page
-// capture fallback is kit/capture.mjs, which uses its own, simpler public-page checks.
+// 30 tries per repo and 60 s per file; pictures and videos only (and the README and repo facts as text).
 //
-// apply: the plan's layout for each line of what you say. Split (repo on top, you below, kit/split.cjs "top", or the
-// framed cards "frame" when Frame breakout is picked) on the body; the repo full screen on a line that points at it
-// ("look at this", "right here") or names a matched heading; you full screen on the hook, the punch lines and the CTA.
-// Takeovers off: Split on every body line, you full screen on the hook and the CTA. Short gaps are held over so you
-// don't flash back. Captions follow split.cjs's own placement (as with any split b-roll).
+// apply: the plan's layout for each line of what you say. The repo in its card on the body: Split (repo on top, you
+// below, kit/split.cjs "top"), or the framed cards "frame" when Frame breakout is picked. Never the repo full screen.
+// Takeovers auto: you full screen on the hook, the punch lines and the CTA; off: the repo card on every body line.
+// Short gaps are held over so you don't flash back. Captions follow split.cjs's own placement.
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs';
 import { execFileSync } from 'child_process';
 import { lookup as dnsLookup } from 'dns';
@@ -159,7 +156,7 @@ export function sizeOf(buf) {
 }
 const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' };
 
-// fetch one repo: { owner, repo, url, dir, header, assets: [{ file, kind, alt, heading, source, w, h }], skipped, fallback }
+// fetch one repo: { owner, repo, url, dir, header, assets: [{ file, kind, alt, heading, source, w, h }], skipped }
 // what the file really is from its first bytes (never the server's label alone): a playlist or anything else FFmpeg
 // could follow never reaches it
 export function magicOk(type, b) {
@@ -187,7 +184,7 @@ export function videoSeconds(file) {
 // fetch one repo's pictures into assets/web/<owner>--<repo>/ (01.png, 02.mp4 ... and meta.json). A good fetch is cached;
 // a failed one (no README read, nothing usable) is never cached, so trying again online works, and an older good
 // folder stays in place until a new one is complete.
-export async function fetchRepo(link, { request = null, resolver, capture = null, max = 12, tries = 30, force = false, log = () => {}, convert = gifToMp4, seconds = videoSeconds } = {}) {
+export async function fetchRepo(link, { request = null, resolver, max = 12, tries = 30, force = false, log = () => {}, convert = gifToMp4, seconds = videoSeconds } = {}) {
   const r = parseRepo(link); if (!r) throw new Error(`not a GitHub repo link: ${link}`);
   const dir = dirFor(r), mf = join(dir, 'meta.json');
   if (!force && existsSync(mf)) {
@@ -203,8 +200,8 @@ export async function fetchRepo(link, { request = null, resolver, capture = null
   const header = { name: facts.full_name || `${r.owner}/${r.repo}`, stars: Number.isFinite(+facts.stargazers_count) ? +facts.stargazers_count : null, description: facts.description || '', url: r.url };
   let md = '', readOk = false; try { md = (await get(api + '/readme', 'text')).body.toString('utf8'); readOk = true; } catch (e) { log(`README: ${e.message}`); }
   const found = readmeAssets(md, `https://raw.githubusercontent.com/${r.owner}/${r.repo}/${branch}/`);
-  // the social preview leads: GitHub's own card for the repo (its name, description and stars, drawn by GitHub)
-  const cands = [{ url: `https://opengraph.githubassets.com/1/${r.owner}/${r.repo}`, alt: header.name, heading: '', kind: 'image', width: null, height: null, header: true }, ...found];
+  // only the README's own pictures and videos: no text card of the repo and no capture of the page (the repo rule)
+  const cands = found;
   const tmp = `${dir}.part-${process.pid}`; rmSync(tmp, { recursive: true, force: true }); mkdirSync(tmp, { recursive: true });
   const assets = [], skipped = []; let tried = 0;
   for (const a of cands) {
@@ -214,7 +211,7 @@ export async function fetchRepo(link, { request = null, resolver, capture = null
     try {
       const g = await get(a.url, 'media'); let kind = g.type.startsWith('video/') ? 'video' : 'image';
       const sz = kind === 'image' ? sizeOf(g.body) : null;
-      if (sz && (sz.h < 40 || ((sz.w < 200 || sz.h < 200) && !a.header))) { skipped.push({ url: a.url, why: `too small (${sz.w}x${sz.h})` }); continue; }
+      if (sz && (sz.w < 200 || sz.h < 200)) { skipped.push({ url: a.url, why: `too small (${sz.w}x${sz.h})` }); continue; }
       if (!magicOk(g.type, g.body)) { skipped.push({ url: a.url, why: `not really ${g.type}` }); continue; }
       if (g.type === 'image/webp' && animatedWebp(g.body)) { skipped.push({ url: a.url, why: 'an animated WebP' }); continue; }
       const n = String(assets.length + 1).padStart(2, '0'); let file = `${n}.${EXT[g.type] || 'bin'}`;
@@ -222,20 +219,14 @@ export async function fetchRepo(link, { request = null, resolver, capture = null
       if (g.type === 'image/gif') { const mp4 = `${n}.mp4`; convert(join(tmp, file), join(tmp, mp4)); rmSync(join(tmp, file), { force: true }); file = mp4; kind = 'video'; }
       const secs = kind === 'video' ? seconds(join(tmp, file)) : null;
       if (kind === 'video' && !secs) throw new Error('a video with no length');
-      assets.push({ file, kind, alt: a.alt, heading: a.heading, source: g.url, ...(sz ? { w: sz.w, h: sz.h } : {}), ...(secs ? { seconds: +secs.toFixed(2) } : {}), ...(a.header ? { header: true } : {}) });
+      assets.push({ file, kind, alt: a.alt, heading: a.heading, source: g.url, ...(sz ? { w: sz.w, h: sz.h } : {}), ...(secs ? { seconds: +secs.toFixed(2) } : {}) });
     } catch (e) { rmSync(join(tmp, `${String(assets.length + 1).padStart(2, '0')}.gif`), { force: true }); skipped.push({ url: a.url, why: e.message }); }
   }
-  let fallback = false;
-  if (!assets.filter(a => !a.header).length && capture) {
-    // nothing usable in the README: the top of the repo page instead (kit/capture.mjs: a headless browser with its own
-    // public-page checks, which judge names without the pinned lookup used here)
-    try { const c = await capture(r.url); if (c && c.image) { const file = 'page.png'; writeFileSync(join(tmp, file), readFileSync(c.image)); assets.push({ file, kind: 'image', alt: header.name, heading: '', source: r.url, capture: true }); fallback = true; } } catch (e) { log(`capture: ${e.message}`); }
-  }
-  const meta = { owner: r.owner, repo: r.repo, url: r.url, header, assets, skipped, fallback, fetchedAt: new Date().toISOString() };
+  const meta = { owner: r.owner, repo: r.repo, url: r.url, header, assets, skipped, fetchedAt: new Date().toISOString() };
   // a partial fetch (some files timed out or were refused for now) never replaces a fuller folder we already have
   let older = null; if (existsSync(mf)) { try { older = JSON.parse(readFileSync(mf, 'utf8')); } catch {} }
   const temporary = skipped.some(x => /timed out|took too long|^(429|5\d\d) |ECONN|ENOTFOUND|EAI_AGAIN/.test(x.why));
-  const good = (readOk || fallback) && assets.some(a => !a.header) && !(older && temporary && (older.assets || []).length > assets.length);
+  const good = readOk && assets.length && !(older && temporary && (older.assets || []).length > assets.length);
   if (!good) {
     // not cached: an older good folder (which a cut may point at) stays as it is
     rmSync(tmp, { recursive: true, force: true });
@@ -250,14 +241,27 @@ export async function fetchRepo(link, { request = null, resolver, capture = null
 }
 
 // ---------- the plan ----------
-const POINT = /\b(look at (this|that|it)|check (this|it) out|right here|over here|here you can see|you can see|this part|this one|as you can see|on screen)\b/i;
 const toks = s => String(s || '').toLowerCase().match(/[a-z0-9]{3,}/g) || [];
 const STOP = new Set(['the', 'and', 'for', 'with', 'you', 'your', 'this', 'that', 'how', 'what', 'are', 'from', 'into', 'about', 'use', 'using', 'can', 'all', 'our', 'get', 'out', 'now', 'just']);
 // how well a line names an asset's heading or alt text (0 none, 1 or more: words in common)
 export function score(line, a) { const lw = new Set(toks(line).filter(w => !STOP.has(w))); return [...new Set(toks(a.heading + ' ' + a.alt).filter(w => !STOP.has(w)))].filter(w => lw.has(w) || lw.has(w.replace(/s$/, ''))).length; }
-// repo-mode layout and timing (plan.content, or these defaults). Template-able: a starter or a saved plan can
-// set bands, takeoverSec and swapSec. About 45/10/45, full-screen takeovers 2-5 s, visuals every 2-4 s.
-export const REPO_STYLE = { bands: { repo: 0.45, captions: 0.10, you: 0.45 }, takeoverSec: [2, 5], swapSec: [2, 4], frameBg: ['#e8eaed', '#dfe3e8'] };
+// repo-mode layout and timing (plan.content, or these defaults). Template-able: a starter or a saved plan can set bands
+// and swapSec. About 45/10/45, a new visual every 2-4 s. (plan.content.takeoverSec is still read by old templates;
+// the repo is never full screen now, so it changes nothing.)
+export const REPO_STYLE = { bands: { repo: 0.45, captions: 0.10, you: 0.45 }, swapSec: [2, 4], frameBg: ['#e8eaed', '#dfe3e8'] };
+// Will, 2026-11-27: in repo mode the b-roll never cuts to full screen, plain text or README text. The repo stays in its
+// card (Split or Frame breakout) with you on screen; a capture of the README page or GitHub's text card is never shown.
+// What breaks that rule, per repo insert (empty when it holds). planRepo never makes one; apply and plan-check check.
+export const onCard = a => !!a && !a.header && !a.capture;
+export function repoRuleBreaks(inserts) {
+  const out = [];
+  for (const x of (inserts || []).filter(i => i && i.repo)) {
+    if (!SPLIT_PLACES.includes(x.place)) out.push({ at: x.at, why: `the repo ${x.place === 'full' ? 'full screen' : 'as ' + x.place}` });
+    if (x.text || x.page) out.push({ at: x.at, why: 'README or page text as a shot' });
+  }
+  return out;
+}
+const SPLIT_PLACES = ['top', 'frame'];
 const pair = (v, fb) => (Array.isArray(v) && v.length === 2 && v.every(n => typeof n === 'number' && n > 0) && v[0] <= v[1] ? v : fb);
 const chunks = (start, end, [lo, hi]) => {
   const dur = end - start; if (dur <= hi + 0.05) return [[start, end]];
@@ -273,102 +277,43 @@ const chunks = (start, end, [lo, hi]) => {
   return out;
 };
 // lines: [{ start, end, text, section: hook | body | cta }] on the reel timeline; assets with { path, kind, heading, alt }
-// -> { inserts: [{ file, at, dur, place, image, repo: true, line }], takeovers: [{ at, dur, who: repo | you }] }
-export function planRepo(lines, assets, { takeovers = 'auto', breakout = false, minDur = 1.2, bands = null, takeoverSec = null, swapSec = null, frameBg = null } = {}) {
-  const inserts = [], who = []; if (!assets.length) return { inserts, takeovers: who };
+// -> { inserts: [{ file, at, dur, place: top | frame, image, repo: true, line }], takeovers: [{ at, dur, who: you }] }
+// takeovers auto: you full screen on the hook, the punch lines and the CTA (noted in takeovers); off: the repo card on
+// every body line. There is never a repo shot on the hook or the CTA, and the repo is never full screen.
+export function planRepo(lines, assets0, { takeovers = 'auto', breakout = false, minDur = 1.2, bands = null, swapSec = null, frameBg = null } = {}) {
+  const inserts = [], who = [], assets = (assets0 || []).filter(onCard); if (!assets.length) return { inserts, takeovers: who };
   const split = breakout ? 'frame' : 'top', used = new Map(); let next = 0;
-  const style = {
-    bands: bands || (breakout ? REPO_STYLE.bands : null),
-    takeoverSec: pair(takeoverSec, REPO_STYLE.takeoverSec),
-    swapSec: pair(swapSec, REPO_STYLE.swapSec),
-    frameBg: Array.isArray(frameBg) ? frameBg : (breakout ? REPO_STYLE.frameBg : null),
-  };
+  const style = { bands: bands || (breakout ? REPO_STYLE.bands : null), swapSec: pair(swapSec, REPO_STYLE.swapSec), frameBg: Array.isArray(frameBg) ? frameBg : (breakout ? REPO_STYLE.frameBg : null) };
   const pick = (text, avoid = null) => {
     let best = null, bs = 0;
     for (const a of assets) {
       if (avoid && a.path === avoid) continue;
       const s = score(text, a) - (used.get(a.path) || 0) * 0.5; if (s > bs && score(text, a) >= 1) { best = a; bs = s; }
     }
-    if (best) return { a: best, named: true };
-    const pool = avoid && assets.length > 1 ? assets.filter(x => x.path !== avoid) : assets;
-    const a = pool[next % pool.length]; next++; return { a, named: false };
-  };
-  // clock time from the start of this continuous full-screen run (including gaps the hold loop may later fill)
-  const runStart = at => {
-    let t = at, start = at;
-    for (let i = inserts.length - 1; i >= 0; i--) {
-      const x = inserts[i]; if (x.place !== 'full') break;
-      if (t - (x.at + x.dur) >= 1.5) break;
-      start = x.at; t = x.at;
-    }
-    return start;
-  };
-  const push = (l, a, named, at, end, full) => {
-    let d = +(end - at).toFixed(2);
-    if (a.kind === 'video' && a.seconds) d = +Math.min(d, a.seconds).toFixed(2);
-    if (full) {
-      const hi = style.takeoverSec[1];
-      if (d > hi) d = hi;
-    }
-    const row = { file: a.path, at: +at.toFixed(2), dur: d, in: 0, place: full ? 'full' : split, image: a.kind === 'image', repo: true, line: l.text.slice(0, 80), ...(full ? {} : { fit: 'whole' }), ...(a.seconds ? { seconds: a.seconds } : {}) };
-    if (split === 'frame' && !full) {
-      if (style.bands) row.bands = style.bands;
-      if (style.frameBg) row.frameBg = style.frameBg;
-    }
-    inserts.push(row);
-    if (full) who.push({ at: row.at, dur: d, who: 'repo', why: named ? `names ${a.heading || a.alt}` : 'points at it' });
+    if (!best) { const pool = avoid && assets.length > 1 ? assets.filter(x => x.path !== avoid) : assets; best = pool[next % pool.length]; next++; }
+    used.set(best.path, (used.get(best.path) || 0) + 1); return best;
   };
   for (const l of lines) {
     const dur = +(l.end - l.start).toFixed(2); if (dur < minDur) continue;
-    const words = toks(l.text).length, punch = l.section === 'body' && (/!\s*$/.test(l.text) || words <= 4);
+    const punch = l.section === 'body' && (/!\s*$/.test(l.text) || toks(l.text).length <= 4);
     if (l.section !== 'body' || (punch && takeovers === 'auto')) { if (takeovers === 'auto') who.push({ at: l.start, dur, who: 'you', why: l.section === 'body' ? 'punch line' : l.section }); continue; }
-    // first pick decides a named full-screen takeover for the opening chunk; later chunks cycle the pictures
-    const first = pick(l.text, inserts.length ? inserts[inserts.length - 1].file : null); used.set(first.a.path, (used.get(first.a.path) || 0) + 1);
-    const full0 = takeovers === 'auto' && (POINT.test(l.text) || first.named);
     // one still does not swap against itself; a second picture is needed to change the visual
     const parts = assets.length > 1 ? chunks(l.start, l.end, style.swapSec) : [[l.start, l.end]];
-    let prevPath = inserts.length ? inserts[inserts.length - 1].file : null;
-    parts.forEach((span, i) => {
-      const { a, named } = i === 0 ? first : pick(l.text, prevPath);
-      if (i) used.set(a.path, (used.get(a.path) || 0) + 1);
-      let full = i === 0 && full0;
-      const room = +(span[1] - span[0]).toFixed(2);
-      const [lo, hi] = style.takeoverSec;
-      if (full) {
-        const left = +(hi - (span[0] - runStart(span[0]))).toFixed(2);
-        if (room < lo - 0.05 || left < lo - 0.05) full = false;
-        else {
-          const cap = Math.min(room, hi, Math.max(left, 0));
-          push(l, a, named, span[0], span[0] + cap, true);
-          prevPath = a.path;
-          if (room - cap >= minDur && assets.length > 1) {
-            const more = pick(l.text, a.path); used.set(more.a.path, (used.get(more.a.path) || 0) + 1);
-            push(l, more.a, false, span[0] + cap, span[1], false);
-            prevPath = more.a.path;
-          }
-          return;
-        }
-      }
-      push(l, a, named, span[0], span[1], false);
-      prevPath = a.path;
-    });
-  }
-  // no flashes back to you: a short gap (a pause, a short line) between two inserts of the same layout is closed by
-  // holding the first one longer, as far as a video's own length allows
-  // (never over a moment that is yours: a punch line, the hook or the CTA)
-  for (let i = 0; i + 1 < inserts.length; i++) {
-    const p = inserts[i], q = inserts[i + 1], gap = q.at - (p.at + p.dur), end = p.at + p.dur;
-    const yours = who.some(w => w.who === 'you' && w.at < q.at && w.at + w.dur > end);
-    if (p.place === q.place && gap > 0 && gap < 1.5 && !yours) {
-      let d = +(q.at - p.at).toFixed(2); if (p.seconds && d > p.seconds) continue;
-      if (p.place === 'full') { const hi = style.takeoverSec[1]; if (d > hi) d = hi; }
-      if (d > p.dur) { p.own = p.own || p.dur; p.dur = d; }
+    for (const [at, end] of parts) {
+      const a = pick(l.text, inserts.length ? inserts[inserts.length - 1].file : null);
+      let d = +(end - at).toFixed(2); if (a.kind === 'video' && a.seconds) d = +Math.min(d, a.seconds).toFixed(2);
+      const row = { file: a.path, at: +at.toFixed(2), dur: d, in: 0, place: split, image: a.kind === 'image', repo: true, line: l.text.slice(0, 80), fit: 'whole', ...(a.seconds ? { seconds: a.seconds } : {}) };
+      if (split === 'frame') { if (style.bands) row.bands = style.bands; if (style.frameBg) row.frameBg = style.frameBg; }
+      inserts.push(row);
     }
   }
-  for (const w of who) {
-    if (w.who !== 'repo') continue;
-    const ins = inserts.find(x => x.place === 'full' && Math.abs(x.at - w.at) < 0.05);
-    if (ins) w.dur = ins.dur;
+  // no flashes back to you: a short gap (a pause, a short line) between two inserts is closed by holding the first one
+  // longer, as far as a video's own length allows (never over a moment that is yours: a punch line, the hook or the CTA)
+  for (let i = 0; i + 1 < inserts.length; i++) {
+    const p = inserts[i], q = inserts[i + 1], gap = q.at - (p.at + p.dur), end = p.at + p.dur;
+    const yours = who.some(w => w.at < q.at && w.at + w.dur > end);
+    const d = +(q.at - p.at).toFixed(2);
+    if (gap > 0 && gap < 1.5 && !yours && !(p.seconds && d > p.seconds) && d > p.dur) { p.own = p.own || p.dur; p.dur = d; }
   }
   inserts.forEach(x => delete x.seconds);
   return { inserts, takeovers: who };
@@ -387,8 +332,8 @@ if (isMain) {
   const a = process.argv.slice(2), opt = k => { const i = a.indexOf('--' + k); return i >= 0 ? a[i + 1] : null; };
   const run = async () => {
     if (a[0] === 'fetch') {
-      const out = []; for (const u of a.slice(1).filter(x => !x.startsWith('--'))) { const m = await fetchRepo(u, { force: a.includes('--force'), log: x => console.error(x) }); out.push({ repo: m.url, dir: relative(ROOT, m.dir), assets: m.assets.length, skipped: m.skipped.length, fallback: m.fallback }); }
-      console.log(a.includes('--json') ? JSON.stringify(out) : out.map(x => `${x.repo}: ${x.assets} pictures and videos in ${x.dir}${x.fallback ? ' (the page, the README had none)' : ''}`).join('\n')); return;
+      const out = []; for (const u of a.slice(1).filter(x => !x.startsWith('--'))) { const m = await fetchRepo(u, { force: a.includes('--force'), log: x => console.error(x) }); out.push({ repo: m.url, dir: relative(ROOT, m.dir), assets: m.assets.length, skipped: m.skipped.length }); }
+      console.log(a.includes('--json') ? JSON.stringify(out) : out.map(x => `${x.repo}: ${x.assets} pictures and videos in ${x.dir}`).join('\n')); return;
     }
     if (a[0] !== 'apply' || !opt('name')) { console.error('usage: repo-broll.mjs fetch <repo url> [...] | apply --name <job> [--plan <video-plan.json>]'); process.exit(2); }
     const build = join(opt('jobs') ? resolve(opt('jobs')) : join(ROOT, 'jobs'), opt('name'), 'build'), cutF = join(build, 'cut.json');
@@ -399,21 +344,20 @@ if (isMain) {
     const others = (cut.inserts || []).filter(x => !x.repo);
     const clear = () => { cut.inserts = others; if (!others.length) delete cut.inserts; delete cut.repoTakeovers; writeFileSync(cutF, JSON.stringify(cut, null, 1)); };
     if (!c.repoFeature || !(c.repos || []).length) { if ((cut.inserts || []).some(x => x.repo) || cut.repoTakeovers) clear(); console.log(JSON.stringify({ ok: true, repo: false })); return; }
-    let capture = null; try { const CAP = await import('./capture.mjs'); capture = async u => { const r = await CAP.capture(u, { imageOnly: true }); return { image: join(r.dir, 'shot.png') }; }; } catch {}
     const assets = [];
-    for (const u of c.repos) { try { const m = await fetchRepo(u, { capture, log: x => console.log(`repo: ${x}`) }); for (const x of m.assets) assets.push({ ...x, path: join(m.dir, x.file) }); } catch (e) { console.log(`repo: ${u}: ${e.message}`); } }
+    for (const u of c.repos) { try { const m = await fetchRepo(u, { log: x => console.log(`repo: ${x}`) }); for (const x of m.assets.filter(onCard)) assets.push({ ...x, path: join(m.dir, x.file) }); } catch (e) { console.log(`repo: ${u}: ${e.message}`); } }
     if (!assets.length) { console.log('repo: we could not get any pictures from the repo, so you stay on screen (check the link, or try again online)'); clear(); console.log(JSON.stringify({ ok: true, repo: true, inserts: 0 })); return; }
     const breakout = (plan.presenter || []).some(x => x && x.id === 'frame-breakout');
-    const { inserts, takeovers } = planRepo(linesOf(cut, build), assets, { takeovers: c.takeovers === 'off' ? 'off' : 'auto', breakout, bands: c.bands || null, takeoverSec: c.takeoverSec || null, swapSec: c.swapSec || null, frameBg: c.frameBg || null });
+    const { inserts, takeovers } = planRepo(linesOf(cut, build), assets, { takeovers: c.takeovers === 'off' ? 'off' : 'auto', breakout, bands: c.bands || null, swapSec: c.swapSec || null, frameBg: c.frameBg || null });
     // a spot the b-roll lane already uses keeps its clip
     // (an insert held over a gap is trimmed back to its own line first, rather than dropped)
     const hits = x => others.some(o => x.at < +o.at + +o.dur && +o.at < x.at + x.dur);
     const free = inserts.map(x => hits(x) && x.own && x.own < x.dur ? { ...x, dur: x.own } : x).filter(x => !hits(x)).map(({ own, ...x }) => ({ ...x, file: relative(build, x.file).split(sep).join('/') }));
     cut.inserts = [...others, ...free].sort((p, q) => p.at - q.at); if (!cut.inserts.length) delete cut.inserts;
-    // what happened, per line: you full screen, and the repo full screen only where its insert was kept
-    cut.repoTakeovers = takeovers.filter(t => t.who === 'you' || free.some(x => x.place === 'full' && x.at === t.at));
+    const breaks = repoRuleBreaks(free); if (breaks.length) throw new Error(`repo: the b-roll would break the repo rule: ${breaks.map(b => `${b.at} s ${b.why}`).join('; ')}`);
+    cut.repoTakeovers = takeovers; // you full screen on the hook, punch lines and CTA
     writeFileSync(cutF, JSON.stringify(cut, null, 1));
-    console.log(`repo: ${free.filter(x => x.place !== 'full').length} split, ${free.filter(x => x.place === 'full').length} repo full screen, ${takeovers.filter(x => x.who === 'you').length} you full screen`);
+    console.log(`repo: ${free.length} repo card shots, ${takeovers.length} you full screen`);
     console.log(JSON.stringify({ ok: true, repo: true, inserts: free.length }));
   };
   run().catch(e => { console.error(e.message); process.exit(1); });
