@@ -163,7 +163,7 @@ function view(s) {
   let look = null; try { look = lookSources(s); } catch {}
   const outputs = C.outputsOf(s), currentOutputs = currentOutputsOf(s);
   const memory = s.job ? MC.renderCheck(join(ROOT, 'jobs', s.job, 'build')) : MC.preflight();
-  return { seq: ++viewSeq, boot: BOOT, scenes: C.catalog().scenesSig || '', state: s, look, compose: comp, outputs, currentOutputs, sizes: SIZES.viewOf(s, outputs), refFont: C.refFontOf(s, SLK.fontOf(s.styleLook)), boost: C.boostOf(s), motion: C.motionOf(s), savedLook: (() => { try { return C.savedLookOf(s); } catch { return null; } })(), draftPreview: draftPreviewOf(s), match: matchOf(s), styleLooks: SLK.list(), reopenable, scripts, cut, broll, highlights: HL ? HL.view(s) : null, publish: (() => { try { return PUB ? PUB.view(s) : null; } catch { return null; } })(), refTitles: RTI.view(s), pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), memory, swap: noTimeline(s) ? null : swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
+  return { seq: ++viewSeq, boot: BOOT, scenes: C.catalog().scenesSig || '', state: s, look, compose: comp, outputs, currentOutputs, sizes: SIZES.viewOf(s, outputs), refFont: C.refFontOf(s, SLK.fontOf(s.styleLook)), boost: C.boostOf(s), motion: C.motionOf(s), savedLook: (() => { try { return C.savedLookOf(s); } catch { return null; } })(), draftPreview: draftPreviewOf(s), match: matchOf(s), styleLooks: SLK.listView(), reopenable, scripts, cut, broll, highlights: HL ? HL.view(s) : null, publish: (() => { try { return PUB ? PUB.view(s) : null; } catch { return null; } })(), refTitles: RTI.view(s), pieces: (() => { try { return piecesOf(s); } catch { return null; } })(), combo: { ...combo, from: draftFrom(s, combo) }, edit, env: env(), memory, swap: noTimeline(s) ? null : swapOf(s), cleanupReady: !!(s.job && existsSync(clipsJsonPath(s))), task: task && { id: task.id, kind: task.kind, status: task.status, ...(task.cancel && task.status === 'running' ? { cancelling: true } : {}), ...(task.fix ? { fix: task.fix } : {}), startedAt: task.startedAt, endedAt: task.endedAt, lines: task.lines.slice(-12), result: task.result || null } };
 }
 
 // Copy the look (kit/studio/stylelooks.mjs): the reference's timeline is not used, so no "what to swap" and no spots from it
@@ -1011,6 +1011,17 @@ const RTI = mountRefTitles({ ROOT, C, update, json, readBody, view: s => view(s)
   complete: (system, user, o) => LLM.complete(system, user, KEYS.envWithKeys(), S.load().chat, o) });
 // startTranscribe calls back only on success; a raw upload also wants to hear a failure
 function watchTx(rel, done) { const t = setInterval(() => { const x = (C.load().tx || {})[rel]; if (x && x.status === 'failed') { clearInterval(t); done(Object.assign(new Error(x.error || 'transcription failed'), { fix: x.fix })); } else if (!MEDIA.transcribing(rel)) clearInterval(t); }, 500); }
+
+// Make a playable sample for a saved look in the background (Teardowns library). Failures are logged; the look stays saved.
+function queueLookSample(name) {
+  // tests set CI=1 and do not need a sample rendered (tests/studio-mix-looks.test.mjs builds one itself)
+  if (process.env.CI && process.env.STUDIO_LOOK_SAMPLE !== '1') return;
+  setImmediate(() => {
+    try { SLK.buildSample(name); pushState(true); }
+    catch (e) { console.error('Look sample for ' + name + ': ' + (e && e.message || e)); pushState(true); }
+  });
+}
+
 function serveFile(req, res, file) {
   let st; try { st = statSync(file); } catch { return json(res, 404, { error: 'not found' }); }
   if (!st.isFile()) return json(res, 404, { error: 'not found' });
@@ -1477,11 +1488,44 @@ async function api(req, res, u) {
     return json(res, 200, await chatTurn(line, false, { kind: 'comment', t: +t.toFixed(2), ...(end != null ? { end } : {}), region: rg, video: video || source, frame, note: text }));
   }
   // saved style looks (kit/studio/stylelooks.mjs): the list, and Save this look from the current reference
-  if (p === '/api/style-looks' && M === 'GET') return json(res, 200, { looks: SLK.list() });
+  if (p === '/api/style-looks' && M === 'GET') return json(res, 200, { looks: SLK.listView() });
   if (p === '/api/style-looks/save' && M === 'POST') {
     const b = await readBody(req).catch(() => ({})); let r;
     try { r = SLK.saveCurrent(C.load(), ROOT, b.name); } catch (e) { return json(res, e.code || 500, { error: e.message }); }
-    pushState(true); return json(res, 200, { ok: true, name: r.name, looks: SLK.list() });
+    queueLookSample(r.name); pushState(true); return json(res, 200, { ok: true, name: r.name, looks: SLK.listView() });
+  }
+  if (p === '/api/style-looks/mix' && M === 'POST') {
+    const b = await readBody(req).catch(() => ({})), s = C.load(); let r;
+    try { r = SLK.mixAndSave(b, { queue: (s.reference && s.reference.queue) || [], root: ROOT }); }
+    catch (e) { return json(res, e.code || 500, { error: e.message }); }
+    queueLookSample(r.name); pushState(true); return json(res, 200, { ok: true, name: r.name, looks: SLK.listView() });
+  }
+  if (p === '/api/style-looks/rename' && M === 'POST') {
+    const b = await readBody(req).catch(() => ({})); let r;
+    try { r = SLK.rename(b.name, b.label); } catch (e) { return json(res, e.code || 500, { error: e.message }); }
+    pushState(true); return json(res, 200, { ok: true, look: r, looks: SLK.listView() });
+  }
+  if (p === '/api/style-looks/duplicate' && M === 'POST') {
+    const b = await readBody(req).catch(() => ({})); let r;
+    try { r = SLK.duplicate(b.name); } catch (e) { return json(res, e.code || 500, { error: e.message }); }
+    if (r && r.sample && r.sample.status !== 'ready') queueLookSample(r.name);
+    pushState(true); return json(res, 200, { ok: true, look: r, looks: SLK.listView() });
+  }
+  if (p === '/api/style-looks/delete' && M === 'POST') {
+    const b = await readBody(req).catch(() => ({}));
+    try { SLK.removeLook(b.name); } catch (e) { return json(res, e.code || 500, { error: e.message }); }
+    pushState(true); return json(res, 200, { ok: true, looks: SLK.listView() });
+  }
+  if (p === '/api/style-looks/sample' && M === 'POST') {
+    const b = await readBody(req).catch(() => ({}));
+    try { const r = SLK.buildSample(b.name, { force: !!b.force }); pushState(true); return json(res, 200, { ok: true, sample: r, looks: SLK.listView() }); }
+    catch (e) { return json(res, e.code || 500, { error: e.message }); }
+  }
+  if (p.startsWith('/api/style-looks/sample/') && M === 'GET') {
+    const name = decodeURIComponent(p.slice('/api/style-looks/sample/'.length).split('/')[0]);
+    const st = SLK.sampleStatus(name);
+    if (!st.file) return json(res, 404, { error: 'No sample for this look yet.' });
+    return serveFile(req, res, st.file);
   }
   // a teardown saved as a named template (its look, and a template.json with the plan derived from it)
   // is there a call to action in what you say? (Make's warning: a CTA card or a filter timed for it needs one).
@@ -1506,7 +1550,7 @@ async function api(req, res, u) {
       // its picture: a still from the reference video it was broken down from
       if (ref.file) TPL.setThumb(L.name, resolve(ROOT, ref.file)).catch(() => {}); }
     catch (e) { return json(res, typeof e.code === 'number' ? e.code : 500, { error: e.message }); }
-    pushState(true); return json(res, 200, { ok: true, template: r, templates: TPL.list(C.catalog()), looks: SLK.list() });
+    if (L && L.name) queueLookSample(L.name); pushState(true); return json(res, 200, { ok: true, template: r, templates: TPL.list(C.catalog()), looks: SLK.listView() });
   }
   if (p === '/api/pack/save' && M === 'POST') {
     const b = await readBody(req), s = C.load(), name = String(b.name || '').toLowerCase();
