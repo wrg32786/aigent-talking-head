@@ -14,8 +14,10 @@ const fail = m => { console.error('FAIL ' + m); process.exit(1); };
 const work = mkdtempSync(join(tmpdir(), 'th-framecap-')), d = join(work, 'build'); mkdirSync(d);
 try {
   // the page and worker counts follow the machine and never go past what memory allows
-  if (FC.pickPages({}, 8, 16 * 2 ** 30) !== 2 || FC.pickPages({}, 16, 16 * 2 ** 30) !== 3 || FC.pickPages({}, 2, 16 * 2 ** 30) !== 1) fail('pages by CPU');
-  if (FC.pickPages({}, 16, 2 * 2 ** 30) !== 1 || FC.pickPages({ RENDER_PAGES: '2' }, 1, 0) !== 2) fail('pages by memory or RENDER_PAGES');
+  const plenty = 32 * 2 ** 30;
+  if (FC.pickPages({}, 8, 16 * 2 ** 30, plenty) !== 2 || FC.pickPages({}, 16, 16 * 2 ** 30, plenty) !== 3 || FC.pickPages({}, 2, 16 * 2 ** 30, plenty) !== 1) fail('pages by CPU');
+  if (FC.pickPages({}, 16, 2 * 2 ** 30, plenty) !== 1 || FC.pickPages({ RENDER_PAGES: '2' }, 1, 0, plenty) !== 2) fail('pages by memory or RENDER_PAGES');
+  if (FC.pickPages({}, 16, 16 * 2 ** 30, 7 * 2 ** 30) !== 1) fail('pages on a machine with under 8 GB');
   if (FC.pickWorkers(8, 2) !== 3 || FC.pickWorkers(2, 1) !== 1) fail('workers');
 
   copyFileSync(join(KIT, 'example', 'skool-logo.svg'), join(d, 'skool-logo.svg'));

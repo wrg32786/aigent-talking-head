@@ -35,28 +35,53 @@ await t('memory check on CPU: portrait and lite, short or enough, and the choice
   assert.strictEqual(short.ok, false); assert.strictEqual(short.model, 'birefnet-portrait');
   assert.deepStrictEqual(short.options.map(o => o.id), ['front', 'light', 'anyway']);
   assert.match(short.message, /needs about 8\.\d GB and 6 GB is free/);
+  assert.match(short.message, /high-quality person mask/);
   assert.strictEqual(withFree(12, () => MC.check('birefnet')).ok, true);
   const mp = withFree(1, () => MC.check('mediapipe')); assert.strictEqual(mp.ok, true); assert.strictEqual(mp.needed, false);
 });
-await t('memory check on DirectML: refuse 24.6 GB free and allow 26 GB', async () => {
+await t('memory check on DirectML when forced: refuse 24.6 GB free and allow 26 GB', async () => {
   process.env.MASK_PROVIDER = 'dml';
   const short = withFree(24.6, () => MC.check('birefnet'));
-  assert.strictEqual(short.ok, false, '24.6 GB free must be refused on DirectML');
+  assert.strictEqual(short.ok, false, '24.6 GB free must be refused when DirectML is forced');
   assert.strictEqual(MC.needGB('birefnet-portrait', 'dml'), 25.8);
   assert.strictEqual(short.provider, 'dml');
-  assert.match(short.message, /on DirectML/);
+  assert.match(short.message, /on the graphics chip/);
   assert.match(short.message, /needs about 25\.8 GB and 24\.6 GB is free/);
+  assert.ok(!/DirectML/.test(short.message), 'Studio copy does not say DirectML');
   assert.strictEqual(withFree(26, () => MC.check('birefnet')).ok, true);
 });
-await t('memory check with no MASK_PROVIDER: Windows is taken as DirectML, other systems as CPU', async () => {
+await t('memory check with no MASK_PROVIDER: Windows uses the processor when the graphics chip does not fit', async () => {
   delete process.env.MASK_PROVIDER;
   const platform = Object.getOwnPropertyDescriptor(process, 'platform');
-  const on = os => { Object.defineProperty(process, 'platform', { ...platform, value: os }); return withFree(12, () => MC.check('birefnet')); };
+  const on = (os, gb) => { Object.defineProperty(process, 'platform', { ...platform, value: os }); return withFree(gb, () => MC.check('birefnet')); };
   try {
-    const win = on('win32'), linux = on('linux');
-    assert.strictEqual(win.provider, 'dml'); assert.strictEqual(win.ok, false);
-    assert.strictEqual(linux.provider, 'cpu'); assert.strictEqual(linux.ok, true);
+    const winFit = on('win32', 12);
+    assert.strictEqual(winFit.provider, 'cpu'); assert.strictEqual(winFit.ok, true);
+    assert.strictEqual(winFit.adapted, true); assert.strictEqual(winFit.preferred, 'dml');
+    assert.match(winFit.note, /uses the processor instead/);
+    const winShort = on('win32', 6);
+    assert.strictEqual(winShort.ok, false); assert.strictEqual(winShort.provider, 'cpu');
+    assert.match(winShort.message, /needs about 8\.\d GB and 6 GB is free/);
+    const winDml = on('win32', 26);
+    assert.strictEqual(winDml.provider, 'dml'); assert.strictEqual(winDml.ok, true); assert.strictEqual(winDml.adapted, false);
+    const linux = on('linux', 12);
+    assert.strictEqual(linux.provider, 'cpu'); assert.strictEqual(linux.ok, true); assert.strictEqual(linux.adapted, false);
   } finally { Object.defineProperty(process, 'platform', platform); }
+});
+await t('preflight: tight memory gets a note even when the mask is not in play', async () => {
+  process.env.MASK_PROVIDER = 'cpu';
+  const tight = withFree(2, () => MC.preflight());
+  assert.strictEqual(tight.ok, false);
+  assert.strictEqual(tight.tight, true);
+  const noMask = withFree(2, () => {
+    const d = mkdtempSync(join(tmpdir(), 'memcheck-tight-'));
+    try {
+      writeFileSync(join(d, 'cut.json'), JSON.stringify({ segs: [], overlay: 'ovl/%04d.png' }));
+      return MC.renderCheck(d);
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+  assert.strictEqual(noMask.needed, false); assert.strictEqual(noMask.ok, true);
+  assert.match(noMask.note, /only 2 GB free/);
 });
 if (previousProvider === undefined) delete process.env.MASK_PROVIDER;
 else process.env.MASK_PROVIDER = previousProvider;

@@ -1029,7 +1029,7 @@ if (flag('rebuild') && flag('no-mask') && (cut.mask || cut.headMask || cut.perso
 }
 // memory for the mask (kit/memcheck.cjs; kit/mask.py checks again before it loads the model)
 if ((cut.titles || splitIns().length) && cut.mask) { const mc = require('./memcheck.cjs').renderCheck(build, { model: opt('mask') });
-  if (mc.needed) console.log(mc.ok ? `memory: ${mc.freeGB} GB free, the ${mc.model} mask needs about ${mc.needGB} GB` : `WARNING: ${mc.message} (--no-mask puts titles in front; --mask mediapipe is the lighter mask)`); }
+  if (mc.needed) console.log(mc.ok ? (mc.note || `memory: ${mc.freeGB} GB free, the ${mc.model} mask needs about ${mc.needGB} GB`) : `WARNING: ${mc.message} (--no-mask puts titles in front; --mask mediapipe is the lighter mask)`); }
 // person mask only for titles that sit behind the head (needs npm run effects:setup)
 if ((cut.titles || splitIns().length) && cut.mask) {
   let capsNow = {}; try { capsNow = R.readCaptions(path.join(build, 'captions.js')); } catch {}

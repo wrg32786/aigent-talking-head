@@ -7,18 +7,19 @@
 // screenshot each frame. motlab encodes with WebCodecs; Chrome's VideoEncoder cannot keep an alpha channel
 // (alpha: 'keep' is unsupported for VP8, VP9, AV1 and H.264), and the overlay layers need alpha, so frames stay PNG.
 // RENDER_CAPTURE=screenshot keeps the old path. RENDER_PAGES=<n> sets how many pages draw at once (default from the
-// CPU count and free memory). Any error on the fast path (an image from a file tainting the canvas, no workers)
-// falls back to screenshots for that page from that frame on, and render.mjs says so.
+// CPU count, free memory, and installed memory). Any error on the fast path (an image from a file tainting the canvas,
+// no workers) falls back to screenshots for that page from that frame on, and render.mjs says so.
 import os from 'os';
 
 export const BATCH = 12;
 
 // how many pages draw frames at once: about one per three CPU threads, at most 3, and only with memory to spare
-// (a page with its encode workers peaks near 600 MB)
-export function pickPages(env = process.env, cpus = (os.cpus() || []).length || 1, free = os.freemem()) {
+// (a page with its encode workers peaks near 600 MB). Machines with under 8 GB of installed memory stay on one page.
+export function pickPages(env = process.env, cpus = (os.cpus() || []).length || 1, free = os.freemem(), total = os.totalmem()) {
   if (env.RENDER_PAGES) return Math.max(1, Math.min(8, Math.floor(+env.RENDER_PAGES) || 1));
   const byCpu = Math.floor(cpus / 3), byMem = Math.floor((free / 2 ** 30 - 1.5) / 0.6);
-  return Math.max(1, Math.min(3, byCpu, byMem));
+  const cap = total / 2 ** 30 < 8 ? 1 : 3;
+  return Math.max(1, Math.min(cap, byCpu, byMem));
 }
 export const pickWorkers = (cpus = (os.cpus() || []).length || 1, pages = 1) => Math.max(1, Math.min(3, Math.floor(cpus / pages) - 1));
 

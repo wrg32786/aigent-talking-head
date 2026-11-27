@@ -23,6 +23,7 @@ export function SetupCheck({ V, open, setOpen }) {
     <header className="sheet-h"><h2 id="h-setup">Setup check</h2><IconBtn n="x" label="Close" onClick={() => setOpen(false)} /></header>
     <div className="sheet-b">
       <p className="fine" id="setup-lead">{!st ? 'Checking this computer.' : missing ? 'Missing things come first. Install does it for you. For the rest, send or copy the steps to your agent.' : 'Everything Studio uses is installed.'}</p>
+      {V && V.env && V.env.memory && (V.env.memory.message || V.env.memory.note) && <p className="fine" id="setup-mem" role={V.env.memory.ok ? 'status' : 'alert'}>{V.env.memory.message || V.env.memory.note}</p>}
       <ul className="setup-list" id="setup-list">
         {items ? items.map(x => { const f = fixOf(V, x.id); return <li key={x.id} data-id={x.id} className={x.status}>
           <span className="sdot" aria-hidden="true">{x.status === 'ready' ? <Icon n="check" /> : <Icon n="x" />}</span>
