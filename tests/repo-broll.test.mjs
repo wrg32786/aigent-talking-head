@@ -114,11 +114,23 @@ try {
     const webp = Buffer.alloc(30); webp.write('RIFF', 0); webp.write('WEBP', 8); webp.write('VP8X', 12); webp[20] = 2; assert.ok(RB.animatedWebp(webp));
     assert.throws(() => { if (!RB.parseRepo('https://github.com/../x')) throw new Error('refused'); }, /refused/); assert.strictEqual(RB.parseRepo('https://gitlab.com/a/b'), null);
   });
-  await t('a README with nothing usable is not captured as a page (README text is never a shot)', async () => {
-    routes['https://api.github.com/repos/demo/bare'] = R('application/json', Buffer.from('{}'));
+  await t('a README with nothing usable is never captured as a page; its text and facts are kept for the animated cards', async () => {
+    routes['https://api.github.com/repos/demo/bare'] = R('application/json', Buffer.from(JSON.stringify({ full_name: 'demo/bare', stargazers_count: 12, forks_count: 3, language: 'Go', license: { spdx_id: 'MIT' }, topics: ['cli'] })));
+    routes['https://api.github.com/repos/demo/bare/contents'] = R('application/json', Buffer.from(JSON.stringify([{ name: '.github', type: 'dir' }, { name: 'cmd', type: 'dir' }, { name: 'go.mod', type: 'file' }])));
     routes['https://api.github.com/repos/demo/bare/readme'] = R('text/plain', Buffer.from('# Bare\n\n[![x](https://img.shields.io/x.svg)](x)'));
     const m = await RB.fetchRepo('https://github.com/demo/bare', { request, resolver });
-    assert.ok(m.failed && !m.assets.length, JSON.stringify(m.assets));
+    assert.ok(!m.failed && !m.assets.length && !m.assets.some(a => a.capture), JSON.stringify(m.assets));
+    assert.deepStrictEqual(m.facts, { language: 'Go', license: 'MIT', forks: 3, topics: ['cli'], files: ['cmd/', 'go.mod'] });
+    assert.match(readFileSync(join(m.dir, 'readme.md'), 'utf8'), /# Bare/);
+    assert.ok((await RB.fetchRepo('https://github.com/demo/bare', { request: () => { throw new Error('no network'); }, resolver })).cached, 'cached too');
+    // no README at all is an empty one; GitHub's facts failing for now (a rate limit) are used but not cached
+    routes['https://api.github.com/repos/demo/noreadme'] = R('application/json', Buffer.from(JSON.stringify({ full_name: 'demo/noreadme', description: 'A thing' })));
+    const nr = await RB.fetchRepo('https://github.com/demo/noreadme', { request, resolver }); assert.ok(!nr.failed && nr.header.description === 'A thing');
+    const limited = (u, o) => (u === 'https://api.github.com/repos/demo/rl' ? Promise.resolve({ status: 403, headers: {}, body: Buffer.alloc(0) }) : request(u, o));
+    routes['https://api.github.com/repos/demo/rl/readme'] = R('text/plain', Buffer.from('# RL'));
+    const rl = await RB.fetchRepo('https://github.com/demo/rl', { request: limited, resolver }); assert.ok(!rl.failed && rl.partial, 'used this time');
+    routes['https://api.github.com/repos/demo/rl'] = R('application/json', Buffer.from(JSON.stringify({ full_name: 'demo/rl', stargazers_count: 7 })));
+    assert.strictEqual((await RB.fetchRepo('https://github.com/demo/rl', { request, resolver })).header.stars, 7, 'and asked again next time');
   });
   const lines = [
     { start: 0, end: 3, text: 'This tool saves me hours every week.', section: 'hook' },
@@ -147,7 +159,15 @@ try {
     }
     const page = { path: '/a/page.png', kind: 'image', heading: '', alt: 'demo/tool', capture: true };
     assert.deepStrictEqual(RB.planRepo(pointy, [page, assets[0]]).inserts, [], 'a page capture or a text card alone gives no shots');
-    assert.deepStrictEqual(RB.repoRuleBreaks([{ repo: true, at: 3, place: 'full' }, { repo: true, at: 5, place: 'frame', text: true }, { at: 7, place: 'full' }]).map(x => x.at), [3, 5], 'the check finds both kinds, and leaves lane clips alone');
+    assert.deepStrictEqual(RB.repoRuleBreaks([{ repo: true, at: 3, place: 'full' }, { repo: true, at: 5, place: 'frame', src: 'page' }, { repo: true, at: 6, place: 'top', file: 'assets/web/a--b/page.png' }, { at: 7, place: 'full' }, { at: 9, place: 'top' }]).map(x => [x.at, x.why]), [[3, 'the repo full screen'], [5, 'README or page text as a shot'], [6, 'README or page text as a shot'], [7, 'b-roll full screen']], 'the repo full screen, a page or text card (old cuts too), and lane b-roll full screen');
+    assert.ok(RB.planRepo(pointy, assets).inserts.every(x => x.src === 'readme'), 'every repo shot says where it came from');
+    assert.strictEqual(RB.usable({ url: 'https://opengraph.githubassets.com/1/a/b', alt: '' }), false, "GitHub's text card is never a README picture");
+  });
+  await t('a card marked once (the proof look at the repo page) is shown one time per reel', () => {
+    const L = [3, 7, 11, 15].map(a => ({ start: a, end: a + 4, text: 'It does one more useful thing for you here.', section: 'body' }));
+    const p = RB.planRepo(L, [{ path: '/m/proof.mp4', kind: 'video', seconds: 4, heading: 'About', alt: 'demo/tool', once: true }, { path: '/m/term.mp4', kind: 'video', seconds: 4, heading: 'Install', alt: '' }, { path: '/m/feat.mp4', kind: 'video', seconds: 4, heading: '', alt: '' }]);
+    assert.strictEqual(p.inserts.filter(x => x.file === '/m/proof.mp4').length, 1, JSON.stringify(p.inserts.map(x => x.file)));
+    assert.strictEqual(p.inserts[0].file, '/m/proof.mp4', 'and it comes first');
   });
   await t('a short gap is held over, but never across a punch line that is yours', () => {
     const L2 = [{ start: 3, end: 7, text: 'It reads your notes and makes a draft video.', section: 'body' }, { start: 7.1, end: 8, text: 'Wild!', section: 'body' }, { start: 8.1, end: 12, text: 'And the output keeps every word you said.', section: 'body' }, { start: 12.5, end: 16, text: 'It sorts every file in the folder for you.', section: 'body' }];
@@ -155,6 +175,12 @@ try {
     assert.ok(p.takeovers.some(x => x.why === 'punch line' && x.at === 7.1));
     assert.ok(p.inserts.every(x => !(x.at < 8 && x.at + x.dur > 7.1)), 'the punch line stays yours: ' + JSON.stringify(p.inserts.map(x => [x.at, x.dur])));
     const second = p.inserts.find(x => x.at === 8.1); assert.ok(second && Math.abs(second.at + second.dur - 12.5) < 0.01, 'the pause before the next line is held over');
+  });
+  await t('a quick list said in short pieces keeps the card up: the pieces are one line, not punch lines', () => {
+    const L3 = [{ start: 3.4, end: 4.4, text: 'Rabbit hole, spotlight,', section: 'body' }, { start: 5.1, end: 6.7, text: 'backdrop board, orbit,', section: 'body' }, { start: 7.4, end: 8, text: 'LED sign,', section: 'body' }, { start: 8.5, end: 9.0, text: 'dot reveal.', section: 'body' }];
+    const p = RB.planRepo(L3, assets.slice(1, 3));
+    assert.strictEqual(p.takeovers.length, 0, JSON.stringify(p.takeovers));
+    assert.ok(p.inserts.length && p.inserts[0].at === 3.4 && Math.abs(p.inserts[p.inserts.length - 1].at + p.inserts[p.inserts.length - 1].dur - 9) < 0.01, JSON.stringify(p.inserts.map(x => [x.at, x.dur])));
   });
   await t('takeovers off: split on the whole body; frame breakout uses the framed cards', () => {
     const off = RB.planRepo(lines, assets, { takeovers: 'off' }); assert.ok(off.inserts.length >= 4 && off.inserts.every(x => x.place === 'top'), JSON.stringify(off.inserts)); assert.strictEqual(off.takeovers.length, 0);
@@ -178,18 +204,19 @@ try {
     const words = []; for (const l of L) { const ws = l.text.split(' '), step = (l.end - l.start) / ws.length; ws.forEach((w, i) => words.push([+(l.start + i * step).toFixed(2), +(l.start + (i + 0.8) * step).toFixed(2), w])); }
     writeFileSync(join(clips, 'clips.json'), JSON.stringify({ clips: [{ file: 'take.mp4', words }] }));
     writeFileSync(join(build, 'cut.json'), JSON.stringify({ segs: [{ file: join(clips, 'take.mp4'), in: 0, out: 24 }], inserts: [{ file: 'lane.mp4', at: 18.5, dur: 1, place: 'full', studio: true }] }));
-    const plan = join(build, 'video-plan.json'), run = p => { writeFileSync(plan, JSON.stringify(p)); return execFileSync(process.execPath, [join(ROOT, 'kit', 'repo-broll.mjs'), 'apply', '--name', 'rj', '--plan', plan, '--jobs', jobs], { env: { ...process.env, ATH_ASSETS: TMP }, encoding: 'utf8' }); };
+    const plan = join(build, 'video-plan.json'), run = p => { writeFileSync(plan, JSON.stringify(p)); return execFileSync(process.execPath, [join(ROOT, 'kit', 'repo-broll.mjs'), 'apply', '--name', 'rj', '--plan', plan, '--jobs', jobs], { env: { ...process.env, ATH_ASSETS: TMP, ATH_REPO_MOCKS: '0' }, encoding: 'utf8' }); };
     const out = run({ content: { repoFeature: true, repos: ['https://github.com/demo/tool'], takeovers: 'auto' }, presenter: [] });
     const cut = JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8')), rep = cut.inserts.filter(x => x.repo);
     assert.ok(rep.length && rep.every(x => x.place === 'top'), out + JSON.stringify(rep)); assert.deepStrictEqual(RB.repoRuleBreaks(rep), []);
     assert.ok(rep.every(x => x.at >= 3 && x.at < 20), 'nothing on the hook or the CTA'); assert.ok(rep.every(x => !(x.at < 19.5 && x.at + x.dur > 18.5)), 'the lane keeps its spot');
-    assert.ok(cut.inserts.some(x => x.studio), 'the lane insert stays');
+    const lane = cut.inserts.find(x => x.studio); assert.ok(lane && lane.place === 'top' && lane.fullBefore, 'the lane clip stays, in the card while repo mode is on: ' + JSON.stringify(lane));
     const you = cut.repoTakeovers.filter(x => x.who === 'you').map(x => x.why); assert.ok(you[0] === 'hook' && you.includes('punch line') && you[you.length - 1] === 'cta', you.join());
     assert.ok(rep.every(x => !x.file.startsWith('/')), 'files relative to build, as the lane writes them');
     run({ content: { repoFeature: false, repos: [] } }); const off = JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8'));
     assert.ok(!(off.inserts || []).some(x => x.repo) && off.inserts.some(x => x.studio) && !off.repoTakeovers, 'turning it off takes only its own inserts away');
+    assert.ok(off.inserts.find(x => x.studio).place === 'full' && !off.inserts.find(x => x.studio).fullBefore, 'and the lane clip goes back to full screen');
     run({ content: { repoFeature: true, repos: ['https://github.com/demo/tool'], takeovers: 'auto' }, presenter: [] }); rmSync(plan);
-    execFileSync(process.execPath, [join(ROOT, 'kit', 'repo-broll.mjs'), 'apply', '--name', 'rj', '--plan', plan, '--jobs', jobs], { env: { ...process.env, ATH_ASSETS: TMP }, encoding: 'utf8' });
+    execFileSync(process.execPath, [join(ROOT, 'kit', 'repo-broll.mjs'), 'apply', '--name', 'rj', '--plan', plan, '--jobs', jobs], { env: { ...process.env, ATH_ASSETS: TMP, ATH_REPO_MOCKS: '0' }, encoding: 'utf8' });
     const gone = JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8')); assert.ok(!(gone.inserts || []).some(x => x.repo) && !gone.repoTakeovers, 'a cleared plan clears its inserts too');
   });
   await t('a real GIF becomes a 12 second looping MP4 (skipped without FFmpeg)', async () => {

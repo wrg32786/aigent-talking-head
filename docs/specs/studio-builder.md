@@ -241,7 +241,8 @@ Checkbox on step 15. When on:
 2. Collect visual assets in order of appearance: images, GIFs, linked videos (mp4/webm). Skip badges (shields.io, badge, under 40 px tall), logos under 200 px, and anything not image or video.
 3. Download to `assets/web/<owner>-<repo>/` (gitignored), with `meta.json` (source URL, alt text, the README heading it sits under).
 4. **The repo rule** (Will, 2026-11-27): the b-roll never cuts to full screen, plain text or README text. No README or page capture and no text card of the repo; README pictures show inside the repo card only. `repoRuleBreaks()` checks every repo insert, `apply` refuses a cut that breaks it, and `plan-check` has a `repo-rule` row.
-5. Match assets to lines: the agent (or `broll-brief.cjs` without an agent) maps each asset's heading and alt text to the transcript lines that mention it. Unmatched assets go in order.
+5. **Animated cards** (`kit/repo-mockups.mjs`): `readmeScore()` scores the README's own visuals (video 3, big picture 2, small 1; 4 or more is good). Weak: proof (browser card, once), terminal (the README's real command and output lines, or `git clone` plus the real top-level files), features (wheel up to 6, grid up to 9, from the README's own list), flow (only when the description says X into Y), stats (10 or more stars). Good: proof and terminal join the README's pictures. README pictures are wrapped in a window card (when the cards can be made: Chrome, about 0.8 GB free, `ATH_REPO_MOCKS` not 0). Lane b-roll set to full screen goes into the card while repo mode is on. Nothing is invented: every word comes from GitHub's facts or the README.
+6. Match assets to lines: the agent (or `broll-brief.cjs` without an agent) maps each asset's heading and alt text to the transcript lines that mention it. Unmatched assets go in order.
 
 **Layout.**
 - Default: **Split**, repo on top, you on the bottom (`split.cjs` `"top"`, with the person mask so your head sits over the panel edge).
