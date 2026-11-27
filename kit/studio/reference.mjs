@@ -6,6 +6,7 @@ import { existsSync, readFileSync, writeFileSync, renameSync } from 'fs';
 import { dirname, join, basename } from 'path';
 import { createRequire } from 'module';
 import { catalog, applyPatch, ROOT } from './core.mjs';
+import { layersView } from './teardown-layers.mjs';
 
 const require = createRequire(import.meta.url);
 const L = require('../locks.cjs');
@@ -42,7 +43,7 @@ export function extract(recipePath) {
   const effects = st.effects ? String(st.effects).split(',').map(x => x.trim()).filter(Boolean) : [];
   const cat = catalog();
   const real = (kind, ids) => ids.filter(id => cat.items[`${kind}:${id}`]);
-  return {
+  const out = {
     summary: summarize(r, recipePath, { transitions: tcount, entrances: real('entrance', entrances), finishes: real('finish', finishes), graphics: real('graphic', graphics), effects: real('effect', effects) }, cat),
     name: (r.card && r.card.name) || basename(dirname(recipePath)), shots: (r.shots || []).length, titles: (r.titles || []).length,
     preset: br.preset && br.preset !== 'none' ? br.preset : null, look: st.look || null, captionStyle: st.captions || null,
@@ -62,6 +63,8 @@ export function extract(recipePath) {
     // for the page to show with a field to fix it before a draft (fixTitleText below)
     checks: (r.titles || []).filter(t => t.check).map(t => ({ n: t.n, at: +t.start || 0, text: t.text === true ? '' : String(t.text || ''), why: t.check === true ? 'the text may be misread' : String(t.check) })),
   };
+  out.layers = layersView(out, r);
+  return out;
 }
 // Fix the text of one title in a reference's Reel.md before a draft: its `text` is rewritten and its `check` field is
 // taken off; every other byte of the file stays as it was (line endings too). Saving the same text says it was right.

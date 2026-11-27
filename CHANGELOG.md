@@ -4,6 +4,10 @@ Each version below is one GitHub release. `npm run release:notes -- --version X.
 
 ## 1.31.1 (unreleased)
 
+- **Teardowns Look library.** On the Teardowns tab you can save a broken-down video as a look, combine parts from different videos or saved looks (captions from one, the grade from another), and manage the library: list, rename, duplicate, and delete (it asks first). Each look gets a short playable sample, made on your computer from the kit's sample presenter and a fixed sample script, never the reference's words. The sample is cached and remade when the look changes. On a machine with little free memory, or without a heavy render, a lighter sample is used. Tests: `tests/studio-mix-looks.test.mjs`.
+
+- **Teardown layer view.** After a video is broken down, the Teardowns breakdown starts with a stack of six plates (Set, Person, Layout, B-roll, Type, Motion) that peel apart in 3D. Click a plate to read what we already measured for that layer. Nothing new is analyzed. Motion is reduced to a simple list when the system asks for less motion. Tests: `tests/studio-teardown-layers.test.mjs`.
+
 - **Studio memory on modest machines.** The high-quality person mask on Windows no longer needs 25.8 GB free just because the graphics chip is available. If that does not fit and about 8.8 GB is free, the kit uses the processor instead (slower, same quality) and says so in plain English. When even that does not fit, Studio warns on the Render page and in Setup check before you click Render, with the same ways out as before (titles in front, the lighter mask, or try anyway). A computer with very little free memory also gets a note to close other apps. Overlay render stays on one Chrome page when the machine has under 8 GB, and a transcript with under 2.5 GB free uses a smaller Whisper model unless you set `TX_MODEL`. The mask process drops the model once the last frame is encoded. Tests: `tests/face-matte.test.mjs`, `tests/test_matte_memory.py`, `tests/framecap.e2e.mjs`.
 
 ## 1.31.0 (unreleased)

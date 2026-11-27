@@ -8,6 +8,7 @@ import { canWrite, NO_WRITER } from './Scripts.jsx';
 import { FixActions } from './Fix.jsx';
 import { Stages } from './Stages.jsx';
 import { RefMode, RefNotice, RefParts, RefPlan, SavedLookNote } from './RefCard.jsx';
+import { TeardownLayers } from './TeardownLayers.jsx';
 import { RefTitles } from './RefTitles.jsx';
 
 export function Reference({ CAT, V, s, apply, patch }) {
@@ -86,6 +87,7 @@ function Breakdown({ CAT, V, s, apply, patch }) {
       <h3 title={item ? item.url : ''}>Breakdown<span className="fine"> {item ? SITE[item.site] || 'Link' : 'File'}</span></h3>
       <RefMode id="ref-mode" mode={r.mode} patch={patch} />
     </div>
+    <TeardownLayers extracted={ex} />
     <RefRan V={V} s={s} apply={apply} ran={Array.isArray(ex.ran) ? ex.ran : []} fallback={/fallback/.test(engine || '')} />
     {/* your saved look in use (the reference Off, or Influence), then what the reference set (nothing when it is Off) */}
     <SavedLookNote V={V} apply={apply} id="saved-look-td" />

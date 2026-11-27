@@ -1,10 +1,11 @@
 // The Teardowns tab: break down a video you like (Reference.jsx: paste a link or upload a file, then the breakdown),
 // Save as template once it is broken down, and the Template Library below (Library.jsx, the same grid New video's
 // Use a template shows).
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Reference } from './Reference.jsx';
 import { api, toast } from './lib.jsx';
 import { Library, useTemplates } from './Library.jsx';
+import { LookLibrary, CombineLooks, SaveLook, useLooks } from './LookLibrary.jsx';
 
 function SaveTemplate({ s, T, looks }) {
   const [name, setName] = useState(''), [busy, setBusy] = useState(false), [err, setErr] = useState('');
@@ -34,8 +35,13 @@ export function TemplateLibrary({ s, apply, looks }) {
 }
 
 export function Teardowns(ctx) {
+  const looks = useLooks();
+  useEffect(() => { if (ctx.V && Array.isArray(ctx.V.styleLooks)) looks.setList(ctx.V.styleLooks); }, [ctx.V && ctx.V.styleLooks]);
   return <div className="teardowns" id="s-teardowns">
     <Reference {...ctx} />
+    <SaveLook s={ctx.s} looks={looks} />
+    <CombineLooks s={ctx.s} looks={looks} />
+    <LookLibrary looks={looks} />
     <TemplateLibrary s={ctx.s} apply={ctx.apply} looks={ctx.looks} />
   </div>;
 }

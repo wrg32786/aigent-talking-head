@@ -8,6 +8,8 @@ import { existsSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { createRequire } from 'module';
 import { styleKey } from './reference.mjs';
+import * as MIX from './lookmix.mjs';
+import * as SAMP from './look-sample.mjs';
 
 const require = createRequire(import.meta.url);
 const SL = require('../stylelook.cjs');
@@ -79,3 +81,55 @@ export function forDraft(s, root, args) {
 // the font a saved look carries (the pairing a teardown matched), or null
 export const fontOf = name => { try { const l = name ? SL.load(name) : null; return (l && l.captions && l.captions.font) || null; } catch { return null; } };
 export const matchOf = build => (build ? FID.read(build) : null);
+
+
+// Teardowns Look library: a list the page can show, plus rename, duplicate and delete.
+export function listView() {
+  return list().map(x => {
+    const look = SL.load(x.name);
+    const sample = look ? SAMP.statusOf(x.name, look) : { status: 'missing' };
+    return {
+      ...x,
+      label: (look && look.label) || x.name.replace(/-/g, ' '),
+      mix: look ? MIX.mixSummary(look) : null,
+      sample: { status: sample.status, url: sample.url || null },
+    };
+  });
+}
+
+export function rename(name, label) {
+  const look = SL.load(name);
+  if (!look) throw fail('No such look.', 404);
+  const l = String(label || '').trim().slice(0, 60);
+  if (!l) throw fail('Give the look a name.');
+  look.label = l;
+  delete look.file;
+  SL.save(look, name);
+  return listView().find(x => x.name === name);
+}
+
+export function duplicate(name) {
+  const look = SL.load(name);
+  if (!look) throw fail('No such look.', 404);
+  const base = SL.slug(name).slice(0, 48).replace(/-+$/, '');
+  let n = `${base}-copy`;
+  for (let i = 2; SL.exists(n); i++) {
+    if (i > 999) throw fail('Too many copies of this look. Rename or delete some first.', 409);
+    n = `${base}-copy-${i}`;
+  }
+  const out = { ...look, name: n, label: `${(look.label || look.name).replace(/ copy$/, '')} copy`, created: new Date().toISOString() };
+  delete out.file;
+  SL.save(out, n);
+  try { SAMP.copySample(name, n); } catch {}
+  return listView().find(x => x.name === n);
+}
+
+export function removeLook(name) {
+  if (!SL.exists(name)) throw fail('No such look.', 404);
+  SL.remove(name);
+  return true;
+}
+
+export const mixAndSave = (raw, ctx) => MIX.mixAndSave(raw, ctx);
+export const sampleStatus = (name, look) => SAMP.statusOf(name, look);
+export const buildSample = (name, opts) => SAMP.build(name, opts);

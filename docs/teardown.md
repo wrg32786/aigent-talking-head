@@ -23,6 +23,9 @@ It fetches only the post you name, anonymously. It never logs in, and it does no
 
 Both write `build/match.json`, an estimate of how close the draft is, part by part.
 
+In Studio, on the Teardowns tab, you can save a look, combine parts from more than one teardown or saved look, and play a short sample of that look. Combining looks lives there, not in the New video steps. After a video is broken down, the breakdown starts with a stack of six plates (Set, Person, Layout, B-roll, Type, Motion) that peel apart to show what we already measured. See [Studio](studio.md).
+
+
 ## What runs
 
 1. **rea-video** ([JuneYaooo/rea-video](https://github.com/JuneYaooo/rea-video), Apache-2.0) breaks the video down shot by shot and writes a [VIDEO.md](https://videomd.github.io/videomd/) package: cuts, captions and styled text with timing, colour, outline and entrance, stickers, music BPM and beats, sound effects, grade, framing and camera moves, plus its own `report.html`. It runs offline. A vision model is optional (`--vlm`, see rea-video's docs).

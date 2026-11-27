@@ -375,6 +375,14 @@ if (target) {
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-stylelook.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { slkerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
     results.push({ label: 'Studio Copy the look (tests/studio-stylelook.test.mjs: reference mode look, a draft with --style-look and no recipe or re-cut, the look saved as look-<job>, a saved style look with no reference, Recreate wins, the list and save API, match passed through, MCP get_edit, studio_set_selections and save_look)', errs: slkerrs, warns: [] });
+    const mixerrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-mix-looks.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { mixerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio mix looks (tests/studio-mix-looks.test.mjs: captions from one look and grade from another, rename duplicate delete, sample plan and cache, a stale sample remade when the look changes)', errs: mixerrs, warns: [] });
+    const layererrs = [];
+    try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-teardown-layers.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
+    catch (e) { layererrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
+    results.push({ label: 'Studio teardown layers (tests/studio-teardown-layers.test.mjs: six plates from existing measurements, empty Type B-roll and Set on a bare recipe, no invented room or B-roll)', errs: layererrs, warns: [] });
     const auerrs = [];
     try { execFileSync(process.execPath, [join(ROOT, 'tests', 'studio-agent-ux.test.mjs')], { cwd: ROOT, stdio: 'pipe', env: { ...process.env, CI: '1' } }); }
     catch (e) { auerrs.push(String(e.stderr || e.stdout || e.message).trim().split('\n').slice(0, 8).join(' | ')); }
