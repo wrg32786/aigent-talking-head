@@ -19,7 +19,6 @@ export function TeardownLayers({ extracted, recipe = null }) {
           aria-pressed={open === l.id} aria-controls="td-layer-detail" style={{ '--i': i }}
           onClick={() => toggle(l.id)} onKeyDown={e => onKey(e, i)}>
           <span className="td-plate-name">{l.label}</span>
-          {!l.empty && <span className="fine td-plate-hint">{l.lines[0]}</span>}
         </button>
       ))}
     </div>
