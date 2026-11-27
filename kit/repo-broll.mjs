@@ -139,6 +139,7 @@ export function usable(a) {
   if (!/^https?:$/.test(u.protocol)) return false;
   if (BADGE_HOST.test(u.hostname) || /badge|shield|\/workflows\/[^/]+\/badge/i.test(u.pathname) || /\bbadge\b/i.test(a.alt)) return false;
   if (/\.svg(\?|$)/i.test(u.pathname)) return false;
+  if (/(^|\.)opengraph\.githubassets\.com$/i.test(u.hostname)) return false; // GitHub's text card of a repo
   if (a.height != null && a.height < 40) return false;
   const small = (a.width != null && a.width < 200) || (a.height != null && a.height < 200);
   if (small && /logo|icon|avatar/i.test(a.alt + ' ' + u.pathname)) return false;
@@ -182,7 +183,7 @@ export function videoSeconds(file) {
 }
 
 // fetch one repo's pictures into assets/web/<owner>--<repo>/ (01.png, 02.mp4 ... and meta.json). A good fetch is cached;
-// a failed one (no README read, nothing usable) is never cached, so trying again online works, and an older good
+// a failed one (no README read) is never cached, so trying again online works, and an older good
 // folder stays in place until a new one is complete.
 export async function fetchRepo(link, { request = null, resolver, max = 12, tries = 30, force = false, log = () => {}, convert = gifToMp4, seconds = videoSeconds } = {}) {
   const r = parseRepo(link); if (!r) throw new Error(`not a GitHub repo link: ${link}`);
@@ -190,15 +191,20 @@ export async function fetchRepo(link, { request = null, resolver, max = 12, trie
   if (!force && existsSync(mf)) {
     try {
       const m = JSON.parse(readFileSync(mf, 'utf8'));
-      if (String(m.owner).toLowerCase() === r.owner.toLowerCase() && String(m.repo).toLowerCase() === r.repo.toLowerCase() && m.assets && m.assets.length && m.assets.every(a => existsSync(join(dir, a.file)))) return { ...m, dir, cached: true };
+      if (String(m.owner).toLowerCase() === r.owner.toLowerCase() && String(m.repo).toLowerCase() === r.repo.toLowerCase() && m.facts && !m.partial && existsSync(join(dir, 'readme.md')) && (m.assets || []).every(a => existsSync(join(dir, a.file)))) return { ...m, dir, cached: true };
     } catch {}
   }
   const get = (u, kind) => safeGet(u, { kind, request, resolver });
   const api = `https://api.github.com/repos/${r.owner}/${r.repo}`;
-  let facts = {}; try { facts = JSON.parse((await get(api, 'text')).body.toString('utf8')); } catch (e) { log(`repo facts: ${e.message}`); }
+  const soft = []; // facts that failed for now (a rate limit, a timeout): the fetch is used but not cached
+  let facts = {}; try { facts = JSON.parse((await get(api, 'text')).body.toString('utf8')); } catch (e) { log(`repo facts: ${e.message}`); soft.push({ url: api, why: e.message }); }
   const branch = facts.default_branch || 'HEAD';
   const header = { name: facts.full_name || `${r.owner}/${r.repo}`, stars: Number.isFinite(+facts.stargazers_count) ? +facts.stargazers_count : null, description: facts.description || '', url: r.url };
-  let md = '', readOk = false; try { md = (await get(api + '/readme', 'text')).body.toString('utf8'); readOk = true; } catch (e) { log(`README: ${e.message}`); }
+  // the facts the animated cards are drawn from (kit/repo-mockups.mjs): GitHub's own, and the top-level file names
+  let files = []; try { files = JSON.parse((await get(api + '/contents', 'text')).body.toString('utf8')).filter(x => x && !String(x.name).startsWith('.')).slice(0, 40).map(x => x.name + (x.type === 'dir' ? '/' : '')); } catch (e) { log(`files: ${e.message}`); if (!/^404 /.test(e.message)) soft.push({ url: api + '/contents', why: e.message }); }
+  const facts2 = { language: facts.language || null, license: (facts.license && facts.license.spdx_id && facts.license.spdx_id !== 'NOASSERTION') ? facts.license.spdx_id : null, forks: Number.isFinite(+facts.forks_count) ? +facts.forks_count : null, topics: Array.isArray(facts.topics) ? facts.topics.slice(0, 8) : [], files };
+  // no README at all (404) is an empty one: the cards are drawn from GitHub's facts
+  let md = '', readOk = false; try { md = (await get(api + '/readme', 'text')).body.toString('utf8'); readOk = true; } catch (e) { log(`README: ${e.message}`); if (/^404 /.test(e.message) && facts.full_name) readOk = true; }
   const found = readmeAssets(md, `https://raw.githubusercontent.com/${r.owner}/${r.repo}/${branch}/`);
   // only the README's own pictures and videos: no text card of the repo and no capture of the page (the repo rule)
   const cands = found;
@@ -222,17 +228,23 @@ export async function fetchRepo(link, { request = null, resolver, max = 12, trie
       assets.push({ file, kind, alt: a.alt, heading: a.heading, source: g.url, ...(sz ? { w: sz.w, h: sz.h } : {}), ...(secs ? { seconds: +secs.toFixed(2) } : {}) });
     } catch (e) { rmSync(join(tmp, `${String(assets.length + 1).padStart(2, '0')}.gif`), { force: true }); skipped.push({ url: a.url, why: e.message }); }
   }
-  const meta = { owner: r.owner, repo: r.repo, url: r.url, header, assets, skipped, fetchedAt: new Date().toISOString() };
+  const meta = { owner: r.owner, repo: r.repo, url: r.url, header, facts: facts2, assets, skipped, fetchedAt: new Date().toISOString() };
   // a partial fetch (some files timed out or were refused for now) never replaces a fuller folder we already have
   let older = null; if (existsSync(mf)) { try { older = JSON.parse(readFileSync(mf, 'utf8')); } catch {} }
-  const temporary = skipped.some(x => /timed out|took too long|^(429|5\d\d) |ECONN|ENOTFOUND|EAI_AGAIN/.test(x.why));
-  const good = readOk && assets.length && !(older && temporary && (older.assets || []).length > assets.length);
+  const TEMP = /timed out|took too long|^(429|5\d\d) |ECONN|ENOTFOUND|EAI_AGAIN/;
+  const temporary = skipped.some(x => TEMP.test(x.why));
+  // GitHub's facts missing for now (a 403 rate limit too): used this time, kept as partial so the next run asks again
+  const partial = soft.some(x => TEMP.test(x.why) || /^403 /.test(x.why));
+  if (partial) meta.partial = true;
+  // a README with no pictures is still a good fetch: the animated cards are drawn from it
+  const good = readOk && !(older && ((temporary && (older.assets || []).length > assets.length) || (partial && !older.partial)));
   if (!good) {
     // not cached: an older good folder (which a cut may point at) stays as it is
     rmSync(tmp, { recursive: true, force: true });
     if (older) return { ...older, dir, cached: true, stale: true };
     return { ...meta, assets: [], dir, failed: true };
   }
+  writeFileSync(join(tmp, 'readme.md'), md);
   writeFileSync(join(tmp, 'meta.json'), JSON.stringify(meta, null, 1) + '\n');
   const old = `${dir}.old-${process.pid}`;
   if (existsSync(dir)) renameSync(dir, old);
@@ -252,12 +264,17 @@ export const REPO_STYLE = { bands: { repo: 0.45, captions: 0.10, you: 0.45 }, sw
 // Will, 2026-11-27: in repo mode the b-roll never cuts to full screen, plain text or README text. The repo stays in its
 // card (Split or Frame breakout) with you on screen; a capture of the README page or GitHub's text card is never shown.
 // What breaks that rule, per repo insert (empty when it holds). planRepo never makes one; apply and plan-check check.
+// Every repo insert says where its picture came from (src: a card kind from kit/repo-mockups.mjs, readme, or page/card
+// for an old cut made from a page capture or GitHub's text card). Other b-roll in repo mode stays out of full screen too.
 export const onCard = a => !!a && !a.header && !a.capture;
+export const srcOf = a => (a.capture ? 'page' : a.header ? 'card' : a.mock || 'readme');
+const oldSrc = x => x.src || (/(^|\/)page\.png$/.test(String(x.file)) ? 'page' : null);
 export function repoRuleBreaks(inserts) {
   const out = [];
-  for (const x of (inserts || []).filter(i => i && i.repo)) {
-    if (!SPLIT_PLACES.includes(x.place)) out.push({ at: x.at, why: `the repo ${x.place === 'full' ? 'full screen' : 'as ' + x.place}` });
-    if (x.text || x.page) out.push({ at: x.at, why: 'README or page text as a shot' });
+  for (const x of (inserts || []).filter(Boolean)) {
+    if (x.place === 'full') out.push({ at: x.at, why: x.repo ? 'the repo full screen' : 'b-roll full screen' });
+    else if (x.repo && !SPLIT_PLACES.includes(x.place)) out.push({ at: x.at, why: `the repo as ${x.place}` });
+    if (x.repo && ['page', 'card'].includes(oldSrc(x))) out.push({ at: x.at, why: 'README or page text as a shot' });
   }
   return out;
 }
@@ -283,26 +300,38 @@ const chunks = (start, end, [lo, hi]) => {
 export function planRepo(lines, assets0, { takeovers = 'auto', breakout = false, minDur = 1.2, bands = null, swapSec = null, frameBg = null } = {}) {
   const inserts = [], who = [], assets = (assets0 || []).filter(onCard); if (!assets.length) return { inserts, takeovers: who };
   const split = breakout ? 'frame' : 'top', used = new Map(); let next = 0;
+  // a card marked once (the proof look at the repo page) is shown one time per reel
+  const spent = a => a.once && used.get(a.path) > 0;
   const style = { bands: bands || (breakout ? REPO_STYLE.bands : null), swapSec: pair(swapSec, REPO_STYLE.swapSec), frameBg: Array.isArray(frameBg) ? frameBg : (breakout ? REPO_STYLE.frameBg : null) };
   const pick = (text, avoid = null) => {
     let best = null, bs = 0;
     for (const a of assets) {
-      if (avoid && a.path === avoid) continue;
+      if ((avoid && a.path === avoid) || spent(a)) continue;
       const s = score(text, a) - (used.get(a.path) || 0) * 0.5; if (s > bs && score(text, a) >= 1) { best = a; bs = s; }
     }
-    if (!best) { const pool = avoid && assets.length > 1 ? assets.filter(x => x.path !== avoid) : assets; best = pool[next % pool.length]; next++; }
+    if (!best) { const left = assets.filter(x => !spent(x)), pool = avoid && left.length > 1 ? left.filter(x => x.path !== avoid) : left; if (!pool.length) return null; best = pool[next % pool.length]; next++; }
     used.set(best.path, (used.get(best.path) || 0) + 1); return best;
   };
+  // a sentence said in pieces (a quick list: "rabbit hole, spotlight, backdrop board, ...") is one body line, so the card
+  // stays up through it rather than each short piece counting as a punch line
+  const joined = [];
   for (const l of lines) {
+    const p = joined[joined.length - 1];
+    if (p && p.section === 'body' && l.section === 'body' && /,\s*$/.test(p.text) && l.start - p.end < 1.5) joined[joined.length - 1] = { ...p, end: l.end, text: `${p.text} ${l.text}` };
+    else joined.push(l);
+  }
+  for (const l of joined) {
     const dur = +(l.end - l.start).toFixed(2); if (dur < minDur) continue;
-    const punch = l.section === 'body' && (/!\s*$/.test(l.text) || toks(l.text).length <= 4);
+    // a punch line is short (a long run-on line that ends in ! is still a body line with the repo in its card)
+    const punch = l.section === 'body' && dur <= 3 && (/!\s*$/.test(l.text) || toks(l.text).length <= 4);
     if (l.section !== 'body' || (punch && takeovers === 'auto')) { if (takeovers === 'auto') who.push({ at: l.start, dur, who: 'you', why: l.section === 'body' ? 'punch line' : l.section }); continue; }
     // one still does not swap against itself; a second picture is needed to change the visual
-    const parts = assets.length > 1 ? chunks(l.start, l.end, style.swapSec) : [[l.start, l.end]];
+    // one card left to reuse does not swap against itself (no restarting the same card every 2 to 4 s)
+    const parts = assets.filter(x => !spent(x)).length > 1 ? chunks(l.start, l.end, style.swapSec) : [[l.start, l.end]];
     for (const [at, end] of parts) {
-      const a = pick(l.text, inserts.length ? inserts[inserts.length - 1].file : null);
+      const a = pick(l.text, inserts.length ? inserts[inserts.length - 1].file : null); if (!a) break;
       let d = +(end - at).toFixed(2); if (a.kind === 'video' && a.seconds) d = +Math.min(d, a.seconds).toFixed(2);
-      const row = { file: a.path, at: +at.toFixed(2), dur: d, in: 0, place: split, image: a.kind === 'image', repo: true, line: l.text.slice(0, 80), fit: 'whole', ...(a.seconds ? { seconds: a.seconds } : {}) };
+      const row = { file: a.path, at: +at.toFixed(2), dur: d, in: 0, place: split, image: a.kind === 'image', repo: true, src: srcOf(a), line: l.text.slice(0, 80), fit: 'whole', ...(a.seconds ? { seconds: a.seconds } : {}) };
       if (split === 'frame') { if (style.bands) row.bands = style.bands; if (style.frameBg) row.frameBg = style.frameBg; }
       inserts.push(row);
     }
@@ -341,20 +370,32 @@ if (isMain) {
     // no plan file (the plan was cleared) counts as repo mode off: our own inserts are taken out again
     const planF = opt('plan') ? (isAbsolute(opt('plan')) ? opt('plan') : resolve(ROOT, opt('plan'))) : null;
     const plan = planF && existsSync(planF) ? JSON.parse(readFileSync(planF, 'utf8')) : {}, c = (plan && plan.content) || {}, cut = JSON.parse(readFileSync(cutF, 'utf8'));
-    const others = (cut.inserts || []).filter(x => !x.repo);
+    // b-roll lane clips set full screen go into the card while repo mode is on (fullBefore), and back when it is off
+    const others = (cut.inserts || []).filter(x => !x.repo).map(x => { if (!x.fullBefore) return x; const { fullBefore, fit, ...y } = x; return { ...y, place: 'full' }; });
     const clear = () => { cut.inserts = others; if (!others.length) delete cut.inserts; delete cut.repoTakeovers; writeFileSync(cutF, JSON.stringify(cut, null, 1)); };
     if (!c.repoFeature || !(c.repos || []).length) { if ((cut.inserts || []).some(x => x.repo) || cut.repoTakeovers) clear(); console.log(JSON.stringify({ ok: true, repo: false })); return; }
     const assets = [];
-    for (const u of c.repos) { try { const m = await fetchRepo(u, { log: x => console.log(`repo: ${x}`) }); for (const x of m.assets.filter(onCard)) assets.push({ ...x, path: join(m.dir, x.file) }); } catch (e) { console.log(`repo: ${u}: ${e.message}`); } }
+    // what goes in the card (kit/repo-mockups.mjs): animated cards of what the repo does, the README's pictures each in a
+    // window card and its videos; without Chrome, or with ATH_REPO_MOCKS=0, the README's own pictures and videos only
+    const MOCK = process.env.ATH_REPO_MOCKS === '0' ? null : await import('./repo-mockups.mjs');
+    for (const u of c.repos) {
+      try {
+        const m = await fetchRepo(u, { log: x => console.log(`repo: ${x}`) }); if (m.failed) throw new Error('we could not read the README');
+        let list = m.assets.filter(onCard);
+        if (MOCK) { try { const r = await MOCK.cardAssets(m, m.dir, { log: x => console.log(`repo: ${x}`) }); list = r.assets; console.log(`repo: ${m.url}: ${r.quality.why} (${r.quality.good ? 'good, so mostly those' : 'few, so animated cards of what it does'})`); } catch (e) { console.log(`repo: the animated cards could not be made (${e.message}), so the README's own pictures only`); } }
+        for (const x of list) assets.push({ ...x, path: join(m.dir, x.file) });
+      } catch (e) { console.log(`repo: ${u}: ${e.message}`); }
+    }
     if (!assets.length) { console.log('repo: we could not get any pictures from the repo, so you stay on screen (check the link, or try again online)'); clear(); console.log(JSON.stringify({ ok: true, repo: true, inserts: 0 })); return; }
     const breakout = (plan.presenter || []).some(x => x && x.id === 'frame-breakout');
+    for (const o of others) if (o.place === 'full') { o.place = breakout ? 'frame' : 'top'; o.fit = 'whole'; o.fullBefore = true; if (breakout) { o.bands = c.bands || REPO_STYLE.bands; o.frameBg = c.frameBg || REPO_STYLE.frameBg; } }
     const { inserts, takeovers } = planRepo(linesOf(cut, build), assets, { takeovers: c.takeovers === 'off' ? 'off' : 'auto', breakout, bands: c.bands || null, swapSec: c.swapSec || null, frameBg: c.frameBg || null });
     // a spot the b-roll lane already uses keeps its clip
     // (an insert held over a gap is trimmed back to its own line first, rather than dropped)
     const hits = x => others.some(o => x.at < +o.at + +o.dur && +o.at < x.at + x.dur);
     const free = inserts.map(x => hits(x) && x.own && x.own < x.dur ? { ...x, dur: x.own } : x).filter(x => !hits(x)).map(({ own, ...x }) => ({ ...x, file: relative(build, x.file).split(sep).join('/') }));
     cut.inserts = [...others, ...free].sort((p, q) => p.at - q.at); if (!cut.inserts.length) delete cut.inserts;
-    const breaks = repoRuleBreaks(free); if (breaks.length) throw new Error(`repo: the b-roll would break the repo rule: ${breaks.map(b => `${b.at} s ${b.why}`).join('; ')}`);
+    const breaks = repoRuleBreaks(cut.inserts); if (breaks.length) throw new Error(`repo: the b-roll would break the repo rule: ${breaks.map(b => `${b.at} s ${b.why}`).join('; ')}`);
     cut.repoTakeovers = takeovers; // you full screen on the hook, punch lines and CTA
     writeFileSync(cutF, JSON.stringify(cut, null, 1));
     console.log(`repo: ${free.length} repo card shots, ${takeovers.length} you full screen`);
