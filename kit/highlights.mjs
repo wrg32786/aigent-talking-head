@@ -152,7 +152,7 @@ export const keptOf = current => (current.candidates || []).filter(c => c.keep);
 // the brief the page copies for the user's agent (no terminal commands)
 export function briefOf(current, { job } = {}) {
   const c = current.candidates || [];
-  const lines = c.map(x => `- ${x.id}: ${x.start.toFixed(1)}s to ${x.end.toFixed(1)}s (${Math.round(x.seconds)} s, score ${x.score}). ${x.reason}. "${x.text}"`);
+  const lines = c.map(x => `- ${x.id}: ${x.start.toFixed(2)}s to ${x.end.toFixed(2)}s (${Math.round(x.seconds)} s, score ${x.score}). ${x.reason}. "${x.text}"`);
   return [
     'Please score the highlight moments of this talk, then pick the ones I should use as my take.',
     job ? `The Studio job is ${job}.` : '',

@@ -6,11 +6,11 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { execFileSync } from 'child_process';
 import * as P from '../kit/publish-kit.mjs';
-import { kitOf, NINE16 } from '../kit/studio/publish-api.mjs';
+import { kitOf, NINE16, mount } from '../kit/studio/publish-api.mjs';
 import { mkdirSync } from 'fs';
 
 const KIT = dirname(fileURLToPath(import.meta.url));
-let n = 0; const ok = (m, f) => { f(); n++; console.log('ok ' + m); };
+let n = 0; const ok = (m, f) => { const r = f(), done = () => { n++; console.log('ok ' + m); }; return r && r.then ? r.then(done) : done(); };
 
 ok('SAFE is the intersection of the 9:16 platform UI zones', () => {
   assert.equal(P.SAFE.y0, 220);
@@ -174,6 +174,17 @@ ok('the kit view returns coverMeta, so the face-on-cover notes can show', () => 
 ok('every 9:16 reel gets a kit (effects and smaller copies too), never a 4:5 or 1:1 one', () => {
   for (const f of ['reel-v2.mp4', 'reel-fx-v2.mp4', 'reel-v2-reels.mp4', 'reel-v2-tiktok.mp4', 'reel-v2-shorts.mp4']) assert.ok(NINE16.test('jobs/j/' + f), f);
   for (const f of ['reel-v2-feed45.mp4', 'reel-v2-square.mp4', 'reel-v2-cover.jpg', 'take.mp4']) assert.ok(!NINE16.test('jobs/j/' + f), f);
+});
+
+await ok('Save copy keeps the page\'s Publish kit panel: the kit comes back under kit, not over publish', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'pub-post-')), d = join(root, 'jobs', 'j');
+  mkdirSync(d, { recursive: true }); writeFileSync(join(d, 'reel-v1.mp4'), 'x');
+  const res = {}, m = mount({ ROOT: root, C: { load: () => ({ job: 'j' }) }, json: (r, code, obj) => Object.assign(r, { code, obj }),
+    readBody: async () => ({ reel: 'jobs/j/reel-v1.mp4', copy: { title: 'Hi', description: 'Line one.\nLine two.' } }), view: () => ({ publish: { offer: true, reels: ['all'] } }) });
+  assert.ok(await m.route('/api/publish/copy', 'POST', null, {}, res));
+  assert.equal(res.code, 200, JSON.stringify(res.obj));
+  assert.deepEqual(res.obj.publish, { offer: true, reels: ['all'] });
+  assert.equal(res.obj.kit.reel, 'jobs/j/reel-v1.mp4'); assert.equal(res.obj.kit.copy.description, 'Line one.\nLine two.');
 });
 
 ok('descriptions keep their paragraphs; titles stay on one line', () => {

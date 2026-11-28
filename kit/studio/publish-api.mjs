@@ -80,7 +80,7 @@ export function mount({ ROOT, C, json, readBody, view: pageView }) {
       } catch (e) {
         return json(res, e.code || 500, { error: e.message, ...(e.fix ? { fix: e.fix } : {}) });
       }
-      return json(res, 200, { ...pageView(C.load()), publish: kitOf(ROOT, rel) });
+      return json(res, 200, { ...pageView(C.load()), kit: kitOf(ROOT, rel) }); // the page's publish (every reel's kit) stays as it is
     }
     if (p === '/api/publish/copy' && M === 'POST') {
       const b = await readBody(req);
@@ -97,7 +97,7 @@ export function mount({ ROOT, C, json, readBody, view: pageView }) {
       });
       try { P.writeCopy(join(ROOT, rel), next); P.zipKit(join(ROOT, rel)); }
       catch (e) { return json(res, 500, { error: e.message }); }
-      return json(res, 200, { ...pageView(C.load()), publish: kitOf(ROOT, rel) });
+      return json(res, 200, { ...pageView(C.load()), kit: kitOf(ROOT, rel) }); // the page's publish (every reel's kit) stays as it is
     }
     return false;
   }
