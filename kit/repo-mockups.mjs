@@ -58,7 +58,7 @@ export function sections(md) {
   }
   return out;
 }
-const CMD = /^(?:\$\s*)?((?:npm|npx|pnpm|yarn|bun|pip3?|pipx|uv|uvx|brew|cargo|go|gem|composer|dotnet|docker|kubectl|helm|deno|git clone|curl|wget|make|node|python3?|gh|claude|codex|\/plugin|\/[a-z][\w-]*(?=\s|$))\b.*)$/; // a slash command is one word (/plugin), never a path (/etc/app)
+const CMD = /^(?:\$\s*)?((?:npm|npx|pnpm|yarn|bun|pip3?|pipx|uv|uvx|brew|cargo|go|gem|composer|dotnet|docker|kubectl|helm|deno|git clone|curl|wget|make|node|python3?|gh|claude|codex|\/plugin|\/[a-z][\w-]*(?::[\w-]+)?(?=\s|$))\b.*)$/; // a slash command is one word (/plugin, /ponytail:review), never a path (/etc/app)
 const SHELL_LANG = /^(sh|bash|zsh|fish|shell|console|terminal|shell-session|shellsession|powershell|pwsh|ps1?|cmd|bat|text|txt|plaintext)$/;
 const SETUP = /install|quick ?start|getting started|setup|set up|usage|use it|try it|run/i, NOT_SETUP = /uninstall|remov|troubleshoot|if something/i;
 const SKIP = /licen[cs]e|contribut|credit|thank|acknowledg|support|sponsor|changelog|repo(sitory)? map|links|faq|citation|security|limit|status|evidence|known|alternativ|compar|uninstall|remov|troubleshoot/i;
