@@ -188,6 +188,17 @@ try {
     const sparse = await req('/api/broll/suggest', {}); assert.strictEqual(sparse.j.count, 0, 'one every 6 s: the filled spot at 3.5 s leaves no room in a 9 s reel');
     await req('/api/broll/idea', { beat: 3, action: 'dismiss' }); await req('/api/broll/idea', { beat: 1, action: 'dismiss' });
   });
+  await t('Studio places nothing on its own from another video\'s made cards; you can still pick them', async () => {
+    const f = join(STATE, 'other-card.mp4'); writeFileSync(f, Buffer.concat([BODY, Buffer.alloc(32, 7)]));
+    const card = BR.add(f, { name: 'quote-other.mp4', title: 'revenue doubled quote card', source: 'agent', tags: ['quote', 'revenue', 'doubled'] }); BR.update(card.id, { usedIn: 'another-video' });
+    const fill = await req('/api/broll/suggest', { all: true, fill: true }); assert.strictEqual(fill.status, 200, fill.text);
+    assert.ok(!fill.j.broll.beats.some(b => (b.slot && b.slot.clip && b.slot.clip.id === card.id) || (b.idea && b.idea.clip && b.idea.clip.id === card.id)), 'the other video\'s card is not auto-placed: ' + JSON.stringify(fill.j.broll.beats.map(b => [b.slot && b.slot.clip && b.slot.clip.id, b.idea && b.idea.clip && b.idea.clip.id])));
+    for (const n of [1, 2, 3]) { await req('/api/broll/idea', { beat: n, action: 'dismiss' }); }
+    for (const n of [1, 3]) await req('/api/broll/slot', { beat: n, clear: true });
+    const offer = await req('/api/broll/suggest', { all: true }); assert.ok(offer.j.broll.beats.some(b => b.idea && b.idea.clip && b.idea.clip.id === card.id), 'it is still offered as an idea you approve');
+    for (const n of [1, 2, 3]) await req('/api/broll/idea', { beat: n, action: 'dismiss' });
+    BR.remove(card.id);
+  });
   await t('render plan: broll-run puts the lane into cut.json (paths from build/), keeps other inserts, writes and removes credits.txt', async () => {
     const lib = BR.load().clips, pex = lib.find(c => c.source === 'pexels');
     await req('/api/broll/slot', { beat: 3, clip: pex.id, place: 'full' });

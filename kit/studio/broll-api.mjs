@@ -137,9 +137,14 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
   // your uploads of the kind the spot likes (testimonials and product demos on proof, screen recordings on tips).
   // Numbers and quotes become a made card; everything else a stock search.
   const autoOn = () => { const a = S.load().broll.auto; return a == null ? process.env.STUDIO_BROLL_AUTO !== '0' : a === true; };
-  function pickIdeas(s, { gap = 6, all = false } = {}) {
-    const d = draftOf(s.job, s); if (!d) throw bad('make a draft first: the spots come from it'); const j = peek(s), lib = BR.load().clips;
-    const used = new Set(Object.values(j.slots).map(x => x.clip)), taken = Object.entries(j.slots).map(([n, x]) => x.at != null ? +x.at : (d.beats.find(b => b.n === +n) || {}).start).filter(x => x != null);
+  // what Studio may place on its own (after a draft, or Suggest with fill): never a made card (text) from another
+  // video, and no made card at all in repo mode, where the card holds the repo and plain text never goes in it.
+  // Those stay in the Vault for you to pick, and an idea you approve can still use them.
+  const repoMode = s => !!(s.videoPlan && s.videoPlan.content && s.videoPlan.content.repoFeature);
+  const autoOk = (s, c) => !c || c.source !== 'agent' || (!repoMode(s) && (c.usedIn || []).every(j => j === s.job));
+  function pickIdeas(s, { gap = 6, all = false, auto = false } = {}) {
+    const d = draftOf(s.job, s); if (!d) throw bad('make a draft first: the spots come from it'); const j = peek(s), lib = BR.load().clips.filter(c => !auto || autoOk(s, c));
+    const used = new Set([...Object.values(j.slots).map(x => x.clip), ...(auto ? BR.load().clips.filter(c => !autoOk(s, c)).map(c => c.id) : [])]), taken = Object.entries(j.slots).map(([n, x]) => x.at != null ? +x.at : (d.beats.find(b => b.n === +n) || {}).start).filter(x => x != null);
     const out = [];
     // plan slots are matched to the Vault by their brief (a slot on a line that serves your point chooses first)
     const va = VM.assign(d.beats.filter(bt => bt.ref && bt.ref.slot && !bt.ref.slot.run && !j.slots[bt.n] && bt.seconds >= 1.2 && !underOf(bt, d.beats)).map(bt => ({ key: bt.n, brief: briefFor(s, bt) })), V.load().items, { used, n: 1 });
@@ -173,7 +178,7 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
       const dur = bt.ref && bt.ref.seconds ? +Math.max(1, Math.min(+bt.ref.seconds, bt.seconds - offset)).toFixed(2) : null;
       const why = bt.ref ? `The reference cuts to b-roll here${bt.ref.detail ? ` (${bt.ref.detail})` : ''}.${p && !what ? ' ' + p.why : ''}` : p.why;
       const why2 = screen ? `${why} Record your screen showing it (Screen recording in B-roll), or Approve for stock.` : why;
-      out.push({ beat: bt.n, at: +at.toFixed(2), offset, ...(dur ? { dur } : {}), idea, why: why2, role, query: wq || (p && p.query ? p.query : null), card: !hit && !what && p && p.card ? p.card : null, clip: hit ? hit.id : null, place: screen || rscreen ? 'top' : place, ...(screen || rscreen ? { screen: true } : {}), source: bt.ref ? 'reference' : 'rules' });
+      out.push({ beat: bt.n, at: +at.toFixed(2), offset, ...(dur ? { dur } : {}), idea, why: why2, role, query: wq || (p && p.query ? p.query : null), card: !hit && !what && p && p.card && !(auto && repoMode(s)) ? p.card : null, clip: hit ? hit.id : null, place: screen || rscreen ? 'top' : place, ...(screen || rscreen ? { screen: true } : {}), source: bt.ref ? 'reference' : 'rules' });
     }
     return out;
   }
@@ -186,9 +191,9 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     if (!autoOn()) return autoRun;
     autoRun = autoRun.then(async () => {
       const s = C.load(); if (s.job !== job || !draftOf(job, s)) return;
-      const ideas = pickIdeas(s); if (ideas.length) saveIdeas(ideas, 'Studio');
+      const ideas = pickIdeas(s, { auto: true }); if (ideas.length) saveIdeas(ideas, 'Studio');
       let placed = 0;
-      for (const x of ideas) { try { await approveIdea(C.load(), x.beat, 'Studio', { quiet: true, noFallback: true }); placed++; } catch {} }
+      for (const x of ideas) { try { await approveIdea(C.load(), x.beat, 'Studio', { quiet: true, noFallback: true, auto: true }); placed++; } catch {} }
       // one count that matches the step: what was placed, what waits for a yes, and the slots that need a clip from you
       const vw = view(C.load()), needs = vw.beats.filter(x => x.need && !x.need.skipped).length, waits = ideas.length - placed;
       if (!ideas.length && !needs) return;
@@ -239,12 +244,13 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
   // spot's words. A fresh install with no keys still gets b-roll: library clips and made cards need no account.
   async function approveIdea(s, n, by = 'you', o = {}) {
     const idea = peek(s).ideas[n]; if (!idea) throw bad(`no idea on spot ${n}`, 404);
-    let clip = idea.clip && BR.get(idea.clip); const tried = [];
-    if (!clip && idea.card && chromeOk()) clip = await makeCard(idea.card);
-    if (!clip && idea.query) clip = BR.search(idea.query)[0] || null;
+    const ok = c => !o.auto || autoOk(s, c), cards = !(o.auto && repoMode(s));
+    let clip = idea.clip && BR.get(idea.clip); if (!ok(clip)) clip = null; const tried = [];
+    if (!clip && idea.card && cards && chromeOk()) clip = await makeCard(idea.card);
+    if (!clip && idea.query) clip = BR.search(idea.query).find(ok) || null;
     if (!clip && idea.query) { const prov = ['pexels', 'pixabay'].find(p => KEYS.isSet(p));
       if (prov) { try { const res = await BR.searchStock(prov, { query: idea.query, orientation: idea.place === 'pip' ? 'landscape' : 'portrait' }); if (res.length) clip = await BR.downloadStock(prov, res[0]); else tried.push(`${KEYS.byId(prov).name} found nothing for "${idea.query}"`); } catch (e) { tried.push(e.message); } } }
-    if (!clip && !o.noFallback && chromeOk()) { const bt = (draftOf(s.job, s) || { beats: [] }).beats.find(b => b.n === +n), text = idea.card && idea.card.text || (bt && bt.text) || idea.idea;
+    if (!clip && !o.noFallback && cards && chromeOk()) { const bt = (draftOf(s.job, s) || { beats: [] }).beats.find(b => b.n === +n), text = idea.card && idea.card.text || (bt && bt.text) || idea.idea;
       clip = await makeCard(idea.card || { kind: 'quote', text: String(text).split(/\s+/).slice(0, 14).join(' ') }); }
     if (!clip) throw bad(`Nothing in the library${idea.query ? ` for "${idea.query}"` : ''}${tried.length ? ` (${tried.join('; ')})` : ''}. Install Chrome so Studio can make a card here, add a free Pexels key for stock, or fill the spot by hand.`, 400, { fix: chromeOk() ? null : ['chrome'] });
     return fill(C.load(), n, clip.id, { place: idea.place, offset: idea.offset != null ? idea.offset : undefined, dur: idea.dur != null ? idea.dur : undefined, by, quiet: o.quiet, why: idea.why });
@@ -404,9 +410,9 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     if (p === '/api/broll/suggest' && M === 'POST') {
       // Suggest b-roll again: the rules on every empty spot, one every gap seconds (6 by default; all: true for every
       // spot). fill: true also puts on what Studio can place for free, like after a draft
-      const b = await readBody(req).catch(() => ({})), ideas = pickIdeas(s, { gap: b.gap != null ? Math.max(1, +b.gap) : 6, all: b.all === true });
+      const b = await readBody(req).catch(() => ({})), ideas = pickIdeas(s, { gap: b.gap != null ? Math.max(1, +b.gap) : 6, all: b.all === true, auto: b.fill === true });
       let v = saveIdeas(ideas);
-      if (b.fill === true) { for (const x of ideas) { try { await approveIdea(C.load(), x.beat, 'Studio', { quiet: true }); } catch {} } v = C.load(); }
+      if (b.fill === true) { for (const x of ideas) { try { await approveIdea(C.load(), x.beat, 'Studio', { quiet: true, auto: true }); } catch {} } v = C.load(); }
       return json(res, 200, { broll: view(v), count: ideas.length, state: v });
     }
     if (p === '/api/broll/auto' && M === 'POST') { const b = await readBody(req); if (typeof b.on !== 'boolean') throw bad('on: true or false'); S.update({ broll: { auto: b.on } }); return json(res, 200, { broll: view(C.load()) }); }
