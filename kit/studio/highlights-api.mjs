@@ -41,7 +41,7 @@ export function mount({ ROOT, C: Core, update, json, readBody, view: pageView, s
     if (!words || !words.length) throw Object.assign(new Error('transcribe the footage first'), { code: 400 });
     const duration = durOf(rel);
     const found = H.fromWords(words, { ...opts, duration, point: Core.load().point });
-    update(x => save(x, { source: rel, ...found, pending: null, usedAsTake: false }));
+    update(x => save(x, { source: rel, ...found, pending: null, error: null, usedAsTake: false }));
     return found;
   }
 
@@ -55,7 +55,7 @@ export function mount({ ROOT, C: Core, update, json, readBody, view: pageView, s
       if (!s.job) return json(res, 400, { error: 'name the reel first' });
       const opt = H.options({ n: b.n, min: b.min, max: b.max, goal: b.goal, point: s.point });
       if (opt.errs.length) return json(res, 400, { error: opt.errs.join('; ') });
-      update(x => save(x, { source: rel, n: opt.n, min: opt.min, max: opt.max, goal: opt.goal, pending: 'transcript', candidates: (x.highlights && x.highlights.source === rel) ? x.highlights.candidates : [] }));
+      update(x => save(x, { source: rel, n: opt.n, min: opt.min, max: opt.max, goal: opt.goal, pending: 'transcript', error: null, candidates: (x.highlights && x.highlights.source === rel) ? x.highlights.candidates : [] }));
       const fail = e => update(x => { if (x.highlights && x.highlights.source === rel) { x.highlights.pending = null; x.highlights.error = e.message; } });
       if (!MEDIA.transcript(rel)) {
         startTranscribe(rel, () => { try { findOn(rel, opt); } catch (e) { fail(e); } }, fail);
