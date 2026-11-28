@@ -140,8 +140,9 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
   // what Studio may place on its own (after a draft, or Suggest with fill): never a made card (text) from another
   // video, and no made card at all in repo mode, where the card holds the repo and plain text never goes in it.
   // Those stay in the Vault for you to pick, and an idea you approve can still use them.
-  const repoMode = s => !!(s.videoPlan && s.videoPlan.content && s.videoPlan.content.repoFeature);
-  const autoOk = (s, c) => !c || c.source !== 'agent' || (!repoMode(s) && (c.usedIn || []).every(j => j === s.job));
+  // (a made card is stamped with the video it was made for, so one never rendered still counts as that video's)
+  const repoMode = s => { const c = (s.videoPlan && s.videoPlan.content) || {}; return !!(c.repoFeature && (c.repos || []).length); };
+  const autoOk = (s, c) => !c || c.source !== 'agent' || (!repoMode(s) && (c.usedIn || []).length > 0 && c.usedIn.every(j => j === s.job));
   function pickIdeas(s, { gap = 6, all = false, auto = false } = {}) {
     const d = draftOf(s.job, s); if (!d) throw bad('make a draft first: the spots come from it'); const j = peek(s), lib = BR.load().clips.filter(c => !auto || autoOk(s, c));
     const used = new Set([...Object.values(j.slots).map(x => x.clip), ...(auto ? BR.load().clips.filter(c => !autoOk(s, c)).map(c => c.id) : [])]), taken = Object.entries(j.slots).map(([n, x]) => x.at != null ? +x.at : (d.beats.find(b => b.n === +n) || {}).start).filter(x => x != null);
@@ -178,7 +179,7 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
       const dur = bt.ref && bt.ref.seconds ? +Math.max(1, Math.min(+bt.ref.seconds, bt.seconds - offset)).toFixed(2) : null;
       const why = bt.ref ? `The reference cuts to b-roll here${bt.ref.detail ? ` (${bt.ref.detail})` : ''}.${p && !what ? ' ' + p.why : ''}` : p.why;
       const why2 = screen ? `${why} Record your screen showing it (Screen recording in B-roll), or Approve for stock.` : why;
-      out.push({ beat: bt.n, at: +at.toFixed(2), offset, ...(dur ? { dur } : {}), idea, why: why2, role, query: wq || (p && p.query ? p.query : null), card: !hit && !what && p && p.card && !(auto && repoMode(s)) ? p.card : null, clip: hit ? hit.id : null, place: screen || rscreen ? 'top' : place, ...(screen || rscreen ? { screen: true } : {}), source: bt.ref ? 'reference' : 'rules' });
+      out.push({ beat: bt.n, at: +at.toFixed(2), offset, ...(dur ? { dur } : {}), idea, why: why2, role, query: wq || (p && p.query ? p.query : null), card: !hit && !what && p && p.card ? p.card : null, clip: hit ? hit.id : null, place: screen || rscreen ? 'top' : place, ...(screen || rscreen ? { screen: true } : {}), source: bt.ref ? 'reference' : 'rules' });
     }
     return out;
   }
@@ -205,8 +206,10 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
   async function makeCard(spec, extra = {}) {
     if (!chromeOk()) throw bad('Agent-made B-roll needs Chrome, and it is not installed.', 400, { fix: ['chrome'] });
     if (!MAKE.KINDS.includes(spec.kind)) throw bad(`kind: ${MAKE.KINDS.join(', ')}`);
-    const r = await MAKE.make(spec);
-    return BR.add(r.file, { move: true, name: `${spec.kind}-${randomBytes(2).toString('hex')}.mp4`, title: spec.title && spec.kind !== 'chart' ? String(spec.title) : MAKE.titleOf(spec), source: 'agent', tags: [spec.kind, ...(extra.tags || [])], ...extra });
+    const r = await MAKE.make(spec), job = C.load().job;
+    const c = BR.add(r.file, { move: true, name: `${spec.kind}-${randomBytes(2).toString('hex')}.mp4`, title: spec.title && spec.kind !== 'chart' ? String(spec.title) : MAKE.titleOf(spec), source: 'agent', tags: [spec.kind, ...(extra.tags || [])], ...extra });
+    if (job) BR.update(c.id, { usedIn: job }); // the video it was made for (see autoOk)
+    return BR.get(c.id) || c;
   }
   // ---------- fast run: N library clips cut on the beat, as one clip ----------
   // the pace the job's bed gives: seconds for a beat and half a beat (build/beat-grid.json after a render with a bed,

@@ -191,13 +191,18 @@ try {
   await t('Studio places nothing on its own from another video\'s made cards; you can still pick them', async () => {
     const f = join(STATE, 'other-card.mp4'); writeFileSync(f, Buffer.concat([BODY, Buffer.alloc(32, 7)]));
     const card = BR.add(f, { name: 'quote-other.mp4', title: 'revenue doubled quote card', source: 'agent', tags: ['quote', 'revenue', 'doubled'] }); BR.update(card.id, { usedIn: 'another-video' });
+    // and a card made for another video that was never rendered (no video on it): not this video's either
+    const f2 = join(STATE, 'other-card-2.mp4'); writeFileSync(f2, Buffer.concat([BODY, Buffer.alloc(32, 9)]));
+    const card2 = BR.add(f2, { name: 'quote-other-2.mp4', title: 'revenue doubled counter card', source: 'agent', tags: ['counter', 'revenue', 'doubled'] });
     const fill = await req('/api/broll/suggest', { all: true, fill: true }); assert.strictEqual(fill.status, 200, fill.text);
-    assert.ok(!fill.j.broll.beats.some(b => (b.slot && b.slot.clip && b.slot.clip.id === card.id) || (b.idea && b.idea.clip && b.idea.clip.id === card.id)), 'the other video\'s card is not auto-placed: ' + JSON.stringify(fill.j.broll.beats.map(b => [b.slot && b.slot.clip && b.slot.clip.id, b.idea && b.idea.clip && b.idea.clip.id])));
+    const on = id => fill.j.broll.beats.some(b => (b.slot && b.slot.clip && b.slot.clip.id === id) || (b.idea && b.idea.clip && b.idea.clip.id === id));
+    assert.ok(!on(card2.id), 'an unrendered card from another video is not auto-placed');
+    assert.ok(!on(card.id), 'the other video\'s card is not auto-placed: ' + JSON.stringify(fill.j.broll.beats.map(b => [b.slot && b.slot.clip && b.slot.clip.id, b.idea && b.idea.clip && b.idea.clip.id])));
     for (const n of [1, 2, 3]) { await req('/api/broll/idea', { beat: n, action: 'dismiss' }); }
     for (const n of [1, 3]) await req('/api/broll/slot', { beat: n, clear: true });
-    const offer = await req('/api/broll/suggest', { all: true }); assert.ok(offer.j.broll.beats.some(b => b.idea && b.idea.clip && b.idea.clip.id === card.id), 'it is still offered as an idea you approve');
+    const offer = await req('/api/broll/suggest', { all: true }); assert.ok(offer.j.broll.beats.some(b => b.idea && b.idea.clip && [card.id, card2.id].includes(b.idea.clip.id)), 'it is still offered as an idea you approve');
     for (const n of [1, 2, 3]) await req('/api/broll/idea', { beat: n, action: 'dismiss' });
-    BR.remove(card.id);
+    BR.remove(card.id); BR.remove(card2.id);
   });
   await t('render plan: broll-run puts the lane into cut.json (paths from build/), keeps other inserts, writes and removes credits.txt', async () => {
     const lib = BR.load().clips, pex = lib.find(c => c.source === 'pexels');
