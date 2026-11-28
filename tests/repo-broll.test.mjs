@@ -244,6 +244,10 @@ try {
     writeFileSync(cf, JSON.stringify(cj)); const out3 = run(), after = JSON.parse(readFileSync(cf, 'utf8')).inserts;
     assert.strictEqual(after.filter(x => x.repo).length, first, out3); assert.ok(/2 that broke the repo rule/.test(out3), out3);
     assert.deepStrictEqual(RB.repoRuleBreaks(after), []); assert.ok(after.find(x => x.studio).fullBefore);
+    // a b-roll clip you put on a repo card's spot after reopening keeps the spot
+    const r0 = after.find(x => x.repo), c4 = JSON.parse(readFileSync(cf, 'utf8')); c4.inserts.push({ studio: true, at: +r0.at, dur: 0.5, place: 'top', file: 'w.mp4' }); writeFileSync(cf, JSON.stringify(c4));
+    const out4 = run(), after4 = JSON.parse(readFileSync(cf, 'utf8')).inserts;
+    assert.strictEqual(after4.filter(x => x.repo).length, first - 1, out4); assert.ok(!after4.some(x => x.repo && x.at === r0.at));
   });
   await t('a real GIF becomes a 12 second looping MP4 (skipped without FFmpeg)', async () => {
     const { execFileSync } = await import('child_process');
