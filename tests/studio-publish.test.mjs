@@ -147,6 +147,9 @@ ok('Make again keeps the saved (edited) description and hashtags, and only chang
   const given = P.remakeCopy(saved, { title: 'T', description: 'Sent now.', hashtags: ['#x'] });
   assert.equal(given.description, 'Sent now.');
   assert.deepEqual(given.hashtags, ['#x']);
+  // hashtags we made from the old title follow the new one
+  const made = P.copyOf({ title: 'Sourdough starter basics' }), re = P.remakeCopy(made, { title: 'Tax tips for freelancers' });
+  assert.ok(re.hashtags.includes('#freelancers') && !re.hashtags.includes('#sourdough'), re.hashtags.join(' '));
 });
 
 ok('saving from a short-limit tab keeps the full description for every platform', () => {

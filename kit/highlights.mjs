@@ -156,7 +156,7 @@ export function briefOf(current, { job } = {}) {
   return [
     'Please score the highlight moments of this talk, then pick the ones I should use as my take.',
     job ? `The Studio job is ${job}.` : '',
-    'Use the find_highlights, get_highlights, score_highlights and pick_highlights tools. Stay on sentence boundaries. Do not post anything.',
+    'Use the find_highlights, get_highlights, score_highlights and pick_highlights tools. Stay on sentence boundaries. Score a candidate by its id (h1, h2 ...); send start and end only for a new moment. Do not post anything.',
     c.length ? 'Current candidates:\n' + lines.join('\n') : 'Run find_highlights first if there are no candidates yet.',
   ].filter(Boolean).join('\n\n');
 }

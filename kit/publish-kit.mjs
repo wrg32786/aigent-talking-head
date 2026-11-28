@@ -109,7 +109,10 @@ export function copyOf({ title, description, hashtags, point, text } = {}) {
 // unless new copy is given; with nothing saved yet, fresh copy from the title, the transcript or the point
 export function remakeCopy(saved, { title, description, hashtags, text, point } = {}) {
   if (!saved) return copyOf({ title, description, hashtags, point, text });
-  return copyOf({ title: title || saved.title, description: description || saved.description || text, hashtags: Array.isArray(hashtags) ? hashtags : saved.hashtags, point });
+  // hashtags we made from the old title are made again from the new one; ones you edited stay
+  const auto = JSON.stringify(saved.hashtags || []) === JSON.stringify(tagsOf(saved.title, saved.description, point));
+  const desc = description || saved.description || text;
+  return copyOf({ title: title || saved.title, description: desc, hashtags: Array.isArray(hashtags) ? hashtags : auto ? undefined : saved.hashtags, point });
 }
 
 export function copyText(copy) {

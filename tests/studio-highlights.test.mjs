@@ -142,6 +142,16 @@ t('a ticked clip the agent scores by its start and end keeps its tick and id', (
   assert.strictEqual(same[0].id, c.id); assert.strictEqual(same[0].keep, true); assert.strictEqual(same[0].score, 40);
 });
 
+t('times read back from the brief come back as the same clips, ticks kept', () => {
+  const words = wordsOf(), found = H.fromWords(words, { n: 3, min: 15, max: 50, duration: words[words.length - 1][1] });
+  const kept = H.setKeep(found, [found.candidates[0].id], true), brief = H.briefOf(kept, { job: 'talk-one' });
+  const sent = [...brief.matchAll(/- (h\d+): ([\d.]+)s to ([\d.]+)s/g)].map(m => ({ start: +m[2], end: +m[3], score: 50, reason: 'ok', was: m[1] }));
+  assert.strictEqual(sent.length, found.candidates.length, brief);
+  const next = H.applyScores(kept, sent.map(({ was, ...x }) => x), { words, duration: found.duration });
+  assert.deepStrictEqual(next.candidates.map(c => c.id).sort(), found.candidates.map(c => c.id).sort());
+  assert.ok(next.candidates.find(c => c.id === found.candidates[0].id).keep);
+});
+
 t('setKeep and keptOf, and the brief names the tools with no em dash', () => {
   const words = wordsOf(), found = H.fromWords(words, { n: 3, min: 15, max: 50, duration: words[words.length - 1][1] });
   const id = found.candidates[0].id;
