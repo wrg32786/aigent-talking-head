@@ -133,6 +133,15 @@ t('a rules clip sent back by its start and end (no id) comes back the same, brea
   }
 });
 
+t('a ticked clip the agent scores by its start and end keeps its tick and id', () => {
+  const words = wordsOf(), found = H.fromWords(words, { n: 3, min: 15, max: 50, duration: words[words.length - 1][1] });
+  const c = found.candidates[0], kept = H.setKeep(found, [c.id], true);
+  const next = H.applyScores(kept, [{ start: c.start, end: c.end, score: 40, reason: 'Fine' }], { words, duration: found.duration });
+  const same = next.candidates.filter(x => x.start === c.start && x.end === c.end);
+  assert.strictEqual(same.length, 1, 'one clip, not a copy');
+  assert.strictEqual(same[0].id, c.id); assert.strictEqual(same[0].keep, true); assert.strictEqual(same[0].score, 40);
+});
+
 t('setKeep and keptOf, and the brief names the tools with no em dash', () => {
   const words = wordsOf(), found = H.fromWords(words, { n: 3, min: 15, max: 50, duration: words[words.length - 1][1] });
   const id = found.candidates[0].id;

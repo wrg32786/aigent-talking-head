@@ -6,7 +6,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { execFileSync } from 'child_process';
 import * as P from '../kit/publish-kit.mjs';
-import { kitOf } from '../kit/studio/publish-api.mjs';
+import { kitOf, NINE16 } from '../kit/studio/publish-api.mjs';
 import { mkdirSync } from 'fs';
 
 const KIT = dirname(fileURLToPath(import.meta.url));
@@ -169,6 +169,11 @@ ok('the kit view returns coverMeta, so the face-on-cover notes can show', () => 
   const k = kitOf(root, 'jobs/j/reel-v1.mp4');
   assert.deepEqual(k.coverMeta, { onFace: true, detector: 'off' });
   assert.equal(kitOf(root, 'jobs/j/reel-v2.mp4').coverMeta, null);
+});
+
+ok('every 9:16 reel gets a kit (effects and smaller copies too), never a 4:5 or 1:1 one', () => {
+  for (const f of ['reel-v2.mp4', 'reel-fx-v2.mp4', 'reel-v2-reels.mp4', 'reel-v2-tiktok.mp4', 'reel-v2-shorts.mp4']) assert.ok(NINE16.test('jobs/j/' + f), f);
+  for (const f of ['reel-v2-feed45.mp4', 'reel-v2-square.mp4', 'reel-v2-cover.jpg', 'take.mp4']) assert.ok(!NINE16.test('jobs/j/' + f), f);
 });
 
 ok('descriptions keep their paragraphs; titles stay on one line', () => {

@@ -113,6 +113,9 @@ export function applyScores(current, scores, { duration, words } = {}) {
       const snap = snapToSentences(raw.start, raw.end, S, dur);
       if (!snap) { skipped++; continue; }
       [start, end] = snap;
+      // a clip sent back by its times is that clip: it keeps its id and the user's tick
+      const same = (current.candidates || []).find(c => c.start === start && c.end === end);
+      if (same) { base = same; id = same.id; }
     } else { skipped++; continue; }
     const score = Math.max(0, Math.min(100, Math.round(+raw.score || 0)));
     const reason = String(raw.reason || (base && base.reason) || 'Scored by your agent').replace(/\u2014/g, ', ').slice(0, 200);

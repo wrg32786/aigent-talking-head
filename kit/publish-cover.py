@@ -133,13 +133,16 @@ def draw(im, box, lines):
     y = box["y"] + max(0, (box["h"] - total) / 2)
     stroke = max(3, size // 18)
     # where the letters really land (a thin band can overflow at the floor size), so onFace is measured on the ink
-    ink = dict(x=box["x"], y=int(y - stroke), w=box["w"], h=int(total + 2 * stroke))
+    bb = None
     for line in lines:
         tw = draw.textlength(line, font=fnt)
         x = box["x"] + (box["w"] - tw) / 2
+        b = draw.textbbox((x, y), line, font=fnt, stroke_width=stroke)
+        bb = b if bb is None else (min(bb[0], b[0]), min(bb[1], b[1]), max(bb[2], b[2]), max(bb[3], b[3]))
         # dark stroke so white letters stay readable on a light or dark still
         draw.text((x, y), line, font=fnt, fill=(255, 255, 255, 255), stroke_width=stroke, stroke_fill=(12, 18, 22, 255))
         y += size + gap
+    ink = dict(x=int(bb[0]), y=int(bb[1]), w=int(bb[2] - bb[0]), h=int(bb[3] - bb[1])) if bb else dict(x=box["x"], y=box["y"], w=0, h=0)
     return im, ink
 
 

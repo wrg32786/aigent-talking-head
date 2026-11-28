@@ -7,9 +7,12 @@ import { existsSync, readFileSync, statSync } from 'fs';
 import { join, relative, resolve } from 'path';
 import * as P from '../publish-kit.mjs';
 import * as POST from './post.mjs';
+import { createRequire } from 'module';
 
-// the cover is drawn 9:16 (1080x1920): only the main reel and its 9:16 copy get a kit, never a 4:5 or 1:1 one
-const NINE16 = /reel-v\d+(-reels)?\.mp4$/;
+// the cover is drawn 9:16 (1080x1920): every 9:16 reel gets a kit (the effects version and the smaller copies too),
+// never a 4:5 or 1:1 one (kit/exports.cjs reads the size from the file name)
+const EXP = createRequire(import.meta.url)('../exports.cjs');
+export const NINE16 = { test: f => { const i = EXP.fileInfo(f); return !!i && i.size === '9:16'; } };
 const relOf = (ROOT, p) => relative(ROOT, resolve(ROOT, p)).replace(/\\/g, '/');
 const okReel = (ROOT, job, path) => {
   if (!path || path.includes('..') || !job) return null;
