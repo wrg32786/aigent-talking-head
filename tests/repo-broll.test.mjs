@@ -238,6 +238,12 @@ try {
     // an older reopened build with no words for its clips: the cards it has stay, rather than all going
     rmSync(join(dir, '.media', 'clips.json')); const out2 = run();
     assert.strictEqual(reps(), first, out2); assert.ok(/could not read the words/.test(out2));
+    // and the repo rule still holds there: an old full-screen repo shot or README text shot goes, a lane clip goes into the card
+    const cf = join(build, 'cut.json'), cj = JSON.parse(readFileSync(cf, 'utf8'));
+    cj.inserts.push({ repo: true, at: 30, dur: 2, place: 'full', file: 'x.png' }, { repo: true, at: 33, dur: 2, place: 'top', src: 'page', file: 'y.png' }, { studio: true, at: 36, dur: 2, place: 'full', file: 'z.mp4' });
+    writeFileSync(cf, JSON.stringify(cj)); const out3 = run(), after = JSON.parse(readFileSync(cf, 'utf8')).inserts;
+    assert.strictEqual(after.filter(x => x.repo).length, first, out3); assert.ok(/2 that broke the repo rule/.test(out3), out3);
+    assert.deepStrictEqual(RB.repoRuleBreaks(after), []); assert.ok(after.find(x => x.studio).fullBefore);
   });
   await t('a real GIF becomes a 12 second looping MP4 (skipped without FFmpeg)', async () => {
     const { execFileSync } = await import('child_process');
