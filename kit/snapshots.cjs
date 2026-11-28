@@ -35,7 +35,15 @@ function save(dir, reel, { name } = {}) {
   fs.rmSync(out, { recursive: true, force: true }); fs.mkdirSync(out, { recursive: true });
   const cut = JSON.parse(fs.readFileSync(cutF, 'utf8')), media = [];
   const keep = f => { if (!f || typeof f !== 'string' || /^[a-z]+:/i.test(f)) return f; const r = stash(dir, build, f); if (r) media.push(r); return r || f; };
-  for (const s of cut.segs || []) if (s.file) s.file = keep(s.file);
+  // the words of each stashed clip go into .media/clips.json under its new name, so a reopened build still knows what
+  // is said where (kit/spoken.cjs timeline): repo cards, sections, titles and the .srt of the next render need them
+  const wordsOf = require('./spoken.cjs').wordsReader(build), said = {};
+  for (const s of cut.segs || []) if (s.file) { const ws = /^[a-z]+:/i.test(s.file) ? [] : wordsOf(path.resolve(build, s.file)); s.file = keep(s.file); if (ws.length && s.file.startsWith('../.media/')) said[path.basename(s.file)] = ws; }
+  if (Object.keys(said).length) {
+    const mj = path.join(dir, '.media', 'clips.json'); let cur = []; try { cur = JSON.parse(fs.readFileSync(mj, 'utf8')).clips || []; } catch {}
+    const map = new Map(cur.filter(c => c && c.file).map(c => [c.file, c])); for (const [file, words] of Object.entries(said)) map.set(file, { file, words });
+    fs.writeFileSync(mj, JSON.stringify({ note: 'words of the clips in this folder, by file name (kit/snapshots.cjs)', clips: [...map.values()] }) + '\n');
+  }
   for (const s of cut.inserts || []) if (s.file) s.file = keep(s.file);
   if (cut.bed && typeof cut.bed === 'string' && fs.existsSync(path.resolve(build, cut.bed)) && !path.resolve(build, cut.bed).startsWith(path.join(ROOT, 'kit'))) cut.bed = keep(cut.bed);
   const used = new Set((cut.segs || []).concat(cut.inserts || []).map(s => s.file));
