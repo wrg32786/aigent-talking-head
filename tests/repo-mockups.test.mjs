@@ -66,6 +66,7 @@ try {
     assert.deepStrictEqual(c[0].after, [], 'a plain block has no output: its other lines may be commands');
     const sess = M.commands('## Usage\n\n```console\n$ tiny build notes.md\n$ npx tiny build notes.md\nwrote deck.html (12 slides)\n```\n\n## Run\n\n```bash\ndocker run -d \\\n  -p 80:80 tiny\n```\n');
     assert.deepStrictEqual(sess.map(x => [x.cmd, x.after]), [['npx tiny build notes.md', ['wrote deck.html (12 slides)']]], 'a session block: the lines without $ are its output; a command that runs on with a backslash is left out');
+    assert.deepStrictEqual(M.commands('## Usage\n\n```yaml\nnode-version: 20\n```\n\n```\n/etc/app/config.toml\nnpm i tiny\n```\n').map(x => x.cmd), ['npm i tiny'], 'a YAML block is never typed as a command');
     assert.strictEqual(M.flow('A CLI: a fast way to deploy.'), null); assert.strictEqual(M.flow('Everything from setup to deployment.'), null);
   });
   await t('which scenes: a weak README gets every scene that fits, a good one the proof card and the terminal; the proof card is once', () => {

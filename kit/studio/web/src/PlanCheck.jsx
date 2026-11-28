@@ -9,10 +9,12 @@ import { clock } from './Review.jsx';
 const ask = r => `In the video, "${r.selection}" is off: ${r.note}${r.time != null ? ` (at ${clock(r.time)})` : ''} Please fix it so it matches the plan, then check it again.`;
 
 export function PlanCheck({ V, s, drafted, apply }) {
-  const [rep, setRep] = useState(null), [busy, setBusy] = useState(false), [err, setErr] = useState('');
+  const [rep, setRep] = useState(null), [busy, setBusy] = useState(false), [err, setErr] = useState(''), [changed, setChanged] = useState(false);
   const a = (V.env && V.env.agent) || {}, agentOn = !!(a.connected || a.listening);
-  useEffect(() => { let live = true; setRep(null); if (s.job) api('/api/plan-check').then(j => { if (live) setRep(j.report || null); }).catch(() => {}); return () => { live = false; }; }, [s.job, drafted && drafted.at]);
-  const run = async fix => { setBusy(true); setErr(''); try { const j = await api('/api/plan-check', { fix }); setRep(j.report); if (fix && j.report.fixed.length) toast(`Fixed ${j.report.fixed.length}. Render again to see it.`, true); } catch (e) { setErr(e.message || 'The check did not run.'); } finally { setBusy(false); } };
+  // read again when the plan changes too, so an old pass never shows as current
+  const planKey = JSON.stringify(s.videoPlan || null);
+  useEffect(() => { let live = true; if (s.job) api('/api/plan-check').then(j => { if (live) { setRep(j.report || null); setChanged(!!j.planChanged); } }).catch(() => {}); else { setRep(null); setChanged(false); } return () => { live = false; }; }, [s.job, drafted && drafted.at, planKey]);
+  const run = async fix => { setBusy(true); setErr(''); try { const j = await api('/api/plan-check', { fix }); setRep(j.report); setChanged(false); if (fix && j.report.fixed.length) toast(`Fixed ${j.report.fixed.length}. Render again to see it.`, true); } catch (e) { setErr(e.message || 'The check did not run.'); } finally { setBusy(false); } };
   const send = async r => {
     const text = ask(r);
     if (agentOn) { try { const j = await api('/api/chat', { text }); if (apply) apply(j); toast('Sent to your agent', true); return; } catch {} }
@@ -23,7 +25,7 @@ export function PlanCheck({ V, s, drafted, apply }) {
   const frame = f => f && s.job ? file(`jobs/${s.job}/build/${f}`) : null;
   return <section className="review glass-card" id="plan-check" aria-labelledby="plan-check-h">
     <div className="rv-head"><h3 id="plan-check-h">Plan check</h3>
-      <span className="fine grow" role="status" id="plan-check-sum">{!rep ? 'Check that the video does what you built.' : bad.length ? `${bad.length} to look at` : rows.some(r => r.ok === null) ? 'Some checks wait for a render.' : rows.length ? 'The measured checks passed.' : 'Nothing to check for this plan yet.'}</span>
+      <span className="fine grow" role="status" id="plan-check-sum">{!rep ? 'Check that the video does what you built.' : changed ? 'You changed the plan since this check. Check again.' : bad.length ? `${bad.length} to look at` : rows.some(r => r.ok === null) ? 'Some checks wait for a render.' : rows.length ? 'The measured checks passed.' : 'Nothing to check for this plan yet.'}</span>
       <button type="button" className="btn sm outline" id="plan-check-run" disabled={busy} onClick={() => run(false)}>{busy ? 'Checking' : rep ? 'Check again' : 'Check the plan'}</button>
       {fixable && <button type="button" className="btn sm" id="plan-check-fix" disabled={busy} onClick={() => run(true)}>Fix what we can</button>}
     </div>

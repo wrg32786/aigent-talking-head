@@ -38,6 +38,8 @@ try {
     const a = RB.readmeAssets(README, 'https://raw.githubusercontent.com/demo/tool/main/').filter(RB.usable).map(x => x.url.split('/').pop());
     assert.deepStrictEqual(a, ['preview.png', 'batch.gif', 'install.mp4', '0f1e2d3c-aaaa-bbbb-cccc-123456789abc', 'dot.png']);
     assert.ok(!RB.usable({ url: 'https://example.com/x.png', alt: '', height: 20 }), 'under 40 px tall');
+    assert.ok(RB.usable({ url: 'https://raw.githubusercontent.com/dgraph-io/badger/main/images/diggy.png', alt: '' }), 'a repo called badger keeps its pictures');
+    assert.ok(!RB.usable({ url: 'https://github.com/acme/shieldwall/actions/workflows/ci.yml/badge.svg', alt: '' }) && !RB.usable({ url: 'https://example.com/img/build-badge.png', alt: '' }), 'a badge file is still dropped');
     assert.deepStrictEqual(RB.sizeOf(png(1280, 720)), { w: 1280, h: 720 }); assert.deepStrictEqual(RB.sizeOf(gif(800, 450)), { w: 800, h: 450 });
   });
   await t('only public addresses: names, DNS answers and every redirect hop are checked', async () => {
@@ -218,6 +220,20 @@ try {
     run({ content: { repoFeature: true, repos: ['https://github.com/demo/tool'], takeovers: 'auto' }, presenter: [] }); rmSync(plan);
     execFileSync(process.execPath, [join(ROOT, 'kit', 'repo-broll.mjs'), 'apply', '--name', 'rj', '--plan', plan, '--jobs', jobs], { env: { ...process.env, ATH_ASSETS: TMP, ATH_REPO_MOCKS: '0' }, encoding: 'utf8' });
     const gone = JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8')); assert.ok(!(gone.inserts || []).some(x => x.repo) && !gone.repoTakeovers, 'a cleared plan clears its inserts too');
+  });
+  await t('repo mode with nothing from the repo: other b-roll still stays out of full screen', async () => {
+    const { mkdirSync } = await import('fs'), { execFileSync } = await import('child_process');
+    const empty = join(TMP, 'demo--empty'); mkdirSync(empty, { recursive: true }); writeFileSync(join(empty, 'readme.md'), '# empty\n');
+    writeFileSync(join(empty, 'meta.json'), JSON.stringify({ owner: 'demo', repo: 'empty', url: 'https://github.com/demo/empty', facts: { language: null }, assets: [], skipped: [] }));
+    const jobs = join(TMP, 'jobs3'), build = join(jobs, 'rj', 'build'); mkdirSync(build, { recursive: true });
+    writeFileSync(join(build, 'cut.json'), JSON.stringify({ segs: [{ file: 'none.mp4', in: 0, out: 10 }], inserts: [{ file: 'lane.mp4', at: 4, dur: 1, place: 'full', studio: true }] }));
+    const plan = join(build, 'video-plan.json'); writeFileSync(plan, JSON.stringify({ content: { repoFeature: true, repos: ['https://github.com/demo/empty'] }, presenter: [] }));
+    const out = execFileSync(process.execPath, [join(ROOT, 'kit', 'repo-broll.mjs'), 'apply', '--name', 'rj', '--plan', plan, '--jobs', jobs], { env: { ...process.env, ATH_ASSETS: TMP, ATH_REPO_MOCKS: '0' }, encoding: 'utf8' });
+    const cut = JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8'));
+    assert.deepStrictEqual(RB.repoRuleBreaks(cut.inserts), [], out + JSON.stringify(cut.inserts));
+    writeFileSync(plan, JSON.stringify({ content: { repoFeature: false, repos: [] } }));
+    execFileSync(process.execPath, [join(ROOT, 'kit', 'repo-broll.mjs'), 'apply', '--name', 'rj', '--plan', plan, '--jobs', jobs], { env: { ...process.env, ATH_ASSETS: TMP, ATH_REPO_MOCKS: '0' }, encoding: 'utf8' });
+    assert.deepStrictEqual(JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8')).inserts, [{ file: 'lane.mp4', at: 4, dur: 1, place: 'full', studio: true }], 'repo mode off: back to full screen');
   });
   await t('a real GIF becomes a 12 second looping MP4 (skipped without FFmpeg)', async () => {
     const { execFileSync } = await import('child_process');

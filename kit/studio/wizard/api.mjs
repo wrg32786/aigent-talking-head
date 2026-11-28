@@ -72,7 +72,8 @@ export function mount({ C, json, readBody, view, pushState }) {
     if (p === '/api/plan-check' || p === '/api/plan-check/points' || p === '/api/plan-check/report') {
       const s = C.load(); if (!s.job) { json(res, 400, { error: 'name the job first' }); return true; }
       const build = join(ROOT, 'jobs', s.job, 'build'), read = () => { try { return JSON.parse(readFileSync(join(build, 'plan-check.json'), 'utf8')); } catch { return null; } };
-      if (p === '/api/plan-check' && M === 'GET') { json(res, 200, { report: read(), job: s.job }); return true; }
+      // planChanged: the plan is not the one the saved report checked (a report from before planSig counts as current)
+      if (p === '/api/plan-check' && M === 'GET') { const rep = read(); json(res, 200, { report: rep, job: s.job, planChanged: !!(rep && rep.planSig && rep.planSig !== PC.planSig(JSON.parse(JSON.stringify(planOf(s, C.catalog()))))) }); return true; }
       if (!existsSync(join(build, 'cut.json'))) { json(res, 400, { error: 'Make a draft first.' }); return true; }
       try {
         if (p === '/api/plan-check/points' && M === 'GET') { const st = PC.load(build); json(res, 200, { points: PC.checkpoints(st.cut, st.caps, build) }); return true; }
@@ -83,8 +84,9 @@ export function mount({ C, json, readBody, view, pushState }) {
           if (b.fix === true && s.task && s.task.status === 'running') { json(res, 409, { error: 'Wait for the draft or render to finish, then fix.' }); return true; }
           // the plan as it is now beside the draft, then the newest render for the stills
           mkdirSync(build, { recursive: true }); writeFileSync(join(build, 'video-plan.json'), JSON.stringify(planOf(s, C.catalog()), null, 1));
-          const outs = (C.outputsOf ? C.outputsOf(s) : []).map(f => join(ROOT, f)).filter(f => existsSync(f)).sort((x, y) => statSync(y).mtimeMs - statSync(x).mtimeMs);
-          json(res, 200, { report: PC.run(build, { fix: b.fix === true, video: outs[0] || null, state: { finishWhen: s.finishWhen, transitionsWhen: s.transitionsWhen, keyWords: s.keyWords } }), job: s.job }); return true;
+          // the newest main reel (reel-vN.mp4): a size export of an older reel is newer, but it is not a render of the fixed cut
+          const outs = (C.outputsOf ? C.outputsOf(s) : []).filter(f => /(^|\/)reel-v\d+\.mp4$/.test(f)).map(f => join(ROOT, f)).filter(f => existsSync(f)).sort((x, y) => statSync(y).mtimeMs - statSync(x).mtimeMs);
+          json(res, 200, { planChanged: false, report: PC.run(build, { fix: b.fix === true, video: outs[0] || null, state: { finishWhen: s.finishWhen, transitionsWhen: s.transitionsWhen, keyWords: s.keyWords } }), job: s.job }); return true;
         }
       } catch (e) { json(res, 400, { error: e.message }); return true; }
       return false;
