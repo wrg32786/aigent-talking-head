@@ -1,14 +1,6 @@
 // What a finished teardown measured, grouped into six layers for the Teardowns tab.
 // Existing extract() / recipe data only: no new analyzer, no network, no files beyond what extract already read.
 export const LAYER_IDS = ['set', 'person', 'layout', 'broll', 'type', 'motion'];
-export const LAYERS = [
-  { id: 'set', label: 'Set' },
-  { id: 'person', label: 'Person' },
-  { id: 'layout', label: 'Layout' },
-  { id: 'broll', label: 'B-roll' },
-  { id: 'type', label: 'Type' },
-  { id: 'motion', label: 'Motion' },
-];
 
 const pack = (id, label, lines, emptyDefault) => {
   const clean = (lines || []).filter(l => l && l !== emptyDefault);
@@ -80,8 +72,8 @@ export function layersView(extracted, recipe = null) {
   if (shotN) layoutLines.push(shotN + ' shot' + (shotN === 1 ? '' : 's'));
   const kinds = {};
   for (const s of slots) { const k = s.kind || 'full'; kinds[k] = (kinds[k] || 0) + 1; }
-  const layout = Object.keys(kinds).sort((a, b) => kinds[b] - kinds[a])[0] || style['broll-layout'] || (recipe && recipe.broll && recipe.broll.layout) || null;
-  if (layout && slots.length) layoutLines.push('B-roll layout ' + (kinds.split ? 'split' : layout));
+  const layout = Object.keys(kinds).sort((a, b) => kinds[b] - kinds[a])[0];
+  if (slots.length) layoutLines.push('B-roll layout ' + (kinds.split ? 'split' : layout));
   const splits = kinds.split || 0;
   if (splits) layoutLines.push(splits + ' split-screen slot' + (splits === 1 ? '' : 's'));
 
@@ -94,9 +86,9 @@ export function layersView(extracted, recipe = null) {
   } else if (cutaways) {
     brollLines.push(cutaways + ' cutaway' + (cutaways === 1 ? '' : 's'));
   }
-  const graphics = ex.graphics || plan.graphics;
-  if (Array.isArray(graphics) && graphics.length) brollLines.push(graphics.length + ' graphic' + (graphics.length === 1 ? '' : 's'));
-  else if (typeof graphics === 'number' && graphics) brollLines.push(graphics + ' graphic' + (graphics === 1 ? '' : 's'));
+  // plan.graphics counts every graphic; ex.graphics lists the kinds, so it is only the fallback
+  const gN = typeof plan.graphics === 'number' ? plan.graphics : Array.isArray(ex.graphics) ? ex.graphics.length : 0;
+  if (gN) brollLines.push(gN + ' graphic' + (gN === 1 ? '' : 's'));
 
   const typeLines = [];
   const cap = sm.captions || {};
