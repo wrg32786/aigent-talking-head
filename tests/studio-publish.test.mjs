@@ -6,6 +6,8 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { execFileSync } from 'child_process';
 import * as P from '../kit/publish-kit.mjs';
+import { kitOf } from '../kit/studio/publish-api.mjs';
+import { mkdirSync } from 'fs';
 
 const KIT = dirname(fileURLToPath(import.meta.url));
 let n = 0; const ok = (m, f) => { f(); n++; console.log('ok ' + m); };
@@ -131,6 +133,65 @@ ok('publish-cover.py places the title off a given face zone', () => {
   assert.ok(j.box.y + j.box.h <= 800 + 1e-6, JSON.stringify(j.box));
   assert.ok(existsSync(out));
   assert.equal(j.detector, 'given');
+});
+
+ok('Make again keeps the saved (edited) description and hashtags, and only changes the title', () => {
+  const saved = P.copyOf({ title: 'Old title', description: 'My own words about this reel.', hashtags: ['#mine', '#edited'] });
+  const next = P.remakeCopy(saved, { title: 'New title', point: 'something else entirely' });
+  assert.equal(next.title, 'New title');
+  assert.equal(next.description, 'My own words about this reel.');
+  assert.deepEqual(next.hashtags, ['#mine', '#edited']);
+  assert.ok(next.platforms.instagram.caption.startsWith('My own words'));
+  const fresh = P.remakeCopy(null, { title: 'First', text: 'What I said.' });
+  assert.equal(fresh.description, 'What I said.');
+  const given = P.remakeCopy(saved, { title: 'T', description: 'Sent now.', hashtags: ['#x'] });
+  assert.equal(given.description, 'Sent now.');
+  assert.deepEqual(given.hashtags, ['#x']);
+});
+
+ok('saving from a short-limit tab keeps the full description for every platform', () => {
+  const long = 'A sentence that goes on for a while about the reel. '.repeat(12).trim();
+  const copy = P.copyOf({ title: 'T', description: long, hashtags: ['#a'] });
+  assert.ok(copy.platforms.twitter.description.length < long.length, 'X is shortened');
+  // what the page sends now: the full description, so Instagram keeps all of it
+  const saved = P.copyOf({ title: 'T', description: copy.description, hashtags: copy.hashtags });
+  assert.equal(saved.platforms.instagram.description, long);
+  assert.ok(P.units(saved.platforms.twitter.caption) <= 280);
+  const jsx = readFileSync(new URL('../kit/studio/web/src/PublishKit.jsx', import.meta.url), 'utf8');
+  assert.ok(!/description:\s*\(p && p\.description\)/.test(jsx), 'Save copy must not send the tab\'s shortened description');
+});
+
+ok('the kit view returns coverMeta, so the face-on-cover notes can show', () => {
+  const root = mkdtempSync(join(tmpdir(), 'pub-view-')), d = join(root, 'jobs', 'j');
+  mkdirSync(d, { recursive: true });
+  writeFileSync(join(d, 'reel-v1.mp4'), 'x');
+  writeFileSync(join(d, 'reel-v1-cover.json'), JSON.stringify({ t: 1.2, onFace: true, detector: 'off' }));
+  const k = kitOf(root, 'jobs/j/reel-v1.mp4');
+  assert.deepEqual(k.coverMeta, { onFace: true, detector: 'off' });
+  assert.equal(kitOf(root, 'jobs/j/reel-v2.mp4').coverMeta, null);
+});
+
+ok('descriptions keep their paragraphs; titles stay on one line', () => {
+  const c = P.copyOf({ title: 'Two\nlines', description: 'First para.\n\n\n\nSecond   para.\r\nThird.', hashtags: ['#a'] });
+  assert.equal(c.description, 'First para.\n\nSecond para.\nThird.');
+  assert.equal(c.title, 'Two lines');
+  assert.ok(c.platforms.instagram.caption.startsWith('First para.\n\nSecond para.'));
+  const long = ('Word '.repeat(30).trim() + '\n\n').repeat(10);
+  const x = P.copyOf({ title: 'T', description: long, hashtags: ['#a'] }).platforms.twitter;
+  assert.ok(P.units(x.caption) <= 280 && !/\s$/.test(x.description) && x.description.split(/\s+/).every(w => w === 'Word'));
+});
+
+ok('a title that cannot fit a thin band off the face is reported as onFace (measured on the drawn letters)', () => {
+  const py = process.env.PYTHON || 'python3';
+  try { execFileSync(py, ['-c', 'from PIL import Image'], { stdio: 'pipe' }); }
+  catch { console.log('  note: skipped (Pillow is not installed on this Python)'); return; }
+  const dir = mkdtempSync(join(tmpdir(), 'pub-thin-'));
+  const src = join(dir, 'frame.jpg'), out = join(dir, 'cover.jpg');
+  execFileSync(py, ['-c', 'from PIL import Image; Image.new("RGB", (1080, 1920), (20, 40, 50)).save("' + src.replace(/\\/g, '/') + '")']);
+  const r = execFileSync(py, [join(KIT, '..', 'kit', 'publish-cover.py'), '--in', src, '--out', out, '--title', 'A long title that needs two lines here', '--zone', '80,270,1000,1500,200'], { encoding: 'utf8' });
+  const j = JSON.parse(r.trim().split('\n').pop());
+  assert.equal(j.lines.length, 2);
+  assert.equal(j.onFace, true, 'two lines at the floor size do not fit a 50 px band: ' + JSON.stringify(j));
 });
 
 console.log('\n' + n + ' checks passed');

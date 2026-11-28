@@ -23,16 +23,17 @@ export function PublishKit({ V, s, apply, hidden }) {
     setBusy(true);
     api('/api/publish', { reel: kit && kit.reel, title }).then(j => { apply(j); toast('Publish kit ready. The ZIP is beside the reel.', true); }).catch(() => {}).finally(() => setBusy(false));
   };
+  // the full description, never the tab's shortened one (X or Bluesky): each platform is cut to its own limit again
   const saveCopy = () => {
     setBusy(true);
-    api('/api/publish/copy', { reel: kit && kit.reel, copy: { title, description: (p && p.description) || copy.description, hashtags: copy.hashtags } }).then(j => { apply(j); toast('Copy saved in the ZIP.', true); }).catch(() => {}).finally(() => setBusy(false));
+    api('/api/publish/copy', { reel: kit && kit.reel, copy: { title, description: copy.description, hashtags: copy.hashtags } }).then(j => { apply(j); toast('Copy saved in the ZIP.', true); }).catch(() => {}).finally(() => setBusy(false));
   };
   if (hidden || !pub.offer) return null;
   return <section className="pub-kit glass-card" id="pub-kit" aria-labelledby="h-pub-kit">
     <header className="sh"><h3 id="h-pub-kit">Publish kit</h3><p className="sub">A cover with the title off your face, post copy for each platform, and a ZIP with the reel and the .srt. Nothing is posted for you.</p></header>
     <NeedFix V={V} ids={['python', 'ffmpeg']} what="Making the cover" apply={apply} />
     <div className="pub-row">
-      {kit && kit.cover ? <figure className="pub-cover"><img src={file(kit.cover) + '?v=' + s.rev} alt="Cover still" /><figcaption className="fine">Cover</figcaption></figure> : <div className="pub-cover empty-art"><p className="fine">The cover shows up here.</p></div>}
+      {kit && kit.cover ? <figure className="pub-cover"><img src={file(kit.cover) + '?v=' + (kit.coverV || s.rev)} alt="Cover still" /><figcaption className="fine">Cover</figcaption></figure> : <div className="pub-cover empty-art"><p className="fine">The cover shows up here.</p></div>}
       <div className="pub-form">
         <label className="fine" htmlFor="pub-title">Title on the cover</label>
         <input id="pub-title" type="text" value={title} onChange={e => setTitle(e.target.value)} maxLength={100} disabled={busy || running} />

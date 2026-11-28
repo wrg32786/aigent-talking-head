@@ -27,17 +27,20 @@ export const PLATFORMS = {
 };
 
 export const units = s => [...String(s || '')].reduce((n, c) => n + (c.codePointAt(0) > 0xffff ? 2 : 1), 0);
-const clip = (s, n) => {
-  const t = String(s || '').replace(/\s+/g, ' ').trim();
+// shorten on word ends only; lines = true keeps line breaks (a description's paragraphs), else one line (a title)
+const clip = (s, n, lines = false) => {
+  const t = lines
+    ? String(s || '').replace(/\r\n?/g, '\n').replace(/[^\S\n]+/g, ' ').replace(/ *\n */g, '\n').replace(/\n{3,}/g, '\n\n').trim()
+    : String(s || '').replace(/\s+/g, ' ').trim();
   if (units(t) <= n) return t;
-  const words = t.split(' ');
+  const parts = t.split(/( |\n+)/);
   let out = '';
-  for (const w of words) {
-    const next = out ? out + ' ' + w : w;
+  for (let i = 0; i < parts.length; i += 2) {
+    const next = out + (i ? parts[i - 1] : '') + parts[i];
     if (units(next) > n) break;
     out = next;
   }
-  return out || [...t].slice(0, n).join('');
+  return out.trim() || [...t].slice(0, n).join('');
 };
 
 // wrap a title on word ends only, never mid-word, up to two lines
@@ -88,18 +91,25 @@ export function tagsOf(...parts) {
 
 export function copyOf({ title, description, hashtags, point, text } = {}) {
   const rawTitle = clip(title || point || 'New reel', 100) || 'New reel';
-  const body = clip(description || text || point || '', 2000);
+  const body = clip(description || text || point || '', 2000, true);
   const tags = Array.isArray(hashtags) ? hashtags.map(t => (String(t).startsWith('#') ? String(t) : '#' + String(t).replace(/^#+/, '')).replace(/\s+/g, '')).filter(t => t.length > 1) : tagsOf(rawTitle, body, point);
   const platforms = {};
   for (const [id, p] of Object.entries(PLATFORMS)) {
     const t = p.title ? clip(rawTitle, p.title) : rawTitle;
     const tagStr = tags.join(' ');
     const room = p.caption - (tagStr ? units(tagStr) + 2 : 0);
-    const desc = room > 20 ? clip(body, room) : '';
+    const desc = room > 20 ? clip(body, room, true) : '';
     const caption = [desc, tagStr].filter(Boolean).join('\n\n');
     platforms[id] = { name: p.name, title: t, description: desc, hashtags: tags.slice(), caption, limit: p.caption, over: units(caption) > p.caption };
   }
   return { title: rawTitle, description: body, hashtags: tags, platforms };
+}
+
+// the copy a remake ("Make again") writes: the saved copy (your edited description and hashtags) under the new title,
+// unless new copy is given; with nothing saved yet, fresh copy from the title, the transcript or the point
+export function remakeCopy(saved, { title, description, hashtags, text, point } = {}) {
+  if (!saved) return copyOf({ title, description, hashtags, point, text });
+  return copyOf({ title: title || saved.title, description: description || saved.description || text, hashtags: Array.isArray(hashtags) ? hashtags : saved.hashtags, point });
 }
 
 export function copyText(copy) {

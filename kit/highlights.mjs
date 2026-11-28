@@ -45,13 +45,15 @@ export function snapToSentences(start, end, S, dur) {
     const from = +Math.max(0, a).toFixed(2), to = +Math.min(dur == null ? b : dur, b).toFixed(2);
     return to > from ? [from, to] : null;
   }
-  const first = S[0].start, last = S[S.length - 1].end;
-  if (b <= first + 0.05 || a >= last - 0.05) return null;
+  // the same 0.12 s breath before and after as the rules' own clips (kit/studio/cut.mjs), and a tolerance above it, so a
+  // rules clip's own start and end sent back come out the same and never pull in the next sentence
+  const PAD = 0.12, TOL = 0.15, first = S[0].start, last = S[S.length - 1].end;
+  if (b <= first + TOL || a >= last - TOL) return null;
   let i = -1, j = -1;
-  for (let k = 0; k < S.length; k++) { if (S[k].end > a + 0.05) { i = k; break; } }
-  for (let k = S.length - 1; k >= 0; k--) { if (S[k].start < b - 0.05) { j = k; break; } }
+  for (let k = 0; k < S.length; k++) { if (S[k].end > a + TOL) { i = k; break; } }
+  for (let k = S.length - 1; k >= 0; k--) { if (S[k].start < b - TOL) { j = k; break; } }
   if (i < 0 || j < 0 || j < i) return null;
-  const from = +Math.max(0, S[i].start).toFixed(2), to = +Math.min(dur == null ? Infinity : dur, S[j].end).toFixed(2);
+  const from = +Math.max(0, S[i].start - PAD).toFixed(2), to = +Math.min(dur == null ? Infinity : dur, S[j].end + PAD).toFixed(2);
   return to > from ? [from, to] : null;
 }
 

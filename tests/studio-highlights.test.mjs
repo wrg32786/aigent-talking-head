@@ -72,8 +72,8 @@ t('snapToSentences never starts or ends mid-sentence', () => {
   const S = sentences(wordsOf());
   assert.ok(S.length >= 8);
   const mid = S[1].start + (S[1].end - S[1].start) / 2;
-  const [a, b] = H.snapToSentences(mid, S[3].start + 0.1, S);
-  assert.strictEqual(a, S[1].start);
+  const [a, b] = H.snapToSentences(mid, S[3].start + 0.2, S);
+  assert.strictEqual(a, +Math.max(0, S[1].start - 0.12).toFixed(2), 'a breath before the sentence');
   assert.ok(b >= S[3].end - 0.01, 'end expands to the sentence that contains it');
 });
 t('fromWords returns up to n complete highlights with reasons and start times', () => {
@@ -120,9 +120,17 @@ t('applyScores snaps agent times to sentences, keeps 0-100, and marks scoredBy a
   assert.strictEqual(first.reason, 'Strong open');
   const added = next.candidates.find(c => c.reason.startsWith('A complete thought'));
   assert.ok(added);
-  assert.strictEqual(added.start, S[0].start);
+  assert.strictEqual(added.start, +Math.max(0, S[0].start - 0.12).toFixed(2));
   assert.ok(added.end >= S[2].end - 0.01);
   assert.ok(next.candidates[0].score >= next.candidates[next.candidates.length - 1].score);
+});
+
+t('a rules clip sent back by its start and end (no id) comes back the same, breath kept, no extra sentence', () => {
+  const words = wordsOf(), found = H.fromWords(words, { n: 3, min: 15, max: 50, duration: words[words.length - 1][1] });
+  for (const c of found.candidates) {
+    const snap = H.snapToSentences(c.start, c.end, found.sentences, found.duration);
+    assert.deepStrictEqual(snap, [c.start, c.end], `${c.start}-${c.end} came back as ${snap}`);
+  }
 });
 
 t('setKeep and keptOf, and the brief names the tools with no em dash', () => {

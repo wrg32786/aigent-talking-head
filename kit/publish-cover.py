@@ -119,9 +119,9 @@ def draw(im, box, lines):
     draw = ImageDraw.Draw(im)
     # font size from the box height and line count
     n = max(1, len(lines))
-    size = max(36, min(140, int(box["h"] / (n * 1.25))))
+    # font size from the box height (never above it, down to a 28 px floor that stays readable), then shrink to fit width
+    size = max(28, min(140, int(box["h"] / (n * 1.25))))
     fnt = font(size)
-    # shrink to fit width
     for _ in range(8):
         widths = [draw.textlength(line, font=fnt) for line in lines] or [0]
         if max(widths) <= box["w"] - 8:
@@ -132,13 +132,15 @@ def draw(im, box, lines):
     total = n * size + (n - 1) * gap
     y = box["y"] + max(0, (box["h"] - total) / 2)
     stroke = max(3, size // 18)
+    # where the letters really land (a thin band can overflow at the floor size), so onFace is measured on the ink
+    ink = dict(x=box["x"], y=int(y - stroke), w=box["w"], h=int(total + 2 * stroke))
     for line in lines:
         tw = draw.textlength(line, font=fnt)
         x = box["x"] + (box["w"] - tw) / 2
         # dark stroke so white letters stay readable on a light or dark still
         draw.text((x, y), line, font=fnt, fill=(255, 255, 255, 255), stroke_width=stroke, stroke_fill=(12, 18, 22, 255))
         y += size + gap
-    return im
+    return im, ink
 
 
 def main():
@@ -163,12 +165,13 @@ def main():
     else:
         box = title_box(zone)
     lines = wrap(a.title)
+    ink = None
     if not lines:
         lines = []
         # still write the frame as the cover when there is no title
         im2 = im.resize((OW, OH)) if im.size != (OW, OH) else im
     else:
-        im2 = draw(im, box, lines)
+        im2, ink = draw(im, box, lines)
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     im2.convert("RGB").save(a.out, "JPEG", quality=92, optimize=True)
     print(json.dumps({
@@ -176,7 +179,7 @@ def main():
         "box": box,
         "zone": zone,
         "lines": lines,
-        "onFace": overlaps(box, zone) if zone else False,
+        "onFace": overlaps(ink or box, zone) if zone else False,
         "detector": detector,
     }))
 
