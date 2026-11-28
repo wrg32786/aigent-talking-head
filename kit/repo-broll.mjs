@@ -137,7 +137,7 @@ const BADGE_HOST = /(^|\.)(shields\.io|badgen\.net|badge\.fury\.io|codecov\.io|c
 export function usable(a) {
   let u; try { u = new URL(a.url); } catch { return false; }
   if (!/^https?:$/.test(u.protocol)) return false;
-  if (BADGE_HOST.test(u.hostname) || /badge|shield|\/workflows\/[^/]+\/badge/i.test(u.pathname) || /\bbadge\b/i.test(a.alt)) return false;
+  if (BADGE_HOST.test(u.hostname) || /badge|shield/i.test(u.pathname.split('/').pop()) || /\/workflows\/[^/]+\/badge/i.test(u.pathname) || /\bbadge\b/i.test(a.alt)) return false;
   if (/\.svg(\?|$)/i.test(u.pathname)) return false;
   if (/(^|\.)opengraph\.githubassets\.com$/i.test(u.hostname)) return false; // GitHub's text card of a repo
   if (a.height != null && a.height < 40) return false;
@@ -371,9 +371,9 @@ if (isMain) {
     const planF = opt('plan') ? (isAbsolute(opt('plan')) ? opt('plan') : resolve(ROOT, opt('plan'))) : null;
     const plan = planF && existsSync(planF) ? JSON.parse(readFileSync(planF, 'utf8')) : {}, c = (plan && plan.content) || {}, cut = JSON.parse(readFileSync(cutF, 'utf8'));
     // b-roll lane clips set full screen go into the card while repo mode is on (fullBefore), and back when it is off
-    const others = (cut.inserts || []).filter(x => !x.repo).map(x => { if (!x.fullBefore) return x; const { fullBefore, fit, ...y } = x; return { ...y, place: 'full' }; });
+    const others = (cut.inserts || []).filter(x => !x.repo).map(x => { if (!x.fullBefore) return x; const { fullBefore, fit, bands, frameBg, ...y } = x; return { ...y, place: 'full' }; });
     const clear = () => { cut.inserts = others; if (!others.length) delete cut.inserts; delete cut.repoTakeovers; writeFileSync(cutF, JSON.stringify(cut, null, 1)); };
-    if (!c.repoFeature || !(c.repos || []).length) { if ((cut.inserts || []).some(x => x.repo) || cut.repoTakeovers) clear(); console.log(JSON.stringify({ ok: true, repo: false })); return; }
+    if (!c.repoFeature || !(c.repos || []).length) { if ((cut.inserts || []).some(x => x.repo || x.fullBefore) || cut.repoTakeovers) clear(); console.log(JSON.stringify({ ok: true, repo: false })); return; }
     const assets = [];
     // what goes in the card (kit/repo-mockups.mjs): animated cards of what the repo does, the README's pictures each in a
     // window card and its videos; without Chrome, or with ATH_REPO_MOCKS=0, the README's own pictures and videos only
@@ -386,10 +386,10 @@ if (isMain) {
         for (const x of list) assets.push({ ...x, path: join(m.dir, x.file) });
       } catch (e) { console.log(`repo: ${u}: ${e.message}`); }
     }
-    if (!assets.length) { console.log('repo: we could not get any pictures from the repo, so you stay on screen (check the link, or try again online)'); clear(); console.log(JSON.stringify({ ok: true, repo: true, inserts: 0 })); return; }
-    // (lane clips set full screen go into the card first, on both paths below)
+    // repo mode is on, so other b-roll set full screen goes into the card first, even when the repo gives us nothing
     const breakout = (plan.presenter || []).some(x => x && x.id === 'frame-breakout');
     for (const o of others) if (o.place === 'full') { o.place = breakout ? 'frame' : 'top'; o.fit = 'whole'; o.fullBefore = true; if (breakout) { o.bands = c.bands || REPO_STYLE.bands; o.frameBg = c.frameBg || REPO_STYLE.frameBg; } }
+    if (!assets.length) { console.log('repo: we could not get any pictures from the repo, so you stay on screen (check the link, or try again online)'); clear(); console.log(JSON.stringify({ ok: true, repo: true, inserts: 0 })); return; }
     // no words for the cut (a reopened reel from before its clips' words were kept): the repo shots it already has
     // stay as they are, rather than every one going
     const lines = linesOf(cut, build);

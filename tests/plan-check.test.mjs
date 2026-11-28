@@ -72,6 +72,20 @@ try {
     const good = job('rg', { plan: on, cut: { inserts: [{ file: 'y.png', at: 8, dur: 2, place: 'frame', repo: true }] } });
     assert.ok(PC.run(good.build).checks.find(x => x.id === 'repo-rule').ok);
   });
+  await t('auto-fix runs with rounds 1; repo-off puts card b-roll back full screen; the report carries its plan signature', () => {
+    const { build } = job('r1', { plan: P(p => { p.filters = { ids: ['mono'], when: 'hook' }; }), cut: { finish: 'mono' } });
+    const r = PC.run(build, { fix: true, rounds: 1 }); assert.strictEqual(r.fixed.length, 1, 'one fix pass even with rounds 1');
+    assert.strictEqual(r.planSig, PC.planSig(JSON.parse(readFileSync(join(build, 'video-plan.json'), 'utf8'))));
+    assert.notStrictEqual(PC.planSig(P(p => { p.filters = { ids: ['mono'], when: 'whole' }; })), r.planSig, 'a plan change gives another signature');
+    const off = job('roff', { cut: { inserts: [{ file: 'x.png', at: 5, dur: 2, place: 'top', repo: true }, { file: 'own.mp4', at: 9, dur: 2, place: 'frame', fit: 'whole', fullBefore: true, bands: { repo: 0.45 }, frameBg: ['#fff', '#eee'] }] } });
+    PC.run(off.build, { fix: true }); const cut = JSON.parse(readFileSync(join(off.build, 'cut.json'), 'utf8'));
+    assert.deepStrictEqual(cut.inserts, [{ file: 'own.mp4', at: 9, dur: 2, place: 'full' }]);
+  });
+  await t('repo mode with no repo shots still fails on full screen b-roll', () => {
+    const on = P(p => { p.content.repoFeature = true; p.content.repos = ['https://github.com/demo/tool']; });
+    const { build } = job('rfull', { plan: on, cut: { inserts: [{ file: 'own.mp4', at: 5, dur: 2, place: 'full' }] } });
+    const row = PC.run(build).checks.find(x => x.id === 'repo-rule'); assert.ok(row && row.ok === false && /full screen/.test(row.note), JSON.stringify(row));
+  });
   await t('key words, titles, repo shots and the call to action', () => {
     const { build } = job('kw', { plan: P(p => { p.words.keyWords.level = 'strong'; p.words.titles.on = false; }), cut: { inserts: [{ file: 'x.png', at: 5, dur: 2, place: 'top', repo: true }] }, caps: { flips: [{ start: 0.2, end: 2, text: 'This tool', mode: 0 }, { start: 5, end: 7, text: 'Big title', mode: 7 }] } });
     const r1 = PC.run(build), by = id => r1.checks.find(x => x.id === id);
