@@ -72,8 +72,8 @@ t('snapToSentences never starts or ends mid-sentence', () => {
   const S = sentences(wordsOf());
   assert.ok(S.length >= 8);
   const mid = S[1].start + (S[1].end - S[1].start) / 2;
-  const [a, b] = H.snapToSentences(mid, S[3].start + 0.1, S);
-  assert.strictEqual(a, S[1].start);
+  const [a, b] = H.snapToSentences(mid, S[3].start + 0.2, S);
+  assert.strictEqual(a, +Math.max(0, S[1].start - 0.12).toFixed(2), 'a breath before the sentence');
   assert.ok(b >= S[3].end - 0.01, 'end expands to the sentence that contains it');
 });
 t('fromWords returns up to n complete highlights with reasons and start times', () => {
@@ -120,9 +120,36 @@ t('applyScores snaps agent times to sentences, keeps 0-100, and marks scoredBy a
   assert.strictEqual(first.reason, 'Strong open');
   const added = next.candidates.find(c => c.reason.startsWith('A complete thought'));
   assert.ok(added);
-  assert.strictEqual(added.start, S[0].start);
+  assert.strictEqual(added.start, +Math.max(0, S[0].start - 0.12).toFixed(2));
   assert.ok(added.end >= S[2].end - 0.01);
   assert.ok(next.candidates[0].score >= next.candidates[next.candidates.length - 1].score);
+});
+
+t('a rules clip sent back by its start and end (no id) comes back the same, breath kept, no extra sentence', () => {
+  const words = wordsOf(), found = H.fromWords(words, { n: 3, min: 15, max: 50, duration: words[words.length - 1][1] });
+  for (const c of found.candidates) {
+    const snap = H.snapToSentences(c.start, c.end, found.sentences, found.duration);
+    assert.deepStrictEqual(snap, [c.start, c.end], `${c.start}-${c.end} came back as ${snap}`);
+  }
+});
+
+t('a ticked clip the agent scores by its start and end keeps its tick and id', () => {
+  const words = wordsOf(), found = H.fromWords(words, { n: 3, min: 15, max: 50, duration: words[words.length - 1][1] });
+  const c = found.candidates[0], kept = H.setKeep(found, [c.id], true);
+  const next = H.applyScores(kept, [{ start: c.start, end: c.end, score: 40, reason: 'Fine' }], { words, duration: found.duration });
+  const same = next.candidates.filter(x => x.start === c.start && x.end === c.end);
+  assert.strictEqual(same.length, 1, 'one clip, not a copy');
+  assert.strictEqual(same[0].id, c.id); assert.strictEqual(same[0].keep, true); assert.strictEqual(same[0].score, 40);
+});
+
+t('times read back from the brief come back as the same clips, ticks kept', () => {
+  const words = wordsOf(), found = H.fromWords(words, { n: 3, min: 15, max: 50, duration: words[words.length - 1][1] });
+  const kept = H.setKeep(found, [found.candidates[0].id], true), brief = H.briefOf(kept, { job: 'talk-one' });
+  const sent = [...brief.matchAll(/- (h\d+): ([\d.]+)s to ([\d.]+)s/g)].map(m => ({ start: +m[2], end: +m[3], score: 50, reason: 'ok', was: m[1] }));
+  assert.strictEqual(sent.length, found.candidates.length, brief);
+  const next = H.applyScores(kept, sent.map(({ was, ...x }) => x), { words, duration: found.duration });
+  assert.deepStrictEqual(next.candidates.map(c => c.id).sort(), found.candidates.map(c => c.id).sort());
+  assert.ok(next.candidates.find(c => c.id === found.candidates[0].id).keep);
 });
 
 t('setKeep and keptOf, and the brief names the tools with no em dash', () => {
