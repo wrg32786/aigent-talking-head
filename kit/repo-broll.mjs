@@ -387,9 +387,13 @@ if (isMain) {
       } catch (e) { console.log(`repo: ${u}: ${e.message}`); }
     }
     if (!assets.length) { console.log('repo: we could not get any pictures from the repo, so you stay on screen (check the link, or try again online)'); clear(); console.log(JSON.stringify({ ok: true, repo: true, inserts: 0 })); return; }
+    // no words for the cut (a reopened reel from before its clips' words were kept): the repo shots it already has
+    // stay as they are, rather than every one going
+    const lines = linesOf(cut, build);
+    if (!lines.length) { const had = (cut.inserts || []).filter(x => x.repo).length; console.log(`repo: we could not read the words of this cut, so the ${had} repo card shot${had === 1 ? '' : 's'} it has stay as they are`); console.log(JSON.stringify({ ok: true, repo: true, inserts: had, kept: true })); return; }
     const breakout = (plan.presenter || []).some(x => x && x.id === 'frame-breakout');
     for (const o of others) if (o.place === 'full') { o.place = breakout ? 'frame' : 'top'; o.fit = 'whole'; o.fullBefore = true; if (breakout) { o.bands = c.bands || REPO_STYLE.bands; o.frameBg = c.frameBg || REPO_STYLE.frameBg; } }
-    const { inserts, takeovers } = planRepo(linesOf(cut, build), assets, { takeovers: c.takeovers === 'off' ? 'off' : 'auto', breakout, bands: c.bands || null, swapSec: c.swapSec || null, frameBg: c.frameBg || null });
+    const { inserts, takeovers } = planRepo(lines, assets, { takeovers: c.takeovers === 'off' ? 'off' : 'auto', breakout, bands: c.bands || null, swapSec: c.swapSec || null, frameBg: c.frameBg || null });
     // a spot the b-roll lane already uses keeps its clip
     // (an insert held over a gap is trimmed back to its own line first, rather than dropped)
     const hits = x => others.some(o => x.at < +o.at + +o.dur && +o.at < x.at + x.dur);

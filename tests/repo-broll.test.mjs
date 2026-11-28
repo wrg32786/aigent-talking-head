@@ -219,6 +219,26 @@ try {
     execFileSync(process.execPath, [join(ROOT, 'kit', 'repo-broll.mjs'), 'apply', '--name', 'rj', '--plan', plan, '--jobs', jobs], { env: { ...process.env, ATH_ASSETS: TMP, ATH_REPO_MOCKS: '0' }, encoding: 'utf8' });
     const gone = JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8')); assert.ok(!(gone.inserts || []).some(x => x.repo) && !gone.repoTakeovers, 'a cleared plan clears its inserts too');
   });
+  await t('Edit this reel then Render keeps the repo cards: the reopened cut still has its words', async () => {
+    const { mkdirSync, existsSync } = await import('fs'), { execFileSync } = await import('child_process'), { createRequire } = await import('module');
+    const SNAP = createRequire(import.meta.url)('../kit/snapshots.cjs');
+    const jobs = join(TMP, 'jobs2'), dir = join(jobs, 'rj'), build = join(dir, 'build'), clips = join(dir, 'clips'); mkdirSync(build, { recursive: true }); mkdirSync(clips, { recursive: true });
+    const L = [...lines.slice(0, 4), { start: 14, end: 18, text: 'It sorts every file in the folder for you.' }, { start: 20, end: 24, text: 'Follow for more tools like this.' }];
+    const words = []; for (const l of L) { const ws = l.text.split(' '), step = (l.end - l.start) / ws.length; ws.forEach((w, i) => words.push([+(l.start + i * step).toFixed(2), +(l.start + (i + 0.8) * step).toFixed(2), w])); }
+    writeFileSync(join(clips, 'clips.json'), JSON.stringify({ clips: [{ file: 'clip-001.mp4', words }] })); writeFileSync(join(clips, 'clip-001.mp4'), 'TAKE');
+    writeFileSync(join(build, 'cut.json'), JSON.stringify({ segs: [{ file: '../clips/clip-001.mp4', in: 0, out: 24 }] }));
+    const plan = join(build, 'video-plan.json'); writeFileSync(plan, JSON.stringify({ content: { repoFeature: true, repos: ['https://github.com/demo/tool'], takeovers: 'auto' }, presenter: [] }));
+    const run = () => execFileSync(process.execPath, [join(ROOT, 'kit', 'repo-broll.mjs'), 'apply', '--name', 'rj', '--plan', plan, '--jobs', jobs], { env: { ...process.env, ATH_ASSETS: TMP, ATH_REPO_MOCKS: '0' }, encoding: 'utf8' });
+    const reps = () => (JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8')).inserts || []).filter(x => x.repo).length;
+    run(); const first = reps(); assert.ok(first > 0, 'v1 has repo cards');
+    writeFileSync(join(dir, 'reel-v1.mp4'), 'REEL'); SNAP.save(dir, join(dir, 'reel-v1.mp4'));
+    assert.ok(existsSync(join(dir, '.media', 'clips.json')), 'the stashed clip keeps its words');
+    SNAP.reopen(dir, 'v1'); writeFileSync(plan, JSON.stringify({ content: { repoFeature: true, repos: ['https://github.com/demo/tool'], takeovers: 'auto' }, presenter: [] }));
+    const out = run(); assert.strictEqual(reps(), first, 'the re-render after Edit this reel has the same repo cards: ' + out);
+    // an older reopened build with no words for its clips: the cards it has stay, rather than all going
+    rmSync(join(dir, '.media', 'clips.json')); const out2 = run();
+    assert.strictEqual(reps(), first, out2); assert.ok(/could not read the words/.test(out2));
+  });
   await t('a real GIF becomes a 12 second looping MP4 (skipped without FFmpeg)', async () => {
     const { execFileSync } = await import('child_process');
     try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); } catch { console.log('  (no FFmpeg here: skipped)'); return; }
