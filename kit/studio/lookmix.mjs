@@ -3,6 +3,7 @@
 // The mixed look has no script, title words or timeline from any reference.
 import { join } from 'path';
 import { createRequire } from 'module';
+import * as TPL from './templates.mjs';
 
 const require = createRequire(import.meta.url);
 const SL = require('../stylelook.cjs');
@@ -22,7 +23,7 @@ export const PART_IDS = PARTS.map(p => p.id);
 // the Reel.md Style lines the draft reads for each part (stylelook toRecipe: look.style), so a mixed part reaches the
 // video and not only the card: the caption style from the captions source, the finish from the grade source, and so on
 const STYLE_OF = { captions: /^(captions|look|running-captions|caption-.+)$/, titles: /^(titles|title-.+)$/, transitions: /^(transition|glitch)$/,
-  grade: /^finish$/, effects: /^(punch|effects)$/, graphics: /^(stickers?|graphics?)$/, sound: /^sfx-.+$/, fonts: /^font(-.+)?$/ };
+  grade: /^finish(-pool)?$/, effects: /^(punch|effects)$/, graphics: /^(stickers?|graphics?)$/, sound: /^sfx-.+$/, fonts: /^font(-.+)?$/ };
 const fail = (msg, code = 400) => { throw Object.assign(new Error(msg), { code }); };
 const clone = x => (x == null ? x : structuredClone(x));
 
@@ -90,10 +91,11 @@ export function mixLooks({ name, parts, base, titles } = {}) {
 }
 
 // Build and save a mixed look from API sources. sources: { captions: { kind, name|id }, ... }
-export function mixAndSave(raw, { queue, root } = {}) {
+export function mixAndSave(raw, { queue, root, cat = null } = {}) {
   const name = SL.slug(raw && raw.name);
   if (!name || !SL.NAME_RE.test(name)) fail('Give the look a name with letters or numbers.');
-  if (SL.exists(name)) fail('You already have a look with that name. Pick another name.', 409); // a mix never replaces a saved look
+  // a mix never replaces a saved look, nor lands in a template's folder (they share looks/local/<name>)
+  if (SL.exists(name) || TPL.taken(name, cat)) fail('You already have a template or look with that name. Pick another name.', 409);
   const rawParts = (raw && raw.parts) || {};
   const bad = Object.keys(rawParts).filter(k => !PART_IDS.includes(k));
   if (bad.length) fail(`Unknown part: ${bad.join(', ')}.`);

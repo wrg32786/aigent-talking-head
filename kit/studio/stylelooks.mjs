@@ -82,7 +82,7 @@ export function forDraft(s, root, args) {
 // the font a saved look carries (the pairing a teardown matched), or null
 // a saved look by its name only: SL.load also takes a path, which a page must not reach
 const saved = name => (SL.NAME_RE.test(String(name || '')) ? SL.load(name) : null);
-export const fontOf = name => { try { const l = name ? SL.load(name) : null; return (l && l.captions && l.captions.font) || null; } catch { return null; } };
+export const fontOf = name => { try { const l = name ? saved(name) : null; return (l && l.captions && l.captions.font) || null; } catch { return null; } };
 export const matchOf = build => (build ? FID.read(build) : null);
 
 

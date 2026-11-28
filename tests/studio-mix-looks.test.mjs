@@ -64,7 +64,7 @@ await t('mix: captions from A, grade from B, no script or title words', () => {
   SL.save(mixed, 'mixed-ab');
 });
 
-await t('mixAndSave from saved looks, and a bad part is refused', () => {
+await t('mixAndSave from saved looks, and a bad part is refused', async () => {
   const r = MIX.mixAndSave({ name: 'mixed-2', parts: { captions: { kind: 'look', name: 'look-a' }, grade: { kind: 'look', name: 'look-b' }, transitions: { kind: 'look', name: 'look-b' } } }, { queue: [], root: ROOT });
   assert.strictEqual(r.name, 'mixed-2');
   const got = SL.load('mixed-2');
@@ -74,6 +74,14 @@ await t('mixAndSave from saved looks, and a bad part is refused', () => {
   let threw = false;
   try { MIX.mixAndSave({ name: 'x', parts: { colour: { kind: 'look', name: 'look-a' } } }); } catch (e) { threw = true; assert.match(e.message, /Unknown part|colour/i); }
   assert.ok(threw);
+  // a name a template already has, a path, and an uploaded reference (id -1) as a source
+  const TPL = await import('../kit/studio/templates.mjs'); TPL.save('a-template', { plan: TPL.planFor('look-b') });
+  let tt = null; try { MIX.mixAndSave({ name: 'a-template', parts: { grade: { kind: 'look', name: 'look-b' } } }, { queue: [], root: ROOT }); } catch (e) { tt = e; }
+  assert.ok(tt && tt.code === 409, 'a mix never lands in a template\'s folder'); TPL.remove('a-template');
+  assert.throws(() => MIX.resolveSource({ kind: 'look', name: join(LOOKS, 'look-a', 'look.json') }), /No saved look/);
+  assert.throws(() => SLK.rename('../look-a', 'x'), /No such|not found|look/i);
+  const up = MIX.resolveSource({ kind: 'teardown', id: -1 }, { queue: [{ id: -1, status: 'ready', out: 'td-a', title: 'This video' }], root: STATE });
+  assert.strictEqual(up.title, 'This video');
   let taken = null; try { MIX.mixAndSave({ name: 'look-a', parts: { grade: { kind: 'look', name: 'look-b' } } }, { queue: [], root: ROOT }); } catch (e) { taken = e; }
   assert.ok(taken && taken.code === 409, 'a mix never replaces a saved look'); assert.strictEqual(SL.load('look-a').grade.finish, lookA.grade.finish);
 });
