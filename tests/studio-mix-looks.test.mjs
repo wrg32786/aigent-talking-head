@@ -1,6 +1,7 @@
 // Mix looks, the Look library, and sample plans (no Chrome, no network).
 // Run: node tests/studio-mix-looks.test.mjs   (npm run check runs it too)
 import assert from 'assert';
+import { execFileSync } from 'child_process';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
@@ -52,6 +53,9 @@ await t('mix: captions from A, grade from B, no script or title words', () => {
   assert.strictEqual(mixed.kind, 'style-look');
   assert.strictEqual(mixed.captions.style, lookA.captions.style);
   assert.strictEqual(mixed.grade.finish, lookB.grade.finish);
+  // and the draft gets the mix too (it reads look.style through toRecipe), not the base look's style
+  const rs = SL.toRecipe(mixed).style;
+  assert.deepStrictEqual([rs.captions, rs.finish, rs.transition], ['one-word', 'warm', 'flash']);
   assert.ok(!JSON.stringify(mixed).includes('Build your first')); // sample script is not stored on the look
   assert.ok(!mixed.script);
   assert.ok(MIX.mixSummary(mixed));
@@ -70,9 +74,11 @@ await t('mixAndSave from saved looks, and a bad part is refused', () => {
   let threw = false;
   try { MIX.mixAndSave({ name: 'x', parts: { colour: { kind: 'look', name: 'look-a' } } }); } catch (e) { threw = true; assert.match(e.message, /Unknown part|colour/i); }
   assert.ok(threw);
+  let taken = null; try { MIX.mixAndSave({ name: 'look-a', parts: { grade: { kind: 'look', name: 'look-b' } } }, { queue: [], root: ROOT }); } catch (e) { taken = e; }
+  assert.ok(taken && taken.code === 409, 'a mix never replaces a saved look'); assert.strictEqual(SL.load('look-a').grade.finish, lookA.grade.finish);
 });
 
-await t('rename, duplicate and delete a look', () => {
+await t('rename, duplicate and delete a look', async () => {
   const ren = SLK.rename('look-a', 'Look from A');
   assert.strictEqual(ren.label, 'Look from A');
   assert.strictEqual(SL.load('look-a').label, 'Look from A');
@@ -81,6 +87,13 @@ await t('rename, duplicate and delete a look', () => {
   assert.match(dup.label, /copy/i);
   assert.ok(SL.exists(dup.name));
   assert.ok(SLK.removeLook(dup.name));
+  // a look a saved template starts from is kept, with a reason
+  const TPL = await import('../kit/studio/templates.mjs');
+  const T = TPL.save('uses-look-b', { plan: { ...TPL.planFor('look-b'), template: { kind: 'look', name: 'look-b' } } });
+  let kept = null; try { SLK.removeLook('look-b'); } catch (e) { kept = e; }
+  assert.ok(kept && kept.code === 409 && /uses this look/.test(kept.message), kept && kept.message);
+  assert.ok(SL.exists('look-b'));
+  TPL.remove(T.name || 'uses-look-b');
   assert.ok(!SL.exists(dup.name));
   assert.ok(SL.exists('look-a'));
 });
@@ -113,6 +126,11 @@ if (SAMP.modeOf().ffmpeg) {
     assert.strictEqual(first.status, 'ready');
     assert.ok(existsSync(first.file));
     assert.ok(statSize(first.file) > 1000);
+    // as long as its plan (it used to be about a minute), and 540x960
+    const probe = execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height:format=duration', '-of', 'json', first.file], { encoding: 'utf8' }), pj = JSON.parse(probe);
+    const want = SAMP.secondsOf(SAMP.samplePlan(SL.load('look-b')));
+    assert.ok(Math.abs(+pj.format.duration - want) < 0.6, `sample ${pj.format.duration} s, plan ${want} s`);
+    assert.deepStrictEqual([pj.streams[0].width, pj.streams[0].height], [540, 960]);
     const again = SAMP.build('look-b');
     assert.strictEqual(again.mode, 'cached');
     const staleLook = { ...SL.load('look-b'), grade: { ...lookB.grade, finish: 'crushed' } };

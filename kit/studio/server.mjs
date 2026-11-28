@@ -1496,7 +1496,10 @@ async function api(req, res, u) {
   }
   if (p === '/api/style-looks/mix' && M === 'POST') {
     const b = await readBody(req).catch(() => ({})), s = C.load(); let r;
-    try { r = SLK.mixAndSave(b, { queue: (s.reference && s.reference.queue) || [], root: ROOT }); }
+    // an uploaded reference that is not in the queue is id -1 (Combine's "This video")
+    const ref = s.reference || {}, queue = [...(ref.queue || [])];
+    if (ref.out && ref.extracted && !queue.some(x => x.id === ref.active)) queue.push({ id: -1, status: 'ready', out: ref.out, title: ref.extracted.name || ref.file || 'This video' });
+    try { r = SLK.mixAndSave(b, { queue, root: ROOT }); }
     catch (e) { return json(res, e.code || 500, { error: e.message }); }
     queueLookSample(r.name); pushState(true); return json(res, 200, { ok: true, name: r.name, looks: SLK.listView() });
   }
