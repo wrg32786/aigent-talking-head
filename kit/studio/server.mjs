@@ -185,7 +185,7 @@ function runTask(kind, steps, done, hooks = {}) {
   if (lane) refTask = me; else task = me;
   // an engine note that names a command (for someone at a terminal) stays out of the page's "What ran": we never show
   // users commands. Hooks still see every line.
-  const log = l => { for (const x of String(l).split(/\r?\n/)) if (x.trim()) { if (TERMINAL_LINE.test(x)) { if (hooks.line) try { hooks.line(x); } catch {} continue; } me.lines.push(x.slice(0, 400)); if (me.lines.length > 400) me.lines.shift(); if (!lane) send('log', { id: me.id, line: x.slice(0, 400) }); if (hooks.line) try { hooks.line(x); } catch {} } };
+  const log = l => { for (const x of String(l).split(/\r?\n/)) if (x.trim()) { if (TERMINAL_LINE.test(x)) { if (hooks.line) try { hooks.line(x); } catch {} continue; } const ui = uiLine(x).slice(0, 400); me.lines.push(ui); if (me.lines.length > 400) me.lines.shift(); if (!lane) send('log', { id: me.id, line: ui }); if (hooks.line) try { hooks.line(x); } catch {} } };
   if (!lane) update(s => { s.task = { id: me.id, kind, status: 'running' }; });
   (async () => {
     let out = '';
@@ -356,7 +356,8 @@ function renderSteps(s) {
   // (with no plan any more, it still runs when cut.json holds repo spots, to take them out)
   const hasRepo = () => { try { const c = JSON.parse(readFileSync(join(ROOT, 'jobs', s.job, 'build', 'cut.json'), 'utf8')); return (c.inserts || []).some(x => x.repo) || !!c.repoTakeovers; } catch { return false; } };
   if (s.videoPlan || hasRepo()) { writePlanFile(s); steps.push(repoStep(s)); }
-  steps.push([process.env.STUDIO_REEL || 'kit/reel.cjs', args, { STUDIO_DRAFT_KEY: draftKey(s), STUDIO_FOOTAGE_KEY: C.footageKey(s) }]);
+  const reel = [process.env.STUDIO_REEL || 'kit/reel.cjs', args, { STUDIO_DRAFT_KEY: draftKey(s), STUDIO_FOOTAGE_KEY: C.footageKey(s) }];
+  steps.push(reel);
   let fx = null;
   if (comp.effects.length && env().effectsReady) {
     // presenter effect timing from the builder plan (hook, key moments or the whole video)
@@ -370,7 +371,7 @@ function renderSteps(s) {
     fx = C.fxPlan(ch, comp.effects, when);
     if (fx.plan.effects.length) { const p = join('jobs', s.job, 'fx.json'); writeFileSync(join(ROOT, p), JSON.stringify(fx.plan, null, 2)); steps.push(['kit/fx.cjs', ['--name', s.job, '--plan', p]]); }
   }
-  return { steps, fx, effects: comp.effects };
+  return { steps, reel, fx, effects: comp.effects };
 }
 const choicesPath = s => join(ROOT, 'jobs', s.job || '-', 'choices.json');
 // ---------- review: what to swap, the clean-up pass, comments on the preview (kit/studio/review.mjs) ----------
@@ -722,6 +723,9 @@ function fromText(s, combo) {
   return by === 'ai' ? `our ${n} best ${lines}, ${secs}` : !by || by === 'you' || by === 'ai, changed by you' ? `your ${n} ${lines}, ${secs}` : `${n} ${lines}, ${secs}, picked by ${by}`;
 }
 const TERMINAL_LINE = /\b(npm run|npx|pip install|python -m)\b/;
+// engine lines keep their meaning on the page without the command-line flags in them (no terminal commands in the UI):
+// "(--no-mask ...)" hints and "MASK_FORCE=1 tries anyway" go, and the --no-mask note loses its cut.json how-to
+const uiLine = x => String(x).replace(/;\s*remove the flag and set .*$/, '').replace(/\s*\([^()]*(--[a-z]|MASK_FORCE)[^()]*\)/g, '').replace(/\s*MASK_FORCE=1 tries anyway\.?/g, '').replace(/\s{2,}/g, ' ');
 function editOf(s, v) {
   const combo = v.combo, o = outputOf(s), cut = v.cut || {}, from = draftFrom(s, combo), fin = { ...C.defaultState().finish, ...(s.finish || {}) };
   const fmt = (CUT.FORMATS[o.format] || {}).label || o.format, aspect = CUT.aspectOf(o);
@@ -1406,9 +1410,10 @@ async function api(req, res, u) {
     const mem = MC.renderCheck(join(ROOT, 'jobs', s.job, 'build'));
     if (mem.needed && !mem.ok && !['front', 'light', 'anyway'].includes(b.memory)) return json(res, 409, { error: mem.message, memory: mem });
     const miss = needFor('render'); if (miss) return json(res, 400, miss);
-    if (b.memory === 'front') r.steps[0][1].push('--no-mask');
-    if (b.memory === 'light') r.steps[0][1].push('--mask', 'mediapipe');
-    if (b.memory === 'anyway') r.steps[0][2] = { ...(r.steps[0][2] || {}), MASK_FORCE: '1' };
+    // on the reel step itself (the b-roll lane and repo steps can run before it)
+    if (b.memory === 'front') r.reel[1].push('--no-mask');
+    if (b.memory === 'light') r.reel[1].push('--mask', 'mediapipe');
+    if (b.memory === 'anyway') r.reel[2] = { ...(r.reel[2] || {}), MASK_FORCE: '1' };
     runTask('render', () => [...r.steps, ...xs.steps], () => { const st = C.load(), outputs = C.outputsOf(st); saveSettings(st); const cuts = xs.plan.map(y => ({ ...y, outputs: C.outputsOf({ job: y.job }) })); return { outputs, cuts, plain: xs.plain || [], copiedTo: copyRenders([...outputs, ...cuts.flatMap(y => y.outputs.slice(0, 1))]), fx: r.fx, effects: r.effects }; });
     return json(res, 202, { ...view(C.load()), exports: fin, plan: xs.plan, fx: r.fx, effectsUnplaced: r.fx && r.fx.unplaced.length ? `Not placed, there was no room in the part of the video you chose: ${r.fx.unplaced.map(x => x.replace(/-/g, ' ')).join(', ')}.` : null, effectsSkipped: r.effects.length && !r.fx ? 'Effects are not set up on this computer, so this reel renders without them.' : null, ...(r.effects.length && !r.fx ? { fix: ['effects'] } : {}) });
   }
@@ -1547,9 +1552,9 @@ async function api(req, res, u) {
     return json(res, 200, { heard });
   }
   if (p === '/api/templates/from-teardown' && M === 'POST') {
-    const b = await readBody(req).catch(() => ({})), s = C.load(); let r;
+    const b = await readBody(req).catch(() => ({})), s = C.load(); let r, L;
     try { if (TPL.taken(b.name, C.catalog())) throw Object.assign(new Error('You already have a template or look with that name. Pick another name.'), { code: 409 });
-      const L = SLK.saveCurrent(s, ROOT, b.name), ref = s.reference || {}; r = TPL.saveFromLook(L.name, { kind: ref.url ? 'teardown-url' : 'teardown-file', url: ref.url || null, file: ref.file || null, teardown: ref.out || null }, C.catalog(), b.name);
+      L = SLK.saveCurrent(s, ROOT, b.name); const ref = s.reference || {}; r = TPL.saveFromLook(L.name, { kind: ref.url ? 'teardown-url' : 'teardown-file', url: ref.url || null, file: ref.file || null, teardown: ref.out || null }, C.catalog(), b.name);
       // its picture: a still from the reference video it was broken down from
       if (ref.file) TPL.setThumb(L.name, resolve(ROOT, ref.file)).catch(() => {}); }
     catch (e) { return json(res, typeof e.code === 'number' ? e.code : 500, { error: e.message }); }

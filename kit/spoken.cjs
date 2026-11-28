@@ -68,16 +68,20 @@ const ORD_WORD = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 's
 
 // [{start, end, word}] in reel time from cut.segs (file relative to build/, in/out in clip time) and each clip's
 // words in the clips.json next to it (or words.json in build/, keyed by file name).
-function timeline(segs, build) {
+// the words of one clip file (absolute path): [[start, end, word]] in clip time
+function wordsReader(build) {
   const cache = {}, W = (() => { try { return JSON.parse(fs.readFileSync(path.join(build, 'words.json'), 'utf8')); } catch { return {}; } })();
-  const wordsFor = file => {
+  return file => {
     const k = path.basename(file);
     if (W && !Array.isArray(W) && W[k]) return W[k];
     const cj = path.join(path.dirname(file), 'clips.json');
     if (!(cj in cache)) { try { cache[cj] = JSON.parse(fs.readFileSync(cj, 'utf8')).clips || []; } catch { cache[cj] = []; } }
-    const c = cache[cj].find(c => path.basename(c.file) === k);
+    const c = cache[cj].find(c => c && path.basename(String(c.file || '')) === k);
     return (c && Array.isArray(c.words)) ? c.words : [];
   };
+}
+function timeline(segs, build) {
+  const wordsFor = wordsReader(build);
   const out = []; let off = 0;
   for (const s of segs || []) {
     const f = path.resolve(build, s.file), a = +s.in || 0, b = +s.out;
@@ -273,4 +277,4 @@ function meantFlips(flips) {
     if (JSON.stringify([f.text, f.words]) !== before) n++; }
   return n;
 }
-module.exports = { setAliases, meantText, meantFlips, matchKind, phon, fuzzyLog, REQUIRED, cueTimes, cueFlips, listOf, norm, tokens, timeline, said, heard, numberTokens, whenSaid, ordinalsSaid, fitGraphics, audit, ORD, SPOKEN };
+module.exports = { wordsReader, setAliases, meantText, meantFlips, matchKind, phon, fuzzyLog, REQUIRED, cueTimes, cueFlips, listOf, norm, tokens, timeline, said, heard, numberTokens, whenSaid, ordinalsSaid, fitGraphics, audit, ORD, SPOKEN };

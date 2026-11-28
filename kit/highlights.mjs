@@ -45,13 +45,15 @@ export function snapToSentences(start, end, S, dur) {
     const from = +Math.max(0, a).toFixed(2), to = +Math.min(dur == null ? b : dur, b).toFixed(2);
     return to > from ? [from, to] : null;
   }
-  const first = S[0].start, last = S[S.length - 1].end;
-  if (b <= first + 0.05 || a >= last - 0.05) return null;
+  // the same 0.12 s breath before and after as the rules' own clips (kit/studio/cut.mjs), and a tolerance above it, so a
+  // rules clip's own start and end sent back come out the same and never pull in the next sentence
+  const PAD = 0.12, TOL = 0.15, first = S[0].start, last = S[S.length - 1].end;
+  if (b <= first + TOL || a >= last - TOL) return null;
   let i = -1, j = -1;
-  for (let k = 0; k < S.length; k++) { if (S[k].end > a + 0.05) { i = k; break; } }
-  for (let k = S.length - 1; k >= 0; k--) { if (S[k].start < b - 0.05) { j = k; break; } }
+  for (let k = 0; k < S.length; k++) { if (S[k].end > a + TOL) { i = k; break; } }
+  for (let k = S.length - 1; k >= 0; k--) { if (S[k].start < b - TOL) { j = k; break; } }
   if (i < 0 || j < 0 || j < i) return null;
-  const from = +Math.max(0, S[i].start).toFixed(2), to = +Math.min(dur == null ? Infinity : dur, S[j].end).toFixed(2);
+  const from = +Math.max(0, S[i].start - PAD).toFixed(2), to = +Math.min(dur == null ? Infinity : dur, S[j].end + PAD).toFixed(2);
   return to > from ? [from, to] : null;
 }
 
@@ -111,6 +113,9 @@ export function applyScores(current, scores, { duration, words } = {}) {
       const snap = snapToSentences(raw.start, raw.end, S, dur);
       if (!snap) { skipped++; continue; }
       [start, end] = snap;
+      // a clip sent back by its times is that clip: it keeps its id and the user's tick
+      const same = (current.candidates || []).find(c => c.start === start && c.end === end);
+      if (same) { base = same; id = same.id; }
     } else { skipped++; continue; }
     const score = Math.max(0, Math.min(100, Math.round(+raw.score || 0)));
     const reason = String(raw.reason || (base && base.reason) || 'Scored by your agent').replace(/\u2014/g, ', ').slice(0, 200);
@@ -147,11 +152,11 @@ export const keptOf = current => (current.candidates || []).filter(c => c.keep);
 // the brief the page copies for the user's agent (no terminal commands)
 export function briefOf(current, { job } = {}) {
   const c = current.candidates || [];
-  const lines = c.map(x => `- ${x.id}: ${x.start.toFixed(1)}s to ${x.end.toFixed(1)}s (${Math.round(x.seconds)} s, score ${x.score}). ${x.reason}. "${x.text}"`);
+  const lines = c.map(x => `- ${x.id}: ${x.start.toFixed(2)}s to ${x.end.toFixed(2)}s (${Math.round(x.seconds)} s, score ${x.score}). ${x.reason}. "${x.text}"`);
   return [
     'Please score the highlight moments of this talk, then pick the ones I should use as my take.',
     job ? `The Studio job is ${job}.` : '',
-    'Use the find_highlights, get_highlights, score_highlights and pick_highlights tools. Stay on sentence boundaries. Do not post anything.',
+    'Use the find_highlights, get_highlights, score_highlights and pick_highlights tools. Stay on sentence boundaries. Score a candidate by its id (h1, h2 ...); send start and end only for a new moment. Do not post anything.',
     c.length ? 'Current candidates:\n' + lines.join('\n') : 'Run find_highlights first if there are no candidates yet.',
   ].filter(Boolean).join('\n\n');
 }

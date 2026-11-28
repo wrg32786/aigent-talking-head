@@ -58,7 +58,8 @@ export function sections(md) {
   }
   return out;
 }
-const CMD = /^(?:\$\s*)?((?:npm|npx|pnpm|yarn|bun|pip3?|pipx|uv|uvx|brew|cargo|go|gem|composer|dotnet|docker|kubectl|helm|deno|git clone|curl|wget|make|node|python3?|gh|claude|codex|\/plugin|\/[a-z][\w-]*)\b.*)$/;
+const CMD = /^(?:\$\s*)?((?:npm|npx|pnpm|yarn|bun|pip3?|pipx|uv|uvx|brew|cargo|go|gem|composer|dotnet|docker|kubectl|helm|deno|git clone|curl|wget|make|node|python3?|gh|claude|codex|\/plugin|\/[a-z][\w-]*(?::[\w-]+)?(?=\s|$))\b.*)$/; // a slash command is one word (/plugin, /ponytail:review), never a path (/etc/app)
+const SHELL_LANG = /^(sh|bash|zsh|fish|shell|console|terminal|shell-session|shellsession|powershell|pwsh|ps1?|cmd|bat|text|txt|plaintext)$/;
 const SETUP = /install|quick ?start|getting started|setup|set up|usage|use it|try it|run/i, NOT_SETUP = /uninstall|remov|troubleshoot|if something/i;
 const SKIP = /licen[cs]e|contribut|credit|thank|acknowledg|support|sponsor|changelog|repo(sitory)? map|links|faq|citation|security|limit|status|evidence|known|alternativ|compar|uninstall|remov|troubleshoot/i;
 const setupHead = h => SETUP.test(h) && !NOT_SETUP.test(h);
@@ -68,7 +69,9 @@ const isSetup = s => setupHead(s.heading) || (!!s.parent && setupHead(s.parent) 
 // A command that runs on with "\" is left out (only its whole text is ever typed).
 export function commands(md) {
   const secs = sections(md), out = [];
+  // only plain or shell blocks: a YAML or JSON block's "node-version: 20" is not a command
   const take = s => { for (const c of s.code) {
+    if (c.lang && !SHELL_LANG.test(c.lang)) continue;
     const ls = c.lines.filter(l => l.trim()), session = ls.some(l => /^\s*\$\s/.test(l));
     for (let i = 0; i < ls.length; i++) {
       const line = ls[i].trim(); if (session && !line.startsWith('$')) continue;

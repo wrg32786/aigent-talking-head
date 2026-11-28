@@ -38,6 +38,8 @@ try {
     const a = RB.readmeAssets(README, 'https://raw.githubusercontent.com/demo/tool/main/').filter(RB.usable).map(x => x.url.split('/').pop());
     assert.deepStrictEqual(a, ['preview.png', 'batch.gif', 'install.mp4', '0f1e2d3c-aaaa-bbbb-cccc-123456789abc', 'dot.png']);
     assert.ok(!RB.usable({ url: 'https://example.com/x.png', alt: '', height: 20 }), 'under 40 px tall');
+    assert.ok(RB.usable({ url: 'https://raw.githubusercontent.com/dgraph-io/badger/main/images/diggy.png', alt: '' }), 'a repo called badger keeps its pictures');
+    assert.ok(!RB.usable({ url: 'https://github.com/acme/shieldwall/actions/workflows/ci.yml/badge.svg', alt: '' }) && !RB.usable({ url: 'https://example.com/img/build-badge.png', alt: '' }), 'a badge file is still dropped');
     assert.deepStrictEqual(RB.sizeOf(png(1280, 720)), { w: 1280, h: 720 }); assert.deepStrictEqual(RB.sizeOf(gif(800, 450)), { w: 800, h: 450 });
   });
   await t('only public addresses: names, DNS answers and every redirect hop are checked', async () => {
@@ -218,6 +220,50 @@ try {
     run({ content: { repoFeature: true, repos: ['https://github.com/demo/tool'], takeovers: 'auto' }, presenter: [] }); rmSync(plan);
     execFileSync(process.execPath, [join(ROOT, 'kit', 'repo-broll.mjs'), 'apply', '--name', 'rj', '--plan', plan, '--jobs', jobs], { env: { ...process.env, ATH_ASSETS: TMP, ATH_REPO_MOCKS: '0' }, encoding: 'utf8' });
     const gone = JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8')); assert.ok(!(gone.inserts || []).some(x => x.repo) && !gone.repoTakeovers, 'a cleared plan clears its inserts too');
+  });
+  await t('repo mode with nothing from the repo: other b-roll still stays out of full screen', async () => {
+    const { mkdirSync } = await import('fs'), { execFileSync } = await import('child_process');
+    const empty = join(TMP, 'demo--empty'); mkdirSync(empty, { recursive: true }); writeFileSync(join(empty, 'readme.md'), '# empty\n');
+    writeFileSync(join(empty, 'meta.json'), JSON.stringify({ owner: 'demo', repo: 'empty', url: 'https://github.com/demo/empty', facts: { language: null }, assets: [], skipped: [] }));
+    const jobs = join(TMP, 'jobs3'), build = join(jobs, 'rj', 'build'); mkdirSync(build, { recursive: true });
+    writeFileSync(join(build, 'cut.json'), JSON.stringify({ segs: [{ file: 'none.mp4', in: 0, out: 10 }], inserts: [{ file: 'lane.mp4', at: 4, dur: 1, place: 'full', studio: true }] }));
+    const plan = join(build, 'video-plan.json'); writeFileSync(plan, JSON.stringify({ content: { repoFeature: true, repos: ['https://github.com/demo/empty'] }, presenter: [] }));
+    const out = execFileSync(process.execPath, [join(ROOT, 'kit', 'repo-broll.mjs'), 'apply', '--name', 'rj', '--plan', plan, '--jobs', jobs], { env: { ...process.env, ATH_ASSETS: TMP, ATH_REPO_MOCKS: '0' }, encoding: 'utf8' });
+    const cut = JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8'));
+    assert.deepStrictEqual(RB.repoRuleBreaks(cut.inserts), [], out + JSON.stringify(cut.inserts));
+    writeFileSync(plan, JSON.stringify({ content: { repoFeature: false, repos: [] } }));
+    execFileSync(process.execPath, [join(ROOT, 'kit', 'repo-broll.mjs'), 'apply', '--name', 'rj', '--plan', plan, '--jobs', jobs], { env: { ...process.env, ATH_ASSETS: TMP, ATH_REPO_MOCKS: '0' }, encoding: 'utf8' });
+    assert.deepStrictEqual(JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8')).inserts, [{ file: 'lane.mp4', at: 4, dur: 1, place: 'full', studio: true }], 'repo mode off: back to full screen');
+  });
+  await t('Edit this reel then Render keeps the repo cards: the reopened cut still has its words', async () => {
+    const { mkdirSync, existsSync } = await import('fs'), { execFileSync } = await import('child_process'), { createRequire } = await import('module');
+    const SNAP = createRequire(import.meta.url)('../kit/snapshots.cjs');
+    const jobs = join(TMP, 'jobs2'), dir = join(jobs, 'rj'), build = join(dir, 'build'), clips = join(dir, 'clips'); mkdirSync(build, { recursive: true }); mkdirSync(clips, { recursive: true });
+    const L = [...lines.slice(0, 4), { start: 14, end: 18, text: 'It sorts every file in the folder for you.' }, { start: 20, end: 24, text: 'Follow for more tools like this.' }];
+    const words = []; for (const l of L) { const ws = l.text.split(' '), step = (l.end - l.start) / ws.length; ws.forEach((w, i) => words.push([+(l.start + i * step).toFixed(2), +(l.start + (i + 0.8) * step).toFixed(2), w])); }
+    writeFileSync(join(clips, 'clips.json'), JSON.stringify({ clips: [{ file: 'clip-001.mp4', words }] })); writeFileSync(join(clips, 'clip-001.mp4'), 'TAKE');
+    writeFileSync(join(build, 'cut.json'), JSON.stringify({ segs: [{ file: '../clips/clip-001.mp4', in: 0, out: 24 }] }));
+    const plan = join(build, 'video-plan.json'); writeFileSync(plan, JSON.stringify({ content: { repoFeature: true, repos: ['https://github.com/demo/tool'], takeovers: 'auto' }, presenter: [] }));
+    const run = () => execFileSync(process.execPath, [join(ROOT, 'kit', 'repo-broll.mjs'), 'apply', '--name', 'rj', '--plan', plan, '--jobs', jobs], { env: { ...process.env, ATH_ASSETS: TMP, ATH_REPO_MOCKS: '0' }, encoding: 'utf8' });
+    const reps = () => (JSON.parse(readFileSync(join(build, 'cut.json'), 'utf8')).inserts || []).filter(x => x.repo).length;
+    run(); const first = reps(); assert.ok(first > 0, 'v1 has repo cards');
+    writeFileSync(join(dir, 'reel-v1.mp4'), 'REEL'); SNAP.save(dir, join(dir, 'reel-v1.mp4'));
+    assert.ok(existsSync(join(dir, '.media', 'clips.json')), 'the stashed clip keeps its words');
+    SNAP.reopen(dir, 'v1'); writeFileSync(plan, JSON.stringify({ content: { repoFeature: true, repos: ['https://github.com/demo/tool'], takeovers: 'auto' }, presenter: [] }));
+    const out = run(); assert.strictEqual(reps(), first, 'the re-render after Edit this reel has the same repo cards: ' + out);
+    // an older reopened build with no words for its clips: the cards it has stay, rather than all going
+    rmSync(join(dir, '.media', 'clips.json')); const out2 = run();
+    assert.strictEqual(reps(), first, out2); assert.ok(/could not read the words/.test(out2));
+    // and the repo rule still holds there: an old full-screen repo shot or README text shot goes, a lane clip goes into the card
+    const cf = join(build, 'cut.json'), cj = JSON.parse(readFileSync(cf, 'utf8'));
+    cj.inserts.push({ repo: true, at: 30, dur: 2, place: 'full', file: 'x.png' }, { repo: true, at: 33, dur: 2, place: 'top', src: 'page', file: 'y.png' }, { studio: true, at: 36, dur: 2, place: 'full', file: 'z.mp4' });
+    writeFileSync(cf, JSON.stringify(cj)); const out3 = run(), after = JSON.parse(readFileSync(cf, 'utf8')).inserts;
+    assert.strictEqual(after.filter(x => x.repo).length, first, out3); assert.ok(/2 that broke the repo rule/.test(out3), out3);
+    assert.deepStrictEqual(RB.repoRuleBreaks(after), []); assert.ok(after.find(x => x.studio).fullBefore);
+    // a b-roll clip you put on a repo card's spot after reopening keeps the spot
+    const r0 = after.find(x => x.repo), c4 = JSON.parse(readFileSync(cf, 'utf8')); c4.inserts.push({ studio: true, at: +r0.at, dur: 0.5, place: 'top', file: 'w.mp4' }); writeFileSync(cf, JSON.stringify(c4));
+    const out4 = run(), after4 = JSON.parse(readFileSync(cf, 'utf8')).inserts;
+    assert.strictEqual(after4.filter(x => x.repo).length, first - 1, out4); assert.ok(!after4.some(x => x.repo && x.at === r0.at));
   });
   await t('a real GIF becomes a 12 second looping MP4 (skipped without FFmpeg)', async () => {
     const { execFileSync } = await import('child_process');

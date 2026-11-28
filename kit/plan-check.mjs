@@ -151,7 +151,7 @@ export function check({ plan, cut, caps, build, state = null, since = 0 }) {
   // repo mode
   const c = plan.content || {}, rep = (cut.inserts || []).filter(x => x.repo);
   if (c.repoFeature) row('repo', 'Repo feature', rep.length > 0, !(c.repos || []).length ? 'Add a repo link on the Content step.' : rep.length ? `${rep.length} repo card shots.` : 'No repo shots yet: check the links, or try again online.', { time: rep.length ? r2(+rep[0].at + 0.3) : null });
-  if (c.repoFeature && rep.length) { const br = RB.repoRuleBreaks(cut.inserts); row('repo-rule', 'Repo shots stay in their card', !br.length, br.length ? `At ${(+br[0].at).toFixed(1)} s: ${br[0].why}. Make the draft again so the repo stays in its card.` : 'No full screen b-roll and no README or page text.', { time: br.length ? r2(+br[0].at + 0.3) : null }); }
+  if (c.repoFeature && (cut.inserts || []).length) { const br = RB.repoRuleBreaks(cut.inserts); row('repo-rule', 'Repo shots stay in their card', !br.length, br.length ? `At ${(+br[0].at).toFixed(1)} s: ${br[0].why}. Make the draft again so the repo stays in its card.` : 'No full screen b-roll and no README or page text.', { time: br.length ? r2(+br[0].at + 0.3) : null }); }
   else if (rep.length) row('repo', 'Repo feature: off', false, 'Repo shots from an earlier plan are still in the cut.', { time: r2(+rep[0].at + 0.3), fix: { kind: 'repo-off' } });
   // a call to action to show the CTA card on
   if (plan.graphics && plan.graphics.cta !== false && (known || b.ctaStart != null)) row('cta', 'Call to action', b.ctaStart != null, b.ctaStart != null ? `Starts at ${b.ctaStart.toFixed(1)} s.` : 'We did not hear a call to action (like "follow for more"), so there is nowhere to show one. Say one at the end, or turn the call to action off on Extras.', { time: b.ctaStart != null ? r2(b.ctaStart + 0.4) : null });
@@ -205,7 +205,8 @@ export function applyFixes(rows, { cut, caps, build }) {
       if (fx.level === 'off') delete caps.keyWords; else caps.keyWords = fx.level;
       done.push(`Key words set to ${fx.level}.`);
     } else if (fx.kind === 'repo-off') {
-      cut.inserts = (cut.inserts || []).filter(x => !x.repo); if (!cut.inserts.length) delete cut.inserts; delete cut.repoTakeovers;
+      // b-roll that repo mode put in its card (fullBefore) goes back to full screen, as the repo step does when it is off
+      cut.inserts = (cut.inserts || []).filter(x => !x.repo).map(x => { if (!x.fullBefore) return x; const { fullBefore, fit, bands, frameBg, ...y } = x; return { ...y, place: 'full' }; }); if (!cut.inserts.length) delete cut.inserts; delete cut.repoTakeovers;
       done.push('Repo shots from an earlier plan were taken out.');
     }
   }
@@ -235,6 +236,8 @@ export function stills(video, points, dir) {
   return out;
 }
 
+// the plan a report was made for, so the page can say when the plan changed after it (check again)
+export const planSig = plan => plan ? createHash('sha1').update(JSON.stringify(plan)).digest('hex').slice(0, 16) : null;
 // the whole run: check, fix, check again (up to rounds), and the report
 export function run(build, { fix = false, rounds = 3, video = null, state = null } = {}) {
   const st = load(build); if (!st.cut) throw new Error('make a draft first: no build/cut.json');
@@ -244,7 +247,8 @@ export function run(build, { fix = false, rounds = 3, video = null, state = null
   if (!video) { try { const d = dirname(build); video = readdirSync(d).filter(f => /^reel-v\d+\.mp4$/.test(f)).map(f => join(d, f)).sort((x, y) => statSync(y).mtimeMs - statSync(x).mtimeMs)[0] || null; } catch {} }
   st.build = build; st.state = state; st.since = Math.max(mt('captions.js') - 2000, prev && prev.fixedAt ? Date.parse(prev.fixedAt) : 0); const hist = [], fixed = [];
   let rows = check(st), round = 1; hist.push({ round, failed: rows.filter(r => r.ok === false).map(r => r.id) });
-  while (fix && round < rounds && rows.some(r => r.ok === false && r.fix)) {
+  // rounds counts checks, so at least one fix pass even with rounds 1 (check, fix, check again)
+  while (fix && round < Math.max(2, rounds) && rows.some(r => r.ok === false && r.fix)) {
     const done = applyFixes(rows.filter(r => r.ok === false), st); if (!done.length) break;
     fixed.push(...done.map(note => ({ round, note })));
     writeFileSync(join(build, 'cut.json'), JSON.stringify(st.cut, null, 1)); if (st.caps) writeCaptions(join(build, 'captions.js'), st.caps);
@@ -260,7 +264,7 @@ export function run(build, { fix = false, rounds = 3, video = null, state = null
   const checks = rows.map(r => ({ ...r, frame: frame(`row-${r.id}`) }));
   const pending = fixed.length > 0 || !!(old && old.needsRender && vt <= oldAt);
   const rep = { round, rounds: hist, checks, points: points.map(p => ({ ...p, frame: frame(p.id) })), fixed: fixed.length ? fixed : pending && old ? old.fixed || [] : [], needsRender: pending,
-    fixedAt: fixed.length ? new Date().toISOString() : old && old.fixedAt || null,
+    fixedAt: fixed.length ? new Date().toISOString() : old && old.fixedAt || null, planSig: planSig(st.plan),
     // an agent's looks hold until the next draft, fix or render
     looked: old && old.looked && !fixed.length ? old.looked.filter(x => !x.at || (Date.parse(x.at) >= st.since && Date.parse(x.at) >= vt)) : [], at: new Date().toISOString() };
   writeFileSync(join(build, 'plan-check.json'), JSON.stringify(rep, null, 1) + '\n');
