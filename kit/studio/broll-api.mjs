@@ -142,7 +142,7 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
   // Those stay in the Vault for you to pick, and an idea you approve can still use them.
   // (a made card is stamped with the video it was made for, so one never rendered still counts as that video's)
   const repoMode = s => { const c = (s.videoPlan && s.videoPlan.content) || {}; return !!(c.repoFeature && (c.repos || []).length); };
-  const autoOk = (s, c) => !c || c.source !== 'agent' || (!repoMode(s) && (c.usedIn || []).length > 0 && c.usedIn.every(j => j === s.job));
+  const autoOk = (s, c) => { if (!c || c.source !== 'agent') return true; const vids = [...(c.usedIn || []), ...(c.madeFor ? [c.madeFor] : [])]; return !repoMode(s) && vids.length > 0 && vids.every(j => j === s.job); };
   function pickIdeas(s, { gap = 6, all = false, auto = false } = {}) {
     const d = draftOf(s.job, s); if (!d) throw bad('make a draft first: the spots come from it'); const j = peek(s), lib = BR.load().clips.filter(c => !auto || autoOk(s, c));
     const used = new Set([...Object.values(j.slots).map(x => x.clip), ...(auto ? BR.load().clips.filter(c => !autoOk(s, c)).map(c => c.id) : [])]), taken = Object.entries(j.slots).map(([n, x]) => x.at != null ? +x.at : (d.beats.find(b => b.n === +n) || {}).start).filter(x => x != null);
@@ -207,9 +207,7 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
     if (!chromeOk()) throw bad('Agent-made B-roll needs Chrome, and it is not installed.', 400, { fix: ['chrome'] });
     if (!MAKE.KINDS.includes(spec.kind)) throw bad(`kind: ${MAKE.KINDS.join(', ')}`);
     const job = C.load().job, r = await MAKE.make(spec); // the video it is made for, read before the render
-    const c = BR.add(r.file, { move: true, name: `${spec.kind}-${randomBytes(2).toString('hex')}.mp4`, title: spec.title && spec.kind !== 'chart' ? String(spec.title) : MAKE.titleOf(spec), source: 'agent', tags: [spec.kind, ...(extra.tags || [])], ...extra });
-    if (job) BR.update(c.id, { usedIn: job }); // the video it was made for (see autoOk)
-    return BR.get(c.id) || c;
+    return BR.add(r.file, { move: true, name: `${spec.kind}-${randomBytes(2).toString('hex')}.mp4`, title: spec.title && spec.kind !== 'chart' ? String(spec.title) : MAKE.titleOf(spec), source: 'agent', tags: [spec.kind, ...(extra.tags || [])], ...(job ? { madeFor: job } : {}), ...extra });
   }
   // ---------- fast run: N library clips cut on the beat, as one clip ----------
   // the pace the job's bed gives: seconds for a beat and half a beat (build/beat-grid.json after a render with a bed,

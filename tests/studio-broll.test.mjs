@@ -193,7 +193,8 @@ try {
     const card = BR.add(f, { name: 'quote-other.mp4', title: 'revenue doubled quote card', source: 'agent', tags: ['quote', 'revenue', 'doubled'] }); BR.update(card.id, { usedIn: 'another-video' });
     // and a card made for another video that was never rendered (no video on it): not this video's either
     const f2 = join(STATE, 'other-card-2.mp4'); writeFileSync(f2, Buffer.concat([BODY, Buffer.alloc(32, 9)]));
-    const card2 = BR.add(f2, { name: 'quote-other-2.mp4', title: 'revenue doubled counter card', source: 'agent', tags: ['counter', 'revenue', 'doubled'] });
+    const card2 = BR.add(f2, { name: 'quote-other-2.mp4', title: 'revenue doubled counter card', source: 'agent', tags: ['counter', 'revenue', 'doubled'], madeFor: 'another-video' });
+    assert.deepStrictEqual(card2.usedIn, [], 'made for a video is not used in it until it is rendered');
     const fill = await req('/api/broll/suggest', { all: true, fill: true }); assert.strictEqual(fill.status, 200, fill.text);
     const on = id => fill.j.broll.beats.some(b => (b.slot && b.slot.clip && b.slot.clip.id === id) || (b.idea && b.idea.clip && b.idea.clip.id === id));
     assert.ok(!on(card2.id), 'an unrendered card from another video is not auto-placed');

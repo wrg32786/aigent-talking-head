@@ -213,7 +213,9 @@ function addFile(src, m) {
     ...(source === 'capture' ? { captured: new Date().toISOString() } : {}),
     ...(m.prompt ? { prompt: String(m.prompt).slice(0, 500) } : {}), ...(m.provider ? { provider: m.provider, model: m.model || null } : {}), ...(m.extId ? { extId: String(m.extId) } : {}), ...(m.type && TYPES.includes(m.type) ? { type: m.type } : {}), ...(m.raw ? { raw: m.raw } : {}),
     // a fast run (kit/fastrun.cjs): the clips it was cut from, in order, and the seconds each one plays
-    ...(m.run ? { run: m.run } : {}), usedIn: [] };
+    ...(m.run ? { run: m.run } : {}),
+    // a made card: the video it was made for (kit/studio/broll-api.mjs autoOk), apart from usedIn, which is renders
+    ...(m.madeFor ? { madeFor: String(m.madeFor) } : {}), usedIn: [] };
   const v2 = load(); v2.items.unshift(keep(it)); save(v2); return it;
 }
 export function update(id, p) {
