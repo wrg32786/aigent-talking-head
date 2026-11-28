@@ -206,7 +206,7 @@ export function mount({ ROOT, C, update, json, readBody, serveFile, CH, captureP
   async function makeCard(spec, extra = {}) {
     if (!chromeOk()) throw bad('Agent-made B-roll needs Chrome, and it is not installed.', 400, { fix: ['chrome'] });
     if (!MAKE.KINDS.includes(spec.kind)) throw bad(`kind: ${MAKE.KINDS.join(', ')}`);
-    const r = await MAKE.make(spec), job = C.load().job;
+    const job = C.load().job, r = await MAKE.make(spec); // the video it is made for, read before the render
     const c = BR.add(r.file, { move: true, name: `${spec.kind}-${randomBytes(2).toString('hex')}.mp4`, title: spec.title && spec.kind !== 'chart' ? String(spec.title) : MAKE.titleOf(spec), source: 'agent', tags: [spec.kind, ...(extra.tags || [])], ...extra });
     if (job) BR.update(c.id, { usedIn: job }); // the video it was made for (see autoOk)
     return BR.get(c.id) || c;
