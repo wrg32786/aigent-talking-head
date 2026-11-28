@@ -4,6 +4,16 @@ Each version below is one GitHub release. `npm run release:notes -- --version X.
 
 ## 1.31.1 (unreleased)
 
+Release notes: [docs/releases/v1.31.1.md](docs/releases/v1.31.1.md).
+
+Fixes from the Fable and Ponytail reviews of v1.30.0 and v1.31.0 (#113 to #117), on top of #108 to #112.
+
+- **Publish kit and Highlights (#113).** Make again keeps your edited post copy (hashtags we made follow a new title); Save copy no longer shortens every platform's description; the face-on-cover note shows and is measured on the drawn letters; the cover preview and the panel stay after Make again and Save copy; descriptions keep line breaks; every 9:16 reel gets a kit, never a 4:5 or 1:1 one. Highlights keep the small pause and the user's tick when an agent scores by times, the brief asks for ids, and an old error clears.
+- **Edit this reel keeps repo cards (#114).** The words of each stashed clip are kept in `.media/clips.json`, so Render after Edit this reel still finds where to put the cards. Older snapshots keep their cards and still follow the repo rule.
+- **B-roll belongs to its video (#115).** Studio no longer places a made card from another video on its own; in repo mode it places no text card on its own.
+- **Plan check, repo mode and Studio (#116).** Low memory goes on the reel step; one round still fixes; repo off puts b-roll back; the repo rule row runs whenever repo mode is on; the report remembers its plan; a size export no longer looks stale; badge and shield pictures are judged by file name; the terminal card types only shell commands; Studio's log hides terminal flags.
+- **Look library (#117).** The sample is as long as its plan and fast to make, with a Remake button when it is out of date; a mixed look uses each part's own style; Combine never replaces a saved look or a template; deleting a look a template uses is refused; names only, never paths; the layer view counts every graphic.
+
 - **Teardowns Look library.** On the Teardowns tab you can save a broken-down video as a look, combine parts from different videos or saved looks (captions from one, the grade from another), and manage the library: list, rename, duplicate, and delete (it asks first). Each look gets a short playable sample, made on your computer from the kit's sample presenter and a fixed sample script, never the reference's words. The sample is cached and remade when the look changes. On a machine with little free memory, or without a heavy render, a lighter sample is used. Tests: `tests/studio-mix-looks.test.mjs`.
 
 - **Teardown layer view.** After a video is broken down, the Teardowns breakdown starts with a stack of six plates (Set, Person, Layout, B-roll, Type, Motion) that peel apart in 3D. Click a plate to read what we already measured for that layer. Nothing new is analyzed. Motion is reduced to a simple list when the system asks for less motion. Tests: `tests/studio-teardown-layers.test.mjs`.
