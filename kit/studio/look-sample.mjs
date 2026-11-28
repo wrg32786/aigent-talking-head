@@ -1,7 +1,7 @@
 // A short playable sample of a saved style look, for the Teardowns Look library.
 // Built locally from the look (the kit's sample presenter, a fixed sample script, never the reference's words).
 // Cached as looks/local/<name>/sample.mp4 with sample.sig; rebuilt when the look changes.
-// Low memory (under 2.5 GB free, or no Chrome): a lighter ffmpeg-only sample, no overlay render and no person mask.
+// One way on every computer: an ffmpeg-only sample at 540x960 (no overlay render, no person mask), as long as its plan.
 import { createHash } from 'crypto';
 import { execFileSync } from 'child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, statSync, copyFileSync } from 'fs';
@@ -13,19 +13,17 @@ import { resolveFonts } from '../fonts.mjs';
 
 const require = createRequire(import.meta.url);
 const SL = require('../stylelook.cjs');
-const MC = require('../memcheck.cjs');
 const B = require('../beats.cjs');
-const XFX = require('../xfx.cjs');
 
 const KIT = dirname(fileURLToPath(import.meta.url)); // kit/studio
 const ROOT = dirname(dirname(KIT));
 const PRESENTER = join(ROOT, 'showcase', 'source', 'presenter.jpg');
 const FONT_FALLBACK = join(ROOT, 'kit', 'fonts', 'InterTight-VF.ttf');
-const TIGHT_GB = 2.5;
 const WORDS = { title: 'THIS WEEKEND', lineA: 'Build your first agent', lineB: 'with one take on your phone' };
 
 const fail = (msg, code = 400) => { throw Object.assign(new Error(msg), { code }); };
-const which = cmd => { try { execFileSync('which', [cmd], { stdio: 'ignore' }); return true; } catch { return false; } };
+// ffmpeg -version works on every system (Windows has no "which" outside Git Bash)
+const hasFfmpeg = () => { try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); return true; } catch { return false; } };
 
 export function samplePlan(look) {
   if (!look || typeof look !== 'object') fail('No look to sample.');
@@ -75,7 +73,8 @@ export function secondsOf(plan) {
 // fields that change the picture or the sound; created/label/from/file do not
 export function sigOf(look) {
   const plan = samplePlan(look);
-  const body = JSON.stringify({ plan, mix: look.mix || null, grade: look.grade || null, captions: look.captions || null, titles: look.titles || null, transitions: look.transitions || null, moves: look.moves || null, pace: look.pace || null, music: look.music || null, sfx: look.sfx || null, brand: look.brand || null, stickers: look.stickers || null, style: look.style || null });
+  // v: the sample builder's version, so a sample from an older builder (a minute long, 270x480) counts as out of date
+  const body = JSON.stringify({ v: 2, plan, mix: look.mix || null, grade: look.grade || null, captions: look.captions || null, titles: look.titles || null, transitions: look.transitions || null, moves: look.moves || null, pace: look.pace || null, music: look.music || null, sfx: look.sfx || null, brand: look.brand || null, stickers: look.stickers || null, style: look.style || null });
   return createHash('sha256').update(body).digest('hex').slice(0, 24);
 }
 
@@ -95,8 +94,7 @@ export function statusOf(name, look) {
 }
 
 export function modeOf() {
-  const free = MC.freeGB(), tight = free < TIGHT_GB, ffmpeg = which('ffmpeg');
-  return { freeGB: free, tight, ffmpeg, lite: tight || !ffmpeg };
+  return { ffmpeg: hasFfmpeg() };
 }
 
 function fontFile(pairing) {
@@ -125,15 +123,8 @@ function bedFile(plan) {
 }
 
 function sfxFile(plan) {
-  const pop = join(ROOT, 'kit', 'sfx', 'pop');
-  // a known short pop in the kit; otherwise skip
-  const cands = [
-    plan.sfxSound && join(ROOT, 'kit', 'sfx', plan.sfxSound),
-    join(ROOT, 'kit', 'sfx', 'pop', '11-pop-sticker.mp3'),
-    join(ROOT, 'kit', 'sfx', 'pop', 'pop.wav'),
-  ].filter(Boolean);
-  // scan a couple of well-known names
-  const well = ['kit/sfx/pop', 'kit/sounds'];
+  // the look's own sound when the kit has it, else a known short pop in the kit; otherwise none
+  const cands = [plan.sfxSound && join(ROOT, 'kit', 'sfx', plan.sfxSound), join(ROOT, 'kit', 'sfx', 'pop', '11-pop-sticker.mp3'), join(ROOT, 'kit', 'sfx', 'pop', 'pop.wav')].filter(Boolean);
   for (const c of cands) if (existsSync(c) && statSync(c).isFile()) return c;
   return null;
 }
@@ -168,57 +159,47 @@ function ff(args) {
 function buildLite(look, dest, work) {
   if (!existsSync(PRESENTER)) fail('The sample presenter picture is missing.', 500);
   const plan = samplePlan(look), font = fontFile(plan.fonts);
-  const W = 270, H = 480, FPS = 12;
+  const W = 540, H = 960, FPS = 24, k = W / 270; // laid out on a 270 wide grid, drawn at 540x960
   const aLen = plan.shotA, bLen = plan.shotB, d = plan.transDur || 0;
-  const zoom = plan.move === 'pull' ? "zoompan=z='1.12-0.12*on/(({n}))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={n}:s=1080x1920:fps=" + FPS
-    : (plan.punch || plan.move === 'push') ? "zoompan=z='1.02+0.10*on/(({n}))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={n}:s=1080x1920:fps=" + FPS
+  // d=1: one zoomed frame for each input frame, so a shot is as long as its plan (d=n made n x n frames, about a minute)
+  const zoom = plan.move === 'pull' ? "zoompan=z='1.12-0.12*on/(({n}))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1080x1920:fps=" + FPS
+    : (plan.punch || plan.move === 'push') ? "zoompan=z='1.02+0.10*on/(({n}))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1080x1920:fps=" + FPS
     : null;
-  const capY = plan.captionPosition === 'top' ? 80 : plan.captionPosition === 'middle' ? 240 : 400;
+  const capY = (plan.captionPosition === 'top' ? 80 : plan.captionPosition === 'middle' ? 240 : 400) * k;
   const title = plan.titleOn ? (plan.captionCase === 'lower' ? plan.title.toLowerCase() : plan.title) : '';
   const lineA = plan.captionCase === 'upper' ? plan.lineA.toUpperCase() : plan.lineA;
   const lineB = plan.captionCase === 'upper' ? plan.lineB.toUpperCase() : plan.lineB;
   const rawColor = String(plan.captionColor || '').replace(/^#/, '');
   const hex = /^[0-9a-f]{6}$/i.test(rawColor) ? rawColor : 'f1e8dc';
   const fontOpt = font ? `:fontfile='${escDraw(font)}'` : '';
+  // a title or a line never runs off the frame: its size shrinks to fit the width (min(size, w*0.9 per character))
+  const text = (t, size, y) => `drawtext=text='${escDraw(t)}'${fontOpt}:fontsize=${Math.min(size, Math.floor((W * 0.9) / Math.max(1, t.length * 0.56)))}:fontcolor=0x${hex}:x=(w-tw)/2:y=${y}:borderw=${2 * k}:bordercolor=0x0b0907@0.8`;
   const textA = [];
-  if (title) textA.push(`drawtext=text='${escDraw(title)}'${fontOpt}:fontsize=22:fontcolor=0x${hex}:x=(w-tw)/2:y=36:borderw=2:bordercolor=0x0b0907@0.8`);
-  textA.push(`drawtext=text='${escDraw(lineA)}'${fontOpt}:fontsize=16:fontcolor=0x${hex}:x=(w-tw)/2:y=${capY}:borderw=2:bordercolor=0x0b0907@0.8`);
-  const textB = [`drawtext=text='${escDraw(lineB)}'${fontOpt}:fontsize=16:fontcolor=0x${hex}:x=(w-tw)/2:y=${capY}:borderw=2:bordercolor=0x0b0907@0.8`];
-  if (plan.graphic === 'ordinal') textA.push(`drawbox=x=w-70:y=24:w=48:h=48:color=${plan.graphicColor.replace('#','0x')}@0.95:t=fill,drawtext=text='1'${fontOpt}:fontsize=18:fontcolor=0x0b0907:x=w-70+(48-tw)/2:y=24+(48-th)/2`);
+  if (title) textA.push(text(title, 22 * k, 36 * k));
+  textA.push(text(lineA, 16 * k, capY));
+  const textB = [text(lineB, 16 * k, capY)];
+  if (plan.graphic === 'ordinal') { const b = 48 * k, x = `w-${70 * k}`, y = 24 * k; textA.push(`drawbox=x=${x}:y=${y}:w=${b}:h=${b}:color=${plan.graphicColor.replace('#', '0x')}@0.95:t=fill,drawtext=text='1'${fontOpt}:fontsize=${18 * k}:fontcolor=0x0b0907:x=${x}+(${b}-tw)/2:y=${y}+(${b}-th)/2`); }
   const fin = finishVf(plan.finish);
   const framesA = Math.max(2, Math.round(aLen * FPS)), framesB = Math.max(2, Math.round(bLen * FPS));
   const zA = zoom ? zoom.replaceAll('{n}', String(framesA)) + ',' : '';
   const zB = zoom ? zoom.replaceAll('{n}', String(framesB)) + ',' : '';
   const aOut = join(work, 'a.mp4'), bOut = join(work, 'b.mp4'), vOut = join(work, 'v.mp4');
-  const baseA = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,${zA}setsar=1${fin},scale=${W}:${H}:flags=lanczos,setsar=1,${textA.join(',')}[v]`;
-  const baseB = `[0:v]hflip,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,${zB}setsar=1${fin},scale=${W}:${H}:flags=lanczos,setsar=1,${textB.join(',')}[v]`;
-  ff(['-loop', '1', '-framerate', String(FPS), '-t', String(aLen), '-i', PRESENTER, '-filter_complex', baseA, '-map', '[v]', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '28', '-pix_fmt', 'yuv420p', '-r', String(FPS), '-an', aOut]);
-  ff(['-loop', '1', '-framerate', String(FPS), '-t', String(bLen), '-i', PRESENTER, '-filter_complex', baseB, '-map', '[v]', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '28', '-pix_fmt', 'yuv420p', '-r', String(FPS), '-an', bOut]);
-  if (d > 0 && plan.transition !== 'cut') {
-    const xf = stockXfade(plan.transition);
-    const offset = +(aLen - d).toFixed(2);
-    ff(['-i', aOut, '-i', bOut, '-filter_complex', `xfade=transition=${xf}:duration=${d}:offset=${offset}`, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '28', '-pix_fmt', 'yuv420p', '-an', vOut]);
-  } else {
-    ff(['-i', aOut, '-i', bOut, '-filter_complex', '[0:v][1:v]concat=n=2:v=1:a=0[v]', '-map', '[v]', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '28', '-pix_fmt', 'yuv420p', '-an', vOut]);
-  }
+  const enc = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-pix_fmt', 'yuv420p', '-r', String(FPS), '-an'];
+  const shot = (flip, z, txt, frames, len, out) => ff(['-loop', '1', '-framerate', String(FPS), '-t', String(len), '-i', PRESENTER, '-filter_complex',
+    `[0:v]${flip}scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,${z}setsar=1${fin},scale=${W}:${H}:flags=lanczos,setsar=1,${txt.join(',')}[v]`, '-map', '[v]', '-frames:v', String(frames), ...enc, out]);
+  shot('', zA, textA, framesA, aLen, aOut);
+  shot('hflip,', zB, textB, framesB, bLen, bOut);
+  if (d > 0 && plan.transition !== 'cut') ff(['-i', aOut, '-i', bOut, '-filter_complex', `xfade=transition=${stockXfade(plan.transition)}:duration=${d}:offset=${+(aLen - d).toFixed(2)}`, ...enc, vOut]);
+  else ff(['-i', aOut, '-i', bOut, '-filter_complex', '[0:v][1:v]concat=n=2:v=1:a=0[v]', '-map', '[v]', ...enc, vOut]);
   const dur = secondsOf(plan);
-  const bed = plan.music ? bedFile(plan) : null;
-  const hit = plan.sfx ? sfxFile(plan) : null;
-  if (bed || hit) {
-    const ins = ['-i', vOut];
-    let filter = '[0:v]copy[v]';
-    if (bed) { ins.push('-t', String(dur), '-i', bed); filter = ''; }
-    // simpler: mix audio then mux
-    if (bed && hit) {
-      ff(['-i', vOut, '-t', String(dur), '-i', bed, '-i', hit, '-filter_complex', `[1:a]volume=0.22,afade=t=in:st=0:d=0.3,afade=t=out:st=${Math.max(0, dur - 0.4)}:d=0.4[b];[2:a]volume=0.5,adelay=${Math.round(Math.max(0, aLen - 0.05) * 1000)}|${Math.round(Math.max(0, aLen - 0.05) * 1000)}[s];[b][s]amix=inputs=2:duration=first:dropout_transition=0[a]`, '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-shortest', dest]);
-    } else if (bed) {
-      ff(['-i', vOut, '-t', String(dur), '-i', bed, '-filter_complex', `[1:a]volume=0.22,afade=t=in:st=0:d=0.3,afade=t=out:st=${Math.max(0, dur - 0.4)}:d=0.4[a]`, '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-shortest', dest]);
-    } else {
-      ff(['-i', vOut, '-i', hit, '-filter_complex', `[1:a]volume=0.5,adelay=${Math.round(Math.max(0, aLen - 0.05) * 1000)}|${Math.round(Math.max(0, aLen - 0.05) * 1000)}[a]`, '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-shortest', dest]);
-    }
-  } else {
-    copyFileSync(vOut, dest);
-  }
+  const bed = plan.music ? bedFile(plan) : null, hit = plan.sfx ? sfxFile(plan) : null;
+  if (!bed && !hit) { copyFileSync(vOut, dest); return; }
+  // one mix: the bed faded in and out, the pop on the cut; padded to the video and cut at its length (-t)
+  const at = Math.round(Math.max(0, aLen - 0.05) * 1000), ins = ['-i', vOut], parts = [];
+  if (bed) { ins.push('-t', String(dur), '-i', bed); parts.push(`[1:a]volume=0.22,afade=t=in:st=0:d=0.3,afade=t=out:st=${Math.max(0, dur - 0.4)}:d=0.4[b]`); }
+  if (hit) { ins.push('-i', hit); parts.push(`[${bed ? 2 : 1}:a]volume=0.5,adelay=${at}|${at}[s]`); }
+  const mix = bed && hit ? '[b][s]amix=inputs=2:duration=first:dropout_transition=0,apad[a]' : `[${bed ? 'b' : 's'}]apad[a]`;
+  ff([...ins, '-filter_complex', [...parts, mix].join(';'), '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-t', String(dur), dest]);
 }
 
 // Build or reuse the cached sample. Returns { status, file, url, sig, mode, note }.
@@ -240,7 +221,7 @@ export function build(name, { force = false, look: given } = {}) {
   try {
     buildLite(look, dest, work);
     writeFileSync(sigFile(n), sig + '\n');
-    return { status: 'ready', file: dest, url: `/api/style-looks/sample/${n}?v=${sig}`, sig, mode: mode.lite ? 'lite' : 'full', note: mode.tight ? `This computer has ${mode.freeGB} GB free, so we made a lighter sample.` : null };
+    return { status: 'ready', file: dest, url: `/api/style-looks/sample/${n}?v=${sig}`, sig, mode: 'lite', note: null };
   } finally {
     try { rmSync(work, { recursive: true, force: true }); } catch {}
   }

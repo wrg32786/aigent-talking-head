@@ -78,5 +78,12 @@ const by = (layers, id) => layers.find(l => l.id === id);
   console.log('ok cinematic recipe and extract-only fallback do not invent a room or B-roll');
 }
 
+{
+  // five graphics of two kinds: the count, not the number of kinds
+  const v = layersView({ graphics: ['sticker', 'screen-card'], plan: { graphics: 5 } }, null);
+  assert.ok(by(v, 'broll').lines.includes('5 graphics'), by(v, 'broll').lines.join(' | '));
+  console.log('ok the graphic count is every graphic, not its kinds');
+}
+
 rmSync(dir, { recursive: true, force: true });
-console.log('studio-teardown-layers: 3 passed');
+console.log('studio-teardown-layers: 4 passed');

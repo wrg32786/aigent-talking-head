@@ -10,6 +10,7 @@ import { createRequire } from 'module';
 import { styleKey } from './reference.mjs';
 import * as MIX from './lookmix.mjs';
 import * as SAMP from './look-sample.mjs';
+import * as TPL from './templates.mjs';
 
 const require = createRequire(import.meta.url);
 const SL = require('../stylelook.cjs');
@@ -79,7 +80,9 @@ export function forDraft(s, root, args) {
 
 // how close the current draft is to what it copies (build/match.json), or null
 // the font a saved look carries (the pairing a teardown matched), or null
-export const fontOf = name => { try { const l = name ? SL.load(name) : null; return (l && l.captions && l.captions.font) || null; } catch { return null; } };
+// a saved look by its name only: SL.load also takes a path, which a page must not reach
+const saved = name => (SL.NAME_RE.test(String(name || '')) ? SL.load(name) : null);
+export const fontOf = name => { try { const l = name ? saved(name) : null; return (l && l.captions && l.captions.font) || null; } catch { return null; } };
 export const matchOf = build => (build ? FID.read(build) : null);
 
 
@@ -98,7 +101,7 @@ export function listView() {
 }
 
 export function rename(name, label) {
-  const look = SL.load(name);
+  const look = saved(name);
   if (!look) throw fail('No such look.', 404);
   const l = String(label || '').trim().slice(0, 60);
   if (!l) throw fail('Give the look a name.');
@@ -109,7 +112,7 @@ export function rename(name, label) {
 }
 
 export function duplicate(name) {
-  const look = SL.load(name);
+  const look = saved(name);
   if (!look) throw fail('No such look.', 404);
   const base = SL.slug(name).slice(0, 48).replace(/-+$/, '');
   let n = `${base}-copy`;
@@ -126,7 +129,8 @@ export function duplicate(name) {
 
 export function removeLook(name) {
   if (!SL.exists(name)) throw fail('No such look.', 404);
-  SL.remove(name);
+  // the look shares its folder with its template: the Template Library's remove says which templates use it and keeps it
+  TPL.remove(name);
   return true;
 }
 

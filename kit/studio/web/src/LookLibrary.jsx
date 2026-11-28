@@ -32,13 +32,14 @@ function Sample({ x, onBuild, busy }) {
       <button type="button" className="btn sm ghost look-sound" id={`look-sound-${x.name}`} onClick={() => setSound(s => !s)}>{sound ? 'Mute' : 'Play with sound'}</button>
     </div>;
   }
-  if (st === 'building' || st === 'stale') {
-    return <div className="look-sample look-sample-wait"><Icon n="spark" /><p className="fine">{st === 'stale' ? 'Updating the sample' : 'Making the sample'}</p></div>;
+  if (st === 'building') {
+    return <div className="look-sample look-sample-wait"><Icon n="spark" /><p className="fine">Making the sample</p></div>;
   }
+  // an old sample (the look changed, or it was made by an older Studio) is not remade on its own: one button does it
   return <div className="look-sample look-sample-wait">
     <Icon n="film" />
-    <p className="fine">No sample yet.</p>
-    <button type="button" className="btn sm" id={`look-sample-${x.name}`} disabled={busy} onClick={() => onBuild(x)}>Make the sample</button>
+    <p className="fine">{st === 'stale' ? 'The sample is out of date.' : 'No sample yet.'}</p>
+    <button type="button" className="btn sm" id={`look-sample-${x.name}`} disabled={busy} onClick={() => onBuild(x)}>{st === 'stale' ? 'Remake the sample' : 'Make the sample'}</button>
   </div>;
 }
 
@@ -133,7 +134,7 @@ export function CombineLooks({ s, looks }) {
       const picked = {};
       for (const p of PARTS) {
         const v = parts[p.id]; if (!v) continue;
-        if (v.startsWith('td:')) picked[p.id] = { kind: 'teardown', id: +v.slice(3) };
+        if (v.startsWith('td:')) picked[p.id] = { kind: 'teardown', id: v === 'td:active' ? -1 : +v.slice(3) };
         else if (v.startsWith('look:')) picked[p.id] = { kind: 'look', name: v.slice(5) };
       }
       if (!Object.keys(picked).length) { setErr('Pick a source for at least one part.'); setBusy(false); return; }
